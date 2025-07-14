@@ -1,0 +1,17 @@
+# .github/workflows/security-scan.yml - Güvenlik Taraması
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 0 * * MON'  # Her pazartesi gece yarısı
+  workflow_dispatch:        # Manuel tetikleme
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run OWASP Dependency Check
+        run: mvn org.owasp:dependency-check-maven:check
+      - name: Run SpotBugs
+        run: mvn spotbugs:check
