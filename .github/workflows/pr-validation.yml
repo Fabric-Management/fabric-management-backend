@@ -1,0 +1,18 @@
+# .github/workflows/pr-validation.yml - Pull Request Validation
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check code formatting
+        run: mvn spotless:check
+      - name: Run unit tests
+        run: mvn test
+      - name: Check test coverage
+        run: mvn jacoco:report
