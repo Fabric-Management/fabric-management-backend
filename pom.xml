@@ -27,7 +27,7 @@
     </properties>
 
     <modules>
-        <!-- Sadece mevcut modülleri ekleyelim -->
+        <!-- Only include modules that have pom.xml files -->
         <module>service/contact-service</module>
         <module>service/user-service</module>
     </modules>
@@ -50,6 +50,14 @@
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <source>21</source>
+                        <target>21</target>
+                    </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
