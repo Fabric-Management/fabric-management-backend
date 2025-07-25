@@ -1,2 +1,16 @@
-package com.fabricmanagement.user_service.dto.request;public class CreatePasswordRequest {
-}
+
+package com.fabricmanagement.user_service.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+public record CreatePasswordRequest(
+        @NotBlank(message = "Şifre boş olamaz")
+        @Size(min = 8, max = 100, message = "Şifre 8-100 karakter arasında olmalıdır")
+        @Pattern(
+                regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$",
+                message = "Şifre en az bir küçük harf, bir büyük harf ve bir rakam içermelidir"
+        )
+        String password
+) {}
