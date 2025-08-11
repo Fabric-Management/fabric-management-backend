@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="auth-service" target="17" />
+      <module name="common" target="17" />
+      <module name="common-dto" target="1.8" />
+      <module name="fabric-management-backend" target="1.5" />
+      <module name="user-service" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
