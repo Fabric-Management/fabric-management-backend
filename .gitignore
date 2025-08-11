@@ -1,0 +1,30 @@
+# === Java & Maven ===
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+
+# === IDE & Editor ===
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+
+# === macOS ===
+.DS_Store
+
+# === Logs ===
+logs/
+*.log
+
+# === OS temporary files ===
+Thumbs.db
+ehthumbs.db
+
+# === Others ===
+bin/
+out/
