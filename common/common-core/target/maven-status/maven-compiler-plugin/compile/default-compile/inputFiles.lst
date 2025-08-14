@@ -1,0 +1,7 @@
+/Users/user/Coding/fabric-management/fabric-management-backend/common/common-core/src/main/java/com/fabricmanagement/common/core/domain/ValueObject.java
+/Users/user/Coding/fabric-management/fabric-management-backend/common/common-core/src/main/java/com/fabricmanagement/common/core/exception/BusinessException.java
+/Users/user/Coding/fabric-management/fabric-management-backend/common/common-core/src/main/java/com/fabricmanagement/common/core/domain/DomainEvent.java
+/Users/user/Coding/fabric-management/fabric-management-backend/common/common-core/src/main/java/com/fabricmanagement/common/core/domain/BaseEntity.java
+/Users/user/Coding/fabric-management/fabric-management-backend/common/common-core/src/main/java/com/fabricmanagement/common/core/exception/DomainException.java
+/Users/user/Coding/fabric-management/fabric-management-backend/common/common-core/src/main/java/com/fabricmanagement/common/core/domain/AggregateRoot.java
+/Users/user/Coding/fabric-management/fabric-management-backend/common/common-core/src/main/java/com/fabricmanagement/common/core/exception/ErrorCode.java

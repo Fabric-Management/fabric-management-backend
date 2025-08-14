@@ -1,0 +1,5 @@
+com/fabricmanagement/common/persistence/repository/BaseRepository.class
+com/fabricmanagement/common/persistence/entity/BaseJpaEntity$BaseJpaEntityBuilder.class
+com/fabricmanagement/common/persistence/config/BaseJpaConfig.class
+com/fabricmanagement/common/persistence/audit/AuditorAwareImpl.class
+com/fabricmanagement/common/persistence/entity/BaseJpaEntity.class
