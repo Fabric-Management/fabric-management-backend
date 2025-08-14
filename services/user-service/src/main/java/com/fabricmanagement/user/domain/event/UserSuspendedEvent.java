@@ -2,9 +2,9 @@ package com.fabricmanagement.user.domain.event;
 
 import java.util.UUID;
 
-public class UserCreatedEvent extends UserDomainEvent {
+public class UserSuspendedEvent extends UserDomainEvent {
 
-    public UserCreatedEvent(UUID userId) {
+    public UserSuspendedEvent(UUID userId) {
         super(userId);
     }
 }
