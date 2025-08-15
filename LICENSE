@@ -1,0 +1,224 @@
+# MIT License
+
+**Copyright (c) 2024-2025 Fabric Management System**
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## 📋 License Summary
+
+This project is licensed under the **MIT License** - one of the most permissive and open source licenses available.
+
+### ✅ What you CAN do:
+
+- **Commercial Use**: Use the software for commercial purposes
+- **Modification**: Modify the software as needed
+- **Distribution**: Distribute the original or modified software
+- **Private Use**: Use the software for private purposes
+- **Sublicense**: Grant a sublicense to modify and distribute the software to third parties not included in the license
+
+### ⚠️ What you MUST do:
+
+- **Include Copyright**: Include the original copyright notice in any copies or substantial portions of the software
+- **Include License**: Include the full MIT License text in any copies or substantial portions of the software
+
+### ❌ What you CANNOT do:
+
+- **Hold Liable**: Hold the authors liable for any damages or liabilities arising from the use of the software
+- **Use Trademark**: Use the names, trademarks, or logos of the copyright holders without permission
+
+### 🛡️ Warranty Disclaimer:
+
+The software is provided "AS IS", without warranty of any kind. The authors or copyright holders are not liable for any claim, damages, or other liability arising from the use of the software.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! By contributing to this project, you agree that your contributions will be licensed under the MIT License. See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+
+---
+
+## 📚 Third-Party Licenses
+
+This project uses several open-source libraries and frameworks. Each component maintains its own license:
+
+### Core Dependencies:
+
+| Component | License | Link |
+|-----------|---------|------|
+| **Spring Boot** | Apache 2.0 | [License](https://github.com/spring-projects/spring-boot/blob/main/LICENSE.txt) |
+| **Spring Cloud** | Apache 2.0 | [License](https://github.com/spring-cloud/spring-cloud-release/blob/main/LICENSE.txt) |
+| **PostgreSQL JDBC** | BSD 2-Clause | [License](https://github.com/pgjdbc/pgjdbc/blob/master/LICENSE) |
+| **Hibernate** | LGPL 2.1 | [License](https://github.com/hibernate/hibernate-orm/blob/main/license.txt) |
+| **Flyway** | Apache 2.0 | [License](https://github.com/flyway/flyway/blob/main/LICENSE) |
+| **MapStruct** | Apache 2.0 | [License](https://github.com/mapstruct/mapstruct/blob/main/LICENSE.txt) |
+| **Lombok** | MIT | [License](https://github.com/projectlombok/lombok/blob/master/LICENSE) |
+| **Jackson** | Apache 2.0 | [License](https://github.com/FasterXML/jackson-core/blob/2.16/LICENSE) |
+| **SLF4J** | MIT | [License](https://www.slf4j.org/license.html) |
+| **Logback** | EPL 1.0 / LGPL 2.1 | [License](https://logback.qos.ch/license.html) |
+
+### Development Dependencies:
+
+| Component | License | Link |
+|-----------|---------|------|
+| **JUnit 5** | EPL 2.0 | [License](https://github.com/junit-team/junit5/blob/main/LICENSE.md) |
+| **Mockito** | MIT | [License](https://github.com/mockito/mockito/blob/main/LICENSE) |
+| **AssertJ** | Apache 2.0 | [License](https://github.com/assertj/assertj-core/blob/main/LICENSE.txt) |
+| **Testcontainers** | MIT | [License](https://github.com/testcontainers/testcontainers-java/blob/main/LICENSE) |
+| **ArchUnit** | Apache 2.0 | [License](https://github.com/TNG/ArchUnit/blob/main/LICENSE) |
+
+### Infrastructure Components:
+
+| Component | License | Link |
+|-----------|---------|------|
+| **PostgreSQL** | PostgreSQL License | [License](https://www.postgresql.org/about/licence/) |
+| **Redis** | BSD 3-Clause | [License](https://github.com/redis/redis/blob/unstable/COPYING) |
+| **RabbitMQ** | MPL 2.0 | [License](https://github.com/rabbitmq/rabbitmq-server/blob/main/LICENSE-MPL-RabbitMQ) |
+| **Elasticsearch** | Elastic License 2.0 | [License](https://github.com/elastic/elasticsearch/blob/main/LICENSE.txt) |
+| **Docker** | Apache 2.0 | [License](https://github.com/moby/moby/blob/master/LICENSE) |
+
+### Frontend Dependencies (if applicable):
+
+| Component | License | Link |
+|-----------|---------|------|
+| **React** | MIT | [License](https://github.com/facebook/react/blob/main/LICENSE) |
+| **Vue.js** | MIT | [License](https://github.com/vuejs/core/blob/main/LICENSE) |
+| **Angular** | MIT | [License](https://github.com/angular/angular/blob/main/LICENSE) |
+
+---
+
+## 🔄 License Compatibility
+
+The MIT License is compatible with many other open source licenses, including:
+
+- ✅ Apache License 2.0
+- ✅ BSD Licenses (2-Clause and 3-Clause)
+- ✅ GPL v2 and v3 (one-way compatibility)
+- ✅ LGPL
+- ✅ MPL 2.0
+- ✅ ISC License
+
+---
+
+## 📝 License Text Formats
+
+### Plain Text Version
+Available at: [LICENSE.txt](LICENSE.txt)
+
+### Markdown Version
+This file (LICENSE.md)
+
+### JSON Version (for package managers):
+```json
+{
+  "name": "Fabric Management System",
+  "license": "MIT",
+  "licenseText": "Copyright (c) 2024-2025 Fabric Management System...",
+  "licenseUrl": "https://opensource.org/licenses/MIT"
+}
+```
+
+---
+
+## 🌍 Translations
+
+While the English version is the official license, unofficial translations are available for reference:
+
+- 🇹🇷 [Turkish](LICENSE_TR.md) (Türkçe)
+- 🇩🇪 [German](LICENSE_DE.md) (Deutsch)
+- 🇫🇷 [French](LICENSE_FR.md) (Français)
+- 🇪🇸 [Spanish](LICENSE_ES.md) (Español)
+- 🇨🇳 [Chinese](LICENSE_ZH.md) (中文)
+- 🇯🇵 [Japanese](LICENSE_JA.md) (日本語)
+
+**Note**: Only the English version is legally binding.
+
+---
+
+## ❓ Frequently Asked Questions
+
+### Can I use this software for commercial purposes?
+Yes, the MIT License allows commercial use without any restrictions.
+
+### Do I need to open source my modifications?
+No, you can keep your modifications private. However, you must include the copyright notice and license.
+
+### Can I change the license for my fork?
+You can add additional restrictions in your fork, but you cannot remove the MIT License requirements for the original code.
+
+### Do I need to attribute the original authors?
+Yes, you must include the copyright notice and permission notice in all copies or substantial portions of the software.
+
+### Can I use the project name or logo?
+The MIT License does not grant trademark rights. Please contact us for permission to use the project name or logo.
+
+---
+
+## 📮 Contact
+
+For licensing questions or clarifications, please contact:
+
+- **Email**: legal@fabricmanagement.com
+- **Website**: https://fabricmanagement.com/license
+- **GitHub Issues**: [License Questions](https://github.com/fabric-management/fabric-system/labels/license)
+
+---
+
+## 🔗 Additional Resources
+
+- [Choose a License](https://choosealicense.com/licenses/mit/)
+- [Open Source Initiative - MIT License](https://opensource.org/licenses/MIT)
+- [SPDX License Identifier](https://spdx.org/licenses/MIT.html)
+- [GitHub's License API](https://api.github.com/licenses/mit)
+- [License Compatibility Checker](https://www.gnu.org/licenses/license-compatibility.html)
+
+---
+
+## 📅 License History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2024-01-01 | Initial MIT License adoption |
+| 1.0.1 | 2024-06-15 | Added third-party licenses section |
+| 1.1.0 | 2025-01-15 | Updated copyright year, added translations |
+
+---
+
+## ⚖️ Legal Notice
+
+This project is not legal advice. The license summary and FAQ are provided for convenience but do not replace the full license text. For legal questions, please consult with a qualified attorney.
+
+---
+
+**Last Updated**: January 2025
+**License Version**: MIT License (SPDX: MIT)
+**Copyright Holder**: Fabric Management System Team
+
+---
+
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
+  </a>
+  <a href="https://opensource.org">
+    <img src="https://img.shields.io/badge/Open%20Source-%E2%9D%A4-red.svg" alt="Open Source">
+  </a>
+</p>
