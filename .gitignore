@@ -1,4 +1,57 @@
-docs/troubleshooting-postgresql.md
+cat > .gitignore << 'EOF'
+# Compiled class files
+*.class
 target/
-*.iml
+*.jar
+*.war
+*.ear
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
 .idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# VS Code
+.vscode/
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+EOF
