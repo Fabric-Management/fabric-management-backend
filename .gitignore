@@ -54,4 +54,4 @@ logs/
 
 # Docker
 docker-compose.override.yml
-EOF
+EOF.idea/
