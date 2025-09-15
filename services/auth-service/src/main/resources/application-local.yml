@@ -1,5 +1,5 @@
 # =============================================================================
-# CONTACT SERVICE - LOCAL ENVIRONMENT OVERRIDES
+# AUTH SERVICE - LOCAL ENVIRONMENT OVERRIDES
 # =============================================================================
 # Contains only local development-specific configuration overrides
 
@@ -20,24 +20,24 @@ spring:
         format_sql: true
 
 # =============================================================================
-# LOCAL CONTACT SERVICE OVERRIDES
+# LOCAL SECURITY OVERRIDES
 # =============================================================================
-contact:
-  communication:
-    email:
-      enabled: false # Disable email in local development
-      provider: mock
-    sms:
-      enabled: false # Disable SMS in local development
-      provider: mock
-  import:
-    batch-size: 100 # Smaller batch size for local testing
-  export:
-    max-records: 1000 # Smaller export limit for local testing
+security:
+  password:
+    encoder: bcrypt
+    strength: 10 # Lower strength for faster local development
+
+# =============================================================================
+# LOCAL AUTH OVERRIDES
+# =============================================================================
+auth:
+  max-login-attempts: 10 # More lenient for development
+  lockout-duration: 60000 # 1 minute (shorter for development)
 
 # =============================================================================
 # DEVELOPMENT LOGGING
 # =============================================================================
 logging:
   level:
-    com.fabricmanagement.contact: DEBUG
+    com.fabricmanagement.auth: DEBUG
+    org.springframework.security: DEBUG

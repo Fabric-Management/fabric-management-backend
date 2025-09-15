@@ -1,0 +1,75 @@
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - USER SERVICE CONFIGURATION
+# =============================================================================
+# Service-specific configuration for user management service
+
+# =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
+spring:
+  application:
+    name: user-service
+  profiles:
+    active: local
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8082
+  servlet:
+    context-path: /api/v1/users
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
+    username: ${POSTGRES_USER:fabric_user}
+    password: ${POSTGRES_PASSWORD:fabric_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        show_sql: false
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET:defaultSecretKey123456789012345678901234567890}
+  expiration: 86400000 # 24 hours
+
+# =============================================================================
+# SERVICE-SPECIFIC CONFIGURATION
+# =============================================================================
+user:
+  profile:
+    image-upload:
+      max-size: 5MB
+      allowed-types: jpg,jpeg,png,gif
+      storage-path: ${USER_UPLOAD_PATH:/uploads/users}
+  notification:
+    email:
+      enabled: true
+    sms:
+      enabled: false

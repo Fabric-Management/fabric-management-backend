@@ -1,4 +1,4 @@
-# DELETED - Runtime configurations belong in individual microservices
-# This file has been removed as part of DDD refactoring
-# Each service should maintain its own application.yml files
+# This directory no longer contains configuration files
+# Runtime configurations have been moved to individual services as part of DDD refactoring
+# See COMMON-SECURITY-REFACTORING-COMPLETE.md for details
 

@@ -1,5 +1,5 @@
 # =============================================================================
-# COMPANY SERVICE - PRODUCTION ENVIRONMENT OVERRIDES
+# USER SERVICE - PRODUCTION ENVIRONMENT OVERRIDES
 # =============================================================================
 # Contains only production-specific configuration overrides
 
@@ -32,26 +32,23 @@ spring:
       max-lifetime: 1800000
 
 # =============================================================================
-# PRODUCTION COMPANY SERVICE OVERRIDES
+# PRODUCTION USER SERVICE OVERRIDES
 # =============================================================================
-company:
-  validation:
-    tax-id:
-      enabled: true # Enable tax validation in production
-      provider: ${TAX_VALIDATION_PROVIDER:external}
-  address:
-    validation:
-      enabled: true # Enable address validation in production
-      google-maps-api-key: ${GOOGLE_MAPS_API_KEY}
-  document:
-    upload:
-      max-size: 5MB # Stricter size limit for production
-      storage-path: ${COMPANY_UPLOAD_PATH:/var/app/uploads/companies}
+user:
+  profile:
+    image-upload:
+      max-size: 2MB # Stricter size limit for production
+      storage-path: ${USER_UPLOAD_PATH:/var/app/uploads/users}
+  notification:
+    email:
+      enabled: true # Enable email notifications in production
+    sms:
+      enabled: true # Enable SMS notifications in production
 
 # =============================================================================
 # PRODUCTION LOGGING
 # =============================================================================
 logging:
   level:
-    com.fabricmanagement.company: INFO
+    com.fabricmanagement.user: INFO
     root: WARN

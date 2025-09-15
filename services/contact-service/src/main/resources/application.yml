@@ -1,0 +1,79 @@
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - CONTACT SERVICE CONFIGURATION
+# =============================================================================
+# Service-specific configuration for contact management service
+
+# =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
+spring:
+  application:
+    name: contact-service
+  profiles:
+    active: local
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8084
+  servlet:
+    context-path: /api/v1/contacts
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
+    username: ${POSTGRES_USER:fabric_user}
+    password: ${POSTGRES_PASSWORD:fabric_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        show_sql: false
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET:defaultSecretKey123456789012345678901234567890}
+  expiration: 86400000 # 24 hours
+
+# =============================================================================
+# SERVICE-SPECIFIC CONFIGURATION
+# =============================================================================
+contact:
+  communication:
+    email:
+      enabled: true
+      provider: ${EMAIL_PROVIDER:smtp}
+    sms:
+      enabled: true
+      provider: ${SMS_PROVIDER:twilio}
+  import:
+    batch-size: 1000
+    max-file-size: 25MB
+    allowed-formats: csv,xlsx,vcf
+  export:
+    formats: csv,xlsx,pdf
+    max-records: 10000
