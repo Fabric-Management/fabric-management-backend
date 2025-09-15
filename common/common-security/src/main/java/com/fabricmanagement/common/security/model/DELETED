@@ -1,0 +1,4 @@
+# This directory has been removed as part of DDD refactoring
+# Domain models (AuthenticatedUser, Role) belong in auth-service or user-service domains
+# This marker file indicates the model directory should be deleted
+
