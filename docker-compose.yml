@@ -1,23 +1,136 @@
-services:
-  postgres-user:
-    image: postgres:15-alpine
-    container_name: user-db
-    environment:
-      POSTGRES_USER: user_service
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: user_db
-    ports:
-      - "5433:5432"
-    volumes:
-      - user_db_data:/var/lib/postgresql/data
-    networks:
-      - fabric-network
-    restart: unless-stopped
-
-volumes:
-  user_db_data:
-    driver: local
+# ==============================================
+# FABRIC MANAGEMENT SYSTEM - DOCKER COMPOSE
+# ==============================================
 
 networks:
   fabric-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+services:
+  # ==============================================
+  # DATABASE SERVICES
+  # ==============================================
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: fabric-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fabric_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-FabricAdmin2025!}
+      POSTGRES_DB: ${POSTGRES_DB:-fabric_management}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fabric-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fabric_admin} -d ${POSTGRES_DB:-fabric_management}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ==============================================
+  # CACHE & SESSION STORE
+  # ==============================================
+  redis:
+    image: redis:7-alpine
+    container_name: fabric-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - fabric-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ==============================================
+  # MESSAGE QUEUE
+  # ==============================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: fabric-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-fabric_mq}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-FabricMQ2025!}
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - fabric-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  # ==============================================
+  # MICROSERVICES
+  # ==============================================
+  contact-service:
+    build:
+      context: .
+      dockerfile: services/contact-service/Dockerfile
+    container_name: fabric-contact-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      POSTGRES_HOST: postgres-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fabric_management}
+      POSTGRES_USER: contact_service
+      POSTGRES_PASSWORD: password
+      CONTACT_DB: contact_db
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    ports:
+      - "${CONTACT_SERVICE_PORT:-8082}:8082"
+      - "9082:9082"  # Management/Actuator port
+    volumes:
+      - app_logs:/app/logs
+    networks:
+      - fabric-network
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# ==============================================
+# VOLUMES
+# ==============================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  app_logs:
+    driver: local
