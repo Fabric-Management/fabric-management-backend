@@ -2,4 +2,3 @@ package com.fabricmanagement.common.core.infrastructure.persistence.specificatio
 
 public class CoreSpecification {
 }
-

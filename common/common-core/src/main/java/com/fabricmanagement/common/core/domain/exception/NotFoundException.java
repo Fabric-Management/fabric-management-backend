@@ -1,5 +1,4 @@
 package com.fabricmanagement.common.core.domain.exception;
 
-public class NotFoundException extends RuntimeException {
+public class CoreDomainException extends RuntimeException {
 }
-
