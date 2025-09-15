@@ -1,5 +1,5 @@
 # =============================================================================
-# CONTACT SERVICE - LOCAL ENVIRONMENT OVERRIDES
+# USER SERVICE - LOCAL ENVIRONMENT OVERRIDES
 # =============================================================================
 # Contains only local development-specific configuration overrides
 
@@ -20,24 +20,21 @@ spring:
         format_sql: true
 
 # =============================================================================
-# LOCAL CONTACT SERVICE OVERRIDES
+# LOCAL USER SERVICE OVERRIDES
 # =============================================================================
-contact:
-  communication:
+user:
+  profile:
+    image-upload:
+      storage-path: /tmp/uploads/users # Local temp directory for development
+  notification:
     email:
-      enabled: false # Disable email in local development
-      provider: mock
+      enabled: false # Disable email notifications in local development
     sms:
-      enabled: false # Disable SMS in local development
-      provider: mock
-  import:
-    batch-size: 100 # Smaller batch size for local testing
-  export:
-    max-records: 1000 # Smaller export limit for local testing
+      enabled: false # Disable SMS notifications in local development
 
 # =============================================================================
 # DEVELOPMENT LOGGING
 # =============================================================================
 logging:
   level:
-    com.fabricmanagement.contact: DEBUG
+    com.fabricmanagement.user: DEBUG

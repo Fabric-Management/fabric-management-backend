@@ -1,5 +1,5 @@
 # =============================================================================
-# COMPANY SERVICE - PRODUCTION ENVIRONMENT OVERRIDES
+# AUTH SERVICE - PRODUCTION ENVIRONMENT OVERRIDES
 # =============================================================================
 # Contains only production-specific configuration overrides
 
@@ -32,26 +32,30 @@ spring:
       max-lifetime: 1800000
 
 # =============================================================================
-# PRODUCTION COMPANY SERVICE OVERRIDES
+# PRODUCTION SECURITY OVERRIDES
 # =============================================================================
-company:
-  validation:
-    tax-id:
-      enabled: true # Enable tax validation in production
-      provider: ${TAX_VALIDATION_PROVIDER:external}
-  address:
-    validation:
-      enabled: true # Enable address validation in production
-      google-maps-api-key: ${GOOGLE_MAPS_API_KEY}
-  document:
-    upload:
-      max-size: 5MB # Stricter size limit for production
-      storage-path: ${COMPANY_UPLOAD_PATH:/var/app/uploads/companies}
+security:
+  password:
+    encoder: bcrypt
+    strength: 12 # Higher strength for production
+
+jwt:
+  expiration: 3600000 # 1 hour (shorter for production security)
+  refresh-expiration: 86400000 # 24 hours
+
+# =============================================================================
+# PRODUCTION AUTH OVERRIDES
+# =============================================================================
+auth:
+  max-login-attempts: 3 # Stricter in production
+  lockout-duration: 900000 # 15 minutes
+  password-reset-expiration: 1800000 # 30 minutes (shorter for security)
 
 # =============================================================================
 # PRODUCTION LOGGING
 # =============================================================================
 logging:
   level:
-    com.fabricmanagement.company: INFO
+    com.fabricmanagement.auth: INFO
+    org.springframework.security: WARN
     root: WARN
