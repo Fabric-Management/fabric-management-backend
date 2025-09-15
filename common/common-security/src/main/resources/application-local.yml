@@ -1,0 +1,4 @@
+# DELETED - Runtime configurations belong in individual microservices
+# This file has been removed as part of DDD refactoring
+# Each service should maintain its own application-local.yml files
+
