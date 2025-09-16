@@ -1,72 +1,94 @@
 package com.fabricmanagement.common.core.application.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
- * Standardized API response format for all microservices
+ * Standard API response wrapper for all REST endpoints.
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
 
     private boolean success;
     private String message;
     private T data;
-    private String error;
-    private LocalDateTime timestamp;
+    private List<String> errors;
+    private String errorCode;
 
-    private ApiResponse() {
-        this.timestamp = LocalDateTime.now();
-    }
+    @Builder.Default
+    private LocalDateTime timestamp = LocalDateTime.now();
 
+    /**
+     * Creates a successful response with data.
+     */
     public static <T> ApiResponse<T> success(T data) {
-        ApiResponse<T> response = new ApiResponse<>();
-        response.success = true;
-        response.data = data;
-        return response;
+        return ApiResponse.<T>builder()
+            .success(true)
+            .data(data)
+            .build();
     }
 
-    public static <T> ApiResponse<T> success(String message, T data) {
-        ApiResponse<T> response = new ApiResponse<>();
-        response.success = true;
-        response.message = message;
-        response.data = data;
-        return response;
+    /**
+     * Creates a successful response with data and message.
+     */
+    public static <T> ApiResponse<T> success(T data, String message) {
+        return ApiResponse.<T>builder()
+            .success(true)
+            .data(data)
+            .message(message)
+            .build();
     }
 
-    public static <T> ApiResponse<T> error(String error) {
-        ApiResponse<T> response = new ApiResponse<>();
-        response.success = false;
-        response.error = error;
-        return response;
+    /**
+     * Creates a successful response with only message.
+     */
+    public static <T> ApiResponse<T> success(String message) {
+        return ApiResponse.<T>builder()
+            .success(true)
+            .message(message)
+            .build();
     }
 
-    public static <T> ApiResponse<T> error(String message, String error) {
-        ApiResponse<T> response = new ApiResponse<>();
-        response.success = false;
-        response.message = message;
-        response.error = error;
-        return response;
+    /**
+     * Creates an error response with message.
+     */
+    public static <T> ApiResponse<T> error(String message) {
+        return ApiResponse.<T>builder()
+            .success(false)
+            .message(message)
+            .build();
     }
 
-    // Getters and setters
-    public boolean isSuccess() {
-        return success;
+    /**
+     * Creates an error response with message and error code.
+     */
+    public static <T> ApiResponse<T> error(String message, String errorCode) {
+        return ApiResponse.<T>builder()
+            .success(false)
+            .message(message)
+            .errorCode(errorCode)
+            .build();
     }
 
-    public String getMessage() {
-        return message;
-    }
-
-    public T getData() {
-        return data;
-    }
-
-    public String getError() {
-        return error;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
+    /**
+     * Creates an error response with validation errors.
+     */
+    public static <T> ApiResponse<T> validationError(List<String> errors) {
+        return ApiResponse.<T>builder()
+            .success(false)
+            .message("Validation failed")
+            .errors(errors)
+            .errorCode("VALIDATION_ERROR")
+            .build();
     }
 }
