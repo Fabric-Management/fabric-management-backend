@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fabric-config
+  namespace: fabric-management
+data:
+  # Database Configuration
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "fabric_management"
+
+  # Redis Configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+
+  # RabbitMQ Configuration
+  RABBITMQ_HOST: "rabbitmq-service"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_MANAGEMENT_PORT: "15672"
+
+  # Service Discovery
+  AUTH_SERVICE_URL: "http://auth-service:8080"
+  USER_SERVICE_URL: "http://user-service:8081"
+  CONTACT_SERVICE_URL: "http://contact-service:8082"
+  COMPANY_SERVICE_URL: "http://company-service:8083"
+
+  # Application Configuration
+  SPRING_PROFILES_ACTIVE: "prod"
+  LOG_LEVEL: "INFO"
+
+  # JVM Configuration
+  JAVA_OPTS: "-Xmx512m -Xms256m -XX:+UseG1GC"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+  namespace: fabric-management
+data:
+  SERVICE_PORT: "8080"
+  MANAGEMENT_PORT: "9080"
+  JWT_EXPIRATION: "86400"
+  REFRESH_TOKEN_EXPIRATION: "604800"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+  namespace: fabric-management
+data:
+  SERVICE_PORT: "8081"
+  MANAGEMENT_PORT: "9081"
+  USER_CACHE_TTL: "3600"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: contact-service-config
+  namespace: fabric-management
+data:
+  SERVICE_PORT: "8082"
+  MANAGEMENT_PORT: "9082"
+  CONTACT_CACHE_TTL: "1800"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: company-service-config
+  namespace: fabric-management
+data:
+  SERVICE_PORT: "8083"
+  MANAGEMENT_PORT: "9083"
+  COMPANY_CACHE_TTL: "7200"
+

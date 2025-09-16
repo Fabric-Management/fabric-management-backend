@@ -18,18 +18,29 @@ RUN mvn clean package -pl services/company-service -am -DskipTests
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
 
+# Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
 WORKDIR /app
 
+# Copy JAR file
 COPY --from=builder --chown=appuser:appgroup /app/services/company-service/target/*.jar app.jar
+
+# Create logs directory
+RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
 
 USER appuser
 
-EXPOSE 8080
+EXPOSE 8083 9083
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:9083/actuator/health || exit 1
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["java", \
+    "-Djava.security.egd=file:/dev/./urandom", \
+    "-Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:docker}", \
+    "-Dmanagement.server.port=9083", \
+    "-Dserver.port=8083", \
+    "-jar", "app.jar"]
