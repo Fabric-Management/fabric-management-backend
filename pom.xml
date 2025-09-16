@@ -23,8 +23,8 @@
         <project.version>1.0.0-SNAPSHOT</project.version>
 
         <!-- Spring Framework Versions -->
-        <spring-boot.version>3.5.2</spring-boot.version>
-        <spring-cloud.version>2023.0.0</spring-cloud.version>
+        <spring-boot.version>3.5.5</spring-boot.version>
+        <spring-cloud.version>2025.0.0</spring-cloud.version>
         <spring-security.version>6.1.4</spring-security.version>
 
         <!-- Database Versions -->
@@ -287,7 +287,6 @@
                         </excludes>
                     </configuration>
                 </plugin>
-
                 <!-- Compiler Plugin -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -311,7 +310,6 @@
                         </annotationProcessorPaths>
                     </configuration>
                 </plugin>
-
                 <!-- Surefire Plugin (Unit Tests) -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -324,7 +322,6 @@
                         </includes>
                     </configuration>
                 </plugin>
-
                 <!-- Failsafe Plugin (Integration Tests) -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -337,7 +334,6 @@
                         </includes>
                     </configuration>
                 </plugin>
-
                 <!-- JaCoCo Plugin (Code Coverage) -->
                 <plugin>
                     <groupId>org.jacoco</groupId>
@@ -358,7 +354,6 @@
                         </execution>
                     </executions>
                 </plugin>
-
                 <!-- Flyway Plugin -->
                 <plugin>
                     <groupId>org.flywaydb</groupId>
@@ -380,7 +375,6 @@
                 <spring.profiles.active>local</spring.profiles.active>
             </properties>
         </profile>
-
         <profile>
             <id>prod</id>
             <properties>
