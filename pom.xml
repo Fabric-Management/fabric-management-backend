@@ -61,6 +61,11 @@
         <!-- Messaging Versions -->
         <kafka.version>3.5.1</kafka.version>
 
+
+        <!-- File Processing Versions -->
+        <apache-poi.version>5.2.5</apache-poi.version>
+        <opencsv.version>5.9</opencsv.version>
+
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
@@ -220,6 +225,26 @@
                 <version>${kafka.version}</version>
             </dependency>
 
+
+            <!-- File Processing Dependencies -->
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi</artifactId>
+                <version>${apache-poi.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${apache-poi.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.opencsv</groupId>
+                <artifactId>opencsv</artifactId>
+                <version>${opencsv.version}</version>
+            </dependency>
+
             <!-- Internal Module Dependencies -->
             <dependency>
                 <groupId>com.fabricmanagement</groupId>
@@ -354,4 +379,3 @@
         </profile>
     </profiles>
 </project>
-
