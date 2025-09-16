@@ -66,6 +66,9 @@
         <apache-poi.version>5.2.5</apache-poi.version>
         <opencsv.version>5.9</opencsv.version>
 
+        <!-- Jakarta Versions -->
+        <jakarta.persistence-api.version>3.1.0</jakarta.persistence-api.version>
+
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
@@ -243,6 +246,13 @@
                 <groupId>com.opencsv</groupId>
                 <artifactId>opencsv</artifactId>
                 <version>${opencsv.version}</version>
+            </dependency>
+
+            <!-- Jakarta Dependencies -->
+            <dependency>
+                <groupId>jakarta.persistence</groupId>
+                <artifactId>jakarta.persistence-api</artifactId>
+                <version>${jakarta.persistence-api.version}</version>
             </dependency>
 
             <!-- Internal Module Dependencies -->
