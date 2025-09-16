@@ -1,0 +1,380 @@
+# ==============================================
+# FABRIC MANAGEMENT SYSTEM - CI/CD PIPELINE
+# ==============================================
+#
+# This workflow provides:
+# - Build & Test for all services and common modules
+# - Docker image building and publishing to GHCR
+# - Database migrations with Flyway
+# - Code coverage and test reports
+# - Matrix strategy for parallel builds
+# - Future-ready deployment placeholder
+#
+# Author: DevOps Engineering Team
+# Last Updated: September 2025
+# ==============================================
+
+name: CI/CD Pipeline
+
+on:
+  # Trigger on pull requests to main and develop branches
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+      - 'LICENSE'
+
+  # Trigger on pushes to main and develop branches
+  push:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+      - 'LICENSE'
+
+  # Allow manual workflow dispatch
+  workflow_dispatch:
+
+# Environment variables
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  JAVA_VERSION: '21'
+  MAVEN_OPTS: '-Xmx1024m -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN'
+
+# Ensure only one workflow runs at a time per PR/branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==============================================
+  # SETUP & VALIDATION JOB
+  # ==============================================
+  setup:
+    name: Setup & Validation
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.detect-services.outputs.services }}
+      cache-key: ${{ steps.cache-key.outputs.key }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect services for matrix strategy
+        id: detect-services
+        run: |
+          # Dynamically detect all services
+          services=$(find services -name "pom.xml" -type f | sed 's|services/||' | sed 's|/pom.xml||' | jq -R -s -c 'split("\n")[:-1]')
+          echo "services=$services" >> $GITHUB_OUTPUT
+          echo "Detected services: $services"
+
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          # Create a cache key based on POM files and Java version
+          key="maven-${{ runner.os }}-java${{ env.JAVA_VERSION }}-$(find . -name "pom.xml" -exec sha256sum {} \; | sha256sum | cut -d' ' -f1)"
+          echo "key=$key" >> $GITHUB_OUTPUT
+
+  # ==============================================
+  # BUILD & TEST JOB
+  # ==============================================
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    needs: setup
+
+    # PostgreSQL service for integration tests
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: fabric_test
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: fabric_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fabric_test -d fabric_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ needs.setup.outputs.cache-key }}
+          restore-keys: |
+            maven-${{ runner.os }}-java${{ env.JAVA_VERSION }}-
+
+      - name: Verify Maven configuration
+        run: |
+          mvn --version
+          mvn help:effective-settings
+
+      - name: Download dependencies
+        run: |
+          mvn dependency:go-offline -B -V
+        env:
+          MAVEN_OPTS: ${{ env.MAVEN_OPTS }}
+
+      - name: Run Flyway migrations
+        run: |
+          # Run migrations for all services
+          for service in auth-service user-service contact-service company-service; do
+            echo "Running migrations for $service..."
+            mvn flyway:migrate -pl services/$service \
+              -Dflyway.url=jdbc:postgresql://localhost:5432/fabric_test \
+              -Dflyway.user=fabric_test \
+              -Dflyway.password=test_password \
+              -Dflyway.schemas=public || echo "Migration failed for $service, continuing..."
+          done
+
+      - name: Run tests and build
+        run: |
+          mvn clean verify -B -V \
+            -Dspring.profiles.active=test \
+            -Dspring.datasource.url=jdbc:postgresql://localhost:5432/fabric_test \
+            -Dspring.datasource.username=fabric_test \
+            -Dspring.datasource.password=test_password \
+            -Dspring.redis.host=localhost \
+            -Dspring.redis.port=6379
+        env:
+          MAVEN_OPTS: ${{ env.MAVEN_OPTS }}
+
+      - name: Generate test report summary
+        if: always()
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          find . -name "surefire-reports" -type d | while read dir; do
+            service=$(echo $dir | sed 's|.*/services/||' | sed 's|/target.*||')
+            if [ -n "$service" ]; then
+              echo "### $service" >> $GITHUB_STEP_SUMMARY
+              test_files=$(find "$dir" -name "TEST-*.xml" 2>/dev/null | wc -l)
+              if [ $test_files -gt 0 ]; then
+                echo "- Test files found: $test_files" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- No test results found" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          retention-days: 30
+
+      - name: Upload JaCoCo coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            **/target/site/jacoco/**
+          retention-days: 30
+
+      - name: Cache build artifacts for Docker
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/target/*.jar
+          key: build-artifacts-${{ github.sha }}
+
+  # ==============================================
+  # DOCKER BUILD & PUSH JOB (MATRIX STRATEGY)
+  # ==============================================
+  docker-build:
+    name: Docker Build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-test]
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+
+    strategy:
+      fail-fast: true
+      matrix:
+        service: ${{ fromJson(needs.setup.outputs.services) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Restore Maven cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ needs.setup.outputs.cache-key }}
+          restore-keys: |
+            maven-${{ runner.os }}-java${{ env.JAVA_VERSION }}-
+
+      - name: Restore build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/target/*.jar
+          key: build-artifacts-${{ github.sha }}
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./services/${{ matrix.service }}/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Generate image summary
+        run: |
+          echo "## Docker Image Built: ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo '${{ steps.meta.outputs.tags }}' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+
+  # ==============================================
+  # SECURITY SCANNING JOB
+  # ==============================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ==============================================
+  # DEPLOYMENT PLACEHOLDER JOB
+  # ==============================================
+  deploy:
+    name: Deploy (Placeholder)
+    runs-on: ubuntu-latest
+    needs: [build-and-test, docker-build]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+
+    steps:
+      - name: Deployment placeholder
+        run: |
+          echo "🚀 Deploy step skipped - placeholder for future Kubernetes/Docker Swarm deployment"
+          echo "Environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}"
+          echo "Services to deploy: ${{ needs.setup.outputs.services }}"
+          echo ""
+          echo "Future deployment steps will include:"
+          echo "- kubectl apply -f k8s/ (for Kubernetes)"
+          echo "- docker stack deploy (for Docker Swarm)"
+          echo "- Helm chart deployment"
+          echo "- Health checks and rollback capability"
+
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ⏭️ Skipped (Placeholder)" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # ==============================================
+  # NOTIFICATION JOB
+  # ==============================================
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [build-and-test, docker-build, deploy]
+    if: always()
+
+    steps:
+      - name: Pipeline Summary
+        run: |
+          echo "## 📊 Pipeline Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build & Test:** ${{ needs.build-and-test.result == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Build:** ${{ needs.docker-build.result == 'success' && '✅ Passed' || needs.docker-build.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy:** ${{ needs.deploy.result == 'success' && '✅ Passed' || needs.deploy.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY

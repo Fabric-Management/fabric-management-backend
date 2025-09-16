@@ -1,0 +1,28 @@
+# Docker Compose Override for CI/CD
+# This file provides optimized settings for CI/CD environments
+
+version: '3.8'
+
+services:
+  postgres-db:
+    environment:
+      # Faster startup for CI
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+      # Disable fsync for faster CI tests (not for production!)
+      POSTGRES_CONFIG: |
+        fsync = off
+        synchronous_commit = off
+        checkpoint_segments = 32
+        checkpoint_completion_target = 0.9
+        wal_buffers = 16MB
+        shared_buffers = 256MB
+    command: |
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+      -c checkpoint_segments=32
+      -c checkpoint_completion_target=0.9
+
+  redis:
+    command: redis-server --save "" --appendonly no
