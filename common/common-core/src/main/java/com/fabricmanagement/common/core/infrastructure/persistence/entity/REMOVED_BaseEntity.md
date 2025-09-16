@@ -1,8 +1,9 @@
-# Duplicate BaseEntity Removed
+# Duplicate BaseEntity File Removed
 
-This file previously contained a duplicate BaseEntity class that was causing compilation errors.
-The duplicate has been removed to fix the following error:
-- `duplicate class: com.fabricmanagement.common.core.infrastructure.persistence.BaseEntity`
+This file previously contained a duplicate BaseEntity class with invalid Markdown syntax that was causing compilation errors including:
+- illegal character: '#'
+- illegal character: '`'
+- duplicate class issues
 
-The correct BaseEntity class is located at:
+The duplicate has been completely removed. The correct BaseEntity class is located at:
 `/infrastructure/persistence/BaseEntity.java`
