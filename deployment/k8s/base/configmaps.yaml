@@ -1,74 +1,55 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: fabric-config
+  name: fabric-management-config
   namespace: fabric-management
 data:
   # Database Configuration
-  POSTGRES_HOST: "postgres-service"
+  POSTGRES_HOST: postgres-service
   POSTGRES_PORT: "5432"
-  POSTGRES_DB: "fabric_management"
+  POSTGRES_DB: fabric_management
 
   # Redis Configuration
-  REDIS_HOST: "redis-service"
+  REDIS_HOST: redis-service
   REDIS_PORT: "6379"
 
-  # RabbitMQ Configuration
-  RABBITMQ_HOST: "rabbitmq-service"
-  RABBITMQ_PORT: "5672"
-  RABBITMQ_MANAGEMENT_PORT: "15672"
+  # Kafka Configuration
+  KAFKA_BOOTSTRAP_SERVERS: kafka-service:9092
 
-  # Service Discovery
-  AUTH_SERVICE_URL: "http://auth-service:8080"
-  USER_SERVICE_URL: "http://user-service:8081"
-  CONTACT_SERVICE_URL: "http://contact-service:8082"
-  COMPANY_SERVICE_URL: "http://company-service:8083"
+  # Service Discovery (using exact ports from application.yml)
+  AUTH_SERVICE_URL: http://auth-service:8081
+  USER_SERVICE_URL: http://user-service:8082
+  COMPANY_SERVICE_URL: http://company-service:8083
+  CONTACT_SERVICE_URL: http://contact-service:8084
 
-  # Application Configuration
-  SPRING_PROFILES_ACTIVE: "prod"
-  LOG_LEVEL: "INFO"
+  # Spring Configuration
+  SPRING_PROFILES_ACTIVE: prod
 
   # JVM Configuration
-  JAVA_OPTS: "-Xmx512m -Xms256m -XX:+UseG1GC"
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: auth-service-config
-  namespace: fabric-management
-data:
-  SERVICE_PORT: "8080"
-  MANAGEMENT_PORT: "9080"
-  JWT_EXPIRATION: "86400"
-  REFRESH_TOKEN_EXPIRATION: "604800"
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: user-service-config
-  namespace: fabric-management
-data:
-  SERVICE_PORT: "8081"
-  MANAGEMENT_PORT: "9081"
-  USER_CACHE_TTL: "3600"
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: contact-service-config
-  namespace: fabric-management
-data:
-  SERVICE_PORT: "8082"
-  MANAGEMENT_PORT: "9082"
-  CONTACT_CACHE_TTL: "1800"
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: company-service-config
-  namespace: fabric-management
-data:
-  SERVICE_PORT: "8083"
-  MANAGEMENT_PORT: "9083"
-  COMPANY_CACHE_TTL: "7200"
+  JAVA_OPTS: "-Xms1024m -Xmx2048m -XX:+UseG1GC -XX:+UseStringDeduplication"
 
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: fabric-management
+data:
+  init.sql: |
+    -- Initialize databases for each service
+    CREATE DATABASE fabric_management_auth;
+    CREATE DATABASE fabric_management_user;
+    CREATE DATABASE fabric_management_company;
+    CREATE DATABASE fabric_management_contact;
+    
+    -- Create service-specific users
+    CREATE USER auth_service WITH PASSWORD 'auth_service_password';
+    CREATE USER user_service WITH PASSWORD 'user_service_password';
+    CREATE USER company_service WITH PASSWORD 'company_service_password';
+    CREATE USER contact_service WITH PASSWORD 'contact_service_password';
+    
+    -- Grant permissions
+    GRANT ALL PRIVILEGES ON DATABASE fabric_management_auth TO auth_service;
+    GRANT ALL PRIVILEGES ON DATABASE fabric_management_user TO user_service;
+    GRANT ALL PRIVILEGES ON DATABASE fabric_management_company TO company_service;
+    GRANT ALL PRIVILEGES ON DATABASE fabric_management_contact TO contact_service;

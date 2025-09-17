@@ -1,12 +1,11 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
-  name: postgres
+  name: postgres-deployment
   namespace: fabric-management
   labels:
     app: postgres
 spec:
-  serviceName: postgres-service
   replicas: 1
   selector:
     matchLabels:
@@ -19,92 +18,187 @@ spec:
       containers:
       - name: postgres
         image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
         env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_DB
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: fabric-secrets
+              name: postgres-secrets
               key: POSTGRES_USER
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: fabric-secrets
+              name: postgres-secrets
               key: POSTGRES_PASSWORD
-        - name: POSTGRES_DB
-          valueFrom:
-            configMapKeyRef:
-              name: fabric-config
-              key: POSTGRES_DB
-        - name: POSTGRES_INITDB_ARGS
-          value: "--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
-        ports:
-        - containerPort: 5432
-          name: postgres
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-init
+          mountPath: /docker-entrypoint-initdb.d
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
             memory: "1Gi"
             cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
         livenessProbe:
           exec:
             command:
             - pg_isready
             - -U
-            - $(POSTGRES_USER)
+            - fabric_user
             - -d
-            - $(POSTGRES_DB)
+            - fabric_management
           initialDelaySeconds: 30
           periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
         readinessProbe:
           exec:
             command:
             - pg_isready
             - -U
-            - $(POSTGRES_USER)
+            - fabric_user
             - -d
-            - $(POSTGRES_DB)
+            - fabric_management
           initialDelaySeconds: 5
           periodSeconds: 5
-          timeoutSeconds: 3
-          successThreshold: 1
-          failureThreshold: 3
-        volumeMounts:
-        - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
-        - name: init-scripts
-          mountPath: /docker-entrypoint-initdb.d
       volumes:
-      - name: init-scripts
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: postgres-init
         configMap:
-          name: postgres-init-scripts
-  volumeClaimTemplates:
-  - metadata:
-      name: postgres-storage
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 20Gi
+          name: postgres-init
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres-service
   namespace: fabric-management
-  labels:
-    app: postgres
 spec:
   selector:
     app: postgres
   ports:
-  - name: postgres
-    port: 5432
+  - port: 5432
     targetPort: 5432
+    name: postgres
   type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: fabric-management
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+  namespace: fabric-management
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fabric-management-secrets
+              key: REDIS_PASSWORD
+        command: ["redis-server", "--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes"]
+        volumeMounts:
+        - name: redis-storage
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: redis-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: fabric-management
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: redis
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: fabric-management
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -130,4 +224,3 @@ data:
     GRANT ALL PRIVILEGES ON DATABASE user_db TO user_service;
     GRANT ALL PRIVILEGES ON DATABASE contact_db TO contact_service;
     GRANT ALL PRIVILEGES ON DATABASE company_db TO company_service;
-
