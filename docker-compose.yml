@@ -115,7 +115,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "${AUTH_SERVICE_PORT:-8081}:8081"
+      - "8081:8081"  # auth-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -150,7 +150,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "${USER_SERVICE_PORT:-8082}:8082"
+      - "8082:8082"  # user-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -185,7 +185,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "${COMPANY_SERVICE_PORT:-8083}:8083"
+      - "8083:8083"  # company-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -220,7 +220,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "${CONTACT_SERVICE_PORT:-8084}:8084"
+      - "8084:8084"  # contact-service port from application.yml
     networks:
       - fabric-network
     depends_on:

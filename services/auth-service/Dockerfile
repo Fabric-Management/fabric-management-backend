@@ -4,19 +4,15 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /app
 
 # Configure Maven for better network reliability
-ENV MAVEN_OPTS="-Dmaven.repo.local=/root/.m2/repository -Dhttp.socketTimeout=60000 -Dhttp.connectionTimeout=60000 -Dmaven.wagon.http.retryHandler.count=3"
+ENV MAVEN_OPTS="-Dmaven.repo.local=/root/.m2/repository \
+    -Dhttp.socketTimeout=60000 \
+    -Dhttp.connectionTimeout=60000 \
+    -Dmaven.wagon.http.retryHandler.count=3"
 
-# Copy parent POM and common modules first for better caching
-COPY pom.xml .
-COPY common/ common/
-
-# Create Maven settings.xml for timeout configuration
+# Create Maven settings
 RUN mkdir -p /root/.m2 && \
     echo '<?xml version="1.0" encoding="UTF-8"?>' > /root/.m2/settings.xml && \
-    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> /root/.m2/settings.xml && \
-    echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' >> /root/.m2/settings.xml && \
-    echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0' >> /root/.m2/settings.xml && \
-    echo '          http://maven.apache.org/xsd/settings-1.0.0.xsd">' >> /root/.m2/settings.xml && \
+    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">' >> /root/.m2/settings.xml && \
     echo '    <profiles>' >> /root/.m2/settings.xml && \
     echo '        <profile>' >> /root/.m2/settings.xml && \
     echo '            <id>default</id>' >> /root/.m2/settings.xml && \
@@ -31,33 +27,36 @@ RUN mkdir -p /root/.m2 && \
     echo '    </activeProfiles>' >> /root/.m2/settings.xml && \
     echo '</settings>' >> /root/.m2/settings.xml
 
-# Build parent POM first with retry logic
-RUN mvn clean install -N -DskipTests || \
-    (sleep 10 && mvn clean install -N -DskipTests) || \
-    (sleep 20 && mvn clean install -N -DskipTests)
-
-# Build common modules with retry logic
-RUN mvn clean install -f common/common-core/pom.xml -DskipTests || \
-    (sleep 10 && mvn clean install -f common/common-core/pom.xml -DskipTests) || \
-    (sleep 20 && mvn clean install -f common/common-core/pom.xml -DskipTests)
-
-RUN mvn clean install -f common/common-security/pom.xml -DskipTests || \
-    (sleep 10 && mvn clean install -f common/common-security/pom.xml -DskipTests) || \
-    (sleep 20 && mvn clean install -f common/common-security/pom.xml -DskipTests)
-
-# Copy service POM and download dependencies with retry
+# Copy all POMs first for better caching
+COPY pom.xml .
+COPY common/common-core/pom.xml common/common-core/
+COPY common/common-security/pom.xml common/common-security/
 COPY services/auth-service/pom.xml services/auth-service/
-WORKDIR /app/services/auth-service
-RUN mvn dependency:go-offline || \
-    (sleep 10 && mvn dependency:go-offline) || \
-    (sleep 20 && mvn dependency:go-offline)
 
-# Copy source code and build the service independently
-COPY services/auth-service/src/ src/
+# Build parent POM
+RUN mvn clean install -N -DskipTests || \
+    (sleep 10 && mvn clean install -N -DskipTests)
+
+# Copy and build common modules source
+COPY common/common-core/src common/common-core/src
+RUN mvn clean install -f common/common-core/pom.xml -DskipTests
+
+COPY common/common-security/src common/common-security/src
+RUN mvn clean install -f common/common-security/pom.xml -DskipTests
+
+# Download service dependencies
+WORKDIR /app/services/auth-service
+RUN mvn dependency:go-offline -B
+
+# Copy and build service
+COPY services/auth-service/src src
 RUN mvn clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
 
 # Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
@@ -68,11 +67,23 @@ WORKDIR /app
 # Copy JAR file
 COPY --from=builder --chown=appuser:appgroup /app/services/auth-service/target/*.jar app.jar
 
-# Create logs directory
-RUN mkdir -p /app/logs && chown appuser:appgroup /app/logs
+# Create necessary directories
+RUN mkdir -p /app/logs /tmp && \
+    chown -R appuser:appgroup /app/logs /tmp
+
+# Set JVM options
+ENV JAVA_OPTS="-Xmx512m -Xms256m \
+    -XX:MaxMetaspaceSize=128m \
+    -XX:+UseG1GC \
+    -Djava.io.tmpdir=/tmp \
+    -Djava.security.egd=file:/dev/./urandom"
 
 USER appuser
 
 EXPOSE 8081
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
