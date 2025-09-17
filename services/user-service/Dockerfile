@@ -9,23 +9,24 @@ ENV MAVEN_OPTS="-Dmaven.repo.local=/root/.m2/repository \
     -Dhttp.connectionTimeout=60000 \
     -Dmaven.wagon.http.retryHandler.count=3"
 
-# Create Maven settings
+# Create Maven settings using printf to avoid parsing issues
 RUN mkdir -p /root/.m2 && \
-    echo '<?xml version="1.0" encoding="UTF-8"?>' > /root/.m2/settings.xml && \
-    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">' >> /root/.m2/settings.xml && \
-    echo '    <profiles>' >> /root/.m2/settings.xml && \
-    echo '        <profile>' >> /root/.m2/settings.xml && \
-    echo '            <id>default</id>' >> /root/.m2/settings.xml && \
-    echo '            <properties>' >> /root/.m2/settings.xml && \
-    echo '                <maven.wagon.http.connectionTimeout>60000</maven.wagon.http.connectionTimeout>' >> /root/.m2/settings.xml && \
-    echo '                <maven.wagon.http.readTimeout>60000</maven.wagon.http.readTimeout>' >> /root/.m2/settings.xml && \
-    echo '            </properties>' >> /root/.m2/settings.xml && \
-    echo '        </profile>' >> /root/.m2/settings.xml && \
-    echo '    </profiles>' >> /root/.m2/settings.xml && \
-    echo '    <activeProfiles>' >> /root/.m2/settings.xml && \
-    echo '        <activeProfile>default</activeProfile>' >> /root/.m2/settings.xml && \
-    echo '    </activeProfiles>' >> /root/.m2/settings.xml && \
-    echo '</settings>' >> /root/.m2/settings.xml
+    printf '%s\n' \
+    '<?xml version="1.0" encoding="UTF-8"?>' \
+    '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">' \
+    '    <profiles>' \
+    '        <profile>' \
+    '            <id>default</id>' \
+    '            <properties>' \
+    '                <maven.wagon.http.connectionTimeout>60000</maven.wagon.http.connectionTimeout>' \
+    '                <maven.wagon.http.readTimeout>60000</maven.wagon.http.readTimeout>' \
+    '            </properties>' \
+    '        </profile>' \
+    '    </profiles>' \
+    '    <activeProfiles>' \
+    '        <activeProfile>default</activeProfile>' \
+    '    </activeProfiles>' \
+    '</settings>' > /root/.m2/settings.xml
 
 # Copy all POMs first for better caching
 COPY pom.xml .
@@ -33,9 +34,10 @@ COPY common/common-core/pom.xml common/common-core/
 COPY common/common-security/pom.xml common/common-security/
 COPY services/user-service/pom.xml services/user-service/
 
-# Build parent POM
+# Build parent POM with retry logic
 RUN mvn clean install -N -DskipTests || \
-    (sleep 10 && mvn clean install -N -DskipTests)
+    (sleep 10 && mvn clean install -N -DskipTests) || \
+    (sleep 20 && mvn clean install -N -DskipTests)
 
 # Copy and build common modules source
 COPY common/common-core/src common/common-core/src
