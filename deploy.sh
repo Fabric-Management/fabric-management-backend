@@ -151,14 +151,28 @@ deploy_kubernetes() {
 check_docker_health() {
     log_info "Checking service health..."
 
-    services=("auth-service:8081" "user-service:8082" "company-service:8083" "contact-service:8084")
+    # Service configurations with their context paths
+    declare -A service_configs=(
+        ["auth-service"]="8081:/api/v1/auth"
+        ["user-service"]="8082:/api/v1/users"
+        ["company-service"]="8083:/api/v1/companies"
+        ["contact-service"]="8084:/api/v1/contacts"
+    )
 
-    for service in "${services[@]}"; do
-        IFS=':' read -r name port <<< "$service"
-        if curl -s -f "http://localhost:$port/actuator/health" > /dev/null; then
-            log_success "$name is healthy"
+    for service in "${!service_configs[@]}"; do
+        IFS=':' read -r port context_path <<< "${service_configs[$service]}"
+        health_url="http://localhost:$port$context_path/actuator/health"
+
+        if curl -s -f "$health_url" > /dev/null 2>&1; then
+            log_success "$service is healthy"
         else
-            log_warning "$name health check failed"
+            log_warning "$service health check failed (checking $health_url)"
+            # Also try without context path in case actuator is exposed at root
+            if curl -s -f "http://localhost:$port/actuator/health" > /dev/null 2>&1; then
+                log_success "$service is healthy (actuator at root)"
+            else
+                log_warning "$service is not responding on either endpoint"
+            fi
         fi
     done
 }
