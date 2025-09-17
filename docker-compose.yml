@@ -17,12 +17,12 @@ services:
     image: postgres:15-alpine
     container_name: fabric-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-fabric_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-FabricAdmin2025!}
+      POSTGRES_USER: ${POSTGRES_USER:-fabric_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fabric_password}
       POSTGRES_DB: ${POSTGRES_DB:-fabric_management}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_DOCKER_PORT:-5433}:5432"
     volumes:
       - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
       - postgres_data:/var/lib/postgresql/data
@@ -30,7 +30,7 @@ services:
       - fabric-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fabric_admin} -d ${POSTGRES_DB:-fabric_management}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fabric_user} -d ${POSTGRES_DB:-fabric_management}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,7 +45,7 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_DOCKER_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -54,57 +54,68 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 3s
-      retries: 5
+      timeout: 5s
+      retries: 3
 
   # ==============================================
-  # MESSAGE QUEUE
+  # MESSAGE BROKER
   # ==============================================
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: fabric-rabbitmq
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: fabric-zookeeper
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-fabric_mq}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-FabricMQ2025!}
-      RABBITMQ_DEFAULT_VHOST: /
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "15672:15672"  # Management UI
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - "${ZOOKEEPER_DOCKER_PORT:-2181}:2181"
+    networks:
+      - fabric-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: fabric-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "${KAFKA_DOCKER_PORT:-9092}:9092"
     networks:
       - fabric-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
       interval: 30s
-      timeout: 30s
+      timeout: 10s
       retries: 3
 
   # ==============================================
-  # MICROSERVICES
+  # MICROSERVICES (Using exact ports from application.yml)
   # ==============================================
-  contact-service:
+  auth-service:
     build:
-      context: .
-      dockerfile: services/contact-service/Dockerfile
-    container_name: fabric-contact-service
+      context: .  # Root directory context to access parent pom and common modules
+      dockerfile: services/auth-service/Dockerfile
+    container_name: fabric-auth-service
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       POSTGRES_HOST: postgres-db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-fabric_management}
-      POSTGRES_USER: contact_service
-      POSTGRES_PASSWORD: password
-      CONTACT_DB: contact_db
+      POSTGRES_USER: ${POSTGRES_USER:-fabric_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fabric_password}
       REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "${CONTACT_SERVICE_PORT:-8082}:8082"
-      - "9082:9082"  # Management/Actuator port
-    volumes:
-      - app_logs:/app/logs
+      - "8081:8081"  # auth-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -112,25 +123,123 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      rabbitmq:
+      kafka:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/v1/auth/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
-# ==============================================
-# VOLUMES
-# ==============================================
+  user-service:
+    build:
+      context: .  # Root directory context to access parent pom and common modules
+      dockerfile: services/user-service/Dockerfile
+    container_name: fabric-user-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      POSTGRES_HOST: postgres-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fabric_management}
+      POSTGRES_USER: ${POSTGRES_USER:-fabric_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fabric_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
+    ports:
+      - "8082:8082"  # user-service port from application.yml
+    networks:
+      - fabric-network
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/v1/users/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  company-service:
+    build:
+      context: .  # Root directory context to access parent pom and common modules
+      dockerfile: services/company-service/Dockerfile
+    container_name: fabric-company-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      POSTGRES_HOST: postgres-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fabric_management}
+      POSTGRES_USER: ${POSTGRES_USER:-fabric_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fabric_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
+    ports:
+      - "8083:8083"  # company-service port from application.yml
+    networks:
+      - fabric-network
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/v1/companies/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  contact-service:
+    build:
+      context: .  # Root directory context to access parent pom and common modules
+      dockerfile: services/contact-service/Dockerfile
+    container_name: fabric-contact-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      POSTGRES_HOST: postgres-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fabric_management}
+      POSTGRES_USER: ${POSTGRES_USER:-fabric_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fabric_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
+    ports:
+      - "8084:8084"  # contact-service port from application.yml
+    networks:
+      - fabric-network
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/api/v1/contacts/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  rabbitmq_data:
-    driver: local
-  app_logs:
     driver: local
