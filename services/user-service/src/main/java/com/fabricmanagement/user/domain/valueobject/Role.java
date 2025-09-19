@@ -1,5 +1,8 @@
 package com.fabricmanagement.user.domain.valueobject;
 
-public class Role {
+public enum Role {
+    USER,
+    ADMIN,
+    SUPER_ADMIN
 }
 
