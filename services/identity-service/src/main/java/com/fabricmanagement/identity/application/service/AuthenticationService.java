@@ -1,384 +1,247 @@
 package com.fabricmanagement.identity.application.service;
 
-import com.fabricmanagement.common.security.jwt.JwtTokenProvider;
-import com.fabricmanagement.identity.application.dto.*;
-import com.fabricmanagement.identity.domain.exception.IdentityDomainException;
-import com.fabricmanagement.identity.domain.model.AuthenticationResult;
 import com.fabricmanagement.identity.domain.model.User;
 import com.fabricmanagement.identity.domain.repository.UserRepository;
+import com.fabricmanagement.identity.domain.valueobject.Credentials;
+import com.fabricmanagement.identity.domain.valueobject.Role;
 import com.fabricmanagement.identity.domain.valueobject.UserId;
-import com.fabricmanagement.identity.domain.valueobject.VerificationToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Service handling authentication and authorization operations.
- * Implements the unified authentication flow with contact verification.
+ * Service for user authentication and identity management.
+ * Handles user creation, password management, and authentication logic.
  */
 @Service
-@Transactional
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class AuthenticationService {
-
+    
     private final UserRepository userRepository;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final NotificationService notificationService;
-    private final SessionService sessionService;
-
+    private final PasswordEncoder passwordEncoder;
+    
     /**
-     * Initiates authentication with any contact (email or phone).
-     * This is the entry point for all authentication attempts.
+     * Creates a new user with initial credentials.
      */
-    public AuthInitiationResponse initiateAuthentication(AuthInitiationRequest request) {
-        log.info("Initiating authentication for contact: {}", request.getContact());
-
-        // Find user by contact (email or phone)
-        Optional<User> userOpt = userRepository.findByContact(request.getContact());
-
+    public User createUser(String username, String email, String firstName, String lastName, 
+                          String password, Role role, UUID tenantId) {
+        log.info("Creating new user: {}", username);
+        
+        // Check if user already exists
+        if (userRepository.existsByUsername(username)) {
+            throw new RuntimeException("Username already exists: " + username);
+        }
+        
+        if (userRepository.existsByEmail(email)) {
+            throw new RuntimeException("Email already exists: " + email);
+        }
+        
+        // Create user entity
+        User user = User.builder()
+            .userId(UserId.generate())
+            .username(username)
+            .email(email)
+            .firstName(firstName)
+            .lastName(lastName)
+            .role(role)
+            .tenantId(tenantId)
+            .status(UserStatus.PENDING_ACTIVATION)
+            .credentials(Credentials.builder()
+                .passwordHash(passwordEncoder.encode(password))
+                .passwordCreatedAt(LocalDateTime.now())
+                .passwordMustChange(false)
+                .build())
+            .build();
+        
+        User savedUser = userRepository.save(user);
+        log.info("User created successfully: {}", savedUser.getUserId());
+        
+        return savedUser;
+    }
+    
+    /**
+     * Authenticates a user with username/email and password.
+     */
+    @Transactional(readOnly = true)
+    public Optional<User> authenticateUser(String usernameOrEmail, String password) {
+        log.debug("Authenticating user: {}", usernameOrEmail);
+        
+        Optional<User> userOpt = userRepository.findByUsernameOrEmail(usernameOrEmail);
+        
         if (userOpt.isEmpty()) {
-            // Don't reveal that the contact doesn't exist (security)
-            return AuthInitiationResponse.notFound();
+            log.warn("User not found: {}", usernameOrEmail);
+            return Optional.empty();
         }
-
+        
         User user = userOpt.get();
-
-        // Check if contact is verified
-        if (!user.canAuthenticateWith(request.getContact())) {
-            // Contact exists but not verified - send verification
-            VerificationToken token = user.initiateContactVerification(request.getContact());
-            userRepository.save(user);
-
-            // Send verification code/link
-            sendVerification(user, request.getContact(), token);
-
-            return AuthInitiationResponse.verificationRequired(
-                determineContactType(request.getContact()),
-                maskContact(request.getContact())
-            );
+        
+        // Check if user is active
+        if (!user.isActive()) {
+            log.warn("User account is not active: {}", usernameOrEmail);
+            return Optional.empty();
         }
-
-        // Check if user has password
-        if (user.getCredentials() == null || !user.getCredentials().hasPassword()) {
-            // User verified but no password - needs to create one
-            String tempToken = sessionService.createSession(user.getId().getValue(), "PASSWORD_CREATION", 30);
-            return AuthInitiationResponse.passwordCreationRequired(tempToken);
+        
+        // Check if user is locked
+        if (user.isLocked()) {
+            log.warn("User account is locked: {}", usernameOrEmail);
+            return Optional.empty();
         }
-
-        // Normal authentication flow - proceed to password
-        return AuthInitiationResponse.passwordRequired();
-    }
-
-    /**
-     * Verifies contact and optionally creates password.
-     * Dual-purpose: verify contact + enable password creation for first-time users.
-     */
-    public VerificationResponse verifyContact(VerificationRequest request) {
-        log.info("Verifying contact: {}", request.getContact());
-
-        // Find user by contact
-        User user = userRepository.findByContact(request.getContact())
-            .orElseThrow(() -> new IdentityDomainException("Invalid verification request"));
-
-        // Verify the contact
-        boolean verified = user.verifyContact(request.getContact(), request.getCode());
-
-        if (!verified) {
-            throw new IdentityDomainException("Invalid or expired verification code");
+        
+        // Verify password
+        if (!passwordEncoder.matches(password, user.getCredentials().getPasswordHash())) {
+            log.warn("Invalid password for user: {}", usernameOrEmail);
+            return Optional.empty();
         }
-
+        
+        // Update last login
+        user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
-
-        // Check if user needs to create password
-        if (user.getCredentials() == null || !user.getCredentials().hasPassword()) {
-            // First-time user - allow password creation
-            String tempToken = sessionService.createSession(user.getId().getValue(), "PASSWORD_CREATION", 30);
-            return VerificationResponse.successWithPasswordCreation(tempToken);
-        }
-
-        // Existing user verifying additional contact
-        return VerificationResponse.success();
+        
+        log.info("User authenticated successfully: {}", usernameOrEmail);
+        return Optional.of(user);
     }
-
+    
     /**
-     * Creates initial password for new users.
-     * Only allowed after contact verification.
+     * Changes user password.
      */
-    public PasswordCreationResponse createPassword(PasswordCreationRequest request) {
-        log.info("Creating password for user with temp token");
-
-        // Validate temporary token
-        SessionService.SessionData sessionData = sessionService.getSession(request.getTempToken());
-        if (sessionData == null) {
-            throw new IdentityDomainException("Invalid or expired token");
+    public User changePassword(UUID userId, String currentPassword, String newPassword) {
+        log.info("Changing password for user: {}", userId);
+        
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        
+        // Verify current password
+        if (!passwordEncoder.matches(currentPassword, user.getCredentials().getPasswordHash())) {
+            throw new RuntimeException("Current password is incorrect");
         }
-        UserId userId = new UserId(sessionData.userId);
-
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IdentityDomainException("User not found"));
-
-        // Create password
-        user.createInitialPassword(request.getPassword());
-        userRepository.save(user);
-
-        // Generate JWT tokens
-        String accessToken = jwtTokenProvider.createToken(user.getId().getValue().toString());
-        String refreshToken = jwtTokenProvider.createToken(user.getId().getValue().toString()); // In production, use separate refresh token logic
-
-        // Create session
-        // Session created with token
-
-        return PasswordCreationResponse.success(accessToken, refreshToken, user.getFullName());
+        
+        // Update password
+        user.getCredentials().setPasswordHash(passwordEncoder.encode(newPassword));
+        user.getCredentials().setPasswordChangedAt(LocalDateTime.now());
+        user.getCredentials().setPasswordMustChange(false);
+        
+        User savedUser = userRepository.save(user);
+        log.info("Password changed successfully for user: {}", userId);
+        
+        return savedUser;
     }
-
+    
     /**
-     * Authenticates user with contact and password.
-     * Standard login flow for users with existing passwords.
+     * Resets user password (admin operation).
      */
-    public LoginResponse login(LoginRequest request) {
-        log.info("Login attempt for contact: {}", request.getContact());
-
-        // Find user by contact
-        User user = userRepository.findByContact(request.getContact())
-            .orElseThrow(() -> new IdentityDomainException("Invalid credentials"));
-
-        // Authenticate
-        AuthenticationResult result = user.authenticate(
-            request.getContact(),
-            request.getPassword(),
-            request.getIpAddress()
-        );
-
-        if (!result.isSuccess()) {
-            userRepository.save(user);
-
-            if (result.isAccountLocked()) {
-                throw new IdentityDomainException("Account locked until: " + result.getLockedUntil());
-            }
-            if (result.isContactNotVerified()) {
-                // Shouldn't happen in normal flow, but handle it
-                VerificationToken token = user.initiateContactVerification(request.getContact());
-                sendVerification(user, request.getContact(), token);
-                throw new IdentityDomainException("Contact not verified. Verification sent.");
-            }
-            if (result.isPasswordChangeRequired()) {
-                String tempToken = sessionService.createSession(user.getId().getValue(), "PASSWORD_CREATION", 30);
-                return LoginResponse.passwordChangeRequired(tempToken);
-            }
-
-            throw new IdentityDomainException("Invalid credentials");
-        }
-
-        userRepository.save(user);
-
-        // Generate JWT tokens
-        String accessToken = jwtTokenProvider.createToken(user.getId().getValue().toString());
-        String refreshToken = jwtTokenProvider.createToken(user.getId().getValue().toString()); // In production, use separate refresh token logic
-
-        // Create session
-        // Session created with token
-
-        // Check if 2FA is enabled
-        if (user.isTwoFactorEnabled()) {
-            String tempToken = sessionService.createSession(user.getId().getValue(), "2FA", 5);
-            return LoginResponse.twoFactorRequired(tempToken);
-        }
-
-        return LoginResponse.success(
-            accessToken,
-            refreshToken,
-            user.getFullName(),
-            user.getRole().name()
-        );
+    public User resetPassword(UUID userId, String newPassword) {
+        log.info("Resetting password for user: {}", userId);
+        
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        
+        // Update password
+        user.getCredentials().setPasswordHash(passwordEncoder.encode(newPassword));
+        user.getCredentials().setPasswordChangedAt(LocalDateTime.now());
+        user.getCredentials().setPasswordMustChange(true);
+        
+        User savedUser = userRepository.save(user);
+        log.info("Password reset successfully for user: {}", userId);
+        
+        return savedUser;
     }
-
+    
     /**
-     * Verifies two-factor authentication code.
+     * Activates a user account.
      */
-    public TwoFactorResponse verifyTwoFactor(TwoFactorRequest request) {
-        log.info("Verifying 2FA code");
-
-        SessionService.SessionData sessionData = sessionService.getSession(request.getTempToken());
-        if (sessionData == null || !"2FA".equals(sessionData.purpose)) {
-            throw new IdentityDomainException("Invalid or expired 2FA token");
-        }
-        UserId userId = new UserId(sessionData.userId);
-
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IdentityDomainException("User not found"));
-
-        // Verify TOTP code
-        if (!verifyTotpCode(user.getTwoFactorSecret(), request.getCode())) {
-            throw new IdentityDomainException("Invalid 2FA code");
-        }
-
-        // Generate JWT tokens
-        String accessToken = jwtTokenProvider.createToken(user.getId().getValue().toString());
-        String refreshToken = jwtTokenProvider.createToken(user.getId().getValue().toString()); // In production, use separate refresh token logic
-
-        // Create session
-        // Session created with token
-
-        return TwoFactorResponse.success(accessToken, refreshToken);
+    public User activateUser(UUID userId) {
+        log.info("Activating user: {}", userId);
+        
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        
+        user.setStatus(UserStatus.ACTIVE);
+        user.setIsActive(true);
+        
+        User savedUser = userRepository.save(user);
+        log.info("User activated successfully: {}", userId);
+        
+        return savedUser;
     }
-
+    
     /**
-     * Refreshes access token using refresh token.
+     * Deactivates a user account.
      */
-    public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
-        log.debug("Refreshing access token");
-
-        // Validate refresh token
-        if (!jwtTokenProvider.validateToken(request.getRefreshToken())) {
-            throw new IdentityDomainException("Invalid refresh token");
-        }
-
-        String userIdStr = jwtTokenProvider.getUserIdFromToken(request.getRefreshToken());
-        UserId userId = new UserId(UUID.fromString(userIdStr));
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IdentityDomainException("User not found"));
-
-        // Generate new access token
-        String newAccessToken = jwtTokenProvider.createToken(user.getId().getValue().toString());
-
-        // Update session
-        // Session updated with new token
-
-        return RefreshTokenResponse.success(newAccessToken);
+    public User deactivateUser(UUID userId) {
+        log.info("Deactivating user: {}", userId);
+        
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        
+        user.setStatus(UserStatus.SUSPENDED);
+        user.setIsActive(false);
+        
+        User savedUser = userRepository.save(user);
+        log.info("User deactivated successfully: {}", userId);
+        
+        return savedUser;
     }
-
+    
     /**
-     * Logs out user by invalidating session.
+     * Locks a user account.
      */
-    public void logout(String accessToken) {
-        log.info("User logout");
-
-        String userIdStr = jwtTokenProvider.getUserIdFromToken(accessToken);
-        UserId userId = new UserId(UUID.fromString(userIdStr));
-        // Invalidate all user sessions
-        // In production, track sessions by user ID
+    public User lockUser(UUID userId) {
+        log.info("Locking user: {}", userId);
+        
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        
+        user.setStatus(UserStatus.LOCKED);
+        user.setLockedUntil(LocalDateTime.now().plusHours(24)); // Lock for 24 hours
+        
+        User savedUser = userRepository.save(user);
+        log.info("User locked successfully: {}", userId);
+        
+        return savedUser;
     }
-
+    
     /**
-     * Initiates password reset flow.
+     * Unlocks a user account.
      */
-    public PasswordResetResponse initiatePasswordReset(PasswordResetRequest request) {
-        log.info("Initiating password reset for: {}", request.getContact());
-
-        Optional<User> userOpt = userRepository.findByContact(request.getContact());
-
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-
-            // Generate reset token
-            VerificationToken token = user.initiateContactVerification(request.getContact());
-            userRepository.save(user);
-
-            // Send reset link/code
-            sendPasswordResetVerification(user, request.getContact(), token);
-        }
-
-        // Always return success (don't reveal if contact exists)
-        return PasswordResetResponse.success(
-            maskContact(request.getContact()),
-            determineContactType(request.getContact())
-        );
+    public User unlockUser(UUID userId) {
+        log.info("Unlocking user: {}", userId);
+        
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        
+        user.setStatus(UserStatus.ACTIVE);
+        user.setLockedUntil(null);
+        user.setFailedLoginAttempts(0);
+        
+        User savedUser = userRepository.save(user);
+        log.info("User unlocked successfully: {}", userId);
+        
+        return savedUser;
     }
-
+    
     /**
-     * Completes password reset.
+     * Gets user by ID.
      */
-    public void resetPassword(PasswordResetConfirmRequest request) {
-        log.info("Resetting password");
-
-        // Find user by contact
-        User user = userRepository.findByContact(request.getContact())
-            .orElseThrow(() -> new IdentityDomainException("Invalid reset request"));
-
-        // Verify token
-        if (!user.verifyContact(request.getContact(), request.getCode())) {
-            throw new IdentityDomainException("Invalid or expired reset code");
-        }
-
-        // Reset password
-        user.resetPassword(request.getNewPassword());
-        userRepository.save(user);
-
-        // Invalidate all existing sessions
-        // Invalidate all user sessions after password reset
+    @Transactional(readOnly = true)
+    public Optional<User> getUserById(UUID userId) {
+        log.debug("Fetching user by ID: {}", userId);
+        return userRepository.findByUserId(userId);
     }
-
-    // Helper methods
-
-    private void sendVerification(User user, String contact, VerificationToken token) {
-        String type = determineContactType(contact);
-
-        if ("EMAIL".equals(type)) {
-            notificationService.sendEmail(
-                contact,
-                "Verification Code",
-                "Your verification code is: " + token.getCode()
-            );
-        } else {
-            notificationService.sendSms(
-                contact,
-                "Your verification code is: " + token.getCode()
-            );
-        }
-    }
-
-    private void sendPasswordResetVerification(User user, String contact, VerificationToken token) {
-        String type = determineContactType(contact);
-
-        if ("EMAIL".equals(type)) {
-            notificationService.sendEmail(
-                contact,
-                "Password Reset",
-                "Your password reset code is: " + token.getCode()
-            );
-        } else {
-            notificationService.sendSms(
-                contact,
-                "Password reset code: " + token.getCode()
-            );
-        }
-    }
-
-    private String determineContactType(String contact) {
-        if (contact.contains("@")) {
-            return "EMAIL";
-        }
-        return "PHONE";
-    }
-
-    private String maskContact(String contact) {
-        if (contact.contains("@")) {
-            // Mask email: j****@example.com
-            String[] parts = contact.split("@");
-            if (parts[0].length() > 1) {
-                return parts[0].charAt(0) + "****@" + parts[1];
-            }
-            return "****@" + parts[1];
-        } else {
-            // Mask phone: ******1234
-            if (contact.length() >= 4) {
-                return "******" + contact.substring(contact.length() - 4);
-            }
-            return "******";
-        }
-    }
-
-    private boolean verifyTotpCode(String secret, String code) {
-        // Basic TOTP verification - in production use proper TOTP library
-        if (secret == null || code == null) {
-            return false;
-        }
-        // Simplified implementation - would use Google Authenticator library in production
-        return code.length() == 6 && code.matches("\\d+");
+    
+    /**
+     * Gets user by username or email.
+     */
+    @Transactional(readOnly = true)
+    public Optional<User> getUserByUsernameOrEmail(String usernameOrEmail) {
+        log.debug("Fetching user by username or email: {}", usernameOrEmail);
+        return userRepository.findByUsernameOrEmail(usernameOrEmail);
     }
 }
