@@ -4,6 +4,8 @@ package com.fabricmanagement.contact.domain.valueobject;
  * Enum representing the type of contact in the system.
  */
 public enum ContactType {
+    USER("User contact"),
+    COMPANY("Company contact"),
     CUSTOMER("Customer contact"),
     SUPPLIER("Supplier contact"),
     PARTNER("Business partner"),

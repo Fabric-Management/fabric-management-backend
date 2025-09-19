@@ -44,8 +44,12 @@ public class ContactResponse {
 
     // Company-specific fields
     private UUID companyId;
+    private String companyName;
+    private String industry;
+    private String website;
     private String position;
     private String businessUnit;
+    private String mainContactPerson;
 
     // Audit fields
     private LocalDateTime createdAt;
@@ -90,6 +94,9 @@ public class ContactResponse {
             .firstName(entity.getFirstName())
             .lastName(entity.getLastName())
             .displayName(entity.getDisplayName())
+            .primaryEmail(entity.getPrimaryEmail() != null ? entity.getPrimaryEmail().getEmail() : null)
+            .primaryPhone(entity.getPrimaryPhone() != null ? entity.getPrimaryPhone().getPhoneNumber() : null)
+            .primaryAddress(entity.getPrimaryAddress() != null ? entity.getPrimaryAddress().getFullAddress() : null)
             .userId(entity.getUserId())
             .jobTitle(entity.getJobTitle())
             .department(entity.getDepartment())

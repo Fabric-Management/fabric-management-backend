@@ -2,6 +2,7 @@ package com.fabricmanagement.contact.infrastructure.persistence.repository;
 
 import com.fabricmanagement.contact.infrastructure.persistence.entity.ContactEntity;
 import com.fabricmanagement.contact.infrastructure.persistence.entity.UserContactEntity;
+import com.fabricmanagement.contact.infrastructure.persistence.entity.CompanyContactEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -59,4 +60,32 @@ public interface ContactJpaRepository extends JpaRepository<ContactEntity, UUID>
      */
     @Query("SELECT c FROM ContactEntity c WHERE c.status = :status AND c.deleted = false")
     Page<ContactEntity> findByStatus(@Param("status") String status, Pageable pageable);
+
+    /**
+     * Finds a company contact by company ID.
+     */
+    @Query("SELECT c FROM CompanyContactEntity c WHERE c.companyId = :companyId AND c.deleted = false")
+    Optional<CompanyContactEntity> findByCompanyId(@Param("companyId") UUID companyId);
+
+    /**
+     * Checks if a contact exists for the given company ID.
+     */
+    @Query("SELECT COUNT(c) > 0 FROM CompanyContactEntity c WHERE c.companyId = :companyId AND c.deleted = false")
+    boolean existsByCompanyId(@Param("companyId") UUID companyId);
+
+    /**
+     * Finds company contacts by industry.
+     */
+    @Query("SELECT c FROM CompanyContactEntity c WHERE c.industry = :industry AND c.deleted = false")
+    Page<CompanyContactEntity> findByIndustry(@Param("industry") String industry, Pageable pageable);
+
+    /**
+     * Searches company contacts by query string.
+     */
+    @Query("SELECT c FROM CompanyContactEntity c WHERE " +
+           "(LOWER(c.companyName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(c.industry) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(c.mainContactPerson) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           "AND c.deleted = false")
+    Page<CompanyContactEntity> searchCompanyContacts(@Param("query") String query, Pageable pageable);
 }

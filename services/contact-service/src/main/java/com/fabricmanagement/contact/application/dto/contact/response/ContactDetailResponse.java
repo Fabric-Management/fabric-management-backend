@@ -47,16 +47,20 @@ public class ContactDetailResponse {
     private UUID companyId;
     private String companyName;
     private String industry;
+    private String companySize;
+    private String website;
     private String position;
     private String businessUnit;
-    private String companyWebsite;
     private String taxId;
     private String registrationNumber;
+    private String mainContactPerson;
+    private String mainContactEmail;
+    private String mainContactPhone;
 
     // Related data collections
-    private List<Object> emails;     // List of email DTOs
-    private List<Object> phones;     // List of phone DTOs
-    private List<Object> addresses;  // List of address DTOs
+    private List<com.fabricmanagement.contact.domain.valueobject.ContactEmail> emails;     // List of email DTOs
+    private List<com.fabricmanagement.contact.domain.valueobject.ContactPhone> phones;     // List of phone DTOs
+    private List<com.fabricmanagement.contact.domain.valueobject.ContactAddress> addresses;  // List of address DTOs
 
     // Audit fields
     private LocalDateTime createdAt;
@@ -65,4 +69,5 @@ public class ContactDetailResponse {
     private String updatedBy;
     private Long version;
     private Boolean deleted;
+    private Boolean isActive;
 }

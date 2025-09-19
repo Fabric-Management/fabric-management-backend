@@ -55,6 +55,12 @@ public class CompanyContactEntity extends ContactEntity {
     @Column(name = "currency_code", length = 3)
     private String currencyCode;
 
+    @Column(name = "position", length = 100)
+    private String position;
+
+    @Column(name = "business_unit", length = 100)
+    private String businessUnit;
+
     @Column(name = "main_contact_person", length = 200)
     private String mainContactPerson;
 
