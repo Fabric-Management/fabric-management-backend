@@ -1,7 +1,7 @@
 package com.fabricmanagement.contact.infrastructure.web.controller;
 
 import com.fabricmanagement.common.core.application.dto.ApiResponse;
-import com.fabricmanagement.common.core.application.dto.PageRequest;
+import com.fabricmanagement.contact.application.dto.common.PageRequestDto;
 import com.fabricmanagement.common.core.application.dto.PageResponse;
 import com.fabricmanagement.contact.application.dto.contact.request.CreateContactRequest;
 import com.fabricmanagement.contact.application.dto.contact.request.UpdateContactRequest;
@@ -107,8 +107,12 @@ public class UserContactController {
     ) {
         log.info("Fetching user contacts - page: {}, size: {}", page, size);
 
-        PageRequest pageRequest = PageRequest.of(page, size)
-            .withSort(sortBy, sortDirection);
+        PageRequestDto pageRequest = PageRequestDto.builder()
+            .page(page)
+            .size(size)
+            .sortBy(sortBy)
+            .sortDirection(sortDirection)
+            .build();
 
         PageResponse<ContactResponse> response = userContactService.getUserContactsByTenant(
             tenantId != null ? tenantId : getCurrentTenantId(),
@@ -131,7 +135,7 @@ public class UserContactController {
     ) {
         log.info("Searching user contacts with query: {}", query);
 
-        PageRequest pageRequest = PageRequest.of(page, size);
+        PageRequestDto pageRequest = PageRequestDto.builder().page(page).size(size).build();
         PageResponse<ContactResponse> response = userContactService.searchUserContacts(query, pageRequest);
 
         return ResponseEntity.ok(ApiResponse.success(response));
