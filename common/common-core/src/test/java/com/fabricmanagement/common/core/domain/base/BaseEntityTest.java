@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.UUID;
+
 /**
  * Test class for BaseEntity to verify compilation and basic functionality.
  */
@@ -45,11 +47,16 @@ class BaseEntityTest {
         assertNotEquals(entity1, entity2);
 
         // Set same ID for testing
-        entity1.setId(1L);
-        entity2.setId(1L);
+        UUID testId = UUID.randomUUID();
+        entity1.setId(testId);
+        entity2.setId(testId);
 
         assertEquals(entity1, entity2);
         assertEquals(entity1.hashCode(), entity2.hashCode());
+
+        // Test with different IDs
+        entity2.setId(UUID.randomUUID());
+        assertNotEquals(entity1, entity2);
     }
 
     /**

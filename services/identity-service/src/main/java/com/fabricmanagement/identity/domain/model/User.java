@@ -11,7 +11,8 @@ import java.util.stream.Collectors;
 
 /**
  * User Aggregate Root
- * Manages user identity, credentials, and contact information as a cohesive unit.
+ * Pure domain model managing user identity, credentials, and contact information.
+ * Infrastructure concerns (JPA/BaseEntity) are handled by UserEntity.
  */
 @Getter
 @Setter
@@ -20,11 +21,10 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class User {
 
-    private UserId id;
-    private UUID tenantId;
-    private String username;
-    private String firstName;
-    private String lastName;
+    // Core Identity
+    private UserIdentity identity;
+
+    // Business Fields
     private UserRole role;
     private UserStatus status;
 
@@ -78,7 +78,7 @@ public class User {
             createdBy
         );
 
-        user.addDomainEvent(new UserCreatedEvent(user.id, tenantId, username));
+        user.addDomainEvent(new UserCreatedEvent(user.getId().getValue(), tenantId, username));
         return user;
     }
 
@@ -94,11 +94,13 @@ public class User {
         validateUsername(username);
         validateName(firstName, lastName);
 
-        this.id = id;
-        this.tenantId = tenantId;
-        this.username = username;
-        this.firstName = firstName;
-        this.lastName = lastName;
+        this.identity = UserIdentity.builder()
+            .id(id)
+            .tenantId(tenantId)
+            .username(username)
+            .firstName(firstName)
+            .lastName(lastName)
+            .build();
         this.role = role != null ? role : UserRole.USER;
         this.status = UserStatus.PENDING_ACTIVATION;
         this.contacts = new ArrayList<>();
@@ -133,10 +135,9 @@ public class User {
             contact.markAsPrimary();
         }
 
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = addedBy;
+        this.auditInfo.update(addedBy);
 
-        addDomainEvent(new UserContactAddedEvent(id, contactId, type, value));
+        addDomainEvent(new UserContactAddedEvent(getId().getValue(), contactId.getValue(), type, value));
     }
 
     /**
@@ -154,9 +155,9 @@ public class User {
         VerificationToken token = VerificationToken.generate(contact.getType());
         pendingVerifications.put(contact.getId(), token);
 
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
 
-        addDomainEvent(new ContactVerificationInitiatedEvent(id, contact.getId(), contactValue));
+        addDomainEvent(new ContactVerificationInitiatedEvent(getId().getValue(), contact.getId().getValue(), contactValue));
 
         return token;
     }
@@ -185,12 +186,12 @@ public class User {
         // Activate user on first verification
         if (status == UserStatus.PENDING_ACTIVATION) {
             status = UserStatus.ACTIVE;
-            addDomainEvent(new UserActivatedEvent(id));
+            addDomainEvent(new UserActivatedEvent(getId().getValue()));
         }
 
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
 
-        addDomainEvent(new ContactVerifiedEvent(id, contact.getId(), contactValue));
+        addDomainEvent(new ContactVerifiedEvent(getId().getValue(), contact.getId().getValue(), contactValue));
 
         return true;
     }
@@ -210,9 +211,9 @@ public class User {
 
         this.credentials = Credentials.create(password);
         this.passwordMustChange = false;
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
 
-        addDomainEvent(new PasswordCreatedEvent(id));
+        addDomainEvent(new PasswordCreatedEvent(getId().getValue()));
     }
 
     /**
@@ -284,9 +285,9 @@ public class User {
 
         credentials = credentials.change(newPassword);
         passwordMustChange = false;
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
 
-        addDomainEvent(new PasswordChangedEvent(id));
+        addDomainEvent(new PasswordChangedEvent(getId().getValue()));
     }
 
     /**
@@ -297,9 +298,9 @@ public class User {
         passwordMustChange = false;
         failedLoginAttempts = 0;
         lockedUntil = null;
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
 
-        addDomainEvent(new PasswordResetEvent(id));
+        addDomainEvent(new PasswordResetEvent(getId().getValue()));
     }
 
     /**
@@ -319,7 +320,7 @@ public class User {
         // Set new primary
         contact.markAsPrimary();
         this.primaryContactId = contactId;
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
     }
 
     /**
@@ -340,10 +341,10 @@ public class User {
         }
 
         contacts.remove(contact);
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = removedBy;
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
+        this.auditInfo.setUpdatedBy(removedBy);
 
-        addDomainEvent(new UserContactRemovedEvent(id, contactId));
+        addDomainEvent(new UserContactRemovedEvent(getId().getValue(), contactId.getValue()));
     }
 
     /**
@@ -356,9 +357,9 @@ public class User {
 
         this.twoFactorSecret = TwoFactorSecret.generate();
         this.twoFactorEnabled = true;
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
 
-        addDomainEvent(new TwoFactorEnabledEvent(id));
+        addDomainEvent(new TwoFactorEnabledEvent(getId().getValue()));
 
         return twoFactorSecret;
     }
@@ -369,9 +370,9 @@ public class User {
     public void disableTwoFactor() {
         this.twoFactorEnabled = false;
         this.twoFactorSecret = null;
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
 
-        addDomainEvent(new TwoFactorDisabledEvent(id));
+        addDomainEvent(new TwoFactorDisabledEvent(getId().getValue()));
     }
 
     /**
@@ -380,12 +381,12 @@ public class User {
     public void updateProfile(String firstName, String lastName, String updatedBy) {
         validateName(firstName, lastName);
 
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = updatedBy;
+        this.identity.setFirstName(firstName);
+        this.identity.setLastName(lastName);
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
+        this.auditInfo.setUpdatedBy(updatedBy);
 
-        addDomainEvent(new UserProfileUpdatedEvent(id));
+        addDomainEvent(new UserProfileUpdatedEvent(getId().getValue()));
     }
 
     /**
@@ -398,10 +399,10 @@ public class User {
 
         UserRole oldRole = this.role;
         this.role = newRole;
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = changedBy;
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
+        this.auditInfo.setUpdatedBy(changedBy);
 
-        addDomainEvent(new UserRoleChangedEvent(id, oldRole, newRole));
+        addDomainEvent(new UserRoleChangedEvent(getId().getValue(), oldRole, newRole));
     }
 
     /**
@@ -413,10 +414,10 @@ public class User {
         }
 
         this.status = UserStatus.SUSPENDED;
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = suspendedBy;
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
+        this.auditInfo.setUpdatedBy(suspendedBy);
 
-        addDomainEvent(new UserSuspendedEvent(id, reason));
+        addDomainEvent(new UserSuspendedEvent(getId().getValue(), reason));
     }
 
     /**
@@ -430,10 +431,10 @@ public class User {
         this.status = UserStatus.ACTIVE;
         this.failedLoginAttempts = 0;
         this.lockedUntil = null;
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = reactivatedBy;
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
+        this.auditInfo.setUpdatedBy(reactivatedBy);
 
-        addDomainEvent(new UserReactivatedEvent(id));
+        addDomainEvent(new UserReactivatedEvent(getId().getValue()));}
     }
 
     // Helper methods
@@ -460,7 +461,7 @@ public class User {
         if (failedLoginAttempts >= 5) {
             lockedUntil = LocalDateTime.now().plusMinutes(30);
         }
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
     }
 
     private void resetFailedAttempts() {
@@ -471,16 +472,13 @@ public class User {
     private void recordSuccessfulLogin(String ipAddress) {
         lastLoginAt = LocalDateTime.now();
         lastLoginIp = ipAddress;
-        this.updatedAt = LocalDateTime.now();
+        this.auditInfo.setUpdatedAt(LocalDateTime.now());
     }
 
     public boolean isAccountLocked() {
         return lockedUntil != null && lockedUntil.isAfter(LocalDateTime.now());
     }
 
-    public String getFullName() {
-        return String.format("%s %s", firstName, lastName).trim();
-    }
 
     public String getPrimaryEmail() {
         if (primaryContactId == null) {
@@ -541,7 +539,32 @@ public class User {
         domainEvents.clear();
     }
 
-    // Convenience methods for backward compatibility
+    // Convenience methods for identity access
+    public UserId getId() {
+        return identity != null ? identity.getId() : null;
+    }
+
+    public UUID getTenantId() {
+        return identity != null ? identity.getTenantId() : null;
+    }
+
+    public String getUsername() {
+        return identity != null ? identity.getUsername() : null;
+    }
+
+    public String getFirstName() {
+        return identity != null ? identity.getFirstName() : null;
+    }
+
+    public String getLastName() {
+        return identity != null ? identity.getLastName() : null;
+    }
+
+    public String getFullName() {
+        return identity != null ? identity.getFullName() : null;
+    }
+
+    // Convenience methods for audit access
     public LocalDateTime getCreatedAt() {
         return auditInfo != null ? auditInfo.getCreatedAt() : null;
     }
