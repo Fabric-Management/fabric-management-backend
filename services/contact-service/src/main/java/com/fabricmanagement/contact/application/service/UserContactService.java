@@ -1,7 +1,7 @@
 package com.fabricmanagement.contact.application.service;
 
 import com.fabricmanagement.common.core.application.dto.ApiResponse;
-import com.fabricmanagement.common.core.application.dto.PageRequest;
+import com.fabricmanagement.contact.application.dto.common.PageRequestDto;
 import com.fabricmanagement.common.core.application.dto.PageResponse;
 import com.fabricmanagement.contact.application.dto.contact.request.CreateContactRequest;
 import com.fabricmanagement.contact.application.dto.contact.request.UpdateContactRequest;
@@ -160,7 +160,7 @@ public class UserContactService {
      * Gets all user contacts for a tenant with pagination.
      */
     @Transactional(readOnly = true)
-    public PageResponse<ContactResponse> getUserContactsByTenant(UUID tenantId, PageRequest pageRequest) {
+    public PageResponse<ContactResponse> getUserContactsByTenant(UUID tenantId, PageRequestDto pageRequest) {
         log.debug("Fetching user contacts for tenant: {}", tenantId);
 
         Pageable pageable = pageRequest.toPageable();
@@ -185,7 +185,7 @@ public class UserContactService {
      * Searches user contacts.
      */
     @Transactional(readOnly = true)
-    public PageResponse<ContactResponse> searchUserContacts(String query, PageRequest pageRequest) {
+    public PageResponse<ContactResponse> searchUserContacts(String query, PageRequestDto pageRequest) {
         log.debug("Searching user contacts with query: {}", query);
 
         Pageable pageable = pageRequest.toPageable();

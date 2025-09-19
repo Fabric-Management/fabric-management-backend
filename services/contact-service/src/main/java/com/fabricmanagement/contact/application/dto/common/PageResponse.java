@@ -36,8 +36,6 @@ public class PageResponse<T> {
             .totalPages(page.getTotalPages())
             .first(page.isFirst())
             .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
             .build();
     }
     
@@ -50,12 +48,10 @@ public class PageResponse<T> {
             .totalPages(page.getTotalPages())
             .first(page.isFirst())
             .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
             .build();
     }
     
-    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequestDto pageRequest) {
         return PageResponse.<R>builder()
             .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
@@ -64,12 +60,10 @@ public class PageResponse<T> {
             .totalPages(page.getTotalPages())
             .first(page.isFirst())
             .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
             .build();
     }
     
-    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest, String methodName) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequestDto pageRequest, String methodName) {
         return PageResponse.<R>builder()
             .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
@@ -78,12 +72,10 @@ public class PageResponse<T> {
             .totalPages(page.getTotalPages())
             .first(page.isFirst())
             .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
             .build();
     }
     
-    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest, String methodName, String sortBy) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequestDto pageRequest, String methodName, String sortBy) {
         return PageResponse.<R>builder()
             .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
@@ -92,12 +84,10 @@ public class PageResponse<T> {
             .totalPages(page.getTotalPages())
             .first(page.isFirst())
             .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
             .build();
     }
     
-    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest, String methodName, String sortBy, String sortDirection) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequestDto pageRequest, String methodName, String sortBy, String sortDirection) {
         return PageResponse.<R>builder()
             .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
@@ -106,8 +96,6 @@ public class PageResponse<T> {
             .totalPages(page.getTotalPages())
             .first(page.isFirst())
             .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
             .build();
     }
 }

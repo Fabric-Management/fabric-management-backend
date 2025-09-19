@@ -1,6 +1,6 @@
 package com.fabricmanagement.contact.application.service;
 
-import com.fabricmanagement.common.core.application.dto.PageRequest;
+import com.fabricmanagement.contact.application.dto.common.PageRequestDto;
 import com.fabricmanagement.common.core.application.dto.PageResponse;
 import com.fabricmanagement.contact.application.dto.contact.request.CreateContactRequest;
 import com.fabricmanagement.contact.application.dto.contact.request.UpdateContactRequest;
@@ -190,7 +190,7 @@ public class CompanyContactService {
      * Gets all company contacts for a tenant with pagination.
      */
     @Transactional(readOnly = true)
-    public PageResponse<ContactResponse> getCompanyContactsByTenant(UUID tenantId, PageRequest pageRequest) {
+    public PageResponse<ContactResponse> getCompanyContactsByTenant(UUID tenantId, PageRequestDto pageRequest) {
         log.debug("Fetching company contacts for tenant: {}", tenantId);
 
         Pageable pageable = pageRequest.toPageable();
@@ -215,7 +215,7 @@ public class CompanyContactService {
      * Gets company contacts by industry.
      */
     @Transactional(readOnly = true)
-    public PageResponse<ContactResponse> getCompanyContactsByIndustry(String industry, PageRequest pageRequest) {
+    public PageResponse<ContactResponse> getCompanyContactsByIndustry(String industry, PageRequestDto pageRequest) {
         log.debug("Fetching company contacts for industry: {}", industry);
 
         Pageable pageable = pageRequest.toPageable();
@@ -240,7 +240,7 @@ public class CompanyContactService {
      * Searches company contacts.
      */
     @Transactional(readOnly = true)
-    public PageResponse<ContactResponse> searchCompanyContacts(String query, PageRequest pageRequest) {
+    public PageResponse<ContactResponse> searchCompanyContacts(String query, PageRequestDto pageRequest) {
         log.debug("Searching company contacts with query: {}", query);
 
         Pageable pageable = pageRequest.toPageable();

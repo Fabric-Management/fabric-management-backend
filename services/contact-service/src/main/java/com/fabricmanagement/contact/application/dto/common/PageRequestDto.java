@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.domain.PageRequest as SpringPageRequest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
@@ -15,7 +15,7 @@ import org.springframework.data.domain.Sort;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PageRequest {
+public class PageRequestDto {
     
     @Builder.Default
     private int page = 0;
@@ -30,8 +30,8 @@ public class PageRequest {
         if (sortBy != null && sortDirection != null) {
             Sort.Direction direction = Sort.Direction.fromString(sortDirection);
             Sort sort = Sort.by(direction, sortBy);
-            return SpringPageRequest.of(page, size, sort);
+            return PageRequest.of(page, size, sort);
         }
-        return SpringPageRequest.of(page, size);
+        return PageRequest.of(page, size);
     }
 }
