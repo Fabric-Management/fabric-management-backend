@@ -3,6 +3,7 @@ package com.fabricmanagement.identity.infrastructure.persistence.entity;
 import com.fabricmanagement.identity.domain.valueobject.ContactType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.GenericGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -21,6 +22,7 @@ public class UserContactEntity {
 
     @Id
     @GeneratedValue(generator = "uuid4")
+    @GenericGenerator(name = "uuid4", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(columnDefinition = "uuid")
     private UUID id;
 

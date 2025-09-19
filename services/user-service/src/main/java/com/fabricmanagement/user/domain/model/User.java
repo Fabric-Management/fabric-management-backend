@@ -8,6 +8,11 @@ import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * @deprecated Use identity-service User model instead.
+ * This service is being phased out in favor of consolidated identity-service.
+ */
+@Deprecated
 public class User {
 
     private final UserId id;

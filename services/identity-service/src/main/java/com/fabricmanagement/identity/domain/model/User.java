@@ -50,10 +50,7 @@ public class User {
     private String twoFactorSecret;
 
     // Audit
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private String createdBy;
-    private String updatedBy;
+    private AuditInfo auditInfo;
 
     // Domain Events
     @Builder.Default
@@ -109,10 +106,7 @@ public class User {
         this.failedLoginAttempts = 0;
         this.passwordMustChange = false;
         this.twoFactorEnabled = false;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-        this.createdBy = createdBy;
-        this.updatedBy = createdBy;
+        this.auditInfo = AuditInfo.create(createdBy);
         this.domainEvents = new ArrayList<>();
     }
 
@@ -533,6 +527,10 @@ public class User {
 
     private void addDomainEvent(DomainEvent event) {
         domainEvents.add(event);
+        // Track update timestamp when domain events occur
+        if (auditInfo != null) {
+            auditInfo.setUpdatedAt(LocalDateTime.now());
+        }
     }
 
     public List<DomainEvent> getDomainEvents() {
@@ -541,5 +539,28 @@ public class User {
 
     public void clearDomainEvents() {
         domainEvents.clear();
+    }
+
+    // Convenience methods for backward compatibility
+    public LocalDateTime getCreatedAt() {
+        return auditInfo != null ? auditInfo.getCreatedAt() : null;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return auditInfo != null ? auditInfo.getUpdatedAt() : null;
+    }
+
+    public String getCreatedBy() {
+        return auditInfo != null ? auditInfo.getCreatedBy() : null;
+    }
+
+    public String getUpdatedBy() {
+        return auditInfo != null ? auditInfo.getUpdatedBy() : null;
+    }
+
+    public void setUpdatedBy(String updatedBy) {
+        if (auditInfo != null) {
+            auditInfo.update(updatedBy);
+        }
     }
 }
