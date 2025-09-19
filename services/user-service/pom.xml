@@ -32,13 +32,6 @@
             <artifactId>common-security</artifactId>
         </dependency>
 
-        <!-- Identity Service (for User entity) -->
-        <dependency>
-            <groupId>com.fabricmanagement</groupId>
-            <artifactId>identity-service</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

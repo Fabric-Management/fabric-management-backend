@@ -11,12 +11,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Feign client for communication with identity-service.
+ * Feign client for communication with user-service.
  * Handles all user-related queries from contact-service.
  */
 @FeignClient(
-    name = "identity-service",
-    url = "${services.identity.url:http://localhost:8085}",
+    name = "user-service",
+    url = "${services.user.url:http://localhost:8081}",
     configuration = UserServiceClientConfig.class
 )
 public interface UserServiceClient {

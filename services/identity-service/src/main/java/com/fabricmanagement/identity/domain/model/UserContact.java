@@ -1,100 +1,85 @@
 package com.fabricmanagement.identity.domain.model;
 
-import com.fabricmanagement.identity.domain.valueobject.ContactId;
 import com.fabricmanagement.identity.domain.valueobject.ContactType;
-import com.fabricmanagement.identity.domain.valueobject.UserId;
+import com.fabricmanagement.identity.domain.valueobject.ContactStatus;
+import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
- * UserContact entity - part of the User aggregate.
- * Represents a single contact method (email or phone) for a user.
+ * UserContact entity for managing user contact information.
+ * Part of the User aggregate root.
  */
+@Entity
+@Table(name = "user_contacts", indexes = {
+    @Index(name = "idx_user_contact_user_id", columnList = "user_id"),
+    @Index(name = "idx_user_contact_tenant_user", columnList = "tenant_id, user_id")
+})
 @Getter
 @Setter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserContact {
-
-    private ContactId id;
-    private UserId userId;
-    private ContactType type;
-    private String value;
-    private boolean verified;
-    private LocalDateTime verifiedAt;
-    private boolean isPrimary;
+@Builder
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class UserContact extends BaseEntity {
+    
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
+    
+    @Column(name = "job_title", length = 100)
+    private String jobTitle;
+    
+    @Column(name = "department", length = 100)
+    private String department;
+    
+    @Column(name = "time_zone", length = 50)
+    private String timeZone;
+    
+    @Column(name = "language_preference", length = 10)
+    private String languagePreference;
+    
+    @Column(name = "preferred_contact_method", length = 20)
+    private String preferredContactMethod;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "contact_type", nullable = false)
+    private ContactType contactType;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private ContactStatus status;
+    
+    @Column(name = "primary_email", length = 255)
+    private String primaryEmail;
+    
+    @Column(name = "primary_phone", length = 50)
+    private String primaryPhone;
+    
+    @Column(name = "primary_address", length = 500)
+    private String primaryAddress;
+    
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
+    
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+    
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    private LocalDateTime lastUsedAt;
-
-    /**
-     * Creates a new unverified contact.
-     */
-    public static UserContact create(ContactId id, ContactType type, String value) {
-        return new UserContact(id, type, value);
+    
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+    
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
-
-    private UserContact(ContactId id, ContactType type, String value) {
-        this.id = id;
-        this.type = type;
-        this.value = value;
-        this.verified = false;
-        this.isPrimary = false;
-        this.createdAt = LocalDateTime.now();
-    }
-
-    /**
-     * Marks this contact as verified.
-     */
-    public void verify() {
-        this.verified = true;
-        this.verifiedAt = LocalDateTime.now();
-    }
-
-    /**
-     * Marks this contact as primary.
-     */
-    public void markAsPrimary() {
-        this.isPrimary = true;
-    }
-
-    /**
-     * Unmarks this contact as primary.
-     */
-    public void unmarkAsPrimary() {
-        this.isPrimary = false;
-    }
-
-    /**
-     * Records that this contact was used for authentication.
-     */
-    public void recordUsage() {
-        this.lastUsedAt = LocalDateTime.now();
-    }
-
-    /**
-     * Checks if this contact matches the given value (case-insensitive).
-     */
-    public boolean matches(String value) {
-        return this.value.equalsIgnoreCase(value);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        UserContact that = (UserContact) o;
-        return id.equals(that.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return id.hashCode();
-    }
-
-    @Override
-    public String toString() {
-        return String.format("%s:%s(%s)", type, value, verified ? "verified" : "unverified");
+    
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }
