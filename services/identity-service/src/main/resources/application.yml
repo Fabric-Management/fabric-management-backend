@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: identity-service
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/identity_db
+    username: identity_user
+    password: ${DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: false
+  
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+server:
+  port: 8081
+  servlet:
+    context-path: /api/identity
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Application specific configuration
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:your-256-bit-secret-key-here-for-development-only}
+      expiration: 86400000 # 24 hours
+      refresh-expiration: 604800000 # 7 days
+  
+  auth:
+    verification-code-ttl: 15 # minutes
+    temp-token-ttl: 30 # minutes
+    max-failed-attempts: 5
+    account-lock-duration: 30 # minutes
+    password-expiry-days: 90
+  
+  notification:
+    enabled: ${NOTIFICATION_ENABLED:false}
+    email:
+      from: noreply@fabricmanagement.com
+    sms:
+      from: FABRIC
+
+logging:
+  level:
+    com.fabricmanagement.identity: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

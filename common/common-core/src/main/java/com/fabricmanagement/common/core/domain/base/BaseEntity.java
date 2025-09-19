@@ -3,6 +3,7 @@ package com.fabricmanagement.common.core.domain.base;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.GenericGenerator;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -11,10 +12,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Base entity class providing common fields and functionality for all entities.
  * Includes audit fields, optimistic locking, and soft delete capability.
+ * Uses UUID as primary key for better distributed system support and security.
  */
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
@@ -23,8 +26,10 @@ import java.util.Objects;
 public abstract class BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(generator = "uuid4")
+    @GenericGenerator(name = "uuid4", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID id;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -102,7 +107,7 @@ public abstract class BaseEntity {
 
     @Override
     public String toString() {
-        return String.format("%s{id=%d, version=%d, deleted=%s}",
+        return String.format("%s{id=%s, version=%d, deleted=%s}",
             getClass().getSimpleName(), id, version, deleted);
     }
 }
