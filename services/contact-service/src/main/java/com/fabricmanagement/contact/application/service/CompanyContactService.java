@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -195,11 +196,19 @@ public class CompanyContactService {
         Pageable pageable = pageRequest.toPageable();
         Page<com.fabricmanagement.contact.infrastructure.persistence.entity.ContactEntity> contacts = contactRepository.findByTenantId(tenantId, pageable);
 
-        return PageResponse.of(
-            contacts,
-            entity -> toResponse((CompanyContactEntity) entity),
-            pageRequest
-        );
+        List<ContactResponse> content = contacts.getContent().stream()
+            .map(entity -> toResponse((CompanyContactEntity) entity))
+            .collect(java.util.stream.Collectors.toList());
+        
+        return PageResponse.<ContactResponse>builder()
+            .content(content)
+            .page(contacts.getNumber())
+            .size(contacts.getSize())
+            .totalElements(contacts.getTotalElements())
+            .totalPages(contacts.getTotalPages())
+            .first(contacts.isFirst())
+            .last(contacts.isLast())
+            .build();
     }
 
     /**
@@ -212,11 +221,19 @@ public class CompanyContactService {
         Pageable pageable = pageRequest.toPageable();
         Page<CompanyContactEntity> contacts = contactRepository.findByIndustry(industry, pageable);
 
-        return PageResponse.of(
-            contacts,
-            this::toResponse,
-            pageRequest
-        );
+        List<ContactResponse> content = contacts.getContent().stream()
+            .map(this::toResponse)
+            .collect(java.util.stream.Collectors.toList());
+        
+        return PageResponse.<ContactResponse>builder()
+            .content(content)
+            .page(contacts.getNumber())
+            .size(contacts.getSize())
+            .totalElements(contacts.getTotalElements())
+            .totalPages(contacts.getTotalPages())
+            .first(contacts.isFirst())
+            .last(contacts.isLast())
+            .build();
     }
 
     /**
@@ -229,11 +246,19 @@ public class CompanyContactService {
         Pageable pageable = pageRequest.toPageable();
         Page<CompanyContactEntity> contacts = contactRepository.searchCompanyContacts(query, pageable);
 
-        return PageResponse.of(
-            contacts,
-            this::toResponse,
-            pageRequest
-        );
+        List<ContactResponse> content = contacts.getContent().stream()
+            .map(this::toResponse)
+            .collect(java.util.stream.Collectors.toList());
+        
+        return PageResponse.<ContactResponse>builder()
+            .content(content)
+            .page(contacts.getNumber())
+            .size(contacts.getSize())
+            .totalElements(contacts.getTotalElements())
+            .totalPages(contacts.getTotalPages())
+            .first(contacts.isFirst())
+            .last(contacts.isLast())
+            .build();
     }
 
     /**
