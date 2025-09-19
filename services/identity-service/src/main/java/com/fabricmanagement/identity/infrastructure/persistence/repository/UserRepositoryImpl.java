@@ -125,11 +125,13 @@ public class UserRepositoryImpl implements UserRepository {
 
     private User toDomain(UserEntity entity) {
         User user = User.builder()
-            .id(new UserId(entity.getId()))
-            .tenantId(entity.getTenantId())
-            .username(entity.getUsername())
-            .firstName(entity.getFirstName())
-            .lastName(entity.getLastName())
+            .identity(UserIdentity.builder()
+                .id(new UserId(entity.getId()))
+                .tenantId(entity.getTenantId())
+                .username(entity.getUsername())
+                .firstName(entity.getFirstName())
+                .lastName(entity.getLastName())
+                .build())
             .role(entity.getRole())
             .status(entity.getStatus())
             .credentials(entity.getPasswordHash() != null ?
