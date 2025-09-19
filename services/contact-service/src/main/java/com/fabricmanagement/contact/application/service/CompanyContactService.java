@@ -45,8 +45,10 @@ public class CompanyContactService {
         log.debug("Creating contact for company: {}", companyId);
 
         // Verify company exists
-        CompanyDto company = companyServiceClient.getCompanyById(companyId)
-            .orElseThrow(() -> new IllegalArgumentException("Company not found: " + companyId));
+        CompanyDto company = companyServiceClient.getCompanyById(companyId);
+        if (company == null) {
+            throw new IllegalArgumentException("Company not found: " + companyId);
+        }
 
         // Check if contact already exists for this company
         if (contactRepository.existsByCompanyId(companyId)) {
@@ -59,7 +61,8 @@ public class CompanyContactService {
             company.getTenantId(),
             company.getName()
         );
-        contact.setContactType(request.getContactType() != null ? request.getContactType() : ContactType.CUSTOMER);
+        contact.setContactType(request.getContactType() != null ? 
+            ContactType.valueOf(request.getContactType()) : ContactType.COMPANY);
         contact.setStatus(ContactStatus.ACTIVE);
 
         // Set company-specific fields
@@ -190,10 +193,11 @@ public class CompanyContactService {
         log.debug("Fetching company contacts for tenant: {}", tenantId);
 
         Pageable pageable = pageRequest.toPageable();
-        Page<CompanyContactEntity> contacts = contactRepository.findByTenantIdAndEntityType(tenantId, "COMPANY", pageable);
+        Page<com.fabricmanagement.contact.infrastructure.persistence.entity.ContactEntity> contacts = contactRepository.findByTenantId(tenantId, pageable);
 
         return PageResponse.of(
-            contacts.map(this::toResponse),
+            contacts,
+            entity -> toResponse((CompanyContactEntity) entity),
             pageRequest
         );
     }
@@ -209,7 +213,8 @@ public class CompanyContactService {
         Page<CompanyContactEntity> contacts = contactRepository.findByIndustry(industry, pageable);
 
         return PageResponse.of(
-            contacts.map(this::toResponse),
+            contacts,
+            this::toResponse,
             pageRequest
         );
     }
@@ -225,7 +230,8 @@ public class CompanyContactService {
         Page<CompanyContactEntity> contacts = contactRepository.searchCompanyContacts(query, pageable);
 
         return PageResponse.of(
-            contacts.map(this::toResponse),
+            contacts,
+            this::toResponse,
             pageRequest
         );
     }
@@ -258,8 +264,12 @@ public class CompanyContactService {
     private ContactDetailResponse toDetailResponse(CompanyContactEntity entity) {
         ContactDetailResponse response = new ContactDetailResponse();
         response.setId(entity.getId());
+        response.setTenantId(entity.getTenantId());
         response.setContactType(entity.getContactType());
         response.setStatus(entity.getStatus());
+        response.setFirstName(entity.getFirstName());
+        response.setLastName(entity.getLastName());
+        response.setDisplayName(entity.getDisplayName());
         response.setNotes(entity.getNotes());
 
         // Add company-specific fields
@@ -268,10 +278,16 @@ public class CompanyContactService {
         response.setIndustry(entity.getIndustry());
         response.setCompanySize(entity.getCompanySize());
         response.setWebsite(entity.getWebsite());
+        response.setPosition(entity.getPosition());
+        response.setBusinessUnit(entity.getBusinessUnit());
         response.setTaxId(entity.getTaxId());
+        response.setRegistrationNumber(entity.getRegistrationNumber());
         response.setMainContactPerson(entity.getMainContactPerson());
         response.setMainContactEmail(entity.getMainContactEmail());
         response.setMainContactPhone(entity.getMainContactPhone());
+        response.setCreatedAt(entity.getCreatedAt());
+        response.setUpdatedAt(entity.getUpdatedAt());
+        response.setIsActive(entity.getStatus() != null && "ACTIVE".equals(entity.getStatus().name()));
 
         // Load related data
         response.setEmails(emailService.getContactEmails(entity.getId()));
@@ -287,12 +303,22 @@ public class CompanyContactService {
     private ContactResponse toResponse(CompanyContactEntity entity) {
         ContactResponse response = new ContactResponse();
         response.setId(entity.getId());
+        response.setTenantId(entity.getTenantId());
         response.setContactType(entity.getContactType());
         response.setStatus(entity.getStatus());
+        response.setFirstName(entity.getFirstName());
+        response.setLastName(entity.getLastName());
+        response.setDisplayName(entity.getDisplayName());
         response.setCompanyId(entity.getCompanyId());
         response.setCompanyName(entity.getCompanyName());
         response.setIndustry(entity.getIndustry());
         response.setWebsite(entity.getWebsite());
+        response.setPosition(entity.getPosition());
+        response.setBusinessUnit(entity.getBusinessUnit());
+        response.setMainContactPerson(entity.getMainContactPerson());
+        response.setCreatedAt(entity.getCreatedAt());
+        response.setUpdatedAt(entity.getUpdatedAt());
+        response.setIsActive(entity.getStatus() != null && "ACTIVE".equals(entity.getStatus().name()));
 
         // Add primary contact info
         if (entity.getPrimaryEmail() != null) {
@@ -301,8 +327,8 @@ public class CompanyContactService {
         if (entity.getPrimaryPhone() != null) {
             response.setPrimaryPhone(entity.getPrimaryPhone().getFullPhoneNumber());
         }
-        if (entity.getMainContactPerson() != null) {
-            response.setMainContactPerson(entity.getMainContactPerson());
+        if (entity.getPrimaryAddress() != null) {
+            response.setPrimaryAddress(entity.getPrimaryAddress().getFullAddress());
         }
 
         return response;

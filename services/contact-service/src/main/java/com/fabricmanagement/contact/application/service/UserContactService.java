@@ -166,7 +166,8 @@ public class UserContactService {
         Page<UserContactEntity> contacts = contactRepository.findByTenantIdAndEntityType(tenantId, "USER", pageable);
 
         return PageResponse.of(
-            contacts.map(this::toResponse),
+            contacts,
+            this::toResponse,
             pageRequest
         );
     }
@@ -182,7 +183,8 @@ public class UserContactService {
         Page<UserContactEntity> contacts = contactRepository.searchUserContacts(query, pageable);
 
         return PageResponse.of(
-            contacts.map(this::toResponse),
+            contacts,
+            this::toResponse,
             pageRequest
         );
     }
@@ -213,8 +215,12 @@ public class UserContactService {
         // Implementation would use mapper
         ContactDetailResponse response = new ContactDetailResponse();
         response.setId(entity.getId());
+        response.setTenantId(entity.getTenantId());
         response.setContactType(entity.getContactType());
         response.setStatus(entity.getStatus());
+        response.setFirstName(entity.getFirstName());
+        response.setLastName(entity.getLastName());
+        response.setDisplayName(entity.getDisplayName());
         response.setNotes(entity.getNotes());
 
         // Add user-specific fields
@@ -223,6 +229,15 @@ public class UserContactService {
         response.setDepartment(entity.getDepartment());
         response.setTimeZone(entity.getTimeZone());
         response.setLanguagePreference(entity.getLanguagePreference());
+        response.setPreferredContactMethod(entity.getPreferredContactMethod());
+        response.setLinkedinUrl(entity.getLinkedinUrl());
+        response.setTwitterHandle(entity.getTwitterHandle());
+        response.setEmergencyContactName(entity.getEmergencyContactName());
+        response.setEmergencyContactPhone(entity.getEmergencyContactPhone());
+        response.setEmergencyContactRelationship(entity.getEmergencyContactRelationship());
+        response.setCreatedAt(entity.getCreatedAt());
+        response.setUpdatedAt(entity.getUpdatedAt());
+        response.setIsActive(entity.getStatus() != null && "ACTIVE".equals(entity.getStatus().name()));
 
         // Load related data
         response.setEmails(emailService.getContactEmails(entity.getId()));
@@ -238,11 +253,21 @@ public class UserContactService {
     private ContactResponse toResponse(UserContactEntity entity) {
         ContactResponse response = new ContactResponse();
         response.setId(entity.getId());
+        response.setTenantId(entity.getTenantId());
         response.setContactType(entity.getContactType());
         response.setStatus(entity.getStatus());
+        response.setFirstName(entity.getFirstName());
+        response.setLastName(entity.getLastName());
+        response.setDisplayName(entity.getDisplayName());
         response.setUserId(entity.getUserId());
         response.setJobTitle(entity.getJobTitle());
         response.setDepartment(entity.getDepartment());
+        response.setTimeZone(entity.getTimeZone());
+        response.setLanguagePreference(entity.getLanguagePreference());
+        response.setPreferredContactMethod(entity.getPreferredContactMethod());
+        response.setCreatedAt(entity.getCreatedAt());
+        response.setUpdatedAt(entity.getUpdatedAt());
+        response.setIsActive(entity.getStatus() != null && "ACTIVE".equals(entity.getStatus().name()));
 
         // Add primary contact info
         if (entity.getPrimaryEmail() != null) {
@@ -250,6 +275,9 @@ public class UserContactService {
         }
         if (entity.getPrimaryPhone() != null) {
             response.setPrimaryPhone(entity.getPrimaryPhone().getFullPhoneNumber());
+        }
+        if (entity.getPrimaryAddress() != null) {
+            response.setPrimaryAddress(entity.getPrimaryAddress().getFullAddress());
         }
 
         return response;

@@ -46,6 +46,16 @@ public abstract class ContactEntity extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private ContactStatus status = ContactStatus.ACTIVE;
 
+    // Basic identity fields
+    @Column(name = "first_name", length = 100)
+    private String firstName;
+
+    @Column(name = "last_name", length = 100)
+    private String lastName;
+
+    @Column(name = "display_name", length = 200)
+    private String displayName;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
@@ -140,6 +150,14 @@ public abstract class ContactEntity extends BaseEntity {
             .filter(ContactAddressEntity::getIsPrimary)
             .findFirst()
             .orElse(null);
+    }
+
+    /**
+     * Marks this contact as deleted (soft delete).
+     */
+    public void markAsDeleted() {
+        this.setDeleted(true);
+        this.status = ContactStatus.INACTIVE;
     }
 
     @PrePersist

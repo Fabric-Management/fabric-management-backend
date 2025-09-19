@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS company_contacts (
     founded_year INTEGER,
     annual_revenue BIGINT,
     currency_code VARCHAR(3),
+    position VARCHAR(100),
+    business_unit VARCHAR(100),
     main_contact_person VARCHAR(200),
     main_contact_email VARCHAR(100),
     main_contact_phone VARCHAR(50),
