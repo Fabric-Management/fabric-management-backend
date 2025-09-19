@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Generic page response wrapper.
@@ -24,10 +26,8 @@ public class PageResponse<T> {
     private int totalPages;
     private boolean first;
     private boolean last;
-    private boolean hasNext;
-    private boolean hasPrevious;
     
-    public static <T> PageResponse<T> of(org.springframework.data.domain.Page<T> page, PageRequest pageRequest) {
+    public static <T> PageResponse<T> fromPage(Page<T> page) {
         return PageResponse.<T>builder()
             .content(page.getContent())
             .page(page.getNumber())
@@ -41,9 +41,9 @@ public class PageResponse<T> {
             .build();
     }
     
-    public static <T> PageResponse<T> of(org.springframework.data.domain.Page<T> page) {
-        return PageResponse.<T>builder()
-            .content(page.getContent())
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper) {
+        return PageResponse.<R>builder()
+            .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
             .size(page.getSize())
             .totalElements(page.getTotalElements())
@@ -55,9 +55,9 @@ public class PageResponse<T> {
             .build();
     }
     
-    public static <T, R> PageResponse<R> of(org.springframework.data.domain.Page<T> page, java.util.function.Function<T, R> mapper, PageRequest pageRequest) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest) {
         return PageResponse.<R>builder()
-            .content(page.getContent().stream().map(mapper).collect(java.util.stream.Collectors.toList()))
+            .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
             .size(page.getSize())
             .totalElements(page.getTotalElements())
@@ -69,9 +69,9 @@ public class PageResponse<T> {
             .build();
     }
     
-    public static <T, R> PageResponse<R> of(org.springframework.data.domain.Page<T> page, java.util.function.Function<T, R> mapper) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest, String methodName) {
         return PageResponse.<R>builder()
-            .content(page.getContent().stream().map(mapper).collect(java.util.stream.Collectors.toList()))
+            .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
             .size(page.getSize())
             .totalElements(page.getTotalElements())
@@ -83,9 +83,9 @@ public class PageResponse<T> {
             .build();
     }
     
-    public static <T, R> PageResponse<R> of(org.springframework.data.domain.Page<T> page, java.util.function.Function<T, R> mapper, PageRequest pageRequest, Class<R> responseType) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest, String methodName, String sortBy) {
         return PageResponse.<R>builder()
-            .content(page.getContent().stream().map(mapper).collect(java.util.stream.Collectors.toList()))
+            .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
             .size(page.getSize())
             .totalElements(page.getTotalElements())
@@ -97,51 +97,9 @@ public class PageResponse<T> {
             .build();
     }
     
-    public static <T, R> PageResponse<R> of(org.springframework.data.domain.Page<T> page, java.util.function.Function<T, R> mapper, PageRequest pageRequest, Class<R> responseType, String sortBy) {
+    public static <T, R> PageResponse<R> fromPageWithMapper(Page<T> page, Function<T, R> mapper, PageRequest pageRequest, String methodName, String sortBy, String sortDirection) {
         return PageResponse.<R>builder()
-            .content(page.getContent().stream().map(mapper).collect(java.util.stream.Collectors.toList()))
-            .page(page.getNumber())
-            .size(page.getSize())
-            .totalElements(page.getTotalElements())
-            .totalPages(page.getTotalPages())
-            .first(page.isFirst())
-            .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
-            .build();
-    }
-    
-    public static <T, R> PageResponse<R> of(org.springframework.data.domain.Page<T> page, java.util.function.Function<T, R> mapper, PageRequest pageRequest, Class<R> responseType, String sortBy, String sortDirection) {
-        return PageResponse.<R>builder()
-            .content(page.getContent().stream().map(mapper).collect(java.util.stream.Collectors.toList()))
-            .page(page.getNumber())
-            .size(page.getSize())
-            .totalElements(page.getTotalElements())
-            .totalPages(page.getTotalPages())
-            .first(page.isFirst())
-            .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
-            .build();
-    }
-    
-    public static <T, R> PageResponse<R> of(org.springframework.data.domain.Page<T> page, java.util.function.Function<T, R> mapper, PageRequest pageRequest, Class<R> responseType, String sortBy, String sortDirection, String filter) {
-        return PageResponse.<R>builder()
-            .content(page.getContent().stream().map(mapper).collect(java.util.stream.Collectors.toList()))
-            .page(page.getNumber())
-            .size(page.getSize())
-            .totalElements(page.getTotalElements())
-            .totalPages(page.getTotalPages())
-            .first(page.isFirst())
-            .last(page.isLast())
-            .hasNext(page.hasNext())
-            .hasPrevious(page.hasPrevious())
-            .build();
-    }
-    
-    public static <T, R> PageResponse<R> of(org.springframework.data.domain.Page<T> page, java.util.function.Function<T, R> mapper, PageRequest pageRequest, Class<R> responseType, String sortBy, String sortDirection, String filter, String search) {
-        return PageResponse.<R>builder()
-            .content(page.getContent().stream().map(mapper).collect(java.util.stream.Collectors.toList()))
+            .content(page.getContent().stream().map(mapper).collect(Collectors.toList()))
             .page(page.getNumber())
             .size(page.getSize())
             .totalElements(page.getTotalElements())

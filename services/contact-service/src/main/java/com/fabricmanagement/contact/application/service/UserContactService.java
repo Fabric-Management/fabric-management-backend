@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -165,11 +166,19 @@ public class UserContactService {
         Pageable pageable = pageRequest.toPageable();
         Page<UserContactEntity> contacts = contactRepository.findByTenantIdAndEntityType(tenantId, "USER", pageable);
 
-        return PageResponse.of(
-            contacts,
-            this::toResponse,
-            pageRequest
-        );
+        List<ContactResponse> content = contacts.getContent().stream()
+            .map(this::toResponse)
+            .collect(java.util.stream.Collectors.toList());
+        
+        return PageResponse.<ContactResponse>builder()
+            .content(content)
+            .page(contacts.getNumber())
+            .size(contacts.getSize())
+            .totalElements(contacts.getTotalElements())
+            .totalPages(contacts.getTotalPages())
+            .first(contacts.isFirst())
+            .last(contacts.isLast())
+            .build();
     }
 
     /**
@@ -182,11 +191,19 @@ public class UserContactService {
         Pageable pageable = pageRequest.toPageable();
         Page<UserContactEntity> contacts = contactRepository.searchUserContacts(query, pageable);
 
-        return PageResponse.of(
-            contacts,
-            this::toResponse,
-            pageRequest
-        );
+        List<ContactResponse> content = contacts.getContent().stream()
+            .map(this::toResponse)
+            .collect(java.util.stream.Collectors.toList());
+        
+        return PageResponse.<ContactResponse>builder()
+            .content(content)
+            .page(contacts.getNumber())
+            .size(contacts.getSize())
+            .totalElements(contacts.getTotalElements())
+            .totalPages(contacts.getTotalPages())
+            .first(contacts.isFirst())
+            .last(contacts.isLast())
+            .build();
     }
 
     /**
