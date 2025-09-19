@@ -96,11 +96,13 @@ public class UserRepositoryImpl implements UserRepository {
             entity.setPasswordChangedAt(user.getCredentials().getLastChangedAt());
         }
 
-        // Set audit fields
-        entity.setCreatedAt(user.getCreatedAt());
-        entity.setUpdatedAt(user.getUpdatedAt());
-        entity.setCreatedBy(user.getCreatedBy());
-        entity.setUpdatedBy(user.getUpdatedBy());
+        // Set audit fields from domain model's AuditInfo
+        if (user.getAuditInfo() != null) {
+            entity.setCreatedAt(user.getAuditInfo().getCreatedAt());
+            entity.setUpdatedAt(user.getAuditInfo().getUpdatedAt());
+            entity.setCreatedBy(user.getAuditInfo().getCreatedBy());
+            entity.setUpdatedBy(user.getAuditInfo().getUpdatedBy());
+        }
 
         // Map contacts
         for (UserContact contact : user.getContacts()) {
@@ -139,10 +141,14 @@ public class UserRepositoryImpl implements UserRepository {
             .twoFactorEnabled(entity.getTwoFactorEnabled() != null && entity.getTwoFactorEnabled())
             .twoFactorSecret(entity.getTwoFactorSecret())
             .passwordMustChange(entity.getPasswordMustChange() != null && entity.getPasswordMustChange())
-            .createdAt(entity.getCreatedAt())
-            .updatedAt(entity.getUpdatedAt())
-            .createdBy(entity.getCreatedBy())
-            .updatedBy(entity.getUpdatedBy())
+            .auditInfo(AuditInfo.builder()
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .createdBy(entity.getCreatedBy())
+                .updatedBy(entity.getUpdatedBy())
+                .version(entity.getVersion())
+                .deleted(entity.getDeleted())
+                .build())
             .build();
 
         // Map contacts directly to the list

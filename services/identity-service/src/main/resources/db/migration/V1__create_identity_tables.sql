@@ -27,15 +27,13 @@ CREATE TABLE users (
     -- Contact reference
     primary_contact_id UUID,
     
-    -- Audit fields
+    -- Audit fields (from BaseEntity)
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255),
-    updated_by VARCHAR(255),
+    created_by VARCHAR(100),
+    updated_by VARCHAR(100),
     version BIGINT DEFAULT 0,
-    is_deleted BOOLEAN DEFAULT FALSE,
-    deleted_at TIMESTAMP,
-    deleted_by VARCHAR(255)
+    deleted BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Create user_contacts table
