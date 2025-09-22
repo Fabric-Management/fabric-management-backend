@@ -1,13 +1,17 @@
 package com.fabricmanagement.contact.infrastructure.persistence.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
 
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.experimental.SuperBuilder;
+import lombok.NoArgsConstructor;
 import java.util.UUID;
 
 /**
  * Contact entity specifically for companies.
  * Links contact information to a company in the company-service.
+ * Extends ContactEntity which in turn extends BaseEntity for common functionality.
  */
 @Entity
 @Table(name = "company_contacts", indexes = {
@@ -19,10 +23,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
+@SuperBuilder
 public class CompanyContactEntity extends ContactEntity {
 
     @Column(name = "company_id", nullable = false, unique = true)
@@ -93,7 +94,6 @@ public class CompanyContactEntity extends ContactEntity {
     /**
      * Checks if this contact belongs to the specified company.
      */
-    @Transient
     public boolean belongsToCompany(UUID companyId) {
         return this.companyId != null && this.companyId.equals(companyId);
     }

@@ -1,13 +1,18 @@
+
 package com.fabricmanagement.contact.infrastructure.persistence.entity;
 
 import com.fabricmanagement.common.core.domain.base.BaseEntity;
 import com.fabricmanagement.contact.domain.valueobject.ContactStatus;
 import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
-
+import org.hibernate.annotations.SQLRestriction;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -26,11 +31,11 @@ import java.util.UUID;
 @Inheritance(strategy = InheritanceType.JOINED)
 @DiscriminatorColumn(name = "entity_type", discriminatorType = DiscriminatorType.STRING)
 @SQLDelete(sql = "UPDATE contacts SET deleted = true WHERE id = ? AND version = ?")
-@Where(clause = "deleted = false")
+@SQLRestriction("deleted = false")
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
+@SuperBuilder
 @ToString(callSuper = true, exclude = {"emails", "phones", "addresses"})
 @EqualsAndHashCode(callSuper = true, exclude = {"emails", "phones", "addresses"})
 public abstract class ContactEntity extends BaseEntity {
@@ -122,7 +127,6 @@ public abstract class ContactEntity extends BaseEntity {
     /**
      * Gets the primary email if exists.
      */
-    @Transient
     public ContactEmailEntity getPrimaryEmail() {
         return emails.stream()
             .filter(ContactEmailEntity::getIsPrimary)
@@ -133,7 +137,6 @@ public abstract class ContactEntity extends BaseEntity {
     /**
      * Gets the primary phone if exists.
      */
-    @Transient
     public ContactPhoneEntity getPrimaryPhone() {
         return phones.stream()
             .filter(ContactPhoneEntity::getIsPrimary)
@@ -144,7 +147,6 @@ public abstract class ContactEntity extends BaseEntity {
     /**
      * Gets the primary address if exists.
      */
-    @Transient
     public ContactAddressEntity getPrimaryAddress() {
         return addresses.stream()
             .filter(ContactAddressEntity::getIsPrimary)
@@ -154,9 +156,11 @@ public abstract class ContactEntity extends BaseEntity {
 
     /**
      * Marks this contact as deleted (soft delete).
+     * Overrides BaseEntity to also update contact status.
      */
+    @Override
     public void markAsDeleted() {
-        this.setDeleted(true);
+        super.markAsDeleted(); // Call parent's implementation
         this.status = ContactStatus.INACTIVE;
     }
 
