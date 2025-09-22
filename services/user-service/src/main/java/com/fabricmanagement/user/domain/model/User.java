@@ -1,88 +1,102 @@
 package com.fabricmanagement.user.domain.model;
 
-import com.fabricmanagement.user.domain.valueobject.Role;
-import com.fabricmanagement.user.domain.valueobject.UserId;
-import com.fabricmanagement.user.domain.valueobject.UserStatus;
+import com.fabricmanagement.common.core.domain.base.BaseEntity;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
-import java.time.OffsetDateTime;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
- * @deprecated Use identity-service User model instead.
- * This service is being phased out in favor of consolidated identity-service.
+ * User domain entity representing user profiles in the system.
+ * Extends BaseEntity for common functionality (id, auditing, soft delete).
+ * Focused ONLY on user profile data - NO authentication/authorization or contact data.
  */
-@Deprecated
-public class User {
+@Getter
+@Setter
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@SuperBuilder
+public class User extends BaseEntity {
 
-    private final UserId id;
-    private final UUID tenantId;
-    private final String username;
-    private final String email;
-    private final String firstName;
-    private final String lastName;
-    private final Role role;
-    private final UserStatus status;
-    private final OffsetDateTime createdAt;
-    private final OffsetDateTime updatedAt;
+    private UUID tenantId;
 
-    private User(Builder builder) {
-        this.id = builder.id;
-        this.tenantId = builder.tenantId;
-        this.username = builder.username;
-        this.email = builder.email;
-        this.firstName = builder.firstName;
-        this.lastName = builder.lastName;
-        this.role = builder.role;
-        this.status = builder.status;
-        this.createdAt = builder.createdAt;
-        this.updatedAt = builder.updatedAt;
+    // Basic user profile information
+    private String firstName;
+    private String lastName;
+    private String displayName;
+    private String jobTitle;
+    private String department;
+
+    // User preferences and settings
+    private String timeZone;
+    private String languagePreference;
+    private String profileImageUrl;
+
+    // User status (different from BaseEntity's deleted flag)
+    private UserStatus status;
+
+    // Business domain behavior
+    public String getFullName() {
+        if (firstName != null && lastName != null) {
+            return firstName + " " + lastName;
+        }
+        if (displayName != null && !displayName.trim().isEmpty()) {
+            return displayName;
+        }
+        return "";
     }
 
-    public UserId getId() { return id; }
-    public UUID getTenantId() { return tenantId; }
-    public String getUsername() { return username; }
-    public String getEmail() { return email; }
-    public String getFirstName() { return firstName; }
-    public String getLastName() { return lastName; }
-    public Role getRole() { return role; }
-    public UserStatus getStatus() { return status; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+    }
 
-    public static Builder builder() { return new Builder(); }
+    public void deactivate() {
+        this.status = UserStatus.INACTIVE;
+    }
 
-    public static final class Builder {
-        private UserId id;
-        private UUID tenantId;
-        private String username;
-        private String email;
-        private String firstName;
-        private String lastName;
-        private Role role = Role.USER;
-        private UserStatus status = UserStatus.ACTIVE;
-        private OffsetDateTime createdAt;
-        private OffsetDateTime updatedAt;
+    public void suspend() {
+        this.status = UserStatus.SUSPENDED;
+    }
 
-        public Builder id(UserId id) { this.id = id; return this; }
-        public Builder tenantId(UUID tenantId) { this.tenantId = tenantId; return this; }
-        public Builder username(String username) { this.username = username; return this; }
-        public Builder email(String email) { this.email = email; return this; }
-        public Builder firstName(String firstName) { this.firstName = firstName; return this; }
-        public Builder lastName(String lastName) { this.lastName = lastName; return this; }
-        public Builder role(Role role) { this.role = role; return this; }
-        public Builder status(UserStatus status) { this.status = status; return this; }
-        public Builder createdAt(OffsetDateTime createdAt) { this.createdAt = createdAt; return this; }
-        public Builder updatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
+    public boolean isActive() {
+        return UserStatus.ACTIVE.equals(status);
+    }
 
-        public User build() {
-            Objects.requireNonNull(tenantId, "tenantId must not be null");
-            Objects.requireNonNull(username, "username must not be null");
-            Objects.requireNonNull(email, "email must not be null");
-            Objects.requireNonNull(firstName, "firstName must not be null");
-            Objects.requireNonNull(lastName, "lastName must not be null");
-            return new User(this);
-        }
+    public boolean hasJobTitle() {
+        return jobTitle != null && !jobTitle.trim().isEmpty();
+    }
+
+    public boolean hasDepartment() {
+        return department != null && !department.trim().isEmpty();
+    }
+
+    public void updateProfile(String firstName, String lastName, String displayName,
+                             String jobTitle, String department) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.displayName = displayName;
+        this.jobTitle = jobTitle;
+        this.department = department;
+    }
+
+    public void updatePreferences(String timeZone, String languagePreference) {
+        this.timeZone = timeZone;
+        this.languagePreference = languagePreference;
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+            "id=" + getId() +
+            ", tenantId=" + tenantId +
+            ", firstName='" + firstName + '\'' +
+            ", lastName='" + lastName + '\'' +
+            ", displayName='" + displayName + '\'' +
+            ", status=" + status +
+            ", deleted=" + isDeleted() +
+            '}';
     }
 }
-
