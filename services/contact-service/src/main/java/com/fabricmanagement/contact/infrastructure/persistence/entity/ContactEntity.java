@@ -5,6 +5,7 @@ import com.fabricmanagement.common.core.domain.base.BaseEntity;
 import com.fabricmanagement.contact.domain.valueobject.ContactStatus;
 import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
@@ -40,27 +41,34 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true, exclude = {"emails", "phones", "addresses"})
 public abstract class ContactEntity extends BaseEntity {
 
+    @NotNull(message = "Tenant ID is required")
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
+    @NotNull(message = "Contact type is required")
     @Enumerated(EnumType.STRING)
     @Column(name = "contact_type", nullable = false, length = 30)
     private ContactType contactType;
 
+    @NotNull(message = "Contact status is required")
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ContactStatus status = ContactStatus.ACTIVE;
 
     // Basic identity fields
+    @Size(max = 100, message = "First name cannot exceed 100 characters")
     @Column(name = "first_name", length = 100)
     private String firstName;
 
+    @Size(max = 100, message = "Last name cannot exceed 100 characters")
     @Column(name = "last_name", length = 100)
     private String lastName;
 
+    @Size(max = 200, message = "Display name cannot exceed 200 characters")
     @Column(name = "display_name", length = 200)
     private String displayName;
 
+    @Size(max = 5000, message = "Notes cannot exceed 5000 characters")
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 

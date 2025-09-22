@@ -1,7 +1,7 @@
 package com.fabricmanagement.contact.application.mapper;
 
 import com.fabricmanagement.contact.application.dto.contact.request.CreateCompanyContactRequest;
-import com.fabricmanagement.contact.application.dto.contact.request.UpdateContactRequest;
+import com.fabricmanagement.contact.application.dto.contact.request.UpdateCompanyContactRequest;
 import com.fabricmanagement.contact.application.dto.contact.response.*;
 import com.fabricmanagement.contact.domain.model.CompanyContact;
 import com.fabricmanagement.contact.domain.valueobject.ContactStatus;
@@ -18,9 +18,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Mapper for converting between Contact domain models, entities, and DTOs.
- * Uses MapStruct for compile-time type safety and performance.
- * Focused on contact information only, not company business data.
+ * Dedicated mapper for CompanyContact operations.
+ * Handles ONLY contact information - NO user profile or company business data.
  */
 @Component
 @Mapper(
@@ -29,36 +28,12 @@ import java.util.stream.Collectors;
     nullValueCheckStrategy = NullValueCheckStrategy.ALWAYS,
     unmappedTargetPolicy = ReportingPolicy.IGNORE
 )
-public interface ContactMapper {
+public interface CompanyContactMapper {
 
-    // ========== Domain Model <-> Entity Mappings ==========
-
-    /**
-     * Converts a CompanyContactEntity to a CompanyContact domain model.
-     */
-    @Mapping(target = "contactType", expression = "java(mapContactTypeToString(entity.getContactType()))")
-    @Mapping(target = "status", expression = "java(mapContactStatusToString(entity.getStatus()))")
-    CompanyContact toCompanyContactDomain(CompanyContactEntity entity);
+    // ========== Request to Domain ==========
 
     /**
-     * Converts a CompanyContact domain model to a CompanyContactEntity.
-     */
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "createdBy", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "updatedBy", ignore = true)
-    @Mapping(target = "version", ignore = true)
-    @Mapping(target = "emails", ignore = true)
-    @Mapping(target = "phones", ignore = true)
-    @Mapping(target = "addresses", ignore = true)
-    @Mapping(target = "contactType", expression = "java(mapContactType(contact.getContactType()))")
-    @Mapping(target = "status", expression = "java(mapContactStatus(contact.getStatus()))")
-    CompanyContactEntity toEntity(CompanyContact contact);
-
-    // ========== DTO <-> Domain Model Mappings ==========
-
-    /**
-     * Converts a CreateCompanyContactRequest to a CompanyContact domain model.
+     * Converts CreateCompanyContactRequest to CompanyContact domain model.
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "tenantId", ignore = true)
@@ -72,31 +47,59 @@ public interface ContactMapper {
     CompanyContact toDomain(CreateCompanyContactRequest request);
 
     /**
-     * Updates a CompanyContact domain model from an UpdateContactRequest.
+     * Updates CompanyContact domain model from UpdateCompanyContactRequest.
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "tenantId", ignore = true)
     @Mapping(target = "companyId", ignore = true)
+    @Mapping(target = "companyName", ignore = true)
     @Mapping(target = "contactType", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "deleted", ignore = true)
-    void updateDomainFromRequest(UpdateContactRequest request, @MappingTarget CompanyContact contact);
+    @Mapping(target = "displayName", ignore = true)
+    @Mapping(target = "firstName", ignore = true)
+    @Mapping(target = "lastName", ignore = true)
+    void updateDomain(UpdateCompanyContactRequest request, @MappingTarget CompanyContact domain);
 
-    // ========== Entity <-> DTO Response Mappings ==========
+    // ========== Domain to Entity ==========
 
     /**
-     * Converts a CompanyContactEntity to a CompanyContactResponse.
+     * Converts CompanyContact domain to CompanyContactEntity.
+     */
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "updatedBy", ignore = true)
+    @Mapping(target = "version", ignore = true)
+    @Mapping(target = "emails", ignore = true)
+    @Mapping(target = "phones", ignore = true)
+    @Mapping(target = "addresses", ignore = true)
+    @Mapping(target = "contactType", expression = "java(mapContactType(domain.getContactType()))")
+    @Mapping(target = "status", expression = "java(mapContactStatus(domain.getStatus()))")
+    CompanyContactEntity toEntity(CompanyContact domain);
+
+    /**
+     * Converts CompanyContactEntity to CompanyContact domain.
+     */
+    @Mapping(target = "contactType", expression = "java(mapContactTypeToString(entity.getContactType()))")
+    @Mapping(target = "status", expression = "java(mapContactStatusToString(entity.getStatus()))")
+    CompanyContact toDomain(CompanyContactEntity entity);
+
+    // ========== Entity to Response DTOs ==========
+
+    /**
+     * Converts CompanyContactEntity to CompanyContactResponse (detailed).
      */
     @Mapping(target = "contactType", expression = "java(mapContactTypeToString(entity.getContactType()))")
     @Mapping(target = "status", expression = "java(mapContactStatusToString(entity.getStatus()))")
     @Mapping(target = "isActive", expression = "java(isActiveStatus(entity.getStatus()))")
-    @Mapping(target = "emails", source = "emails")
-    @Mapping(target = "phones", source = "phones")
-    @Mapping(target = "addresses", source = "addresses")
+    @Mapping(target = "emails", expression = "java(mapEmails(entity.getEmails()))")
+    @Mapping(target = "phones", expression = "java(mapPhones(entity.getPhones()))")
+    @Mapping(target = "addresses", expression = "java(mapAddresses(entity.getAddresses()))")
     CompanyContactResponse toDetailResponse(CompanyContactEntity entity);
 
     /**
-     * Converts a CompanyContactEntity to a ContactListResponse.
+     * Converts CompanyContactEntity to ContactListResponse (summary).
      */
     @Mapping(target = "contactType", expression = "java(mapContactTypeToString(entity.getContactType()))")
     @Mapping(target = "status", expression = "java(mapContactStatusToString(entity.getStatus()))")
@@ -104,12 +107,32 @@ public interface ContactMapper {
     @Mapping(target = "primaryEmail", expression = "java(getPrimaryEmail(entity))")
     @Mapping(target = "primaryPhone", expression = "java(getPrimaryPhone(entity))")
     @Mapping(target = "primaryAddress", expression = "java(getPrimaryAddress(entity))")
-    ContactListResponse toResponse(CompanyContactEntity entity);
+    ContactListResponse toListResponse(CompanyContactEntity entity);
 
     // ========== Contact Info Mappings ==========
 
     /**
-     * Maps a set of ContactEmailEntity to a list of EmailDto.
+     * Maps ContactEmailEntity to EmailDto.
+     */
+    @Mapping(target = "isPrimary", source = "isPrimary")
+    EmailDto toEmailDto(ContactEmailEntity entity);
+
+    /**
+     * Maps ContactPhoneEntity to PhoneDto.
+     */
+    @Mapping(target = "isPrimary", source = "isPrimary")
+    PhoneDto toPhoneDto(ContactPhoneEntity entity);
+
+    /**
+     * Maps ContactAddressEntity to AddressDto.
+     */
+    @Mapping(target = "isPrimary", source = "isPrimary")
+    AddressDto toAddressDto(ContactAddressEntity entity);
+
+    // ========== Helper Methods ==========
+
+    /**
+     * Maps set of emails to list of DTOs.
      */
     default List<EmailDto> mapEmails(Set<ContactEmailEntity> emails) {
         if (emails == null) return List.of();
@@ -119,7 +142,7 @@ public interface ContactMapper {
     }
 
     /**
-     * Maps a set of ContactPhoneEntity to a list of PhoneDto.
+     * Maps set of phones to list of DTOs.
      */
     default List<PhoneDto> mapPhones(Set<ContactPhoneEntity> phones) {
         if (phones == null) return List.of();
@@ -129,7 +152,7 @@ public interface ContactMapper {
     }
 
     /**
-     * Maps a set of ContactAddressEntity to a list of AddressDto.
+     * Maps set of addresses to list of DTOs.
      */
     default List<AddressDto> mapAddresses(Set<ContactAddressEntity> addresses) {
         if (addresses == null) return List.of();
@@ -137,23 +160,6 @@ public interface ContactMapper {
             .map(this::toAddressDto)
             .collect(Collectors.toList());
     }
-
-    /**
-     * Converts a ContactEmailEntity to an EmailDto.
-     */
-    EmailDto toEmailDto(ContactEmailEntity entity);
-
-    /**
-     * Converts a ContactPhoneEntity to a PhoneDto.
-     */
-    PhoneDto toPhoneDto(ContactPhoneEntity entity);
-
-    /**
-     * Converts a ContactAddressEntity to an AddressDto.
-     */
-    AddressDto toAddressDto(ContactAddressEntity entity);
-
-    // ========== Helper Methods ==========
 
     /**
      * Maps ContactType enum to string.
@@ -192,14 +198,14 @@ public interface ContactMapper {
     }
 
     /**
-     * Checks if the status is active.
+     * Checks if status is active.
      */
     default boolean isActiveStatus(ContactStatus status) {
         return status == ContactStatus.ACTIVE;
     }
 
     /**
-     * Gets the primary email from a contact entity.
+     * Gets primary email from entity.
      */
     default String getPrimaryEmail(CompanyContactEntity entity) {
         if (entity.getMainContactEmail() != null) {
@@ -216,7 +222,7 @@ public interface ContactMapper {
     }
 
     /**
-     * Gets the primary phone from a contact entity.
+     * Gets primary phone from entity.
      */
     default String getPrimaryPhone(CompanyContactEntity entity) {
         if (entity.getMainContactPhone() != null) {
@@ -233,7 +239,7 @@ public interface ContactMapper {
     }
 
     /**
-     * Gets the primary address from a contact entity.
+     * Gets primary address from entity.
      */
     default String getPrimaryAddress(CompanyContactEntity entity) {
         if (entity.getAddresses() != null) {

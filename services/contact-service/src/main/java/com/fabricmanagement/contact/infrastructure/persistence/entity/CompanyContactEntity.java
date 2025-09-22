@@ -2,6 +2,7 @@ package com.fabricmanagement.contact.infrastructure.persistence.entity;
 
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
@@ -26,59 +27,37 @@ import java.util.UUID;
 @SuperBuilder
 public class CompanyContactEntity extends ContactEntity {
 
+    @NotNull(message = "Company ID is required")
     @Column(name = "company_id", nullable = false, unique = true)
     private UUID companyId;
 
+    @NotBlank(message = "Company name is required")
+    @Size(max = 200, message = "Company name cannot exceed 200 characters")
     @Column(name = "company_name", nullable = false, length = 200)
     private String companyName;
 
-    @Column(name = "industry", length = 100)
-    private String industry;
-
-    @Column(name = "company_size", length = 50)
-    private String companySize;
-
+    @Pattern(regexp = "^https?://.*", message = "Website must be a valid URL")
+    @Size(max = 500, message = "Website URL cannot exceed 500 characters")
     @Column(name = "website", length = 500)
     private String website;
 
-    @Column(name = "tax_id", length = 50)
-    private String taxId;
-
-    @Column(name = "registration_number", length = 50)
-    private String registrationNumber;
-
-    @Column(name = "founded_year")
-    private Integer foundedYear;
-
-    @Column(name = "annual_revenue")
-    private Long annualRevenue;
-
-    @Column(name = "currency_code", length = 3)
-    private String currencyCode;
-
-    @Column(name = "position", length = 100)
-    private String position;
-
-    @Column(name = "business_unit", length = 100)
-    private String businessUnit;
-
+    @Size(max = 200, message = "Main contact person name cannot exceed 200 characters")
     @Column(name = "main_contact_person", length = 200)
     private String mainContactPerson;
 
+    @Email(message = "Main contact email must be valid")
+    @Size(max = 100, message = "Main contact email cannot exceed 100 characters")
     @Column(name = "main_contact_email", length = 100)
     private String mainContactEmail;
 
+    @Pattern(regexp = "^[+]?[0-9\\s\\-().]{3,50}$", message = "Main contact phone must be a valid phone number")
+    @Size(max = 50, message = "Main contact phone cannot exceed 50 characters")
     @Column(name = "main_contact_phone", length = 50)
     private String mainContactPhone;
 
+    @Size(max = 200, message = "Business hours cannot exceed 200 characters")
     @Column(name = "business_hours", length = 200)
     private String businessHours;
-
-    @Column(name = "payment_terms", length = 100)
-    private String paymentTerms;
-
-    @Column(name = "credit_limit")
-    private Long creditLimit;
 
     /**
      * Creates a new CompanyContactEntity with the given company ID and tenant ID.
