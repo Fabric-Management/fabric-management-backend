@@ -1,22 +1,26 @@
 package com.fabricmanagement.contact.infrastructure.web.controller;
 
 import com.fabricmanagement.common.core.application.dto.ApiResponse;
+import com.fabricmanagement.common.security.context.SecurityContextUtil;
 import com.fabricmanagement.contact.application.dto.common.PageRequestDto;
 import com.fabricmanagement.common.core.application.dto.PageResponse;
-import com.fabricmanagement.contact.application.dto.contact.request.CreateContactRequest;
-import com.fabricmanagement.contact.application.dto.contact.request.UpdateContactRequest;
-import com.fabricmanagement.contact.application.dto.contact.response.ContactDetailResponse;
-import com.fabricmanagement.contact.application.dto.contact.response.ContactResponse;
+import com.fabricmanagement.contact.application.dto.contact.request.CreateCompanyContactRequest;
+import com.fabricmanagement.contact.application.dto.contact.request.UpdateCompanyContactRequest;
+import com.fabricmanagement.contact.application.dto.contact.response.CompanyContactResponse;
+import com.fabricmanagement.contact.application.dto.contact.response.ContactListResponse;
 import com.fabricmanagement.contact.application.service.CompanyContactService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -29,6 +33,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Tag(name = "Company Contacts", description = "Company contact management endpoints")
 @Slf4j
+@Validated
 public class CompanyContactController {
 
     private final CompanyContactService companyContactService;
@@ -39,12 +44,12 @@ public class CompanyContactController {
     @PostMapping("/{companyId}")
     @Operation(summary = "Create company contact", description = "Creates a new contact for the specified company")
     @PreAuthorize("hasRole('ADMIN') or hasRole('COMPANY_ADMIN')")
-    public ResponseEntity<ApiResponse<ContactDetailResponse>> createCompanyContact(
+    public ResponseEntity<ApiResponse<CompanyContactResponse>> createCompanyContact(
         @PathVariable @Parameter(description = "Company ID") UUID companyId,
-        @Valid @RequestBody CreateContactRequest request
+        @Valid @RequestBody CreateCompanyContactRequest request
     ) {
         log.info("Creating contact for company: {}", companyId);
-        ContactDetailResponse response = companyContactService.createCompanyContact(companyId, request);
+        CompanyContactResponse response = companyContactService.createCompanyContact(companyId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(response, "Company contact created successfully"));
     }
@@ -55,11 +60,11 @@ public class CompanyContactController {
     @GetMapping("/{companyId}")
     @Operation(summary = "Get company contact", description = "Gets the contact information for the specified company")
     @PreAuthorize("hasRole('ADMIN') or hasRole('COMPANY_ADMIN') or hasRole('USER')")
-    public ResponseEntity<ApiResponse<ContactDetailResponse>> getCompanyContact(
+    public ResponseEntity<ApiResponse<CompanyContactResponse>> getCompanyContact(
         @PathVariable @Parameter(description = "Company ID") UUID companyId
     ) {
         log.info("Fetching contact for company: {}", companyId);
-        ContactDetailResponse response = companyContactService.getCompanyContact(companyId);
+        CompanyContactResponse response = companyContactService.getCompanyContact(companyId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -69,12 +74,12 @@ public class CompanyContactController {
     @PutMapping("/{companyId}")
     @Operation(summary = "Update company contact", description = "Updates the contact information for the specified company")
     @PreAuthorize("hasRole('ADMIN') or hasRole('COMPANY_ADMIN')")
-    public ResponseEntity<ApiResponse<ContactDetailResponse>> updateCompanyContact(
+    public ResponseEntity<ApiResponse<CompanyContactResponse>> updateCompanyContact(
         @PathVariable @Parameter(description = "Company ID") UUID companyId,
-        @Valid @RequestBody UpdateContactRequest request
+        @Valid @RequestBody UpdateCompanyContactRequest request
     ) {
         log.info("Updating contact for company: {}", companyId);
-        ContactDetailResponse response = companyContactService.updateCompanyContact(companyId, request);
+        CompanyContactResponse response = companyContactService.updateCompanyContact(companyId, request);
         return ResponseEntity.ok(ApiResponse.success(response, "Company contact updated successfully"));
     }
 
@@ -98,10 +103,10 @@ public class CompanyContactController {
     @GetMapping
     @Operation(summary = "List company contacts", description = "Gets all company contacts with pagination")
     @PreAuthorize("hasRole('ADMIN') or hasRole('COMPANY_ADMIN')")
-    public ResponseEntity<ApiResponse<PageResponse<ContactResponse>>> getCompanyContacts(
+    public ResponseEntity<ApiResponse<PageResponse<ContactListResponse>>> getCompanyContacts(
         @Parameter(description = "Tenant ID") @RequestParam(required = false) UUID tenantId,
-        @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-        @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size,
+        @Parameter(description = "Page number") @RequestParam(defaultValue = "0") @Min(0) int page,
+        @Parameter(description = "Page size") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
         @Parameter(description = "Sort by") @RequestParam(defaultValue = "companyName") String sortBy,
         @Parameter(description = "Sort direction") @RequestParam(defaultValue = "ASC") String sortDirection
     ) {
@@ -114,7 +119,7 @@ public class CompanyContactController {
             .sortDirection(sortDirection)
             .build();
 
-        PageResponse<ContactResponse> response = companyContactService.getCompanyContactsByTenant(
+        PageResponse<ContactListResponse> response = companyContactService.getCompanyContactsByTenant(
             tenantId != null ? tenantId : getCurrentTenantId(),
             pageRequest
         );
@@ -123,65 +128,28 @@ public class CompanyContactController {
     }
 
     /**
-     * Gets company contacts by industry.
-     */
-    @GetMapping("/by-industry")
-    @Operation(summary = "Get contacts by industry", description = "Gets company contacts filtered by industry")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('COMPANY_ADMIN')")
-    public ResponseEntity<ApiResponse<PageResponse<ContactResponse>>> getCompanyContactsByIndustry(
-        @Parameter(description = "Industry") @RequestParam String industry,
-        @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-        @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size
-    ) {
-        log.info("Fetching company contacts for industry: {}", industry);
-
-        PageRequestDto pageRequest = PageRequestDto.builder().page(page).size(size).build();
-        PageResponse<ContactResponse> response = companyContactService.getCompanyContactsByIndustry(industry, pageRequest);
-
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    /**
-     * Searches company contacts.
+     * Searches company contacts by name or contact person.
      */
     @GetMapping("/search")
-    @Operation(summary = "Search company contacts", description = "Searches company contacts by query")
+    @Operation(summary = "Search company contacts", description = "Searches company contacts by company name or contact person")
     @PreAuthorize("hasRole('ADMIN') or hasRole('COMPANY_ADMIN')")
-    public ResponseEntity<ApiResponse<PageResponse<ContactResponse>>> searchCompanyContacts(
+    public ResponseEntity<ApiResponse<PageResponse<ContactListResponse>>> searchCompanyContacts(
         @Parameter(description = "Search query") @RequestParam String query,
-        @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-        @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size
+        @Parameter(description = "Page number") @RequestParam(defaultValue = "0") @Min(0) int page,
+        @Parameter(description = "Page size") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         log.info("Searching company contacts with query: {}", query);
 
         PageRequestDto pageRequest = PageRequestDto.builder().page(page).size(size).build();
-        PageResponse<ContactResponse> response = companyContactService.searchCompanyContacts(query, pageRequest);
+        PageResponse<ContactListResponse> response = companyContactService.searchCompanyContacts(query, pageRequest);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
-     * Updates credit information for a company.
-     */
-    @PutMapping("/{companyId}/credit")
-    @Operation(summary = "Update credit info", description = "Updates the credit information for the specified company")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('FINANCE_ADMIN')")
-    public ResponseEntity<ApiResponse<ContactDetailResponse>> updateCreditInfo(
-        @PathVariable @Parameter(description = "Company ID") UUID companyId,
-        @Parameter(description = "Credit limit") @RequestParam(required = false) Long creditLimit,
-        @Parameter(description = "Payment terms") @RequestParam(required = false) String paymentTerms
-    ) {
-        log.info("Updating credit info for company: {}", companyId);
-        ContactDetailResponse response = companyContactService.updateCreditInfo(companyId, creditLimit, paymentTerms);
-        return ResponseEntity.ok(ApiResponse.success(response, "Credit information updated successfully"));
-    }
-
-    /**
      * Gets the current tenant ID from security context.
-     * This is a placeholder - implement based on your security setup.
      */
     private UUID getCurrentTenantId() {
-        // TODO: Get from security context
-        return UUID.randomUUID();
+        return SecurityContextUtil.getCurrentTenantId();
     }
 }
