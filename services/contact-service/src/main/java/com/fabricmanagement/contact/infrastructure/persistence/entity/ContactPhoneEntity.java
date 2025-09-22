@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
     @Index(name = "idx_contact_phone_primary", columnList = "is_primary")
 })
 @SQLDelete(sql = "UPDATE contact_phones SET deleted = true WHERE id = ? AND version = ?")
-@Where(clause = "deleted = false")
+@SQLRestriction("deleted = false")
 @Getter
 @Setter
 @NoArgsConstructor
