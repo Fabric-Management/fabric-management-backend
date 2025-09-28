@@ -78,7 +78,7 @@ public class SessionService {
         }
         
         UserSession session = sessionOpt.get();
-        if (!session.isActive()) {
+        if (!session.getIsActive()) {
             log.warn("Session is not active");
             return false;
         }
@@ -112,7 +112,7 @@ public class SessionService {
         }
         
         UserSession session = sessionOpt.get();
-        if (!session.isActive()) {
+        if (!session.getIsActive()) {
             throw new RuntimeException("Session is not active");
         }
         
