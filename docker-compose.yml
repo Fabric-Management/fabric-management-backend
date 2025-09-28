@@ -30,7 +30,11 @@ services:
       - fabric-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fabric_user} -d ${POSTGRES_DB:-fabric_management}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-fabric_user} -d ${POSTGRES_DB:-fabric_management}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,7 +94,13 @@ services:
       - fabric-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -98,11 +108,11 @@ services:
   # ==============================================
   # MICROSERVICES (Using exact ports from application.yml)
   # ==============================================
-  auth-service:
+  identity-service:
     build:
-      context: .  # Root directory context to access parent pom and common modules
-      dockerfile: services/auth-service/Dockerfile
-    container_name: fabric-auth-service
+      context: . # Root directory context to access parent pom and common modules
+      dockerfile: services/identity-service/Dockerfile
+    container_name: fabric-identity-service
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       POSTGRES_HOST: postgres-db
@@ -115,7 +125,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "8081:8081"  # auth-service port from application.yml
+      - "8081:8081" # identity-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -127,7 +137,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/api/v1/auth/actuator/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8081/api/identity/actuator/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -135,7 +151,7 @@ services:
 
   user-service:
     build:
-      context: .  # Root directory context to access parent pom and common modules
+      context: . # Root directory context to access parent pom and common modules
       dockerfile: services/user-service/Dockerfile
     container_name: fabric-user-service
     environment:
@@ -150,7 +166,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "8082:8082"  # user-service port from application.yml
+      - "8082:8082" # user-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -162,7 +178,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/api/v1/users/actuator/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8082/api/v1/users/actuator/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -170,7 +192,7 @@ services:
 
   company-service:
     build:
-      context: .  # Root directory context to access parent pom and common modules
+      context: . # Root directory context to access parent pom and common modules
       dockerfile: services/company-service/Dockerfile
     container_name: fabric-company-service
     environment:
@@ -185,7 +207,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "8083:8083"  # company-service port from application.yml
+      - "8083:8083" # company-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -197,7 +219,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/api/v1/companies/actuator/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8083/api/v1/companies/actuator/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -205,7 +233,7 @@ services:
 
   contact-service:
     build:
-      context: .  # Root directory context to access parent pom and common modules
+      context: . # Root directory context to access parent pom and common modules
       dockerfile: services/contact-service/Dockerfile
     container_name: fabric-contact-service
     environment:
@@ -220,7 +248,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC}
     ports:
-      - "8084:8084"  # contact-service port from application.yml
+      - "8084:8084" # contact-service port from application.yml
     networks:
       - fabric-network
     depends_on:
@@ -232,7 +260,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/api/v1/contacts/actuator/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8084/api/v1/contacts/actuator/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

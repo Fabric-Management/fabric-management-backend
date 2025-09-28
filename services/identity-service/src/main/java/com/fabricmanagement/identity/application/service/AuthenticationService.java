@@ -8,6 +8,7 @@ import com.fabricmanagement.identity.domain.valueobject.ContactType;
 import com.fabricmanagement.identity.domain.valueobject.UserRole;
 import com.fabricmanagement.identity.infrastructure.security.JwtTokenProvider;
 import com.fabricmanagement.identity.infrastructure.security.UserPrincipal;
+import com.fabricmanagement.identity.infrastructure.messaging.IdentityEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -36,6 +37,7 @@ public class AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final NotificationService notificationService;
     private final SessionService sessionService;
+    private final IdentityEventPublisher eventPublisher;
     
     /**
      * Registers a new user.
@@ -71,6 +73,15 @@ public class AuthenticationService {
 
         // Save user
         user = userRepository.save(user);
+
+        // Publish user created event
+        eventPublisher.publishUserCreatedEvent(
+            new com.fabricmanagement.identity.domain.event.UserCreatedEvent(
+                user.getId().getValue(),
+                user.getTenantId(),
+                user.getUsername()
+            )
+        );
 
         // Initiate email verification
         user.initiateContactVerification(request.getEmail());

@@ -8,6 +8,7 @@ import com.fabricmanagement.identity.domain.valueobject.ContactId;
 import com.fabricmanagement.identity.domain.valueobject.ContactType;
 import com.fabricmanagement.identity.domain.valueobject.UserId;
 import com.fabricmanagement.identity.infrastructure.security.UserPrincipal;
+import com.fabricmanagement.identity.infrastructure.messaging.IdentityEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -28,6 +29,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final IdentityEventPublisher eventPublisher;
 
     /**
      * Gets current user profile.
@@ -55,6 +57,13 @@ public class UserService {
 
         user.updateProfile(request.getFirstName(), request.getLastName(), userPrincipal.getUsername());
         user = userRepository.save(user);
+
+        // Publish profile updated event
+        eventPublisher.publishUserProfileUpdatedEvent(
+            new com.fabricmanagement.identity.domain.event.UserProfileUpdatedEvent(
+                user.getId().getValue()
+            )
+        );
 
         log.info("User profile updated for user: {}", user.getUsername());
         return mapToProfileResponse(user);

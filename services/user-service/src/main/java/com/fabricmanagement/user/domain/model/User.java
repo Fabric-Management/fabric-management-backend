@@ -22,6 +22,7 @@ import java.util.UUID;
 public class User extends BaseEntity {
 
     private UUID tenantId;
+    private String username; // Username from Identity Service
 
     // Basic user profile information
     private String firstName;
