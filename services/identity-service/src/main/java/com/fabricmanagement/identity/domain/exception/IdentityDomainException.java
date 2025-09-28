@@ -1,7 +1,7 @@
 package com.fabricmanagement.identity.domain.exception;
 
 /**
- * Domain exception for identity service.
+ * Base exception for identity domain.
  */
 public class IdentityDomainException extends RuntimeException {
 

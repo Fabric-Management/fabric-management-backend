@@ -1,27 +1,20 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a password is created.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class PasswordCreatedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private boolean isTemporary;
-    private LocalDateTime expiresAt;
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
+@EqualsAndHashCode(callSuper = true)
+public class PasswordCreatedEvent extends DomainEvent {
+    private UUID userId;
 
-    @Override
-    public String getEventType() {
-        return "PasswordCreated";
+    public PasswordCreatedEvent(UUID userId) {
+        super("PasswordCreated");
+        this.userId = userId;
     }
 }

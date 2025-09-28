@@ -1,43 +1,39 @@
 package com.fabricmanagement.identity.domain.valueobject;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import lombok.Data;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Base entity with common fields.
+ * Base entity with audit fields.
  */
+@Data
 @MappedSuperclass
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public abstract class BaseEntity {
-    
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    @CreationTimestamp
+
+    @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    
-    @UpdateTimestamp
+
+    @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-    
-    @Column(name = "created_by")
+
+    @Column(name = "created_by", length = 100)
     private String createdBy;
-    
-    @Column(name = "updated_by")
+
+    @Column(name = "updated_by", length = 100)
     private String updatedBy;
-    
+
     @Version
-    private Long version;
-    
-    @Column(name = "is_deleted", nullable = false)
-    private Boolean isDeleted = false;
+    @Column(name = "version")
+    private Long version = 0L;
+
+    @Column(name = "deleted", nullable = false)
+    private Boolean deleted = false;
 }

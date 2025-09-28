@@ -1,29 +1,24 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a user is created.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserCreatedEvent implements DomainEvent {
-    private UUID aggregateId;
+@EqualsAndHashCode(callSuper = true)
+public class UserCreatedEvent extends DomainEvent {
+    private UUID userId;
     private UUID tenantId;
     private String username;
-    private String firstName;
-    private String lastName;
-    private String role;
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
 
-    @Override
-    public String getEventType() {
-        return "UserCreated";
+    public UserCreatedEvent(UUID userId, UUID tenantId, String username) {
+        super("UserCreated");
+        this.userId = userId;
+        this.tenantId = tenantId;
+        this.username = username;
     }
 }

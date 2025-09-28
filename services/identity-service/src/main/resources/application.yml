@@ -1,13 +1,13 @@
 spring:
   application:
     name: identity-service
-  
+
   datasource:
     url: jdbc:postgresql://localhost:5432/identity_db
     username: identity_user
     password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
-  
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -16,11 +16,37 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: false
-  
+
   flyway:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+
+  # Redis configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  # Mail configuration
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8081
@@ -31,7 +57,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
@@ -40,27 +66,43 @@ management:
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET:your-256-bit-secret-key-here-for-development-only}
+      secret: ${JWT_SECRET:your-256-bit-secret-key-here-for-development-only-change-in-production}
       expiration: 86400000 # 24 hours
       refresh-expiration: 604800000 # 7 days
-  
+
   auth:
     verification-code-ttl: 15 # minutes
     temp-token-ttl: 30 # minutes
     max-failed-attempts: 5
     account-lock-duration: 30 # minutes
     password-expiry-days: 90
-  
-  notification:
-    enabled: ${NOTIFICATION_ENABLED:false}
-    email:
-      from: noreply@fabricmanagement.com
-    sms:
-      from: FABRIC
 
+  notification:
+    enabled: ${NOTIFICATION_ENABLED:true}
+    email:
+      from: ${NOTIFICATION_EMAIL_FROM:noreply@fabricmanagement.com}
+    sms:
+      from: ${NOTIFICATION_SMS_FROM:FABRIC}
+      provider: ${SMS_PROVIDER:twilio}
+
+# OpenAPI/Swagger configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+# Logging configuration
 logging:
   level:
     com.fabricmanagement.identity: DEBUG
-    org.springframework.security: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/identity-service.log
