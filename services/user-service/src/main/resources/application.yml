@@ -57,6 +57,27 @@ spring:
 # =============================================================================
 jwt:
   secret: ${JWT_SECRET:defaultSecretKey123456789012345678901234567890}
+
+# =============================================================================
+# KAFKA CONFIGURATION
+# =============================================================================
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: user-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      session-timeout-ms: 30000
+      heartbeat-interval-ms: 10000
+      max-poll-records: 500
+      fetch-min-bytes: 1
+      fetch-max-wait-ms: 500
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: "java.util.Map"
   expiration: 86400000 # 24 hours
 
 # =============================================================================

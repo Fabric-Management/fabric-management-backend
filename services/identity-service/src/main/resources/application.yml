@@ -48,6 +48,21 @@ spring:
           starttls:
             enable: true
 
+  # Kafka configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      client-id: identity-service
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      enable-idempotence: true
+      max-in-flight-requests-per-connection: 1
+      batch-size: 16384
+      linger-ms: 5
+      buffer-memory: 33554432
+
 server:
   port: 8081
   servlet:
