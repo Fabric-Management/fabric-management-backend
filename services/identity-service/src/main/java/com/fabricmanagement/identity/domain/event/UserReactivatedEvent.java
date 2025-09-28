@@ -1,28 +1,20 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a user is reactivated.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserReactivatedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private String reactivationReason;
-    private String reactivatedBy; // ADMIN, SYSTEM, AUTO_EXPIRY, etc.
-    private String previousSuspensionReason;
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
+@EqualsAndHashCode(callSuper = true)
+public class UserReactivatedEvent extends DomainEvent {
+    private UUID userId;
 
-    @Override
-    public String getEventType() {
-        return "UserReactivated";
+    public UserReactivatedEvent(UUID userId) {
+        super("UserReactivated");
+        this.userId = userId;
     }
 }

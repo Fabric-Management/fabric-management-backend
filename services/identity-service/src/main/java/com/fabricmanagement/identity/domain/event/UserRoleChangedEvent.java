@@ -1,29 +1,24 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a user role is changed.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserRoleChangedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private String previousRole;
+@EqualsAndHashCode(callSuper = true)
+public class UserRoleChangedEvent extends DomainEvent {
+    private UUID userId;
+    private String oldRole;
     private String newRole;
-    private String changedBy; // ADMIN, SYSTEM, etc.
-    private String reason; // PROMOTION, DEMOTION, TRANSFER, etc.
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
 
-    @Override
-    public String getEventType() {
-        return "UserRoleChanged";
+    public UserRoleChangedEvent(UUID userId, String oldRole, String newRole) {
+        super("UserRoleChanged");
+        this.userId = userId;
+        this.oldRole = oldRole;
+        this.newRole = newRole;
     }
 }

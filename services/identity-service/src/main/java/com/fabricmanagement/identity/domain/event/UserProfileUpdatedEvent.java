@@ -1,29 +1,20 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Event fired when a user profile is updated.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserProfileUpdatedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private Map<String, String> updatedFields; // field name -> new value
-    private Map<String, String> previousValues; // field name -> old value
-    private String updatedBy; // USER, ADMIN, etc.
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
+@EqualsAndHashCode(callSuper = true)
+public class UserProfileUpdatedEvent extends DomainEvent {
+    private UUID userId;
 
-    @Override
-    public String getEventType() {
-        return "UserProfileUpdated";
+    public UserProfileUpdatedEvent(UUID userId) {
+        super("UserProfileUpdated");
+        this.userId = userId;
     }
 }

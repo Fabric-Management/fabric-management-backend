@@ -1,31 +1,22 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a user is authenticated.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserAuthenticatedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private String authenticationMethod; // PASSWORD, TWO_FACTOR, SSO, etc.
+@EqualsAndHashCode(callSuper = true)
+public class UserAuthenticatedEvent extends DomainEvent {
+    private UUID userId;
     private String ipAddress;
-    private String userAgent;
-    private String sessionId;
-    private boolean isSuccessful;
-    private String failureReason; // if not successful
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
 
-    @Override
-    public String getEventType() {
-        return "UserAuthenticated";
+    public UserAuthenticatedEvent(UUID userId, String ipAddress) {
+        super("UserAuthenticated");
+        this.userId = userId;
+        this.ipAddress = ipAddress;
     }
 }

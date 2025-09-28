@@ -1,28 +1,20 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a password is reset.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class PasswordResetEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private String resetToken;
-    private String resetMethod; // EMAIL, SMS, etc.
-    private LocalDateTime expiresAt;
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
+@EqualsAndHashCode(callSuper = true)
+public class PasswordResetEvent extends DomainEvent {
+    private UUID userId;
 
-    @Override
-    public String getEventType() {
-        return "PasswordReset";
+    public PasswordResetEvent(UUID userId) {
+        super("PasswordReset");
+        this.userId = userId;
     }
 }

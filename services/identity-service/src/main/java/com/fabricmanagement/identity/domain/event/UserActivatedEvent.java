@@ -1,26 +1,20 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a user is activated.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserActivatedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private String activatedBy; // ADMIN, SELF_VERIFICATION, etc.
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
+@EqualsAndHashCode(callSuper = true)
+public class UserActivatedEvent extends DomainEvent {
+    private UUID userId;
 
-    @Override
-    public String getEventType() {
-        return "UserActivated";
+    public UserActivatedEvent(UUID userId) {
+        super("UserActivated");
+        this.userId = userId;
     }
 }

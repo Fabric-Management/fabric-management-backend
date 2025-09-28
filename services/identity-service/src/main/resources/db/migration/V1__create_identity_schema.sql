@@ -1,11 +1,11 @@
 -- =====================================================
 -- Identity Service Database Schema
 -- Version: V1
--- Description: Consolidated schema for users, authentication, and user contacts
+-- Description: Modern identity service schema with JWT authentication
 -- =====================================================
 
 -- Users table (core identity and authentication)
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
 
     -- Audit fields
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
     updated_by VARCHAR(100),
     version BIGINT DEFAULT 0,
@@ -43,25 +43,23 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- User contacts table (part of user aggregate)
-CREATE TABLE IF NOT EXISTS user_contacts (
+CREATE TABLE user_contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_type VARCHAR(20) NOT NULL,
     contact_value VARCHAR(255) NOT NULL,
-    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     verified_at TIMESTAMP,
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
-    last_used_at TIMESTAMP,
-
-    -- Audit fields
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT chk_contact_type CHECK (contact_type IN ('EMAIL', 'PHONE')),
+    CONSTRAINT chk_contact_status CHECK (status IN ('PENDING', 'VERIFIED', 'SUSPENDED', 'INACTIVE')),
     CONSTRAINT uk_contact_value UNIQUE (contact_value)
 );
 
 -- Verification tokens table (temporary storage)
-CREATE TABLE IF NOT EXISTS verification_tokens (
+CREATE TABLE verification_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_id UUID NOT NULL REFERENCES user_contacts(id) ON DELETE CASCADE,
@@ -75,25 +73,22 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
     CONSTRAINT chk_token_type CHECK (token_type IN ('EMAIL_VERIFICATION', 'PHONE_VERIFICATION', 'PASSWORD_RESET'))
 );
 
--- User sessions table
-CREATE TABLE IF NOT EXISTS user_sessions (
+-- User sessions table (JWT token management)
+CREATE TABLE user_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    access_token TEXT NOT NULL,
-    refresh_token TEXT NOT NULL,
+    token_id VARCHAR(255) NOT NULL UNIQUE,
+    access_token_hash VARCHAR(255) NOT NULL,
+    refresh_token_hash VARCHAR(255) NOT NULL,
     ip_address VARCHAR(45),
     user_agent TEXT,
     expires_at TIMESTAMP NOT NULL,
     revoked_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    INDEX idx_session_user_id (user_id),
-    INDEX idx_session_access_token_hash (SHA2(access_token, 256)),
-    INDEX idx_session_refresh_token_hash (SHA2(refresh_token, 256))
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Temporary tokens table (for multi-step flows)
-CREATE TABLE IF NOT EXISTS temporary_tokens (
+CREATE TABLE temporary_tokens (
     token VARCHAR(255) PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_type VARCHAR(30) NOT NULL,
@@ -104,8 +99,8 @@ CREATE TABLE IF NOT EXISTS temporary_tokens (
     CONSTRAINT chk_temp_token_type CHECK (token_type IN ('PASSWORD_CREATION', 'TWO_FACTOR', 'PASSWORD_CHANGE'))
 );
 
--- Audit log table
-CREATE TABLE IF NOT EXISTS authentication_audit_log (
+-- Authentication audit log table
+CREATE TABLE authentication_audit_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     event_type VARCHAR(50) NOT NULL,
@@ -115,31 +110,38 @@ CREATE TABLE IF NOT EXISTS authentication_audit_log (
     success BOOLEAN NOT NULL,
     failure_reason VARCHAR(255),
     metadata JSON,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    INDEX idx_audit_user_id (user_id),
-    INDEX idx_audit_event_type (event_type),
-    INDEX idx_audit_created_at (created_at)
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes for performance
-CREATE INDEX idx_user_tenant_id ON users(tenant_id);
-CREATE INDEX idx_user_username ON users(username);
-CREATE INDEX idx_user_status ON users(status);
-CREATE INDEX idx_user_role ON users(role);
-CREATE INDEX idx_user_deleted ON users(deleted);
-CREATE INDEX idx_user_tenant_status ON users(tenant_id, status);
+CREATE INDEX idx_users_tenant_id ON users(tenant_id);
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_status ON users(status);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_deleted ON users(deleted);
+CREATE INDEX idx_users_tenant_status ON users(tenant_id, status);
 
-CREATE INDEX idx_contact_user_id ON user_contacts(user_id);
-CREATE INDEX idx_contact_value ON user_contacts(contact_value);
-CREATE INDEX idx_contact_type ON user_contacts(contact_type);
-CREATE INDEX idx_contact_verified ON user_contacts(is_verified);
-CREATE INDEX idx_contact_primary ON user_contacts(is_primary);
+CREATE INDEX idx_contacts_user_id ON user_contacts(user_id);
+CREATE INDEX idx_contacts_value ON user_contacts(contact_value);
+CREATE INDEX idx_contacts_type ON user_contacts(contact_type);
+CREATE INDEX idx_contacts_status ON user_contacts(status);
+CREATE INDEX idx_contacts_primary ON user_contacts(is_primary);
 
-CREATE INDEX idx_token_user_id ON verification_tokens(user_id);
-CREATE INDEX idx_token_contact_id ON verification_tokens(contact_id);
-CREATE INDEX idx_token_value ON verification_tokens(token);
-CREATE INDEX idx_token_expires ON verification_tokens(expires_at);
+CREATE INDEX idx_tokens_user_id ON verification_tokens(user_id);
+CREATE INDEX idx_tokens_contact_id ON verification_tokens(contact_id);
+CREATE INDEX idx_tokens_value ON verification_tokens(token);
+CREATE INDEX idx_tokens_expires ON verification_tokens(expires_at);
+
+CREATE INDEX idx_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX idx_sessions_token_id ON user_sessions(token_id);
+CREATE INDEX idx_sessions_expires ON user_sessions(expires_at);
+
+CREATE INDEX idx_temp_tokens_user_id ON temporary_tokens(user_id);
+CREATE INDEX idx_temp_tokens_expires ON temporary_tokens(expires_at);
+
+CREATE INDEX idx_audit_user_id ON authentication_audit_log(user_id);
+CREATE INDEX idx_audit_event_type ON authentication_audit_log(event_type);
+CREATE INDEX idx_audit_created_at ON authentication_audit_log(created_at);
 
 -- Views for common queries
 

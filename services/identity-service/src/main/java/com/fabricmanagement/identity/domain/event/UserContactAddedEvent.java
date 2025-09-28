@@ -1,27 +1,26 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when a user contact is added.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserContactAddedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String contactType; // EMAIL, PHONE, etc.
+@EqualsAndHashCode(callSuper = true)
+public class UserContactAddedEvent extends DomainEvent {
+    private UUID userId;
+    private UUID contactId;
+    private String contactType;
     private String contactValue;
-    private boolean isPrimary;
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
 
-    @Override
-    public String getEventType() {
-        return "UserContactAdded";
+    public UserContactAddedEvent(UUID userId, UUID contactId, String contactType, String contactValue) {
+        super("UserContactAdded");
+        this.userId = userId;
+        this.contactId = contactId;
+        this.contactType = contactType;
+        this.contactValue = contactValue;
     }
 }

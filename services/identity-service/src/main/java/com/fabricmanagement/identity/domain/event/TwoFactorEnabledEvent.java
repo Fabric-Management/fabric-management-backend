@@ -1,27 +1,20 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when two-factor authentication is enabled.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class TwoFactorEnabledEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String username;
-    private String twoFactorMethod; // TOTP, SMS, EMAIL, etc.
-    private String enabledBy; // USER, ADMIN, SECURITY_POLICY, etc.
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
+@EqualsAndHashCode(callSuper = true)
+public class TwoFactorEnabledEvent extends DomainEvent {
+    private UUID userId;
 
-    @Override
-    public String getEventType() {
-        return "TwoFactorEnabled";
+    public TwoFactorEnabledEvent(UUID userId) {
+        super("TwoFactorEnabled");
+        this.userId = userId;
     }
 }

@@ -1,28 +1,24 @@
 package com.fabricmanagement.identity.domain.event;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Event fired when contact verification is initiated.
+ */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class ContactVerificationInitiatedEvent implements DomainEvent {
-    private UUID aggregateId;
-    private String contactType; // EMAIL, PHONE, etc.
+@EqualsAndHashCode(callSuper = true)
+public class ContactVerificationInitiatedEvent extends DomainEvent {
+    private UUID userId;
+    private UUID contactId;
     private String contactValue;
-    private String verificationCode;
-    private LocalDateTime expiresAt;
-    @Builder.Default
-    private LocalDateTime occurredAt = LocalDateTime.now();
 
-    @Override
-    public String getEventType() {
-        return "ContactVerificationInitiated";
+    public ContactVerificationInitiatedEvent(UUID userId, UUID contactId, String contactValue) {
+        super("ContactVerificationInitiated");
+        this.userId = userId;
+        this.contactId = contactId;
+        this.contactValue = contactValue;
     }
 }
