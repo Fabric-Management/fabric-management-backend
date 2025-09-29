@@ -2,7 +2,7 @@
 
 ## 📋 Overview
 
-Bu dokümantasyon, Fabric Management System'deki 19 microservice'in detaylı mimarisini, sorumluluklarını ve birbirleriyle olan ilişkilerini açıklar.
+Bu dokümantasyon, Fabric Management System'deki 24 microservice'in detaylı mimarisini, sorumluluklarını ve birbirleriyle olan ilişkilerini açıklar.
 
 ## 🏗️ Complete Microservice Architecture
 
@@ -58,53 +58,83 @@ Bu dokümantasyon, Fabric Management System'deki 19 microservice'in detaylı mim
 - **Dependencies**: HR Service, User Service, Leave Service
 - **Dependents**: Reporting Service, AI Service
 
-### **Inventory Management Services (4 Services)**
+### **Inventory Management Services (5 Services)**
 
-#### 9. **Warehouse Service** (Port: 8089) ❌
-
-- **Status**: Dokümantasyon eksik
-- **Dependencies**: Identity Service, Company Service, Stock Service
-- **Dependents**: Stock Service, Procurement Service, Quality Control Service
-
-#### 10. **Stock Service** (Port: 8090) ❌
-
-- **Status**: Dokümantasyon eksik
-- **Dependencies**: Warehouse Service, Fabric Service, Procurement Service
-- **Dependents**: Warehouse Service, Procurement Service, Accounting Service
-
-#### 11. **Fabric Service** (Port: 8091) ❌
+#### 9. **Inventory Service** (Port: 8089) ❌
 
 - **Status**: Dokümantasyon eksik
 - **Dependencies**: Identity Service, Company Service
-- **Dependents**: Stock Service, Procurement Service, Quality Control Service, Accounting Service
+- **Dependents**: Order Service, Production Service, Accounting Service
+
+#### 10. **Catalog Service** (Port: 8090) ❌
+
+- **Status**: Dokümantasyon eksik
+- **Dependencies**: Identity Service, Company Service
+- **Dependents**: Order Service, Pricing Service
+
+#### 11. **Pricing Service** (Port: 8091) ❌
+
+- **Status**: Dokümantasyon eksik
+- **Dependencies**: Identity Service, Company Service, Catalog Service
+- **Dependents**: Order Service, Accounting Service
 
 #### 12. **Procurement Service** (Port: 8092) ❌
 
 - **Status**: Dokümantasyon eksik
-- **Dependencies**: Company Service, Contact Service, Fabric Service, Stock Service
+- **Dependencies**: Company Service, Contact Service, Inventory Service
 - **Dependents**: Accounting Service, Invoice Service, Quality Control Service
+
+#### 13. **Quality Control Service** (Port: 8093) ❌
+
+- **Status**: Dokümantasyon eksik
+- **Dependencies**: Identity Service, Inventory Service, Company Service
+- **Dependents**: AI Service, Reporting Service, Notification Service
+
+### **Order Management Services (1 Service)**
+
+#### 14. **Order Service** (Port: 8094) ❌
+
+- **Status**: Dokümantasyon eksik
+- **Dependencies**: Identity Service, Company Service, Inventory Service, Catalog Service, Pricing Service
+- **Dependents**: Logistics Service, Production Service, Accounting Service
+
+### **Logistics Management Services (1 Service)**
+
+#### 15. **Logistics Service** (Port: 8095) ❌
+
+- **Status**: Dokümantasyon eksik
+- **Dependencies**: Identity Service, Company Service, Order Service
+- **Dependents**: Production Service, Accounting Service, Reporting Service
+
+### **Production Management Services (1 Service)**
+
+#### 16. **Production Service** (Port: 8096) ❌
+
+- **Status**: Dokümantasyon eksik
+- **Dependencies**: Identity Service, Company Service, Inventory Service, Order Service, Logistics Service
+- **Dependents**: Accounting Service, Quality Control Service, Reporting Service
 
 ### **Financial Services (4 Services)**
 
-#### 13. **Accounting Service** (Port: 8093) ❌
+#### 17. **Accounting Service** (Port: 8097) ❌
 
 - **Status**: Dokümantasyon eksik
-- **Dependencies**: Identity Service, Company Service, Fabric Service
+- **Dependencies**: Identity Service, Company Service, Inventory Service
 - **Dependents**: Invoice Service, Payment Service, Billing Service, Payroll Service
 
-#### 14. **Invoice Service** (Port: 8094) ❌
+#### 18. **Invoice Service** (Port: 8098) ❌
 
 - **Status**: Dokümantasyon eksik
 - **Dependencies**: Accounting Service, Procurement Service, Company Service
 - **Dependents**: Payment Service, Billing Service, Reporting Service
 
-#### 15. **Payment Service** (Port: 8095) ❌
+#### 19. **Payment Service** (Port: 8099) ❌
 
 - **Status**: Dokümantasyon eksik
 - **Dependencies**: Invoice Service, Accounting Service, Notification Service
 - **Dependents**: Billing Service, Reporting Service
 
-#### 16. **Billing Service** (Port: 8096) ❌
+#### 20. **Billing Service** (Port: 8100) ❌
 
 - **Status**: Dokümantasyon eksik
 - **Dependencies**: Accounting Service, Invoice Service, Payment Service
@@ -112,19 +142,19 @@ Bu dokümantasyon, Fabric Management System'deki 19 microservice'in detaylı mim
 
 ### **AI & Analytics Services (3 Services)**
 
-#### 17. **AI Service** (Port: 8097) ❌
+#### 21. **AI Service** (Port: 8101) ❌
 
 - **Status**: Dokümantasyon eksik
 - **Dependencies**: Identity Service, Performance Service, Quality Control Service
 - **Dependents**: Reporting Service, Notification Service
 
-#### 18. **Reporting Service** (Port: 8098) ❌
+#### 22. **Reporting Service** (Port: 8102) ❌
 
 - **Status**: Dokümantasyon eksik
 - **Dependencies**: Identity Service, User Service, AI Service, Tüm business servisler
 - **Dependents**: Notification Service
 
-#### 19. **Notification Service** (Port: 8099) ❌
+#### 23. **Notification Service** (Port: 8103) ❌
 
 - **Status**: Dokümantasyon eksik
 - **Dependencies**: Identity Service, Contact Service
@@ -132,10 +162,10 @@ Bu dokümantasyon, Fabric Management System'deki 19 microservice'in detaylı mim
 
 ### **Quality Management Services (1 Service)**
 
-#### 20. **Quality Control Service** (Port: 8100) ✅
+#### 24. **Quality Control Service** (Port: 8104) ✅
 
 - **Status**: Dokümantasyon tamamlandı
-- **Dependencies**: Identity Service, Fabric Service, Company Service
+- **Dependencies**: Identity Service, Inventory Service, Company Service
 - **Dependents**: AI Service, Reporting Service, Notification Service
 
 ## 🔗 Service Interaction Matrix
@@ -159,16 +189,29 @@ graph TB
     end
 
     subgraph "Inventory Layer"
-        WS[Warehouse Service]
-        SS[Stock Service]
-        FS[Fabric Service]
-        PS2[Procurement Service]
+        IS3[Inventory Service]
+        CS2[Catalog Service]
+        PS2[Pricing Service]
+        PS3[Procurement Service]
+        QCS[Quality Control Service]
+    end
+
+    subgraph "Order Layer"
+        OS[Order Service]
+    end
+
+    subgraph "Logistics Layer"
+        LS[Logistics Service]
+    end
+
+    subgraph "Production Layer"
+        PS4[Production Service]
     end
 
     subgraph "Financial Layer"
         AS[Accounting Service]
         IS2[Invoice Service]
-        PS3[Payment Service]
+        PS5[Payment Service]
         BS[Billing Service]
     end
 
@@ -205,32 +248,52 @@ graph TB
     PMS --> LS
 
     %% Inventory dependencies
-    WS --> IS
-    WS --> COS
-    WS --> SS
-    SS --> WS
-    SS --> FS
-    SS --> PS2
-    FS --> IS
-    FS --> COS
+    IS3 --> IS
+    IS3 --> COS
+    CS2 --> IS
+    CS2 --> COS
+    PS2 --> IS
     PS2 --> COS
-    PS2 --> CS
-    PS2 --> FS
-    PS2 --> SS
+    PS2 --> CS2
+    PS3 --> COS
+    PS3 --> CS
+    PS3 --> IS3
+    QCS --> IS
+    QCS --> IS3
+    QCS --> COS
+
+    %% Order dependencies
+    OS --> IS
+    OS --> COS
+    OS --> IS3
+    OS --> CS2
+    OS --> PS2
+
+    %% Logistics dependencies
+    LS --> IS
+    LS --> COS
+    LS --> OS
+
+    %% Production dependencies
+    PS4 --> IS
+    PS4 --> COS
+    PS4 --> IS3
+    PS4 --> OS
+    PS4 --> LS
 
     %% Financial dependencies
     AS --> IS
     AS --> COS
-    AS --> FS
+    AS --> IS3
     IS2 --> AS
-    IS2 --> PS2
+    IS2 --> PS3
     IS2 --> COS
-    PS3 --> IS2
-    PS3 --> AS
-    PS3 --> NS
+    PS5 --> IS2
+    PS5 --> AS
+    PS5 --> NS
     BS --> AS
     BS --> IS2
-    BS --> PS3
+    BS --> PS5
 
     %% AI & Analytics dependencies
     AIS --> IS
@@ -241,21 +304,20 @@ graph TB
     RS --> AIS
     RS --> HRS
     RS --> AS
-    RS --> WS
+    RS --> IS3
     RS --> QCS
     NS --> IS
     NS --> CS
 
     %% Quality dependencies
     QCS --> IS
-    QCS --> FS
+    QCS --> IS3
     QCS --> COS
-    QCS --> WS
 
     %% Cross-layer dependencies
     PS --> AS
-    SS --> AS
-    PS2 --> AS
+    IS3 --> AS
+    PS3 --> AS
     QCS --> AIS
     QCS --> RS
     QCS --> NS
@@ -561,37 +623,50 @@ graph TB
 
 ### **Phase 3: Inventory Management** (Eksik ❌)
 
-9. Warehouse Service
-10. Stock Service
-11. Fabric Service
+9. Inventory Service
+10. Catalog Service
+11. Pricing Service
 12. Procurement Service
+13. Quality Control Service
 
-### **Phase 4: Financial Services** (Eksik ❌)
+### **Phase 4: Order & Logistics Services** (Eksik ❌)
 
-13. Accounting Service
-14. Invoice Service
-15. Payment Service
-16. Billing Service
+14. Order Service
+15. Logistics Service
 
-### **Phase 5: AI & Analytics** (Eksik ❌)
+### **Phase 5: Production Services** (Eksik ❌)
 
-17. AI Service
-18. Reporting Service
-19. Notification Service
+16. Production Service
 
-### **Phase 6: Quality Management** (Tamamlandı ✅)
+### **Phase 6: Financial Services** (Eksik ❌)
 
-20. Quality Control Service
+17. Accounting Service
+18. Invoice Service
+19. Payment Service
+20. Billing Service
+
+### **Phase 7: AI & Analytics** (Eksik ❌)
+
+21. AI Service
+22. Reporting Service
+23. Notification Service
+
+### **Phase 8: Quality Management** (Tamamlandı ✅)
+
+24. Quality Control Service
 
 ## 📈 Business Value Matrix
 
-| Service Category     | Business Impact | Technical Complexity | Priority |
-| -------------------- | --------------- | -------------------- | -------- |
-| Core Services        | High            | Medium               | High     |
-| HR Management        | High            | Medium               | High     |
-| Inventory Management | High            | High                 | High     |
-| Financial Services   | High            | High                 | High     |
-| AI & Analytics       | Medium          | High                 | Medium   |
-| Quality Management   | High            | Medium               | High     |
+| Service Category      | Business Impact | Technical Complexity | Priority |
+| --------------------- | --------------- | -------------------- | -------- |
+| Core Services         | High            | Medium               | High     |
+| HR Management         | High            | Medium               | High     |
+| Inventory Management  | High            | High                 | High     |
+| Order Management      | High            | Medium               | High     |
+| Logistics Management  | High            | Medium               | High     |
+| Production Management | High            | High                 | High     |
+| Financial Services    | High            | High                 | High     |
+| AI & Analytics        | Medium          | High                 | Medium   |
+| Quality Management    | High            | Medium               | High     |
 
-Bu dokümantasyon, kalan 15 microservice'in detaylı mimarisini ve birbirleriyle olan ilişkilerini gösterir. Her servis için sorumluluklar, bağımlılıklar ve etkileşimler net bir şekilde tanımlanmıştır.
+Bu dokümantasyon, kalan 19 microservice'in detaylı mimarisini ve birbirleriyle olan ilişkilerini gösterir. Her servis için sorumluluklar, bağımlılıklar ve etkileşimler net bir şekilde tanımlanmıştır.

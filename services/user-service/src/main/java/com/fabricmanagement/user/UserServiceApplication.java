@@ -8,7 +8,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @SpringBootApplication(scanBasePackages = {
     "com.fabricmanagement.user",
-    "com.fabricmanagement.common"
+    "com.fabricmanagement.common.core",
+    "com.fabricmanagement.common.security"
 })
 @EnableFeignClients
 @EnableAsync

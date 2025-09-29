@@ -7,6 +7,7 @@ Bu dokümantasyon Fabric Management System'in konfigürasyon yapısını ve kull
 ## 🏗️ Configuration Architecture
 
 ### Environment-Based Configuration
+
 ```
 .env                    # Development environment
 .env.example            # Template for all environments
@@ -15,6 +16,7 @@ Bu dokümantasyon Fabric Management System'in konfigürasyon yapısını ve kull
 ```
 
 ### Service-Specific Configuration
+
 ```
 services/
 ├── user-service/src/main/resources/application.yml
@@ -25,6 +27,7 @@ services/
 ## 🚀 Quick Start
 
 ### 1. Environment Setup
+
 ```bash
 # Copy the example environment file
 cp .env.example .env
@@ -34,6 +37,7 @@ nano .env
 ```
 
 ### 2. Required Environment Variables
+
 ```bash
 # Database
 POSTGRES_HOST=localhost
@@ -48,6 +52,7 @@ GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 ```
 
 ### 3. Start Services
+
 ```bash
 # Development mode
 docker-compose up -d
@@ -59,6 +64,7 @@ SPRING_PROFILES_ACTIVE=prod docker-compose -f docker-compose.yml up -d
 ## 📊 Configuration Profiles
 
 ### Local Development Profile (`local`)
+
 - H2 in-memory database
 - Mock geocoding service
 - Debug logging enabled
@@ -66,12 +72,14 @@ SPRING_PROFILES_ACTIVE=prod docker-compose -f docker-compose.yml up -d
 - Swagger UI enabled
 
 ### Test Profile (`test`)
+
 - H2 test database
 - Minimal logging
 - Fast startup configuration
 - Mock external services
 
 ### Production Profile (`prod`)
+
 - PostgreSQL database
 - Google Maps geocoding
 - Optimized logging
@@ -81,16 +89,18 @@ SPRING_PROFILES_ACTIVE=prod docker-compose -f docker-compose.yml up -d
 ## 🔒 Security Configuration
 
 ### JWT Configuration
+
 ```yaml
 spring:
   security:
     jwt:
       secret: ${JWT_SECRET}
-      expiration: ${JWT_EXPIRATION:86400000}  # 24 hours
-      refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 days
+      expiration: ${JWT_EXPIRATION:86400000} # 24 hours
+      refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
 ```
 
 ### Database Security
+
 ```yaml
 spring:
   datasource:
@@ -104,6 +114,7 @@ spring:
 ## 📍 Geocoding Configuration
 
 ### Google Maps Setup
+
 ```yaml
 geocoding:
   provider: google
@@ -116,13 +127,14 @@ geocoding:
 ```
 
 ### Cache Configuration
+
 ```yaml
 geocoding:
   cache:
     enabled: true
-    ttl: 86400  # 24 hours
+    ttl: 86400 # 24 hours
     max-size: 10000
-    
+
   rate-limiting:
     enabled: true
     requests-per-second: 50
@@ -132,13 +144,14 @@ geocoding:
 ## 🗄️ Database Configuration
 
 ### PostgreSQL Setup
+
 ```yaml
 spring:
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}_servicename
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
-    
+
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
       minimum-idle: ${DB_POOL_MIN_SIZE:5}
@@ -146,6 +159,7 @@ spring:
 ```
 
 ### Flyway Migration
+
 ```yaml
 spring:
   flyway:
@@ -159,6 +173,7 @@ spring:
 ## 📡 External Services
 
 ### Service Discovery
+
 ```yaml
 external:
   services:
@@ -171,6 +186,7 @@ external:
 ```
 
 ### Message Queue (RabbitMQ)
+
 ```yaml
 messaging:
   rabbitmq:
@@ -183,6 +199,7 @@ messaging:
 ## 📊 Monitoring & Observability
 
 ### Actuator Configuration
+
 ```yaml
 management:
   endpoints:
@@ -196,6 +213,7 @@ management:
 ```
 
 ### Logging Configuration
+
 ```yaml
 logging:
   level:
@@ -208,6 +226,7 @@ logging:
 ## 🐳 Docker Configuration
 
 ### Environment Variables in Docker
+
 ```yaml
 services:
   contact-service:
@@ -220,6 +239,7 @@ services:
 ```
 
 ### Health Checks
+
 ```yaml
 healthcheck:
   test: ["CMD", "wget", "--spider", "http://localhost:8082/actuator/health"]
@@ -234,15 +254,17 @@ healthcheck:
 ### Common Issues
 
 1. **Database Connection Failed**
+
    ```bash
    # Check if PostgreSQL is running
    docker-compose ps postgres-db
-   
+
    # Check connection
    docker-compose exec postgres-db psql -U fabric_admin -d fabric_management
    ```
 
 2. **Service Discovery Issues**
+
    ```bash
    # Check service health
    curl http://localhost:8081/actuator/health
@@ -256,6 +278,7 @@ healthcheck:
    ```
 
 ### Debug Mode
+
 ```bash
 # Enable debug logging
 export DEBUG_MODE=true
@@ -268,17 +291,19 @@ docker-compose restart
 ## 📈 Performance Tuning
 
 ### Database Pool Optimization
+
 ```yaml
 spring:
   datasource:
     hikari:
-      maximum-pool-size: 50  # Production
+      maximum-pool-size: 50 # Production
       minimum-idle: 10
       connection-timeout: 30000
       idle-timeout: 600000
 ```
 
 ### JVM Tuning (Production)
+
 ```dockerfile
 ENV JAVA_OPTS="-Xms1g -Xmx2g -XX:+UseG1GC -XX:G1HeapRegionSize=16m"
 ```

@@ -70,13 +70,19 @@ deployment/
 - Security Hardening
 - Performance Optimization
 - Disaster Recovery
+- Order Services Deployment
+- Logistics Services Deployment
+- Production Services Deployment
 
 ## 🎯 Next Steps
 
 1. **Complete Production Setup** - Production environment configuration
 2. **Monitoring Setup** - Comprehensive monitoring strategies
-3. **Security Hardening** - Production security measures
-4. **Performance Optimization** - Production performance tuning
+3. **Order Services Deployment** - Kubernetes manifests for Order Service
+4. **Logistics Services Deployment** - Kubernetes manifests for Logistics Service
+5. **Production Services Deployment** - Kubernetes manifests for Production Service
+6. **Security Hardening** - Production security measures
+7. **Performance Optimization** - Production performance tuning
 
 ---
 

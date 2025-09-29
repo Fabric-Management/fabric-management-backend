@@ -23,10 +23,17 @@ docs/
 │   │   ├── LEAVE_SERVICE_ARCHITECTURE.md
 │   │   └── PERFORMANCE_SERVICE_ARCHITECTURE.md
 │   ├── INVENTORY_SERVICES/                # Envanter yönetim servisleri
-│   │   ├── WAREHOUSE_SERVICE_ARCHITECTURE.md
-│   │   ├── STOCK_SERVICE_ARCHITECTURE.md
-│   │   ├── FABRIC_SERVICE_ARCHITECTURE.md
-│   │   └── PROCUREMENT_SERVICE_ARCHITECTURE.md
+│   │   ├── INVENTORY_SERVICE_ARCHITECTURE.md
+│   │   ├── CATALOG_SERVICE_ARCHITECTURE.md
+│   │   ├── PRICING_SERVICE_ARCHITECTURE.md
+│   │   ├── PROCUREMENT_SERVICE_ARCHITECTURE.md
+│   │   └── QUALITY_CONTROL_SERVICE_ARCHITECTURE.md
+│   ├── ORDER_SERVICES/                     # Sipariş yönetim servisleri
+│   │   └── ORDER_SERVICE_ARCHITECTURE.md
+│   ├── LOGISTICS_SERVICES/                 # Lojistik yönetim servisleri
+│   │   └── LOGISTICS_SERVICE_ARCHITECTURE.md
+│   ├── PRODUCTION_SERVICES/               # Üretim yönetim servisleri
+│   │   └── PRODUCTION_SERVICE_ARCHITECTURE.md
 │   ├── FINANCIAL_SERVICES/               # Mali servisler
 │   │   ├── ACCOUNTING_SERVICE_ARCHITECTURE.md
 │   │   ├── INVOICE_SERVICE_ARCHITECTURE.md
@@ -74,10 +81,17 @@ docs/
 │   │   ├── leave-service-api.md
 │   │   └── performance-service-api.md
 │   ├── inventory-services/               # Envanter servisler API'leri
-│   │   ├── warehouse-service-api.md
-│   │   ├── stock-service-api.md
-│   │   ├── fabric-service-api.md
-│   │   └── procurement-service-api.md
+│   │   ├── inventory-service-api.md
+│   │   ├── catalog-service-api.md
+│   │   ├── pricing-service-api.md
+│   │   ├── procurement-service-api.md
+│   │   └── quality-control-service-api.md
+│   ├── order-services/                  # Sipariş servisler API'leri
+│   │   └── order-service-api.md
+│   ├── logistics-services/              # Lojistik servisler API'leri
+│   │   └── logistics-service-api.md
+│   ├── production-services/             # Üretim servisler API'leri
+│   │   └── production-service-api.md
 │   ├── financial-services/               # Mali servisler API'leri
 │   │   ├── accounting-service-api.md
 │   │   ├── invoice-service-api.md
@@ -113,7 +127,10 @@ Sistem mimarisi, tasarım kararları ve microservice yapısı hakkında detaylı
 
 - **Core Services**: Identity, User, Contact, Company
 - **HR Services**: HR, Payroll, Leave, Performance
-- **Inventory Services**: Warehouse, Stock, Fabric, Procurement
+- **Inventory Services**: Inventory, Catalog, Pricing, Procurement, Quality Control
+- **Order Services**: Order
+- **Logistics Services**: Logistics
+- **Production Services**: Production
 - **Financial Services**: Accounting, Invoice, Payment, Billing
 - **AI & Analytics Services**: AI, Reporting, Notification
 - **Quality Services**: Quality Control
@@ -161,6 +178,9 @@ Tüm servislerin API dokümantasyonu ve kullanım örnekleri.
 - Core Services APIs
 - HR Services APIs
 - Inventory Services APIs
+- Order Services APIs
+- Logistics Services APIs
+- Production Services APIs
 - Financial Services APIs
 - AI & Analytics Services APIs
 - Quality Services APIs
@@ -216,6 +236,9 @@ Test stratejileri, rehberleri ve best practices.
 - Company Service Architecture
 - HR Services Architecture
 - Inventory Services Architecture
+- Order Services Architecture
+- Logistics Services Architecture
+- Production Services Architecture
 - Financial Services Architecture
 - AI & Analytics Services Architecture
 
