@@ -1,9 +1,11 @@
 package com.fabricmanagement.user.infrastructure.messaging;
 
+import com.fabricmanagement.user.application.port.out.IdentityServicePort;
 import com.fabricmanagement.user.application.service.UserApplicationService;
 import com.fabricmanagement.user.domain.model.User;
 import com.fabricmanagement.user.domain.model.UserStatus;
 import com.fabricmanagement.user.domain.repository.UserRepository;
+import com.fabricmanagement.user.domain.valueobject.UserId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -19,6 +21,7 @@ import java.util.UUID;
 
 /**
  * Event listener for handling events from Identity Service.
+ * Updated to follow Hexagonal Architecture principles.
  */
 @Component
 @RequiredArgsConstructor
@@ -26,7 +29,7 @@ import java.util.UUID;
 public class IdentityEventConsumer {
 
     private final UserRepository userRepository;
-    private final UserApplicationService userApplicationService;
+    private final IdentityServicePort identityServicePort;
 
     @KafkaListener(topics = "user.created", groupId = "user-service")
     @Transactional
@@ -51,6 +54,10 @@ public class IdentityEventConsumer {
                 .build();
             
             userRepository.save(user);
+            
+            // Notify Identity Service about user profile creation
+            UserId userIdObj = new UserId(UUID.fromString(userId));
+            identityServicePort.notifyUserProfileChange(userIdObj, "PROFILE_CREATED");
             
             log.info("User profile created successfully for user: {}", userId);
             
@@ -80,6 +87,11 @@ public class IdentityEventConsumer {
             userRepository.findById(userUuid).ifPresent(user -> {
                 user.setUpdatedAt(java.time.LocalDateTime.now());
                 userRepository.save(user);
+                
+                // Notify Identity Service about profile update
+                UserId userIdObj = new UserId(userUuid);
+                identityServicePort.notifyUserProfileChange(userIdObj, "PROFILE_UPDATED");
+                
                 log.info("User profile updated timestamp refreshed for user: {}", userId);
             });
             

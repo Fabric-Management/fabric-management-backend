@@ -1,20 +1,21 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
- * Request DTO for password reset.
+ * Single Responsibility: Forgot password request representation only
+ * Open/Closed: Can be extended without modification
  */
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class ForgotPasswordRequest {
-
-    @NotBlank(message = "Contact value is required")
-    private String contactValue; // Email or phone
+    
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email should be valid")
+    private String email;
 }

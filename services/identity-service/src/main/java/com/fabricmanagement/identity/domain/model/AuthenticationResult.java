@@ -7,7 +7,8 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 
 /**
- * Result of an authentication attempt.
+ * Single Responsibility: Authentication result representation only
+ * Open/Closed: Can be extended without modification
  */
 @Getter
 @Builder
@@ -18,20 +19,29 @@ public class AuthenticationResult {
     private final String reason;
     private final boolean requiresTwoFactor;
     private final LocalDateTime lockedUntil;
-    private final User authenticatedUser;
+    private final String userId;
+    private final String username;
+    private final String email;
+    private final String role;
 
-    public static AuthenticationResult success(User user) {
+    public static AuthenticationResult success(String userId, String username, String email, String role) {
         return AuthenticationResult.builder()
             .success(true)
-            .authenticatedUser(user)
+            .userId(userId)
+            .username(username)
+            .email(email)
+            .role(role)
             .build();
     }
 
-    public static AuthenticationResult requiresTwoFactor(User user) {
+    public static AuthenticationResult requiresTwoFactor(String userId, String username, String email, String role) {
         return AuthenticationResult.builder()
             .success(false)
             .requiresTwoFactor(true)
-            .authenticatedUser(user)
+            .userId(userId)
+            .username(username)
+            .email(email)
+            .role(role)
             .reason("Two-factor authentication required")
             .build();
     }
@@ -58,13 +68,6 @@ public class AuthenticationResult {
             .build();
     }
 
-    public static AuthenticationResult contactNotVerified() {
-        return AuthenticationResult.builder()
-            .success(false)
-            .reason("Contact not verified")
-            .build();
-    }
-
     public static AuthenticationResult passwordChangeRequired() {
         return AuthenticationResult.builder()
             .success(false)
@@ -74,10 +77,6 @@ public class AuthenticationResult {
 
     public boolean isAccountLocked() {
         return !success && lockedUntil != null;
-    }
-
-    public boolean isContactNotVerified() {
-        return !success && "Contact not verified".equals(reason);
     }
 
     public boolean isPasswordChangeRequired() {

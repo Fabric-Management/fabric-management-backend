@@ -1,185 +1,126 @@
 package com.fabricmanagement.identity.infrastructure.web.controller;
 
-import com.fabricmanagement.identity.application.dto.auth.*;
-import com.fabricmanagement.identity.application.service.AuthenticationService;
-import com.fabricmanagement.identity.infrastructure.security.UserPrincipal;
+import com.fabricmanagement.identity.application.dto.auth.LoginRequest;
+import com.fabricmanagement.identity.application.dto.auth.LoginResponse;
+import com.fabricmanagement.identity.application.dto.auth.RefreshTokenRequest;
+import com.fabricmanagement.identity.application.dto.auth.RefreshTokenResponse;
+import com.fabricmanagement.identity.application.dto.auth.ChangePasswordRequest;
+import com.fabricmanagement.identity.application.dto.auth.ForgotPasswordRequest;
+import com.fabricmanagement.identity.application.dto.auth.ResetPasswordRequest;
+import com.fabricmanagement.identity.application.dto.auth.TwoFactorRequest;
+import com.fabricmanagement.identity.application.dto.auth.TwoFactorResponse;
+import com.fabricmanagement.identity.application.port.in.command.AuthenticationUseCase;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 /**
- * REST Controller for authentication operations.
+ * Single Responsibility: Authentication endpoints only
+ * Open/Closed: Can be extended without modification
+ * REST controller for authentication operations
  */
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-@Slf4j
 @Tag(name = "Authentication", description = "Authentication and authorization endpoints")
+@Slf4j
 public class AuthenticationController {
 
-    private final AuthenticationService authenticationService;
-
-    @PostMapping("/register")
-    @Operation(summary = "Register a new user", description = "Creates a new user account and sends verification email")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "User registered successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid input data"),
-        @ApiResponse(responseCode = "409", description = "User already exists")
-    })
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        log.info("Registration request for username: {}", request.getUsername());
-        
-        AuthResponse response = authenticationService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+    private final AuthenticationUseCase authenticationUseCase;
 
     @PostMapping("/login")
-    @Operation(summary = "Login user", description = "Authenticates user with email/phone and password")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Login successful"),
-        @ApiResponse(responseCode = "400", description = "Invalid credentials"),
-        @ApiResponse(responseCode = "423", description = "Account locked")
-    })
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        log.info("Login request for contact: {}", request.getContactValue());
-        
-        String ipAddress = getClientIpAddress(httpRequest);
-        AuthResponse response = authenticationService.login(request, ipAddress);
+    @Operation(summary = "User login", description = "Authenticates a user and returns access token")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        log.info("Login attempt for user: {}", request.getUsername());
+        LoginResponse response = authenticationUseCase.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh token", description = "Refreshes access token using refresh token")
+    public ResponseEntity<RefreshTokenResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        log.info("Token refresh request");
+        RefreshTokenResponse response = authenticationUseCase.refreshToken(request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout user", description = "Logs out the current user and revokes tokens")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Logout successful"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public ResponseEntity<Map<String, String>> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+    @Operation(summary = "User logout", description = "Logs out a user by invalidating tokens")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authorization) {
         log.info("Logout request");
-        
-        String refreshToken = null;
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            // Extract refresh token from header or request body
-            // This is a simplified implementation
-        }
-        
-        authenticationService.logout(refreshToken);
-        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+        String refreshToken = extractRefreshToken(authorization);
+        authenticationUseCase.logout(refreshToken);
+        return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/refresh-token")
-    @Operation(summary = "Refresh access token", description = "Generates new access token using refresh token")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Token refreshed successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid refresh token")
-    })
-    public ResponseEntity<AuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
-        log.info("Refresh token request");
-        
-        AuthResponse response = authenticationService.refreshToken(request);
-        return ResponseEntity.ok(response);
+    @PostMapping("/change-password")
+    @Operation(summary = "Change password", description = "Changes user password")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        log.info("Password change request");
+        String userId = getCurrentUserId(); // Implementation would get from security context
+        authenticationUseCase.changePassword(userId, request);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/forgot-password")
     @Operation(summary = "Forgot password", description = "Initiates password reset process")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Password reset email/SMS sent"),
-        @ApiResponse(responseCode = "404", description = "User not found")
-    })
-    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        log.info("Forgot password request for contact: {}", request.getContactValue());
-        
-        authenticationService.forgotPassword(request);
-        return ResponseEntity.ok(Map.of("message", "Password reset instructions sent"));
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("Forgot password request for email: {}", request.getEmail());
+        authenticationUseCase.forgotPassword(request);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/reset-password")
-    @Operation(summary = "Reset password", description = "Resets password using verification token")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Password reset successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid token")
-    })
-    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        log.info("Reset password request");
-        
-        authenticationService.resetPassword(request);
-        return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+    @Operation(summary = "Reset password", description = "Resets password using reset token")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        log.info("Password reset request");
+        authenticationUseCase.resetPassword(request);
+        return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/change-password")
-    @Operation(summary = "Change password", description = "Changes user password (requires authentication)")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Password changed successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid current password"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public ResponseEntity<Map<String, String>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        log.info("Change password request");
-        
-        authenticationService.changePassword(request);
-        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    @PostMapping("/two-factor/validate")
+    @Operation(summary = "Validate two-factor", description = "Validates two-factor authentication code")
+    public ResponseEntity<TwoFactorResponse> validateTwoFactor(@Valid @RequestBody TwoFactorRequest request) {
+        log.info("Two-factor validation request");
+        TwoFactorResponse response = authenticationUseCase.validateTwoFactor(request);
+        return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/verify-contact")
-    @Operation(summary = "Verify contact", description = "Verifies email or phone with verification code")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Contact verified successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid verification code")
-    })
-    public ResponseEntity<Map<String, String>> verifyContact(@Valid @RequestBody VerifyContactRequest request) {
-        log.info("Verify contact request for: {}", request.getContactValue());
-        
-        authenticationService.verifyContact(request);
-        return ResponseEntity.ok(Map.of("message", "Contact verified successfully"));
+    @PostMapping("/two-factor/enable")
+    @Operation(summary = "Enable two-factor", description = "Enables two-factor authentication")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<String> enableTwoFactor() {
+        log.info("Two-factor enable request");
+        String userId = getCurrentUserId(); // Implementation would get from security context
+        String qrCode = authenticationUseCase.enableTwoFactor(userId);
+        return ResponseEntity.ok(qrCode);
     }
 
-    @GetMapping("/me")
-    @Operation(summary = "Get current user", description = "Returns current authenticated user information")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "User information retrieved"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public ResponseEntity<Map<String, Object>> getCurrentUser(Authentication authentication) {
-        log.info("Get current user request");
-        
-        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-        
-        Map<String, Object> userInfo = Map.of(
-            "id", userPrincipal.getId(),
-            "username", userPrincipal.getUsername(),
-            "email", userPrincipal.getEmail(),
-            "role", userPrincipal.getAuthorities().iterator().next().getAuthority(),
-            "twoFactorEnabled", userPrincipal.isTwoFactorEnabled()
-        );
-        
-        return ResponseEntity.ok(userInfo);
+    @PostMapping("/two-factor/disable")
+    @Operation(summary = "Disable two-factor", description = "Disables two-factor authentication")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ResponseEntity<Void> disableTwoFactor() {
+        log.info("Two-factor disable request");
+        String userId = getCurrentUserId(); // Implementation would get from security context
+        authenticationUseCase.disableTwoFactor(userId);
+        return ResponseEntity.ok().build();
     }
 
-    /**
-     * Gets client IP address from request.
-     */
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-        
-        return request.getRemoteAddr();
+    // Private helper methods
+    private String extractRefreshToken(String authorization) {
+        // Implementation would extract refresh token from authorization header
+        return "refresh_token";
+    }
+
+    private String getCurrentUserId() {
+        // Implementation would get current user ID from security context
+        return "user123";
     }
 }

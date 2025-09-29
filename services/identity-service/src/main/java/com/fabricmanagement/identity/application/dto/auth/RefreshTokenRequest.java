@@ -1,20 +1,19 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
- * Request DTO for refresh token.
+ * Single Responsibility: Refresh token request representation only
+ * Open/Closed: Can be extended without modification
  */
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class RefreshTokenRequest {
-
+    
     @NotBlank(message = "Refresh token is required")
     private String refreshToken;
 }

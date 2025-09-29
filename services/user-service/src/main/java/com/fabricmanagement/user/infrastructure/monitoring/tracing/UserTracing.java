@@ -2,6 +2,8 @@ package com.fabricmanagement.user.infrastructure.monitoring.tracing;
 
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.annotation.NewSpan;
+import io.micrometer.tracing.annotation.SpanTag;
 import org.springframework.stereotype.Component;
 
 /**

@@ -1,30 +1,24 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
- * Response DTO for authentication operations.
+ * Single Responsibility: Auth response representation only
+ * Open/Closed: Can be extended without modification
  */
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class AuthResponse {
-
+    
     private String accessToken;
     private String refreshToken;
-    private String tokenType = "Bearer";
+    private String tokenType;
     private Long expiresIn;
     private String userId;
     private String username;
     private String email;
     private String role;
-    private boolean twoFactorRequired;
-    private boolean passwordChangeRequired;
-    private LocalDateTime expiresAt;
 }

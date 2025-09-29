@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
+import org.hibernate.annotations.Filter;
 
 import java.util.UUID;
 
@@ -26,7 +26,7 @@ import java.util.UUID;
     @Index(name = "idx_user_last_name", columnList = "last_name")
 })
 @SQLDelete(sql = "UPDATE users SET deleted = true WHERE id = ? AND version = ?")
-@Where(clause = "deleted = false")
+@Filter(name = "deletedFilter", condition = "deleted = false")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -38,6 +38,14 @@ public class UserEntity extends BaseEntity {
 
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
+
+    @Size(max = 50, message = "Username cannot exceed 50 characters")
+    @Column(name = "username", length = 50)
+    private String username;
+
+    @Size(max = 100, message = "Email cannot exceed 100 characters")
+    @Column(name = "email", length = 100)
+    private String email;
 
     // Basic user profile information
     @NotBlank(message = "First name is required")

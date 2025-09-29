@@ -781,7 +781,37 @@ domain/
 ├── events/             # Domain events
 ├── exceptions/         # Business exceptions
 ├── services/           # Domain services
+├── specification/      # Business rule specifications
 └── repository/         # Repository interfaces (ports)
+```
+
+**Specification Pattern Implementation:**
+
+```java
+// Base specification interface
+public interface Specification<T> {
+    boolean isSatisfiedBy(T entity);
+    String getErrorMessage();
+    String getSpecificationName();
+}
+
+// Example specification
+public class ActiveUserSpecification implements Specification<User> {
+    @Override
+    public boolean isSatisfiedBy(User user) {
+        return user != null && UserStatus.ACTIVE.equals(user.getStatus());
+    }
+
+    @Override
+    public String getErrorMessage() {
+        return "User must be active";
+    }
+}
+
+// Composite specifications
+public class AndSpecification<T> implements Specification<T> {
+    // Combines multiple specifications with AND logic
+}
 ```
 
 **Example:**
@@ -830,13 +860,18 @@ Orchestrates the use cases of the application.
 
 ```
 application/
-├── usecases/          # Use case implementations
-├── dto/               # Data Transfer Objects
-├── ports/             # Port interfaces
-│   ├── input/        # Input ports (use cases)
-│   └── output/       # Output ports (adapters)
-├── mappers/          # DTO-Entity mappers
-└── services/         # Application services
+├── port/
+│   ├── in/              # Inbound ports (use cases)
+│   │   ├── command/     # Command use cases
+│   │   └── query/       # Query use cases
+│   └── out/             # Outbound ports (interfaces)
+│       ├── repository/  # Repository interfaces
+│       ├── external/    # External service interfaces
+│       └── messaging/   # Event publishing interfaces
+├── usecases/            # Use case implementations
+├── dto/                 # Data Transfer Objects
+├── mapper/              # Object mappers
+└── service/             # Application services
 ```
 
 **Example:**
@@ -873,19 +908,82 @@ Technical implementations and framework-specific code.
 - External service integrations
 - Database implementations
 - Messaging implementations
+- Adapter Pattern implementations
+- Monitoring and Observability
 
 **Components:**
 
 ```
 infrastructure/
-├── persistence/       # JPA/Database implementations
-│   ├── entities/     # JPA entities
-│   ├── repositories/ # Repository implementations
-│   └── config/       # Database configuration
-├── messaging/        # Message queue implementations
-├── external/         # External service clients
-├── security/         # Security implementations
-└── config/          # Framework configurations
+├── adapter/
+│   ├── in/              # Inbound adapters
+│   │   ├── web/         # REST controllers
+│   │   └── messaging/   # Message consumers
+│   └── out/             # Outbound adapters
+│       ├── persistence/ # Database adapters
+│       ├── external/    # External service adapters
+│       └── messaging/   # Event publishers
+├── persistence/         # JPA/Database implementations
+│   ├── entity/          # JPA entities
+│   ├── repository/      # Repository implementations
+│   └── specification/   # JPA specifications
+├── monitoring/          # Monitoring and observability
+│   ├── metrics/         # Metrics collection
+│   ├── tracing/         # Distributed tracing
+│   └── health/          # Health checks
+├── messaging/           # Message queue implementations
+├── security/            # Security implementations
+└── config/              # Framework configurations
+```
+
+**Adapter Pattern Implementation:**
+
+```java
+// Base adapter classes
+public abstract class BaseAdapter {
+    protected PerformanceMonitor performanceMonitor;
+    protected BusinessMetricsCollector businessMetricsCollector;
+
+    protected abstract String getAdapterName();
+    protected void recordSuccess(String operationType) { ... }
+    protected void recordFailure(String operationType, String errorType) { ... }
+}
+
+// Repository adapter
+public class UserRepositoryAdapter extends BaseRepositoryAdapter
+    implements UserRepositoryPort {
+
+    @Override
+    protected String getRepositoryName() {
+        return "UserRepository";
+    }
+
+    @Override
+    public User save(User user) {
+        return measureRepositoryOperation("save", () -> {
+            UserEntity entity = mapper.toEntity(user);
+            UserEntity saved = jpaRepository.save(entity);
+            return mapper.toDomain(saved);
+        });
+    }
+}
+
+// External service adapter
+public class NotificationServiceAdapter extends BaseExternalServiceAdapter
+    implements NotificationServicePort {
+
+    @Override
+    protected String getServiceName() {
+        return "NotificationService";
+    }
+
+    @Override
+    public void sendEmail(String to, String subject, String body) {
+        measureExternalServiceCall("sendEmail", () -> {
+            // External service call implementation
+        });
+    }
+}
 ```
 
 **Example:**
@@ -952,6 +1050,166 @@ public class UserController {
 }
 ```
 
+## Monitoring and Observability
+
+### 📊 Metrics Collection
+
+**Application Metrics:**
+
+- Request rate and response time
+- Error rate and error types
+- Business event counts
+- Database query performance
+- External service call metrics
+
+**Business Metrics:**
+
+- User registration rate
+- Company creation rate
+- Contact validation success rate
+- Authentication success/failure rates
+
+**Infrastructure Metrics:**
+
+- CPU and memory usage
+- Database connection pool status
+- Message queue depth
+- Cache hit/miss ratios
+
+### 🔍 Distributed Tracing
+
+**Trace Context Propagation:**
+
+```java
+@Component
+public class TracingService {
+
+    public <T> T traceOperation(String operationName, Supplier<T> operation) {
+        Span span = tracer.nextSpan()
+            .name(operationName)
+            .start();
+
+        try (Tracer.SpanInScope ws = tracer.withSpanInScope(span)) {
+            return operation.get();
+        } finally {
+            span.end();
+        }
+    }
+}
+```
+
+**Custom Spans:**
+
+```java
+@Service
+public class UserService {
+
+    public UserResponse createUser(CreateUserRequest request) {
+        return tracingService.traceOperation("user.create", () -> {
+            // User creation logic
+            return userResponse;
+        });
+    }
+}
+```
+
+### 🏥 Health Checks
+
+**Service Health Indicators:**
+
+```java
+@Component
+public class UserServiceHealthIndicator implements HealthIndicator {
+
+    @Override
+    public Health health() {
+        try {
+            // Check database connectivity
+            userRepository.count();
+
+            // Check external service connectivity
+            identityServiceClient.healthCheck();
+
+            return Health.up()
+                .withDetail("database", "connected")
+                .withDetail("identity-service", "available")
+                .build();
+        } catch (Exception e) {
+            return Health.down()
+                .withDetail("error", e.getMessage())
+                .build();
+        }
+    }
+}
+```
+
+**Dependency Health Monitoring:**
+
+```java
+@Component
+public class DependencyHealthMonitor {
+
+    public void monitorDependencies() {
+        // Monitor database health
+        healthMetricsBinder.recordDependencyHealth(
+            "user-service", "database", isDatabaseHealthy());
+
+        // Monitor external service health
+        healthMetricsBinder.recordDependencyHealth(
+            "user-service", "identity-service", isIdentityServiceHealthy());
+    }
+}
+```
+
+### 📈 Performance Monitoring
+
+**Operation Timing:**
+
+```java
+@Component
+public class UserService {
+
+    @Autowired
+    private PerformanceMonitor performanceMonitor;
+
+    public UserResponse createUser(CreateUserRequest request) {
+        return performanceMonitor.measureExecution("user.create", () -> {
+            // User creation logic
+            return userResponse;
+        });
+    }
+}
+```
+
+**Custom Metrics:**
+
+```java
+@Component
+public class UserMetrics {
+
+    private final Counter userCreatedCounter;
+    private final Timer userCreationTimer;
+
+    public UserMetrics(MeterRegistry meterRegistry) {
+        this.userCreatedCounter = Counter.builder("user.created.count")
+            .description("Number of users created")
+            .register(meterRegistry);
+
+        this.userCreationTimer = Timer.builder("user.creation.time")
+            .description("Time taken to create a user")
+            .register(meterRegistry);
+    }
+
+    public void recordUserCreated() {
+        userCreatedCounter.increment();
+    }
+
+    public void recordUserCreationTime(Duration duration) {
+        userCreationTimer.record(duration);
+    }
+}
+```
+
 ## Design Patterns Used
 
 ### 1. Domain-Driven Design (DDD)
@@ -1013,28 +1271,281 @@ public interface UserRepository {
 }
 ```
 
-### 2. Hexagonal Architecture (Ports & Adapters)
+**Specification Pattern**
 
 ```java
-// Input Port (Use Case Interface)
-public interface CreateUserInputPort {
-    UserDto execute(CreateUserCommand command);
+// Base specification interface
+public interface Specification<T> {
+    boolean isSatisfiedBy(T entity);
+    String getErrorMessage();
+    String getSpecificationName();
 }
 
-// Output Port (Infrastructure Interface)
-public interface UserOutputPort {
-    User save(User user);
-    Optional<User> findById(UserId id);
+// Concrete specifications
+public class ActiveUserSpecification implements Specification<User> {
+    @Override
+    public boolean isSatisfiedBy(User user) {
+        return user != null && UserStatus.ACTIVE.equals(user.getStatus());
+    }
+
+    @Override
+    public String getErrorMessage() {
+        return "User must be active";
+    }
 }
 
-// Adapter (Implementation)
-@Adapter
-public class PostgresUserAdapter implements UserOutputPort {
-    // PostgreSQL specific implementation
+public class UserRequiredFieldsSpecification implements Specification<User> {
+    @Override
+    public boolean isSatisfiedBy(User user) {
+        return user != null &&
+               user.getUsername() != null && !user.getUsername().trim().isEmpty() &&
+               user.getEmail() != null && !user.getEmail().trim().isEmpty();
+    }
+
+    @Override
+    public String getErrorMessage() {
+        return "User must have username and email";
+    }
+}
+
+// Composite specifications
+public class AndSpecification<T> implements Specification<T> {
+    private final List<Specification<T>> specifications;
+
+    public AndSpecification(List<Specification<T>> specifications) {
+        this.specifications = specifications;
+    }
+
+    @Override
+    public boolean isSatisfiedBy(T entity) {
+        return specifications.stream()
+            .allMatch(spec -> spec.isSatisfiedBy(entity));
+    }
+
+    @Override
+    public String getErrorMessage() {
+        return specifications.stream()
+            .map(Specification::getErrorMessage)
+            .collect(Collectors.joining(" AND "));
+    }
+}
+
+// Usage in domain service
+@Service
+public class UserDomainService {
+
+    public void validateUser(User user) {
+        List<Specification<User>> specifications = Arrays.asList(
+            new ActiveUserSpecification(),
+            new UserRequiredFieldsSpecification()
+        );
+
+        Specification<User> combinedSpec = new AndSpecification<>(specifications);
+
+        if (!combinedSpec.isSatisfiedBy(user)) {
+            throw new BusinessRuleViolationException(combinedSpec.getErrorMessage());
+        }
+    }
 }
 ```
 
-### 3. CQRS (Command Query Responsibility Segregation)
+### 2. Hexagonal Architecture (Ports & Adapters)
+
+**Inbound Ports (Primary):**
+
+```java
+// Command ports
+public interface CreateUserUseCase {
+    UserResponse createUser(CreateUserRequest request);
+}
+
+public interface AuthenticationUseCase {
+    LoginResponse login(LoginRequest request);
+    void logout(String refreshToken);
+}
+
+// Query ports
+public interface UserQueryUseCase {
+    UserResponse findById(UUID userId);
+    List<UserResponse> findByStatus(String status);
+}
+```
+
+**Outbound Ports (Secondary):**
+
+```java
+// Repository ports
+public interface UserRepositoryPort {
+    User save(User user);
+    Optional<User> findById(UserId userId);
+    boolean existsByUsername(String username);
+}
+
+// External service ports
+public interface NotificationServicePort {
+    void sendEmail(String to, String subject, String body);
+    void sendSms(String phoneNumber, String message);
+}
+
+// Event publishing ports
+public interface UserEventPublisherPort {
+    void publishUserCreated(UserCreatedEvent event);
+    void publishUserUpdated(UserUpdatedEvent event);
+}
+```
+
+**Adapters (Infrastructure Implementations):**
+
+```java
+// Repository adapter
+@Component
+public class UserRepositoryAdapter extends BaseRepositoryAdapter
+    implements UserRepositoryPort {
+
+    @Override
+    protected String getRepositoryName() {
+        return "UserRepository";
+    }
+
+    @Override
+    public User save(User user) {
+        return measureRepositoryOperation("save", () -> {
+            UserEntity entity = mapper.toEntity(user);
+            UserEntity saved = jpaRepository.save(entity);
+            return mapper.toDomain(saved);
+        });
+    }
+}
+
+// External service adapter
+@Component
+public class NotificationServiceAdapter extends BaseExternalServiceAdapter
+    implements NotificationServicePort {
+
+    @Override
+    protected String getServiceName() {
+        return "NotificationService";
+    }
+
+    @Override
+    public void sendEmail(String to, String subject, String body) {
+        measureExternalServiceCall("sendEmail", () -> {
+            // External service call implementation
+        });
+    }
+}
+```
+
+### 4. Adapter Pattern
+
+**Base Adapter Classes:**
+
+```java
+// Base adapter providing common functionality
+public abstract class BaseAdapter {
+    @Autowired
+    protected PerformanceMonitor performanceMonitor;
+
+    @Autowired
+    protected BusinessMetricsCollector businessMetricsCollector;
+
+    protected abstract String getAdapterName();
+
+    protected void recordSuccess(String operationType) {
+        businessMetricsCollector.recordSuccess(operationType, getAdapterName());
+    }
+
+    protected void recordFailure(String operationType, String errorType) {
+        businessMetricsCollector.recordFailure(operationType, getAdapterName(), errorType);
+    }
+}
+
+// Base repository adapter
+public abstract class BaseRepositoryAdapter {
+    @Autowired
+    protected PerformanceMonitor performanceMonitor;
+
+    protected abstract String getRepositoryName();
+
+    protected <T> T measureRepositoryOperation(String operation, Callable<T> callable) {
+        return performanceMonitor.measureExecution(getRepositoryName() + "." + operation, callable);
+    }
+}
+
+// Base external service adapter
+public abstract class BaseExternalServiceAdapter {
+    @Autowired
+    protected PerformanceMonitor performanceMonitor;
+
+    protected abstract String getServiceName();
+
+    protected <T> T measureExternalServiceCall(String operation, Callable<T> callable) {
+        return performanceMonitor.measureExecution(getServiceName() + "." + operation, callable);
+    }
+}
+```
+
+**Concrete Adapter Implementations:**
+
+```java
+// Repository adapter
+@Component
+public class UserRepositoryAdapter extends BaseRepositoryAdapter
+    implements UserRepositoryPort {
+
+    private final UserJpaRepository jpaRepository;
+    private final UserMapper mapper;
+
+    @Override
+    protected String getRepositoryName() {
+        return "UserRepository";
+    }
+
+    @Override
+    public User save(User user) {
+        return measureRepositoryOperation("save", () -> {
+            try {
+                UserEntity entity = mapper.toEntity(user);
+                UserEntity saved = jpaRepository.save(entity);
+                recordSuccess("save");
+                return mapper.toDomain(saved);
+            } catch (Exception e) {
+                recordFailure("save", e.getClass().getSimpleName());
+                throw e;
+            }
+        });
+    }
+}
+
+// External service adapter
+@Component
+public class NotificationServiceAdapter extends BaseExternalServiceAdapter
+    implements NotificationServicePort {
+
+    private final RestTemplate restTemplate;
+
+    @Override
+    protected String getServiceName() {
+        return "NotificationService";
+    }
+
+    @Override
+    public void sendEmail(String to, String subject, String body) {
+        measureExternalServiceCall("sendEmail", () -> {
+            try {
+                EmailRequest request = new EmailRequest(to, subject, body);
+                restTemplate.postForEntity("/api/email/send", request, Void.class);
+                recordSuccess("sendEmail");
+            } catch (Exception e) {
+                recordFailure("sendEmail", e.getClass().getSimpleName());
+                throw e;
+            }
+        });
+    }
+}
+```
+
+### 5. CQRS (Command Query Responsibility Segregation)
 
 ```java
 // Command Side

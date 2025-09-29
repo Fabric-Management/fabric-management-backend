@@ -23,6 +23,7 @@ public class User extends BaseEntity {
 
     private UUID tenantId;
     private String username; // Username from Identity Service
+    private String email; // Email from Identity Service
 
     // Basic user profile information
     private String firstName;

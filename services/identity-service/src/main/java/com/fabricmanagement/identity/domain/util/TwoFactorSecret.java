@@ -1,36 +1,53 @@
 package com.fabricmanagement.identity.domain.util;
 
-import java.security.SecureRandom;
-import java.util.Base64;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
 
 /**
- * Two-factor authentication secret generator.
+ * Single Responsibility: Two-factor secret management only
+ * Open/Closed: Can be extended without modification
+ * Immutable: Once created, cannot be modified
  */
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
 public class TwoFactorSecret {
-
-    private static final SecureRandom random = new SecureRandom();
-    private static final int SECRET_LENGTH = 32;
-
-    public static String generate() {
-        byte[] bytes = new byte[SECRET_LENGTH];
-        random.nextBytes(bytes);
-        return Base64.getEncoder().encodeToString(bytes);
+    
+    private final String secretKey;
+    private final String qrCode;
+    private final LocalDateTime createdAt;
+    private final LocalDateTime expiresAt;
+    private final boolean isActive;
+    
+    /**
+     * Creates a new two-factor secret.
+     */
+    public static TwoFactorSecret create(String secretKey, String qrCode) {
+        return TwoFactorSecret.builder()
+            .secretKey(secretKey)
+            .qrCode(qrCode)
+            .createdAt(LocalDateTime.now())
+            .expiresAt(LocalDateTime.now().plusMinutes(10)) // 10 minutes to complete setup
+            .isActive(false)
+            .build();
     }
-
-    public static String generateTOTP(String secret, long timeCounter) {
-        // Simplified TOTP generation - in production use proper TOTP library
-        int code = Math.abs((secret + timeCounter).hashCode() % 1000000);
-        return String.format("%06d", code);
+    
+    /**
+     * Checks if the secret is expired.
+     */
+    public boolean isExpired() {
+        return expiresAt != null && expiresAt.isBefore(LocalDateTime.now());
     }
-
-    public static boolean verifyTOTP(String secret, String code, long timeWindow) {
-        long currentTime = System.currentTimeMillis() / 30000;
-        for (long i = -timeWindow; i <= timeWindow; i++) {
-            String expected = generateTOTP(secret, currentTime + i);
-            if (expected.equals(code)) {
-                return true;
-            }
-        }
-        return false;
+    
+    /**
+     * Checks if the secret is valid for use.
+     */
+    public boolean isValid() {
+        return isActive && !isExpired();
     }
 }

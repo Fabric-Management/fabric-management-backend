@@ -1,26 +1,28 @@
 package com.fabricmanagement.identity.domain.event;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Base class for domain events.
+ * Base domain event for Identity Service.
+ * Single Responsibility: Event representation only
  */
-@Data
-@NoArgsConstructor
+@Getter
 @AllArgsConstructor
 public abstract class DomainEvent {
-    private UUID eventId;
-    private LocalDateTime occurredAt;
-    private String eventType;
-
-    protected DomainEvent(String eventType) {
+    
+    private final UUID eventId;
+    private final String eventType;
+    private final LocalDateTime timestamp;
+    private final String userId;
+    
+    protected DomainEvent(String eventType, String userId) {
         this.eventId = UUID.randomUUID();
-        this.occurredAt = LocalDateTime.now();
         this.eventType = eventType;
+        this.timestamp = LocalDateTime.now();
+        this.userId = userId;
     }
 }
