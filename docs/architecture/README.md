@@ -57,7 +57,7 @@ architecture/
 - **Identity Service** (Port: 8081) ✅
 - **User Service** (Port: 8082) ✅
 - **Contact Service** (Port: 8083) ✅
-- **Company Service** (Port: 8084) ❌
+- **Company Service** (Port: 8084) ✅
 
 ### 👥 **HR Services** (4 Services)
 
@@ -101,21 +101,20 @@ architecture/
 
 ### 🔍 **Quality Services** (1 Service)
 
-- **Quality Control Service** (Port: 8104) ✅
+- **Quality Control Service** (Port: 8093) ❌
 
 ## 📊 Implementation Status
 
-### **Completed Services** ✅ (5/24)
+### **Completed Services** ✅ (4/24)
 
 - Identity Service
 - User Service
 - Contact Service
-- Quality Control Service
+- Company Service
 - Architecture Overview
 
-### **Planned Services** ❌ (19/24)
+### **Planned Services** ❌ (20/24)
 
-- Company Service
 - HR Services (4)
 - Inventory Services (5)
 - Order Services (1)

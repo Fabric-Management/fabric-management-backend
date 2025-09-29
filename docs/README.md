@@ -228,12 +228,13 @@ Test stratejileri, rehberleri ve best practices.
 - Identity Service Architecture
 - User Service Architecture
 - Contact Service Architecture
-- Quality Control Service Architecture
+- Company Service Architecture ✅
 - Identity-User Integration Guide
+- Company Service API Documentation ✅
+- Company Service Deployment Documentation ✅
 
 ### 🚧 **In Progress Documentation**
 
-- Company Service Architecture
 - HR Services Architecture
 - Inventory Services Architecture
 - Order Services Architecture

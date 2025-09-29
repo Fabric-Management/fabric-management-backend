@@ -137,14 +137,29 @@ CREATE TABLE user_roles (
 
 ## 🔧 Service Implementation
 
-### **Common Modules Integration**
+### **Minimalist Common Modules Integration**
 
-Identity Service, common modüllerini kullanarak tutarlı bir yapı sağlar:
+Identity Service, over-engineering'den kaçınarak sadece gerekli common modülleri kullanır:
+
+#### **✅ Kullanılan Common Bileşenler:**
+
+- **BaseEntity**: User, Session, Role entity'leri için audit trail ve soft delete
+- **ApiResponse**: Standart response formatı
+- **GlobalExceptionHandler**: Tutarlı hata yönetimi
+- **Common Exceptions**: EntityNotFoundException, BusinessRuleViolationException, AuthenticationException
+- **JwtTokenProvider**: Token yönetimi için
+- **SecurityContextUtil**: Current user bilgileri için
+
+#### **❌ Kullanılmayan Bileşenler:**
+
+- **BaseService**: Business logic kısıtlaması
+- **BaseController**: Generic CRUD kısıtlaması
+- **BaseRepository**: JPA zaten sağlıyor
 
 ```java
 @Service
 @Transactional
-public class AuthenticationService extends BaseService<AuthResponse, UUID> {
+public class AuthenticationService {
 
     private final UserRepository userRepository;
     private final SessionRepository sessionRepository;
@@ -200,18 +215,30 @@ public class AuthenticationService extends BaseService<AuthResponse, UUID> {
         sessionRepository.save(session);
     }
 
-    // BaseService implementation
-    @Override
-    public AuthResponse create(AuthResponse dto) {
-        // Implementation for BaseService
-        return dto;
-    }
+    public AuthResponse refreshToken(String refreshToken) {
+        // Token refresh logic
+        Session session = sessionRepository.findByRefreshToken(refreshToken)
+            .orElseThrow(() -> new EntityNotFoundException("Invalid refresh token"));
 
-    @Override
-    public AuthResponse getById(UUID id) {
-        Session session = sessionRepository.findActiveById(id)
-            .orElseThrow(() -> new EntityNotFoundException("Session not found"));
-        return mapToAuthResponse(session);
+        if (!session.isActive()) {
+            throw new AuthenticationException("Session expired");
+        }
+
+        // Generate new tokens
+        String newAccessToken = jwtTokenProvider.createToken(session.getUserId().toString());
+        String newRefreshToken = jwtTokenProvider.createToken(session.getUserId().toString());
+
+        // Update session
+        session.setAccessToken(newAccessToken);
+        session.setRefreshToken(newRefreshToken);
+        session.setExpiresAt(LocalDateTime.now().plusHours(24));
+        sessionRepository.save(session);
+
+        return AuthResponse.builder()
+            .accessToken(newAccessToken)
+            .refreshToken(newRefreshToken)
+            .expiresIn(jwtTokenProvider.getValidity())
+            .build();
     }
 }
 ```
@@ -222,10 +249,12 @@ public class AuthenticationService extends BaseService<AuthResponse, UUID> {
 @RestController
 @RequestMapping("/api/v1/auth")
 @Validated
-public class AuthenticationController extends BaseController<AuthResponse, UUID, AuthenticationService> {
+public class AuthenticationController {
+
+    private final AuthenticationService authenticationService;
 
     public AuthenticationController(AuthenticationService authenticationService) {
-        super(authenticationService);
+        this.authenticationService = authenticationService;
     }
 
     @PostMapping("/login")

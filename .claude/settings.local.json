@@ -1,9 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(mvn:clean)",
+      "Bash(mvn:compile)",
+      "Bash(mvn:package)",
+      "Bash(mvn:install)",
+      "Bash(tree:*)",
+      "CreateFile(*)",
+      "StrReplace(*)",
+      "View(*)"
     ],
-    "deny": [],
-    "ask": []
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(rmdir:*)",
+      "Bash(delete:*)"
+    ],
+    "ask": [
+      "Bash(mv:*)",
+      "Bash(cp:*)"
+    ]
   }
 }
