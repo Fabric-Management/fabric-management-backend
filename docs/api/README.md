@@ -1,8 +1,21 @@
-# API Documentation Hub
+# 📖 Fabric Management System - API Documentation Hub
 
-## 📋 Overview
+<div align="center">
 
-Bu klasör, Fabric Management System'in tüm API dokümantasyonunu organize eder. Her servis kategorisi için ayrı klasörler ve detaylı API referansları bulunur.
+![API](https://img.shields.io/badge/API-Documented-orange?style=for-the-badge&logo=swagger)
+![REST](https://img.shields.io/badge/REST-API-blue?style=for-the-badge&logo=rest)
+![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-green?style=for-the-badge&logo=openapi)
+![Swagger](https://img.shields.io/badge/Swagger-UI-available-green?style=for-the-badge&logo=swagger)
+
+**Comprehensive API documentation for all microservices**
+
+[← Back to Documentation Hub](../README.md) | [🏗️ Architecture](../architecture/README.md) | [🛠️ Development](../development/README.md)
+
+</div>
+
+## 📋 API Overview
+
+This API documentation hub provides **complete REST API specifications** for all microservices in the Fabric Management System. All APIs follow **consistent patterns** and **OpenAPI 3.0** standards.
 
 ## 📖 API Structure
 

@@ -1,8 +1,21 @@
-# Development Documentation Hub
+# 🛠️ Fabric Management System - Development Hub
 
-## 📋 Overview
+<div align="center">
 
-Bu klasör, Fabric Management System için geliştiriciler için rehberler, standartlar ve best practices içerir. Yeni geliştiricilerin sistemi anlaması ve mevcut geliştiricilerin standartlara uygun kod yazması için gerekli tüm bilgileri sağlar.
+![Development](https://img.shields.io/badge/Development-Guides-green?style=for-the-badge&logo=code)
+![Java](https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen?style=for-the-badge&logo=spring)
+![Testing](https://img.shields.io/badge/Testing-Comprehensive-blue?style=for-the-badge&logo=testing)
+
+**Complete development guides and standards**
+
+[← Back to Documentation Hub](../README.md) | [🏗️ Architecture](../architecture/README.md) | [📖 API](../api/README.md)
+
+</div>
+
+## 📋 Development Overview
+
+This development hub provides **comprehensive guides** for developers working on the Fabric Management System. From initial setup to production deployment, all development aspects are covered with **consistent standards** and **best practices**.
 
 ## 🛠️ Development Structure
 
