@@ -43,8 +43,7 @@ public interface UserMapper {
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "tenantId", ignore = true)
-    @Mapping(target = "username", ignore = true)
-    @Mapping(target = "email", ignore = true)
+    @Mapping(target = "identityId", ignore = true)
     @Mapping(target = "status", constant = "ACTIVE")
     @Mapping(target = "deleted", constant = "false")
     @Mapping(target = "createdAt", ignore = true)
@@ -59,8 +58,7 @@ public interface UserMapper {
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "tenantId", ignore = true)
-    @Mapping(target = "username", ignore = true)
-    @Mapping(target = "email", ignore = true)
+    @Mapping(target = "identityId", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "deleted", ignore = true)
     @Mapping(target = "createdAt", ignore = true)

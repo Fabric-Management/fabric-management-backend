@@ -13,6 +13,9 @@ import java.util.UUID;
  * Domain repository interface for User entity.
  * Defines contract for user data access operations.
  * Implementation will be in infrastructure layer.
+ * 
+ * Note: Username/email operations are handled by Identity Service.
+ * This repository only deals with user profile data.
  */
 public interface UserRepository {
 
@@ -27,9 +30,24 @@ public interface UserRepository {
     Optional<User> findByIdAndTenantId(UUID id, UUID tenantId);
 
     /**
-     * Finds a user by ID (without tenant filtering - for admin operations).
+     * Finds a user by identity ID (reference to Identity Service).
      */
-    Optional<User> findById(UUID id);
+    Optional<User> findByIdentityId(UUID identityId);
+
+    /**
+     * Finds a user by identity ID within tenant context.
+     */
+    Optional<User> findByIdentityIdAndTenantId(UUID identityId, UUID tenantId);
+
+    /**
+     * Checks if a user exists by identity ID.
+     */
+    boolean existsByIdentityId(UUID identityId);
+
+    /**
+     * Checks if a user exists by identity ID and tenant.
+     */
+    boolean existsByIdentityIdAndTenantId(UUID identityId, UUID tenantId);
 
     /**
      * Finds all active users for a tenant with pagination.

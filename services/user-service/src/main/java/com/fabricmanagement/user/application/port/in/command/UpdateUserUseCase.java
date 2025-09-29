@@ -1,21 +1,22 @@
 package com.fabricmanagement.user.application.port.in.command;
 
 import com.fabricmanagement.user.application.dto.user.request.UpdateUserRequest;
-import com.fabricmanagement.user.application.dto.user.response.UserResponse;
-import com.fabricmanagement.user.domain.valueobject.UserId;
+import com.fabricmanagement.user.application.dto.user.response.UserDetailResponse;
+
+import java.util.UUID;
 
 /**
- * Port interface for updating an existing user.
- * This follows Hexagonal Architecture principles as an inbound port.
+ * Use case interface for updating a user profile.
+ * Single responsibility: Handle user profile updates.
  */
 public interface UpdateUserUseCase {
     
     /**
-     * Updates an existing user with the provided information.
-     *
-     * @param userId the user ID to update
+     * Updates an existing user profile.
+     * 
+     * @param userId the user ID
      * @param request the user update request
-     * @return the updated user response
+     * @return the updated user details
      */
-    UserResponse updateUser(UserId userId, UpdateUserRequest request);
+    UserDetailResponse updateUser(UUID userId, UpdateUserRequest request);
 }

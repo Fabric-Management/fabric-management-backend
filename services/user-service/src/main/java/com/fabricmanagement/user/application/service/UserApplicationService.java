@@ -25,8 +25,18 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Application service for user management operations.
+ * Application service for user profile management operations.
  * Orchestrates business logic and coordinates between domain and infrastructure layers.
+ * 
+ * Responsibilities:
+ * - User profile CRUD operations
+ * - User status management
+ * - User search and filtering
+ * 
+ * NOT responsible for:
+ * - Authentication (handled by Identity Service)
+ * - Contact information (handled by Contact Service)
+ * - Username/email validation (handled by Identity Service)
  */
 @Service
 @Transactional
@@ -39,21 +49,29 @@ public class UserApplicationService {
     private final UserEventPublisher eventPublisher;
 
     /**
-     * Creates a new user.
+     * Creates a new user profile.
+     * Identity validation is handled by Identity Service.
      */
     public UserDetailResponse createUser(CreateUserRequest request) {
-        log.info("Creating new user with name: {} {}", request.firstName(), request.lastName());
+        log.info("Creating new user profile for identity: {} with name: {} {}", 
+                request.identityId(), request.firstName(), request.lastName());
 
         UUID tenantId = SecurityContextUtil.getCurrentTenantId();
 
+        // Check if user profile already exists for this identity
+        if (userRepository.existsByIdentityIdAndTenantId(request.identityId(), tenantId)) {
+            throw new IllegalArgumentException("User profile already exists for identity: " + request.identityId());
+        }
+
         User user = userMapper.toDomain(request);
         user.setTenantId(tenantId);
+        user.setIdentityId(request.identityId());
         user.setStatus(UserStatus.ACTIVE);
 
         User savedUser = userRepository.save(user);
         eventPublisher.publishUserCreatedEvent(savedUser);
 
-        log.info("User created successfully with ID: {}", savedUser.getId());
+        log.info("User profile created successfully with ID: {}", savedUser.getId());
         return userMapper.toDetailResponse(savedUser);
     }
 

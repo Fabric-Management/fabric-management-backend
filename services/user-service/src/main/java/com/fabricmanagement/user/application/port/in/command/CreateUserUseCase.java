@@ -1,19 +1,19 @@
 package com.fabricmanagement.user.application.port.in.command;
 
 import com.fabricmanagement.user.application.dto.user.request.CreateUserRequest;
-import com.fabricmanagement.user.application.dto.user.response.UserResponse;
+import com.fabricmanagement.user.application.dto.user.response.UserDetailResponse;
 
 /**
- * Port interface for creating a new user.
- * This follows Hexagonal Architecture principles as an inbound port.
+ * Use case interface for creating a user profile.
+ * Single responsibility: Handle user profile creation.
  */
 public interface CreateUserUseCase {
     
     /**
-     * Creates a new user with the provided information.
-     *
+     * Creates a new user profile.
+     * 
      * @param request the user creation request
-     * @return the created user response
+     * @return the created user details
      */
-    UserResponse createUser(CreateUserRequest request);
+    UserDetailResponse createUser(CreateUserRequest request);
 }

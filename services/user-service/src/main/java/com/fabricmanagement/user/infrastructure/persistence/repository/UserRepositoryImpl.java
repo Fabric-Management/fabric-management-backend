@@ -43,10 +43,29 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public Optional<User> findById(UUID id) {
-        log.debug("Finding user by ID: {}", id);
-        return userJpaRepository.findById(id)
+    public Optional<User> findByIdentityId(UUID identityId) {
+        log.debug("Finding user by identity ID: {}", identityId);
+        return userJpaRepository.findByIdentityId(identityId)
             .map(userMapper::toDomain);
+    }
+
+    @Override
+    public Optional<User> findByIdentityIdAndTenantId(UUID identityId, UUID tenantId) {
+        log.debug("Finding user by identity ID: {} and tenant: {}", identityId, tenantId);
+        return userJpaRepository.findByIdentityIdAndTenantId(identityId, tenantId)
+            .map(userMapper::toDomain);
+    }
+
+    @Override
+    public boolean existsByIdentityId(UUID identityId) {
+        log.debug("Checking if user exists by identity ID: {}", identityId);
+        return userJpaRepository.existsByIdentityId(identityId);
+    }
+
+    @Override
+    public boolean existsByIdentityIdAndTenantId(UUID identityId, UUID tenantId) {
+        log.debug("Checking if user exists by identity ID: {} and tenant: {}", identityId, tenantId);
+        return userJpaRepository.existsByIdentityIdAndTenantId(identityId, tenantId);
     }
 
     @Override

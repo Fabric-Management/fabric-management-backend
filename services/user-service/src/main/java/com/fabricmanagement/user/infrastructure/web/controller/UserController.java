@@ -6,7 +6,8 @@ import com.fabricmanagement.user.application.dto.user.request.CreateUserRequest;
 import com.fabricmanagement.user.application.dto.user.request.UpdateUserRequest;
 import com.fabricmanagement.user.application.dto.user.response.UserDetailResponse;
 import com.fabricmanagement.user.application.dto.user.response.UserResponse;
-import com.fabricmanagement.user.application.service.UserApplicationService;
+import com.fabricmanagement.user.application.port.in.command.*;
+import com.fabricmanagement.user.application.port.in.query.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +27,8 @@ import java.util.UUID;
 
 /**
  * REST controller for user profile management operations.
- * Focused ONLY on user profile data - NO authentication/authorization endpoints.
+ * Single responsibility: Handle HTTP requests for user profile operations.
+ * Delegates business logic to use case services.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -36,7 +38,17 @@ import java.util.UUID;
 @Validated
 public class UserController {
 
-    private final UserApplicationService userApplicationService;
+    // Command use cases
+    private final CreateUserUseCase createUserUseCase;
+    private final UpdateUserUseCase updateUserUseCase;
+    private final DeleteUserUseCase deleteUserUseCase;
+    private final ActivateUserUseCase activateUserUseCase;
+    private final DeactivateUserUseCase deactivateUserUseCase;
+    
+    // Query use cases
+    private final GetUserUseCase getUserUseCase;
+    private final GetAllUsersUseCase getAllUsersUseCase;
+    private final SearchUsersUseCase searchUsersUseCase;
 
     /**
      * Creates a new user profile.
@@ -48,7 +60,7 @@ public class UserController {
         @Valid @RequestBody CreateUserRequest request
     ) {
         log.info("Creating user profile: {} {}", request.firstName(), request.lastName());
-        UserDetailResponse response = userApplicationService.createUser(request);
+        UserDetailResponse response = createUserUseCase.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(response, "User profile created successfully"));
     }
@@ -63,7 +75,7 @@ public class UserController {
         @PathVariable @Parameter(description = "User ID") UUID userId
     ) {
         log.info("Fetching user profile: {}", userId);
-        UserDetailResponse response = userApplicationService.getUserById(userId);
+        UserDetailResponse response = getUserUseCase.getUserById(userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -78,7 +90,7 @@ public class UserController {
         @Valid @RequestBody UpdateUserRequest request
     ) {
         log.info("Updating user profile: {}", userId);
-        UserDetailResponse response = userApplicationService.updateUser(userId, request);
+        UserDetailResponse response = updateUserUseCase.updateUser(userId, request);
         return ResponseEntity.ok(ApiResponse.success(response, "User profile updated successfully"));
     }
 
@@ -92,7 +104,7 @@ public class UserController {
         @PathVariable @Parameter(description = "User ID") UUID userId
     ) {
         log.info("Deactivating user profile: {}", userId);
-        userApplicationService.deactivateUser(userId);
+        deactivateUserUseCase.deactivateUser(userId);
         return ResponseEntity.ok(ApiResponse.success(null, "User profile deactivated successfully"));
     }
 
@@ -106,22 +118,8 @@ public class UserController {
         @PathVariable @Parameter(description = "User ID") UUID userId
     ) {
         log.info("Activating user profile: {}", userId);
-        UserDetailResponse response = userApplicationService.activateUser(userId);
+        UserDetailResponse response = activateUserUseCase.activateUser(userId);
         return ResponseEntity.ok(ApiResponse.success(response, "User profile activated successfully"));
-    }
-
-    /**
-     * Suspends a user profile.
-     */
-    @PutMapping("/{userId}/suspend")
-    @Operation(summary = "Suspend user", description = "Suspends a user profile")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<UserDetailResponse>> suspendUser(
-        @PathVariable @Parameter(description = "User ID") UUID userId
-    ) {
-        log.info("Suspending user profile: {}", userId);
-        UserDetailResponse response = userApplicationService.suspendUser(userId);
-        return ResponseEntity.ok(ApiResponse.success(response, "User profile suspended successfully"));
     }
 
     /**
@@ -134,7 +132,7 @@ public class UserController {
         @PathVariable @Parameter(description = "User ID") UUID userId
     ) {
         log.info("Deleting user profile: {}", userId);
-        userApplicationService.deleteUser(userId);
+        deleteUserUseCase.deleteUser(userId);
         return ResponseEntity.ok(ApiResponse.success(null, "User profile deleted successfully"));
     }
 
@@ -151,24 +149,7 @@ public class UserController {
         @Parameter(description = "Sort direction") @RequestParam(defaultValue = "ASC") String sortDirection
     ) {
         log.info("Fetching user profiles - page: {}, size: {}", page, size);
-        PageResponse<UserResponse> response = userApplicationService.getUsers(page, size, sortBy, sortDirection);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    /**
-     * Gets active user profiles with pagination.
-     */
-    @GetMapping("/active")
-    @Operation(summary = "List active user profiles", description = "Gets active user profiles with pagination")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER_ADMIN') or hasRole('USER')")
-    public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> getActiveUsers(
-        @Parameter(description = "Page number") @RequestParam(defaultValue = "0") @Min(0) int page,
-        @Parameter(description = "Page size") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
-        @Parameter(description = "Sort by") @RequestParam(defaultValue = "firstName") String sortBy,
-        @Parameter(description = "Sort direction") @RequestParam(defaultValue = "ASC") String sortDirection
-    ) {
-        log.info("Fetching active user profiles - page: {}, size: {}", page, size);
-        PageResponse<UserResponse> response = userApplicationService.getActiveUsers(page, size, sortBy, sortDirection);
+        PageResponse<UserResponse> response = getAllUsersUseCase.getAllUsers(page, size, sortBy, sortDirection);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -184,21 +165,7 @@ public class UserController {
         @Parameter(description = "Page size") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         log.info("Searching user profiles with query: {}", query);
-        PageResponse<UserResponse> response = userApplicationService.searchUsers(query, page, size);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    /**
-     * Gets user profiles by department.
-     */
-    @GetMapping("/department/{department}")
-    @Operation(summary = "Get users by department", description = "Gets user profiles by department")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER_ADMIN') or hasRole('USER')")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getUsersByDepartment(
-        @PathVariable @Parameter(description = "Department name") String department
-    ) {
-        log.info("Fetching user profiles for department: {}", department);
-        List<UserResponse> response = userApplicationService.getUsersByDepartment(department);
+        PageResponse<UserResponse> response = searchUsersUseCase.searchUsers(query, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
