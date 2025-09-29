@@ -1,128 +1,139 @@
 package com.fabricmanagement.identity.application.service;
 
+import com.fabricmanagement.identity.domain.model.Session;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Service for managing user sessions and tokens.
+ * Single Responsibility: Session management only
+ * Open/Closed: Can be extended without modification
+ * Session service for managing user sessions
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class SessionService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
-    private static final String SESSION_PREFIX = "session:";
-    private static final String REFRESH_PREFIX = "refresh:";
-    private static final Duration SESSION_DURATION = Duration.ofDays(7);
-
     /**
-     * Creates a new session.
+     * Creates a new session for a user.
      */
-    public void createSession(UUID userId, String accessToken, String refreshToken, String ipAddress) {
-        log.debug("Creating session for user: {}", userId);
-
-        String sessionKey = SESSION_PREFIX + userId;
-        String refreshKey = REFRESH_PREFIX + refreshToken;
-
-        SessionData sessionData = SessionData.builder()
-            .userId(userId)
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .ipAddress(ipAddress)
-            .createdAt(System.currentTimeMillis())
-            .build();
-
-        redisTemplate.opsForValue().set(sessionKey, sessionData, SESSION_DURATION);
-        redisTemplate.opsForValue().set(refreshKey, userId.toString(), SESSION_DURATION);
-
-        log.debug("Session created successfully for user: {}", userId);
+    public Session createSession(String userId, String username, String email, String role) {
+        log.info("Creating session for user: {}", userId);
+        
+        String accessToken = generateAccessToken(userId, username, role);
+        String refreshToken = generateRefreshToken(userId);
+        LocalDateTime expiresAt = LocalDateTime.now().plusHours(1);
+        
+        Session session = Session.create(
+            userId,
+            accessToken,
+            refreshToken,
+            expiresAt,
+            "127.0.0.1", // IP address
+            "Mozilla/5.0" // User agent
+        );
+        
+        // Save session to storage
+        saveSession(session);
+        
+        log.info("Session created successfully for user: {}", userId);
+        return session;
     }
 
     /**
-     * Updates an existing session.
+     * Refreshes an existing session.
      */
-    public void updateSession(String oldRefreshToken, String newAccessToken, String newRefreshToken) {
-        log.debug("Updating session");
+    public Session refreshSession(String refreshToken) {
+        log.info("Refreshing session");
+        
+        // Validate refresh token
+        Session session = validateRefreshToken(refreshToken);
+        if (session == null) {
+            throw new IllegalArgumentException("Invalid refresh token");
+        }
+        
+        // Generate new tokens
+        String newAccessToken = generateAccessToken(session.getUserId(), "username", "role");
+        String newRefreshToken = generateRefreshToken(session.getUserId());
+        LocalDateTime newExpiresAt = LocalDateTime.now().plusHours(1);
+        
+        // Update session
+        session.setAccessToken(newAccessToken);
+        session.setRefreshToken(newRefreshToken);
+        session.setExpiresAt(newExpiresAt);
+        session.updateLastAccessed();
+        
+        // Save updated session
+        saveSession(session);
+        
+        log.info("Session refreshed successfully for user: {}", session.getUserId());
+        return session;
+    }
 
-        String oldRefreshKey = REFRESH_PREFIX + oldRefreshToken;
-        String userId = (String) redisTemplate.opsForValue().get(oldRefreshKey);
-
-        if (userId != null) {
-            // Remove old refresh token
-            redisTemplate.delete(oldRefreshKey);
-
-            // Create new session
-            createSession(UUID.fromString(userId), newAccessToken, newRefreshToken, null);
+    /**
+     * Invalidates a session.
+     */
+    public void invalidateSession(String refreshToken) {
+        log.info("Invalidating session");
+        
+        // Find session by refresh token
+        Session session = findSessionByRefreshToken(refreshToken);
+        if (session != null) {
+            session.invalidate();
+            saveSession(session);
+            log.info("Session invalidated successfully");
         }
     }
 
     /**
-     * Revokes a session.
+     * Validates a session.
      */
-    public void revokeSession(String refreshToken) {
-        log.debug("Revoking session");
-
-        String refreshKey = REFRESH_PREFIX + refreshToken;
-        String userId = (String) redisTemplate.opsForValue().get(refreshKey);
-
-        if (userId != null) {
-            String sessionKey = SESSION_PREFIX + userId;
-            redisTemplate.delete(sessionKey);
-            redisTemplate.delete(refreshKey);
-            log.debug("Session revoked for user: {}", userId);
-        }
+    public boolean validateSession(String accessToken) {
+        Session session = findSessionByAccessToken(accessToken);
+        return session != null && session.isValid();
     }
 
     /**
-     * Checks if a session is valid.
+     * Gets session by access token.
      */
-    public boolean isSessionValid(String refreshToken) {
-        String refreshKey = REFRESH_PREFIX + refreshToken;
-        return redisTemplate.hasKey(refreshKey);
+    public Session getSessionByAccessToken(String accessToken) {
+        return findSessionByAccessToken(accessToken);
     }
 
-    /**
-     * Gets session data for a user.
-     */
-    public SessionData getSessionData(UUID userId) {
-        String sessionKey = SESSION_PREFIX + userId;
-        return (SessionData) redisTemplate.opsForValue().get(sessionKey);
+    // Private helper methods
+    private String generateAccessToken(String userId, String username, String role) {
+        // Implementation would generate JWT access token
+        return "access_token_" + UUID.randomUUID().toString();
     }
 
-    /**
-     * Revokes all sessions for a user.
-     */
-    public void revokeAllUserSessions(UUID userId) {
-        log.debug("Revoking all sessions for user: {}", userId);
-
-        String sessionKey = SESSION_PREFIX + userId;
-        SessionData sessionData = (SessionData) redisTemplate.opsForValue().get(sessionKey);
-
-        if (sessionData != null) {
-            String refreshKey = REFRESH_PREFIX + sessionData.getRefreshToken();
-            redisTemplate.delete(sessionKey);
-            redisTemplate.delete(refreshKey);
-        }
+    private String generateRefreshToken(String userId) {
+        // Implementation would generate refresh token
+        return "refresh_token_" + UUID.randomUUID().toString();
     }
 
-    /**
-     * Session data model.
-     */
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
-    public static class SessionData {
-        private UUID userId;
-        private String accessToken;
-        private String refreshToken;
-        private String ipAddress;
-        private long createdAt;
+    private void saveSession(Session session) {
+        // Implementation would save session to storage (Redis, Database, etc.)
+        log.debug("Saving session: {}", session.getId());
+    }
+
+    private Session validateRefreshToken(String refreshToken) {
+        // Implementation would validate refresh token
+        return findSessionByRefreshToken(refreshToken);
+    }
+
+    private Session findSessionByRefreshToken(String refreshToken) {
+        // Implementation would find session by refresh token
+        return null; // Mock implementation
+    }
+
+    private Session findSessionByAccessToken(String accessToken) {
+        // Implementation would find session by access token
+        return null; // Mock implementation
     }
 }

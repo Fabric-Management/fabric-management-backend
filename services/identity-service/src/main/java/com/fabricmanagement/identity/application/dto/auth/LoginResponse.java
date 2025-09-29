@@ -1,49 +1,28 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
 
 /**
- * Response from login.
+ * Single Responsibility: Login response representation only
+ * Open/Closed: Can be extended without modification
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 @Builder
 public class LoginResponse {
-
+    
     private String accessToken;
     private String refreshToken;
-    private String fullName;
+    private String tokenType;
+    private Long expiresIn;
+    private LocalDateTime expiresAt;
+    private boolean requiresTwoFactor;
+    private String userId;
+    private String username;
+    private String email;
     private String role;
-    private boolean twoFactorRequired;
-    private String tempToken; // For 2FA or password change
-    private boolean passwordChangeRequired;
-
-    public static LoginResponse success(String accessToken, String refreshToken, String fullName, String role) {
-        return LoginResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .fullName(fullName)
-            .role(role)
-            .twoFactorRequired(false)
-            .passwordChangeRequired(false)
-            .build();
-    }
-
-    public static LoginResponse twoFactorRequired(String tempToken) {
-        return LoginResponse.builder()
-            .twoFactorRequired(true)
-            .tempToken(tempToken)
-            .build();
-    }
-
-    public static LoginResponse passwordChangeRequired(String tempToken) {
-        return LoginResponse.builder()
-            .passwordChangeRequired(true)
-            .tempToken(tempToken)
-            .build();
-    }
 }

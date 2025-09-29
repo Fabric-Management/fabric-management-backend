@@ -1,18 +1,21 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+/**
+ * Single Responsibility: Two-factor request representation only
+ * Open/Closed: Can be extended without modification
+ */
+@Getter
+@Setter
+@Builder
 public class TwoFactorRequest {
-
-    @NotBlank(message = "Temporary token is required")
-    private String tempToken;
-
-    @NotBlank(message = "2FA code is required")
+    
+    @NotBlank(message = "Two-factor code is required")
     private String code;
+    
+    private String userId;
 }

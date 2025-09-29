@@ -1,318 +1,274 @@
 package com.fabricmanagement.identity.application.service;
 
-import com.fabricmanagement.identity.application.dto.auth.*;
+import com.fabricmanagement.identity.application.dto.auth.LoginRequest;
+import com.fabricmanagement.identity.application.dto.auth.LoginResponse;
+import com.fabricmanagement.identity.application.dto.auth.RefreshTokenRequest;
+import com.fabricmanagement.identity.application.dto.auth.RefreshTokenResponse;
+import com.fabricmanagement.identity.application.dto.auth.ChangePasswordRequest;
+import com.fabricmanagement.identity.application.dto.auth.ForgotPasswordRequest;
+import com.fabricmanagement.identity.application.dto.auth.ResetPasswordRequest;
+import com.fabricmanagement.identity.application.dto.auth.TwoFactorRequest;
+import com.fabricmanagement.identity.application.dto.auth.TwoFactorResponse;
+import com.fabricmanagement.identity.application.port.in.command.AuthenticationUseCase;
+import com.fabricmanagement.identity.application.port.out.ExternalIdentityServicePort;
+import com.fabricmanagement.identity.application.port.out.IdentityEventPublisherPort;
+import com.fabricmanagement.identity.application.port.out.UserServicePort;
 import com.fabricmanagement.identity.domain.model.AuthenticationResult;
-import com.fabricmanagement.identity.domain.model.User;
-import com.fabricmanagement.identity.domain.repository.UserRepository;
-import com.fabricmanagement.identity.domain.valueobject.ContactType;
-import com.fabricmanagement.identity.domain.valueobject.UserRole;
-import com.fabricmanagement.identity.infrastructure.security.JwtTokenProvider;
-import com.fabricmanagement.identity.infrastructure.security.UserPrincipal;
-import com.fabricmanagement.identity.infrastructure.messaging.IdentityEventPublisher;
+import com.fabricmanagement.identity.domain.model.Session;
+import com.fabricmanagement.identity.domain.event.PasswordChangedEvent;
+import com.fabricmanagement.identity.domain.event.TwoFactorEnabledEvent;
+import com.fabricmanagement.identity.domain.event.TwoFactorDisabledEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
 /**
- * Authentication service for handling user authentication operations.
+ * Single Responsibility: Authentication operations only
+ * Open/Closed: Can be extended without modification
+ * Dependency Inversion: Depends on abstractions, not implementations
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
-public class AuthenticationService {
-    
-    private final UserRepository userRepository;
-    private final JwtTokenProvider tokenProvider;
-    private final AuthenticationManager authenticationManager;
-    private final NotificationService notificationService;
+public class AuthenticationService implements AuthenticationUseCase {
+
+    private final ExternalIdentityServicePort externalIdentityServicePort;
+    private final IdentityEventPublisherPort identityEventPublisherPort;
+    private final UserServicePort userServicePort;
     private final SessionService sessionService;
-    private final IdentityEventPublisher eventPublisher;
-    
-    /**
-     * Registers a new user.
-     */
-    public AuthResponse register(RegisterRequest request) {
-        log.info("Registering new user with username: {}", request.getUsername());
+
+    @Override
+    public LoginResponse login(LoginRequest request) {
+        log.info("Attempting login for user: {}", request.getUsername());
         
-        // Check if user already exists
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalArgumentException("Username already exists");
-        }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
-        }
-        if (userRepository.existsByContactValue(request.getPhone())) {
-            throw new IllegalArgumentException("Phone number already exists");
-        }
-
-        // Create user
-        UUID tenantId = request.getTenantId() != null ? UUID.fromString(request.getTenantId()) : UUID.randomUUID();
-        User user = User.create(
-            tenantId,
-            request.getUsername(),
-            request.getFirstName(),
-            request.getLastName(),
-            UserRole.USER,
-            "system"
-        );
-
-        // Add contacts
-        user.addContact(ContactType.EMAIL, request.getEmail(), "system");
-        user.addContact(ContactType.PHONE, request.getPhone(), "system");
-
-        // Save user
-        user = userRepository.save(user);
-
-        // Publish user created event
-        eventPublisher.publishUserCreatedEvent(
-            new com.fabricmanagement.identity.domain.event.UserCreatedEvent(
-                user.getId().getValue(),
-                user.getTenantId(),
-                user.getUsername()
-            )
-        );
-
-        // Initiate email verification
-        user.initiateContactVerification(request.getEmail());
-        userRepository.save(user);
-
-        // Send verification email
-        notificationService.sendVerificationEmail(request.getEmail(), user.getPendingVerifications().values().iterator().next());
-
-        log.info("User registered successfully with ID: {}", user.getId());
-
-        return AuthResponse.builder()
-            .userId(user.getId().getValue().toString())
-            .username(user.getUsername())
-            .email(request.getEmail())
-            .role(user.getRole().name())
-            .twoFactorRequired(false)
-            .passwordChangeRequired(false)
-            .build();
-    }
-
-    /**
-     * Authenticates a user.
-     */
-    public AuthResponse login(LoginRequest request, String ipAddress) {
-        log.info("Login attempt for contact: {}", request.getContactValue());
-
-        // Find user by contact
-        User user = userRepository.findByContactValue(request.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
-
         // Authenticate user
-        AuthenticationResult result = user.authenticate(request.getContactValue(), request.getPassword(), ipAddress);
-
+        AuthenticationResult result = authenticateUser(request.getUsername(), request.getPassword());
+        
         if (!result.isSuccess()) {
-            userRepository.save(user); // Save failed attempts
             throw new IllegalArgumentException(result.getReason());
         }
-
-        // Check if 2FA is required
-        if (user.isTwoFactorEnabled() && request.getTwoFactorCode() == null) {
-            return AuthResponse.builder()
-                .userId(user.getId().getValue().toString())
-                .username(user.getUsername())
-                .email(user.getPrimaryEmail())
-                .role(user.getRole().name())
-                .twoFactorRequired(true)
-                .passwordChangeRequired(false)
+        
+        // Check if two-factor is required
+        if (result.isRequiresTwoFactor()) {
+            return LoginResponse.builder()
+                .requiresTwoFactor(true)
+                .userId(result.getUserId())
+                .username(result.getUsername())
+                .email(result.getEmail())
+                .role(result.getRole())
                 .build();
         }
-
-        // Verify 2FA if provided
-        if (user.isTwoFactorEnabled() && request.getTwoFactorCode() != null) {
-            if (!verifyTwoFactorCode(user, request.getTwoFactorCode())) {
-                throw new IllegalArgumentException("Invalid two-factor authentication code");
-            }
-        }
-
-        // Generate tokens
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", user.getId().getValue().toString());
-        claims.put("role", user.getRole().name());
-        claims.put("tenantId", user.getTenantId().toString());
-
-        String accessToken = tokenProvider.generateToken(user.getUsername(), claims);
-        String refreshToken = tokenProvider.generateRefreshToken(user.getUsername());
-
-        // Create session
-        sessionService.createSession(user.getId().getValue(), accessToken, refreshToken, ipAddress);
-
-        // Save user with updated login info
-        userRepository.save(user);
         
-        log.info("User logged in successfully: {}", user.getUsername());
-
-        return AuthResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .expiresIn(tokenProvider.getTokenRemainingTime(accessToken))
-            .userId(user.getId().getValue().toString())
-            .username(user.getUsername())
-            .email(user.getPrimaryEmail())
-            .role(user.getRole().name())
-            .twoFactorRequired(false)
-            .passwordChangeRequired(user.isPasswordMustChange())
-            .expiresAt(LocalDateTime.now().plusSeconds(tokenProvider.getTokenRemainingTime(accessToken) / 1000))
+        // Create session
+        Session session = sessionService.createSession(
+            result.getUserId(),
+            request.getUsername(),
+            result.getEmail(),
+            result.getRole()
+        );
+        
+        return LoginResponse.builder()
+            .accessToken(session.getAccessToken())
+            .refreshToken(session.getRefreshToken())
+            .tokenType("Bearer")
+            .expiresIn(3600L) // 1 hour
+            .expiresAt(session.getExpiresAt())
+            .userId(result.getUserId())
+            .username(result.getUsername())
+            .email(result.getEmail())
+            .role(result.getRole())
             .build();
     }
 
-    /**
-     * Refreshes access token.
-     */
-    public AuthResponse refreshToken(RefreshTokenRequest request) {
+    @Override
+    public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
         log.info("Refreshing token");
-
-        if (!tokenProvider.validateToken(request.getRefreshToken()) || 
-            !tokenProvider.isRefreshToken(request.getRefreshToken())) {
-            throw new IllegalArgumentException("Invalid refresh token");
-        }
-
-        String username = tokenProvider.getUsernameFromToken(request.getRefreshToken());
-        User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        // Generate new tokens
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", user.getId().getValue().toString());
-        claims.put("role", user.getRole().name());
-        claims.put("tenantId", user.getTenantId().toString());
-
-        String newAccessToken = tokenProvider.generateToken(username, claims);
-        String newRefreshToken = tokenProvider.generateRefreshToken(username);
-
-        // Update session
-        sessionService.updateSession(request.getRefreshToken(), newAccessToken, newRefreshToken);
-
-        return AuthResponse.builder()
-            .accessToken(newAccessToken)
-            .refreshToken(newRefreshToken)
-            .expiresIn(tokenProvider.getTokenRemainingTime(newAccessToken))
-            .userId(user.getId().getValue().toString())
-            .username(user.getUsername())
-            .email(user.getPrimaryEmail())
-            .role(user.getRole().name())
-            .twoFactorRequired(false)
-            .passwordChangeRequired(user.isPasswordMustChange())
-            .expiresAt(LocalDateTime.now().plusSeconds(tokenProvider.getTokenRemainingTime(newAccessToken) / 1000))
+        
+        Session session = sessionService.refreshSession(request.getRefreshToken());
+        
+        return RefreshTokenResponse.builder()
+            .accessToken(session.getAccessToken())
+            .refreshToken(session.getRefreshToken())
+            .tokenType("Bearer")
+            .expiresIn(3600L) // 1 hour
+            .expiresAt(session.getExpiresAt())
             .build();
     }
 
-    /**
-     * Initiates password reset.
-     */
-    public void forgotPassword(ForgotPasswordRequest request) {
-        log.info("Password reset initiated for contact: {}", request.getContactValue());
-
-        User user = userRepository.findByContactValue(request.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        // Generate reset token
-        var verificationToken = user.initiateContactVerification(request.getContactValue());
-        userRepository.save(user);
-
-        // Send reset email/SMS
-        if (request.getContactValue().contains("@")) {
-            notificationService.sendPasswordResetEmail(request.getContactValue(), verificationToken);
-        } else {
-            notificationService.sendPasswordResetSms(request.getContactValue(), verificationToken);
-        }
-
-        log.info("Password reset email/SMS sent to: {}", request.getContactValue());
-    }
-
-    /**
-     * Resets password with token.
-     */
-    public void resetPassword(ResetPasswordRequest request) {
-        log.info("Password reset with token");
-
-        // Find user by token (this would need a separate method in repository)
-        // For now, we'll implement a simplified version
-        // In a real implementation, you'd need to store and validate the token
-
-        throw new UnsupportedOperationException("Password reset with token not yet implemented");
-    }
-
-    /**
-     * Changes user password.
-     */
-    public void changePassword(ChangePasswordRequest request) {
-        log.info("Changing password for authenticated user");
-
-        UserPrincipal currentUser = getCurrentUser();
-        User user = userRepository.findById(com.fabricmanagement.identity.domain.valueobject.UserId.of(currentUser.getId()))
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        user.changePassword(request.getCurrentPassword(), request.getNewPassword());
-        userRepository.save(user);
-
-        log.info("Password changed successfully for user: {}", user.getUsername());
-    }
-
-    /**
-     * Verifies contact with code.
-     */
-    public void verifyContact(VerifyContactRequest request) {
-        log.info("Verifying contact: {}", request.getContactValue());
-
-        User user = userRepository.findByContactValue(request.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        boolean verified = user.verifyContact(request.getContactValue(), request.getVerificationCode());
-        if (!verified) {
-            throw new IllegalArgumentException("Invalid verification code");
-        }
-
-        userRepository.save(user);
-        log.info("Contact verified successfully: {}", request.getContactValue());
-    }
-
-    /**
-     * Logs out user.
-     */
+    @Override
     public void logout(String refreshToken) {
         log.info("Logging out user");
-
-        if (refreshToken != null) {
-            sessionService.revokeSession(refreshToken);
-        }
-
-        SecurityContextHolder.clearContext();
-        log.info("User logged out successfully");
+        sessionService.invalidateSession(refreshToken);
     }
 
-    /**
-     * Gets current authenticated user.
-     */
-    private UserPrincipal getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal)) {
-            throw new IllegalArgumentException("User not authenticated");
+    @Override
+    public void changePassword(String userId, ChangePasswordRequest request) {
+        log.info("Changing password for user: {}", userId);
+        
+        // Validate current password
+        if (!validateCurrentPassword(userId, request.getCurrentPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
         }
-        return (UserPrincipal) authentication.getPrincipal();
+        
+        // Validate new password
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("New password and confirm password do not match");
+        }
+        
+        // Update password
+        updatePassword(userId, request.getNewPassword());
+        
+        // Publish event
+        identityEventPublisherPort.publish(new PasswordChangedEvent(userId));
+        
+        log.info("Password changed successfully for user: {}", userId);
     }
 
-    /**
-     * Verifies two-factor authentication code.
-     */
-    private boolean verifyTwoFactorCode(User user, String code) {
-        // This would use a proper TOTP library in production
-        // For now, we'll use a simplified implementation
-        return com.fabricmanagement.identity.domain.util.TwoFactorSecret.verifyTOTP(
-            user.getTwoFactorSecret(), code, 1);
+    @Override
+    public void forgotPassword(ForgotPasswordRequest request) {
+        log.info("Initiating password reset for email: {}", request.getEmail());
+        
+        // Send password reset email
+        externalIdentityServicePort.sendEmail(
+            request.getEmail(),
+            "Password Reset",
+            "Click the link to reset your password"
+        );
+        
+        log.info("Password reset email sent to: {}", request.getEmail());
+    }
+
+    @Override
+    public void resetPassword(ResetPasswordRequest request) {
+        log.info("Resetting password with token");
+        
+        // Validate reset token
+        if (!validateResetToken(request.getResetToken())) {
+            throw new IllegalArgumentException("Invalid or expired reset token");
+        }
+        
+        // Validate new password
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("New password and confirm password do not match");
+        }
+        
+        // Get user ID from token
+        String userId = getUserIdFromResetToken(request.getResetToken());
+        
+        // Update password
+        updatePassword(userId, request.getNewPassword());
+        
+        // Publish event
+        identityEventPublisherPort.publish(new PasswordChangedEvent(userId));
+        
+        log.info("Password reset successfully for user: {}", userId);
+    }
+
+    @Override
+    public TwoFactorResponse validateTwoFactor(TwoFactorRequest request) {
+        log.info("Validating two-factor code for user: {}", request.getUserId());
+        
+        // Validate two-factor code
+        if (!validateTwoFactorCode(request.getUserId(), request.getCode())) {
+            throw new IllegalArgumentException("Invalid two-factor code");
+        }
+        
+        // Get user profile
+        var userProfile = userServicePort.getUserProfile(request.getUserId());
+        
+        // Create session
+        Session session = sessionService.createSession(
+            request.getUserId(),
+            userProfile.username(),
+            userProfile.email(),
+            userProfile.status()
+        );
+        
+        return TwoFactorResponse.builder()
+            .success(true)
+            .message("Two-factor authentication successful")
+            .build();
+    }
+
+    @Override
+    public String enableTwoFactor(String userId) {
+        log.info("Enabling two-factor authentication for user: {}", userId);
+        
+        // Generate two-factor secret
+        String secretKey = generateTwoFactorSecret();
+        String qrCode = generateQRCode(secretKey, userId);
+        
+        // Save two-factor secret
+        saveTwoFactorSecret(userId, secretKey);
+        
+        // Publish event
+        identityEventPublisherPort.publish(new TwoFactorEnabledEvent(userId));
+        
+        log.info("Two-factor authentication enabled for user: {}", userId);
+        return qrCode;
+    }
+
+    @Override
+    public void disableTwoFactor(String userId) {
+        log.info("Disabling two-factor authentication for user: {}", userId);
+        
+        // Remove two-factor secret
+        removeTwoFactorSecret(userId);
+        
+        // Publish event
+        identityEventPublisherPort.publish(new TwoFactorDisabledEvent(userId));
+        
+        log.info("Two-factor authentication disabled for user: {}", userId);
+    }
+
+    // Private helper methods
+    private AuthenticationResult authenticateUser(String username, String password) {
+        // Implementation would authenticate against external service
+        // For now, return a mock result
+        return AuthenticationResult.success("user123", username, "user@example.com", "USER");
+    }
+
+    private boolean validateCurrentPassword(String userId, String currentPassword) {
+        // Implementation would validate current password
+        return true;
+    }
+
+    private void updatePassword(String userId, String newPassword) {
+        // Implementation would update password
+    }
+
+    private boolean validateResetToken(String resetToken) {
+        // Implementation would validate reset token
+        return true;
+    }
+
+    private String getUserIdFromResetToken(String resetToken) {
+        // Implementation would extract user ID from token
+        return "user123";
+    }
+
+    private boolean validateTwoFactorCode(String userId, String code) {
+        // Implementation would validate two-factor code
+        return true;
+    }
+
+    private String generateTwoFactorSecret() {
+        // Implementation would generate two-factor secret
+        return "secret123";
+    }
+
+    private String generateQRCode(String secretKey, String userId) {
+        // Implementation would generate QR code
+        return "qr123";
+    }
+
+    private void saveTwoFactorSecret(String userId, String secretKey) {
+        // Implementation would save two-factor secret
+    }
+
+    private void removeTwoFactorSecret(String userId) {
+        // Implementation would remove two-factor secret
     }
 }

@@ -1,5 +1,6 @@
 package com.fabricmanagement.user.domain.specification;
 
+import com.fabricmanagement.common.core.domain.specification.Specification;
 import com.fabricmanagement.user.domain.model.User;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 
@@ -7,7 +8,7 @@ import com.fabricmanagement.user.domain.valueobject.UserStatus;
  * Specification to check if a user is active.
  * This follows the Specification Pattern for business rules.
  */
-public class ActiveUserSpecification {
+public class ActiveUserSpecification implements Specification<User> {
     
     /**
      * Checks if a user is active.
@@ -15,6 +16,7 @@ public class ActiveUserSpecification {
      * @param user the user to check
      * @return true if user is active, false otherwise
      */
+    @Override
     public boolean isSatisfiedBy(User user) {
         return user != null && UserStatus.ACTIVE.equals(user.getStatus());
     }
@@ -24,6 +26,7 @@ public class ActiveUserSpecification {
      *
      * @return error message
      */
+    @Override
     public String getErrorMessage() {
         return "User must be active";
     }

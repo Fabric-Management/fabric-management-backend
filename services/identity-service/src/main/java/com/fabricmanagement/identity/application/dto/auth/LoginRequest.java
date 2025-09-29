@@ -1,25 +1,26 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
- * Request DTO for user login.
+ * Single Responsibility: Login request representation only
+ * Open/Closed: Can be extended without modification
  */
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class LoginRequest {
-
-    @NotBlank(message = "Contact value is required")
-    private String contactValue; // Can be email or phone
-
+    
+    @NotBlank(message = "Username is required")
+    private String username;
+    
     @NotBlank(message = "Password is required")
     private String password;
-
-    private String twoFactorCode; // Optional for 2FA
+    
+    private String twoFactorCode;
+    private boolean rememberMe;
 }

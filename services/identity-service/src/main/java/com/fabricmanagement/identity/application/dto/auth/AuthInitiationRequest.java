@@ -1,18 +1,24 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
- * Request to initiate authentication with email or phone.
+ * Single Responsibility: Auth initiation request representation only
+ * Open/Closed: Can be extended without modification
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
+@Builder
 public class AuthInitiationRequest {
-
-    @NotBlank(message = "Contact is required")
-    private String contact; // Email or phone number
+    
+    @NotBlank(message = "Username is required")
+    private String username;
+    
+    @NotBlank(message = "Password is required")
+    private String password;
+    
+    private String twoFactorCode;
 }

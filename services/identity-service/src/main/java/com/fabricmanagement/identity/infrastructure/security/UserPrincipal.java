@@ -1,34 +1,48 @@
 package com.fabricmanagement.identity.infrastructure.security;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.UUID;
+import java.util.Collections;
 
 /**
- * Custom UserDetails implementation for Spring Security.
+ * Single Responsibility: User principal representation only
+ * Open/Closed: Can be extended without modification
+ * User principal for Spring Security
  */
-@Data
+@Getter
+@Setter
 @Builder
+@AllArgsConstructor
 public class UserPrincipal implements UserDetails {
 
-    private UUID id;
+    private String id;
     private String username;
     private String email;
+    private String role;
+    private String status;
     private String password;
-    private Collection<? extends GrantedAuthority> authorities;
-    private boolean accountNonExpired;
-    private boolean accountNonLocked;
-    private boolean credentialsNonExpired;
-    private boolean enabled;
-    private boolean twoFactorEnabled;
+
+    public static UserPrincipal create(String id, String username, String email, String role, String status) {
+        return UserPrincipal.builder()
+            .id(id)
+            .username(username)
+            .email(email)
+            .role(role)
+            .status(status)
+            .password("") // Password is handled separately
+            .build();
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     @Override
@@ -43,43 +57,21 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return accountNonExpired;
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return accountNonLocked;
+        return !"LOCKED".equals(status);
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return credentialsNonExpired;
+        return true;
     }
 
     @Override
     public boolean isEnabled() {
-        return enabled;
-    }
-
-    /**
-     * Checks if the user has a specific role.
-     */
-    public boolean hasRole(String role) {
-        return authorities.stream()
-            .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
-    }
-
-    /**
-     * Checks if the user has admin privileges.
-     */
-    public boolean isAdmin() {
-        return hasRole("ADMIN") || hasRole("SUPER_ADMIN");
-    }
-
-    /**
-     * Checks if the user has manager privileges.
-     */
-    public boolean isManager() {
-        return hasRole("MANAGER") || isAdmin();
+        return "ACTIVE".equals(status);
     }
 }

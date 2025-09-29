@@ -8,7 +8,9 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
- * Redis configuration for session management.
+ * Single Responsibility: Redis configuration only
+ * Open/Closed: Can be extended without modification
+ * Configuration for Redis caching
  */
 @Configuration
 public class RedisConfig {

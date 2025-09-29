@@ -1,23 +1,21 @@
 package com.fabricmanagement.identity.application.dto.auth;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+/**
+ * Single Responsibility: Two-factor response representation only
+ * Open/Closed: Can be extended without modification
+ */
+@Getter
+@Setter
 @Builder
 public class TwoFactorResponse {
-
-    private String accessToken;
-    private String refreshToken;
-
-    public static TwoFactorResponse success(String accessToken, String refreshToken) {
-        return TwoFactorResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .build();
-    }
+    
+    private boolean success;
+    private String message;
+    private String qrCode;
+    private String secretKey;
+    private String backupCodes;
 }
