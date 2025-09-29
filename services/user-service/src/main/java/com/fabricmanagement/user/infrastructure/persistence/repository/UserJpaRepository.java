@@ -23,7 +23,26 @@ public interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
     /**
      * Finds a user by ID and tenant ID.
      */
-    Optional<UserEntity> findByIdAndTenantId(UUID id, UUID tenantId);
+    @Query("SELECT u FROM UserEntity u WHERE u.id = :id AND u.tenantId = :tenantId AND u.deleted = false")
+    Optional<UserEntity> findByIdAndTenantId(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
+
+    /**
+     * Finds a user by identity ID within tenant context.
+     */
+    @Query("SELECT u FROM UserEntity u WHERE u.identityId = :identityId AND u.tenantId = :tenantId AND u.deleted = false")
+    Optional<UserEntity> findByIdentityIdAndTenantId(@Param("identityId") UUID identityId, @Param("tenantId") UUID tenantId);
+
+    /**
+     * Checks if a user exists by identity ID.
+     */
+    @Query("SELECT COUNT(u) > 0 FROM UserEntity u WHERE u.identityId = :identityId AND u.deleted = false")
+    boolean existsByIdentityId(@Param("identityId") UUID identityId);
+
+    /**
+     * Checks if a user exists by identity ID and tenant.
+     */
+    @Query("SELECT COUNT(u) > 0 FROM UserEntity u WHERE u.identityId = :identityId AND u.tenantId = :tenantId AND u.deleted = false")
+    boolean existsByIdentityIdAndTenantId(@Param("identityId") UUID identityId, @Param("tenantId") UUID tenantId);
 
     /**
      * Finds all active users for a tenant with pagination.

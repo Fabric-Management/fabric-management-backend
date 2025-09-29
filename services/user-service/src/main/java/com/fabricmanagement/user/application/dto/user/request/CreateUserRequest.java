@@ -3,12 +3,18 @@ package com.fabricmanagement.user.application.dto.user.request;
 import jakarta.validation.constraints.*;
 import lombok.Builder;
 
+import java.util.UUID;
+
 /**
  * Request DTO for creating a new user as a record.
  * Focused only on user profile information.
+ * Identity information (email/phone) is handled by Identity Service.
  */
 @Builder
 public record CreateUserRequest(
+    @NotNull(message = "Identity ID is required")
+    UUID identityId, // Reference to Identity Service user
+
     @NotBlank(message = "First name is required")
     @Size(max = 100, message = "First name cannot exceed 100 characters")
     String firstName,

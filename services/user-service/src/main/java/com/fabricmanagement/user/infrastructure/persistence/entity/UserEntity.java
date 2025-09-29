@@ -15,10 +15,12 @@ import java.util.UUID;
  * User entity for user profile management (clean architecture).
  * Focused ONLY on user profile data - NO authentication/authorization data.
  * Authentication is handled by identity-service, authorization by auth-service.
+ * Username/email are handled by identity-service.
  */
 @Entity
 @Table(name = "users", indexes = {
     @Index(name = "idx_user_tenant_id", columnList = "tenant_id"),
+    @Index(name = "idx_user_identity_id", columnList = "identity_id"),
     @Index(name = "idx_user_status", columnList = "status"),
     @Index(name = "idx_user_department", columnList = "department"),
     @Index(name = "idx_user_deleted", columnList = "deleted"),
@@ -39,13 +41,8 @@ public class UserEntity extends BaseEntity {
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
-    @Size(max = 50, message = "Username cannot exceed 50 characters")
-    @Column(name = "username", length = 50)
-    private String username;
-
-    @Size(max = 100, message = "Email cannot exceed 100 characters")
-    @Column(name = "email", length = 100)
-    private String email;
+    @Column(name = "identity_id", nullable = false)
+    private UUID identityId; // Reference to Identity Service user
 
     // Basic user profile information
     @NotBlank(message = "First name is required")

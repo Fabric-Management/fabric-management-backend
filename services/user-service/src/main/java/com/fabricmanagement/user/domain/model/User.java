@@ -5,25 +5,36 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.experimental.SuperBuilder;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 import java.util.UUID;
 
 /**
  * User domain entity representing user profiles in the system.
  * Extends BaseEntity for common functionality (id, auditing, soft delete).
- * Focused ONLY on user profile data - NO authentication/authorization or contact data.
+ *
+ * Responsibilities:
+ * - User profile information (name, title, department)
+ * - User preferences (timezone, language, profile image)
+ * - User status management
+ *
+ * NOT responsible for:
+ * - Authentication/authorization (handled by Identity Service)
+ * - Contact information (handled by Contact Service)
+ * - Credentials (handled by Identity Service)
+ * - Username/email (handled by Identity Service)
  */
 @Getter
 @Setter
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
-@SuperBuilder
+@AllArgsConstructor
+@Builder
 public class User extends BaseEntity {
 
     private UUID tenantId;
-    private String username; // Username from Identity Service
-    private String email; // Email from Identity Service
+    private UUID identityId; // Reference to Identity Service user
 
     // Basic user profile information
     private String firstName;

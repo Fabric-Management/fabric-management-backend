@@ -13,6 +13,7 @@ import java.util.UUID;
 public record UserDetailResponse(
     UUID id,
     UUID tenantId,
+    UUID identityId, // Reference to Identity Service
     String firstName,
     String lastName,
     String displayName,
