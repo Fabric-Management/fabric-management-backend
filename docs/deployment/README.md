@@ -58,6 +58,7 @@ deployment/
 
 - Docker Setup
 - Basic Kubernetes Deployment
+- Company Service Deployment
 
 ### 🚧 **In Progress Documentation**
 
@@ -83,6 +84,7 @@ deployment/
 5. **Production Services Deployment** - Kubernetes manifests for Production Service
 6. **Security Hardening** - Production security measures
 7. **Performance Optimization** - Production performance tuning
+8. **Company Service Monitoring** - Grafana dashboards and alerts
 
 ---
 

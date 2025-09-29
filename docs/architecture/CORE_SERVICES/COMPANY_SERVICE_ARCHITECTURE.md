@@ -144,6 +144,24 @@ CREATE TABLE company_contacts (
 
 ## 🔧 Service Implementation
 
+### **Minimalist Common Modules Integration**
+
+Company Service, over-engineering'den kaçınarak sadece gerekli common modülleri kullanır:
+
+#### **✅ Kullanılan Common Bileşenler:**
+
+- **BaseEntity**: Company, CompanySettings, CompanyLocation entity'leri için audit trail ve soft delete
+- **ApiResponse**: Standart response formatı
+- **GlobalExceptionHandler**: Tutarlı hata yönetimi
+- **Common Exceptions**: EntityNotFoundException, BusinessRuleViolationException
+- **SecurityContextUtil**: Current user bilgileri için
+
+#### **❌ Kullanılmayan Bileşenler:**
+
+- **BaseService**: Business logic kısıtlaması
+- **BaseController**: Generic CRUD kısıtlaması
+- **BaseRepository**: JPA zaten sağlıyor
+
 ```java
 @Service
 @Transactional
@@ -154,14 +172,19 @@ public class CompanyService {
     private final CompanyLocationRepository companyLocationRepository;
     private final IdentityServiceClient identityServiceClient;
     private final ContactServiceClient contactServiceClient;
+    private final SecurityContextUtil securityContextUtil; // Common Security
 
     public CompanyResponse createCompany(CreateCompanyRequest request) {
         // Validate company data
         validateCompanyData(request);
 
+        // Get current user info from security context
+        UUID currentUserId = securityContextUtil.getCurrentUserId();
+        UUID tenantId = securityContextUtil.getCurrentTenantId();
+
         // Create company entity
         Company company = Company.builder()
-            .tenantId(request.getTenantId())
+            .tenantId(tenantId)
             .companyName(request.getCompanyName())
             .legalName(request.getLegalName())
             .taxNumber(request.getTaxNumber())
@@ -171,6 +194,7 @@ public class CompanyService {
             .website(request.getWebsite())
             .description(request.getDescription())
             .status(CompanyStatus.ACTIVE)
+            .createdBy(currentUserId.toString())
             .build();
 
         Company savedCompany = companyRepository.save(company);
@@ -203,7 +227,10 @@ public class CompanyService {
 
     public CompanyResponse updateCompany(UUID companyId, UpdateCompanyRequest request) {
         Company company = companyRepository.findById(companyId)
-            .orElseThrow(() -> new CompanyNotFoundException("Company not found"));
+            .orElseThrow(() -> new EntityNotFoundException("Company not found"));
+
+        // Get current user info
+        String currentUsername = securityContextUtil.getCurrentUsername();
 
         // Update company fields
         if (request.getCompanyName() != null) {
@@ -222,7 +249,7 @@ public class CompanyService {
             company.setDescription(request.getDescription());
         }
 
-        company.setUpdatedAt(LocalDateTime.now());
+        company.setUpdatedBy(currentUsername);
         Company updatedCompany = companyRepository.save(company);
 
         // Publish company updated event
@@ -233,7 +260,7 @@ public class CompanyService {
 
     public CompanyLocationResponse addCompanyLocation(UUID companyId, CreateCompanyLocationRequest request) {
         Company company = companyRepository.findById(companyId)
-            .orElseThrow(() -> new CompanyNotFoundException("Company not found"));
+            .orElseThrow(() -> new EntityNotFoundException("Company not found"));
 
         CompanyLocation location = CompanyLocation.builder()
             .companyId(companyId)
@@ -267,69 +294,77 @@ public class CompanyService {
 ```java
 @RestController
 @RequestMapping("/api/v1/companies")
+@Validated
 public class CompanyController {
 
+    private final CompanyService companyService;
+
+    public CompanyController(CompanyService companyService) {
+        this.companyService = companyService;
+    }
+
     @PostMapping
-    public ResponseEntity<CompanyResponse> createCompany(@RequestBody CreateCompanyRequest request) {
+    public ResponseEntity<ApiResponse<CompanyResponse>> createCompany(@Valid @RequestBody CreateCompanyRequest request) {
         CompanyResponse response = companyService.createCompany(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success(response, "Company created successfully"));
     }
 
     @GetMapping("/{companyId}")
-    public ResponseEntity<CompanyResponse> getCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<CompanyResponse>> getCompany(@PathVariable UUID companyId) {
         CompanyResponse response = companyService.getCompany(companyId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PutMapping("/{companyId}")
-    public ResponseEntity<CompanyResponse> updateCompany(
+    public ResponseEntity<ApiResponse<CompanyResponse>> updateCompany(
         @PathVariable UUID companyId,
-        @RequestBody UpdateCompanyRequest request) {
+        @Valid @RequestBody UpdateCompanyRequest request) {
         CompanyResponse response = companyService.updateCompany(companyId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response, "Company updated successfully"));
     }
 
     @DeleteMapping("/{companyId}")
-    public ResponseEntity<Void> deleteCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<Void>> deleteCompany(@PathVariable UUID companyId) {
         companyService.deleteCompany(companyId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success("Company deleted successfully"));
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<CompanyResponse>> searchCompanies(
+    public ResponseEntity<ApiResponse<List<CompanyResponse>>> searchCompanies(
         @RequestParam String query,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
         List<CompanyResponse> response = companyService.searchCompanies(query, page, size);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/{companyId}/locations")
-    public ResponseEntity<CompanyLocationResponse> addCompanyLocation(
+    public ResponseEntity<ApiResponse<CompanyLocationResponse>> addCompanyLocation(
         @PathVariable UUID companyId,
-        @RequestBody CreateCompanyLocationRequest request) {
+        @Valid @RequestBody CreateCompanyLocationRequest request) {
         CompanyLocationResponse response = companyService.addCompanyLocation(companyId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response, "Location added successfully"));
     }
 
     @GetMapping("/{companyId}/locations")
-    public ResponseEntity<List<CompanyLocationResponse>> getCompanyLocations(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<List<CompanyLocationResponse>>> getCompanyLocations(@PathVariable UUID companyId) {
         List<CompanyLocationResponse> response = companyService.getCompanyLocations(companyId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/{companyId}/settings")
-    public ResponseEntity<CompanySettingsResponse> getCompanySettings(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<CompanySettingsResponse>> getCompanySettings(@PathVariable UUID companyId) {
         CompanySettingsResponse response = companyService.getCompanySettings(companyId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PutMapping("/{companyId}/settings")
-    public ResponseEntity<CompanySettingsResponse> updateCompanySettings(
+    public ResponseEntity<ApiResponse<CompanySettingsResponse>> updateCompanySettings(
         @PathVariable UUID companyId,
-        @RequestBody UpdateCompanySettingsRequest request) {
+        @Valid @RequestBody UpdateCompanySettingsRequest request) {
         CompanySettingsResponse response = companyService.updateCompanySettings(companyId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response, "Settings updated successfully"));
     }
 }
 ```

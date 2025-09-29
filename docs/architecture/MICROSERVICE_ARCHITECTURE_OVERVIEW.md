@@ -26,11 +26,11 @@ Bu dokümantasyon, Fabric Management System'deki 24 microservice'in detaylı mim
 - **Dependencies**: User Service, Company Service, Notification Service
 - **Dependents**: Company Service, HR Service, Procurement Service
 
-#### 4. **Company Service** (Port: 8084) ❌
+#### 4. **Company Service** (Port: 8084) ✅
 
-- **Status**: Dokümantasyon eksik
+- **Status**: Dokümantasyon tamamlandı
 - **Dependencies**: Identity Service, Contact Service
-- **Dependents**: HR Service, Warehouse Service, Procurement Service, Accounting Service, Quality Control Service
+- **Dependents**: HR Service, Inventory Service, Procurement Service, Accounting Service, Quality Control Service
 
 ### **HR Management Services (4 Services)**
 
@@ -86,7 +86,7 @@ Bu dokümantasyon, Fabric Management System'deki 24 microservice'in detaylı mim
 
 #### 13. **Quality Control Service** (Port: 8093) ❌
 
-- **Status**: Dokümantasyon eksik
+- **Status**: Dokümantasyon eksik (sadece Dockerfile mevcut)
 - **Dependencies**: Identity Service, Inventory Service, Company Service
 - **Dependents**: AI Service, Reporting Service, Notification Service
 
@@ -162,9 +162,9 @@ Bu dokümantasyon, Fabric Management System'deki 24 microservice'in detaylı mim
 
 ### **Quality Management Services (1 Service)**
 
-#### 24. **Quality Control Service** (Port: 8104) ✅
+#### 24. **Quality Control Service** (Port: 8104) ❌
 
-- **Status**: Dokümantasyon tamamlandı
+- **Status**: Dokümantasyon eksik (sadece Dockerfile mevcut)
 - **Dependencies**: Identity Service, Inventory Service, Company Service
 - **Dependents**: AI Service, Reporting Service, Notification Service
 
@@ -612,7 +612,7 @@ graph TB
 1. Identity Service
 2. User Service
 3. Contact Service
-4. Company Service (Eksik ❌)
+4. Company Service ✅
 
 ### **Phase 2: HR Management** (Eksik ❌)
 
