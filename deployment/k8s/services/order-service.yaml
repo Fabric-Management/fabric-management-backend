@@ -1,0 +1,216 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: fabric-management
+  labels:
+    app: order-service
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+        version: v1
+    spec:
+      containers:
+        - name: order-service
+          image: fabric-management/order-service:latest
+          ports:
+            - containerPort: 8094
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: POSTGRES_HOST
+              value: "postgres-order"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "order_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: order-service-secrets
+                  key: postgres-username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: order-service-secrets
+                  key: postgres-password
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USERNAME
+              value: "guest"
+            - name: RABBITMQ_PASSWORD
+              value: "guest"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-server:8761/eureka/"
+            - name: IDENTITY_SERVICE_URL
+              value: "http://identity-service:8081"
+            - name: CONTACT_SERVICE_URL
+              value: "http://contact-service:8083"
+            - name: COMPANY_SERVICE_URL
+              value: "http://company-service:8084"
+            - name: INVENTORY_SERVICE_URL
+              value: "http://inventory-service:8089"
+            - name: CATALOG_SERVICE_URL
+              value: "http://catalog-service:8090"
+            - name: PRICING_SERVICE_URL
+              value: "http://pricing-service:8091"
+            - name: LOGISTICS_SERVICE_URL
+              value: "http://logistics-service:8095"
+            - name: PRODUCTION_SERVICE_URL
+              value: "http://production-service:8096"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8094
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8094
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+      volumes:
+        - name: config-volume
+          configMap:
+            name: order-service-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: fabric-management
+  labels:
+    app: order-service
+spec:
+  selector:
+    app: order-service
+  ports:
+    - port: 8094
+      targetPort: 8094
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: fabric-management
+data:
+  application.yml: |
+    server:
+      port: 8094
+
+    spring:
+      application:
+        name: order-service
+      datasource:
+        url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+        username: ${POSTGRES_USER}
+        password: ${POSTGRES_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+      jpa:
+        hibernate:
+          ddl-auto: update
+        show-sql: false
+        properties:
+          hibernate:
+            dialect: org.hibernate.dialect.PostgreSQLDialect
+      redis:
+        host: ${REDIS_HOST}
+        port: ${REDIS_PORT}
+        password: ""
+        database: 0
+      rabbitmq:
+        host: ${RABBITMQ_HOST}
+        port: ${RABBITMQ_PORT}
+        username: ${RABBITMQ_USERNAME}
+        password: ${RABBITMQ_PASSWORD}
+        virtual-host: /
+
+    eureka:
+      client:
+        service-url:
+          defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE}
+        register-with-eureka: true
+        fetch-registry: true
+      instance:
+        prefer-ip-address: true
+        lease-renewal-interval-in-seconds: 30
+        lease-expiration-duration-in-seconds: 90
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,info,metrics,prometheus
+      endpoint:
+        health:
+          show-details: always
+      metrics:
+        export:
+          prometheus:
+            enabled: true
+
+    logging:
+      level:
+        com.fabricmanagement.order: INFO
+        org.springframework.web: INFO
+        org.hibernate.SQL: WARN
+      pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+        file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+      file:
+        name: /app/logs/order-service.log
+
+    # Service URLs
+    services:
+      identity:
+        url: ${IDENTITY_SERVICE_URL}
+      contact:
+        url: ${CONTACT_SERVICE_URL}
+      company:
+        url: ${COMPANY_SERVICE_URL}
+      inventory:
+        url: ${INVENTORY_SERVICE_URL}
+      catalog:
+        url: ${CATALOG_SERVICE_URL}
+      pricing:
+        url: ${PRICING_SERVICE_URL}
+      logistics:
+        url: ${LOGISTICS_SERVICE_URL}
+      production:
+        url: ${PRODUCTION_SERVICE_URL}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: order-service-secrets
+  namespace: fabric-management
+type: Opaque
+data:
+  postgres-username: b3JkZXJfdXNlcg== # order_user
+  postgres-password: b3JkZXJfcGFzcw== # order_pass

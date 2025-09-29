@@ -148,22 +148,25 @@ curl http://localhost:8081/actuator/health
 #### IntelliJ IDEA Setup
 
 1. **Import Project**
-    - File → Open → Select project root
-    - Import as Maven project
+
+   - File → Open → Select project root
+   - Import as Maven project
 
 2. **Enable Annotation Processing**
-    - Settings → Build, Execution, Deployment → Compiler → Annotation Processors
-    - ✅ Enable annotation processing
+
+   - Settings → Build, Execution, Deployment → Compiler → Annotation Processors
+   - ✅ Enable annotation processing
 
 3. **Install Plugins**
-    - Lombok Plugin
-    - Spring Boot Plugin
-    - SonarLint
-    - CheckStyle-IDEA
+
+   - Lombok Plugin
+   - Spring Boot Plugin
+   - SonarLint
+   - CheckStyle-IDEA
 
 4. **Configure Code Style**
-    - Settings → Editor → Code Style → Java
-    - Import: `config/intellij-java-google-style.xml`
+   - Settings → Editor → Code Style → Java
+   - Import: `config/intellij-java-google-style.xml`
 
 #### VS Code Setup
 
@@ -198,30 +201,37 @@ Before creating a bug report, please check [existing issues](https://github.com/
 
 ```markdown
 ### Description
+
 Clear and concise description of the bug.
 
 ### Steps to Reproduce
+
 1. Go to '...'
 2. Click on '...'
 3. Scroll down to '...'
 4. See error
 
 ### Expected Behavior
+
 What you expected to happen.
 
 ### Actual Behavior
+
 What actually happened.
 
 ### Screenshots
+
 If applicable, add screenshots.
 
 ### Environment
+
 - OS: [e.g., macOS 13.0]
 - Java Version: [e.g., 21.0.1]
 - Docker Version: [e.g., 24.0.6]
 - Service Version: [e.g., 1.0.0]
 
 ### Additional Context
+
 Any other context about the problem.
 ```
 
@@ -231,15 +241,19 @@ Any other context about the problem.
 
 ```markdown
 ### Problem Statement
+
 What problem does this solve?
 
 ### Proposed Solution
+
 How would you solve it?
 
 ### Alternatives Considered
+
 What other solutions did you consider?
 
 ### Additional Context
+
 Any mockups, examples, or references?
 ```
 
@@ -248,6 +262,7 @@ Any mockups, examples, or references?
 #### Good First Issues
 
 Look for issues labeled:
+
 - `good first issue` - Simple issues perfect for beginners
 - `help wanted` - Issues where we need community help
 - `documentation` - Documentation improvements
@@ -256,23 +271,26 @@ Look for issues labeled:
 #### Step-by-Step First Contribution
 
 1. **Find an Issue**
+
    ```bash
    # Visit: https://github.com/fabric-management/fabric-system/labels/good%20first%20issue
    ```
 
 2. **Claim the Issue**
-    - Comment: "I'd like to work on this!"
-    - Wait for assignment
+
+   - Comment: "I'd like to work on this!"
+   - Wait for assignment
 
 3. **Work on Your Solution**
-    - Follow coding standards
-    - Write tests
-    - Update documentation
+
+   - Follow coding standards
+   - Write tests
+   - Update documentation
 
 4. **Submit PR**
-    - Reference the issue
-    - Describe your changes
-    - Request review
+   - Reference the issue
+   - Describe your changes
+   - Request review
 
 ### 🌍 Translations
 
@@ -306,16 +324,16 @@ graph LR
 
 ### Branch Naming Convention
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| **Feature** | `feature/description` | `feature/user-authentication` |
-| **Bug Fix** | `fix/description` | `fix/memory-leak` |
-| **Hotfix** | `hotfix/description` | `hotfix/critical-security-patch` |
-| **Documentation** | `docs/description` | `docs/api-guide` |
-| **Performance** | `perf/description` | `perf/query-optimization` |
-| **Refactoring** | `refactor/description` | `refactor/user-service` |
-| **Test** | `test/description` | `test/integration-tests` |
-| **Chore** | `chore/description` | `chore/update-dependencies` |
+| Type              | Pattern                | Example                          |
+| ----------------- | ---------------------- | -------------------------------- |
+| **Feature**       | `feature/description`  | `feature/user-authentication`    |
+| **Bug Fix**       | `fix/description`      | `fix/memory-leak`                |
+| **Hotfix**        | `hotfix/description`   | `hotfix/critical-security-patch` |
+| **Documentation** | `docs/description`     | `docs/api-guide`                 |
+| **Performance**   | `perf/description`     | `perf/query-optimization`        |
+| **Refactoring**   | `refactor/description` | `refactor/user-service`          |
+| **Test**          | `test/description`     | `test/integration-tests`         |
+| **Chore**         | `chore/description`    | `chore/update-dependencies`      |
 
 ## 📏 Coding Standards
 
@@ -337,24 +355,24 @@ import com.fabricmanagement.common.domain.BaseEntity;  // Project imports
 
 /**
  * Represents a user in the system.
- * 
+ *
  * @author Your Name
  * @since 1.0.0
  */
 @Entity
 public class User extends BaseEntity {
-    
+
     // 1. Constants
     private static final int MAX_NAME_LENGTH = 100;
-    
+
     // 2. Static fields
     private static Long instanceCount = 0L;
-    
+
     // 3. Instance fields (in order: public, protected, package, private)
     private final UUID id;
     private String firstName;
     private String lastName;
-    
+
     // 4. Constructors
     public User(String firstName, String lastName) {
         this.id = UUID.randomUUID();
@@ -362,53 +380,53 @@ public class User extends BaseEntity {
         this.lastName = lastName;
         instanceCount++;
     }
-    
+
     // 5. Factory methods
     public static User create(String firstName, String lastName) {
         validateName(firstName);
         validateName(lastName);
         return new User(firstName, lastName);
     }
-    
+
     // 6. Public methods
     public void updateName(String firstName, String lastName) {
         this.firstName = firstName;
         this.lastName = lastName;
         publishEvent(new UserNameUpdatedEvent(this.id));
     }
-    
+
     // 7. Protected methods
     protected void validate() {
         // Validation logic
     }
-    
+
     // 8. Private methods
     private static void validateName(String name) {
         if (name == null || name.length() > MAX_NAME_LENGTH) {
             throw new IllegalArgumentException("Invalid name");
         }
     }
-    
+
     // 9. Getters and Setters
     public UUID getId() {
         return id;
     }
-    
+
     public String getFirstName() {
         return firstName;
     }
-    
+
     // 10. equals, hashCode, toString
     @Override
     public boolean equals(Object o) {
         // Implementation
     }
-    
+
     @Override
     public int hashCode() {
         // Implementation
     }
-    
+
     @Override
     public String toString() {
         return "User{" +
@@ -416,11 +434,11 @@ public class User extends BaseEntity {
                ", firstName='" + firstName + '\'' +
                '}';
     }
-    
+
     // 11. Inner classes
     private static class UserNameUpdatedEvent {
         private final UUID userId;
-        
+
         UserNameUpdatedEvent(UUID userId) {
             this.userId = userId;
         }
@@ -483,7 +501,7 @@ public interface Writable {
 // Dependency Inversion
 public class UserService {
     private final UserRepository repository;  // Depend on abstraction
-    
+
     public UserService(UserRepository repository) {
         this.repository = repository;
     }
@@ -492,17 +510,17 @@ public class UserService {
 
 ### Naming Conventions
 
-| Element | Convention | Good Example | Bad Example |
-|---------|------------|--------------|-------------|
-| **Package** | lowercase | `com.fabric.user` | `com.Fabric.User` |
-| **Class** | PascalCase | `UserService` | `user_service` |
-| **Interface** | PascalCase | `Readable` | `IReadable` |
-| **Method** | camelCase | `getUserById()` | `GetUserById()` |
-| **Variable** | camelCase | `firstName` | `first_name` |
-| **Constant** | UPPER_SNAKE | `MAX_RETRY_COUNT` | `maxRetryCount` |
-| **Type Parameter** | Single letter or PascalCase | `<T>`, `<UserType>` | `<user>` |
-| **Enum** | PascalCase | `UserStatus` | `userStatus` |
-| **Enum Value** | UPPER_SNAKE | `ACTIVE`, `INACTIVE` | `active` |
+| Element            | Convention                  | Good Example         | Bad Example       |
+| ------------------ | --------------------------- | -------------------- | ----------------- |
+| **Package**        | lowercase                   | `com.fabric.user`    | `com.Fabric.User` |
+| **Class**          | PascalCase                  | `UserService`        | `user_service`    |
+| **Interface**      | PascalCase                  | `Readable`           | `IReadable`       |
+| **Method**         | camelCase                   | `getUserById()`      | `GetUserById()`   |
+| **Variable**       | camelCase                   | `firstName`          | `first_name`      |
+| **Constant**       | UPPER_SNAKE                 | `MAX_RETRY_COUNT`    | `maxRetryCount`   |
+| **Type Parameter** | Single letter or PascalCase | `<T>`, `<UserType>`  | `<user>`          |
+| **Enum**           | PascalCase                  | `UserStatus`         | `userStatus`      |
+| **Enum Value**     | UPPER_SNAKE                 | `ACTIVE`, `INACTIVE` | `active`          |
 
 ## 📝 Commit Guidelines
 
@@ -520,19 +538,19 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) specificatio
 
 ### Types
 
-| Type | Description | Example |
-|------|-------------|---------|
-| **feat** | New feature | `feat(user): add email verification` |
-| **fix** | Bug fix | `fix(auth): resolve token expiration issue` |
-| **docs** | Documentation | `docs: update API documentation` |
-| **style** | Code style (no logic change) | `style: format code with prettier` |
-| **refactor** | Code refactoring | `refactor(user): extract validation logic` |
-| **perf** | Performance improvement | `perf(db): add index to user table` |
-| **test** | Tests | `test(user): add integration tests` |
-| **build** | Build system | `build: update Maven dependencies` |
-| **ci** | CI/CD | `ci: add GitHub Actions workflow` |
-| **chore** | Maintenance | `chore: update .gitignore` |
-| **revert** | Revert commit | `revert: revert commit abc123` |
+| Type         | Description                  | Example                                     |
+| ------------ | ---------------------------- | ------------------------------------------- |
+| **feat**     | New feature                  | `feat(user): add email verification`        |
+| **fix**      | Bug fix                      | `fix(auth): resolve token expiration issue` |
+| **docs**     | Documentation                | `docs: update API documentation`            |
+| **style**    | Code style (no logic change) | `style: format code with prettier`          |
+| **refactor** | Code refactoring             | `refactor(user): extract validation logic`  |
+| **perf**     | Performance improvement      | `perf(db): add index to user table`         |
+| **test**     | Tests                        | `test(user): add integration tests`         |
+| **build**    | Build system                 | `build: update Maven dependencies`          |
+| **ci**       | CI/CD                        | `ci: add GitHub Actions workflow`           |
+| **chore**    | Maintenance                  | `chore: update .gitignore`                  |
+| **revert**   | Revert commit                | `revert: revert commit abc123`              |
 
 ### Scope Examples
 
@@ -546,6 +564,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) specificatio
 ### Commit Message Examples
 
 #### Simple Feature
+
 ```bash
 feat(user): add user profile endpoint
 
@@ -555,6 +574,7 @@ and settings.
 ```
 
 #### Bug Fix with Issue
+
 ```bash
 fix(auth): prevent JWT token replay attacks
 
@@ -565,6 +585,7 @@ Fixes #234
 ```
 
 #### Breaking Change
+
 ```bash
 feat(api)!: change user response format
 
@@ -601,6 +622,7 @@ After:
 ### Before Creating a PR
 
 #### Checklist
+
 - [ ] I have read the contributing guidelines
 - [ ] I have searched for similar PRs
 - [ ] I have updated from upstream main
@@ -637,20 +659,25 @@ git rebase upstream/main
 
 ```markdown
 ## 📋 Description
+
 Brief description of changes and why they're needed.
 
 ## 🔗 Related Issue
+
 Fixes #(issue number)
 
 ## 📸 Screenshots
+
 If applicable, add screenshots or GIFs.
 
 ## 🧪 Testing
+
 - [ ] Unit tests pass
 - [ ] Integration tests pass
 - [ ] Manual testing completed
 
 ## 📝 Checklist
+
 - [ ] My code follows the style guidelines
 - [ ] I have performed self-review
 - [ ] I have commented complex code
@@ -661,6 +688,7 @@ If applicable, add screenshots or GIFs.
 - [ ] I have updated CHANGELOG.md
 
 ## 🔄 Type of Change
+
 - [ ] 🐛 Bug fix (non-breaking)
 - [ ] ✨ New feature (non-breaking)
 - [ ] 💥 Breaking change
@@ -672,6 +700,7 @@ If applicable, add screenshots or GIFs.
 - [ ] 🔧 Configuration change
 
 ## 💬 Additional Notes
+
 Any additional information for reviewers.
 ```
 
@@ -693,23 +722,23 @@ graph TD
 
 ### Review Response Times
 
-| PR Type | Target Response Time |
-|---------|---------------------|
-| 🔥 Hotfix | < 2 hours |
-| 🐛 Bug Fix | < 24 hours |
-| ✨ Feature | < 48 hours |
-| 📚 Documentation | < 72 hours |
+| PR Type          | Target Response Time |
+| ---------------- | -------------------- |
+| 🔥 Hotfix        | < 2 hours            |
+| 🐛 Bug Fix       | < 24 hours           |
+| ✨ Feature       | < 48 hours           |
+| 📚 Documentation | < 72 hours           |
 
 ## 🧪 Testing Guidelines
 
 ### Test Coverage Requirements
 
-| Layer | Minimum Coverage | Target Coverage |
-|-------|-----------------|-----------------|
-| **Domain** | 90% | 95% |
-| **Application** | 80% | 90% |
-| **Infrastructure** | 70% | 80% |
-| **Overall** | 80% | 85% |
+| Layer              | Minimum Coverage | Target Coverage |
+| ------------------ | ---------------- | --------------- |
+| **Domain**         | 90%              | 95%             |
+| **Application**    | 80%              | 90%             |
+| **Infrastructure** | 70%              | 80%             |
+| **Overall**        | 80%              | 85%             |
 
 ### Test Categories
 
@@ -723,10 +752,10 @@ void shouldCreateUser_WhenValidDataProvided() {
     String firstName = "John";
     String lastName = "Doe";
     TenantId tenantId = TenantId.generate();
-    
+
     // When (Act)
     User user = User.create(firstName, lastName, "johndoe", tenantId);
-    
+
     // Then (Assert)
     assertThat(user)
         .isNotNull()
@@ -745,10 +774,10 @@ void shouldCreateUser_WhenValidDataProvided() {
 @AutoConfigureMockMvc
 @TestPropertySource(locations = "classpath:application-test.yml")
 class UserControllerIntegrationTest {
-    
+
     @Autowired
     private MockMvc mockMvc;
-    
+
     @Test
     @Sql("/test-data/users.sql")
     @DisplayName("Should create user via REST API")
@@ -761,7 +790,7 @@ class UserControllerIntegrationTest {
                 "username": "janedoe"
             }
             """;
-        
+
         // When & Then
         mockMvc.perform(post("/api/v1/users")
                 .header("X-Tenant-ID", "test-tenant")
@@ -777,7 +806,7 @@ class UserControllerIntegrationTest {
 
 ```java
 @ArchTest
-static final ArchRule domainShouldNotDependOnInfrastructure = 
+static final ArchRule domainShouldNotDependOnInfrastructure =
     noClasses()
         .that().resideInAPackage("..domain..")
         .should().dependOnClassesThat()
@@ -800,21 +829,21 @@ public class UserTestDataBuilder {
     private String lastName = "Doe";
     private String username = "johndoe";
     private UserStatus status = UserStatus.PENDING;
-    
+
     public static UserTestDataBuilder aUser() {
         return new UserTestDataBuilder();
     }
-    
+
     public UserTestDataBuilder withFirstName(String firstName) {
         this.firstName = firstName;
         return this;
     }
-    
+
     public UserTestDataBuilder active() {
         this.status = UserStatus.ACTIVE;
         return this;
     }
-    
+
     public User build() {
         User user = User.create(firstName, lastName, username, TenantId.generate());
         if (status == UserStatus.ACTIVE) {
@@ -842,7 +871,7 @@ User activeUser = aUser()
  * This service implements the business logic for creating,
  * updating, and managing users in the system.
  * </p>
- * 
+ *
  * @author John Doe
  * @since 1.0.0
  * @see UserRepository
@@ -850,19 +879,19 @@ User activeUser = aUser()
  */
 @Service
 public class UserService {
-    
+
     /**
      * Creates a new user with the provided information.
      * <p>
      * This method validates the input, checks for duplicate
      * usernames, creates the user, and publishes a domain event.
      * </p>
-     * 
+     *
      * @param command the command containing user creation data
      * @return the created user response
      * @throws DuplicateUsernameException if username already exists
      * @throws ValidationException if input validation fails
-     * 
+     *
      * @example
      * <pre>{@code
      * CreateUserCommand command = new CreateUserCommand("John", "Doe", "johndoe");
@@ -882,7 +911,7 @@ public class UserService {
 @RequestMapping("/api/v1/users")
 @Tag(name = "User Management", description = "Operations related to user management")
 public class UserController {
-    
+
     @PostMapping
     @Operation(
         summary = "Create a new user",
@@ -926,6 +955,7 @@ When adding new features:
 ## Features
 
 ### User Management ✨ NEW
+
 - Create, update, and delete users
 - User activation and deactivation
 - Bulk operations support
@@ -957,13 +987,13 @@ PGP Key: [Download](https://fabricmanagement.com/pgp-key.asc)
 
 ### Communication Channels
 
-| Channel | Purpose | Link |
-|---------|---------|------|
-| 💬 **Discord** | Real-time chat, quick questions | [Join Server](https://discord.gg/fabric) |
-| 💭 **GitHub Discussions** | Long-form discussions, RFCs | [View Discussions](https://github.com/fabric-management/fabric-system/discussions) |
-| 📧 **Mailing List** | Announcements, newsletter | [Subscribe](https://groups.google.com/g/fabric-dev) |
-| 🐦 **Twitter** | Updates, announcements | [@FabricMgmt](https://twitter.com/FabricMgmt) |
-| 📺 **YouTube** | Tutorials, demos | [Channel](https://youtube.com/@FabricManagement) |
+| Channel                   | Purpose                         | Link                                                                               |
+| ------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- |
+| 💬 **Discord**            | Real-time chat, quick questions | [Join Server](https://discord.gg/fabric)                                           |
+| 💭 **GitHub Discussions** | Long-form discussions, RFCs     | [View Discussions](https://github.com/fabric-management/fabric-system/discussions) |
+| 📧 **Mailing List**       | Announcements, newsletter       | [Subscribe](https://groups.google.com/g/fabric-dev)                                |
+| 🐦 **Twitter**            | Updates, announcements          | [@FabricMgmt](https://twitter.com/FabricMgmt)                                      |
+| 📺 **YouTube**            | Tutorials, demos                | [Channel](https://youtube.com/@FabricManagement)                                   |
 
 ### Getting Help
 
@@ -990,17 +1020,18 @@ All contributors are recognized in:
 
 ### Contribution Levels
 
-| Level | Requirements | Badge |
-|-------|-------------|-------|
-| 🥉 **Bronze** | 1-5 merged PRs | ![Bronze](https://img.shields.io/badge/Contributor-Bronze-CD7F32) |
-| 🥈 **Silver** | 6-15 merged PRs | ![Silver](https://img.shields.io/badge/Contributor-Silver-C0C0C0) |
-| 🥇 **Gold** | 16-30 merged PRs | ![Gold](https://img.shields.io/badge/Contributor-Gold-FFD700) |
-| 💎 **Diamond** | 31+ merged PRs | ![Diamond](https://img.shields.io/badge/Contributor-Diamond-00FFFF) |
-| 🌟 **Core** | Core team member | ![Core](https://img.shields.io/badge/Core-Team-FF69B4) |
+| Level          | Requirements     | Badge                                                               |
+| -------------- | ---------------- | ------------------------------------------------------------------- |
+| 🥉 **Bronze**  | 1-5 merged PRs   | ![Bronze](https://img.shields.io/badge/Contributor-Bronze-CD7F32)   |
+| 🥈 **Silver**  | 6-15 merged PRs  | ![Silver](https://img.shields.io/badge/Contributor-Silver-C0C0C0)   |
+| 🥇 **Gold**    | 16-30 merged PRs | ![Gold](https://img.shields.io/badge/Contributor-Gold-FFD700)       |
+| 💎 **Diamond** | 31+ merged PRs   | ![Diamond](https://img.shields.io/badge/Contributor-Diamond-00FFFF) |
+| 🌟 **Core**    | Core team member | ![Core](https://img.shields.io/badge/Core-Team-FF69B4)              |
 
 ### Monthly Recognition
 
 Each month we recognize:
+
 - 🏆 **Contributor of the Month** - Most impactful contributions
 - 🐛 **Bug Hunter** - Most bugs fixed
 - 📚 **Documentation Hero** - Best documentation improvements
@@ -1025,6 +1056,7 @@ Thank you for taking the time to contribute to Fabric Management System! Every c
 ---
 
 **Questions?** Feel free to reach out:
+
 - 📧 Email: contributors@fabricmanagement.com
 - 💬 Discord: [Join our server](https://discord.gg/fabric)
 - 💭 Discussions: [Start a discussion](https://github.com/fabric-management/fabric-system/discussions)

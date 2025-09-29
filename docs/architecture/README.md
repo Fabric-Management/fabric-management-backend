@@ -32,6 +32,9 @@ architecture/
 │   └── COMPANY_SERVICE_ARCHITECTURE.md
 ├── HR_SERVICES/                           # İnsan kaynakları servisleri
 ├── INVENTORY_SERVICES/                    # Envanter yönetim servisleri
+├── ORDER_SERVICES/                        # Sipariş yönetim servisleri
+├── LOGISTICS_SERVICES/                    # Lojistik yönetim servisleri
+├── PRODUCTION_SERVICES/                   # Üretim yönetim servisleri
 ├── FINANCIAL_SERVICES/                    # Mali servisler
 ├── AI_ANALYTICS_SERVICES/                 # AI ve analitik servisler
 └── QUALITY_SERVICES/                      # Kalite yönetim servisleri
@@ -63,33 +66,46 @@ architecture/
 - **Leave Service** (Port: 8087) ❌
 - **Performance Service** (Port: 8088) ❌
 
-### 📦 **Inventory Services** (4 Services)
+### 📦 **Inventory Services** (5 Services)
 
-- **Warehouse Service** (Port: 8089) ❌
-- **Stock Service** (Port: 8090) ❌
-- **Fabric Service** (Port: 8091) ❌
+- **Inventory Service** (Port: 8089) ❌
+- **Catalog Service** (Port: 8090) ❌
+- **Pricing Service** (Port: 8091) ❌
 - **Procurement Service** (Port: 8092) ❌
+- **Quality Control Service** (Port: 8093) ❌
+
+### 📋 **Order Services** (1 Service)
+
+- **Order Service** (Port: 8094) ❌
+
+### 🚚 **Logistics Services** (1 Service)
+
+- **Logistics Service** (Port: 8095) ❌
+
+### 🏭 **Production Services** (1 Service)
+
+- **Production Service** (Port: 8096) ❌
 
 ### 💰 **Financial Services** (4 Services)
 
-- **Accounting Service** (Port: 8093) ❌
-- **Invoice Service** (Port: 8094) ❌
-- **Payment Service** (Port: 8095) ❌
-- **Billing Service** (Port: 8096) ❌
+- **Accounting Service** (Port: 8097) ❌
+- **Invoice Service** (Port: 8098) ❌
+- **Payment Service** (Port: 8099) ❌
+- **Billing Service** (Port: 8100) ❌
 
 ### 🤖 **AI & Analytics Services** (3 Services)
 
-- **AI Service** (Port: 8097) ❌
-- **Reporting Service** (Port: 8098) ❌
-- **Notification Service** (Port: 8099) ❌
+- **AI Service** (Port: 8101) ❌
+- **Reporting Service** (Port: 8102) ❌
+- **Notification Service** (Port: 8103) ❌
 
 ### 🔍 **Quality Services** (1 Service)
 
-- **Quality Control Service** (Port: 8100) ✅
+- **Quality Control Service** (Port: 8104) ✅
 
 ## 📊 Implementation Status
 
-### **Completed Services** ✅ (5/20)
+### **Completed Services** ✅ (5/24)
 
 - Identity Service
 - User Service
@@ -97,11 +113,14 @@ architecture/
 - Quality Control Service
 - Architecture Overview
 
-### **Planned Services** ❌ (15/20)
+### **Planned Services** ❌ (19/24)
 
 - Company Service
 - HR Services (4)
-- Inventory Services (4)
+- Inventory Services (5)
+- Order Services (1)
+- Logistics Services (1)
+- Production Services (1)
 - Financial Services (4)
 - AI & Analytics Services (3)
 
@@ -120,19 +139,29 @@ architecture/
 
 ### **Phase 3: Inventory Management Services** (Priority: High)
 
-1. Warehouse Service Architecture
-2. Stock Service Architecture
-3. Fabric Service Architecture
+1. Inventory Service Architecture
+2. Catalog Service Architecture
+3. Pricing Service Architecture
 4. Procurement Service Architecture
+5. Quality Control Service Architecture
 
-### **Phase 4: Financial Services** (Priority: High)
+### **Phase 4: Order & Logistics Services** (Priority: High)
+
+1. Order Service Architecture
+2. Logistics Service Architecture
+
+### **Phase 5: Production Services** (Priority: High)
+
+1. Production Service Architecture
+
+### **Phase 6: Financial Services** (Priority: High)
 
 1. Accounting Service Architecture
 2. Invoice Service Architecture
 3. Payment Service Architecture
 4. Billing Service Architecture
 
-### **Phase 5: AI & Analytics Services** (Priority: Medium)
+### **Phase 7: AI & Analytics Services** (Priority: Medium)
 
 1. AI Service Architecture
 2. Reporting Service Architecture
@@ -164,26 +193,32 @@ graph TB
         PS[Payroll Service<br/>:8086]
         LS[Leave Service<br/>:8087]
         PMS[Performance Service<br/>:8088]
-        WS[Warehouse Service<br/>:8089]
-        SS[Stock Service<br/>:8090]
-        FS[Fabric Service<br/>:8091]
-        PS2[Procurement Service<br/>:8092]
-        AS[Accounting Service<br/>:8093]
-        IS2[Invoice Service<br/>:8094]
-        PS3[Payment Service<br/>:8095]
-        BS[Billing Service<br/>:8096]
-        AIS[AI Service<br/>:8097]
-        RS[Reporting Service<br/>:8098]
-        NS[Notification Service<br/>:8099]
-        QCS[Quality Control Service<br/>:8100]
+        IS3[Inventory Service<br/>:8089]
+        CS2[Catalog Service<br/>:8090]
+        PS2[Pricing Service<br/>:8091]
+        PS3[Procurement Service<br/>:8092]
+        OS[Order Service<br/>:8094]
+        LS[Logistics Service<br/>:8095]
+        PS4[Production Service<br/>:8096]
+        AS[Accounting Service<br/>:8097]
+        IS2[Invoice Service<br/>:8098]
+        PS5[Payment Service<br/>:8099]
+        BS[Billing Service<br/>:8100]
+        AIS[AI Service<br/>:8101]
+        RS[Reporting Service<br/>:8102]
+        NS[Notification Service<br/>:8103]
+        QCS[Quality Control Service<br/>:8104]
     end
 
     subgraph "Data Layer"
         PG1[(Core DB<br/>PostgreSQL)]
         PG2[(HR DB<br/>PostgreSQL)]
         PG3[(Inventory DB<br/>PostgreSQL)]
-        PG4[(Financial DB<br/>PostgreSQL)]
-        PG5[(Quality DB<br/>PostgreSQL)]
+        PG4[(Order DB<br/>PostgreSQL)]
+        PG5[(Logistics DB<br/>PostgreSQL)]
+        PG6[(Production DB<br/>PostgreSQL)]
+        PG7[(Financial DB<br/>PostgreSQL)]
+        PG8[(Quality DB<br/>PostgreSQL)]
         REDIS[(Redis Cache)]
         ES[(Elasticsearch)]
     end
@@ -193,7 +228,26 @@ graph TB
         subgraph "Exchanges"
             UE[User Events]
             CE[Contact Events]
+            COE[Company Events]
+            HRE[HR Events]
+            PE[Payroll Events]
+            LE[Leave Events]
+            PME[Performance Events]
+            IE[Inventory Events]
+            CE2[Catalog Events]
+            PE2[Pricing Events]
+            PE3[Procurement Events]
+            OE[Order Events]
+            LE2[Logistics Events]
+            PE4[Production Events]
+            AE[Accounting Events]
+            IE2[Invoice Events]
+            PE5[Payment Events]
+            BE[Billing Events]
+            AIE[AI Events]
+            RE[Reporting Events]
             NE[Notification Events]
+            QE[Quality Events]
         end
     end
 
@@ -210,38 +264,184 @@ graph TB
     LB --> GW
     GW --> US
     GW --> CS
+    GW --> COS
+    GW --> HRS
+    GW --> PS
+    GW --> LS
+    GW --> PMS
+    GW --> IS3
+    GW --> CS2
+    GW --> PS2
+    GW --> PS3
+    GW --> OS
+    GW --> LS
+    GW --> PS4
     GW --> AS
-    GW --> HS
+    GW --> IS2
+    GW --> PS5
+    GW --> BS
+    GW --> AIS
+    GW --> RS
+    GW --> NS
+    GW --> QCS
 
     US --> EUR
     CS --> EUR
+    COS --> EUR
+    HRS --> EUR
+    PS --> EUR
+    LS --> EUR
+    PMS --> EUR
+    IS3 --> EUR
+    CS2 --> EUR
+    PS2 --> EUR
+    PS3 --> EUR
+    OS --> EUR
+    LS --> EUR
+    PS4 --> EUR
     AS --> EUR
-    HS --> EUR
+    IS2 --> EUR
+    PS5 --> EUR
+    BS --> EUR
+    AIS --> EUR
+    RS --> EUR
+    NS --> EUR
+    QCS --> EUR
 
     US --> PG1
-    CS --> PG2
-    AS --> PG3
-    HS --> PG4
+    CS --> PG1
+    COS --> PG1
+    HRS --> PG2
+    PS --> PG2
+    LS --> PG2
+    PMS --> PG2
+    IS3 --> PG3
+    CS2 --> PG3
+    PS2 --> PG3
+    PS3 --> PG3
+    OS --> PG4
+    LS --> PG5
+    PS4 --> PG6
+    AS --> PG7
+    IS2 --> PG7
+    PS5 --> PG7
+    BS --> PG7
+    QCS --> PG8
 
     AS --> REDIS
     US --> REDIS
+    CS --> REDIS
+    COS --> REDIS
+    HRS --> REDIS
+    PS --> REDIS
+    LS --> REDIS
+    PMS --> REDIS
+    IS3 --> REDIS
+    CS2 --> REDIS
+    PS2 --> REDIS
+    PS3 --> REDIS
+    OS --> REDIS
+    LS --> REDIS
+    PS4 --> REDIS
+    IS2 --> REDIS
+    PS5 --> REDIS
+    BS --> REDIS
+    AIS --> REDIS
+    RS --> REDIS
+    NS --> REDIS
+    QCS --> REDIS
 
     US --> RMQ
     CS --> RMQ
+    COS --> RMQ
+    HRS --> RMQ
+    PS --> RMQ
+    LS --> RMQ
+    PMS --> RMQ
+    IS3 --> RMQ
+    CS2 --> RMQ
+    PS2 --> RMQ
+    PS3 --> RMQ
+    OS --> RMQ
+    LS --> RMQ
+    PS4 --> RMQ
     AS --> RMQ
+    IS2 --> RMQ
+    PS5 --> RMQ
+    BS --> RMQ
+    AIS --> RMQ
+    RS --> RMQ
     NS --> RMQ
+    QCS --> RMQ
 
     US --> UE
     CS --> CE
+    COS --> COE
+    HRS --> HRE
+    PS --> PE
+    LS --> LE
+    PMS --> PME
+    IS3 --> IE
+    CS2 --> CE2
+    PS2 --> PE2
+    PS3 --> PE3
+    OS --> OE
+    LS --> LE2
+    PS4 --> PE4
+    AS --> AE
+    IS2 --> IE2
+    PS5 --> PE5
+    BS --> BE
+    AIS --> AIE
+    RS --> RE
     NS --> NE
+    QCS --> QE
 
     US --> ZIP
     CS --> ZIP
+    COS --> ZIP
+    HRS --> ZIP
+    PS --> ZIP
+    LS --> ZIP
+    PMS --> ZIP
+    IS3 --> ZIP
+    CS2 --> ZIP
+    PS2 --> ZIP
+    PS3 --> ZIP
+    OS --> ZIP
+    LS --> ZIP
+    PS4 --> ZIP
     AS --> ZIP
+    IS2 --> ZIP
+    PS5 --> ZIP
+    BS --> ZIP
+    AIS --> ZIP
+    RS --> ZIP
+    NS --> ZIP
+    QCS --> ZIP
 
     US --> PROM
     CS --> PROM
+    COS --> PROM
+    HRS --> PROM
+    PS --> PROM
+    LS --> PROM
+    PMS --> PROM
+    IS3 --> PROM
+    CS2 --> PROM
+    PS2 --> PROM
+    PS3 --> PROM
+    OS --> PROM
+    LS --> PROM
+    PS4 --> PROM
     AS --> PROM
+    IS2 --> PROM
+    PS5 --> PROM
+    BS --> PROM
+    AIS --> PROM
+    RS --> PROM
+    NS --> PROM
+    QCS --> PROM
 ```
 
 ### Architecture Principles
@@ -309,23 +509,23 @@ graph TB
 
 ### 📦 Inventory Management Services
 
-#### **Warehouse Service** (Port: 8089)
+#### **Inventory Service** (Port: 8089)
 
-- **Purpose**: Warehouse management and operations
-- **Documentation**: [Warehouse Service Architecture](./WAREHOUSE_SERVICE_ARCHITECTURE.md)
-- **Responsibilities**: Warehouse operations, location management, inventory tracking
+- **Purpose**: Inventory management and tracking
+- **Documentation**: [Inventory Service Architecture](./INVENTORY_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Inventory tracking, stock movements, inventory valuation, forecasting
 
-#### **Stock Service** (Port: 8090)
+#### **Catalog Service** (Port: 8090)
 
-- **Purpose**: Stock management and tracking
-- **Documentation**: [Stock Service Architecture](./STOCK_SERVICE_ARCHITECTURE.md)
-- **Responsibilities**: Stock movements, stock alerts, stock valuation, forecasting
+- **Purpose**: Product catalog management
+- **Documentation**: [Catalog Service Architecture](./CATALOG_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Product catalog, product specifications, product hierarchy
 
-#### **Fabric Service** (Port: 8091)
+#### **Pricing Service** (Port: 8091)
 
-- **Purpose**: Fabric type and quality management
-- **Documentation**: [Fabric Service Architecture](./FABRIC_SERVICE_ARCHITECTURE.md)
-- **Responsibilities**: Fabric types, fabric properties, fabric specifications, pricing
+- **Purpose**: Pricing management and calculations
+- **Documentation**: [Pricing Service Architecture](./PRICING_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Price management, pricing rules, discount calculations
 
 #### **Procurement Service** (Port: 8092)
 
@@ -333,27 +533,57 @@ graph TB
 - **Documentation**: [Procurement Service Architecture](./PROCUREMENT_SERVICE_ARCHITECTURE.md)
 - **Responsibilities**: Purchase orders, supplier management, procurement workflow
 
+#### **Quality Control Service** (Port: 8093)
+
+- **Purpose**: Quality control and defect management
+- **Documentation**: [Quality Control Service Architecture](./QUALITY_CONTROL_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Quality control, defect management, supplier performance analysis
+
+### 📋 Order Management Services
+
+#### **Order Service** (Port: 8094)
+
+- **Purpose**: Order management and processing
+- **Documentation**: [Order Service Architecture](./ORDER_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Order creation, order tracking, order fulfillment, order status management
+
+### 🚚 Logistics Management Services
+
+#### **Logistics Service** (Port: 8095)
+
+- **Purpose**: Logistics and shipping management
+- **Documentation**: [Logistics Service Architecture](./LOGISTICS_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Shipping management, delivery tracking, logistics optimization
+
+### 🏭 Production Management Services
+
+#### **Production Service** (Port: 8096)
+
+- **Purpose**: Production planning and management
+- **Documentation**: [Production Service Architecture](./PRODUCTION_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Production planning, production scheduling, production tracking
+
 ### 💰 Financial Services
 
-#### **Accounting Service** (Port: 8093)
+#### **Accounting Service** (Port: 8097)
 
 - **Purpose**: Accounting and financial management
 - **Documentation**: [Accounting Service Architecture](./ACCOUNTING_SERVICE_ARCHITECTURE.md)
 - **Responsibilities**: General ledger, chart of accounts, financial reports, budgeting
 
-#### **Invoice Service** (Port: 8094)
+#### **Invoice Service** (Port: 8098)
 
 - **Purpose**: Invoice management and processing
 - **Documentation**: [Invoice Service Architecture](./INVOICE_SERVICE_ARCHITECTURE.md)
 - **Responsibilities**: Invoice generation, invoice management, invoice approval
 
-#### **Payment Service** (Port: 8095)
+#### **Payment Service** (Port: 8099)
 
 - **Purpose**: Payment processing and management
 - **Documentation**: [Payment Service Architecture](./PAYMENT_SERVICE_ARCHITECTURE.md)
 - **Responsibilities**: Payment processing, payment methods, payment gateway integration
 
-#### **Billing Service** (Port: 8096)
+#### **Billing Service** (Port: 8100)
 
 - **Purpose**: Billing management and automation
 - **Documentation**: [Billing Service Architecture](./BILLING_SERVICE_ARCHITECTURE.md)
@@ -361,19 +591,19 @@ graph TB
 
 ### 🤖 AI & Analytics Services
 
-#### **AI Service** (Port: 8097)
+#### **AI Service** (Port: 8101)
 
 - **Purpose**: AI integration and machine learning
 - **Documentation**: [AI Service Architecture](./AI_SERVICE_ARCHITECTURE.md)
 - **Responsibilities**: ChatGPT integration, AI analytics, predictive analytics, ML models
 
-#### **Reporting Service** (Port: 8098)
+#### **Reporting Service** (Port: 8102)
 
 - **Purpose**: Reporting and data visualization
 - **Documentation**: [Reporting Service Architecture](./REPORTING_SERVICE_ARCHITECTURE.md)
 - **Responsibilities**: Report generation, dashboards, data visualization, custom reports
 
-#### **Notification Service** (Port: 8099)
+#### **Notification Service** (Port: 8103)
 
 - **Purpose**: Notification management and delivery
 - **Documentation**: [Notification Service Architecture](./NOTIFICATION_SERVICE_ARCHITECTURE.md)
@@ -381,7 +611,7 @@ graph TB
 
 ### 🔍 Quality Management Services
 
-#### **Quality Control Service** (Port: 8100)
+#### **Quality Control Service** (Port: 8104)
 
 - **Purpose**: Quality control and defect management
 - **Documentation**: [Quality Control Service Architecture](./QUALITY_CONTROL_SERVICE_ARCHITECTURE.md)
@@ -406,16 +636,29 @@ graph TB
     end
 
     subgraph "Inventory Services"
-        WS[Warehouse Service]
-        SS[Stock Service]
-        FS[Fabric Service]
-        PS2[Procurement Service]
+        IS3[Inventory Service]
+        CS2[Catalog Service]
+        PS2[Pricing Service]
+        PS3[Procurement Service]
+        QCS[Quality Control Service]
+    end
+
+    subgraph "Order Services"
+        OS[Order Service]
+    end
+
+    subgraph "Logistics Services"
+        LS[Logistics Service]
+    end
+
+    subgraph "Production Services"
+        PS4[Production Service]
     end
 
     subgraph "Financial Services"
         AS[Accounting Service]
         IS2[Invoice Service]
-        PS3[Payment Service]
+        PS5[Payment Service]
         BS[Billing Service]
     end
 
@@ -444,30 +687,75 @@ graph TB
     PMS --> HRS
 
     %% Inventory dependencies
-    WS --> IS
-    WS --> COS
-    SS --> WS
-    FS --> IS
+    IS3 --> IS
+    IS3 --> COS
+    CS2 --> IS
+    CS2 --> COS
+    PS2 --> IS
     PS2 --> COS
-    PS2 --> FS
+    PS3 --> COS
+    PS3 --> CS
+    QCS --> IS
+    QCS --> COS
+
+    %% Order dependencies
+    OS --> IS
+    OS --> COS
+    OS --> IS3
+    OS --> CS2
+    OS --> PS2
+
+    %% Logistics dependencies
+    LS --> IS
+    LS --> COS
+    LS --> OS
+
+    %% Production dependencies
+    PS4 --> IS
+    PS4 --> COS
+    PS4 --> IS3
+    PS4 --> OS
 
     %% Financial dependencies
     AS --> IS
     AS --> COS
+    AS --> IS3
     IS2 --> AS
-    PS3 --> IS2
+    IS2 --> PS3
+    IS2 --> COS
+    PS5 --> IS2
+    PS5 --> AS
+    PS5 --> NS
     BS --> AS
+    BS --> IS2
+    BS --> PS5
 
     %% AI & Analytics dependencies
     AIS --> IS
+    AIS --> PMS
+    AIS --> QCS
     RS --> IS
+    RS --> US
+    RS --> AIS
+    RS --> HRS
+    RS --> AS
+    RS --> IS3
+    RS --> QCS
     NS --> IS
     NS --> CS
 
     %% Quality dependencies
     QCS --> IS
-    QCS --> FS
+    QCS --> IS3
     QCS --> COS
+
+    %% Cross-layer dependencies
+    PS --> AS
+    IS3 --> AS
+    PS3 --> AS
+    QCS --> AIS
+    QCS --> RS
+    QCS --> NS
 ```
 
 ## Clean Architecture Layers
