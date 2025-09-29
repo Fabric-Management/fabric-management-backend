@@ -3,6 +3,8 @@
 ## 📋 Table of Contents
 
 - [System Architecture](#system-architecture)
+- [Common Modules](#common-modules)
+- [Microservice Architecture](#microservice-architecture)
 - [Clean Architecture Layers](#clean-architecture-layers)
 - [Design Patterns](#design-patterns-used)
 - [Multi-Tenancy Strategy](#multi-tenancy-strategy)
@@ -11,9 +13,130 @@
 - [Service Communication](#service-communication)
 - [Data Management](#data-management)
 
-## System Architecture
+# Architecture Documentation Hub
 
-### High-Level Architecture Diagram
+## 📋 Overview
+
+Bu klasör, Fabric Management System'in tüm mimari dokümantasyonunu organize eder. Her servis kategorisi için ayrı klasörler ve detaylı dokümantasyonlar bulunur.
+
+## 🏗️ Architecture Structure
+
+```
+architecture/
+├── README.md                              # Ana mimari dokümantasyonu
+├── MICROSERVICE_ARCHITECTURE_OVERVIEW.md  # Tüm servislerin genel bakışı
+├── CORE_SERVICES/                         # Temel servisler
+│   ├── IDENTITY_SERVICE_ARCHITECTURE.md
+│   ├── USER_SERVICE_ARCHITECTURE.md
+│   ├── CONTACT_SERVICE_ARCHITECTURE.md
+│   └── COMPANY_SERVICE_ARCHITECTURE.md
+├── HR_SERVICES/                           # İnsan kaynakları servisleri
+├── INVENTORY_SERVICES/                    # Envanter yönetim servisleri
+├── FINANCIAL_SERVICES/                    # Mali servisler
+├── AI_ANALYTICS_SERVICES/                 # AI ve analitik servisler
+└── QUALITY_SERVICES/                      # Kalite yönetim servisleri
+    └── QUALITY_CONTROL_SERVICE_ARCHITECTURE.md
+```
+
+## 🎯 Service Categories
+
+### 🔧 **Common Modules** (2 Modules)
+
+- **Common Core** - Temel ortak bileşenler (BaseEntity, ApiResponse, GlobalExceptionHandler, Common Exceptions)
+- **Common Security** - Güvenlik ortak bileşenleri (JWT, SecurityContext, Authentication)
+
+**📚 Documentation:**
+
+- [Common Modules Approach](../../common/COMMON_MODULES_APPROACH.md) - Over-engineering analizi ve minimalist yaklaşım
+
+### 🏛️ **Core Services** (4 Services)
+
+- **Identity Service** (Port: 8081) ✅
+- **User Service** (Port: 8082) ✅
+- **Contact Service** (Port: 8083) ✅
+- **Company Service** (Port: 8084) ❌
+
+### 👥 **HR Services** (4 Services)
+
+- **HR Service** (Port: 8085) ❌
+- **Payroll Service** (Port: 8086) ❌
+- **Leave Service** (Port: 8087) ❌
+- **Performance Service** (Port: 8088) ❌
+
+### 📦 **Inventory Services** (4 Services)
+
+- **Warehouse Service** (Port: 8089) ❌
+- **Stock Service** (Port: 8090) ❌
+- **Fabric Service** (Port: 8091) ❌
+- **Procurement Service** (Port: 8092) ❌
+
+### 💰 **Financial Services** (4 Services)
+
+- **Accounting Service** (Port: 8093) ❌
+- **Invoice Service** (Port: 8094) ❌
+- **Payment Service** (Port: 8095) ❌
+- **Billing Service** (Port: 8096) ❌
+
+### 🤖 **AI & Analytics Services** (3 Services)
+
+- **AI Service** (Port: 8097) ❌
+- **Reporting Service** (Port: 8098) ❌
+- **Notification Service** (Port: 8099) ❌
+
+### 🔍 **Quality Services** (1 Service)
+
+- **Quality Control Service** (Port: 8100) ✅
+
+## 📊 Implementation Status
+
+### **Completed Services** ✅ (5/20)
+
+- Identity Service
+- User Service
+- Contact Service
+- Quality Control Service
+- Architecture Overview
+
+### **Planned Services** ❌ (15/20)
+
+- Company Service
+- HR Services (4)
+- Inventory Services (4)
+- Financial Services (4)
+- AI & Analytics Services (3)
+
+## 🎯 Next Steps
+
+### **Phase 1: Complete Core Services** (Priority: High)
+
+1. Company Service Architecture
+
+### **Phase 2: HR Management Services** (Priority: High)
+
+1. HR Service Architecture
+2. Payroll Service Architecture
+3. Leave Service Architecture
+4. Performance Service Architecture
+
+### **Phase 3: Inventory Management Services** (Priority: High)
+
+1. Warehouse Service Architecture
+2. Stock Service Architecture
+3. Fabric Service Architecture
+4. Procurement Service Architecture
+
+### **Phase 4: Financial Services** (Priority: High)
+
+1. Accounting Service Architecture
+2. Invoice Service Architecture
+3. Payment Service Architecture
+4. Billing Service Architecture
+
+### **Phase 5: AI & Analytics Services** (Priority: Medium)
+
+1. AI Service Architecture
+2. Reporting Service Architecture
+3. Notification Service Architecture
 
 ```mermaid
 graph TB
@@ -22,33 +145,49 @@ graph TB
         MOB[Mobile App]
         API[API Clients]
     end
-    
+
     subgraph "API Gateway Layer"
         GW[Spring Cloud Gateway]
         LB[Load Balancer]
     end
-    
+
     subgraph "Service Discovery"
         EUR[Eureka Server]
     end
-    
+
     subgraph "Microservices Layer"
-        US[User Service<br/>:8081]
-        CS[Contact Service<br/>:8082]
-        AS[Auth Service<br/>:8083]
-        HS[HR Service<br/>:8084]
-        NS[Notification Service<br/>:8085]
+        IS[Identity Service<br/>:8081]
+        US[User Service<br/>:8082]
+        CS[Contact Service<br/>:8083]
+        COS[Company Service<br/>:8084]
+        HRS[HR Service<br/>:8085]
+        PS[Payroll Service<br/>:8086]
+        LS[Leave Service<br/>:8087]
+        PMS[Performance Service<br/>:8088]
+        WS[Warehouse Service<br/>:8089]
+        SS[Stock Service<br/>:8090]
+        FS[Fabric Service<br/>:8091]
+        PS2[Procurement Service<br/>:8092]
+        AS[Accounting Service<br/>:8093]
+        IS2[Invoice Service<br/>:8094]
+        PS3[Payment Service<br/>:8095]
+        BS[Billing Service<br/>:8096]
+        AIS[AI Service<br/>:8097]
+        RS[Reporting Service<br/>:8098]
+        NS[Notification Service<br/>:8099]
+        QCS[Quality Control Service<br/>:8100]
     end
-    
+
     subgraph "Data Layer"
-        PG1[(User DB<br/>PostgreSQL)]
-        PG2[(Contact DB<br/>PostgreSQL)]
-        PG3[(Auth DB<br/>PostgreSQL)]
-        PG4[(HR DB<br/>PostgreSQL)]
+        PG1[(Core DB<br/>PostgreSQL)]
+        PG2[(HR DB<br/>PostgreSQL)]
+        PG3[(Inventory DB<br/>PostgreSQL)]
+        PG4[(Financial DB<br/>PostgreSQL)]
+        PG5[(Quality DB<br/>PostgreSQL)]
         REDIS[(Redis Cache)]
         ES[(Elasticsearch)]
     end
-    
+
     subgraph "Message Broker"
         RMQ[RabbitMQ]
         subgraph "Exchanges"
@@ -57,14 +196,14 @@ graph TB
             NE[Notification Events]
         end
     end
-    
+
     subgraph "Monitoring & Logging"
         PROM[Prometheus]
         GRAF[Grafana]
         ELK[ELK Stack]
         ZIP[Zipkin]
     end
-    
+
     WEB --> LB
     MOB --> LB
     API --> LB
@@ -73,33 +212,33 @@ graph TB
     GW --> CS
     GW --> AS
     GW --> HS
-    
+
     US --> EUR
     CS --> EUR
     AS --> EUR
     HS --> EUR
-    
+
     US --> PG1
     CS --> PG2
     AS --> PG3
     HS --> PG4
-    
+
     AS --> REDIS
     US --> REDIS
-    
+
     US --> RMQ
     CS --> RMQ
     AS --> RMQ
     NS --> RMQ
-    
+
     US --> UE
     CS --> CE
     NS --> NE
-    
+
     US --> ZIP
     CS --> ZIP
     AS --> ZIP
-    
+
     US --> PROM
     CS --> PROM
     AS --> PROM
@@ -114,6 +253,223 @@ graph TB
 - **Cloud-Native**: Containerized, orchestrated, and cloud-ready
 - **Event-Driven**: Asynchronous communication via events
 
+## Microservice Architecture
+
+### 🏗️ Core Services
+
+#### **Identity Service** (Port: 8081)
+
+- **Purpose**: Authentication, authorization, and user identity management
+- **Documentation**: [Identity Service Architecture](./IDENTITY_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: JWT token management, user authentication, session management, 2FA
+
+#### **User Service** (Port: 8082)
+
+- **Purpose**: User profile management and user preferences
+- **Documentation**: [User Service Architecture](./USER_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: User profiles, preferences, settings, activity tracking
+
+#### **Contact Service** (Port: 8083)
+
+- **Purpose**: Contact information management and verification
+- **Documentation**: [Contact Service Architecture](./CONTACT_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: User contacts, company contacts, contact verification, communication preferences
+
+#### **Company Service** (Port: 8084)
+
+- **Purpose**: Company and organization management
+- **Documentation**: [Company Service Architecture](./COMPANY_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Company profiles, company settings, multi-tenant management
+
+### 👥 HR Management Services
+
+#### **HR Service** (Port: 8085)
+
+- **Purpose**: Human resources management
+- **Documentation**: [HR Service Architecture](./HR_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Employee management, department management, HR policies
+
+#### **Payroll Service** (Port: 8086)
+
+- **Purpose**: Payroll processing and salary management
+- **Documentation**: [Payroll Service Architecture](./PAYROLL_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Salary management, payroll processing, tax calculations, benefits
+
+#### **Leave Service** (Port: 8087)
+
+- **Purpose**: Leave management and tracking
+- **Documentation**: [Leave Service Architecture](./LEAVE_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Leave requests, leave balance, approval workflow, holiday management
+
+#### **Performance Service** (Port: 8088)
+
+- **Purpose**: Performance management and reviews
+- **Documentation**: [Performance Service Architecture](./PERFORMANCE_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Performance reviews, goal setting, KPI management, promotions
+
+### 📦 Inventory Management Services
+
+#### **Warehouse Service** (Port: 8089)
+
+- **Purpose**: Warehouse management and operations
+- **Documentation**: [Warehouse Service Architecture](./WAREHOUSE_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Warehouse operations, location management, inventory tracking
+
+#### **Stock Service** (Port: 8090)
+
+- **Purpose**: Stock management and tracking
+- **Documentation**: [Stock Service Architecture](./STOCK_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Stock movements, stock alerts, stock valuation, forecasting
+
+#### **Fabric Service** (Port: 8091)
+
+- **Purpose**: Fabric type and quality management
+- **Documentation**: [Fabric Service Architecture](./FABRIC_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Fabric types, fabric properties, fabric specifications, pricing
+
+#### **Procurement Service** (Port: 8092)
+
+- **Purpose**: Procurement and supplier management
+- **Documentation**: [Procurement Service Architecture](./PROCUREMENT_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Purchase orders, supplier management, procurement workflow
+
+### 💰 Financial Services
+
+#### **Accounting Service** (Port: 8093)
+
+- **Purpose**: Accounting and financial management
+- **Documentation**: [Accounting Service Architecture](./ACCOUNTING_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: General ledger, chart of accounts, financial reports, budgeting
+
+#### **Invoice Service** (Port: 8094)
+
+- **Purpose**: Invoice management and processing
+- **Documentation**: [Invoice Service Architecture](./INVOICE_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Invoice generation, invoice management, invoice approval
+
+#### **Payment Service** (Port: 8095)
+
+- **Purpose**: Payment processing and management
+- **Documentation**: [Payment Service Architecture](./PAYMENT_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Payment processing, payment methods, payment gateway integration
+
+#### **Billing Service** (Port: 8096)
+
+- **Purpose**: Billing management and automation
+- **Documentation**: [Billing Service Architecture](./BILLING_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Billing cycles, billing rules, billing automation
+
+### 🤖 AI & Analytics Services
+
+#### **AI Service** (Port: 8097)
+
+- **Purpose**: AI integration and machine learning
+- **Documentation**: [AI Service Architecture](./AI_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: ChatGPT integration, AI analytics, predictive analytics, ML models
+
+#### **Reporting Service** (Port: 8098)
+
+- **Purpose**: Reporting and data visualization
+- **Documentation**: [Reporting Service Architecture](./REPORTING_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Report generation, dashboards, data visualization, custom reports
+
+#### **Notification Service** (Port: 8099)
+
+- **Purpose**: Notification management and delivery
+- **Documentation**: [Notification Service Architecture](./NOTIFICATION_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Email notifications, SMS notifications, push notifications
+
+### 🔍 Quality Management Services
+
+#### **Quality Control Service** (Port: 8100)
+
+- **Purpose**: Quality control and defect management
+- **Documentation**: [Quality Control Service Architecture](./QUALITY_CONTROL_SERVICE_ARCHITECTURE.md)
+- **Responsibilities**: Fabric quality control, defect management, supplier performance analysis
+
+### 📊 Service Dependencies
+
+```mermaid
+graph TB
+    subgraph "Core Services"
+        IS[Identity Service]
+        US[User Service]
+        CS[Contact Service]
+        COS[Company Service]
+    end
+
+    subgraph "HR Services"
+        HRS[HR Service]
+        PS[Payroll Service]
+        LS[Leave Service]
+        PMS[Performance Service]
+    end
+
+    subgraph "Inventory Services"
+        WS[Warehouse Service]
+        SS[Stock Service]
+        FS[Fabric Service]
+        PS2[Procurement Service]
+    end
+
+    subgraph "Financial Services"
+        AS[Accounting Service]
+        IS2[Invoice Service]
+        PS3[Payment Service]
+        BS[Billing Service]
+    end
+
+    subgraph "AI & Analytics"
+        AIS[AI Service]
+        RS[Reporting Service]
+        NS[Notification Service]
+    end
+
+    subgraph "Quality Management"
+        QCS[Quality Control Service]
+    end
+
+    %% Core dependencies
+    US --> IS
+    CS --> IS
+    CS --> US
+    COS --> IS
+    COS --> CS
+
+    %% HR dependencies
+    HRS --> IS
+    HRS --> US
+    PS --> HRS
+    LS --> HRS
+    PMS --> HRS
+
+    %% Inventory dependencies
+    WS --> IS
+    WS --> COS
+    SS --> WS
+    FS --> IS
+    PS2 --> COS
+    PS2 --> FS
+
+    %% Financial dependencies
+    AS --> IS
+    AS --> COS
+    IS2 --> AS
+    PS3 --> IS2
+    BS --> AS
+
+    %% AI & Analytics dependencies
+    AIS --> IS
+    RS --> IS
+    NS --> IS
+    NS --> CS
+
+    %% Quality dependencies
+    QCS --> IS
+    QCS --> FS
+    QCS --> COS
+```
+
 ## Clean Architecture Layers
 
 ### 🎯 Domain Layer (Core/Innermost)
@@ -121,12 +477,14 @@ graph TB
 The heart of the application containing pure business logic.
 
 **Characteristics:**
+
 - Zero framework dependencies
 - Pure Java/business logic
 - Highly testable
 - Stable and rarely changes
 
 **Components:**
+
 ```
 domain/
 ├── model/
@@ -140,6 +498,7 @@ domain/
 ```
 
 **Example:**
+
 ```java
 // Entity
 @Entity
@@ -148,7 +507,7 @@ public class User extends BaseEntity {
     private Username username;
     private PersonName name;
     private TenantId tenantId;
-    
+
     // Business logic methods
     public void changeUsername(Username newUsername) {
         // Business rules validation
@@ -161,7 +520,7 @@ public class User extends BaseEntity {
 @ValueObject
 public class Username {
     private final String value;
-    
+
     public Username(String value) {
         validate(value);
         this.value = value;
@@ -174,12 +533,14 @@ public class Username {
 Orchestrates the use cases of the application.
 
 **Characteristics:**
+
 - Implements use cases
 - Coordinates domain objects
 - Manages transactions
 - No business logic
 
 **Components:**
+
 ```
 application/
 ├── usecases/          # Use case implementations
@@ -192,6 +553,7 @@ application/
 ```
 
 **Example:**
+
 ```java
 @UseCase
 @Transactional
@@ -199,7 +561,7 @@ public class CreateUserUseCase implements CreateUserInputPort {
     private final UserRepository userRepository;
     private final UserMapper mapper;
     private final EventPublisher eventPublisher;
-    
+
     public UserDto execute(CreateUserCommand command) {
         // Validate command
         // Create domain entity
@@ -219,12 +581,14 @@ public class CreateUserUseCase implements CreateUserInputPort {
 Technical implementations and framework-specific code.
 
 **Characteristics:**
+
 - Framework dependencies
 - External service integrations
 - Database implementations
 - Messaging implementations
 
 **Components:**
+
 ```
 infrastructure/
 ├── persistence/       # JPA/Database implementations
@@ -238,12 +602,13 @@ infrastructure/
 ```
 
 **Example:**
+
 ```java
 @Repository
 public class JpaUserRepository implements UserRepository {
     private final JpaUserEntityRepository jpaRepository;
     private final UserEntityMapper mapper;
-    
+
     @Override
     public User save(User user) {
         UserEntity entity = mapper.toEntity(user);
@@ -258,12 +623,14 @@ public class JpaUserRepository implements UserRepository {
 Handles external communication and user interfaces.
 
 **Characteristics:**
+
 - REST controllers
 - GraphQL resolvers
 - WebSocket handlers
 - API documentation
 
 **Components:**
+
 ```
 presentation/
 ├── rest/             # REST controllers
@@ -277,18 +644,19 @@ presentation/
 ```
 
 **Example:**
+
 ```java
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
     private final CreateUserInputPort createUserUseCase;
-    
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<UserResponse> createUser(
             @Valid @RequestBody CreateUserRequest request,
             @RequestHeader("X-Tenant-ID") String tenantId) {
-        
+
         CreateUserCommand command = toCommand(request, tenantId);
         UserDto user = createUserUseCase.execute(command);
         return ResponseEntity.created(location(user))
@@ -302,13 +670,14 @@ public class UserController {
 ### 1. Domain-Driven Design (DDD)
 
 **Aggregates**
+
 ```java
 @Aggregate
 public class UserAggregate {
     private User root;
     private List<Contact> contacts;
     private List<Permission> permissions;
-    
+
     // Aggregate operations ensure consistency
     public void addContact(Contact contact) {
         validateContact(contact);
@@ -319,12 +688,13 @@ public class UserAggregate {
 ```
 
 **Value Objects**
+
 ```java
 @ValueObject
 @Immutable
 public class Email {
     private final String value;
-    
+
     public Email(String value) {
         if (!isValid(value)) {
             throw new InvalidEmailException(value);
@@ -335,6 +705,7 @@ public class Email {
 ```
 
 **Domain Events**
+
 ```java
 @DomainEvent
 public class UserCreatedEvent {
@@ -345,6 +716,7 @@ public class UserCreatedEvent {
 ```
 
 **Repository Pattern**
+
 ```java
 public interface UserRepository {
     User findById(UserId id);
@@ -477,15 +849,15 @@ public abstract class BaseEntity {
 @Component
 public class TenantContext {
     private static final ThreadLocal<String> CURRENT_TENANT = new ThreadLocal<>();
-    
+
     public static void setTenantId(String tenantId) {
         CURRENT_TENANT.set(tenantId);
     }
-    
+
     public static String getTenantId() {
         return CURRENT_TENANT.get();
     }
-    
+
     public static void clear() {
         CURRENT_TENANT.remove();
     }
@@ -498,8 +870,8 @@ public class TenantContext {
 @Component
 public class TenantInterceptor implements HandlerInterceptor {
     @Override
-    public boolean preHandle(HttpServletRequest request, 
-                           HttpServletResponse response, 
+    public boolean preHandle(HttpServletRequest request,
+                           HttpServletResponse response,
                            Object handler) {
         String tenantId = request.getHeader("X-Tenant-ID");
         if (tenantId != null) {
@@ -507,7 +879,7 @@ public class TenantInterceptor implements HandlerInterceptor {
         }
         return true;
     }
-    
+
     @Override
     public void afterCompletion(HttpServletRequest request,
                               HttpServletResponse response,
@@ -551,7 +923,7 @@ Authentication Flow:
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) {
         return http
@@ -577,7 +949,7 @@ public class SecurityConfig {
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
     private final RateLimiter rateLimiter = RateLimiter.create(100.0); // 100 requests per second
-    
+
     @Override
     public boolean preHandle(HttpServletRequest request,
                            HttpServletResponse response,
@@ -599,7 +971,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 @Component
 public class DomainEventPublisher {
     private final ApplicationEventPublisher eventPublisher;
-    
+
     public void publish(DomainEvent event) {
         eventPublisher.publishEvent(event);
     }
@@ -623,7 +995,7 @@ spring:
 ```java
 @Component
 public class EventHandler {
-    
+
     @RabbitListener(queues = "user-events")
     public void handleUserEvent(UserEvent event) {
         switch (event.getType()) {
@@ -670,17 +1042,17 @@ public interface UserServiceClient {
 ```java
 @Configuration
 public class RabbitMQConfig {
-    
+
     @Bean
     public TopicExchange userExchange() {
         return new TopicExchange("user-events");
     }
-    
+
     @Bean
     public Queue userCreatedQueue() {
         return new Queue("user-created", true);
     }
-    
+
     @Bean
     public Binding userCreatedBinding() {
         return BindingBuilder
@@ -697,18 +1069,19 @@ public class RabbitMQConfig {
 
 Each microservice has its own database:
 
-| Service | Database | Type | Purpose |
-|---------|----------|------|---------|
-| User Service | user_db | PostgreSQL | User management |
-| Contact Service | contact_db | PostgreSQL | Contact information |
-| Auth Service | auth_db | PostgreSQL | Authentication data |
-| HR Service | hr_db | PostgreSQL | HR management |
-| Session Cache | - | Redis | Session management |
-| Search | - | Elasticsearch | Full-text search |
+| Service         | Database   | Type          | Purpose             |
+| --------------- | ---------- | ------------- | ------------------- |
+| User Service    | user_db    | PostgreSQL    | User management     |
+| Contact Service | contact_db | PostgreSQL    | Contact information |
+| Auth Service    | auth_db    | PostgreSQL    | Authentication data |
+| HR Service      | hr_db      | PostgreSQL    | HR management       |
+| Session Cache   | -          | Redis         | Session management  |
+| Search          | -          | Elasticsearch | Full-text search    |
 
 ### Data Consistency
 
 **Eventual Consistency** through:
+
 - Domain Events
 - Saga Pattern (for distributed transactions)
 - Event Sourcing (future implementation)
@@ -775,7 +1148,7 @@ public User update(User user) {
 @RestController
 public class MetricsController {
     private final MeterRegistry meterRegistry;
-    
+
     @GetMapping("/api/users")
     @Timed(value = "users.get.all", description = "Time taken to fetch all users")
     public List<User> getUsers() {
@@ -836,13 +1209,13 @@ spec:
         app: user-service
     spec:
       containers:
-      - name: user-service
-        image: fabric-system/user-service:latest
-        ports:
-        - containerPort: 8081
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "prod"
+        - name: user-service
+          image: fabric-system/user-service:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
 ```
 
 ## Future Enhancements
