@@ -16,7 +16,7 @@ import java.util.UUID;
 @Builder
 public class CreateUserCommand implements Command {
     
-    private UUID tenantId;
+    private String tenantId;
     private String username;
     private String email;
     private String firstName;
