@@ -25,7 +25,7 @@ class UserContactTest {
         @DisplayName("Should create email contact successfully")
         void shouldCreateEmailContactSuccessfully() {
             // When
-            UserContact contact = UserContact.email(VALID_EMAIL, true, true);
+            UserContact contact = UserContact.email("user123", VALID_EMAIL, true, true);
 
             // Then
             assertThat(contact).isNotNull();
@@ -39,7 +39,7 @@ class UserContactTest {
         @DisplayName("Should create unverified email contact")
         void shouldCreateUnverifiedEmailContact() {
             // When
-            UserContact contact = UserContact.email(VALID_EMAIL, false, false);
+            UserContact contact = UserContact.email("user123", VALID_EMAIL, false, false);
 
             // Then
             assertThat(contact.getContactValue()).isEqualTo(VALID_EMAIL);
@@ -57,7 +57,7 @@ class UserContactTest {
         @DisplayName("Should create phone contact successfully")
         void shouldCreatePhoneContactSuccessfully() {
             // When
-            UserContact contact = UserContact.phone(VALID_PHONE, true, true);
+            UserContact contact = UserContact.phone("user123", VALID_PHONE, true, true);
 
             // Then
             assertThat(contact).isNotNull();
@@ -71,7 +71,7 @@ class UserContactTest {
         @DisplayName("Should create unverified phone contact")
         void shouldCreateUnverifiedPhoneContact() {
             // When
-            UserContact contact = UserContact.phone(VALID_PHONE, false, false);
+            UserContact contact = UserContact.phone("user123", VALID_PHONE, false, false);
 
             // Then
             assertThat(contact.getContactValue()).isEqualTo(VALID_PHONE);
@@ -97,7 +97,13 @@ class UserContactTest {
         @DisplayName("Should create contact with EMAIL type")
         void shouldCreateContactWithEmailType() {
             // When
-            UserContact contact = new UserContact(VALID_EMAIL, UserContact.ContactType.EMAIL, true, true);
+            UserContact contact = UserContact.builder()
+                .userId("user123")
+                .contactValue(VALID_EMAIL)
+                .contactType(UserContact.ContactType.EMAIL)
+                .isVerified(true)
+                .isPrimary(true)
+                .build();
 
             // Then
             assertThat(contact.getContactType()).isEqualTo(UserContact.ContactType.EMAIL);
@@ -107,7 +113,13 @@ class UserContactTest {
         @DisplayName("Should create contact with PHONE type")
         void shouldCreateContactWithPhoneType() {
             // When
-            UserContact contact = new UserContact(VALID_PHONE, UserContact.ContactType.PHONE, true, true);
+            UserContact contact = UserContact.builder()
+                .userId("user123")
+                .contactValue(VALID_PHONE)
+                .contactType(UserContact.ContactType.PHONE)
+                .isVerified(true)
+                .isPrimary(true)
+                .build();
 
             // Then
             assertThat(contact.getContactType()).isEqualTo(UserContact.ContactType.PHONE);
@@ -122,8 +134,8 @@ class UserContactTest {
         @DisplayName("Should be equal when all fields are same")
         void shouldBeEqualWhenAllFieldsAreSame() {
             // Given
-            UserContact contact1 = UserContact.email(VALID_EMAIL, true, true);
-            UserContact contact2 = UserContact.email(VALID_EMAIL, true, true);
+            UserContact contact1 = UserContact.email("user123", VALID_EMAIL, true, true);
+            UserContact contact2 = UserContact.email("user123", VALID_EMAIL, true, true);
 
             // When & Then
             assertThat(contact1).isEqualTo(contact2);
@@ -134,8 +146,8 @@ class UserContactTest {
         @DisplayName("Should not be equal when contact value is different")
         void shouldNotBeEqualWhenContactValueIsDifferent() {
             // Given
-            UserContact contact1 = UserContact.email(VALID_EMAIL, true, true);
-            UserContact contact2 = UserContact.email("different@example.com", true, true);
+            UserContact contact1 = UserContact.email("user123", VALID_EMAIL, true, true);
+            UserContact contact2 = UserContact.email("user123", "different@example.com", true, true);
 
             // When & Then
             assertThat(contact1).isNotEqualTo(contact2);
@@ -145,8 +157,8 @@ class UserContactTest {
         @DisplayName("Should not be equal when contact type is different")
         void shouldNotBeEqualWhenContactTypeIsDifferent() {
             // Given
-            UserContact contact1 = UserContact.email(VALID_EMAIL, true, true);
-            UserContact contact2 = UserContact.phone(VALID_EMAIL, true, true);
+            UserContact contact1 = UserContact.email("user123", VALID_EMAIL, true, true);
+            UserContact contact2 = UserContact.phone("user123", VALID_EMAIL, true, true);
 
             // When & Then
             assertThat(contact1).isNotEqualTo(contact2);
@@ -156,8 +168,8 @@ class UserContactTest {
         @DisplayName("Should not be equal when verification status is different")
         void shouldNotBeEqualWhenVerificationStatusIsDifferent() {
             // Given
-            UserContact contact1 = UserContact.email(VALID_EMAIL, true, true);
-            UserContact contact2 = UserContact.email(VALID_EMAIL, false, true);
+            UserContact contact1 = UserContact.email("user123", VALID_EMAIL, true, true);
+            UserContact contact2 = UserContact.email("user123", VALID_EMAIL, false, true);
 
             // When & Then
             assertThat(contact1).isNotEqualTo(contact2);
@@ -167,8 +179,8 @@ class UserContactTest {
         @DisplayName("Should not be equal when primary status is different")
         void shouldNotBeEqualWhenPrimaryStatusIsDifferent() {
             // Given
-            UserContact contact1 = UserContact.email(VALID_EMAIL, true, true);
-            UserContact contact2 = UserContact.email(VALID_EMAIL, true, false);
+            UserContact contact1 = UserContact.email("user123", VALID_EMAIL, true, true);
+            UserContact contact2 = UserContact.email("user123", VALID_EMAIL, true, false);
 
             // When & Then
             assertThat(contact1).isNotEqualTo(contact2);
@@ -183,7 +195,7 @@ class UserContactTest {
         @DisplayName("Should be immutable")
         void shouldBeImmutable() {
             // Given
-            UserContact contact = UserContact.email(VALID_EMAIL, true, true);
+            UserContact contact = UserContact.email("user123", VALID_EMAIL, true, true);
 
             // When & Then
             assertThat(contact).isInstanceOf(org.junit.jupiter.api.Assertions.class);

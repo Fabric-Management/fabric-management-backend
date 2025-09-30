@@ -10,8 +10,10 @@ import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import com.fabricmanagement.user.domain.valueobject.PasswordResetToken;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,27 +26,66 @@ import java.util.UUID;
  * Represents a user in the system with all business rules and invariants.
  * Follows Domain-Driven Design principles with event sourcing.
  */
+@Entity
+@Table(name = "users")
 @Getter
+@Setter
 @NoArgsConstructor
 @SuperBuilder
 public class User extends BaseEntity {
 
-    private UUID tenantId;
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+    
+    @Column(name = "first_name", nullable = false)
     private String firstName;
+    
+    @Column(name = "last_name", nullable = false)
     private String lastName;
+    
+    @Column(name = "display_name")
     private String displayName;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     private UserStatus status;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "registration_type", nullable = false)
     private RegistrationType registrationType;
+    
+    @Column(name = "invitation_token")
     private String invitationToken;           // For invitation-based registration
+    
+    @Column(name = "password_hash")
     private String passwordHash;               // Encrypted password
+    
+    @OneToMany(mappedBy = "userId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserContact> contacts;        // Multiple contact methods
+    
+    @Column(name = "role")
     private String role;                       // User role in company
+    
+    @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
+    
+    @Column(name = "last_login_ip")
     private String lastLoginIp;
+    
+    @ElementCollection
+    @CollectionTable(name = "user_preferences", joinColumns = @JoinColumn(name = "user_id"))
+    @MapKeyColumn(name = "preference_key")
+    @Column(name = "preference_value")
     private Map<String, Object> preferences;
+    
+    @ElementCollection
+    @CollectionTable(name = "user_settings", joinColumns = @JoinColumn(name = "user_id"))
+    @MapKeyColumn(name = "setting_key")
+    @Column(name = "setting_value")
     private Map<String, Object> settings;
     
-    // Domain events
+    // Domain events (not persisted)
+    @Transient
     private final List<Object> domainEvents = new ArrayList<>();
 
     /**
@@ -62,7 +103,7 @@ public class User extends BaseEntity {
         }
 
         User user = User.builder()
-            .tenantId(tenantId)
+            .tenantId(tenantId.toString())
             .firstName(firstName)
             .lastName(lastName)
             .displayName(firstName + " " + lastName)
@@ -72,7 +113,14 @@ public class User extends BaseEntity {
 
         // Add contact
         UserContact.ContactType type = UserContact.ContactType.valueOf(contactType.toUpperCase());
-        UserContact contact = new UserContact(contactValue, type, true, true); // verified and primary
+        UserContact contact = UserContact.builder()
+            .userId(user.getId().toString())
+            .contactValue(contactValue)
+            .contactType(type)
+            .isVerified(true)
+            .isPrimary(true)
+            .verifiedAt(LocalDateTime.now())
+            .build();
         user.contacts.add(contact);
 
         // Add domain event
@@ -210,7 +258,13 @@ public class User extends BaseEntity {
 
         // Add contact
         UserContact.ContactType type = UserContact.ContactType.valueOf(contactType.toUpperCase());
-        UserContact contact = new UserContact(contactValue, type, false, true); // not verified yet, but primary
+        UserContact contact = UserContact.builder()
+            .userId(user.getId().toString())
+            .contactValue(contactValue)
+            .contactType(type)
+            .isVerified(false)
+            .isPrimary(true)
+            .build();
         user.contacts.add(contact);
 
         // Add domain event
@@ -234,17 +288,20 @@ public class User extends BaseEntity {
 
         // Find and verify the contact
         boolean contactFound = false;
-        for (UserContact contact : this.contacts) {
+        for (int i = 0; i < this.contacts.size(); i++) {
+            UserContact contact = this.contacts.get(i);
             if (contact.getContactValue().equals(contactValue)) {
                 // Mark contact as verified
-                UserContact verifiedContact = new UserContact(
-                    contact.getContactValue(),
-                    contact.getContactType(),
-                    true,  // verified
-                    contact.isPrimary()
-                );
-                this.contacts.remove(contact);
-                this.contacts.add(verifiedContact);
+                UserContact verifiedContact = UserContact.builder()
+                    .id(contact.getId())
+                    .userId(contact.getUserId())
+                    .contactValue(contact.getContactValue())
+                    .contactType(contact.getContactType())
+                    .isVerified(true)
+                    .isPrimary(contact.isPrimary())
+                    .verifiedAt(LocalDateTime.now())
+                    .build();
+                this.contacts.set(i, verifiedContact);
                 contactFound = true;
                 break;
             }
@@ -283,7 +340,13 @@ public class User extends BaseEntity {
             throw new IllegalArgumentException("Contact already exists");
         }
 
-        UserContact newContact = new UserContact(contactValue, contactType, false, false);
+        UserContact newContact = UserContact.builder()
+            .userId(this.getId().toString())
+            .contactValue(contactValue)
+            .contactType(contactType)
+            .isVerified(false)
+            .isPrimary(false)
+            .build();
         this.contacts.add(newContact);
 
         // Add domain event
@@ -300,16 +363,19 @@ public class User extends BaseEntity {
      * Verifies additional contact method
      */
     public void verifyContact(String contactValue) {
-        for (UserContact contact : this.contacts) {
+        for (int i = 0; i < this.contacts.size(); i++) {
+            UserContact contact = this.contacts.get(i);
             if (contact.getContactValue().equals(contactValue)) {
-                UserContact verifiedContact = new UserContact(
-                    contact.getContactValue(),
-                    contact.getContactType(),
-                    true,  // verified
-                    contact.isPrimary()
-                );
-                this.contacts.remove(contact);
-                this.contacts.add(verifiedContact);
+                UserContact verifiedContact = UserContact.builder()
+                    .id(contact.getId())
+                    .userId(contact.getUserId())
+                    .contactValue(contact.getContactValue())
+                    .contactType(contact.getContactType())
+                    .isVerified(true)
+                    .isPrimary(contact.isPrimary())
+                    .verifiedAt(LocalDateTime.now())
+                    .build();
+                this.contacts.set(i, verifiedContact);
                 return;
             }
         }

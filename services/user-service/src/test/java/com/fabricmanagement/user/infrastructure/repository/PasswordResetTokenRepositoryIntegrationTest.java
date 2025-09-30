@@ -40,17 +40,9 @@ class PasswordResetTokenRepositoryIntegrationTest extends UserServiceTestBase {
     @BeforeEach
     void setUp() {
         testUserId = UUID.randomUUID();
-        testToken = PasswordResetToken.create(TEST_EMAIL, PasswordResetToken.ResetMethod.EMAIL_LINK);
+        testToken = PasswordResetToken.create(testUserId.toString(), TEST_EMAIL, PasswordResetToken.ResetMethod.EMAIL_LINK);
         
-        // Set user ID manually for testing
-        testToken = new PasswordResetToken(
-            testToken.getToken(),
-            TEST_EMAIL,
-            testToken.getResetMethod(),
-            testToken.getExpiresAt(),
-            testToken.getAttemptsRemaining(),
-            testToken.isUsed()
-        );
+        // Token is already created with proper user ID
         
         entityManager.persistAndFlush(testToken);
         entityManager.clear();
@@ -174,14 +166,15 @@ class PasswordResetTokenRepositoryIntegrationTest extends UserServiceTestBase {
         @DisplayName("Should find expired tokens")
         void shouldFindExpiredTokens() {
             // Given
-            PasswordResetToken expiredToken = new PasswordResetToken(
-                "expired-token",
-                TEST_EMAIL,
-                PasswordResetToken.ResetMethod.EMAIL_LINK,
-                LocalDateTime.now().minusMinutes(1), // Expired 1 minute ago
-                3,
-                false
-            );
+            PasswordResetToken expiredToken = PasswordResetToken.builder()
+                .userId(testUserId.toString())
+                .contactValue(TEST_EMAIL)
+                .token("expired-token")
+                .resetMethod(PasswordResetToken.ResetMethod.EMAIL_LINK)
+                .expiresAt(LocalDateTime.now().minusMinutes(1)) // Expired 1 minute ago
+                .attemptsRemaining(3)
+                .isUsed(false)
+                .build();
             tokenRepository.save(expiredToken);
 
             // When
@@ -226,14 +219,15 @@ class PasswordResetTokenRepositoryIntegrationTest extends UserServiceTestBase {
         @DisplayName("Should delete expired tokens")
         void shouldDeleteExpiredTokens() {
             // Given
-            PasswordResetToken expiredToken = new PasswordResetToken(
-                "expired-token",
-                TEST_EMAIL,
-                PasswordResetToken.ResetMethod.EMAIL_LINK,
-                LocalDateTime.now().minusMinutes(1), // Expired 1 minute ago
-                3,
-                false
-            );
+            PasswordResetToken expiredToken = PasswordResetToken.builder()
+                .userId(testUserId.toString())
+                .contactValue(TEST_EMAIL)
+                .token("expired-token")
+                .resetMethod(PasswordResetToken.ResetMethod.EMAIL_LINK)
+                .expiresAt(LocalDateTime.now().minusMinutes(1)) // Expired 1 minute ago
+                .attemptsRemaining(3)
+                .isUsed(false)
+                .build();
             tokenRepository.save(expiredToken);
 
             // When
@@ -282,7 +276,7 @@ class PasswordResetTokenRepositoryIntegrationTest extends UserServiceTestBase {
         @DisplayName("Should handle multiple tokens for same contact")
         void shouldHandleMultipleTokensForSameContact() {
             // Given
-            PasswordResetToken smsToken = PasswordResetToken.create(TEST_EMAIL, PasswordResetToken.ResetMethod.SMS_CODE);
+            PasswordResetToken smsToken = PasswordResetToken.create(testUserId.toString(), TEST_EMAIL, PasswordResetToken.ResetMethod.SMS_CODE);
             tokenRepository.save(smsToken);
 
             // When

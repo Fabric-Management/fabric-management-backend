@@ -3,7 +3,6 @@ package com.fabricmanagement.user.infrastructure.repository;
 import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.valueobject.UserContact;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
-import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.test.UserServiceTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

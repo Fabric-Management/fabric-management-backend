@@ -153,14 +153,18 @@ class UserServiceTest {
     void shouldCreateUser() {
         // Given
         CreateUserRequest request = CreateUserRequest.builder()
-            .username("john.doe")
-            .email("john.doe@company.com")
+            .contactValue("john.doe@company.com")
+            .contactType("EMAIL")
+            .firstName("John")
+            .lastName("Doe")
             .build();
 
         User savedUser = User.builder()
-            .id(UUID.randomUUID())
-            .username("john.doe")
-            .email("john.doe@company.com")
+            .id("user-123")
+            .contactValue("john.doe@company.com")
+            .firstName("John")
+            .lastName("Doe")
+            .status(UserStatus.PENDING_VERIFICATION)
             .build();
 
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
@@ -170,10 +174,132 @@ class UserServiceTest {
 
         // Then
         assertThat(response).isNotNull();
-        assertThat(response.getUsername()).isEqualTo("john.doe");
+        assertThat(response.getContactValue()).isEqualTo("john.doe@company.com");
         verify(userRepository).save(any(User.class));
     }
 }
+```
+
+### Domain Entity Testing Standards
+
+**All domain entities MUST have comprehensive tests:**
+
+#### 1. Unit Tests for Aggregates
+
+```java
+@DisplayName("User Aggregate Tests")
+class UserTest {
+
+    @Nested
+    @DisplayName("User Creation Tests")
+    class UserCreationTests {
+
+        @Test
+        @DisplayName("Should create user with contact verification successfully")
+        void shouldCreateUserWithContactVerification() {
+            // When
+            User user = User.createWithContactVerification(
+                "test@example.com", "EMAIL", "John", "Doe", "hashedPassword", "EMPLOYEE"
+            );
+
+            // Then
+            assertThat(user).isNotNull();
+            assertThat(user.getFirstName()).isEqualTo("John");
+            assertThat(user.getStatus()).isEqualTo(UserStatus.PENDING_VERIFICATION);
+            assertThat(user.getContacts()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when contact value is null")
+        void shouldThrowExceptionWhenContactValueIsNull() {
+            // When & Then
+            assertThatThrownBy(() ->
+                User.createWithContactVerification(null, "EMAIL", "John", "Doe", "password", "EMPLOYEE")
+            ).isInstanceOf(IllegalArgumentException.class)
+             .hasMessage("Contact value cannot be null or empty");
+        }
+    }
+}
+```
+
+#### 2. Value Object Testing
+
+```java
+@DisplayName("UserContact Tests")
+class UserContactTest {
+
+    @Test
+    @DisplayName("Should create email contact successfully")
+    void shouldCreateEmailContactSuccessfully() {
+        // When
+        UserContact contact = UserContact.email("user123", "test@example.com", true, true);
+
+        // Then
+        assertThat(contact).isNotNull();
+        assertThat(contact.getContactValue()).isEqualTo("test@example.com");
+        assertThat(contact.getContactType()).isEqualTo(UserContact.ContactType.EMAIL);
+        assertThat(contact.isVerified()).isTrue();
+        assertThat(contact.isPrimary()).isTrue();
+    }
+}
+```
+
+#### 3. Repository Integration Testing
+
+```java
+@DataJpaTest
+@ActiveProfiles("test")
+@DisplayName("User Repository Integration Tests")
+class UserRepositoryIntegrationTest {
+
+    @Autowired
+    private TestEntityManager entityManager;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    @DisplayName("Should save and retrieve user successfully")
+    void shouldSaveAndRetrieveUserSuccessfully() {
+        // Given
+        User user = User.createWithContactVerification(
+            "test@example.com", "EMAIL", "John", "Doe", "password", "EMPLOYEE"
+        );
+        entityManager.persistAndFlush(user);
+
+        // When
+        Optional<User> foundUser = userRepository.findByContactValue("test@example.com");
+
+        // Then
+        assertThat(foundUser).isPresent();
+        assertThat(foundUser.get().getFirstName()).isEqualTo("John");
+    }
+}
+```
+
+### Test Coverage Requirements
+
+- **Domain Logic**: 100% coverage
+- **Business Rules**: 100% coverage
+- **Repository Methods**: 95% coverage
+- **Service Layer**: 90% coverage
+- **Controller Layer**: 80% coverage
+
+### Test Data Management
+
+```java
+// ✅ Correct: Use builders for test data
+User testUser = User.builder()
+    .id("test-user-123")
+    .firstName("John")
+    .lastName("Doe")
+    .status(UserStatus.ACTIVE)
+    .build();
+
+// ❌ Wrong: Hard-coded test data
+User testUser = new User();
+testUser.setFirstName("John");
+testUser.setLastName("Doe");
 ```
 
 ### Test Coverage
@@ -259,6 +385,166 @@ docs(api): update authentication documentation
 4. **Request review** from team members
 5. **Address feedback** and make changes
 6. **Merge** after approval
+
+## 🏗️ Domain Entity Standards
+
+### JPA Entity Implementation
+
+**All domain entities MUST follow these standards:**
+
+#### 1. Entity Annotation Requirements
+
+```java
+@Entity
+@Table(name = "table_name")
+@Getter
+@Setter
+@NoArgsConstructor
+@SuperBuilder
+public class DomainEntity extends BaseEntity {
+    // Implementation
+}
+```
+
+#### 2. Field Mapping Standards
+
+```java
+// ✅ Correct: Proper JPA annotations
+@Column(name = "field_name", nullable = false)
+private String fieldName;
+
+@Enumerated(EnumType.STRING)
+@Column(name = "status", nullable = false)
+private EntityStatus status;
+
+@OneToMany(mappedBy = "parentId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+private List<ChildEntity> children;
+
+// ❌ Wrong: Missing annotations
+private String fieldName; // No @Column
+private EntityStatus status; // No @Enumerated
+```
+
+#### 3. Builder Pattern Usage
+
+```java
+// ✅ Correct: Immutable builder pattern
+public static DomainEntity create(String name, String type) {
+    return DomainEntity.builder()
+        .name(name)
+        .type(type)
+        .status(EntityStatus.ACTIVE)
+        .build();
+}
+
+// ❌ Wrong: Constructor usage
+public DomainEntity(String name, String type) {
+    this.name = name;
+    this.type = type;
+}
+```
+
+#### 4. Immutable Updates
+
+```java
+// ✅ Correct: Index-based updates (thread-safe)
+for (int i = 0; i < this.items.size(); i++) {
+    Item item = this.items.get(i);
+    if (item.getId().equals(itemId)) {
+        Item updatedItem = Item.builder()
+            .id(item.getId())
+            .name(newName)
+            .status(item.getStatus())
+            .build();
+        this.items.set(i, updatedItem);
+        break;
+    }
+}
+
+// ❌ Wrong: List manipulation (not thread-safe)
+this.items.remove(item);
+this.items.add(newItem);
+```
+
+#### 5. ID Type Standards
+
+```java
+// ✅ Correct: String IDs for database compatibility
+@Column(name = "tenant_id", nullable = false)
+private String tenantId;
+
+@Column(name = "user_id", nullable = false)
+private String userId;
+
+// ❌ Wrong: UUID fields (database compatibility issues)
+private UUID tenantId;
+private UUID userId;
+```
+
+#### 6. Domain Events Handling
+
+```java
+// ✅ Correct: Transient domain events
+@Transient
+private final List<Object> domainEvents = new ArrayList<>();
+
+private void addDomainEvent(Object event) {
+    this.domainEvents.add(event);
+}
+
+public List<Object> getAndClearDomainEvents() {
+    List<Object> events = new ArrayList<>(this.domainEvents);
+    this.domainEvents.clear();
+    return events;
+}
+```
+
+### Value Object Standards
+
+**Value Objects MUST be immutable:**
+
+```java
+@Value
+@Builder
+public class ContactInfo {
+    String contactValue;
+    ContactType contactType;
+    boolean isVerified;
+    boolean isPrimary;
+
+    public static ContactInfo email(String userId, String email, boolean verified, boolean primary) {
+        return ContactInfo.builder()
+            .userId(userId)
+            .contactValue(email)
+            .contactType(ContactType.EMAIL)
+            .isVerified(verified)
+            .isPrimary(primary)
+            .build();
+    }
+}
+```
+
+### Repository Standards
+
+**Repository interfaces MUST follow these patterns:**
+
+```java
+@Repository
+public interface UserRepository extends JpaRepository<User, String> {
+
+    // ✅ Correct: Specific query methods
+    Optional<User> findByContactValue(String contactValue);
+
+    List<User> findByStatusAndDeletedFalse(UserStatus status);
+
+    @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.deleted = false")
+    List<User> findActiveUsersByTenant(@Param("tenantId") String tenantId);
+
+    // ❌ Wrong: Generic methods without business context
+    List<User> findAll();
+    Optional<User> findById(String id); // Use inherited method
+}
+```
 
 ## 🏗️ Architecture Patterns
 
