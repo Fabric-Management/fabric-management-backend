@@ -6,28 +6,16 @@ package com.fabricmanagement.user.domain.valueobject;
  * Represents the possible states of a user account
  */
 public enum UserStatus {
-    /**
-     * User account is active and can be used
-     */
-    ACTIVE,
+    // Registration statuses
+    PENDING_VERIFICATION,       // User registered, waiting for contact verification
+    ACTIVE,                     // User fully verified and active
     
-    /**
-     * User account is inactive (temporarily disabled)
-     */
-    INACTIVE,
+    // Self-registration statuses (for external partners)
+    PENDING_APPROVAL,           // Self-registered, waiting for admin approval
+    APPROVED,                   // Admin approved, can access dashboard
     
-    /**
-     * User account is pending activation
-     */
-    PENDING,
-    
-    /**
-     * User account is suspended
-     */
-    SUSPENDED,
-    
-    /**
-     * User account is deleted (soft delete)
-     */
-    DELETED
+    // System statuses
+    INACTIVE,                   // Temporarily disabled
+    SUSPENDED,                  // Suspended by admin
+    DELETED                     // Soft deleted
 }
