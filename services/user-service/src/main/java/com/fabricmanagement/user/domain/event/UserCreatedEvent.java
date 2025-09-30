@@ -17,17 +17,15 @@ import java.util.UUID;
 public class UserCreatedEvent extends DomainEvent {
     
     private final UUID userId;
-    private final String username;
-    private final String email;
+    private final String contactValue;
     private final String firstName;
     private final String lastName;
 
-    public UserCreatedEvent(UUID userId, String username, String email, 
+    public UserCreatedEvent(UUID userId, String contactValue, 
                           String firstName, String lastName) {
         super();
         this.userId = userId;
-        this.username = username;
-        this.email = email;
+        this.contactValue = contactValue;
         this.firstName = firstName;
         this.lastName = lastName;
     }
