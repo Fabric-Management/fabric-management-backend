@@ -79,7 +79,6 @@ public class User extends BaseEntity {
         user.addDomainEvent(new UserCreatedEvent(
             user.getId(),
             contactValue,
-            contactValue,
             firstName,
             lastName
         ));
@@ -218,7 +217,6 @@ public class User extends BaseEntity {
         user.addDomainEvent(new UserCreatedEvent(
             user.getId(),
             contactValue,
-            contactValue,
             firstName,
             lastName
         ));
@@ -235,6 +233,7 @@ public class User extends BaseEntity {
         }
 
         // Find and verify the contact
+        boolean contactFound = false;
         for (UserContact contact : this.contacts) {
             if (contact.getContactValue().equals(contactValue)) {
                 // Mark contact as verified
@@ -246,8 +245,13 @@ public class User extends BaseEntity {
                 );
                 this.contacts.remove(contact);
                 this.contacts.add(verifiedContact);
+                contactFound = true;
                 break;
             }
+        }
+        
+        if (!contactFound) {
+            throw new IllegalArgumentException("Contact not found");
         }
 
         // Activate user
