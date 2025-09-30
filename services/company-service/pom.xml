@@ -13,11 +13,11 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>user-service</artifactId>
+    <artifactId>company-service</artifactId>
     <packaging>jar</packaging>
 
-    <name>User Service</name>
-    <description>User management service with authentication, profiles, and session management</description>
+    <name>Company Service</name>
+    <description>Company management service with multi-tenancy support</description>
 
     <dependencies>
         <!-- Shared Modules -->
