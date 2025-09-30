@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: fabric-management
-  labels:
-    name: fabric-management
-    app.kubernetes.io/name: fabric-management
-    app.kubernetes.io/version: "1.0.0"
-

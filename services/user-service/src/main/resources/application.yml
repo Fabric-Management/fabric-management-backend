@@ -16,7 +16,7 @@ spring:
 # SERVER CONFIGURATION
 # =============================================================================
 server:
-  port: 8082
+  port: 8081
   servlet:
     context-path: /api/v1/users
 
@@ -53,10 +53,25 @@ spring:
     validate-on-migrate: true
 
 # =============================================================================
-# SECURITY CONFIGURATION
+# CACHE CONFIGURATION
 # =============================================================================
-jwt:
-  secret: ${JWT_SECRET:defaultSecretKey123456789012345678901234567890}
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000 # 10 minutes
 
 # =============================================================================
 # KAFKA CONFIGURATION
@@ -64,33 +79,73 @@ jwt:
 spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      client-id: user-service
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      enable-idempotence: true
+      max-in-flight-requests-per-connection: 1
+      batch-size: 16384
+      linger-ms: 5
+      buffer-memory: 33554432
     consumer:
-      group-id: user-service
+      client-id: user-service
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: user-service-group
       auto-offset-reset: earliest
       enable-auto-commit: false
-      session-timeout-ms: 30000
-      heartbeat-interval-ms: 10000
-      max-poll-records: 500
-      fetch-min-bytes: 1
-      fetch-max-wait-ms: 500
       properties:
-        spring.json.trusted.packages: "*"
-        spring.json.value.default.type: "java.util.Map"
-  expiration: 86400000 # 24 hours
+        spring.json.trusted.packages: "com.fabricmanagement.user.domain.event"
 
 # =============================================================================
-# SERVICE-SPECIFIC CONFIGURATION
+# SECURITY CONFIGURATION
 # =============================================================================
-user:
-  profile:
-    image-upload:
-      max-size: 5MB
-      allowed-types: jpg,jpeg,png,gif
-      storage-path: ${USER_UPLOAD_PATH:/uploads/users}
-  notification:
-    email:
-      enabled: true
-    sms:
-      enabled: false
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-here-for-development-only-change-in-production}
+  expiration: 86400000 # 24 hours
+  refresh-expiration: 604800000 # 7 days
+
+# =============================================================================
+# MANAGEMENT & MONITORING
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# =============================================================================
+# OPENAPI/SWAGGER CONFIGURATION
+# =============================================================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.user: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/user-service.log

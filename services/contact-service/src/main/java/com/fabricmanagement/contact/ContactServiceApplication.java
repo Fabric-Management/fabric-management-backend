@@ -2,16 +2,29 @@ package com.fabricmanagement.contact;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+/**
+ * Contact Service Application
+ * 
+ * Provides comprehensive contact information management including:
+ * - User contact details (email, phone, address)
+ * - Company contact information
+ * - Communication preferences
+ * - Contact validation and verification
+ * 
+ * Architecture: Clean Architecture + CQRS + Event Sourcing
+ * Port: 8082
+ */
 @SpringBootApplication(scanBasePackages = {
     "com.fabricmanagement.contact",
-    "com.fabricmanagement.common.core",
-    "com.fabricmanagement.common.security"
+    "com.fabricmanagement.shared"
 })
-@EnableFeignClients
+@EnableCaching
+@EnableKafka
 @EnableAsync
 @EnableTransactionManagement
 public class ContactServiceApplication {

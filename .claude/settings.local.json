@@ -1,13 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "CreateFile(*)",
-      "StrReplace(*)",
-      "View(*)"
+      "mcp__ide__getDiagnostics",
+      "Bash(mv:*)"
     ],
-    "deny": [
-      "Bash(*)"
-    ],
+    "deny": [],
     "ask": []
   }
 }

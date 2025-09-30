@@ -16,7 +16,7 @@ spring:
 # SERVER CONFIGURATION
 # =============================================================================
 server:
-  port: 8084
+  port: 8082
   servlet:
     context-path: /api/v1/contacts
 
@@ -53,27 +53,91 @@ spring:
     validate-on-migrate: true
 
 # =============================================================================
-# SECURITY CONFIGURATION
+# CACHE CONFIGURATION
 # =============================================================================
-jwt:
-  secret: ${JWT_SECRET:defaultSecretKey123456789012345678901234567890}
-  expiration: 86400000 # 24 hours
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000 # 10 minutes
 
 # =============================================================================
-# SERVICE-SPECIFIC CONFIGURATION
+# KAFKA CONFIGURATION
 # =============================================================================
-contact:
-  communication:
-    email:
-      enabled: true
-      provider: ${EMAIL_PROVIDER:smtp}
-    sms:
-      enabled: true
-      provider: ${SMS_PROVIDER:twilio}
-  import:
-    batch-size: 1000
-    max-file-size: 25MB
-    allowed-formats: csv,xlsx,vcf
-  export:
-    formats: csv,xlsx,pdf
-    max-records: 10000
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      client-id: contact-service
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      enable-idempotence: true
+      max-in-flight-requests-per-connection: 1
+      batch-size: 16384
+      linger-ms: 5
+      buffer-memory: 33554432
+    consumer:
+      client-id: contact-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: contact-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: "com.fabricmanagement.contact.domain.event"
+
+# =============================================================================
+# MANAGEMENT & MONITORING
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# =============================================================================
+# OPENAPI/SWAGGER CONFIGURATION
+# =============================================================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.contact: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/contact-service.log
