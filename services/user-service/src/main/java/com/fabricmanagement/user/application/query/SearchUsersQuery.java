@@ -15,7 +15,7 @@ import java.util.UUID;
 @Builder
 public class SearchUsersQuery implements Query {
     
-    private UUID tenantId;
+    private String tenantId;
     private String searchTerm;
     private int page;
     private int size;
