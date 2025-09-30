@@ -78,15 +78,34 @@
 
     <!-- All modules in the project -->
     <modules>
-        <!-- Common modules -->
-        <module>common/common-core</module>
-        <module>common/common-security</module>
+        <!-- Shared modules -->
+        <module>shared/shared-domain</module>
+        <module>shared/shared-application</module>
+        <module>shared/shared-infrastructure</module>
+        <module>shared/shared-security</module>
 
         <!-- Service modules -->
-        <module>services/auth-service</module>
         <module>services/user-service</module>
         <module>services/contact-service</module>
         <module>services/company-service</module>
+        <module>services/notification-service</module>
+        <module>services/hr-service</module>
+        <module>services/inventory-service</module>
+        <module>services/procurement-service</module>
+        <module>services/order-service</module>
+        <module>services/logistics-service</module>
+        <module>services/production-service</module>
+        <module>services/financial-service</module>
+        <module>services/payment-service</module>
+        <module>services/billing-service</module>
+        <module>services/analytics-service</module>
+
+        <!-- Infrastructure modules -->
+        <module>infrastructure/api-gateway</module>
+        <module>infrastructure/service-discovery</module>
+        <module>infrastructure/config-server</module>
+        <module>infrastructure/message-broker</module>
+        <module>infrastructure/event-store</module>
     </modules>
 
     <dependencyManagement>
@@ -258,13 +277,25 @@
             <!-- Internal Module Dependencies -->
             <dependency>
                 <groupId>com.fabricmanagement</groupId>
-                <artifactId>common-core</artifactId>
+                <artifactId>shared-domain</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.fabricmanagement</groupId>
-                <artifactId>common-security</artifactId>
+                <artifactId>shared-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fabricmanagement</groupId>
+                <artifactId>shared-infrastructure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fabricmanagement</groupId>
+                <artifactId>shared-security</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

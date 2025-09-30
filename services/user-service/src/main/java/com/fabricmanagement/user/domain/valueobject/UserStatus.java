@@ -1,22 +1,33 @@
 package com.fabricmanagement.user.domain.valueobject;
 
 /**
- * Enum representing the status of a user in the system.
+ * User Status Enumeration
+ * 
+ * Represents the possible states of a user account
  */
 public enum UserStatus {
-    ACTIVE("Active user"),
-    INACTIVE("Inactive user"),
-    PENDING("Pending activation"),
-    SUSPENDED("Suspended user"),
-    DELETED("Deleted user");
-
-    private final String description;
-
-    UserStatus(String description) {
-        this.description = description;
-    }
-
-    public String getDescription() {
-        return description;
-    }
+    /**
+     * User account is active and can be used
+     */
+    ACTIVE,
+    
+    /**
+     * User account is inactive (temporarily disabled)
+     */
+    INACTIVE,
+    
+    /**
+     * User account is pending activation
+     */
+    PENDING,
+    
+    /**
+     * User account is suspended
+     */
+    SUSPENDED,
+    
+    /**
+     * User account is deleted (soft delete)
+     */
+    DELETED
 }

@@ -1,4 +1,0 @@
-# This directory no longer contains configuration files
-# Runtime configurations have been moved to individual services as part of DDD refactoring
-# See COMMON-SECURITY-REFACTORING-COMPLETE.md for details
-

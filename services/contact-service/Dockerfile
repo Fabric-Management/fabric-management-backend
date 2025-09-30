@@ -1,91 +1,55 @@
-# Multi-stage build for contact-service
-FROM maven:3.9-eclipse-temurin-21 AS builder
+# =============================================================================
+# CONTACT SERVICE DOCKERFILE
+# =============================================================================
+# Multi-stage build for optimized production image
 
+# Build stage
+FROM maven:3.9.6-openjdk-21-slim AS build
+
+# Set working directory
 WORKDIR /app
 
-# Configure Maven for better network reliability
-ENV MAVEN_OPTS="-Dmaven.repo.local=/root/.m2/repository \
-    -Dhttp.socketTimeout=60000 \
-    -Dhttp.connectionTimeout=60000 \
-    -Dmaven.wagon.http.retryHandler.count=3"
-
-# Create Maven settings using printf to avoid parsing issues
-RUN mkdir -p /root/.m2 && \
-    printf '%s\n' \
-    '<?xml version="1.0" encoding="UTF-8"?>' \
-    '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">' \
-    '    <profiles>' \
-    '        <profile>' \
-    '            <id>default</id>' \
-    '            <properties>' \
-    '                <maven.wagon.http.connectionTimeout>60000</maven.wagon.http.connectionTimeout>' \
-    '                <maven.wagon.http.readTimeout>60000</maven.wagon.http.readTimeout>' \
-    '            </properties>' \
-    '        </profile>' \
-    '    </profiles>' \
-    '    <activeProfiles>' \
-    '        <activeProfile>default</activeProfile>' \
-    '    </activeProfiles>' \
-    '</settings>' > /root/.m2/settings.xml
-
-# Copy all POMs first for better caching
+# Copy parent POM and shared modules
 COPY pom.xml .
-COPY common/common-core/pom.xml common/common-core/
-COPY common/common-security/pom.xml common/common-security/
-COPY services/contact-service/pom.xml services/contact-service/
+COPY shared/ ./shared/
 
-# Build parent POM with retry logic
-RUN mvn clean install -N -DskipTests || \
-    (sleep 10 && mvn clean install -N -DskipTests) || \
-    (sleep 20 && mvn clean install -N -DskipTests)
+# Copy service POM
+COPY services/contact-service/pom.xml ./services/contact-service/
 
-# Copy and build common modules source
-COPY common/common-core/src common/common-core/src
-RUN mvn clean install -f common/common-core/pom.xml -DskipTests
+# Download dependencies (this layer will be cached)
+RUN mvn dependency:go-offline -f services/contact-service/pom.xml
 
-COPY common/common-security/src common/common-security/src
-RUN mvn clean install -f common/common-security/pom.xml -DskipTests
+# Copy service source code
+COPY services/contact-service/src ./services/contact-service/src
 
-# Download service dependencies
-WORKDIR /app/services/contact-service
-RUN mvn dependency:go-offline -B
-
-# Copy and build service
-COPY services/contact-service/src src
-RUN mvn clean package -DskipTests
+# Build the application
+RUN mvn clean package -f services/contact-service/pom.xml -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:21-jre-alpine
+FROM openjdk:21-jre-slim
 
-# Install wget for healthcheck
-RUN apk add --no-cache wget
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+RUN groupadd -r fabricuser && useradd -r -g fabricuser fabricuser
 
+# Set working directory
 WORKDIR /app
 
-# Copy JAR file
-COPY --from=builder --chown=appuser:appgroup /app/services/contact-service/target/*.jar app.jar
+# Copy the built JAR
+COPY --from=build /app/services/contact-service/target/contact-service-*.jar app.jar
 
-# Create necessary directories
-RUN mkdir -p /app/logs /tmp && \
-    chown -R appuser:appgroup /app/logs /tmp
+# Change ownership
+RUN chown -R fabricuser:fabricuser /app
+USER fabricuser
 
-# Set JVM options
-ENV JAVA_OPTS="-Xmx512m -Xms256m \
-    -XX:MaxMetaspaceSize=128m \
-    -XX:+UseG1GC \
-    -Djava.io.tmpdir=/tmp \
-    -Djava.security.egd=file:/dev/./urandom"
-
-USER appuser
-
-EXPOSE 8084
+# Expose port
+EXPOSE 8082
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8084/actuator/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8082/api/v1/contacts/actuator/health || exit 1
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]

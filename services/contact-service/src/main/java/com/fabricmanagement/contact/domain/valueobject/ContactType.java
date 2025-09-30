@@ -1,25 +1,23 @@
 package com.fabricmanagement.contact.domain.valueobject;
 
 /**
- * Enum representing the type of contact in the system.
+ * Contact Type Enumeration
+ * 
+ * Represents the type of contact (user or company)
  */
 public enum ContactType {
-    USER("User contact"),
-    COMPANY("Company contact"),
-    CUSTOMER("Customer contact"),
-    SUPPLIER("Supplier contact"),
-    PARTNER("Business partner"),
-    EMPLOYEE("Employee contact"),
-    CONTRACTOR("Contractor contact"),
-    PROSPECT("Potential customer");
-
-    private final String description;
-
-    ContactType(String description) {
-        this.description = description;
-    }
-
-    public String getDescription() {
-        return description;
-    }
+    /**
+     * Contact belongs to a user
+     */
+    USER,
+    
+    /**
+     * Contact belongs to a company
+     */
+    COMPANY,
+    
+    /**
+     * Contact is shared between user and company
+     */
+    SHARED
 }
