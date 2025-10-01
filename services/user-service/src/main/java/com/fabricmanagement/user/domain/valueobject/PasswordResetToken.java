@@ -8,6 +8,7 @@ import lombok.experimental.SuperBuilder;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Password Reset Token Entity
@@ -23,7 +24,7 @@ import java.time.LocalDateTime;
 public class PasswordResetToken extends BaseEntity {
     
     @Column(name = "user_id", nullable = false)
-    private String userId;
+    private UUID userId;
     
     @Column(name = "contact_value", nullable = false)
     private String contactValue;
@@ -53,7 +54,7 @@ public class PasswordResetToken extends BaseEntity {
         EMAIL_CODE
     }
     
-    public static PasswordResetToken create(String userId, String contactValue, ResetMethod method) {
+    public static PasswordResetToken create(UUID userId, String contactValue, ResetMethod method) {
         return PasswordResetToken.builder()
             .userId(userId)
             .contactValue(contactValue)

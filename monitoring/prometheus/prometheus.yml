@@ -1,0 +1,102 @@
+# =============================================================================
+# PROMETHEUS CONFIGURATION
+# =============================================================================
+# Metrics collection for Fabric Management System
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: "fabric-management"
+    environment: "production"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rules configuration
+rule_files:
+  # - 'alerts/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # =============================================================================
+  # PROMETHEUS SELF-MONITORING
+  # =============================================================================
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: "prometheus"
+
+  # =============================================================================
+  # INFRASTRUCTURE SERVICES
+  # =============================================================================
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: "postgresql"
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          service: "redis"
+
+  # =============================================================================
+  # MICROSERVICES - ACTUATOR ENDPOINTS
+  # =============================================================================
+  - job_name: "user-service"
+    metrics_path: "/api/v1/users/actuator/prometheus"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["user-service:8081"]
+        labels:
+          service: "user-service"
+          application: "fabric-management"
+
+  - job_name: "contact-service"
+    metrics_path: "/api/v1/contacts/actuator/prometheus"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["contact-service:8082"]
+        labels:
+          service: "contact-service"
+          application: "fabric-management"
+
+  - job_name: "company-service"
+    metrics_path: "/api/v1/companies/actuator/prometheus"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["company-service:8083"]
+        labels:
+          service: "company-service"
+          application: "fabric-management"
+
+  # =============================================================================
+  # JMX METRICS
+  # =============================================================================
+  - job_name: "user-service-jmx"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["user-service:9010"]
+        labels:
+          service: "user-service-jmx"
+
+  - job_name: "contact-service-jmx"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["contact-service:9010"]
+        labels:
+          service: "contact-service-jmx"
+
+  - job_name: "company-service-jmx"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["company-service:9010"]
+        labels:
+          service: "company-service-jmx"

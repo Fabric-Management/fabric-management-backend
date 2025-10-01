@@ -19,7 +19,7 @@ import java.util.UUID;
  * Provides API endpoints for managing company-user relationships
  */
 @RestController
-@RequestMapping("/api/companies/{companyId}/users")
+@RequestMapping("/companies/{companyId}/users")
 @RequiredArgsConstructor
 @Slf4j
 public class CompanyUserController {

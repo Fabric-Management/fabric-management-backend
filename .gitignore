@@ -1,17 +1,9 @@
 # ==============================================
-# FABRIC MANAGEMENT SYSTEM - GITIGNORE
+# FABRIC MANAGEMENT BACKEND - GITIGNORE
 # ==============================================
 
-# ==============================================
-# JAVA & MAVEN
-# ==============================================
-*.class
+# Maven
 target/
-*.jar
-*.war
-*.ear
-
-# Maven specific
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
@@ -22,126 +14,55 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
-# ==============================================
-# IDE FILES
-# ==============================================
-# IntelliJ IDEA
+# IDE
 .idea/
-*.iws
 *.iml
+*.iws
 *.ipr
-out/
-
-# Eclipse
-.apt_generated
+.vscode/
+.settings/
+.project
 .classpath
 .factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
 
-# VS Code
-.vscode/
-*.code-workspace
-
-# ==============================================
-# OPERATING SYSTEM FILES
-# ==============================================
-# Mac
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-
-# Linux
-*~
-
-# ==============================================
-# LOGS & TEMPORARY FILES
-# ==============================================
-*.log
+# Logs
 logs/
+*.log
+*.log.*
+*.gz
+
+# Backup files
+backup-*.tar.gz
+*-old.*
+*.backup
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose-old.yml
+init-db-old.sql
+
+# Temporary files
 *.tmp
-*.temp
 *.swp
 *.swo
-*~.nib
+*~
 
-# ==============================================
-# DATABASE FILES
-# ==============================================
-*.db
-*.sqlite
-*.h2.db
-*.trace.db
-*.lock.db
+# Test coverage
+.coverage
+*.cover
+htmlcov/
 
-# ==============================================
-# ENVIRONMENT & SECURITY FILES
-# ==============================================
+# Application
+application-local.yml
+application-dev.yml
+!application.yml
+
+# Environment Variables
 .env
 .env.local
-.env.prod
-.env.staging
-.env.*.local
-
-# API Keys and secrets
-secrets/
-*.pem
-*.key
-*.p12
-*.jks
-
-# ==============================================
-# DOCKER & DEPLOYMENT
-# ==============================================
-docker-compose.override.yml.backup
-.docker/
-containers/
-
-# ==============================================
-# APPLICATION SPECIFIC
-# ==============================================
-# Uploads and file storage
-uploads/
-temp-files/
-/tmp/fabric-uploads/
-
-# Generated documentation
-docs/generated/
-
-# Test coverage reports
-coverage/
-*.lcov
-
-# Spring Boot
-spring-shell.log
-*.pid
-
-# ==============================================
-# NODE.JS (if used for frontend)
-# ==============================================
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# ==============================================
-# MONITORING & METRICS
-# ==============================================
-metrics/
-monitoring-data/
-
-# Kişisel environment dosyaları
-.env.save
-
-# Local override dosyası (sadece local içinse)
-docker-compose.override.yml
-
-.env.save
+.env.development
+.env.production
+!.env.example

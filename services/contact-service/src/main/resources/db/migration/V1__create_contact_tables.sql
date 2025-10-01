@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(255),
     updated_by VARCHAR(255),
-    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP,
     version BIGINT DEFAULT 0
 );
@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_contacts_contact_type ON contacts(contact_type);
 CREATE INDEX IF NOT EXISTS idx_contacts_is_verified ON contacts(is_verified);
 CREATE INDEX IF NOT EXISTS idx_contacts_is_primary ON contacts(is_primary);
 CREATE INDEX IF NOT EXISTS idx_contacts_owner_id_type ON contacts(owner_id, owner_type);
-CREATE INDEX IF NOT EXISTS idx_contacts_is_deleted ON contacts(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_contacts_deleted ON contacts(deleted);
 
 -- Add unique constraint for contact value
 ALTER TABLE contacts ADD CONSTRAINT uk_contact_value UNIQUE (contact_value);

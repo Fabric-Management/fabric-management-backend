@@ -22,7 +22,7 @@ import java.util.UUID;
  * Provides API endpoints for company management
  */
 @RestController
-@RequestMapping("/api/companies")
+@RequestMapping("/companies")
 @RequiredArgsConstructor
 @Slf4j
 public class CompanyController {

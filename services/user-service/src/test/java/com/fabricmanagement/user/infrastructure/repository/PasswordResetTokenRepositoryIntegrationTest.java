@@ -52,7 +52,7 @@ class PasswordResetTokenRepositoryIntegrationTest {
     @BeforeEach
     void setUp() {
         testUserId = UUID.randomUUID();
-        testToken = PasswordResetToken.create(testUserId.toString(), TEST_EMAIL, PasswordResetToken.ResetMethod.EMAIL_LINK);
+        testToken = PasswordResetToken.create(testUserId, TEST_EMAIL, PasswordResetToken.ResetMethod.EMAIL_LINK);
         
         // Token is already created with proper user ID
         
@@ -179,7 +179,7 @@ class PasswordResetTokenRepositoryIntegrationTest {
         void shouldFindExpiredTokens() {
             // Given
             PasswordResetToken expiredToken = PasswordResetToken.builder()
-                .userId(testUserId.toString())
+                .userId(testUserId)
                 .contactValue(TEST_EMAIL)
                 .token("expired-token")
                 .resetMethod(PasswordResetToken.ResetMethod.EMAIL_LINK)
@@ -232,7 +232,7 @@ class PasswordResetTokenRepositoryIntegrationTest {
         void shouldDeleteExpiredTokens() {
             // Given
             PasswordResetToken expiredToken = PasswordResetToken.builder()
-                .userId(testUserId.toString())
+                .userId(testUserId)
                 .contactValue(TEST_EMAIL)
                 .token("expired-token")
                 .resetMethod(PasswordResetToken.ResetMethod.EMAIL_LINK)
@@ -288,7 +288,7 @@ class PasswordResetTokenRepositoryIntegrationTest {
         @DisplayName("Should handle multiple tokens for same contact")
         void shouldHandleMultipleTokensForSameContact() {
             // Given
-            PasswordResetToken smsToken = PasswordResetToken.create(testUserId.toString(), TEST_EMAIL, PasswordResetToken.ResetMethod.SMS_CODE);
+            PasswordResetToken smsToken = PasswordResetToken.create(testUserId, TEST_EMAIL, PasswordResetToken.ResetMethod.SMS_CODE);
             tokenRepository.save(smsToken);
 
             // When

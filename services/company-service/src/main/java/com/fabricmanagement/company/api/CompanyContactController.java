@@ -20,7 +20,7 @@ import java.util.UUID;
  * Provides API endpoints for managing company contacts
  */
 @RestController
-@RequestMapping("/api/companies/{companyId}/contacts")
+@RequestMapping("/companies/{companyId}/contacts")
 @RequiredArgsConstructor
 @Slf4j
 public class CompanyContactController {
