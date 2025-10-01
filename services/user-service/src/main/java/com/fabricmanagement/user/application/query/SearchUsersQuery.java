@@ -4,8 +4,6 @@ import com.fabricmanagement.shared.application.query.Query;
 import lombok.Builder;
 import lombok.Data;
 
-import java.util.UUID;
-
 /**
  * Search Users Query
  * 

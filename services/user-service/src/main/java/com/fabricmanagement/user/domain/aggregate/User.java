@@ -4,10 +4,8 @@ import com.fabricmanagement.shared.domain.base.BaseEntity;
 import com.fabricmanagement.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.user.domain.event.UserUpdatedEvent;
 import com.fabricmanagement.user.domain.event.UserDeletedEvent;
-import com.fabricmanagement.user.domain.valueobject.UserContact;
 import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
-import com.fabricmanagement.user.domain.valueobject.PasswordResetToken;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -60,8 +58,8 @@ public class User extends BaseEntity {
     @Column(name = "password_hash")
     private String passwordHash;               // Encrypted password
     
-    @OneToMany(mappedBy = "userId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<UserContact> contacts;        // Multiple contact methods
+    // NOTE: Contacts are now managed by Contact Service
+    // Use ContactServiceClient to retrieve user contacts
     
     @Column(name = "role")
     private String role;                       // User role in company
@@ -89,7 +87,9 @@ public class User extends BaseEntity {
     private final List<Object> domainEvents = new ArrayList<>();
 
     /**
-     * Creates a new user with business validation (Legacy method - use createWithContactVerification instead)
+     * Creates a new user with business validation
+     * 
+     * NOTE: Contact information should be created separately using ContactServiceClient
      */
     public static User create(UUID tenantId, String contactValue, String contactType,
                             String firstName, String lastName) {
@@ -108,23 +108,7 @@ public class User extends BaseEntity {
             .lastName(lastName)
             .displayName(firstName + " " + lastName)
             .status(UserStatus.ACTIVE)
-            .contacts(new ArrayList<>())
             .build();
-
-        // Generate a temporary ID for the contact (will be replaced when entity is persisted)
-        String tempUserId = UUID.randomUUID().toString();
-        
-        // Add contact with temporary user ID
-        UserContact.ContactType type = UserContact.ContactType.valueOf(contactType.toUpperCase());
-        UserContact contact = UserContact.builder()
-            .userId(tempUserId)  // Use temporary ID instead of user.getId()
-            .contactValue(contactValue)
-            .contactType(type)
-            .isVerified(true)
-            .isPrimary(true)
-            .verifiedAt(LocalDateTime.now())
-            .build();
-        user.contacts.add(contact);
 
         // Add domain event
         user.addDomainEvent(new UserCreatedEvent(
@@ -230,6 +214,8 @@ public class User extends BaseEntity {
 
     /**
      * Creates a new user with contact verification
+     * 
+     * NOTE: Contact information should be created separately using ContactServiceClient
      */
     public static User createWithContactVerification(String contactValue, String contactType,
                                                     String firstName, String lastName, 
@@ -248,9 +234,6 @@ public class User extends BaseEntity {
         if (passwordHash == null || passwordHash.trim().isEmpty()) {
             throw new IllegalArgumentException("Password hash cannot be null or empty");
         }
-
-        // Generate a temporary ID for the contact (will be replaced when entity is persisted)
-        String tempUserId = UUID.randomUUID().toString();
         
         User user = User.builder()
             .firstName(firstName)
@@ -259,19 +242,7 @@ public class User extends BaseEntity {
             .passwordHash(passwordHash)
             .status(UserStatus.PENDING_VERIFICATION)
             .registrationType(RegistrationType.DIRECT_REGISTRATION)
-            .contacts(new ArrayList<>())
             .build();
-
-        // Add contact with temporary user ID
-        UserContact.ContactType type = UserContact.ContactType.valueOf(contactType.toUpperCase());
-        UserContact contact = UserContact.builder()
-            .userId(tempUserId)  // Use temporary ID instead of user.getId()
-            .contactValue(contactValue)
-            .contactType(type)
-            .isVerified(false)
-            .isPrimary(true)
-            .build();
-        user.contacts.add(contact);
 
         // Add domain event
         user.addDomainEvent(new UserCreatedEvent(
@@ -286,35 +257,13 @@ public class User extends BaseEntity {
 
     /**
      * Verifies contact and activates user
+     * 
+     * NOTE: Contact verification is now handled by Contact Service
+     * This method only updates user status after receiving ContactVerifiedEvent
      */
     public void verifyContactAndActivate(String contactValue) {
         if (this.status != UserStatus.PENDING_VERIFICATION) {
             throw new IllegalStateException("User must be in PENDING_VERIFICATION status");
-        }
-
-        // Find and verify the contact
-        boolean contactFound = false;
-        for (int i = 0; i < this.contacts.size(); i++) {
-            UserContact contact = this.contacts.get(i);
-            if (contact.getContactValue().equals(contactValue)) {
-                // Mark contact as verified
-                UserContact verifiedContact = UserContact.builder()
-                    .id(contact.getId())
-                    .userId(contact.getUserId())
-                    .contactValue(contact.getContactValue())
-                    .contactType(contact.getContactType())
-                    .isVerified(true)
-                    .isPrimary(contact.isPrimary())
-                    .verifiedAt(LocalDateTime.now())
-                    .build();
-                this.contacts.set(i, verifiedContact);
-                contactFound = true;
-                break;
-            }
-        }
-        
-        if (!contactFound) {
-            throw new IllegalArgumentException("Contact not found");
         }
 
         // Activate user
@@ -330,76 +279,18 @@ public class User extends BaseEntity {
         ));
     }
 
-    /**
-     * Adds new contact method
-     */
-    public void addContact(String contactValue, UserContact.ContactType contactType) {
-        if (this.status != UserStatus.ACTIVE) {
-            throw new IllegalStateException("User must be active to add contacts");
-        }
-
-        // Check if contact already exists
-        boolean exists = this.contacts.stream()
-            .anyMatch(contact -> contact.getContactValue().equals(contactValue));
-        
-        if (exists) {
-            throw new IllegalArgumentException("Contact already exists");
-        }
-
-        // Use existing ID if available, otherwise use temporary ID
-        String userId = this.getId() != null ? this.getId().toString() : UUID.randomUUID().toString();
-        
-        UserContact newContact = UserContact.builder()
-            .userId(userId)
-            .contactValue(contactValue)
-            .contactType(contactType)
-            .isVerified(false)
-            .isPrimary(false)
-            .build();
-        this.contacts.add(newContact);
-
-        // Add domain event
-        addDomainEvent(new UserUpdatedEvent(
-            this.getId(),
-            contactValue,
-            contactValue,
-            this.firstName,
-            this.lastName
-        ));
-    }
-
-    /**
-     * Verifies additional contact method
-     */
-    public void verifyContact(String contactValue) {
-        for (int i = 0; i < this.contacts.size(); i++) {
-            UserContact contact = this.contacts.get(i);
-            if (contact.getContactValue().equals(contactValue)) {
-                UserContact verifiedContact = UserContact.builder()
-                    .id(contact.getId())
-                    .userId(contact.getUserId())
-                    .contactValue(contact.getContactValue())
-                    .contactType(contact.getContactType())
-                    .isVerified(true)
-                    .isPrimary(contact.isPrimary())
-                    .verifiedAt(LocalDateTime.now())
-                    .build();
-                this.contacts.set(i, verifiedContact);
-                return;
-            }
-        }
-        throw new IllegalArgumentException("Contact not found");
-    }
-
+    // NOTE: Contact management is now handled by Contact Service
+    // Use ContactServiceClient to manage contacts
+    
     /**
      * Gets primary contact value
+     * 
+     * @deprecated Use ContactServiceClient.getPrimaryContact(userId) instead
      */
+    @Deprecated
     public String getPrimaryContact() {
-        return this.contacts.stream()
-            .filter(UserContact::isPrimary)
-            .map(UserContact::getContactValue)
-            .findFirst()
-            .orElse("unknown");
+        // TODO: This should call ContactServiceClient in the future
+        return "unknown";
     }
 
     /**
@@ -424,22 +315,8 @@ public class User extends BaseEntity {
         ));
     }
 
-    /**
-     * Checks if user has contact method
-     */
-    public boolean hasContact(String contactValue) {
-        return this.contacts.stream()
-            .anyMatch(contact -> contact.getContactValue().equals(contactValue));
-    }
-
-    /**
-     * Gets verified contacts only
-     */
-    public List<UserContact> getVerifiedContacts() {
-        return this.contacts.stream()
-            .filter(UserContact::isVerified)
-            .collect(java.util.stream.Collectors.toList());
-    }
+    // NOTE: Contact management methods are now handled by Contact Service
+    // Use ContactServiceClient for these operations
 
     /**
      * Gets and clears domain events

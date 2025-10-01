@@ -1,7 +1,6 @@
 package com.fabricmanagement.user.infrastructure.repository;
 
 import com.fabricmanagement.user.domain.aggregate.User;
-import com.fabricmanagement.user.domain.valueobject.UserContact;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,11 +40,12 @@ class UserRepositoryIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private UserContactRepository userContactRepository;
-
     private User testUser;
-    private UserContact testContact;
+    
+    /**
+     * NOTE: Contact management is now handled by Contact Service
+     * Use ContactServiceClient for contact operations
+     */
 
     @BeforeEach
     void setUp() {
@@ -57,10 +57,6 @@ class UserRepositoryIntegrationTest {
         
         // Persist user
         entityManager.persistAndFlush(testUser);
-        
-        // Get the contact
-        testContact = testUser.getContacts().get(0);
-        entityManager.persistAndFlush(testContact);
         
         entityManager.clear(); // Clear to test actual database queries
     }
@@ -315,63 +311,9 @@ class UserRepositoryIntegrationTest {
         }
     }
 
-    @Nested
-    @DisplayName("Contact Repository Tests")
-    class ContactRepositoryTests {
-
-        @Test
-        @DisplayName("Should find contact by contact value")
-        void shouldFindContactByContactValue() {
-            // When
-            Optional<UserContact> foundContact = userContactRepository.findByContactValue(TEST_EMAIL);
-
-            // Then
-            assertThat(foundContact).isPresent();
-            assertThat(foundContact.get().getContactValue()).isEqualTo(TEST_EMAIL);
-            assertThat(foundContact.get().getContactType()).isEqualTo(UserContact.ContactType.EMAIL);
-        }
-
-        @Test
-        @DisplayName("Should find contacts by user ID")
-        void shouldFindContactsByUserId() {
-            // When
-            List<UserContact> contacts = userContactRepository.findByUserId(testUser.getId());
-
-            // Then
-            assertThat(contacts).hasSize(1);
-            assertThat(contacts.get(0).getContactValue()).isEqualTo(TEST_EMAIL);
-        }
-
-        @Test
-        @DisplayName("Should find contacts by contact type")
-        void shouldFindContactsByContactType() {
-            // When
-            List<UserContact> emailContacts = userContactRepository.findByContactType(UserContact.ContactType.EMAIL);
-
-            // Then
-            assertThat(emailContacts).hasSize(1);
-            assertThat(emailContacts.get(0).getContactValue()).isEqualTo(TEST_EMAIL);
-        }
-
-        @Test
-        @DisplayName("Should count contacts by user ID")
-        void shouldCountContactsByUserId() {
-            // When
-            long count = userContactRepository.countByUserId(testUser.getId());
-
-            // Then
-            assertThat(count).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("Should find contacts by verification status")
-        void shouldFindContactsByVerificationStatus() {
-            // When
-            List<UserContact> unverifiedContacts = userContactRepository.findByUserIdAndIsVerified(testUser.getId(), false);
-
-            // Then
-            assertThat(unverifiedContacts).hasSize(1);
-            assertThat(unverifiedContacts.get(0).isVerified()).isFalse();
-        }
-    }
+    /**
+     * NOTE: Contact Repository Tests removed
+     * Contact management is now handled by Contact Service
+     * Use ContactServiceClient to test contact operations
+     */
 }
