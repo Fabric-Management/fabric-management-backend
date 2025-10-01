@@ -111,10 +111,13 @@ public class User extends BaseEntity {
             .contacts(new ArrayList<>())
             .build();
 
-        // Add contact
+        // Generate a temporary ID for the contact (will be replaced when entity is persisted)
+        String tempUserId = UUID.randomUUID().toString();
+        
+        // Add contact with temporary user ID
         UserContact.ContactType type = UserContact.ContactType.valueOf(contactType.toUpperCase());
         UserContact contact = UserContact.builder()
-            .userId(user.getId().toString())
+            .userId(tempUserId)  // Use temporary ID instead of user.getId()
             .contactValue(contactValue)
             .contactType(type)
             .isVerified(true)
@@ -246,6 +249,9 @@ public class User extends BaseEntity {
             throw new IllegalArgumentException("Password hash cannot be null or empty");
         }
 
+        // Generate a temporary ID for the contact (will be replaced when entity is persisted)
+        String tempUserId = UUID.randomUUID().toString();
+        
         User user = User.builder()
             .firstName(firstName)
             .lastName(lastName)
@@ -256,10 +262,10 @@ public class User extends BaseEntity {
             .contacts(new ArrayList<>())
             .build();
 
-        // Add contact
+        // Add contact with temporary user ID
         UserContact.ContactType type = UserContact.ContactType.valueOf(contactType.toUpperCase());
         UserContact contact = UserContact.builder()
-            .userId(user.getId().toString())
+            .userId(tempUserId)  // Use temporary ID instead of user.getId()
             .contactValue(contactValue)
             .contactType(type)
             .isVerified(false)
@@ -340,8 +346,11 @@ public class User extends BaseEntity {
             throw new IllegalArgumentException("Contact already exists");
         }
 
+        // Use existing ID if available, otherwise use temporary ID
+        String userId = this.getId() != null ? this.getId().toString() : UUID.randomUUID().toString();
+        
         UserContact newContact = UserContact.builder()
-            .userId(this.getId().toString())
+            .userId(userId)
             .contactValue(contactValue)
             .contactType(contactType)
             .isVerified(false)

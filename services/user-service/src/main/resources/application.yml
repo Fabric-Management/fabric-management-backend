@@ -12,18 +12,9 @@ spring:
   profiles:
     active: local
 
-# =============================================================================
-# SERVER CONFIGURATION
-# =============================================================================
-server:
-  port: 8081
-  servlet:
-    context-path: /api/v1/users
-
-# =============================================================================
-# DATABASE CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # DATABASE CONFIGURATION
+  # ===========================================================================
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
     username: ${POSTGRES_USER:fabric_user}
@@ -52,10 +43,9 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-# =============================================================================
-# CACHE CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -73,10 +63,9 @@ spring:
     redis:
       time-to-live: 600000 # 10 minutes
 
-# =============================================================================
-# KAFKA CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # KAFKA CONFIGURATION
+  # ===========================================================================
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -99,6 +88,14 @@ spring:
       enable-auto-commit: false
       properties:
         spring.json.trusted.packages: "com.fabricmanagement.user.domain.event"
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8081
+  servlet:
+    context-path: /api/v1/users
 
 # =============================================================================
 # SECURITY CONFIGURATION
