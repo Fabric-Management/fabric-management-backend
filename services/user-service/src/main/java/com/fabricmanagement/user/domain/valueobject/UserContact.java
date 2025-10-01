@@ -67,4 +67,31 @@ public class UserContact extends BaseEntity {
             .verifiedAt(isVerified ? LocalDateTime.now() : null)
             .build();
     }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof UserContact)) return false;
+        
+        UserContact that = (UserContact) o;
+        
+        // Compare key fields for equality (excluding verifiedAt which can vary by milliseconds)
+        return isVerified == that.isVerified &&
+               isPrimary == that.isPrimary &&
+               (userId != null ? userId.equals(that.userId) : that.userId == null) &&
+               (contactValue != null ? contactValue.equals(that.contactValue) : that.contactValue == null) &&
+               contactType == that.contactType;
+        // Note: verifiedAt is excluded from equals comparison as it can vary by milliseconds
+    }
+    
+    @Override
+    public int hashCode() {
+        int result = userId != null ? userId.hashCode() : 0;
+        result = 31 * result + (contactValue != null ? contactValue.hashCode() : 0);
+        result = 31 * result + (contactType != null ? contactType.hashCode() : 0);
+        result = 31 * result + (isVerified ? 1 : 0);
+        result = 31 * result + (isPrimary ? 1 : 0);
+        // Note: verifiedAt is excluded from hashCode to match equals() implementation
+        return result;
+    }
 }

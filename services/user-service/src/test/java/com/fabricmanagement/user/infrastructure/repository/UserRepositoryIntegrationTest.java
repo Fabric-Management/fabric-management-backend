@@ -3,7 +3,6 @@ package com.fabricmanagement.user.infrastructure.repository;
 import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.valueobject.UserContact;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
-import com.fabricmanagement.user.test.UserServiceTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,7 +26,14 @@ import static org.assertj.core.api.Assertions.*;
 @DataJpaTest
 @ActiveProfiles("test")
 @DisplayName("User Repository Integration Tests")
-class UserRepositoryIntegrationTest extends UserServiceTestBase {
+class UserRepositoryIntegrationTest {
+
+    // Test constants
+    private static final String TEST_EMAIL = "test@example.com";
+    private static final String TEST_FIRST_NAME = "John";
+    private static final String TEST_LAST_NAME = "Doe";
+    private static final String TEST_PASSWORD_HASH = "$2a$10$hashedpassword123";
+    private static final String TEST_TENANT_ID = "123e4567-e89b-12d3-a456-426614174000";
 
     @Autowired
     private TestEntityManager entityManager;
