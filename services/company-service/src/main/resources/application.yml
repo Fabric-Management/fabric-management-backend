@@ -53,6 +53,15 @@ spring:
     validate-on-migrate: true
 
 # =============================================================================
+# EXTERNAL SERVICES CONFIGURATION
+# =============================================================================
+contact-service:
+  url: ${CONTACT_SERVICE_URL:http://localhost:8082}
+
+user-service:
+  url: ${USER_SERVICE_URL:http://localhost:8081}
+
+# =============================================================================
 # CACHE CONFIGURATION
 # =============================================================================
 spring:

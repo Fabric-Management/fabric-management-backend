@@ -16,21 +16,14 @@ import java.util.UUID;
 public class ContactDeletedEvent extends DomainEvent {
     
     private final UUID contactId;
-    private final UUID tenantId;
-    private final UUID userId;
-    private final UUID companyId;
-    private final String contactType;
-    private final String email;
+    private final String ownerId;
+    private final String ownerType;
 
-    public ContactDeletedEvent(UUID contactId, UUID tenantId, UUID userId, UUID companyId,
-                              String contactType, String email) {
+    public ContactDeletedEvent(UUID contactId, String ownerId, String ownerType) {
         super();
         this.contactId = contactId;
-        this.tenantId = tenantId;
-        this.userId = userId;
-        this.companyId = companyId;
-        this.contactType = contactType;
-        this.email = email;
+        this.ownerId = ownerId;
+        this.ownerType = ownerType;
     }
 
     @Override
@@ -41,10 +34,5 @@ public class ContactDeletedEvent extends DomainEvent {
     @Override
     public String getAggregateId() {
         return contactId.toString();
-    }
-
-    @Override
-    public String getTenantId() {
-        return tenantId.toString();
     }
 }
