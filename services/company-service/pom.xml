@@ -82,6 +82,13 @@
             <artifactId>flyway-core</artifactId>
         </dependency>
 
+        <!-- Hibernate Types for JSONB support -->
+        <dependency>
+            <groupId>io.hypersistence</groupId>
+            <artifactId>hypersistence-utils-hibernate-60</artifactId>
+            <version>3.5.1</version>
+        </dependency>
+
         <!-- Cache -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
