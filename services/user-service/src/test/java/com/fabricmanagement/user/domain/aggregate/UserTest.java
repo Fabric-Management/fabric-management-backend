@@ -1,6 +1,5 @@
 package com.fabricmanagement.user.domain.aggregate;
 
-import com.fabricmanagement.user.domain.valueobject.UserContact;
 import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import com.fabricmanagement.user.domain.event.UserCreatedEvent;
@@ -48,13 +47,9 @@ class UserTest {
             assertThat(user.getStatus()).isEqualTo(UserStatus.PENDING_VERIFICATION);
             assertThat(user.getRegistrationType()).isEqualTo(RegistrationType.DIRECT_REGISTRATION);
             assertThat(user.getPasswordHash()).isEqualTo(PASSWORD_HASH);
-            assertThat(user.getContacts()).hasSize(1);
             
-            UserContact contact = user.getContacts().get(0);
-            assertThat(contact.getContactValue()).isEqualTo(VALID_EMAIL);
-            assertThat(contact.getContactType()).isEqualTo(UserContact.ContactType.EMAIL);
-            assertThat(contact.isVerified()).isFalse();
-            assertThat(contact.isPrimary()).isTrue();
+            // NOTE: Contacts are now managed by Contact Service
+            // Contact validation removed from User entity
         }
 
         @Test
@@ -140,8 +135,8 @@ class UserTest {
             // Then
             assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
             
-            UserContact contact = user.getContacts().get(0);
-            assertThat(contact.isVerified()).isTrue();
+            // NOTE: Contact verification is now handled by Contact Service
+            // Contact state is not checked in User entity anymore
             
             List<Object> events = user.getAndClearDomainEvents();
             assertThat(events).hasSize(1);
@@ -160,14 +155,8 @@ class UserTest {
                 .hasMessage("User must be in PENDING_VERIFICATION status");
         }
 
-        @Test
-        @DisplayName("Should throw exception when contact value not found")
-        void shouldThrowExceptionWhenContactValueNotFound() {
-            // When & Then
-            assertThatThrownBy(() -> user.verifyContactAndActivate("nonexistent@example.com"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Contact not found");
-        }
+        // NOTE: Contact verification is now handled by Contact Service
+        // The verifyContactAndActivate method no longer validates contact existence
     }
 
     @Nested
@@ -218,92 +207,9 @@ class UserTest {
         }
     }
 
-    @Nested
-    @DisplayName("Contact Management Tests")
-    class ContactManagementTests {
-
-        private User user;
-
-        @BeforeEach
-        void setUp() {
-            user = User.createWithContactVerification(
-                VALID_EMAIL, "EMAIL", FIRST_NAME, LAST_NAME, PASSWORD_HASH, "EMPLOYEE"
-            );
-            user.verifyContactAndActivate(VALID_EMAIL); // Activate user
-            user.getAndClearDomainEvents(); // Clear events from setup
-        }
-
-        @Test
-        @DisplayName("Should add new contact successfully")
-        void shouldAddNewContactSuccessfully() {
-            // When
-            user.addContact(VALID_PHONE, UserContact.ContactType.PHONE);
-
-            // Then
-            assertThat(user.getContacts()).hasSize(2);
-            
-            UserContact phoneContact = user.getContacts().stream()
-                .filter(c -> c.getContactValue().equals(VALID_PHONE))
-                .findFirst()
-                .orElseThrow();
-            
-            assertThat(phoneContact.getContactValue()).isEqualTo(VALID_PHONE);
-            assertThat(phoneContact.getContactType()).isEqualTo(UserContact.ContactType.PHONE);
-            assertThat(phoneContact.isVerified()).isFalse();
-            assertThat(phoneContact.isPrimary()).isFalse();
-        }
-
-        @Test
-        @DisplayName("Should throw exception when contact already exists")
-        void shouldThrowExceptionWhenContactAlreadyExists() {
-            // When & Then
-            assertThatThrownBy(() -> user.addContact(VALID_EMAIL, UserContact.ContactType.EMAIL))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Contact already exists");
-        }
-
-        @Test
-        @DisplayName("Should throw exception when user is not active")
-        void shouldThrowExceptionWhenUserNotActive() {
-            // Given
-            User inactiveUser = User.createWithContactVerification(
-                VALID_EMAIL, "EMAIL", FIRST_NAME, LAST_NAME, PASSWORD_HASH, "EMPLOYEE"
-            );
-            // User is still PENDING_VERIFICATION
-
-            // When & Then
-            assertThatThrownBy(() -> inactiveUser.addContact(VALID_PHONE, UserContact.ContactType.PHONE))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("User must be active to add contacts");
-        }
-
-        @Test
-        @DisplayName("Should verify additional contact successfully")
-        void shouldVerifyAdditionalContactSuccessfully() {
-            // Given
-            user.addContact(VALID_PHONE, UserContact.ContactType.PHONE);
-
-            // When
-            user.verifyContact(VALID_PHONE);
-
-            // Then
-            UserContact phoneContact = user.getContacts().stream()
-                .filter(c -> c.getContactValue().equals(VALID_PHONE))
-                .findFirst()
-                .orElseThrow();
-            
-            assertThat(phoneContact.isVerified()).isTrue();
-        }
-
-        @Test
-        @DisplayName("Should throw exception when verifying non-existent contact")
-        void shouldThrowExceptionWhenVerifyingNonExistentContact() {
-            // When & Then
-            assertThatThrownBy(() -> user.verifyContact("nonexistent@example.com"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Contact not found");
-        }
-    }
+    // NOTE: Contact Management Tests removed
+    // Contacts are now managed by Contact Service
+    // Use ContactServiceClient for contact operations
 
     @Nested
     @DisplayName("User Status Tests")
@@ -354,27 +260,7 @@ class UserTest {
             assertThat(user.getFullName()).isEqualTo(FIRST_NAME + " " + LAST_NAME);
         }
 
-        @Test
-        @DisplayName("Should get primary contact correctly")
-        void shouldGetPrimaryContactCorrectly() {
-            // When & Then
-            assertThat(user.getPrimaryContact()).isEqualTo(VALID_EMAIL);
-        }
-
-        @Test
-        @DisplayName("Should get verified contacts only")
-        void shouldGetVerifiedContactsOnly() {
-            // Given
-            user.verifyContactAndActivate(VALID_EMAIL);
-            user.addContact(VALID_PHONE, UserContact.ContactType.PHONE);
-            // Phone contact is not verified
-
-            // When
-            List<UserContact> verifiedContacts = user.getVerifiedContacts();
-
-            // Then
-            assertThat(verifiedContacts).hasSize(1);
-            assertThat(verifiedContacts.get(0).getContactValue()).isEqualTo(VALID_EMAIL);
-        }
+        // NOTE: Contact-related tests removed
+        // Use ContactServiceClient to retrieve contact information
     }
 }

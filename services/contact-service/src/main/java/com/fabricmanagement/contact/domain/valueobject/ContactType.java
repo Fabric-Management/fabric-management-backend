@@ -3,21 +3,36 @@ package com.fabricmanagement.contact.domain.valueobject;
 /**
  * Contact Type Enumeration
  * 
- * Represents the type of contact (user or company)
+ * Defines different types of contact information
  */
 public enum ContactType {
     /**
-     * Contact belongs to a user
+     * Email address
      */
-    USER,
+    EMAIL,
     
     /**
-     * Contact belongs to a company
+     * Phone number
      */
-    COMPANY,
+    PHONE,
     
     /**
-     * Contact is shared between user and company
+     * Physical address
      */
-    SHARED
+    ADDRESS,
+    
+    /**
+     * Fax number
+     */
+    FAX,
+    
+    /**
+     * Website URL
+     */
+    WEBSITE,
+    
+    /**
+     * Social media handle
+     */
+    SOCIAL_MEDIA
 }
