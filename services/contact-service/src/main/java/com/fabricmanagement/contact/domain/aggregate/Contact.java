@@ -58,6 +58,12 @@ public class Contact extends BaseEntity {
     @Column(name = "verification_expires_at")
     private LocalDateTime verificationExpiresAt;
     
+    @Column(name = "is_deleted")
+    private boolean isDeleted = false;
+    
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+    
     @Transient
     private List<Object> domainEvents = new ArrayList<>();
     
@@ -160,11 +166,13 @@ public class Contact extends BaseEntity {
     }
     
     /**
-     * Marks contact as deleted
+     * Marks contact as deleted (soft delete)
      */
     @Override
     public void markAsDeleted() {
         super.markAsDeleted();
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
         
         addDomainEvent(new ContactDeletedEvent(
             this.getId(),
@@ -186,8 +194,13 @@ public class Contact extends BaseEntity {
         this.domainEvents.add(event);
     }
     
+    /**
+     * Generates a cryptographically secure random verification code
+     */
     private String generateRandomCode() {
-        return String.format("%06d", (int)(Math.random() * 1000000));
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        int code = random.nextInt(1000000);
+        return String.format("%06d", code);
     }
     
     @Override

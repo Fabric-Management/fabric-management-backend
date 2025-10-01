@@ -17,8 +17,6 @@ spring:
 # =============================================================================
 server:
   port: 8082
-  servlet:
-    context-path: /api/v1/contacts
 
 # =============================================================================
 # DATABASE CONFIGURATION
@@ -98,7 +96,18 @@ spring:
       auto-offset-reset: earliest
       enable-auto-commit: false
       properties:
-        spring.json.trusted.packages: "com.fabricmanagement.contact.domain.event"
+        spring.json.trusted.packages: "com.fabricmanagement.contact.domain.event,java.util"
+
+# Kafka Topics Configuration
+kafka:
+  topics:
+    email-notifications: email-notifications
+    sms-notifications: sms-notifications
+    contact-events: contact-events
+
+# Notification Configuration
+notification:
+  enabled: ${NOTIFICATION_ENABLED:true}
 
 # =============================================================================
 # MANAGEMENT & MONITORING

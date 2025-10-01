@@ -94,6 +94,12 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+        <!-- Feign Client for Service Communication -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
