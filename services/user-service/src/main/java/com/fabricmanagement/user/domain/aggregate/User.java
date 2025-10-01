@@ -6,10 +6,12 @@ import com.fabricmanagement.user.domain.event.UserUpdatedEvent;
 import com.fabricmanagement.user.domain.event.UserDeletedEvent;
 import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
+import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.Type;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -70,16 +72,12 @@ public class User extends BaseEntity {
     @Column(name = "last_login_ip")
     private String lastLoginIp;
     
-    @ElementCollection
-    @CollectionTable(name = "user_preferences", joinColumns = @JoinColumn(name = "user_id"))
-    @MapKeyColumn(name = "preference_key")
-    @Column(name = "preference_value")
+    @Type(JsonBinaryType.class)
+    @Column(name = "preferences", columnDefinition = "jsonb")
     private Map<String, Object> preferences;
     
-    @ElementCollection
-    @CollectionTable(name = "user_settings", joinColumns = @JoinColumn(name = "user_id"))
-    @MapKeyColumn(name = "setting_key")
-    @Column(name = "setting_value")
+    @Type(JsonBinaryType.class)
+    @Column(name = "settings", columnDefinition = "jsonb")
     private Map<String, Object> settings;
     
     // Domain events (not persisted)
@@ -111,12 +109,16 @@ public class User extends BaseEntity {
             .build();
 
         // Add domain event
-        user.addDomainEvent(new UserCreatedEvent(
-            user.getId(),
-            contactValue,
-            firstName,
-            lastName
-        ));
+        user.addDomainEvent(UserCreatedEvent.builder()
+            .userId(user.getId())
+            .tenantId(tenantId.toString())
+            .firstName(firstName)
+            .lastName(lastName)
+            .email(contactValue)
+            .status(UserStatus.ACTIVE.name())
+            .registrationType(RegistrationType.DIRECT_REGISTRATION.name())
+            .timestamp(LocalDateTime.now())
+            .build());
 
         return user;
     }
@@ -130,13 +132,14 @@ public class User extends BaseEntity {
         this.displayName = displayName != null ? displayName : firstName + " " + lastName;
 
         // Add domain event
-        addDomainEvent(new UserUpdatedEvent(
-            this.getId(),
-            this.getPrimaryContact(),
-            firstName,
-            lastName,
-            this.displayName
-        ));
+        addDomainEvent(UserUpdatedEvent.builder()
+            .userId(this.getId())
+            .tenantId(this.tenantId)
+            .firstName(firstName)
+            .lastName(lastName)
+            .status(this.status.name())
+            .timestamp(LocalDateTime.now())
+            .build());
     }
 
     /**
@@ -145,13 +148,14 @@ public class User extends BaseEntity {
     public void updatePreferences(Map<String, Object> preferences) {
         this.preferences = preferences;
         
-        addDomainEvent(new UserUpdatedEvent(
-            this.getId(),
-            this.getPrimaryContact(),
-            this.firstName,
-            this.lastName,
-            this.displayName
-        ));
+        addDomainEvent(UserUpdatedEvent.builder()
+            .userId(this.getId())
+            .tenantId(this.tenantId)
+            .firstName(this.firstName)
+            .lastName(this.lastName)
+            .status(this.status.name())
+            .timestamp(LocalDateTime.now())
+            .build());
     }
 
     /**
@@ -184,11 +188,11 @@ public class User extends BaseEntity {
         super.markAsDeleted();
         this.status = UserStatus.DELETED;
         
-        addDomainEvent(new UserDeletedEvent(
-            this.getId(),
-            this.getPrimaryContact(),
-            this.getPrimaryContact()
-        ));
+        addDomainEvent(UserDeletedEvent.builder()
+            .userId(this.getId())
+            .tenantId(this.tenantId)
+            .timestamp(LocalDateTime.now())
+            .build());
     }
 
     /**
@@ -245,12 +249,16 @@ public class User extends BaseEntity {
             .build();
 
         // Add domain event
-        user.addDomainEvent(new UserCreatedEvent(
-            user.getId(),
-            contactValue,
-            firstName,
-            lastName
-        ));
+        user.addDomainEvent(UserCreatedEvent.builder()
+            .userId(user.getId())
+            .tenantId("UNKNOWN") // Will be set later
+            .firstName(firstName)
+            .lastName(lastName)
+            .email(contactValue)
+            .status(UserStatus.PENDING_VERIFICATION.name())
+            .registrationType(RegistrationType.DIRECT_REGISTRATION.name())
+            .timestamp(LocalDateTime.now())
+            .build());
 
         return user;
     }
@@ -270,13 +278,14 @@ public class User extends BaseEntity {
         this.status = UserStatus.ACTIVE;
 
         // Add domain event
-        addDomainEvent(new UserUpdatedEvent(
-            this.getId(),
-            contactValue,
-            contactValue,
-            this.firstName,
-            this.lastName
-        ));
+        addDomainEvent(UserUpdatedEvent.builder()
+            .userId(this.getId())
+            .tenantId(this.tenantId)
+            .firstName(this.firstName)
+            .lastName(this.lastName)
+            .status(UserStatus.ACTIVE.name())
+            .timestamp(LocalDateTime.now())
+            .build());
     }
 
     // NOTE: Contact management is now handled by Contact Service
@@ -306,13 +315,14 @@ public class User extends BaseEntity {
         this.passwordHash = newPasswordHash;
         
         // Add domain event
-        addDomainEvent(new UserUpdatedEvent(
-            this.getId(),
-            this.getPrimaryContact(),
-            this.firstName,
-            this.lastName,
-            this.displayName
-        ));
+        addDomainEvent(UserUpdatedEvent.builder()
+            .userId(this.getId())
+            .tenantId(this.tenantId)
+            .firstName(this.firstName)
+            .lastName(this.lastName)
+            .status(this.status.name())
+            .timestamp(LocalDateTime.now())
+            .build());
     }
 
     // NOTE: Contact management methods are now handled by Contact Service

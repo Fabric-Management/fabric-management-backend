@@ -14,15 +14,10 @@ import java.util.UUID;
  * User Repository Interface
  * 
  * Provides data access methods for User aggregate
+ * Note: Contact-related queries removed - use ContactServiceClient instead
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
-    
-    /**
-     * Find user by contact value (email or phone)
-     */
-    @Query("SELECT u FROM User u JOIN u.contacts c WHERE c.contactValue = :contactValue AND u.deleted = false")
-    Optional<User> findByContactValue(@Param("contactValue") String contactValue);
     
     /**
      * Find users by tenant ID
@@ -52,20 +47,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> searchByName(@Param("searchTerm") String searchTerm);
     
     /**
-     * Check if contact value exists
-     */
-    @Query("SELECT COUNT(c) > 0 FROM UserContact c WHERE c.contactValue = :contactValue")
-    boolean existsByContactValue(@Param("contactValue") String contactValue);
-    
-    /**
-     * Find users with verified contacts only
-     */
-    @Query("SELECT u FROM User u JOIN u.contacts c WHERE c.isVerified = true AND u.deleted = false")
-    List<User> findUsersWithVerifiedContacts();
-    
-    /**
      * Count active users by tenant
      */
     @Query("SELECT COUNT(u) FROM User u WHERE u.tenantId = :tenantId AND u.status = 'ACTIVE' AND u.deleted = false")
     long countActiveUsersByTenant(@Param("tenantId") UUID tenantId);
+    
+    /**
+     * Find user by ID and tenant ID
+     */
+    @Query("SELECT u FROM User u WHERE u.id = :userId AND u.tenantId = :tenantId AND u.deleted = false")
+    Optional<User> findByIdAndTenantId(@Param("userId") UUID userId, @Param("tenantId") String tenantId);
 }

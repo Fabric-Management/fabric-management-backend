@@ -17,19 +17,6 @@
     <description>Contact management service for Fabric Management System</description>
 
     <dependencies>
-        <!-- Common Dependencies -->
-        <dependency>
-            <groupId>com.fabricmanagement</groupId>
-            <artifactId>common-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>com.fabricmanagement</groupId>
-            <artifactId>common-security</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Shared Domain -->
         <dependency>
             <groupId>com.fabricmanagement</groupId>
@@ -40,6 +27,13 @@
         <dependency>
             <groupId>com.fabricmanagement</groupId>
             <artifactId>shared-application</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Shared Security -->
+        <dependency>
+            <groupId>com.fabricmanagement</groupId>
+            <artifactId>shared-security</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -64,6 +58,21 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -74,6 +83,10 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
         <!-- Kafka -->
@@ -126,6 +139,21 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>

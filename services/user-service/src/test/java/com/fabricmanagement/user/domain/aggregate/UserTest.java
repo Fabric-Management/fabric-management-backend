@@ -106,7 +106,7 @@ class UserTest {
             assertThat(events.get(0)).isInstanceOf(UserCreatedEvent.class);
             
             UserCreatedEvent event = (UserCreatedEvent) events.get(0);
-            assertThat(event.getContactValue()).isEqualTo(VALID_EMAIL);
+            assertThat(event.getEmail()).isEqualTo(VALID_EMAIL);
             assertThat(event.getFirstName()).isEqualTo(FIRST_NAME);
             assertThat(event.getLastName()).isEqualTo(LAST_NAME);
         }

@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.infrastructure.repository;
 
 import com.fabricmanagement.user.domain.aggregate.User;
+import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,18 +22,18 @@ import static org.assertj.core.api.Assertions.*;
  * User Repository Integration Tests
  * 
  * Tests database operations with real JPA/Hibernate
+ * Note: Contact-related tests removed - use ContactServiceClient instead
  */
 @DataJpaTest
 @ActiveProfiles("test")
 @DisplayName("User Repository Integration Tests")
 class UserRepositoryIntegrationTest {
 
-    // Test constants
     private static final String TEST_EMAIL = "test@example.com";
     private static final String TEST_FIRST_NAME = "John";
     private static final String TEST_LAST_NAME = "Doe";
     private static final String TEST_PASSWORD_HASH = "$2a$10$hashedpassword123";
-    private static final String TEST_TENANT_ID = "123e4567-e89b-12d3-a456-426614174000";
+    private static final UUID TEST_TENANT_ID = UUID.randomUUID();
 
     @Autowired
     private TestEntityManager entityManager;
@@ -41,24 +42,24 @@ class UserRepositoryIntegrationTest {
     private UserRepository userRepository;
 
     private User testUser;
-    
-    /**
-     * NOTE: Contact management is now handled by Contact Service
-     * Use ContactServiceClient for contact operations
-     */
 
     @BeforeEach
     void setUp() {
-        // Create test user with tenant ID
-        testUser = User.createWithContactVerification(
-            TEST_EMAIL, "EMAIL", TEST_FIRST_NAME, TEST_LAST_NAME, TEST_PASSWORD_HASH, "EMPLOYEE"
-        );
-        // Note: tenantId will be set via reflection or builder pattern in real implementation
+        testUser = User.builder()
+                .id(UUID.randomUUID())
+                .tenantId(TEST_TENANT_ID.toString())
+                .firstName(TEST_FIRST_NAME)
+                .lastName(TEST_LAST_NAME)
+                .displayName(TEST_FIRST_NAME + " " + TEST_LAST_NAME)
+                .status(UserStatus.PENDING_VERIFICATION)
+                .registrationType(RegistrationType.DIRECT_REGISTRATION)
+                .passwordHash(TEST_PASSWORD_HASH)
+                .deleted(false)
+                .version(0L)
+                .build();
         
-        // Persist user
         entityManager.persistAndFlush(testUser);
-        
-        entityManager.clear(); // Clear to test actual database queries
+        entityManager.clear();
     }
 
     @Nested
@@ -68,11 +69,8 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should save and retrieve user successfully")
         void shouldSaveAndRetrieveUserSuccessfully() {
-            // When
-            User savedUser = userRepository.save(testUser);
-            Optional<User> foundUser = userRepository.findById(savedUser.getId());
+            Optional<User> foundUser = userRepository.findById(testUser.getId());
 
-            // Then
             assertThat(foundUser).isPresent();
             assertThat(foundUser.get().getFirstName()).isEqualTo(TEST_FIRST_NAME);
             assertThat(foundUser.get().getLastName()).isEqualTo(TEST_LAST_NAME);
@@ -82,15 +80,10 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should update user successfully")
         void shouldUpdateUserSuccessfully() {
-            // Given
-            User savedUser = userRepository.save(testUser);
+            testUser.updateProfile("Updated", "Name", "Updated Name");
+            userRepository.save(testUser);
             
-            // When
-            savedUser.updateProfile("Updated", "Name", "Updated Name");
-            userRepository.save(savedUser);
-            
-            // Then
-            Optional<User> updatedUser = userRepository.findById(savedUser.getId());
+            Optional<User> updatedUser = userRepository.findById(testUser.getId());
             assertThat(updatedUser).isPresent();
             assertThat(updatedUser.get().getFirstName()).isEqualTo("Updated");
             assertThat(updatedUser.get().getLastName()).isEqualTo("Name");
@@ -99,66 +92,12 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should soft delete user successfully")
         void shouldSoftDeleteUserSuccessfully() {
-            // Given
-            User savedUser = userRepository.save(testUser);
-            
-            // When
-            savedUser.markAsDeleted();
-            userRepository.save(savedUser);
-            
-            // Then
-            Optional<User> deletedUser = userRepository.findById(savedUser.getId());
-            assertThat(deletedUser).isPresent();
-            assertThat(deletedUser.get().isDeleted()).isTrue();
-        }
-    }
-
-    @Nested
-    @DisplayName("Contact-Based Queries")
-    class ContactBasedQueries {
-
-        @Test
-        @DisplayName("Should find user by contact value")
-        void shouldFindUserByContactValue() {
-            // When
-            Optional<User> foundUser = userRepository.findByContactValue(TEST_EMAIL);
-
-            // Then
-            assertThat(foundUser).isPresent();
-            assertThat(foundUser.get().getId()).isEqualTo(testUser.getId());
-            assertThat(foundUser.get().getFirstName()).isEqualTo(TEST_FIRST_NAME);
-        }
-
-        @Test
-        @DisplayName("Should return empty when contact not found")
-        void shouldReturnEmptyWhenContactNotFound() {
-            // When
-            Optional<User> foundUser = userRepository.findByContactValue("nonexistent@example.com");
-
-            // Then
-            assertThat(foundUser).isEmpty();
-        }
-
-        @Test
-        @DisplayName("Should not find deleted user by contact")
-        void shouldNotFindDeletedUserByContact() {
-            // Given
             testUser.markAsDeleted();
             userRepository.save(testUser);
-
-            // When
-            Optional<User> foundUser = userRepository.findByContactValue(TEST_EMAIL);
-
-            // Then
-            assertThat(foundUser).isEmpty();
-        }
-
-        @Test
-        @DisplayName("Should check if contact value exists")
-        void shouldCheckIfContactValueExists() {
-            // When & Then
-            assertThat(userRepository.existsByContactValue(TEST_EMAIL)).isTrue();
-            assertThat(userRepository.existsByContactValue("nonexistent@example.com")).isFalse();
+            
+            Optional<User> deletedUser = userRepository.findById(testUser.getId());
+            assertThat(deletedUser).isPresent();
+            assertThat(deletedUser.get().isDeleted()).isTrue();
         }
     }
 
@@ -169,44 +108,28 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should find users by tenant ID")
         void shouldFindUsersByTenantId() {
-            // Given
-            UUID tenantId = UUID.fromString(TEST_TENANT_ID);
-            
-            // When
-            List<User> users = userRepository.findByTenantId(tenantId);
+            List<User> users = userRepository.findByTenantId(TEST_TENANT_ID);
 
-            // Then
-            // Note: This test will pass when tenantId is properly set in User creation
-            assertThat(users).hasSize(0); // Currently no tenant ID set
+            assertThat(users).hasSize(1);
+            assertThat(users.get(0).getId()).isEqualTo(testUser.getId());
         }
 
         @Test
         @DisplayName("Should count active users by tenant")
         void shouldCountActiveUsersByTenant() {
-            // Given
-            UUID tenantId = UUID.fromString(TEST_TENANT_ID);
-            testUser.verifyContactAndActivate(TEST_EMAIL);
+            testUser.activate();
             userRepository.save(testUser);
 
-            // When
-            long count = userRepository.countActiveUsersByTenant(tenantId);
+            long count = userRepository.countActiveUsersByTenant(TEST_TENANT_ID);
 
-            // Then
-            assertThat(count).isEqualTo(0); // Currently no tenant ID set
+            assertThat(count).isEqualTo(1);
         }
 
         @Test
         @DisplayName("Should not count inactive users")
         void shouldNotCountInactiveUsers() {
-            // Given
-            UUID tenantId = UUID.fromString(TEST_TENANT_ID);
-            // User is still PENDING_VERIFICATION
-
-            // When
-            long count = userRepository.countActiveUsersByTenant(tenantId);
-
-            // Then
-            assertThat(count).isEqualTo(0);
+            long count = userRepository.countActiveUsersByTenant(TEST_TENANT_ID);
+            assertThat(count).isEqualTo(0); // User is PENDING_VERIFICATION
         }
     }
 
@@ -217,10 +140,8 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should find users by status")
         void shouldFindUsersByStatus() {
-            // When
             List<User> pendingUsers = userRepository.findByStatus("PENDING_VERIFICATION");
 
-            // Then
             assertThat(pendingUsers).hasSize(1);
             assertThat(pendingUsers.get(0).getId()).isEqualTo(testUser.getId());
         }
@@ -228,27 +149,10 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should find users by registration type")
         void shouldFindUsersByRegistrationType() {
-            // When
             List<User> directUsers = userRepository.findByRegistrationType("DIRECT_REGISTRATION");
 
-            // Then
             assertThat(directUsers).hasSize(1);
             assertThat(directUsers.get(0).getId()).isEqualTo(testUser.getId());
-        }
-
-        @Test
-        @DisplayName("Should find users with verified contacts")
-        void shouldFindUsersWithVerifiedContacts() {
-            // Given
-            testUser.verifyContactAndActivate(TEST_EMAIL);
-            userRepository.save(testUser);
-
-            // When
-            List<User> verifiedUsers = userRepository.findUsersWithVerifiedContacts();
-
-            // Then
-            assertThat(verifiedUsers).hasSize(1);
-            assertThat(verifiedUsers.get(0).getId()).isEqualTo(testUser.getId());
         }
     }
 
@@ -259,10 +163,8 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should search users by first name")
         void shouldSearchUsersByFirstName() {
-            // When
             List<User> results = userRepository.searchByName(TEST_FIRST_NAME);
 
-            // Then
             assertThat(results).hasSize(1);
             assertThat(results.get(0).getId()).isEqualTo(testUser.getId());
         }
@@ -270,10 +172,8 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should search users by last name")
         void shouldSearchUsersByLastName() {
-            // When
             List<User> results = userRepository.searchByName(TEST_LAST_NAME);
 
-            // Then
             assertThat(results).hasSize(1);
             assertThat(results.get(0).getId()).isEqualTo(testUser.getId());
         }
@@ -281,10 +181,8 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should search users by display name")
         void shouldSearchUsersByDisplayName() {
-            // When
             List<User> results = userRepository.searchByName(TEST_FIRST_NAME + " " + TEST_LAST_NAME);
 
-            // Then
             assertThat(results).hasSize(1);
             assertThat(results.get(0).getId()).isEqualTo(testUser.getId());
         }
@@ -292,28 +190,17 @@ class UserRepositoryIntegrationTest {
         @Test
         @DisplayName("Should return empty for non-matching search")
         void shouldReturnEmptyForNonMatchingSearch() {
-            // When
             List<User> results = userRepository.searchByName("NonExistentName");
-
-            // Then
             assertThat(results).isEmpty();
         }
 
         @Test
         @DisplayName("Should be case insensitive search")
         void shouldBeCaseInsensitiveSearch() {
-            // When
             List<User> results = userRepository.searchByName(TEST_FIRST_NAME.toLowerCase());
 
-            // Then
             assertThat(results).hasSize(1);
             assertThat(results.get(0).getId()).isEqualTo(testUser.getId());
         }
     }
-
-    /**
-     * NOTE: Contact Repository Tests removed
-     * Contact management is now handled by Contact Service
-     * Use ContactServiceClient to test contact operations
-     */
 }

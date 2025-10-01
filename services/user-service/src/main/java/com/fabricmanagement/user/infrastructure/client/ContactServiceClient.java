@@ -19,54 +19,54 @@ public interface ContactServiceClient {
     /**
      * Creates a new contact
      */
-    @PostMapping("/api/contacts")
+    @PostMapping("/api/v1/contacts/contacts")
     ContactDto createContact(@RequestBody CreateContactDto request);
     
     /**
      * Gets contacts by owner ID
      */
-    @GetMapping("/api/contacts/owner/{ownerId}")
+    @GetMapping("/api/v1/contacts/contacts/owner/{ownerId}")
     List<ContactDto> getContactsByOwner(@PathVariable("ownerId") String ownerId);
     
     /**
      * Gets verified contacts for an owner
      */
-    @GetMapping("/api/contacts/owner/{ownerId}/verified")
+    @GetMapping("/api/v1/contacts/contacts/owner/{ownerId}/verified")
     List<ContactDto> getVerifiedContacts(@PathVariable("ownerId") String ownerId);
     
     /**
      * Gets primary contact for an owner
      */
-    @GetMapping("/api/contacts/owner/{ownerId}/primary")
+    @GetMapping("/api/v1/contacts/contacts/owner/{ownerId}/primary")
     ContactDto getPrimaryContact(@PathVariable("ownerId") String ownerId);
     
     /**
      * Verifies a contact
      */
-    @PutMapping("/api/contacts/{contactId}/verify")
+    @PutMapping("/api/v1/contacts/contacts/{contactId}/verify")
     ContactDto verifyContact(@PathVariable("contactId") UUID contactId, @RequestParam("code") String code);
     
     /**
      * Makes a contact primary
      */
-    @PutMapping("/api/contacts/{contactId}/primary")
+    @PutMapping("/api/v1/contacts/contacts/{contactId}/primary")
     ContactDto makePrimary(@PathVariable("contactId") UUID contactId);
     
     /**
      * Deletes a contact
      */
-    @DeleteMapping("/api/contacts/{contactId}")
+    @DeleteMapping("/api/v1/contacts/contacts/{contactId}")
     void deleteContact(@PathVariable("contactId") UUID contactId);
     
     /**
      * Checks if a contact value is available
      */
-    @PostMapping("/api/contacts/check-availability")
+    @PostMapping("/api/v1/contacts/contacts/check-availability")
     boolean checkAvailability(@RequestParam("contactValue") String contactValue);
     
     /**
      * Sends verification code to a contact
      */
-    @PostMapping("/api/contacts/{contactId}/send-verification")
+    @PostMapping("/api/v1/contacts/contacts/{contactId}/send-verification")
     void sendVerificationCode(@PathVariable("contactId") UUID contactId);
 }

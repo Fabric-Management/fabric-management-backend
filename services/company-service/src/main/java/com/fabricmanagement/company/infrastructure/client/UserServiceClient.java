@@ -18,25 +18,25 @@ public interface UserServiceClient {
     /**
      * Gets a user by ID
      */
-    @GetMapping("/api/users/{userId}")
+    @GetMapping("/api/v1/users/users/{userId}")
     UserDto getUser(@PathVariable("userId") UUID userId);
     
     /**
      * Gets users by company ID
      */
-    @GetMapping("/api/users/company/{companyId}")
+    @GetMapping("/api/v1/users/users/company/{companyId}")
     List<UserDto> getUsersByCompany(@PathVariable("companyId") UUID companyId);
     
     /**
      * Checks if a user exists
      */
-    @GetMapping("/api/users/{userId}/exists")
+    @GetMapping("/api/v1/users/users/{userId}/exists")
     boolean userExists(@PathVariable("userId") UUID userId);
     
     /**
      * Gets user count for a company
      */
-    @GetMapping("/api/users/company/{companyId}/count")
+    @GetMapping("/api/v1/users/users/company/{companyId}/count")
     int getUserCountForCompany(@PathVariable("companyId") UUID companyId);
 }
 

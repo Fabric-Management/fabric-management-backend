@@ -58,8 +58,7 @@ public class Contact extends BaseEntity {
     @Column(name = "verification_expires_at")
     private LocalDateTime verificationExpiresAt;
     
-    @Column(name = "is_deleted")
-    private boolean isDeleted = false;
+    // Note: 'deleted' field is inherited from BaseEntity
     
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -171,7 +170,7 @@ public class Contact extends BaseEntity {
     @Override
     public void markAsDeleted() {
         super.markAsDeleted();
-        this.isDeleted = true;
+        // Note: 'deleted' flag is set by parent class
         this.deletedAt = LocalDateTime.now();
         
         addDomainEvent(new ContactDeletedEvent(

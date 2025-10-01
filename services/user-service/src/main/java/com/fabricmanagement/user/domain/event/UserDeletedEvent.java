@@ -1,9 +1,11 @@
 package com.fabricmanagement.user.domain.event;
 
 import com.fabricmanagement.shared.domain.event.DomainEvent;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -13,18 +15,12 @@ import java.util.UUID;
  */
 @Getter
 @ToString
+@Builder
 public class UserDeletedEvent extends DomainEvent {
     
     private final UUID userId;
-    private final String username;
-    private final String email;
-
-    public UserDeletedEvent(UUID userId, String username, String email) {
-        super();
-        this.userId = userId;
-        this.username = username;
-        this.email = email;
-    }
+    private final String tenantId;
+    private final LocalDateTime timestamp;
 
     @Override
     public String getEventType() {

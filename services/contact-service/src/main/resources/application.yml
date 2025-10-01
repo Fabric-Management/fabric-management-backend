@@ -12,16 +12,9 @@ spring:
   profiles:
     active: local
 
-# =============================================================================
-# SERVER CONFIGURATION
-# =============================================================================
-server:
-  port: 8082
-
-# =============================================================================
-# DATABASE CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # DATABASE CONFIGURATION
+  # ===========================================================================
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
     username: ${POSTGRES_USER:fabric_user}
@@ -48,12 +41,13 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-    validate-on-migrate: true
+    validate-on-migrate: false
+    clean-disabled: false
+    repair-on-migrate: true
 
-# =============================================================================
-# CACHE CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -71,10 +65,9 @@ spring:
     redis:
       time-to-live: 600000 # 10 minutes
 
-# =============================================================================
-# KAFKA CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # KAFKA CONFIGURATION
+  # ===========================================================================
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -97,6 +90,14 @@ spring:
       enable-auto-commit: false
       properties:
         spring.json.trusted.packages: "com.fabricmanagement.contact.domain.event,java.util"
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8082
+  servlet:
+    context-path: /api/v1/contacts
 
 # Kafka Topics Configuration
 kafka:

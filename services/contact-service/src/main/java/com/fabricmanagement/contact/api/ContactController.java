@@ -21,7 +21,7 @@ import java.util.UUID;
  * Provides API endpoints for contact management with security controls
  */
 @RestController
-@RequestMapping("/api/contacts")
+@RequestMapping("/contacts")
 @RequiredArgsConstructor
 @Slf4j
 public class ContactController {
