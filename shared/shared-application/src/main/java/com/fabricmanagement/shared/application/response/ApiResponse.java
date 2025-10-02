@@ -157,8 +157,6 @@ public class ApiResponse<T> {
         private int totalPages;
         private boolean first;
         private boolean last;
-        private boolean hasNext;
-        private boolean hasPrevious;
 
         public boolean isHasNext() {
             return !last;

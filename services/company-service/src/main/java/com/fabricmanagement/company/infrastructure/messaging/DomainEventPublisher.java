@@ -5,7 +5,6 @@ import com.fabricmanagement.company.infrastructure.persistence.CompanyEventStore
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 

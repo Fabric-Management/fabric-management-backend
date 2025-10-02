@@ -2,7 +2,6 @@ package com.fabricmanagement.company.application.command.handler;
 
 import com.fabricmanagement.company.application.command.UpdateCompanyCommand;
 import com.fabricmanagement.company.domain.aggregate.Company;
-import com.fabricmanagement.company.domain.exception.CompanyNotFoundException;
 import com.fabricmanagement.company.domain.exception.UnauthorizedCompanyAccessException;
 import com.fabricmanagement.company.infrastructure.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;

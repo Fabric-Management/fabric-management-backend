@@ -302,5 +302,27 @@ class PasswordResetTokenRepositoryIntegrationTest {
                     PasswordResetToken.ResetMethod.SMS_CODE
                 );
         }
+        
+        @Test
+        @DisplayName("Should create and validate SMS token with phone number")
+        void shouldCreateAndValidateSmsTokenWithPhone() {
+            // Given
+            PasswordResetToken phoneToken = PasswordResetToken.create(
+                testUserId, 
+                TEST_PHONE, 
+                PasswordResetToken.ResetMethod.SMS_CODE
+            );
+            
+            // When
+            PasswordResetToken savedToken = tokenRepository.save(phoneToken);
+            Optional<PasswordResetToken> foundToken = tokenRepository.findByToken(savedToken.getToken());
+
+            // Then
+            assertThat(foundToken).isPresent();
+            assertThat(foundToken.get().getContactValue()).isEqualTo(TEST_PHONE);
+            assertThat(foundToken.get().getResetMethod()).isEqualTo(PasswordResetToken.ResetMethod.SMS_CODE);
+            assertThat(foundToken.get().getToken()).hasSize(6); // SMS codes are 6 digits
+            assertThat(foundToken.get().isValid()).isTrue();
+        }
     }
 }

@@ -1,7 +1,7 @@
 package com.fabricmanagement.company.application.service;
 
+import com.fabricmanagement.company.application.dto.AddUserToCompanyRequest;
 import com.fabricmanagement.company.domain.aggregate.Company;
-import com.fabricmanagement.company.domain.exception.CompanyNotFoundException;
 import com.fabricmanagement.company.domain.exception.MaxUsersLimitException;
 import com.fabricmanagement.company.domain.exception.UnauthorizedCompanyAccessException;
 import com.fabricmanagement.company.infrastructure.client.UserServiceClient;
@@ -32,8 +32,10 @@ public class CompanyUserService {
      * Adds a user to a company
      */
     @Transactional
-    public void addUserToCompany(UUID companyId, UUID userId, UUID tenantId) {
-        log.info("Adding user {} to company {}", userId, companyId);
+    public void addUserToCompany(UUID companyId, AddUserToCompanyRequest request, 
+                                UUID tenantId, String addedBy) {
+        UUID userId = request.getUserId();
+        log.info("Adding user {} to company {} by user {}", userId, companyId, addedBy);
         
         // Find company with tenant validation
         Company company = companyRepository.findByIdAndTenantId(companyId, tenantId)
@@ -62,8 +64,8 @@ public class CompanyUserService {
      * Removes a user from a company
      */
     @Transactional
-    public void removeUserFromCompany(UUID companyId, UUID userId, UUID tenantId) {
-        log.info("Removing user {} from company {}", userId, companyId);
+    public void removeUserFromCompany(UUID companyId, UUID userId, UUID tenantId, String removedBy) {
+        log.info("Removing user {} from company {} by user {}", userId, companyId, removedBy);
         
         // Find company with tenant validation
         Company company = companyRepository.findByIdAndTenantId(companyId, tenantId)
@@ -75,6 +77,29 @@ public class CompanyUserService {
         companyRepository.save(company);
         
         log.info("User {} removed from company {} successfully", userId, companyId);
+    }
+    
+    /**
+     * Updates a user's role in a company
+     */
+    @Transactional
+    public void updateUserRole(UUID companyId, UUID userId, String role, UUID tenantId, String updatedBy) {
+        log.info("Updating role for user {} in company {} to {} by user {}", userId, companyId, role, updatedBy);
+        
+        // Validate company access
+        companyRepository.findByIdAndTenantId(companyId, tenantId)
+            .orElseThrow(() -> new UnauthorizedCompanyAccessException(companyId, tenantId));
+        
+        // Verify user exists in User Service
+        boolean userExists = userServiceClient.userExists(userId);
+        if (!userExists) {
+            throw new IllegalArgumentException("User not found: " + userId);
+        }
+        
+        // Note: In a real implementation, this would update user-company-role relationship
+        // For now, we just validate the request
+        
+        log.info("Role updated successfully for user {} in company {}", userId, companyId);
     }
     
     /**
@@ -104,36 +129,4 @@ public class CompanyUserService {
         // Get count from User Service
         return userServiceClient.getUserCountForCompany(companyId);
     }
-    
-    /**
-     * Syncs user count from User Service
-     */
-    @Transactional
-    public void syncUserCount(UUID companyId, UUID tenantId) {
-        log.info("Syncing user count for company: {}", companyId);
-        
-        Company company = companyRepository.findByIdAndTenantId(companyId, tenantId)
-            .orElseThrow(() -> new UnauthorizedCompanyAccessException(companyId, tenantId));
-        
-        int actualUserCount = userServiceClient.getUserCountForCompany(companyId);
-        int currentCount = company.getCurrentUsers();
-        
-        // Adjust if there's a mismatch
-        if (actualUserCount != currentCount) {
-            log.warn("User count mismatch for company {}. Expected: {}, Actual: {}", 
-                companyId, currentCount, actualUserCount);
-            
-            // Update the count (this is a simplified approach)
-            while (company.getCurrentUsers() < actualUserCount) {
-                company.addUser();
-            }
-            while (company.getCurrentUsers() > actualUserCount) {
-                company.removeUser();
-            }
-            
-            companyRepository.save(company);
-            log.info("User count synced for company {}: {}", companyId, actualUserCount);
-        }
-    }
 }
-

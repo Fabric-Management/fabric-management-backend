@@ -3,6 +3,8 @@ package com.fabricmanagement.company.infrastructure.security;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -20,7 +22,8 @@ import java.util.UUID;
 public class TenantInterceptor implements HandlerInterceptor {
     
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, 
+                            @NonNull Object handler) {
         // Try to get tenant ID from header
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
         
@@ -49,8 +52,8 @@ public class TenantInterceptor implements HandlerInterceptor {
     }
     
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, 
-                                Object handler, Exception ex) {
+    public void afterCompletion(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, 
+                                @NonNull Object handler, @Nullable Exception ex) {
         // Clear tenant context after request
         TenantContext.clear();
     }

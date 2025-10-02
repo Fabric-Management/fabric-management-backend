@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.*;
 class UserTest {
 
     private static final String VALID_EMAIL = "test@example.com";
-    private static final String VALID_PHONE = "+905551234567";
     private static final String FIRST_NAME = "John";
     private static final String LAST_NAME = "Doe";
     private static final String PASSWORD_HASH = "hashedPassword123";

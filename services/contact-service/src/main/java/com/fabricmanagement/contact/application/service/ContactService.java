@@ -124,6 +124,13 @@ public class ContactService {
     }
     
     /**
+     * Sets a contact as primary (alias for makePrimary)
+     */
+    public void setPrimaryContact(UUID contactId) {
+        makePrimary(contactId);
+    }
+    
+    /**
      * Makes a contact primary
      */
     public ContactResponse makePrimary(UUID contactId) {
@@ -148,6 +155,33 @@ public class ContactService {
     }
     
     /**
+     * Updates a contact
+     */
+    public void updateContact(UUID contactId, com.fabricmanagement.contact.application.dto.UpdateContactRequest request) {
+        log.info("Updating contact: {}", contactId);
+        
+        Contact contact = contactRepository.findById(contactId)
+            .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
+        
+        if (request.getContactValue() != null) {
+            contact.setContactValue(request.getContactValue());
+        }
+        if (request.getContactType() != null) {
+            contact.setContactType(ContactType.valueOf(request.getContactType()));
+        }
+        if (request.getIsPrimary() != null) {
+            contact.setPrimary(request.getIsPrimary());
+        }
+        if (request.getIsVerified() != null) {
+            contact.setVerified(request.getIsVerified());
+        }
+        
+        contactRepository.save(contact);
+        
+        log.info("Contact updated successfully: {}", contactId);
+    }
+    
+    /**
      * Deletes a contact
      */
     public void deleteContact(UUID contactId) {
@@ -163,6 +197,26 @@ public class ContactService {
         contact.getAndClearDomainEvents().forEach(eventPublisher::publish);
         
         log.info("Contact deleted successfully: {}", contactId);
+    }
+    
+    /**
+     * Searches contacts by owner and type
+     */
+    @Transactional(readOnly = true)
+    public List<ContactResponse> searchContacts(String ownerId, String contactType) {
+        log.debug("Searching contacts for owner: {} with type: {}", ownerId, contactType);
+        
+        List<Contact> contacts;
+        if (contactType != null && !contactType.isEmpty()) {
+            contacts = contactRepository.findByOwnerIdAndContactType(ownerId, contactType);
+        } else {
+            contacts = contactRepository.findByOwnerId(ownerId);
+        }
+        
+        return contacts.stream()
+                .filter(Contact::isNotDeleted)
+                .map(this::toContactResponse)
+                .toList();
     }
     
     /**

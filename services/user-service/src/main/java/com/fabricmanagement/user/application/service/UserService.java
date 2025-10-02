@@ -237,18 +237,48 @@ public class UserService {
     }
     
     /**
-     * Searches users
+     * Searches users by criteria
      */
     @Transactional(readOnly = true)
-    public List<UserResponse> searchUsers(String searchTerm, UUID tenantId) {
-        log.debug("Searching users with term: {} for tenant: {}", searchTerm, tenantId);
+    public List<UserResponse> searchUsers(UUID tenantId, String firstName, String lastName, 
+                                         String email, String status) {
+        log.debug("Searching users with criteria for tenant: {}", tenantId);
         
-        List<User> users = userRepository.searchByName(searchTerm);
+        List<User> users = userRepository.findByTenantId(tenantId);
         
-        // Filter by tenant
-        users = users.stream()
-                .filter(u -> u.getTenantId().equals(tenantId.toString()))
-                .collect(Collectors.toList());
+        // Apply filters
+        if (firstName != null && !firstName.isEmpty()) {
+            users = users.stream()
+                    .filter(u -> u.getFirstName().toLowerCase().contains(firstName.toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        if (lastName != null && !lastName.isEmpty()) {
+            users = users.stream()
+                    .filter(u -> u.getLastName().toLowerCase().contains(lastName.toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        if (email != null && !email.isEmpty()) {
+            // Filter by checking contacts via Contact Service
+            // Note: This is a simplified implementation
+            // In production, consider using a database query for better performance
+            final String emailLower = email.toLowerCase();
+            users = users.stream()
+                    .filter(u -> {
+                        try {
+                            List<ContactDto> contacts = contactServiceClient.getContactsByOwner(u.getId().toString());
+                            return contacts.stream()
+                                    .anyMatch(c -> c.getContactValue().toLowerCase().contains(emailLower));
+                        } catch (Exception e) {
+                            return false;
+                        }
+                    })
+                    .collect(Collectors.toList());
+        }
+        if (status != null && !status.isEmpty()) {
+            users = users.stream()
+                    .filter(u -> u.getStatus().name().equals(status))
+                    .collect(Collectors.toList());
+        }
         
         return users.stream()
                 .map(this::mapToResponse)

@@ -58,6 +58,12 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
     Optional<Contact> findPrimaryContactByOwner(@Param("ownerId") String ownerId);
     
     /**
+     * Finds contacts by owner ID and contact type (excluding deleted)
+     */
+    @Query("SELECT c FROM Contact c WHERE c.ownerId = :ownerId AND c.contactType = :contactType AND c.isDeleted = false")
+    List<Contact> findByOwnerIdAndContactType(@Param("ownerId") String ownerId, @Param("contactType") String contactType);
+    
+    /**
      * Finds contacts by type for an owner (excluding deleted)
      */
     @Query("SELECT c FROM Contact c WHERE c.ownerId = :ownerId AND c.contactType = :type AND c.isDeleted = false")
