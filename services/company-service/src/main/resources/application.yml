@@ -110,6 +110,25 @@ spring:
         spring.json.trusted.packages: "com.fabricmanagement.company.domain.event"
 
 # =============================================================================
+# RESILIENCE4J CONFIGURATION
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      user-service:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+      contact-service:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+  retry:
+    instances:
+      user-service:
+        maxAttempts: 3
+      contact-service:
+        maxAttempts: 3
+
+# =============================================================================
 # MANAGEMENT & MONITORING
 # =============================================================================
 management:

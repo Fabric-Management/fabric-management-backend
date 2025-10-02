@@ -61,6 +61,9 @@
         <!-- Messaging Versions -->
         <kafka.version>3.5.1</kafka.version>
 
+        <!-- Resilience Versions -->
+        <resilience4j.version>2.1.0</resilience4j.version>
+        <spring-cloud-circuitbreaker.version>3.1.1</spring-cloud-circuitbreaker.version>
 
         <!-- File Processing Versions -->
         <apache-poi.version>5.2.5</apache-poi.version>
@@ -239,6 +242,49 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc-openapi.version}</version>
+            </dependency>
+
+            <!-- Resilience4j Dependencies -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+                <version>${spring-cloud-circuitbreaker.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot3</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-circuitbreaker</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-retry</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-timelimiter</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-feign</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-micrometer</artifactId>
+                <version>${resilience4j.version}</version>
             </dependency>
 
             <!-- Cache Dependencies -->

@@ -99,16 +99,22 @@ server:
   servlet:
     context-path: /api/v1/contacts
 
-# Kafka Topics Configuration
+# =============================================================================
+# KAFKA TOPICS CONFIGURATION
+# =============================================================================
 kafka:
   topics:
     email-notifications: email-notifications
     sms-notifications: sms-notifications
     contact-events: contact-events
 
-# Notification Configuration
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
 notification:
   enabled: ${NOTIFICATION_ENABLED:true}
+  code-expiry-minutes: 15 # How long verification codes are valid
+  sender-name: "Fabric Management System"
 
 # =============================================================================
 # MANAGEMENT & MONITORING

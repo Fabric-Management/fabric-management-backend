@@ -106,6 +106,33 @@ jwt:
   refresh-expiration: 604800000 # 7 days
 
 # =============================================================================
+# TOKEN CONFIGURATION
+# =============================================================================
+token:
+  password-reset:
+    expiry-minutes: 15 # Password reset token expiry time
+    attempts: 3 # Maximum attempts for password reset
+  verification:
+    expiry-minutes: 15 # Verification code expiry time
+    attempts: 5 # Maximum attempts for verification
+
+# =============================================================================
+# RESILIENCE4J CONFIGURATION
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      contact-service:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        slidingWindowSize: 10
+  retry:
+    instances:
+      contact-service:
+        maxAttempts: 3
+        waitDuration: 1s
+
+# =============================================================================
 # MANAGEMENT & MONITORING
 # =============================================================================
 management:
