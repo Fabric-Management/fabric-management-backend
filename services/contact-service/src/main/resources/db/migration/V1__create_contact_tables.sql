@@ -44,17 +44,11 @@ ALTER TABLE contacts ADD CONSTRAINT chk_owner_type
 ALTER TABLE contacts ADD CONSTRAINT chk_contact_type 
     CHECK (contact_type IN ('EMAIL', 'PHONE', 'ADDRESS', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'));
 
--- Trigger to auto-update updated_at
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Use common function from init-db.sql
+-- Function update_updated_at_column() is already defined in init-db.sql
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_contacts ON contacts;
 CREATE TRIGGER trg_set_updated_at_contacts
   BEFORE UPDATE ON contacts
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();

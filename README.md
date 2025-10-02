@@ -2,179 +2,145 @@
 
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.java.net/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Spring Cloud](https://img.shields.io/badge/Spring%20Cloud-2025.0.0-blue.svg)](https://spring.io/projects/spring-cloud)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/Build-Passing-success.svg)]()
 
-> **Modern, scalable, and enterprise-ready microservice architecture for fabric management**
+> **Modern, maintainable, and production-ready fabric management system**
 
-## 🎯 Overview
+## 📋 Overview
 
-The Fabric Management System is a comprehensive, multi-tenant microservice platform built with modern Java technologies. It provides end-to-end solutions for fabric manufacturing, inventory management, order processing, and business analytics.
-
-### ✨ Key Features
-
-- 🏗️ **Microservice Architecture** - Scalable, maintainable, and fault-tolerant
-- 🔐 **Enterprise Security** - JWT-based authentication with OAuth2 support
-- 📊 **Real-time Analytics** - Business intelligence and reporting
-- 🚀 **Event-Driven** - CQRS and Event Sourcing patterns
-- 🌐 **Multi-tenant** - Isolated tenant data and configurations
-- 📱 **RESTful APIs** - OpenAPI 3.0 compliant
-- 🐳 **Containerized** - Docker and Kubernetes ready
-- 📈 **Observability** - Full monitoring, tracing, and logging
-
-## 🏗️ Architecture
-
-```mermaid
-graph TB
-    subgraph "Client Layer"
-        WEB[Web Application]
-        MOB[Mobile App]
-        API[API Clients]
-    end
-
-    subgraph "API Gateway"
-        GW[Spring Cloud Gateway]
-    end
-
-    subgraph "Core Services"
-        US[User Service]
-        CS[Contact Service]
-        COS[Company Service]
-        NS[Notification Service]
-    end
-
-    subgraph "Business Services"
-        HS[HR Service]
-        IS[Inventory Service]
-        OS[Order Service]
-        LS[Logistics Service]
-    end
-
-    subgraph "Infrastructure"
-        DB[(PostgreSQL)]
-        CACHE[(Redis)]
-        MSG[Kafka]
-    end
-
-    WEB --> GW
-    MOB --> GW
-    API --> GW
-    GW --> US
-    GW --> CS
-    GW --> COS
-    GW --> NS
-    GW --> HS
-    GW --> IS
-    GW --> OS
-    GW --> LS
-```
+Fabric Management System is a comprehensive platform for fabric manufacturing, inventory management, and order processing built with Spring Boot best practices and clean architecture principles.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- **Java 21** or higher
-- **Maven 3.9+**
-- **Docker** and **Docker Compose**
-- **PostgreSQL 16**
-- **Redis 7**
+- Java 21+
+- Maven 3.9+
+- Docker & Docker Compose
+- PostgreSQL 15+ (via Docker)
 
-### 🐳 Docker Setup (Recommended)
+### Installation
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/your-org/fabric-management-backend.git
 cd fabric-management-backend
 
-# Start all services with Docker Compose
+# Start with Docker
+make deploy
+
+# Or manually
 docker-compose up -d
-
-# Check service health
-docker-compose ps
-```
-
-### 🛠️ Local Development
-
-```bash
-# Build all modules
 mvn clean install
-
-# Start infrastructure services
-docker-compose up -d postgres-db redis kafka
-
-# Start individual services
-cd services/user-service
 mvn spring-boot:run
 ```
 
-## 📚 Documentation
+## 📁 Project Structure
 
-| Document                                    | Description                                 |
-| ------------------------------------------- | ------------------------------------------- |
-| [🏗️ Architecture Guide](docs/architecture/) | System architecture and design patterns     |
-| [🔌 API Documentation](docs/api/)           | REST API specifications and examples        |
-| [👨‍💻 Development Guide](docs/development/)   | Setup, coding standards, and best practices |
-| [🚀 Deployment Guide](docs/deployment/)     | Production deployment and operations        |
-| [🧪 Testing Guide](docs/testing/)           | Testing strategies and automation           |
+```
+fabric-management-backend/
+├── docs/                      # Documentation
+│   ├── analysis/             # Analysis reports
+│   │   ├── SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md
+│   │   └── MICROSERVICE_DEVELOPMENT_ANALYSIS.md
+│   ├── architecture/         # Architecture documentation
+│   ├── api/                  # API documentation
+│   ├── deployment/           # Deployment guides
+│   └── development/          # Development guides
+├── services/                 # Microservices
+│   ├── user-service/
+│   ├── company-service/
+│   └── contact-service/
+├── shared/                   # Shared modules
+├── scripts/                  # Utility scripts
+│   ├── deploy.sh            # Main deployment script
+│   ├── run-migrations.sh    # Database migration script
+│   └── docker-entrypoint.sh # Docker entrypoint
+├── monitoring/              # Monitoring configuration
+├── docker-compose.yml       # Docker infrastructure
+└── Makefile                # Build automation
+```
 
-## 🏢 Services
+## 📊 Current Status & Roadmap
 
-### Core Services
+### Current Issues (To Be Fixed)
 
-- **[User Service](services/user-service/)** - Authentication, user profiles, and session management
-- **[Contact Service](services/contact-service/)** - Contact information and communication preferences
-- **[Company Service](services/company-service/)** - Company management and multi-tenancy
-- **[Notification Service](services/notification-service/)** - Email, SMS, and push notifications
+- **Over-engineering**: Unnecessary CQRS pattern (42 classes to be removed)
+- **Code Quality**: 32% compliance with Spring Boot best practices
+- **Testing**: Only 15% test coverage
+- **Security**: Passwords stored in plain text
 
-### Business Services
+### 6-Week Improvement Plan
 
-- **[HR Service](services/hr-service/)** - Human resources, payroll, and leave management
-- **[Inventory Service](services/inventory-service/)** - Stock management and product catalog
-- **[Order Service](services/order-service/)** - Order processing and fulfillment
-- **[Logistics Service](services/logistics-service/)** - Shipping and delivery management
+1. **Week 1-2**: Remove CQRS, standardize DTOs
+2. **Week 3-4**: Implement Spring Boot best practices
+3. **Week 5-6**: Security fixes and testing
 
-### Infrastructure Services
-
-- **[API Gateway](infrastructure/api-gateway/)** - Request routing and load balancing
-- **[Service Discovery](infrastructure/service-discovery/)** - Service registry and health checks
-- **[Config Server](infrastructure/config-server/)** - Centralized configuration management
+See [SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md](docs/analysis/SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md) for detailed analysis.
 
 ## 🛠️ Technology Stack
 
-### Backend
+- **Backend**: Java 21, Spring Boot 3.5.5
+- **Database**: PostgreSQL 15, Flyway migrations
+- **Caching**: Redis 7
+- **Messaging**: Apache Kafka
+- **Containerization**: Docker, Docker Compose
+- **Build**: Maven
 
-- **Java 21** - Latest LTS version
-- **Spring Boot 3.5.5** - Application framework
-- **Spring Cloud 2025.0.0** - Microservice tools
-- **Spring Security 6.1.4** - Security framework
+## 📚 Documentation
 
-### Database & Persistence
+| Document                                                                                    | Description                              |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| [Spring Boot Best Practices Analysis](docs/analysis/SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md) | Code quality and best practices analysis |
+| [Microservice Development Analysis](docs/analysis/MICROSERVICE_DEVELOPMENT_ANALYSIS.md)     | Microservice architecture analysis       |
+| [Architecture Guide](docs/architecture/README.md)                                           | System architecture overview             |
+| [API Documentation](docs/api/README.md)                                                     | REST API specifications                  |
+| [Deployment Guide](docs/deployment/README.md)                                               | Production deployment instructions       |
+| [Development Guide](docs/development/README.md)                                             | Development setup and guidelines         |
 
-- **PostgreSQL 16** - Primary database
-- **Redis 7** - Caching and session store
-- **Flyway** - Database migrations
-- **Hibernate 6.4** - ORM framework
+## 🔧 Available Commands
 
-### Messaging & Events
+```bash
+# Build & Deploy
+make build          # Build all services
+make deploy         # Deploy with Docker
+make down           # Stop all services
+make restart        # Restart services
 
-- **Apache Kafka 3.5.1** - Event streaming
-- **Schema Registry** - Event schema management
-- **Event Sourcing** - Event-driven architecture
+# Development
+make test           # Run tests
+make logs           # View logs
+make status         # Check service status
+make health         # Health check
 
-### Observability
+# Database
+make db-migrate     # Run migrations
+make db-backup      # Backup database
+make db-shell       # Open PostgreSQL shell
 
-- **Micrometer** - Metrics collection
-- **Prometheus** - Metrics storage
-- **Grafana** - Visualization
-- **Jaeger** - Distributed tracing
+# Cleanup
+make clean          # Clean build artifacts
+make prune          # Docker system prune
+```
 
-### DevOps
+## 🏗️ Services
 
-- **Docker** - Containerization
-- **Kubernetes** - Orchestration
-- **Helm** - Package management
-- **Terraform** - Infrastructure as Code
+| Service         | Port | Description                        |
+| --------------- | ---- | ---------------------------------- |
+| User Service    | 8081 | User management and authentication |
+| Company Service | 8083 | Company and tenant management      |
+| Contact Service | 8082 | Contact information management     |
+| PostgreSQL      | 5433 | Primary database                   |
+| Redis           | 6379 | Caching layer                      |
+| Kafka           | 9092 | Event streaming                    |
+
+## 🔐 Security Notes
+
+⚠️ **Current security issues being addressed:**
+
+- Password encoding implementation in progress
+- JWT token management needs improvement
+- API Gateway implementation pending
 
 ## 🧪 Testing
 
@@ -182,59 +148,45 @@ mvn spring-boot:run
 # Run all tests
 mvn test
 
-# Run integration tests
-mvn verify
+# Run with coverage
+mvn test jacoco:report
 
-# Generate test coverage report
-mvn jacoco:report
+# Integration tests
+mvn verify
 ```
 
-## 📊 Monitoring
+Current test coverage: **15%** (Target: 80%)
 
-Access monitoring dashboards:
+## 📈 Performance Metrics
 
-- **API Gateway**: http://localhost:8080/actuator
-- **Service Health**: http://localhost:8080/actuator/health
-- **Metrics**: http://localhost:9090 (Prometheus)
-- **Dashboards**: http://localhost:3000 (Grafana)
-- **Tracing**: http://localhost:16686 (Jaeger)
+| Metric              | Current | Target |
+| ------------------- | ------- | ------ |
+| Startup Time        | 30s     | 5s     |
+| Memory Usage        | 1GB     | 256MB  |
+| Response Time (p95) | 500ms   | 100ms  |
+| Test Coverage       | 15%     | 80%    |
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](docs/development/contributing.md) for details.
+1. Follow Spring Boot best practices
+2. Write tests for new features
+3. Update documentation
+4. Use conventional commits
 
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
+## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
-- 📧 **Email**: support@fabricmanagement.com
-- 💬 **Discord**: [Join our community](https://discord.gg/fabric-management)
-- 📖 **Documentation**: [docs.fabricmanagement.com](https://docs.fabricmanagement.com)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/your-org/fabric-management-backend/issues)
+For issues and questions:
 
-## 🙏 Acknowledgments
-
-- Spring Framework team for the amazing ecosystem
-- Apache Kafka community for event streaming
-- PostgreSQL team for the robust database
-- All contributors and maintainers
+- Check [documentation](docs/)
+- Create an issue on GitHub
+- Contact the development team
 
 ---
 
-<div align="center">
-
-**Built with ❤️ by the Fabric Management Team**
-
-[⭐ Star this repo](https://github.com/your-org/fabric-management-backend) • [🐛 Report Bug](https://github.com/your-org/fabric-management-backend/issues) • [💡 Request Feature](https://github.com/your-org/fabric-management-backend/issues)
-
-</div>
+**Version:** 1.0.0  
+**Last Updated:** October 2025  
+**Status:** Under active refactoring (see roadmap)
