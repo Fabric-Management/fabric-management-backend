@@ -178,26 +178,6 @@ class AuthenticationFlowE2ETest extends E2ETestBase {
         }
     }
 
-    /**
-     * TODO: Multi-Contact Login Tests
-     * 
-     * These tests need to be updated to use ContactServiceClient mock
-     * Contact management is now handled by Contact Service
-     * 
-     * Required updates:
-     * 1. Mock ContactServiceClient
-     * 2. Use WireMock or MockWebServer for Contact Service API
-     * 3. Update test scenarios to reflect new architecture
-     */
-    
-    /*
-    @Nested
-    @DisplayName("Multi-Contact Login")
-    class MultiContactLogin {
-        // Tests temporarily disabled - needs ContactService integration
-    }
-    */
-
     @Nested
     @DisplayName("JWT Token Management")
     class TokenManagement {

@@ -295,10 +295,13 @@ public class User extends BaseEntity {
      * Gets primary contact value
      * 
      * @deprecated Use ContactServiceClient.getPrimaryContact(userId) instead
+     * This method will be removed in the next major version.
+     * Contact management is now fully handled by Contact Service.
      */
-    @Deprecated
+    @Deprecated(since = "1.0.0", forRemoval = true)
     public String getPrimaryContact() {
-        // TODO: This should call ContactServiceClient in the future
+        // Method kept for backward compatibility only
+        // Will be removed in version 2.0.0
         return "unknown";
     }
 

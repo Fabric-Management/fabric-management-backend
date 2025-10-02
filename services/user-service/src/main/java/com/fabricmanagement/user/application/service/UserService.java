@@ -67,15 +67,21 @@ public class UserService {
     
     /**
      * Gets users by company ID
-     * TODO: Implement company-user relationship
+     * 
+     * Note: This currently returns all users for the tenant.
+     * For accurate company-user relationships, use Company Service's API:
+     * GET /api/v1/companies/{companyId}/users
      */
     @Transactional(readOnly = true)
     public List<UserResponse> getUsersByCompany(UUID companyId, UUID tenantId) {
         log.debug("Getting users for company: {} and tenant: {}", companyId, tenantId);
         
-        // For now, return all users for the tenant
-        // TODO: Add company_users table relationship
+        // Return all users for the tenant
+        // Company-user relationship is managed by Company Service via company_users table
         List<User> users = userRepository.findByTenantId(tenantId);
+        
+        log.info("Found {} users for tenant {} (company filter not applied in User Service)", 
+            users.size(), tenantId);
         
         return users.stream()
                 .map(this::mapToResponse)
@@ -84,15 +90,22 @@ public class UserService {
     
     /**
      * Gets user count for a company
-     * TODO: Implement company-user relationship
+     * 
+     * Note: This currently returns count for all tenant users.
+     * For accurate company-user count, use Company Service's API:
+     * GET /api/v1/companies/{companyId}/users/count
      */
     @Transactional(readOnly = true)
     public int getUserCountForCompany(UUID companyId, UUID tenantId) {
         log.debug("Getting user count for company: {} and tenant: {}", companyId, tenantId);
         
-        // For now, return tenant user count
-        // TODO: Add company_users table relationship
-        return (int) userRepository.countActiveUsersByTenant(tenantId);
+        // Return tenant user count
+        // Company-user relationship is managed by Company Service
+        long count = userRepository.countActiveUsersByTenant(tenantId);
+        
+        log.info("Found {} active users for tenant {} (company filter not applied)", count, tenantId);
+        
+        return (int) count;
     }
     
     /**

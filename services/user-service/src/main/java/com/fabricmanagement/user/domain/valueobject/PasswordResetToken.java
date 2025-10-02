@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.domain.valueobject;
 
 import com.fabricmanagement.shared.domain.base.BaseEntity;
+import com.fabricmanagement.shared.infrastructure.constants.TokenConstants;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -9,6 +10,7 @@ import lombok.experimental.SuperBuilder;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Password Reset Token Entity
@@ -54,14 +56,27 @@ public class PasswordResetToken extends BaseEntity {
         EMAIL_CODE
     }
     
+    /**
+     * Creates a new password reset token with default expiry and attempts
+     */
     public static PasswordResetToken create(UUID userId, String contactValue, ResetMethod method) {
+        return create(userId, contactValue, method, 
+            TokenConstants.DEFAULT_RESET_TOKEN_EXPIRY_MINUTES, 
+            TokenConstants.DEFAULT_RESET_TOKEN_ATTEMPTS);
+    }
+    
+    /**
+     * Creates a new password reset token with custom expiry and attempts
+     */
+    public static PasswordResetToken create(UUID userId, String contactValue, ResetMethod method, 
+                                           int expiryMinutes, int attempts) {
         return PasswordResetToken.builder()
             .userId(userId)
             .contactValue(contactValue)
             .token(generateToken(method))
             .resetMethod(method)
-            .expiresAt(LocalDateTime.now().plusMinutes(15)) // 15 minutes expiry
-            .attemptsRemaining(3) // 3 attempts remaining
+            .expiresAt(LocalDateTime.now().plusMinutes(expiryMinutes))
+            .attemptsRemaining(attempts)
             .isUsed(false)
             .build();
     }
@@ -121,7 +136,12 @@ public class PasswordResetToken extends BaseEntity {
                 return java.util.UUID.randomUUID().toString().replace("-", "");
             case SMS_CODE:
             case EMAIL_CODE:
-                return String.format("%06d", (int) (Math.random() * 1000000));
+                // Use ThreadLocalRandom for better random number generation
+                int code = ThreadLocalRandom.current().nextInt(
+                    TokenConstants.MIN_RANDOM_CODE, 
+                    TokenConstants.MAX_RANDOM_CODE + 1
+                );
+                return String.format("%0" + TokenConstants.RESET_TOKEN_CODE_LENGTH + "d", code);
             default:
                 throw new IllegalArgumentException("Unknown reset method: " + method);
         }

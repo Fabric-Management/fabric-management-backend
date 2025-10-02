@@ -30,15 +30,6 @@ class PasswordResetTokenRepositoryIntegrationTest {
     // Test constants
     private static final String TEST_EMAIL = "test@example.com";
     private static final String TEST_PHONE = "+1234567890";
-    
-    /**
-     * TODO: Contact Service Migration Plan
-     * - Remove UserContact entity from User Service
-     * - Implement ContactServiceClient for API calls
-     * - Add event listeners for ContactVerifiedEvent, ContactAddedEvent
-     * - Update all contact-related tests to use mocked ContactService
-     * - This is temporary - contacts should be managed by Contact Service
-     */
 
     @Autowired
     private TestEntityManager entityManager;

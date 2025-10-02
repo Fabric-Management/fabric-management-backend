@@ -4,15 +4,18 @@ import com.fabricmanagement.company.application.dto.AddUserToCompanyRequest;
 import com.fabricmanagement.company.domain.aggregate.Company;
 import com.fabricmanagement.company.domain.exception.MaxUsersLimitException;
 import com.fabricmanagement.company.domain.exception.UnauthorizedCompanyAccessException;
+import com.fabricmanagement.company.domain.valueobject.CompanyUser;
 import com.fabricmanagement.company.infrastructure.client.UserServiceClient;
 import com.fabricmanagement.company.infrastructure.client.dto.UserDto;
 import com.fabricmanagement.company.infrastructure.repository.CompanyRepository;
+import com.fabricmanagement.company.infrastructure.repository.CompanyUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -26,6 +29,7 @@ import java.util.UUID;
 public class CompanyUserService {
     
     private final CompanyRepository companyRepository;
+    private final CompanyUserRepository companyUserRepository;
     private final UserServiceClient userServiceClient;
     
     /**
@@ -52,9 +56,33 @@ public class CompanyUserService {
             throw new IllegalArgumentException("User not found: " + userId);
         }
         
-        // Add user to company
-        company.addUser();
+        // Check if relationship already exists
+        Optional<CompanyUser> existing = companyUserRepository
+            .findByCompanyIdAndUserId(companyId, userId);
         
+        if (existing.isPresent()) {
+            if (existing.get().isActive()) {
+                throw new IllegalArgumentException("User already in company: " + userId);
+            } else {
+                // Reactivate existing relationship
+                existing.get().activate();
+                existing.get().updateRole(request.getRole() != null ? request.getRole() : "USER");
+                companyUserRepository.save(existing.get());
+                log.info("User {} reactivated in company {}", userId, companyId);
+                return;
+            }
+        }
+        
+        // Create new company-user relationship
+        CompanyUser companyUser = CompanyUser.create(
+            companyId, 
+            userId, 
+            request.getRole() != null ? request.getRole() : "USER"
+        );
+        companyUserRepository.save(companyUser);
+        
+        // Update company user count
+        company.addUser();
         companyRepository.save(company);
         
         log.info("User {} added to company {} successfully", userId, companyId);
@@ -71,9 +99,16 @@ public class CompanyUserService {
         Company company = companyRepository.findByIdAndTenantId(companyId, tenantId)
             .orElseThrow(() -> new UnauthorizedCompanyAccessException(companyId, tenantId));
         
-        // Remove user from company
-        company.removeUser();
+        // Find and deactivate company-user relationship
+        CompanyUser companyUser = companyUserRepository
+            .findByCompanyIdAndUserId(companyId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found in company: " + userId));
         
+        companyUser.deactivate();
+        companyUserRepository.save(companyUser);
+        
+        // Update company user count
+        company.removeUser();
         companyRepository.save(company);
         
         log.info("User {} removed from company {} successfully", userId, companyId);
@@ -90,14 +125,18 @@ public class CompanyUserService {
         companyRepository.findByIdAndTenantId(companyId, tenantId)
             .orElseThrow(() -> new UnauthorizedCompanyAccessException(companyId, tenantId));
         
-        // Verify user exists in User Service
-        boolean userExists = userServiceClient.userExists(userId);
-        if (!userExists) {
-            throw new IllegalArgumentException("User not found: " + userId);
+        // Find and update company-user relationship
+        CompanyUser companyUser = companyUserRepository
+            .findByCompanyIdAndUserId(companyId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found in company: " + userId));
+        
+        if (!companyUser.isActive()) {
+            throw new IllegalArgumentException("User is inactive in company: " + userId);
         }
         
-        // Note: In a real implementation, this would update user-company-role relationship
-        // For now, we just validate the request
+        // Update role
+        companyUser.updateRole(role);
+        companyUserRepository.save(companyUser);
         
         log.info("Role updated successfully for user {} in company {}", userId, companyId);
     }
