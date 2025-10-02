@@ -17,10 +17,15 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-ENVIRONMENT="${1:-local}"
-COMPOSE_FILE="docker-compose.yml"
+COMPOSE_FILE="docker-compose-complete.yml"
 HEALTH_CHECK_RETRIES=30
 HEALTH_CHECK_DELAY=2
+
+# Check .env file exists
+if [ ! -f ".env" ]; then
+    log_error ".env file not found! Copy .env.example to .env first."
+    exit 1
+fi
 
 # Functions
 log_info() {
@@ -209,7 +214,6 @@ show_status() {
 main() {
     echo "================================================"
     echo "  FABRIC MANAGEMENT SYSTEM DEPLOYMENT"
-    echo "  Environment: $ENVIRONMENT"
     echo "================================================"
     echo ""
     

@@ -73,7 +73,7 @@ tmp/
 .env
 .env.local
 .env.*.local
-*.env
+.env.backup.*
 !.env.example
 
 # Docker

@@ -9,14 +9,14 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Domain Event Publisher
+ * Company Domain Event Publisher
  * 
- * Listens to entity save events and publishes domain events
+ * Listens to entity save events and publishes company domain events
  */
-@Component
+@Component("companyDomainEventPublisher")
 @RequiredArgsConstructor
 @Slf4j
-public class DomainEventPublisher {
+public class CompanyDomainEventPublisher {
     
     private final CompanyEventPublisher companyEventPublisher;
     private final CompanyEventStore companyEventStore;

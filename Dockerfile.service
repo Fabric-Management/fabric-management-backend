@@ -1,0 +1,73 @@
+# =============================================================================
+# FABRIC MANAGEMENT - UNIVERSAL SERVICE DOCKERFILE
+# =============================================================================
+# DRY Principle: Single parameterized Dockerfile for all microservices
+# Usage: docker build -f Dockerfile.service --build-arg SERVICE_NAME=user-service --build-arg SERVICE_PORT=8081 .
+
+# Build arguments
+ARG SERVICE_NAME
+ARG SERVICE_PORT
+
+# =============================================================================
+# Stage 1: Build (Optimized with dependency caching)
+# =============================================================================
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
+
+ARG SERVICE_NAME
+
+WORKDIR /build
+
+# Copy parent POM for dependency resolution
+COPY pom.xml .
+
+# Copy shared modules first (changes less frequently)
+COPY shared/ shared/
+
+# Copy ALL services (Maven reactor needs all modules defined in parent POM)
+COPY services/ services/
+
+# Build only the specific service with its dependencies
+RUN mvn clean package -pl services/${SERVICE_NAME} -am -DskipTests -B
+
+# =============================================================================
+# Stage 2: Runtime Image (Minimal & Secure)
+# =============================================================================
+FROM eclipse-temurin:21-jre-alpine
+
+ARG SERVICE_NAME
+ARG SERVICE_PORT
+
+# Install only essential tools
+RUN apk add --no-cache curl bash netcat-openbsd && \
+    rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S fabricuser && \
+    adduser -u 1001 -S fabricuser -G fabricuser
+
+WORKDIR /app
+
+# Copy JAR from build stage with ownership
+COPY --from=build --chown=fabricuser:fabricuser /build/services/${SERVICE_NAME}/target/${SERVICE_NAME}-1.0.0-SNAPSHOT.jar app.jar
+
+# Copy optimized entrypoint script
+COPY --chown=fabricuser:fabricuser scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Switch to non-root user
+USER fabricuser
+
+# Expose application port
+EXPOSE ${SERVICE_PORT}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${SERVICE_PORT}/actuator/health || exit 1
+
+# Environment variables
+ENV SPRING_APPLICATION_NAME=${SERVICE_NAME}
+ENV SERVER_PORT=${SERVICE_PORT}
+
+# Use optimized entrypoint
+ENTRYPOINT ["/docker-entrypoint.sh"]
+

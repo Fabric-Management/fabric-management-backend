@@ -3,9 +3,26 @@
 -- =============================================================================
 -- Creates tables for company management service
 
+-- =============================================================================
+-- COMMON FUNCTIONS (Idempotent - Self-contained)
+-- =============================================================================
+-- Each migration defines its own dependencies (Microservice Principle)
+-- CREATE OR REPLACE ensures idempotency and no conflicts
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================================================
+-- TABLES
+-- =============================================================================
+
 -- Companies table
 CREATE TABLE IF NOT EXISTS companies (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     name VARCHAR(100) NOT NULL,
     legal_name VARCHAR(200),
@@ -35,7 +52,7 @@ CREATE TABLE IF NOT EXISTS companies (
 
 -- Company events table (for event sourcing)
 CREATE TABLE IF NOT EXISTS company_events (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID NOT NULL,
     event_type VARCHAR(50) NOT NULL,
     event_data JSONB NOT NULL,
@@ -47,7 +64,7 @@ CREATE TABLE IF NOT EXISTS company_events (
 
 -- Company users table (many-to-many relationship)
 CREATE TABLE IF NOT EXISTS company_users (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID NOT NULL,
     user_id UUID NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'USER',
@@ -60,7 +77,7 @@ CREATE TABLE IF NOT EXISTS company_users (
 
 -- Company settings table (for complex settings)
 CREATE TABLE IF NOT EXISTS company_settings (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID NOT NULL,
     setting_key VARCHAR(100) NOT NULL,
     setting_value JSONB NOT NULL,
@@ -92,8 +109,9 @@ CREATE INDEX IF NOT EXISTS idx_company_users_active ON company_users (is_active)
 CREATE INDEX IF NOT EXISTS idx_company_settings_company_id ON company_settings (company_id);
 CREATE INDEX IF NOT EXISTS idx_company_settings_key ON company_settings (setting_key);
 
--- Use common function from init-db.sql
--- Function update_updated_at_column() is already defined in init-db.sql
+-- =============================================================================
+-- TRIGGERS (Auto-update timestamps)
+-- =============================================================================
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_companies ON companies;
 CREATE TRIGGER trg_set_updated_at_companies
@@ -106,3 +124,26 @@ CREATE TRIGGER trg_set_updated_at_company_settings
   BEFORE UPDATE ON company_settings
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================================================
+-- OUTBOX PATTERN TABLE (For reliable event publishing)
+-- =============================================================================
+-- Service-specific outbox to prevent table name conflicts
+CREATE TABLE IF NOT EXISTS company_outbox_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aggregate_type VARCHAR(100) NOT NULL,
+    aggregate_id VARCHAR(255) NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed BOOLEAN NOT NULL DEFAULT FALSE,
+    processed_at TIMESTAMPTZ,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    tenant_id VARCHAR(100),
+    topic VARCHAR(100) NOT NULL
+);
+
+-- Outbox indexes
+CREATE INDEX IF NOT EXISTS idx_company_outbox_processed ON company_outbox_events (processed, created_at);
+CREATE INDEX IF NOT EXISTS idx_company_outbox_aggregate ON company_outbox_events (aggregate_type, aggregate_id);
