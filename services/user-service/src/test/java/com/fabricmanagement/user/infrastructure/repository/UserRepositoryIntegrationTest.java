@@ -29,7 +29,6 @@ import static org.assertj.core.api.Assertions.*;
 @DisplayName("User Repository Integration Tests")
 class UserRepositoryIntegrationTest {
 
-    private static final String TEST_EMAIL = "test@example.com";
     private static final String TEST_FIRST_NAME = "John";
     private static final String TEST_LAST_NAME = "Doe";
     private static final String TEST_PASSWORD_HASH = "$2a$10$hashedpassword123";

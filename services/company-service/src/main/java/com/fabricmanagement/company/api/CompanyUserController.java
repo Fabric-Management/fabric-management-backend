@@ -1,25 +1,29 @@
 package com.fabricmanagement.company.api;
 
+import com.fabricmanagement.company.application.dto.AddUserToCompanyRequest;
 import com.fabricmanagement.company.application.service.CompanyUserService;
-import com.fabricmanagement.company.infrastructure.client.dto.UserDto;
+import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.infrastructure.security.SecurityContextHolder;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
- * Company User REST Controller
+ * Company User Management Controller
  * 
- * Provides API endpoints for managing company-user relationships
+ * Handles user-company relationships.
+ * Follows Clean Architecture principles.
+ * 
+ * API Version: v1
+ * Base Path: /api/v1/companies/{companyId}/users
  */
 @RestController
-@RequestMapping("/companies/{companyId}/users")
+@RequestMapping("/api/v1/companies/{companyId}/users")
 @RequiredArgsConstructor
 @Slf4j
 public class CompanyUserController {
@@ -27,66 +31,22 @@ public class CompanyUserController {
     private final CompanyUserService companyUserService;
     
     /**
-     * Gets the current tenant ID from security context
-     */
-    private UUID getCurrentTenantId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            Object principal = authentication.getPrincipal();
-            if (principal instanceof String) {
-                try {
-                    return UUID.fromString((String) principal);
-                } catch (Exception e) {
-                    log.warn("Could not parse tenant ID from principal, using default");
-                }
-            }
-        }
-        return UUID.randomUUID();
-    }
-    
-    /**
-     * Gets all users for a company
-     */
-    @GetMapping
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<UserDto>> getCompanyUsers(@PathVariable UUID companyId) {
-        log.debug("Getting users for company: {}", companyId);
-        
-        UUID tenantId = getCurrentTenantId();
-        List<UserDto> users = companyUserService.getCompanyUsers(companyId, tenantId);
-        
-        return ResponseEntity.ok(users);
-    }
-    
-    /**
-     * Gets user count for a company
-     */
-    @GetMapping("/count")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Integer> getCompanyUserCount(@PathVariable UUID companyId) {
-        log.debug("Getting user count for company: {}", companyId);
-        
-        UUID tenantId = getCurrentTenantId();
-        int count = companyUserService.getCompanyUserCount(companyId, tenantId);
-        
-        return ResponseEntity.ok(count);
-    }
-    
-    /**
      * Adds a user to a company
      */
-    @PostMapping("/{userId}")
+    @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
-    public ResponseEntity<Void> addUserToCompany(
+    public ResponseEntity<ApiResponse<Void>> addUserToCompany(
             @PathVariable UUID companyId,
-            @PathVariable UUID userId) {
+            @Valid @RequestBody AddUserToCompanyRequest request) {
         
-        log.info("Adding user {} to company {}", userId, companyId);
+        log.info("Adding user {} to company {}", request.getUserId(), companyId);
         
-        UUID tenantId = getCurrentTenantId();
-        companyUserService.addUserToCompany(companyId, userId, tenantId);
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
+        String addedBy = SecurityContextHolder.getCurrentUserId();
         
-        return ResponseEntity.ok().build();
+        companyUserService.addUserToCompany(companyId, request, tenantId, addedBy);
+        
+        return ResponseEntity.ok(ApiResponse.success(null, "User added to company successfully"));
     }
     
     /**
@@ -94,30 +54,37 @@ public class CompanyUserController {
      */
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
-    public ResponseEntity<Void> removeUserFromCompany(
+    public ResponseEntity<ApiResponse<Void>> removeUserFromCompany(
             @PathVariable UUID companyId,
             @PathVariable UUID userId) {
         
         log.info("Removing user {} from company {}", userId, companyId);
         
-        UUID tenantId = getCurrentTenantId();
-        companyUserService.removeUserFromCompany(companyId, userId, tenantId);
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
+        String removedBy = SecurityContextHolder.getCurrentUserId();
         
-        return ResponseEntity.noContent().build();
+        companyUserService.removeUserFromCompany(companyId, userId, tenantId, removedBy);
+        
+        return ResponseEntity.ok(ApiResponse.success(null, "User removed from company successfully"));
     }
     
     /**
-     * Syncs user count from User Service
+     * Updates a user's role in a company
      */
-    @PostMapping("/sync")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> syncUserCount(@PathVariable UUID companyId) {
-        log.info("Syncing user count for company: {}", companyId);
+    @PutMapping("/{userId}/role")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
+    public ResponseEntity<ApiResponse<Void>> updateUserRole(
+            @PathVariable UUID companyId,
+            @PathVariable UUID userId,
+            @RequestParam String role) {
         
-        UUID tenantId = getCurrentTenantId();
-        companyUserService.syncUserCount(companyId, tenantId);
+        log.info("Updating role for user {} in company {} to {}", userId, companyId, role);
         
-        return ResponseEntity.ok().build();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
+        String updatedBy = SecurityContextHolder.getCurrentUserId();
+        
+        companyUserService.updateUserRole(companyId, userId, role, tenantId, updatedBy);
+        
+        return ResponseEntity.ok(ApiResponse.success(null, "User role updated successfully"));
     }
 }
-

@@ -5,6 +5,7 @@ import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import com.fabricmanagement.contact.domain.event.ContactCreatedEvent;
 import com.fabricmanagement.contact.domain.event.ContactUpdatedEvent;
 import com.fabricmanagement.contact.domain.event.ContactDeletedEvent;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -14,7 +15,6 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Contact Aggregate Root
@@ -64,6 +64,7 @@ public class Contact extends BaseEntity {
     private LocalDateTime deletedAt;
     
     @Transient
+    @Builder.Default
     private List<Object> domainEvents = new ArrayList<>();
     
     public enum OwnerType {

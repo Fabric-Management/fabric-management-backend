@@ -121,6 +121,42 @@ public class CompanyService {
     }
     
     /**
+     * Updates company settings
+     */
+    @CacheEvict(value = {"companies", "companiesList"}, allEntries = true)
+    public void updateCompanySettings(UUID companyId, UpdateCompanySettingsRequest request, 
+                                     UUID tenantId, String updatedBy) {
+        log.info("Updating settings for company: {} by user: {}", companyId, updatedBy);
+        
+        // Merge all settings into a single map
+        java.util.Map<String, Object> allSettings = new java.util.HashMap<>();
+        if (request.getSettings() != null) {
+            allSettings.putAll(request.getSettings());
+        }
+        if (request.getPreferences() != null) {
+            allSettings.put("preferences", request.getPreferences());
+        }
+        if (request.getTimezone() != null) {
+            allSettings.put("timezone", request.getTimezone());
+        }
+        if (request.getLanguage() != null) {
+            allSettings.put("language", request.getLanguage());
+        }
+        if (request.getCurrency() != null) {
+            allSettings.put("currency", request.getCurrency());
+        }
+        
+        UpdateCompanySettingsCommand command = UpdateCompanySettingsCommand.builder()
+            .companyId(companyId)
+            .tenantId(tenantId)
+            .settings(allSettings)
+            .updatedBy(updatedBy)
+            .build();
+        
+        updateCompanySettingsCommandHandler.handle(command);
+    }
+    
+    /**
      * Updates company subscription
      */
     @CacheEvict(value = {"companies", "companiesList"}, allEntries = true)
@@ -201,14 +237,16 @@ public class CompanyService {
     }
     
     /**
-     * Searches companies by name
+     * Searches companies by criteria
      */
-    public List<CompanyResponse> searchCompanies(String searchTerm, UUID tenantId) {
-        log.debug("Searching companies with term: {} for tenant: {}", searchTerm, tenantId);
+    public List<CompanyResponse> searchCompanies(UUID tenantId, String name, 
+                                                 String industry, String companyType) {
+        log.debug("Searching companies with criteria: name={}, industry={}, companyType={} for tenant: {}", 
+                 name, industry, companyType, tenantId);
         
         SearchCompaniesQuery query = SearchCompaniesQuery.builder()
             .tenantId(tenantId)
-            .searchTerm(searchTerm)
+            .searchTerm(name)
             .build();
         
         return searchCompaniesQueryHandler.handle(query);

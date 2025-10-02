@@ -1,7 +1,9 @@
 package com.fabricmanagement.user.api.dto;
 
+import com.fabricmanagement.shared.infrastructure.constants.ValidationConstants;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,6 +14,8 @@ import java.util.Map;
 
 /**
  * Create User Request DTO
+ * 
+ * Follows PRINCIPLES.md - uses constants instead of magic numbers
  */
 @Data
 @Builder
@@ -19,22 +23,25 @@ import java.util.Map;
 @AllArgsConstructor
 public class CreateUserRequest {
     
-    @NotBlank(message = "First name is required")
-    @Size(max = 50, message = "First name must not exceed 50 characters")
+    @NotBlank(message = ValidationConstants.MSG_REQUIRED)
+    @Size(max = ValidationConstants.MAX_NAME_LENGTH, message = ValidationConstants.MSG_TOO_LONG)
     private String firstName;
     
-    @NotBlank(message = "Last name is required")
-    @Size(max = 50, message = "Last name must not exceed 50 characters")
+    @NotBlank(message = ValidationConstants.MSG_REQUIRED)
+    @Size(max = ValidationConstants.MAX_NAME_LENGTH, message = ValidationConstants.MSG_TOO_LONG)
     private String lastName;
     
-    @Size(max = 100, message = "Display name must not exceed 100 characters")
+    @Size(max = ValidationConstants.MAX_NAME_LENGTH, message = ValidationConstants.MSG_TOO_LONG)
     private String displayName;
     
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email must be valid")
+    @NotBlank(message = ValidationConstants.MSG_REQUIRED)
+    @Email(message = ValidationConstants.MSG_INVALID_EMAIL)
+    @Pattern(regexp = ValidationConstants.EMAIL_PATTERN, message = ValidationConstants.MSG_INVALID_EMAIL)
+    @Size(max = ValidationConstants.MAX_EMAIL_LENGTH, message = ValidationConstants.MSG_TOO_LONG)
     private String email;
     
-    @Size(max = 20, message = "Phone must not exceed 20 characters")
+    @Pattern(regexp = ValidationConstants.PHONE_PATTERN, message = ValidationConstants.MSG_INVALID_PHONE)
+    @Size(max = ValidationConstants.MAX_PHONE_LENGTH, message = ValidationConstants.MSG_TOO_LONG)
     private String phone;
     
     private String role;

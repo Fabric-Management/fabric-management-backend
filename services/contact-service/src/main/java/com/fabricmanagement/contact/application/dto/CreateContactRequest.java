@@ -32,5 +32,6 @@ public class CreateContactRequest {
     @NotNull(message = "Primary flag is required")
     private boolean isPrimary;
     
+    @Builder.Default
     private boolean autoVerified = false; // For internal creation
 }

@@ -1,11 +1,13 @@
 package com.fabricmanagement.company.application.service;
 
+import com.fabricmanagement.company.application.dto.AddContactToCompanyRequest;
 import com.fabricmanagement.company.infrastructure.client.ContactServiceClient;
 import com.fabricmanagement.company.infrastructure.client.dto.ContactDto;
 import com.fabricmanagement.company.infrastructure.client.dto.CreateContactDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +23,49 @@ import java.util.UUID;
 public class CompanyContactService {
     
     private final ContactServiceClient contactServiceClient;
+    
+    /**
+     * Adds a contact to a company
+     */
+    @Transactional
+    public UUID addContactToCompany(UUID companyId, AddContactToCompanyRequest request, 
+                                    UUID tenantId, String addedBy) {
+        log.info("Adding contact to company: {} by user: {}", companyId, addedBy);
+        
+        CreateContactDto contactRequest = CreateContactDto.builder()
+            .ownerId(companyId.toString())
+            .ownerType("COMPANY")
+            .contactValue(request.getContactValue())
+            .contactType(request.getContactType())
+            .isPrimary(request.getIsPrimary())
+            .autoVerified(false)
+            .build();
+        
+        ContactDto contact = contactServiceClient.createContact(contactRequest);
+        log.info("Contact created successfully for company {}: {}", companyId, contact.getId());
+        
+        return contact.getId();
+    }
+    
+    /**
+     * Removes a contact from a company
+     */
+    @Transactional
+    public void removeContactFromCompany(UUID companyId, UUID contactId, 
+                                        UUID tenantId, String removedBy) {
+        log.info("Removing contact {} from company: {} by user: {}", contactId, companyId, removedBy);
+        contactServiceClient.deleteContact(contactId);
+    }
+    
+    /**
+     * Sets a contact as primary for the company
+     */
+    @Transactional
+    public void setPrimaryContact(UUID companyId, UUID contactId, 
+                                 UUID tenantId, String updatedBy) {
+        log.info("Setting contact {} as primary for company: {} by user: {}", contactId, companyId, updatedBy);
+        contactServiceClient.makePrimary(contactId);
+    }
     
     /**
      * Creates a new contact for a company

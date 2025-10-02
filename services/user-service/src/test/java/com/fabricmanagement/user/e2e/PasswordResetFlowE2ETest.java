@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 
-import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,7 +27,6 @@ class PasswordResetFlowE2ETest extends E2ETestBase {
 
     private String userEmail = "resetuser@example.com";
     private String userPhone = "+905551234567";
-    private String userId;
     private String oldPassword = "OldPassword123!";
 
     @BeforeEach
@@ -42,15 +40,12 @@ class PasswordResetFlowE2ETest extends E2ETestBase {
         createUserRequest.put("lastName", "User");
         createUserRequest.put("role", "COMPANY_EMPLOYEE");
 
-        Response createResponse = given()
+        given()
             .body(createUserRequest)
         .when()
             .post("/users")
         .then()
-            .statusCode(201)
-            .extract().response();
-
-        userId = createResponse.path("data.id");
+            .statusCode(201);
 
         // Verify contact
         Map<String, Object> verifyRequest = new HashMap<>();
@@ -178,9 +173,9 @@ class PasswordResetFlowE2ETest extends E2ETestBase {
         @Test
         @DisplayName("Should reset password via SMS code")
         void shouldResetPasswordViaSMSCode() {
-            // Request reset via SMS
+            // Request reset via SMS (using phone number)
             Map<String, Object> resetRequest = new HashMap<>();
-            resetRequest.put("contactValue", userEmail);
+            resetRequest.put("contactValue", userPhone);
             resetRequest.put("resetMethod", "SMS");
 
             Response resetResponse = given()
@@ -197,7 +192,7 @@ class PasswordResetFlowE2ETest extends E2ETestBase {
 
             // Verify code
             Map<String, Object> verifyCodeRequest = new HashMap<>();
-            verifyCodeRequest.put("contactValue", userEmail);
+            verifyCodeRequest.put("contactValue", userPhone);
             verifyCodeRequest.put("resetCode", resetCode);
 
             given()
@@ -211,7 +206,7 @@ class PasswordResetFlowE2ETest extends E2ETestBase {
             // Reset password
             String newPassword = "SMSResetPass789!";
             Map<String, Object> resetPasswordRequest = new HashMap<>();
-            resetPasswordRequest.put("contactValue", userEmail);
+            resetPasswordRequest.put("contactValue", userPhone);
             resetPasswordRequest.put("resetCode", resetCode);
             resetPasswordRequest.put("newPassword", newPassword);
             resetPasswordRequest.put("confirmPassword", newPassword);
@@ -245,22 +240,7 @@ class PasswordResetFlowE2ETest extends E2ETestBase {
         @Test
         @DisplayName("Should reject expired reset token")
         void shouldRejectExpiredToken() {
-            // Request reset
-            Map<String, Object> resetRequest = new HashMap<>();
-            resetRequest.put("contactValue", userEmail);
-
-            Response resetResponse = given()
-                .body(resetRequest)
-            .when()
-                .post("/auth/password-reset/request")
-            .then()
-                .statusCode(200)
-                .extract().response();
-
-            String resetToken = resetResponse.path("data.resetToken");
-
-            // Simulate expiry (would need time manipulation in real scenario)
-            // For now, use an obviously expired token
+            // Simulate expiry - use an invalid/expired token
             Map<String, Object> verifyExpiredRequest = new HashMap<>();
             verifyExpiredRequest.put("contactValue", userEmail);
             verifyExpiredRequest.put("resetToken", "EXPIRED_TOKEN_123456");

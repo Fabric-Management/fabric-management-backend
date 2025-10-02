@@ -1,5 +1,7 @@
 package com.fabricmanagement.user.api;
 
+import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.infrastructure.security.SecurityContextHolder;
 import com.fabricmanagement.user.api.dto.CreateUserRequest;
 import com.fabricmanagement.user.api.dto.UpdateUserRequest;
 import com.fabricmanagement.user.api.dto.UserResponse;
@@ -10,8 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,10 +20,14 @@ import java.util.UUID;
 /**
  * User REST Controller
  * 
- * Provides API endpoints for user management
+ * Provides API endpoints for user management.
+ * Follows Clean Architecture principles - only handles HTTP concerns.
+ * 
+ * API Version: v1
+ * Base Path: /api/v1/users
  */
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
@@ -31,47 +35,18 @@ public class UserController {
     private final UserService userService;
     
     /**
-     * Gets the current tenant ID from security context
-     */
-    private UUID getCurrentTenantId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            Object principal = authentication.getPrincipal();
-            if (principal instanceof String) {
-                try {
-                    return UUID.fromString((String) principal);
-                } catch (Exception e) {
-                    log.warn("Could not parse tenant ID from principal, using default");
-                }
-            }
-        }
-        return UUID.randomUUID();
-    }
-    
-    /**
-     * Gets the current user ID from security context
-     */
-    private String getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            return authentication.getName();
-        }
-        return "system";
-    }
-    
-    /**
      * Gets a user by ID
      * Required by Company Service
      */
     @GetMapping("/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<UserResponse> getUser(@PathVariable UUID userId) {
+    public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable UUID userId) {
         log.debug("Getting user: {}", userId);
         
-        UUID tenantId = getCurrentTenantId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
         UserResponse user = userService.getUser(userId, tenantId);
         
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(ApiResponse.success(user));
     }
     
     /**
@@ -80,13 +55,13 @@ public class UserController {
      */
     @GetMapping("/{userId}/exists")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Boolean> userExists(@PathVariable UUID userId) {
+    public ResponseEntity<ApiResponse<Boolean>> userExists(@PathVariable UUID userId) {
         log.debug("Checking if user exists: {}", userId);
         
-        UUID tenantId = getCurrentTenantId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
         boolean exists = userService.userExists(userId, tenantId);
         
-        return ResponseEntity.ok(exists);
+        return ResponseEntity.ok(ApiResponse.success(exists));
     }
     
     /**
@@ -95,13 +70,13 @@ public class UserController {
      */
     @GetMapping("/company/{companyId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<UserResponse>> getUsersByCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getUsersByCompany(@PathVariable UUID companyId) {
         log.debug("Getting users for company: {}", companyId);
         
-        UUID tenantId = getCurrentTenantId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
         List<UserResponse> users = userService.getUsersByCompany(companyId, tenantId);
         
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(ApiResponse.success(users));
     }
     
     /**
@@ -110,13 +85,13 @@ public class UserController {
      */
     @GetMapping("/company/{companyId}/count")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Integer> getUserCountForCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<Integer>> getUserCountForCompany(@PathVariable UUID companyId) {
         log.debug("Getting user count for company: {}", companyId);
         
-        UUID tenantId = getCurrentTenantId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
         int count = userService.getUserCountForCompany(companyId, tenantId);
         
-        return ResponseEntity.ok(count);
+        return ResponseEntity.ok(ApiResponse.success(count));
     }
     
     /**
@@ -124,15 +99,16 @@ public class UserController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UUID> createUser(@Valid @RequestBody CreateUserRequest request) {
+    public ResponseEntity<ApiResponse<UUID>> createUser(@Valid @RequestBody CreateUserRequest request) {
         log.info("Creating user: {}", request.getEmail());
         
-        UUID tenantId = getCurrentTenantId();
-        String createdBy = getCurrentUserId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
+        String createdBy = SecurityContextHolder.getCurrentUserId();
         
         UUID userId = userService.createUser(request, tenantId, createdBy);
         
-        return ResponseEntity.status(HttpStatus.CREATED).body(userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(userId, "User created successfully"));
     }
     
     /**
@@ -140,18 +116,18 @@ public class UserController {
      */
     @PutMapping("/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> updateUser(
+    public ResponseEntity<ApiResponse<Void>> updateUser(
             @PathVariable UUID userId,
             @Valid @RequestBody UpdateUserRequest request) {
         
         log.info("Updating user: {}", userId);
         
-        UUID tenantId = getCurrentTenantId();
-        String updatedBy = getCurrentUserId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
+        String updatedBy = SecurityContextHolder.getCurrentUserId();
         
         userService.updateUser(userId, request, tenantId, updatedBy);
         
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success(null, "User updated successfully"));
     }
     
     /**
@@ -159,15 +135,15 @@ public class UserController {
      */
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable UUID userId) {
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable UUID userId) {
         log.info("Deleting user: {}", userId);
         
-        UUID tenantId = getCurrentTenantId();
-        String deletedBy = getCurrentUserId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
+        String deletedBy = SecurityContextHolder.getCurrentUserId();
         
         userService.deleteUser(userId, tenantId, deletedBy);
         
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success(null, "User deleted successfully"));
     }
     
     /**
@@ -175,27 +151,32 @@ public class UserController {
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<UserResponse>> listUsers() {
+    public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers() {
         log.debug("Listing users");
         
-        UUID tenantId = getCurrentTenantId();
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
         List<UserResponse> users = userService.listUsers(tenantId);
         
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(ApiResponse.success(users));
     }
     
     /**
      * Searches users by criteria
      */
     @GetMapping("/search")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<UserResponse>> searchUsers(@RequestParam String q) {
-        log.debug("Searching users with term: {}", q);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<UserResponse>>> searchUsers(
+            @RequestParam(required = false) String firstName,
+            @RequestParam(required = false) String lastName,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String status) {
         
-        UUID tenantId = getCurrentTenantId();
-        List<UserResponse> users = userService.searchUsers(q, tenantId);
+        log.debug("Searching users with criteria: firstName={}, lastName={}, email={}, status={}",
+                firstName, lastName, email, status);
         
-        return ResponseEntity.ok(users);
+        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
+        List<UserResponse> users = userService.searchUsers(tenantId, firstName, lastName, email, status);
+        
+        return ResponseEntity.ok(ApiResponse.success(users));
     }
 }
-

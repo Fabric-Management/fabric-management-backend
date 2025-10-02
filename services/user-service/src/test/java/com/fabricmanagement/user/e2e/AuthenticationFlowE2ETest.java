@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 
-import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuthenticationFlowE2ETest extends E2ETestBase {
 
     private String activeUserEmail = "active.user@example.com";
-    private String activeUserPhone = "+905559876543";
     private String userId;
 
     @BeforeEach
