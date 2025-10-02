@@ -3,6 +3,23 @@
 -- =============================================================================
 -- Creates tables for contact management service
 
+-- =============================================================================
+-- COMMON FUNCTIONS (Idempotent - Self-contained)
+-- =============================================================================
+-- Each migration defines its own dependencies (Microservice Principle)
+-- CREATE OR REPLACE ensures idempotency and no conflicts
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================================================
+-- TABLES
+-- =============================================================================
+
 -- Contacts table
 CREATE TABLE IF NOT EXISTS contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,11 +61,35 @@ ALTER TABLE contacts ADD CONSTRAINT chk_owner_type
 ALTER TABLE contacts ADD CONSTRAINT chk_contact_type 
     CHECK (contact_type IN ('EMAIL', 'PHONE', 'ADDRESS', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'));
 
--- Use common function from init-db.sql
--- Function update_updated_at_column() is already defined in init-db.sql
+-- =============================================================================
+-- TRIGGERS (Auto-update timestamps)
+-- =============================================================================
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_contacts ON contacts;
 CREATE TRIGGER trg_set_updated_at_contacts
   BEFORE UPDATE ON contacts
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================================================
+-- OUTBOX PATTERN TABLE (For reliable event publishing)
+-- =============================================================================
+-- Service-specific outbox to prevent table name conflicts
+CREATE TABLE IF NOT EXISTS contact_outbox_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aggregate_type VARCHAR(100) NOT NULL,
+    aggregate_id VARCHAR(255) NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed BOOLEAN NOT NULL DEFAULT FALSE,
+    processed_at TIMESTAMPTZ,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    tenant_id VARCHAR(100),
+    topic VARCHAR(100) NOT NULL
+);
+
+-- Outbox indexes
+CREATE INDEX IF NOT EXISTS idx_contact_outbox_processed ON contact_outbox_events (processed, created_at);
+CREATE INDEX IF NOT EXISTS idx_contact_outbox_aggregate ON contact_outbox_events (aggregate_type, aggregate_id);

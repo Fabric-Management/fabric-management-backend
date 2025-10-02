@@ -34,7 +34,7 @@ ALTER SYSTEM SET max_wal_size = '2GB';
 ALTER SYSTEM SET default_statistics_target = '100';
 ALTER SYSTEM SET random_page_cost = '1.1';
 ALTER SYSTEM SET effective_io_concurrency = '200';
-ALTER SYSTEM SET parallel_workers_per_gather = '2';
+ALTER SYSTEM SET max_parallel_workers_per_gather = '2';
 
 -- Connection settings
 ALTER SYSTEM SET max_connections = '100';  -- Reduced from 200
@@ -55,32 +55,37 @@ SELECT pg_reload_conf();
 -- =============================================================================
 -- 3. ROLES AND PERMISSIONS
 -- =============================================================================
--- Create application user if not exists
+-- Note: User creation is handled by PostgreSQL Docker image via environment variables
+-- POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB are set in docker-compose.yml
+-- This ensures credentials are managed through environment, not hardcoded
+
+-- Grant privileges to the application user (already created by Docker)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_user WHERE usename = 'fabric_user') THEN
-        CREATE USER fabric_user WITH PASSWORD 'fabric_password';
-    END IF;
+    -- Only set permissions, user already exists from POSTGRES_USER env var
+    EXECUTE format('GRANT CONNECT ON DATABASE %I TO %I', 
+        current_database(), 
+        current_user);
+    
+    EXECUTE format('GRANT USAGE ON SCHEMA public TO %I', current_user);
+    EXECUTE format('GRANT CREATE ON SCHEMA public TO %I', current_user);
 END
 $$;
 
--- Grant privileges
-GRANT CONNECT ON DATABASE fabric_management TO fabric_user;
-GRANT USAGE ON SCHEMA public TO fabric_user;
-GRANT CREATE ON SCHEMA public TO fabric_user;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO fabric_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO fabric_user;
-GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO fabric_user;
+-- Grant privileges on existing objects
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO CURRENT_USER;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO CURRENT_USER;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO CURRENT_USER;
 
 -- Set default privileges for future objects
 ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-    GRANT ALL ON TABLES TO fabric_user;
+    GRANT ALL ON TABLES TO CURRENT_USER;
     
 ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-    GRANT ALL ON SEQUENCES TO fabric_user;
+    GRANT ALL ON SEQUENCES TO CURRENT_USER;
     
 ALTER DEFAULT PRIVILEGES IN SCHEMA public 
-    GRANT ALL ON FUNCTIONS TO fabric_user;
+    GRANT ALL ON FUNCTIONS TO CURRENT_USER;
 
 -- =============================================================================
 -- 4. COMMON FUNCTIONS

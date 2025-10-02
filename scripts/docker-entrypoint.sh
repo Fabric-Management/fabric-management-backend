@@ -66,6 +66,9 @@ fi
 # JVM CONFIGURATION
 # =============================================================================
 
+# Set JMX port based on service (align with documentation)
+JMX_PORT="${JMX_PORT:-9010}"
+
 # Set default JVM options if not provided
 if [ -z "$JAVA_OPTS" ]; then
     JAVA_OPTS="-XX:MaxRAMPercentage=75.0 \
@@ -79,14 +82,14 @@ if [ -z "$JAVA_OPTS" ]; then
                -Djava.security.egd=file:/dev/./urandom"
 fi
 
-# Add monitoring JVM options
+# Add monitoring JVM options with configurable port
 JAVA_OPTS="$JAVA_OPTS \
            -Dcom.sun.management.jmxremote \
            -Dcom.sun.management.jmxremote.authenticate=false \
            -Dcom.sun.management.jmxremote.ssl=false \
            -Dcom.sun.management.jmxremote.local.only=false \
-           -Dcom.sun.management.jmxremote.port=9010 \
-           -Dcom.sun.management.jmxremote.rmi.port=9010 \
+           -Dcom.sun.management.jmxremote.port=${JMX_PORT} \
+           -Dcom.sun.management.jmxremote.rmi.port=${JMX_PORT} \
            -Djava.rmi.server.hostname=localhost"
 
 echo "${GREEN}📊 JVM Configuration:${NC}"
