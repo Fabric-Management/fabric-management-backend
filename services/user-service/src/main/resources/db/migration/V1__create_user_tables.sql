@@ -112,29 +112,23 @@ CREATE INDEX IF NOT EXISTS idx_events_user_id ON user_events (user_id);
 CREATE INDEX IF NOT EXISTS idx_events_type ON user_events (event_type);
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON user_events (created_at);
 
--- Trigger to auto-update updated_at
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Use common function from init-db.sql
+-- Function update_updated_at_column() is already defined in init-db.sql
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_users ON users;
 CREATE TRIGGER trg_set_updated_at_users
   BEFORE UPDATE ON users
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_sessions ON user_sessions;
 CREATE TRIGGER trg_set_updated_at_sessions
   BEFORE UPDATE ON user_sessions
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_reset_tokens ON password_reset_tokens;
 CREATE TRIGGER trg_set_updated_at_reset_tokens
   BEFORE UPDATE ON password_reset_tokens
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();

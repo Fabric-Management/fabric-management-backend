@@ -92,23 +92,17 @@ CREATE INDEX IF NOT EXISTS idx_company_users_active ON company_users (is_active)
 CREATE INDEX IF NOT EXISTS idx_company_settings_company_id ON company_settings (company_id);
 CREATE INDEX IF NOT EXISTS idx_company_settings_key ON company_settings (setting_key);
 
--- Trigger to auto-update updated_at
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Use common function from init-db.sql
+-- Function update_updated_at_column() is already defined in init-db.sql
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_companies ON companies;
 CREATE TRIGGER trg_set_updated_at_companies
   BEFORE UPDATE ON companies
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS trg_set_updated_at_company_settings ON company_settings;
 CREATE TRIGGER trg_set_updated_at_company_settings
   BEFORE UPDATE ON company_settings
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();

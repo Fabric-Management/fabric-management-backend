@@ -1,9 +1,43 @@
-# ==============================================
-# FABRIC MANAGEMENT BACKEND - GITIGNORE
-# ==============================================
+# ==========================================
+# FABRIC MANAGEMENT SYSTEM - GITIGNORE
+# ==========================================
+# Clean and organized ignore patterns
+# ==========================================
+
+# IDE & Editor Files
+# ==========================================
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build Artifacts
+# ==========================================
+target/
+build/
+out/
+bin/
+*.class
+*.jar
+*.war
+*.ear
+META-INF/
+**/META-INF/MANIFEST.MF
+*.zip
+*.tar.gz
+*.rar
 
 # Maven
-target/
+# ==========================================
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
@@ -14,55 +48,109 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
-# IDE
-.idea/
-*.iml
-*.iws
-*.ipr
-.vscode/
-.settings/
-.project
-.classpath
-.factorypath
-
-# Logs
-logs/
+# Logs & Temporary Files
+# ==========================================
 *.log
-*.log.*
-*.gz
-
-# Backup files
-backup-*.tar.gz
-*-old.*
-*.backup
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Docker
-docker-compose-old.yml
-init-db-old.sql
-
-# Temporary files
+logs/
+log/
+temp/
+tmp/
 *.tmp
-*.swp
-*.swo
-*~
+*.temp
+*.pid
+*.seed
+*.pid.lock
 
-# Test coverage
-.coverage
-*.cover
-htmlcov/
+# Database Files
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+*.h2.db
 
-# Application
-application-local.yml
-application-dev.yml
-!application.yml
-
-# Environment Variables
+# Environment & Configuration
+# ==========================================
 .env
 .env.local
-.env.development
-.env.production
+.env.*.local
+*.env
 !.env.example
+
+# Docker
+# ==========================================
+docker-compose.override.yml
+.docker/
+
+# Test Coverage
+# ==========================================
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Operating System Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Backup Files
+# ==========================================
+*.bak
+*.backup
+*.old
+backup/
+backups/
+
+# Generated Documentation
+# ==========================================
+/javadoc/
+/site/
+
+# Sensitive Data
+# ==========================================
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials/
+
+# Application Specific
+# ==========================================
+/data/
+/uploads/
+/downloads/
+*.pid
+
+# Reports (keep only in docs/analysis)
+# ==========================================
+*_REPORT.md
+*_ANALYSIS.md
+!docs/analysis/*.md
+
+# Build & Deployment Artifacts
+# ==========================================
+deployment.log
+startup.log
+META-INF/
+MANIFEST.MF
+
+# Keep Important Files
+# ==========================================
+!.gitignore
+!.gitkeep
+!README.md
+!LICENSE
+!Makefile
+!pom.xml
+!docker-compose.yml
+!docker-compose.monitoring.yml
