@@ -1,6 +1,7 @@
 package com.fabricmanagement.shared.domain.base;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -53,6 +54,7 @@ public abstract class BaseEntity {
 
     @Column(name = "deleted", nullable = false)
     @JsonIgnore
+    @Builder.Default
     private Boolean deleted = false;
 
     @PrePersist

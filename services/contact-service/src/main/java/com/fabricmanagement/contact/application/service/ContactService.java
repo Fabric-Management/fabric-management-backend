@@ -223,7 +223,7 @@ public class ContactService {
      * Checks if a contact value is available
      */
     @Transactional(readOnly = true)
-    public boolean isContactAvailable(String contactValue) {
+    public boolean checkAvailability(String contactValue) {
         return !contactRepository.existsByContactValue(contactValue);
     }
     

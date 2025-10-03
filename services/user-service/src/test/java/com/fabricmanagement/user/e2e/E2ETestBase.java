@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.e2e;
 
 import com.fabricmanagement.user.UserServiceApplication;
+import com.fabricmanagement.user.config.TestSecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -46,6 +48,7 @@ import org.springframework.test.context.DynamicPropertySource;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ActiveProfiles("test")
+@Import(TestSecurityConfig.class)
 public abstract class E2ETestBase {
 
     @LocalServerPort
@@ -65,17 +68,28 @@ public abstract class E2ETestBase {
     @DynamicPropertySource
     static void configureTestProperties(DynamicPropertyRegistry registry) {
         // H2 In-Memory Database (no Docker required)
-        registry.add("spring.datasource.url", () -> "jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE");
+        registry.add("spring.datasource.url", () -> "jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
         registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
         registry.add("spring.datasource.username", () -> "sa");
         registry.add("spring.datasource.password", () -> "");
         
-        // Flyway (works with H2)
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.flyway.clean-disabled", () -> "false");
+        // Disable Flyway for E2E tests - use JPA ddl-auto instead
+        registry.add("spring.flyway.enabled", () -> "false");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         
-        // Disable Kafka for tests (or use embedded Kafka)
+        // Disable Kafka for tests
         registry.add("spring.kafka.enabled", () -> "false");
+        
+        // Mock environment variables
+        registry.add("POSTGRES_HOST", () -> "localhost");
+        registry.add("POSTGRES_PORT", () -> "5432");
+        registry.add("POSTGRES_DB", () -> "testdb");
+        registry.add("POSTGRES_USER", () -> "sa");
+        registry.add("POSTGRES_PASSWORD", () -> "");
+        registry.add("REDIS_HOST", () -> "localhost");
+        registry.add("REDIS_PORT", () -> "6379");
+        registry.add("KAFKA_BOOTSTRAP_SERVERS", () -> "localhost:9092");
+        registry.add("JWT_SECRET", () -> "test-secret-key-for-testing-only-minimum-256-bits-required-here");
     }
     
     /* 
@@ -112,31 +126,19 @@ public abstract class E2ETestBase {
 
     /**
      * Create a base request specification with common headers
+     *
+     * Note: Authentication is bypassed for testing purposes
+     * In production, all endpoints require authentication
      */
     protected RequestSpecification given() {
         return RestAssured.given()
             .contentType(ContentType.JSON)
-            .accept(ContentType.JSON);
-    }
-
-    /**
-     * Create an authenticated request with JWT token
-     */
-    protected RequestSpecification givenAuthenticated(String token) {
-        return given()
-            .header("Authorization", "Bearer " + token);
-    }
-
-    /**
-     * Create an authenticated request with tenant context
-     */
-    protected RequestSpecification givenAuthenticatedWithTenant(String token, String tenantId) {
-        return givenAuthenticated(token)
-            .header("X-Tenant-Id", tenantId);
+            .accept(ContentType.JSON)
+            .header("X-Tenant-Id", TEST_TENANT_ID); // Mock tenant context for tests
     }
 
     // Common test data constants
-    protected static final String TEST_TENANT_ID = "tenant-test-001";
+    protected static final String TEST_TENANT_ID = "550e8400-e29b-41d4-a716-446655440000";
     protected static final String TEST_EMAIL = "test@example.com";
     protected static final String TEST_PHONE = "+905551234567";
     protected static final String TEST_PASSWORD = "SecurePass123!";

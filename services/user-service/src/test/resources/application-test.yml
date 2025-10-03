@@ -1,46 +1,81 @@
-# Test Configuration for User Service
-spring:
-  profiles:
-    active: test
+# =============================================================================
+# USER SERVICE TEST CONFIGURATION
+# =============================================================================
+# Test environment configuration using H2 in-memory database
 
+spring:
+  # Database Configuration - H2 in PostgreSQL compatibility mode
   datasource:
-    url: jdbc:h2:mem:testdb
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
 
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          time_zone: UTC
+    # Ensure entities are scanned properly
+    open-in-view: false
 
   h2:
     console:
-      enabled: true
+      enabled: false
 
+  # Disable Flyway for tests (using ddl-auto: create-drop)
+  flyway:
+    enabled: false
+
+  # Kafka Configuration - Disabled for unit/integration tests
   kafka:
+    enabled: false
     bootstrap-servers: localhost:9092
     consumer:
       group-id: user-service-test
       auto-offset-reset: earliest
+      enable-auto-commit: false
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-# Test specific configurations
+  # Redis Configuration - Disabled for tests
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+  # Cache Configuration - Simple cache for tests
+  cache:
+    type: simple
+
+# Logging Configuration
 logging:
   level:
     com.fabricmanagement.user: DEBUG
     org.springframework.kafka: WARN
+    org.springframework.web: INFO
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.test: INFO
 
-# Test timeouts
+# Test Timeouts
 test:
   timeout:
     default: 30s
     integration: 60s
+
+# Management Endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

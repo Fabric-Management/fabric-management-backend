@@ -1,0 +1,145 @@
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - API GATEWAY DOCKER CONFIGURATION
+# =============================================================================
+# Docker environment configuration for API Gateway
+
+spring:
+  application:
+    name: api-gateway
+
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      connect-timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  # ===========================================================================
+  # GATEWAY ROUTES CONFIGURATION
+  # ===========================================================================
+  cloud:
+    gateway:
+      routes:
+        # User Service Routes
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://user-service:8081}
+          predicates:
+            - Path=/api/v1/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+
+        # Company Service Routes
+        - id: company-service
+          uri: ${COMPANY_SERVICE_URL:http://company-service:8083}
+          predicates:
+            - Path=/api/v1/companies/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: companyServiceCircuitBreaker
+                fallbackUri: forward:/fallback/company-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+
+        # Contact Service Routes
+        - id: contact-service
+          uri: ${CONTACT_SERVICE_URL:http://contact-service:8082}
+          predicates:
+            - Path=/api/v1/contacts/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: contactServiceCircuitBreaker
+                fallbackUri: forward:/fallback/contact-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8080
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET}
+
+# =============================================================================
+# RESILIENCE4J CONFIGURATION
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        slidingWindowSize: 100
+        permittedNumberOfCallsInHalfOpenState: 10
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+    instances:
+      userServiceCircuitBreaker:
+        baseConfig: default
+      companyServiceCircuitBreaker:
+        baseConfig: default
+      contactServiceCircuitBreaker:
+        baseConfig: default
+
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+
+# =============================================================================
+# MANAGEMENT & MONITORING
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.gateway: INFO
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  # File logging disabled in Docker - logs go to stdout/stderr

@@ -24,10 +24,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     "com.fabricmanagement.contact",
     "com.fabricmanagement.shared"
 })
-@EnableJpaRepositories(basePackages = {
-    "com.fabricmanagement.contact",
-    "com.fabricmanagement.shared"
-})
+@EnableJpaRepositories(basePackages = "com.fabricmanagement.contact.infrastructure.repository")
 @EnableCaching
 @EnableKafka
 @EnableAsync

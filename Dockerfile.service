@@ -1,8 +1,10 @@
 # =============================================================================
 # FABRIC MANAGEMENT - UNIVERSAL SERVICE DOCKERFILE
 # =============================================================================
-# DRY Principle: Single parameterized Dockerfile for all microservices
-# Usage: docker build -f Dockerfile.service --build-arg SERVICE_NAME=user-service --build-arg SERVICE_PORT=8081 .
+# DRY Principle: Single parameterized Dockerfile for ALL services
+# Usage: docker build -f Dockerfile.service --build-arg SERVICE_NAME=api-gateway --build-arg SERVICE_PORT=8080 .
+#
+# Supports: user-service, contact-service, company-service, api-gateway
 
 # Build arguments
 ARG SERVICE_NAME
@@ -48,11 +50,16 @@ RUN addgroup -g 1001 -S fabricuser && \
 WORKDIR /app
 
 # Copy JAR from build stage with ownership
-COPY --from=build --chown=fabricuser:fabricuser /build/services/${SERVICE_NAME}/target/${SERVICE_NAME}-1.0.0-SNAPSHOT.jar app.jar
+COPY --from=build --chown=fabricuser:fabricuser \
+    /build/services/${SERVICE_NAME}/target/${SERVICE_NAME}-1.0.0-SNAPSHOT.jar app.jar
 
 # Copy optimized entrypoint script
 COPY --chown=fabricuser:fabricuser scripts/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
+
+# Create logs directory with proper permissions
+RUN mkdir -p /app/logs && \
+    chown -R fabricuser:fabricuser /app
 
 # Switch to non-root user
 USER fabricuser
@@ -60,7 +67,7 @@ USER fabricuser
 # Expose application port
 EXPOSE ${SERVICE_PORT}
 
-# Health check
+# Health check (dynamic based on service)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${SERVICE_PORT}/actuator/health || exit 1
 
@@ -70,4 +77,3 @@ ENV SERVER_PORT=${SERVICE_PORT}
 
 # Use optimized entrypoint
 ENTRYPOINT ["/docker-entrypoint.sh"]
-

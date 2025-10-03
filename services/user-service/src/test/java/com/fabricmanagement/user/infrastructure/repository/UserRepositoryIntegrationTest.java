@@ -3,6 +3,7 @@ package com.fabricmanagement.user.infrastructure.repository;
 import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
+import com.fabricmanagement.user.util.TestDataBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -21,8 +22,11 @@ import static org.assertj.core.api.Assertions.*;
 /**
  * User Repository Integration Tests
  * 
- * Tests database operations with real JPA/Hibernate
- * Note: Contact-related tests removed - use ContactServiceClient instead
+ * Tests database operations with H2 in-memory database (PostgreSQL mode).
+ * Uses TestDataBuilder for consistent test data creation.
+ * 
+ * For tests requiring real PostgreSQL, use @Import(TestContainersConfiguration.class)
+ * and @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
  */
 @DataJpaTest
 @ActiveProfiles("test")
@@ -31,7 +35,6 @@ class UserRepositoryIntegrationTest {
 
     private static final String TEST_FIRST_NAME = "John";
     private static final String TEST_LAST_NAME = "Doe";
-    private static final String TEST_PASSWORD_HASH = "$2a$10$hashedpassword123";
     private static final UUID TEST_TENANT_ID = UUID.randomUUID();
 
     @Autowired
@@ -44,26 +47,31 @@ class UserRepositoryIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        testUser = User.builder()
-                .id(UUID.randomUUID())
-                .tenantId(TEST_TENANT_ID.toString())
-                .firstName(TEST_FIRST_NAME)
-                .lastName(TEST_LAST_NAME)
-                .displayName(TEST_FIRST_NAME + " " + TEST_LAST_NAME)
-                .status(UserStatus.PENDING_VERIFICATION)
-                .registrationType(RegistrationType.DIRECT_REGISTRATION)
-                .passwordHash(TEST_PASSWORD_HASH)
-                .deleted(false)
-                .version(0L)
+        // Clear any existing data
+        entityManager.clear();
+        
+        // Use TestDataBuilder for consistent test data
+        testUser = TestDataBuilder.customUser()
+                .withTenantId(TEST_TENANT_ID.toString())
+                .withName(TEST_FIRST_NAME, TEST_LAST_NAME)
+                .withStatus(UserStatus.PENDING_VERIFICATION)
+                .withRegistrationType(RegistrationType.DIRECT_REGISTRATION)
                 .build();
         
-        entityManager.persistAndFlush(testUser);
-        entityManager.clear();
+        // Persist and flush to ensure it's in the database
+        testUser = entityManager.persistAndFlush(testUser);
+        entityManager.clear(); // Clear to ensure fresh fetch from DB
     }
 
     @Nested
     @DisplayName("Basic CRUD Operations")
     class BasicCrudOperations {
+
+        @BeforeEach
+        void setUpNested() {
+            // Ensure fresh test data for each nested test
+            entityManager.clear();
+        }
 
         @Test
         @DisplayName("Should save and retrieve user successfully")
@@ -104,6 +112,11 @@ class UserRepositoryIntegrationTest {
     @DisplayName("Tenant-Based Queries")
     class TenantBasedQueries {
 
+        @BeforeEach
+        void setUpNested() {
+            entityManager.clear();
+        }
+
         @Test
         @DisplayName("Should find users by tenant ID")
         void shouldFindUsersByTenantId() {
@@ -136,6 +149,11 @@ class UserRepositoryIntegrationTest {
     @DisplayName("Status-Based Queries")
     class StatusBasedQueries {
 
+        @BeforeEach
+        void setUpNested() {
+            entityManager.clear();
+        }
+
         @Test
         @DisplayName("Should find users by status")
         void shouldFindUsersByStatus() {
@@ -158,6 +176,11 @@ class UserRepositoryIntegrationTest {
     @Nested
     @DisplayName("Search Operations")
     class SearchOperations {
+
+        @BeforeEach
+        void setUpNested() {
+            entityManager.clear();
+        }
 
         @Test
         @DisplayName("Should search users by first name")

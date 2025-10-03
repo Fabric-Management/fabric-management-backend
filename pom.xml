@@ -88,10 +88,11 @@
         <module>shared/shared-security</module>
 
         <!-- Service modules (Active) -->
+        <module>services/api-gateway</module>
         <module>services/user-service</module>
         <module>services/contact-service</module>
         <module>services/company-service</module>
-        
+
         <!-- Service modules (Coming Soon - Uncomment when created) -->
         <!--<module>services/notification-service</module>-->
         <!--<module>services/hr-service</module>-->

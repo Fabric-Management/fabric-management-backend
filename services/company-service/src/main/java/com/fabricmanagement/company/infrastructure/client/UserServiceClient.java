@@ -9,34 +9,39 @@ import java.util.UUID;
 
 /**
  * User Service Client for Company Service
- * 
- * Feign client for communicating with User Service
+ *
+ * Feign client for communicating with User Service.
+ * URL will be resolved via Service Discovery (future) or configuration.
  */
-@FeignClient(name = "user-service", url = "${user-service.url:http://localhost:8081}")
+@FeignClient(
+    name = "user-service",
+    url = "${user-service.url:http://localhost:8081}",
+    path = "/api/v1/users"
+)
 public interface UserServiceClient {
-    
+
     /**
      * Gets a user by ID
      */
-    @GetMapping("/api/v1/users/users/{userId}")
+    @GetMapping("/{userId}")
     UserDto getUser(@PathVariable("userId") UUID userId);
-    
+
     /**
      * Gets users by company ID
      */
-    @GetMapping("/api/v1/users/users/company/{companyId}")
+    @GetMapping("/company/{companyId}")
     List<UserDto> getUsersByCompany(@PathVariable("companyId") UUID companyId);
-    
+
     /**
      * Checks if a user exists
      */
-    @GetMapping("/api/v1/users/users/{userId}/exists")
+    @GetMapping("/{userId}/exists")
     boolean userExists(@PathVariable("userId") UUID userId);
-    
+
     /**
      * Gets user count for a company
      */
-    @GetMapping("/api/v1/users/users/company/{companyId}/count")
+    @GetMapping("/company/{companyId}/count")
     int getUserCountForCompany(@PathVariable("companyId") UUID companyId);
 }
 

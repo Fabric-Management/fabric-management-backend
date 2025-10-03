@@ -10,63 +10,68 @@ import java.util.UUID;
 
 /**
  * Contact Service Client
- * 
- * Feign client for communicating with Contact Service
+ *
+ * Feign client for communicating with Contact Service.
+ * URL will be resolved via Service Discovery (future) or configuration.
  */
-@FeignClient(name = "contact-service", url = "${contact-service.url:http://localhost:8082}")
+@FeignClient(
+    name = "contact-service",
+    url = "${contact-service.url:http://localhost:8082}",
+    path = "/api/v1/contacts"
+)
 public interface ContactServiceClient {
-    
+
     /**
      * Creates a new contact
      */
-    @PostMapping("/api/v1/contacts/contacts")
+    @PostMapping
     ContactDto createContact(@RequestBody CreateContactDto request);
-    
+
     /**
      * Gets contacts by owner ID
      */
-    @GetMapping("/api/v1/contacts/contacts/owner/{ownerId}")
+    @GetMapping("/owner/{ownerId}")
     List<ContactDto> getContactsByOwner(@PathVariable("ownerId") String ownerId);
-    
+
     /**
      * Gets verified contacts for an owner
      */
-    @GetMapping("/api/v1/contacts/contacts/owner/{ownerId}/verified")
+    @GetMapping("/owner/{ownerId}/verified")
     List<ContactDto> getVerifiedContacts(@PathVariable("ownerId") String ownerId);
-    
+
     /**
      * Gets primary contact for an owner
      */
-    @GetMapping("/api/v1/contacts/contacts/owner/{ownerId}/primary")
+    @GetMapping("/owner/{ownerId}/primary")
     ContactDto getPrimaryContact(@PathVariable("ownerId") String ownerId);
-    
+
     /**
      * Verifies a contact
      */
-    @PutMapping("/api/v1/contacts/contacts/{contactId}/verify")
+    @PutMapping("/{contactId}/verify")
     ContactDto verifyContact(@PathVariable("contactId") UUID contactId, @RequestParam("code") String code);
-    
+
     /**
      * Makes a contact primary
      */
-    @PutMapping("/api/v1/contacts/contacts/{contactId}/primary")
+    @PutMapping("/{contactId}/primary")
     ContactDto makePrimary(@PathVariable("contactId") UUID contactId);
-    
+
     /**
      * Deletes a contact
      */
-    @DeleteMapping("/api/v1/contacts/contacts/{contactId}")
+    @DeleteMapping("/{contactId}")
     void deleteContact(@PathVariable("contactId") UUID contactId);
-    
+
     /**
      * Checks if a contact value is available
      */
-    @PostMapping("/api/v1/contacts/contacts/check-availability")
+    @PostMapping("/check-availability")
     boolean checkAvailability(@RequestParam("contactValue") String contactValue);
-    
+
     /**
      * Sends verification code to a contact
      */
-    @PostMapping("/api/v1/contacts/contacts/{contactId}/send-verification")
+    @PostMapping("/{contactId}/send-verification")
     void sendVerificationCode(@PathVariable("contactId") UUID contactId);
 }

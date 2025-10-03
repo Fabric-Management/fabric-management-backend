@@ -1,0 +1,227 @@
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - API GATEWAY CONFIGURATION
+# =============================================================================
+# Central entry point for all microservices
+
+# =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
+spring:
+  application:
+    name: api-gateway
+  profiles:
+    active: local
+
+  # ===========================================================================
+  # GATEWAY ROUTES CONFIGURATION
+  # ===========================================================================
+  cloud:
+    gateway:
+      # Route definitions
+      routes:
+        # User Service Routes
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.requestedTokens: 1
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: true
+
+        # Company Service Routes
+        - id: company-service
+          uri: ${COMPANY_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/companies/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: companyServiceCircuitBreaker
+                fallbackUri: forward:/fallback/company-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.requestedTokens: 1
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+
+        # Contact Service Routes
+        - id: contact-service
+          uri: ${CONTACT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/contacts/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: contactServiceCircuitBreaker
+                fallbackUri: forward:/fallback/contact-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.requestedTokens: 1
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+
+      # Global CORS Configuration
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "http://localhost:4200"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      # Default filters for all routes
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        - AddRequestHeader=X-Gateway-Request, true
+        - AddResponseHeader=X-Gateway-Response, API-Gateway
+
+  # ===========================================================================
+  # REDIS CONFIGURATION (for Rate Limiting)
+  # ===========================================================================
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8080
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 86400000  # 24 hours
+
+# =============================================================================
+# RESILIENCE4J CONFIGURATION
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 100
+        minimum-number-of-calls: 10
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        record-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      userServiceCircuitBreaker:
+        base-config: default
+      companyServiceCircuitBreaker:
+        base-config: default
+      contactServiceCircuitBreaker:
+        base-config: default
+
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 5s
+    instances:
+      userServiceCircuitBreaker:
+        base-config: default
+      companyServiceCircuitBreaker:
+        base-config: default
+      contactServiceCircuitBreaker:
+        base-config: default
+
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+    instances:
+      userServiceCircuitBreaker:
+        base-config: default
+      companyServiceCircuitBreaker:
+        base-config: default
+      contactServiceCircuitBreaker:
+        base-config: default
+
+# =============================================================================
+# MANAGEMENT & MONITORING
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
+    reactor.netty: INFO
+    io.netty: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
