@@ -71,7 +71,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
-      client-id: contact-service
+      client-id: ${spring.application.name}-producer-${HOSTNAME:localhost}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
@@ -82,13 +82,16 @@ spring:
       linger-ms: 5
       buffer-memory: 33554432
     consumer:
-      client-id: contact-service
+      client-id: ${spring.application.name}-consumer-${HOSTNAME:localhost}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       group-id: contact-service-group
       auto-offset-reset: earliest
       enable-auto-commit: false
+      max-poll-records: 100
       properties:
+        allow.auto.create.topics: true
+        jmx.prefix: contact-service
         spring.json.trusted.packages: "com.fabricmanagement.contact.domain.event,java.util"
 
 # =============================================================================

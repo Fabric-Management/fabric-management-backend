@@ -142,7 +142,7 @@ public class ContactController {
     /**
      * Sets a contact as primary
      */
-    @PostMapping("/{contactId}/set-primary")
+    @PutMapping("/{contactId}/primary")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> setPrimaryContact(@PathVariable UUID contactId) {
         log.info("Setting contact as primary: {}", contactId);
@@ -161,13 +161,34 @@ public class ContactController {
     }
     
     /**
+     * Sends verification code to a contact
+     */
+    @PostMapping("/{contactId}/send-verification")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> sendVerificationCode(@PathVariable UUID contactId) {
+        log.info("Sending verification code to contact: {}", contactId);
+
+        // Validate access
+        ContactResponse existingContact = contactService.getContact(contactId);
+        String currentUserId = SecurityContextHolder.getCurrentUserId();
+        if (!currentUserId.equals(existingContact.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
+            log.warn("Unauthorized send verification attempt by user {} for contact {}", currentUserId, contactId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("You don't have permission to send verification for this contact", "FORBIDDEN"));
+        }
+
+        contactService.sendVerificationCode(contactId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Verification code sent successfully"));
+    }
+
+    /**
      * Verifies a contact
      */
-    @PostMapping("/{contactId}/verify")
+    @PutMapping("/{contactId}/verify")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> verifyContact(
             @PathVariable UUID contactId,
-            @RequestParam String verificationCode) {
+            @RequestParam String code) {
         
         log.info("Verifying contact: {}", contactId);
         
@@ -179,8 +200,8 @@ public class ContactController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to verify this contact", "FORBIDDEN"));
         }
-        
-        contactService.verifyContact(contactId, verificationCode);
+
+        contactService.verifyContact(contactId, code);
         return ResponseEntity.ok(ApiResponse.success(null, "Contact verified successfully"));
     }
     
@@ -204,6 +225,18 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contact));
     }
     
+    /**
+     * Checks if a contact value is available
+     */
+    @PostMapping("/check-availability")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Boolean>> checkAvailability(@RequestParam String contactValue) {
+        log.debug("Checking availability for contact value: {}", contactValue);
+
+        boolean available = contactService.checkAvailability(contactValue);
+        return ResponseEntity.ok(ApiResponse.success(available));
+    }
+
     /**
      * Searches contacts by type and owner
      */

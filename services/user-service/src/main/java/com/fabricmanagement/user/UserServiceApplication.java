@@ -26,10 +26,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     "com.fabricmanagement.user",
     "com.fabricmanagement.shared"
 })
-@EnableJpaRepositories(basePackages = {
-    "com.fabricmanagement.user",
-    "com.fabricmanagement.shared"
-})
+@EnableJpaRepositories(basePackages = "com.fabricmanagement.user.infrastructure.repository")
 @EnableCaching
 @EnableKafka
 @EnableAsync

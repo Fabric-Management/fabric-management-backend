@@ -3,6 +3,7 @@ package com.fabricmanagement.shared.infrastructure.outbox;
 import com.fabricmanagement.shared.domain.outbox.OutboxEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,11 +14,14 @@ import java.util.List;
 
 /**
  * Outbox Event Publisher
- * 
+ *
  * Polls outbox table every 5s and publishes to Kafka.
  * Simple and reliable event delivery.
+ *
+ * Only activated when OutboxEventRepository bean is available.
  */
 @Component
+@ConditionalOnBean(OutboxEventRepository.class)
 @RequiredArgsConstructor
 @Slf4j
 public class OutboxEventPublisher {

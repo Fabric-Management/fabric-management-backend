@@ -104,6 +104,16 @@ Complete database documentation including:
 - Environment configuration
 - Production checklist
 
+### [New Service Integration Guide](deployment/NEW_SERVICE_INTEGRATION_GUIDE.md) ⭐ NEW
+
+**Yeni mikroservis/modül eklerken izlenmesi gereken adım adım kılavuz:**
+
+- Dockerfile yapılandırması (Universal Dockerfile.service kullanımı)
+- Docker Compose entegrasyonu
+- Ortam değişkenleri yönetimi
+- API Gateway rotası ekleme
+- Detaylı checklist ve best practices
+
 ### [Environment Management](deployment/ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md)
 
 - Environment variables

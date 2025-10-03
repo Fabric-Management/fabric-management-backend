@@ -15,12 +15,13 @@ This directory contains all deployment-related documentation for the Fabric Mana
 | [CURRENT_DEPLOYMENT_REFERENCE.md](./CURRENT_DEPLOYMENT_REFERENCE.md)                   | **Complete deployment reference guide** | ✅ CURRENT |
 | [ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md](./ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md) | Environment variables best practices    | ✅ UPDATED |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)                                           | Step-by-step deployment instructions    | ✅ ACTIVE  |
+| [NEW_SERVICE_INTEGRATION_GUIDE.md](./NEW_SERVICE_INTEGRATION_GUIDE.md)                 | **New microservice integration guide**  | ✅ NEW     |
 
 ### Configuration Guides
 
 | Document                                                   | Purpose                   | Status       |
 | ---------------------------------------------------------- | ------------------------- | ------------ |
-| [API_GATEWAY_SETUP.md](./API_GATEWAY_SETUP.md)             | API Gateway configuration | 🔄 PLANNED   |
+| [API_GATEWAY_SETUP.md](./API_GATEWAY_SETUP.md)             | API Gateway configuration | ✅ ACTIVE    |
 | [SERVICE_DISCOVERY_SETUP.md](./SERVICE_DISCOVERY_SETUP.md) | Service discovery setup   | 🔄 FUTURE    |
 | [DEPLOYMENT_IMPROVEMENTS.md](./DEPLOYMENT_IMPROVEMENTS.md) | Improvement roadmap       | 📋 REFERENCE |
 

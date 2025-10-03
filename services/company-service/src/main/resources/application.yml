@@ -12,18 +12,9 @@ spring:
   profiles:
     active: local
 
-# =============================================================================
-# SERVER CONFIGURATION
-# =============================================================================
-server:
-  port: 8083
-  servlet:
-    context-path: /api/v1/companies
-
-# =============================================================================
-# DATABASE CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # DATABASE CONFIGURATION
+  # ===========================================================================
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
     username: ${POSTGRES_USER:fabric_user}
@@ -52,19 +43,9 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-# =============================================================================
-# EXTERNAL SERVICES CONFIGURATION
-# =============================================================================
-contact-service:
-  url: ${CONTACT_SERVICE_URL:http://localhost:8082}
-
-user-service:
-  url: ${USER_SERVICE_URL:http://localhost:8081}
-
-# =============================================================================
-# CACHE CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -82,14 +63,13 @@ spring:
     redis:
       time-to-live: 600000 # 10 minutes
 
-# =============================================================================
-# KAFKA CONFIGURATION
-# =============================================================================
-spring:
+  # ===========================================================================
+  # KAFKA CONFIGURATION
+  # ===========================================================================
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
-      client-id: company-service
+      client-id: ${spring.application.name}-producer-${HOSTNAME:localhost}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
@@ -100,14 +80,34 @@ spring:
       linger-ms: 5
       buffer-memory: 33554432
     consumer:
-      client-id: company-service
+      client-id: ${spring.application.name}-consumer-${HOSTNAME:localhost}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       group-id: company-service-group
       auto-offset-reset: earliest
       enable-auto-commit: false
+      max-poll-records: 100
       properties:
         spring.json.trusted.packages: "com.fabricmanagement.company.domain.event"
+        allow.auto.create.topics: true
+        jmx.prefix: company-service
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8083
+  servlet:
+    context-path: /api/v1/companies
+
+# =============================================================================
+# EXTERNAL SERVICES CONFIGURATION
+# =============================================================================
+contact-service:
+  url: ${CONTACT_SERVICE_URL:http://localhost:8082}
+
+user-service:
+  url: ${USER_SERVICE_URL:http://localhost:8081}
 
 # =============================================================================
 # RESILIENCE4J CONFIGURATION

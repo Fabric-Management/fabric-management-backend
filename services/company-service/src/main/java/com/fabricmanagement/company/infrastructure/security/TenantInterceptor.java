@@ -5,8 +5,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -38,16 +36,9 @@ public class TenantInterceptor implements HandlerInterceptor {
             }
         }
         
-        // Try to get tenant ID from authentication
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            // In a real implementation, tenant ID would be extracted from JWT claims
-            // For now, we'll use a default tenant ID
-            UUID defaultTenantId = UUID.randomUUID();
-            TenantContext.setCurrentTenant(defaultTenantId);
-            log.debug("Using default tenant ID: {}", defaultTenantId);
-        }
-        
+        // If no tenant ID in header, request should be rejected by authentication layer
+        // Gateway should always provide X-Tenant-ID header
+        log.warn("No tenant ID found in request headers for: {}", request.getRequestURI());
         return true;
     }
     
