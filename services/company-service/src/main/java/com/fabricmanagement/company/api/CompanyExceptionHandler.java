@@ -17,13 +17,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Global Exception Handler
- * 
- * Handles exceptions globally and returns appropriate error responses
+ * Company Service Exception Handler
+ *
+ * Handles company-specific exceptions and returns appropriate error responses
  */
 @RestControllerAdvice
 @Slf4j
-public class GlobalExceptionHandler {
+public class CompanyExceptionHandler {
     
     @ExceptionHandler(CompanyNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleCompanyNotFound(CompanyNotFoundException ex) {

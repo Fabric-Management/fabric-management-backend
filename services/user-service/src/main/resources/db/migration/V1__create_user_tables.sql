@@ -173,3 +173,37 @@ CREATE TABLE IF NOT EXISTS user_outbox_events (
 -- Outbox indexes
 CREATE INDEX IF NOT EXISTS idx_user_outbox_processed ON user_outbox_events (processed, created_at);
 CREATE INDEX IF NOT EXISTS idx_user_outbox_aggregate ON user_outbox_events (aggregate_type, aggregate_id);
+
+-- =============================================================================
+-- SEED DATA - DEFAULT SUPER ADMIN
+-- =============================================================================
+-- Default Super Admin for initial system access
+-- Email: admin@system.local
+-- Password: Admin@123
+-- Note: Change password immediately after first login in production!
+
+INSERT INTO users (
+    id,
+    tenant_id,
+    first_name,
+    last_name,
+    display_name,
+    status,
+    role,
+    password_hash,
+    registration_type,
+    created_by,
+    updated_by
+) VALUES (
+    '00000000-0000-0000-0000-000000000001'::UUID,
+    '00000000-0000-0000-0000-000000000000',  -- Default tenant ID
+    'Super',
+    'Admin',
+    'Super Administrator',
+    'ACTIVE',
+    'SUPER_ADMIN',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',  -- bcrypt hash of 'Admin@123'
+    'SYSTEM_CREATED',
+    'SYSTEM',
+    'SYSTEM'
+) ON CONFLICT (id) DO NOTHING;

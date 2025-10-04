@@ -11,6 +11,10 @@ spring:
     name: api-gateway
   profiles:
     active: local
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
 
   # ===========================================================================
   # GATEWAY ROUTES CONFIGURATION
@@ -139,7 +143,8 @@ server:
 # =============================================================================
 jwt:
   secret: ${JWT_SECRET}
-  expiration: 86400000  # 24 hours
+  expiration: 86400000 # 24 hours
+  refresh-expiration: 604800000 # 7 days
 
 # =============================================================================
 # RESILIENCE4J CONFIGURATION

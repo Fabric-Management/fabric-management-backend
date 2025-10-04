@@ -7,6 +7,21 @@
 # Load environment variables from .env file
 # Copy .env.example to .env and update values before running
 
+# ==============================================
+# SHARED CONFIGURATIONS (DRY principle)
+# ==============================================
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 60s
+
 networks:
   fabric-network:
     driver: bridge
@@ -151,6 +166,232 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+  # ==============================================
+  # API GATEWAY - Central Entry Point
+  # ==============================================
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: api-gateway
+        SERVICE_PORT: 8080
+    image: fabric-api-gateway:latest
+    container_name: fabric-api-gateway
+    hostname: api-gateway-instance
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET}
+      USER_SERVICE_URL: http://user-service:8081
+      COMPANY_SERVICE_URL: http://company-service:8083
+      CONTACT_SERVICE_URL: http://contact-service:8082
+      SERVER_PORT: 8080
+    ports:
+      - "${API_GATEWAY_PORT:-8080}:8080"
+    networks:
+      - fabric-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      <<: *healthcheck-defaults
+      start_period: 45s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "0.75"
+        reservations:
+          memory: 384M
+          cpus: "0.5"
+
+  # ==============================================
+  # MICROSERVICES
+  # ==============================================
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: user-service
+        SERVICE_PORT: 8081
+    image: fabric-user-service:latest
+    container_name: fabric-user-service
+    hostname: user-service-instance
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      JWT_SECRET: ${JWT_SECRET}
+      JMX_PORT: 9011
+      SERVER_PORT: 8081
+      CONTACT_SERVICE_URL: http://contact-service:8082
+    ports:
+      - "${USER_SERVICE_PORT:-8081}:8081"
+      - "${USER_SERVICE_JMX_PORT:-9011}:9011"
+    networks:
+      - fabric-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8081/api/v1/users/actuator/health",
+        ]
+      <<: *healthcheck-defaults
+      start_period: 90s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+  contact-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: contact-service
+        SERVICE_PORT: 8082
+    image: fabric-contact-service:latest
+    container_name: fabric-contact-service
+    hostname: contact-service-instance
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      JWT_SECRET: ${JWT_SECRET}
+      JMX_PORT: 9012
+      SERVER_PORT: 8082
+    ports:
+      - "${CONTACT_SERVICE_PORT:-8082}:8082"
+      - "${CONTACT_SERVICE_JMX_PORT:-9012}:9012"
+    networks:
+      - fabric-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8082/api/v1/contacts/actuator/health",
+        ]
+      <<: *healthcheck-defaults
+      start_period: 90s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+  company-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: company-service
+        SERVICE_PORT: 8083
+    image: fabric-company-service:latest
+    container_name: fabric-company-service
+    hostname: company-service-instance
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      JWT_SECRET: ${JWT_SECRET}
+      JMX_PORT: 9013
+      USER_SERVICE_HOST: user-service
+      CONTACT_SERVICE_HOST: contact-service
+      USER_SERVICE_URL: http://user-service:8081
+      CONTACT_SERVICE_URL: http://contact-service:8082
+      SERVER_PORT: 8083
+    ports:
+      - "${COMPANY_SERVICE_PORT:-8083}:8083"
+      - "${COMPANY_SERVICE_JMX_PORT:-9013}:9013"
+    networks:
+      - fabric-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8083/api/v1/companies/actuator/health",
+        ]
+      <<: *healthcheck-defaults
+      start_period: 90s
+    logging: *default-logging
     deploy:
       resources:
         limits:

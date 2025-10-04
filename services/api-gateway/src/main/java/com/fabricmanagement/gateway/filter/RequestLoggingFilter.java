@@ -29,17 +29,19 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
 
         String method = request.getMethod().name();
         String path = request.getPath().toString();
-        String remoteAddress = request.getRemoteAddress() != null
-            ? request.getRemoteAddress().getAddress().getHostAddress()
+
+        var remoteAddr = request.getRemoteAddress();
+        String remoteAddress = remoteAddr != null
+            ? remoteAddr.getAddress().getHostAddress()
             : "unknown";
 
         log.info("→ Incoming request: {} {} from {}", method, path, remoteAddress);
 
         return chain.filter(exchange).then(Mono.fromRunnable(() -> {
             long duration = System.currentTimeMillis() - startTime;
-            int statusCode = exchange.getResponse().getStatusCode() != null
-                ? exchange.getResponse().getStatusCode().value()
-                : 0;
+
+            var statusCodeObj = exchange.getResponse().getStatusCode();
+            int statusCode = statusCodeObj != null ? statusCodeObj.value() : 0;
 
             log.info("← Response: {} {} - Status: {} - Duration: {}ms",
                 method, path, statusCode, duration);

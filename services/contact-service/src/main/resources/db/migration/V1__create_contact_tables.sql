@@ -93,3 +93,33 @@ CREATE TABLE IF NOT EXISTS contact_outbox_events (
 -- Outbox indexes
 CREATE INDEX IF NOT EXISTS idx_contact_outbox_processed ON contact_outbox_events (processed, created_at);
 CREATE INDEX IF NOT EXISTS idx_contact_outbox_aggregate ON contact_outbox_events (aggregate_type, aggregate_id);
+
+-- =============================================================================
+-- SEED DATA - SUPER ADMIN CONTACT
+-- =============================================================================
+-- Contact information for default super admin user
+-- Owner ID matches the super admin user ID from user-service
+
+INSERT INTO contacts (
+    id,
+    owner_id,
+    owner_type,
+    contact_value,
+    contact_type,
+    is_verified,
+    is_primary,
+    verified_at,
+    created_by,
+    updated_by
+) VALUES (
+    '00000000-0000-0000-0000-000000000001'::UUID,
+    '00000000-0000-0000-0000-000000000001',  -- Super Admin User ID
+    'USER',
+    'admin@system.local',
+    'EMAIL',
+    TRUE,
+    TRUE,
+    CURRENT_TIMESTAMP,
+    'SYSTEM',
+    'SYSTEM'
+) ON CONFLICT (contact_value) DO NOTHING;

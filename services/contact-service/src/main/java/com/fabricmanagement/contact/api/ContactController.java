@@ -245,9 +245,9 @@ public class ContactController {
     public ResponseEntity<ApiResponse<List<ContactResponse>>> searchContacts(
             @RequestParam String ownerId,
             @RequestParam(required = false) String contactType) {
-        
+
         log.debug("Searching contacts for owner: {} with type: {}", ownerId, contactType);
-        
+
         // Validate access
         String currentUserId = SecurityContextHolder.getCurrentUserId();
         if (!currentUserId.equals(ownerId) && !SecurityContextHolder.hasRole("ADMIN")) {
@@ -255,8 +255,22 @@ public class ContactController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to search these contacts", "FORBIDDEN"));
         }
-        
+
         List<ContactResponse> contacts = contactService.searchContacts(ownerId, contactType);
+        return ResponseEntity.ok(ApiResponse.success(contacts));
+    }
+
+    /**
+     * Finds contacts by contact value (email or phone)
+     * Used for authentication purposes - no auth required
+     */
+    @GetMapping("/find-by-value")
+    public ResponseEntity<ApiResponse<List<ContactResponse>>> findByContactValue(
+            @RequestParam String contactValue) {
+
+        log.debug("Finding contacts by value: {}", contactValue);
+
+        List<ContactResponse> contacts = contactService.findByContactValue(contactValue);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
 }
