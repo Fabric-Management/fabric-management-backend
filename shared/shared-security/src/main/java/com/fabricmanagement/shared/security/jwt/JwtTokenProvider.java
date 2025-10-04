@@ -31,6 +31,15 @@ public class JwtTokenProvider {
     @Value("${jwt.refresh-expiration}")
     private long refreshExpiration;
 
+    @Value("${jwt.algorithm:HS256}")
+    private String jwtAlgorithm;
+
+    @Value("${jwt.issuer:fabric-management-system}")
+    private String jwtIssuer;
+
+    @Value("${jwt.audience:fabric-api}")
+    private String jwtAudience;
+
     /**
      * Generate JWT token
      */
@@ -62,6 +71,8 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
+                .setIssuer(jwtIssuer)
+                .setAudience(jwtAudience)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -103,6 +114,8 @@ public class JwtTokenProvider {
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
+                .requireIssuer(jwtIssuer)
+                .requireAudience(jwtAudience)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -135,9 +148,11 @@ public class JwtTokenProvider {
         try {
             Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
+                .requireIssuer(jwtIssuer)
+                .requireAudience(jwtAudience)
                 .build()
                 .parseClaimsJws(token);
-            return true;
+            return !isTokenExpired(token);
         } catch (JwtException | IllegalArgumentException e) {
             log.error("Invalid JWT token: {}", e.getMessage());
             return false;

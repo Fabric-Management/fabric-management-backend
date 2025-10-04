@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,7 +35,10 @@ public class ContactService {
      */
     public ContactResponse createContact(CreateContactRequest request) {
         log.info("Creating contact for owner: {} with value: {}", request.getOwnerId(), request.getContactValue());
-        
+
+        // Validate contact value based on contact type
+        validateContactValue(request.getContactValue(), request.getContactType());
+
         // Check if contact already exists
         if (contactRepository.existsByContactValue(request.getContactValue())) {
             throw new IllegalArgumentException("Contact value already exists: " + request.getContactValue());
@@ -159,11 +163,14 @@ public class ContactService {
      */
     public void updateContact(UUID contactId, com.fabricmanagement.contact.application.dto.UpdateContactRequest request) {
         log.info("Updating contact: {}", contactId);
-        
+
         Contact contact = contactRepository.findById(contactId)
             .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
-        
+
+        // Validate if contactValue is being updated
         if (request.getContactValue() != null) {
+            String contactType = request.getContactType() != null ? request.getContactType() : contact.getContactType().name();
+            validateContactValue(request.getContactValue(), contactType);
             contact.setContactValue(request.getContactValue());
         }
         if (request.getContactType() != null) {
@@ -269,13 +276,69 @@ public class ContactService {
     @Transactional(readOnly = true)
     public ContactResponse getPrimaryContact(String ownerId) {
         log.debug("Getting primary contact for owner: {}", ownerId);
-        
+
         Contact contact = contactRepository.findPrimaryContactByOwner(ownerId)
             .orElseThrow(() -> new RuntimeException("No primary contact found for owner: " + ownerId));
-        
+
         return toContactResponse(contact);
     }
+
+    /**
+     * Finds contacts by contact value (email or phone)
+     */
+    @Transactional(readOnly = true)
+    public List<ContactResponse> findByContactValue(String contactValue) {
+        log.debug("Finding contacts by value: {}", contactValue);
+
+        Optional<Contact> contactOpt = contactRepository.findByContactValue(contactValue);
+
+        return contactOpt
+                .filter(Contact::isNotDeleted)
+                .map(this::toContactResponse)
+                .map(List::of)
+                .orElse(List.of());
+    }
     
+    /**
+     * Validates contact value based on contact type
+     */
+    private void validateContactValue(String contactValue, String contactType) {
+        if (contactValue == null || contactValue.trim().isEmpty()) {
+            throw new IllegalArgumentException("Contact value cannot be empty");
+        }
+
+        String trimmedValue = contactValue.trim();
+
+        switch (contactType.toUpperCase()) {
+            case "EMAIL":
+                if (!trimmedValue.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+                    throw new IllegalArgumentException("Invalid email format: " + contactValue);
+                }
+                break;
+
+            case "PHONE":
+                // Remove common formatting characters
+                String cleanedPhone = trimmedValue.replaceAll("[\\s\\-\\(\\)]", "");
+                if (!cleanedPhone.matches("^\\+?[1-9]\\d{1,14}$")) {
+                    throw new IllegalArgumentException("Invalid phone number format. Use E.164 format (e.g., +905551234567)");
+                }
+                break;
+
+            case "ADDRESS":
+            case "FAX":
+            case "WEBSITE":
+            case "SOCIAL_MEDIA":
+                // Basic validation for other types
+                if (trimmedValue.length() > 500) {
+                    throw new IllegalArgumentException("Contact value is too long (max 500 characters)");
+                }
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unknown contact type: " + contactType);
+        }
+    }
+
     /**
      * Converts Contact entity to ContactResponse DTO
      */

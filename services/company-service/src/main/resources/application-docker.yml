@@ -19,11 +19,11 @@ spring:
     password: ${POSTGRES_PASSWORD:fabric_password}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 20000
-      idle-timeout: 300000
-      max-lifetime: 1200000
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
 
   jpa:
     hibernate:
@@ -51,17 +51,18 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      timeout: 2000ms
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000}ms
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000}ms
       lettuce:
         pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
 
   cache:
     type: redis
     redis:
-      time-to-live: 600000 # 10 minutes
+      time-to-live: ${CACHE_TTL:300000} # 5 minutes
 
   # ===========================================================================
   # KAFKA CONFIGURATION
@@ -87,15 +88,28 @@ spring:
       auto-offset-reset: earliest
       enable-auto-commit: false
       properties:
-        spring.json.trusted.packages: "com.fabricmanagement.company.domain.event,java.util"
+        spring.json.trusted.packages: "com.fabricmanagement.company.domain.event"
+        allow.auto.create.topics: true
+        jmx.prefix: company-service
 
 # =============================================================================
 # SERVER CONFIGURATION
 # =============================================================================
 server:
-  port: 8083
+  port: ${COMPANY_SERVICE_PORT:8083}
   servlet:
     context-path: /api/v1/companies
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000} # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours
+  algorithm: ${JWT_ALGORITHM:HS256}
+  issuer: ${JWT_ISSUER:fabric-management-system}
+  audience: ${JWT_AUDIENCE:fabric-api}
 
 # =============================================================================
 # MANAGEMENT & MONITORING
@@ -107,7 +121,7 @@ management:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
   metrics:
     export:
       prometheus:

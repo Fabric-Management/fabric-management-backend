@@ -11,6 +11,10 @@ spring:
     name: api-gateway
   profiles:
     active: local
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
 
   # ===========================================================================
   # GATEWAY ROUTES CONFIGURATION
@@ -54,10 +58,6 @@ spring:
               args:
                 name: companyServiceCircuitBreaker
                 fallbackUri: forward:/fallback/company-service
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
             - name: RequestRateLimiter
               args:
                 redis-rate-limiter.replenishRate: 50
@@ -108,7 +108,12 @@ spring:
               - DELETE
               - PATCH
               - OPTIONS
-            allowedHeaders: "*"
+            allowedHeaders:
+              - "Authorization"
+              - "Content-Type"
+              - "X-Requested-With"
+              - "Accept"
+              - "Origin"
             allowCredentials: true
             maxAge: 3600
 
@@ -126,20 +131,35 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      timeout: 2000ms
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000}ms
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000}ms
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: ${CACHE_TTL:300000} # 5 minutes
 
 # =============================================================================
 # SERVER CONFIGURATION
 # =============================================================================
 server:
-  port: 8080
+  port: ${API_GATEWAY_PORT:8080}
 
 # =============================================================================
 # SECURITY CONFIGURATION
 # =============================================================================
 jwt:
   secret: ${JWT_SECRET}
-  expiration: 86400000  # 24 hours
+  expiration: ${JWT_EXPIRATION:3600000} # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours
+  algorithm: ${JWT_ALGORITHM:HS256}
+  issuer: ${JWT_ISSUER:fabric-management-system}
+  audience: ${JWT_AUDIENCE:fabric-api}
 
 # =============================================================================
 # RESILIENCE4J CONFIGURATION
@@ -219,9 +239,9 @@ management:
 # =============================================================================
 logging:
   level:
-    com.fabricmanagement.gateway: DEBUG
-    org.springframework.cloud.gateway: INFO
-    reactor.netty: INFO
-    io.netty: INFO
+    com.fabricmanagement.gateway: ${LOG_LEVEL:DEBUG}
+    org.springframework.cloud.gateway: ${LOG_LEVEL:INFO}
+    reactor.netty: ${LOG_LEVEL:INFO}
+    io.netty: ${LOG_LEVEL:INFO}
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

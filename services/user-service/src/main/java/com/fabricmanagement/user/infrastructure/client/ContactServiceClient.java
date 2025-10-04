@@ -74,4 +74,10 @@ public interface ContactServiceClient {
      */
     @PostMapping("/{contactId}/send-verification")
     void sendVerificationCode(@PathVariable("contactId") UUID contactId);
+
+    /**
+     * Finds contacts by contact value (email or phone)
+     */
+    @GetMapping("/find-by-value")
+    List<ContactDto> findByContactValue(@RequestParam("contactValue") String contactValue);
 }
