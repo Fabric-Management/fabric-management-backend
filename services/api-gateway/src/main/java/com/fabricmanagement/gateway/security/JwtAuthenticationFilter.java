@@ -34,7 +34,7 @@ import java.util.List;
  * - /actuator/**
  * - /fallback/**
  */
-@Component
+@Component("gatewayJwtFilter")
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {

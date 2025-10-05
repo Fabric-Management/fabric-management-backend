@@ -2,6 +2,11 @@ package com.fabricmanagement.gateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 
 /**
  * API Gateway Application
@@ -21,10 +26,25 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *
  * @see <a href="https://spring.io/projects/spring-cloud-gateway">Spring Cloud Gateway</a>
  */
-@SpringBootApplication(scanBasePackages = {
-    "com.fabricmanagement.gateway",
-    "com.fabricmanagement.shared"
-})
+@SpringBootApplication(
+    scanBasePackages = "com.fabricmanagement.gateway",
+    exclude = {
+        SecurityAutoConfiguration.class,
+        ReactiveSecurityAutoConfiguration.class,
+        ReactiveUserDetailsServiceAutoConfiguration.class
+    }
+)
+@ComponentScan(
+    basePackages = {
+        "com.fabricmanagement.gateway",
+        "com.fabricmanagement.shared.domain",
+        "com.fabricmanagement.shared.application"
+    },
+    excludeFilters = @ComponentScan.Filter(
+        type = FilterType.REGEX,
+        pattern = "com\\.fabricmanagement\\.shared\\.security\\..*"
+    )
+)
 public class ApiGatewayApplication {
 
     public static void main(String[] args) {

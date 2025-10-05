@@ -30,10 +30,10 @@ spring:
       ddl-auto: none
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
         show_sql: false
     show-sql: false
+    open-in-view: false
 
   flyway:
     enabled: true
@@ -87,10 +87,13 @@ spring:
       group-id: user-service-group
       auto-offset-reset: earliest
       enable-auto-commit: false
+      heartbeat-interval: 3000
       properties:
         spring.json.trusted.packages: "com.fabricmanagement.user.domain.event"
         allow.auto.create.topics: true
         jmx.prefix: user-service
+        session.timeout.ms: 30000
+        connections.max.idle.ms: 540000
 
 # =============================================================================
 # SERVER CONFIGURATION

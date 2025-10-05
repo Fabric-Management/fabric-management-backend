@@ -10,8 +10,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -104,6 +106,24 @@ public class DefaultSecurityConfig {
     @ConditionalOnMissingBean(ObjectMapper.class)
     public ObjectMapper objectMapper() {
         return new ObjectMapper();
+    }
+
+    /**
+     * Dummy UserDetailsService to prevent Spring Boot auto-configuration warnings
+     *
+     * This bean is required by Spring Security but not actually used in our JWT-based
+     * authentication system. All authentication is handled by JwtAuthenticationFilter
+     * which extracts user information from JWT tokens.
+     *
+     * Without this bean, Spring Boot would auto-configure a default UserDetailsService
+     * with a random password, causing unnecessary warnings in logs.
+     */
+    @Bean
+    @ConditionalOnMissingBean(UserDetailsService.class)
+    public UserDetailsService userDetailsService() {
+        // Return an empty in-memory user details manager
+        // This will never be used as JWT filter handles all authentication
+        return new InMemoryUserDetailsManager();
     }
 }
 
