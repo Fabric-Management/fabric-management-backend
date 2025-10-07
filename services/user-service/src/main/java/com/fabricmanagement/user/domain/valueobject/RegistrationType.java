@@ -7,6 +7,11 @@ package com.fabricmanagement.user.domain.valueobject;
  */
 public enum RegistrationType {
     /**
+     * User created by the system (e.g., initial admin user)
+     */
+    SYSTEM_CREATED,
+    
+    /**
      * User registered directly (no invitation needed)
      */
     DIRECT_REGISTRATION,

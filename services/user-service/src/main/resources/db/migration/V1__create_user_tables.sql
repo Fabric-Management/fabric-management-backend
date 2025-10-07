@@ -202,7 +202,7 @@ INSERT INTO users (
     'Super Administrator',
     'ACTIVE',
     'SUPER_ADMIN',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',  -- bcrypt hash of 'Admin@123'
+    '$2b$12$9fPRsXGTeGgJ0kgRwEBG1OmVXKwpdniaEcBRg0vgdBGAynJFRkIaS',  -- bcrypt hash of 'Admin@123'
     'SYSTEM_CREATED',
     'SYSTEM',
     'SYSTEM'
