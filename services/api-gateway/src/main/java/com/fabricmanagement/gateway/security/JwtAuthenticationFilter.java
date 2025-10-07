@@ -42,11 +42,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HEADER_TENANT_ID = "X-Tenant-Id";
     private static final String HEADER_USER_ID = "X-User-Id";
+    
+    /**
+     * Public paths (after StripPrefix filter)
+     * Note: Gateway routes use StripPrefix=3, so paths are already stripped
+     * Example: /api/v1/users/auth/login → /auth/login (after strip)
+     */
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
-        "/api/v1/users/auth/",
-        "/actuator/",
-        "/fallback/",
-        "/gateway/"
+        "/auth",        // Auth endpoints (stripped from /api/v1/users/auth)
+        "/actuator",    // Actuator endpoints
+        "/fallback",    // Fallback endpoints
+        "/gateway"      // Gateway management endpoints
     );
 
     @Value("${jwt.secret}")
@@ -58,8 +64,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String path = request.getPath().toString();
 
         // Skip authentication for public endpoints
-        if (isPublicEndpoint(path)) {
-            log.debug("Public endpoint, skipping authentication: {}", path);
+        boolean isPublic = isPublicEndpoint(path);
+        log.info("JwtAuthenticationFilter - Path: {} | IsPublic: {} | PUBLIC_PATHS: {}", path, isPublic, PUBLIC_PATHS);
+
+        if (isPublic) {
+            log.info("Public endpoint, skipping JWT authentication: {}", path);
             return chain.filter(exchange);
         }
 
@@ -103,7 +112,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
      * Checks if the path is a public endpoint
      */
     private boolean isPublicEndpoint(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::contains);
+        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
 
     /**
@@ -140,6 +149,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return -100; // Execute before other filters
+        return 100; // Execute after Spring Security filters
     }
 }

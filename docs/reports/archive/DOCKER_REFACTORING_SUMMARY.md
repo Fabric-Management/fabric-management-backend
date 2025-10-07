@@ -75,7 +75,7 @@ flyway:
 
 ```dockerfile
 # Dockerfile - YANLIŞ URL
-CMD curl -f http://localhost:8081/api/v1/users/actuator/health/liveness
+CMD curl -f http://localhost:8081/actuator/health/liveness
 ```
 
 **Sonra:**

@@ -24,7 +24,7 @@ monitoring/
 
 ```yaml
 # docker-compose.monitoring.yml
-version: '3.8'
+version: "3.8"
 
 services:
   prometheus:
@@ -38,8 +38,8 @@ services:
     networks:
       - fabric-network
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
 
   grafana:
     image: grafana/grafana:latest
@@ -78,15 +78,18 @@ docker-compose -f docker-compose.monitoring.yml up -d
 ## 📊 Yapılandırılmış Metrikler
 
 ### Microservices
-- ✅ User Service - `/api/v1/users/actuator/prometheus`
-- ✅ Contact Service - `/api/v1/contacts/actuator/prometheus`
-- ✅ Company Service - `/api/v1/companies/actuator/prometheus`
+
+- ✅ User Service - `/actuator/prometheus`
+- ✅ Contact Service - `/actuator/prometheus`
+- ✅ Company Service - `/actuator/prometheus`
 
 ### Infrastructure
+
 - ✅ PostgreSQL (postgres-exporter gerekli)
 - ✅ Redis (redis-exporter gerekli)
 
 ### JMX Monitoring
+
 - ✅ User Service JMX (port 9010)
 - ✅ Contact Service JMX (port 9010)
 - ✅ Company Service JMX (port 9010)
@@ -96,12 +99,15 @@ docker-compose -f docker-compose.monitoring.yml up -d
 ## 🎯 Ne Zaman Aktif Etmeli?
 
 ### Development
+
 - 🟡 **Opsiyonel** - Local development'ta genelde gerekmiyor
 
 ### Staging
+
 - 🟢 **Önerilen** - Performance testing için faydalı
 
 ### Production
+
 - 🔴 **ZORUNLU** - Monitoring production'da kritik
 
 ---

@@ -442,7 +442,7 @@ docker logs fabric-user-service
 docker exec -it fabric-user-service sh
 
 # Health endpoint'i test et
-curl http://localhost:8081/api/v1/users/actuator/health
+curl http://localhost:8081/actuator/health
 ```
 
 ### Resource Exhaustion

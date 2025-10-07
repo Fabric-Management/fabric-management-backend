@@ -1,0 +1,53 @@
+# =============================================================================
+# GIT ATTRIBUTES - Fabric Management Backend
+# =============================================================================
+# Ensures consistent file handling across different operating systems
+# Prevents checksum mismatches in Flyway migrations
+
+# =============================================================================
+# AUTO DETECT - Let Git decide line endings
+# =============================================================================
+* text=auto
+
+# =============================================================================
+# SQL MIGRATIONS - CRITICAL: Always use LF (Unix-style)
+# =============================================================================
+# Flyway calculates checksums based on file content
+# Different line endings = different checksums = validation failure
+*.sql text eol=lf
+
+# =============================================================================
+# SOURCE CODE - Normalize line endings
+# =============================================================================
+*.java text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.properties text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+Dockerfile* text eol=lf
+*.env text eol=lf
+
+# =============================================================================
+# BINARY FILES - Never modify
+# =============================================================================
+*.jar binary
+*.war binary
+*.ear binary
+*.zip binary
+*.tar.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.class binary
+
+# =============================================================================
+# SPECIAL FILES
+# =============================================================================
+.gitignore text eol=lf
+.gitattributes text eol=lf

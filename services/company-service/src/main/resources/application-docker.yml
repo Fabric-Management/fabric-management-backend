@@ -38,7 +38,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: true
+    table: company_flyway_schema_history # ✅ Separate history table per service
+    baseline-on-migrate: true # ✅ REQUIRED: init.sql creates extensions/functions first
+    baseline-version: 0 # ✅ Baseline at v0, so V1 migrations run
     validate-on-migrate: true
     clean-disabled: true # ✅ SECURITY: Prevent data loss
     repair-on-migrate: false # ✅ SECURITY: Manual repair only
@@ -51,8 +53,8 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      timeout: ${REDIS_CONNECTION_TIMEOUT:2000}ms
-      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000}ms
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000ms}
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000ms}
       lettuce:
         pool:
           max-active: ${REDIS_POOL_MAX_ACTIVE:8}
@@ -70,7 +72,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9093}
     producer:
-      client-id: company-service
+      client-id: ${spring.application.name}-producer-${HOSTNAME:${random.uuid}}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
@@ -81,7 +83,7 @@ spring:
       linger-ms: 5
       buffer-memory: 33554432
     consumer:
-      client-id: company-service
+      client-id: ${spring.application.name}-consumer-${HOSTNAME:${random.uuid}}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       group-id: company-service-group
@@ -100,8 +102,8 @@ spring:
 # =============================================================================
 server:
   port: ${COMPANY_SERVICE_PORT:8083}
-  servlet:
-    context-path: /api/v1/companies
+  # Note: No context-path - Gateway handles API versioning and routing
+  # Gateway strips /api/v1/companies prefix before forwarding to this service
 
 # =============================================================================
 # SECURITY CONFIGURATION

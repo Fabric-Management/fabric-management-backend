@@ -220,9 +220,9 @@ make health
 **Individual service health:**
 
 ```bash
-curl http://localhost:8081/api/v1/users/actuator/health
-curl http://localhost:8082/api/v1/contacts/actuator/health
-curl http://localhost:8083/api/v1/companies/actuator/health
+curl http://localhost:8081/actuator/health
+curl http://localhost:8082/actuator/health
+curl http://localhost:8083/actuator/health
 ```
 
 ### Prometheus Metrics
@@ -230,9 +230,9 @@ curl http://localhost:8083/api/v1/companies/actuator/health
 Access metrics for each service:
 
 ```bash
-curl http://localhost:8081/api/v1/users/actuator/prometheus
-curl http://localhost:8082/api/v1/contacts/actuator/prometheus
-curl http://localhost:8083/api/v1/companies/actuator/prometheus
+curl http://localhost:8081/actuator/prometheus
+curl http://localhost:8082/actuator/prometheus
+curl http://localhost:8083/actuator/prometheus
 ```
 
 ### Grafana Dashboards
@@ -507,9 +507,9 @@ After successful deployment:
 
 1. **Access Swagger UI:**
 
-   - User Service: http://localhost:8081/api/v1/users/swagger-ui.html
-   - Contact Service: http://localhost:8082/api/v1/contacts/swagger-ui.html
-   - Company Service: http://localhost:8083/api/v1/companies/swagger-ui.html
+   - User Service: http://localhost:8081/swagger-ui.html
+   - Contact Service: http://localhost:8082/swagger-ui.html
+   - Company Service: http://localhost:8083/swagger-ui.html
 
 2. **Set up monitoring dashboards in Grafana**
 

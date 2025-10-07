@@ -16,9 +16,9 @@ spring:
   # DATABASE CONFIGURATION
   # ===========================================================================
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
+    username: ${POSTGRES_USER:fabric_user}
+    password: ${POSTGRES_PASSWORD:fabric_password}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
@@ -40,7 +40,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: true
+    baseline-on-migrate: true # ✅ REQUIRED: init.sql creates extensions/functions first
+    baseline-version: 0 # ✅ Baseline at v0, so V1 migrations run
     validate-on-migrate: true
 
   # ===========================================================================
@@ -48,11 +49,11 @@ spring:
   # ===========================================================================
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      timeout: ${REDIS_CONNECTION_TIMEOUT:2000}ms
-      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000}ms
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000ms}
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000ms}
       lettuce:
         pool:
           max-active: ${REDIS_POOL_MAX_ACTIVE:8}
@@ -68,7 +69,7 @@ spring:
   # KAFKA CONFIGURATION
   # ===========================================================================
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       client-id: ${spring.application.name}-producer-${HOSTNAME:localhost}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -98,14 +99,14 @@ spring:
 # =============================================================================
 server:
   port: ${USER_SERVICE_PORT:8081}
-  servlet:
-    context-path: /api/v1/users
+  # Note: No context-path - Gateway handles API versioning and routing
+  # Gateway strips /api/v1/users prefix before forwarding to this service
 
 # =============================================================================
 # SECURITY CONFIGURATION
 # =============================================================================
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:defaultSecretKeyForDevelopmentOnlyChangeInProduction1234567890}
   expiration: ${JWT_EXPIRATION:3600000} # 1 hour
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours
   algorithm: ${JWT_ALGORITHM:HS256}

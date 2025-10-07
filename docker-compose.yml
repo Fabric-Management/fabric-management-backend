@@ -124,6 +124,12 @@ services:
       - "${ZOOKEEPER_PORT:-2181}:2181"
     networks:
       - fabric-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/commands/ruok"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -261,13 +267,7 @@ services:
     networks:
       - fabric-network
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://localhost:8081/api/v1/users/actuator/health",
-        ]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       <<: *healthcheck-defaults
       start_period: 90s
     logging: *default-logging
@@ -318,13 +318,7 @@ services:
     networks:
       - fabric-network
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://localhost:8082/api/v1/contacts/actuator/health",
-        ]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
       <<: *healthcheck-defaults
       start_period: 90s
     logging: *default-logging
@@ -383,13 +377,7 @@ services:
     networks:
       - fabric-network
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://localhost:8083/api/v1/companies/actuator/health",
-        ]
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
       <<: *healthcheck-defaults
       start_period: 90s
     logging: *default-logging

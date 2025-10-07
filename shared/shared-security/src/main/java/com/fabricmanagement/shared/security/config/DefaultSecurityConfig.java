@@ -55,17 +55,21 @@ public class DefaultSecurityConfig {
                 // Public: Health checks and monitoring
                 .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
 
-                // Public: Internal service-to-service endpoints
-                // These endpoints are called by other microservices
-                .requestMatchers(
-                    "/**/find-by-value",           // Contact lookup
-                    "/**/owner/**",                // Owner-based queries
-                    "/**/check-availability"       // Availability checks
-                ).permitAll()
-
                 // Public: Authentication endpoints
+                // These endpoints are for user login, registration, password reset, etc.
+                .requestMatchers("/auth/**").permitAll()
+
+                // Public: Internal service-to-service endpoints
+                // Pattern: /api/v1/{service-name}/{endpoint}
+                // These endpoints are called by other microservices without JWT
+                // Examples:
+                //   - /api/v1/contacts/find-by-value (Contact lookup by email/phone)
+                //   - /api/v1/contacts/owner/123 (Get contacts by owner)
+                //   - /api/v1/contacts/check-availability (Check if contact exists)
                 .requestMatchers(
-                    "/**/auth/**"                  // Login, register, setup-password, check-contact
+                    "/api/v1/*/find-by-value",      // Find contact by value (email/phone)
+                    "/api/v1/*/owner/**",            // Owner-based queries (get by owner ID)
+                    "/api/v1/*/check-availability"   // Availability checks
                 ).permitAll()
 
                 // Public: Swagger/OpenAPI (development only - disable in production via config)
