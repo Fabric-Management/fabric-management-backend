@@ -114,6 +114,16 @@ jwt:
   audience: ${JWT_AUDIENCE:fabric-api}
 
 # =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+security:
+  login-attempt:
+    max-attempts: 5 # Maximum failed login attempts before lockout
+    lockout-duration-minutes: 15 # Account lockout duration in minutes
+  response-time-masking:
+    min-response-time-ms: 200 # Minimum response time to prevent timing attacks
+
+# =============================================================================
 # TOKEN CONFIGURATION
 # =============================================================================
 token:

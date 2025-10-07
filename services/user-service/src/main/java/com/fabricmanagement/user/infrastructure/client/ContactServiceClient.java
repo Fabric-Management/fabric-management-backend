@@ -78,8 +78,9 @@ public interface ContactServiceClient {
     ApiResponse<Void> sendVerificationCode(@PathVariable("contactId") UUID contactId);
 
     /**
-     * Finds contacts by contact value (email or phone)
+     * Finds contact by contact value (email or phone)
+     * Returns single contact since contact_value is UNIQUE
      */
     @GetMapping("/find-by-value")
-    ApiResponse<List<ContactDto>> findByContactValue(@RequestParam("contactValue") String contactValue);
+    ApiResponse<ContactDto> findByContactValue(@RequestParam("contactValue") String contactValue);
 }

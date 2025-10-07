@@ -284,19 +284,16 @@ public class ContactService {
     }
 
     /**
-     * Finds contacts by contact value (email or phone)
+     * Finds contact by contact value (email or phone)
+     * Returns Optional since contact_value is UNIQUE in database
      */
     @Transactional(readOnly = true)
-    public List<ContactResponse> findByContactValue(String contactValue) {
-        log.debug("Finding contacts by value: {}", contactValue);
+    public Optional<ContactResponse> findByContactValue(String contactValue) {
+        log.debug("Finding contact by value: {}", contactValue);
 
-        Optional<Contact> contactOpt = contactRepository.findByContactValue(contactValue);
-
-        return contactOpt
+        return contactRepository.findByContactValue(contactValue)
                 .filter(Contact::isNotDeleted)
-                .map(this::toContactResponse)
-                .map(List::of)
-                .orElse(List.of());
+                .map(this::toContactResponse);
     }
     
     /**

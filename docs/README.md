@@ -6,6 +6,10 @@
 
 **Start here!** Complete guide for developers - everything you need in one place.
 
+### [🔐 SECURITY DOCUMENTATION](SECURITY.md) ⭐ NEW
+
+**Production-ready security guide** - Authentication flow, rate limiting, brute force protection, and more.
+
 ### [⚡ 15-Minute Quick Start](development/QUICK_START.md)
 
 Get your first endpoint running in 15 minutes.
@@ -165,6 +169,9 @@ All documentation should follow these standards:
 
 | Date     | Document         | Changes                            |
 | -------- | ---------------- | ---------------------------------- |
+| Oct 2025 | SECURITY.md      | **NEW** - Complete security guide with authentication flow |
+| Oct 2025 | user-service.md  | Updated with new security features (login attempt tracking, etc.) |
+| Oct 2025 | API_GATEWAY_SETUP.md | Updated with JWT authentication and rate limiting |
 | Oct 2025 | All              | Major reorganization and cleanup   |
 | Oct 2025 | Analysis Reports | Added comprehensive analysis       |
 | Oct 2025 | README           | Simplified and clarified structure |
