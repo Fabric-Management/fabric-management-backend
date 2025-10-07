@@ -51,7 +51,7 @@ scrape_configs:
   # MICROSERVICES - ACTUATOR ENDPOINTS
   # =============================================================================
   - job_name: "user-service"
-    metrics_path: "/api/v1/users/actuator/prometheus"
+    metrics_path: "/actuator/prometheus"
     scrape_interval: 10s
     static_configs:
       - targets: ["user-service:8081"]
@@ -60,7 +60,7 @@ scrape_configs:
           application: "fabric-management"
 
   - job_name: "contact-service"
-    metrics_path: "/api/v1/contacts/actuator/prometheus"
+    metrics_path: "/actuator/prometheus"
     scrape_interval: 10s
     static_configs:
       - targets: ["contact-service:8082"]
@@ -69,7 +69,7 @@ scrape_configs:
           application: "fabric-management"
 
   - job_name: "company-service"
-    metrics_path: "/api/v1/companies/actuator/prometheus"
+    metrics_path: "/actuator/prometheus"
     scrape_interval: 10s
     static_configs:
       - targets: ["company-service:8083"]

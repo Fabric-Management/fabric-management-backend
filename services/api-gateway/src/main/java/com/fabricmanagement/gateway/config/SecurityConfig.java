@@ -16,7 +16,7 @@ public class SecurityConfig {
 
     /**
      * Security filter chain configuration
-     * Temporarily permits all requests for development
+     * Permits all requests - authentication handled by JwtAuthenticationFilter
      */
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
@@ -24,7 +24,9 @@ public class SecurityConfig {
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 .anyExchange().permitAll()
-            );
+            )
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable);
 
         return http.build();
     }

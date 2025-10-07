@@ -5,6 +5,7 @@ Central entry point for Fabric Management System microservices.
 ## 📋 Overview
 
 The API Gateway provides:
+
 - ✅ **Centralized Routing** - Single entry point for all services
 - 🔒 **JWT Authentication** - Centralized token validation
 - 🚦 **Rate Limiting** - Redis-based request throttling
@@ -57,11 +58,11 @@ docker logs -f fabric-api-gateway
 
 ### Public Endpoints (No Auth Required)
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /gateway/health` | Gateway health check |
-| `GET /gateway/info` | Gateway information |
-| `GET /actuator/health` | Spring Actuator health |
+| Endpoint                     | Description              |
+| ---------------------------- | ------------------------ |
+| `GET /gateway/health`        | Gateway health check     |
+| `GET /gateway/info`          | Gateway information      |
+| `GET /actuator/health`       | Spring Actuator health   |
 | `POST /api/v1/users/auth/**` | Authentication endpoints |
 
 ### Protected Endpoints (Auth Required)
@@ -86,12 +87,14 @@ Downstream Service
 ## 🚦 Rate Limiting
 
 Redis-based rate limiting per route:
+
 - **Replenish Rate**: 50 requests/second
 - **Burst Capacity**: 100 requests
 
 ## ⚡ Circuit Breaker
 
 Resilience4j configuration:
+
 - **Failure Threshold**: 50%
 - **Wait Duration**: 30s
 - **Sliding Window**: 100 calls
@@ -125,12 +128,12 @@ curl http://localhost:8080/actuator/gateway/routes
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `JWT_SECRET` | JWT signing secret | Required |
-| `REDIS_HOST` | Redis host | localhost |
-| `REDIS_PORT` | Redis port | 6379 |
-| `USER_SERVICE_URL` | User service URL | http://localhost:8081 |
+| Variable              | Description         | Default               |
+| --------------------- | ------------------- | --------------------- |
+| `JWT_SECRET`          | JWT signing secret  | Required              |
+| `REDIS_HOST`          | Redis host          | localhost             |
+| `REDIS_PORT`          | Redis port          | 6379                  |
+| `USER_SERVICE_URL`    | User service URL    | http://localhost:8081 |
 | `COMPANY_SERVICE_URL` | Company service URL | http://localhost:8083 |
 | `CONTACT_SERVICE_URL` | Contact service URL | http://localhost:8082 |
 
@@ -151,7 +154,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/users
 
 ```bash
 # Check service health
-curl http://localhost:8081/api/v1/users/actuator/health
+curl http://localhost:8081/actuator/health
 ```
 
 ### Issue: 429 Too Many Requests

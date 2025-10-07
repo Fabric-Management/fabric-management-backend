@@ -161,13 +161,13 @@ health: ## Check health of all services
 	@echo "$(BLUE)🏥 Health Check:$(NC)"
 	@echo ""
 	@echo "$(YELLOW)User Service:$(NC)"
-	@curl -s http://localhost:8081/api/v1/users/actuator/health | jq . || echo "$(RED)❌ User Service not responding$(NC)"
+	@curl -s http://localhost:8081/actuator/health | jq . || echo "$(RED)❌ User Service not responding$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Contact Service:$(NC)"
-	@curl -s http://localhost:8082/api/v1/contacts/actuator/health | jq . || echo "$(RED)❌ Contact Service not responding$(NC)"
+	@curl -s http://localhost:8082/actuator/health | jq . || echo "$(RED)❌ Contact Service not responding$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Company Service:$(NC)"
-	@curl -s http://localhost:8083/api/v1/companies/actuator/health | jq . || echo "$(RED)❌ Company Service not responding$(NC)"
+	@curl -s http://localhost:8083/actuator/health | jq . || echo "$(RED)❌ Company Service not responding$(NC)"
 
 ps: ## Show running containers
 	docker ps --filter "name=fabric-*" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

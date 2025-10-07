@@ -1,5 +1,6 @@
 package com.fabricmanagement.user.application.service;
 
+import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.user.api.dto.CreateUserRequest;
 import com.fabricmanagement.user.api.dto.UpdateUserRequest;
 import com.fabricmanagement.user.api.dto.UserResponse;
@@ -278,8 +279,9 @@ public class UserService {
             users = users.stream()
                     .filter(u -> {
                         try {
-                            List<ContactDto> contacts = contactServiceClient.getContactsByOwner(u.getId().toString());
-                            return contacts.stream()
+                            ApiResponse<List<ContactDto>> response = contactServiceClient.getContactsByOwner(u.getId().toString());
+                            List<ContactDto> contacts = response != null && response.getData() != null ? response.getData() : null;
+                            return contacts != null && contacts.stream()
                                     .anyMatch(c -> c.getContactValue().toLowerCase().contains(emailLower));
                         } catch (Exception e) {
                             return false;
@@ -307,9 +309,11 @@ public class UserService {
         String phone = null;
         
         try {
-            List<ContactDto> contacts = contactServiceClient.getContactsByOwner(user.getId().toString());
-            
+            ApiResponse<List<ContactDto>> response = contactServiceClient.getContactsByOwner(user.getId().toString());
+            List<ContactDto> contacts = response != null && response.getData() != null ? response.getData() : null;
+
             // Find primary email and phone
+            if (contacts != null) {
             for (ContactDto contact : contacts) {
                 if ("EMAIL".equals(contact.getContactType()) && contact.isPrimary()) {
                     email = contact.getContactValue();
@@ -333,6 +337,7 @@ public class UserService {
                         .findFirst()
                         .map(ContactDto::getContactValue)
                         .orElse(null);
+            }
             }
         } catch (Exception e) {
             log.warn("Failed to fetch contacts for user {}: {}", user.getId(), e.getMessage());

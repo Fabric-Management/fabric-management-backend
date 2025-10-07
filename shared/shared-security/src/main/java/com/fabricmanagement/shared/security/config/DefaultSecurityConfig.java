@@ -10,8 +10,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -53,17 +55,21 @@ public class DefaultSecurityConfig {
                 // Public: Health checks and monitoring
                 .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
 
-                // Public: Internal service-to-service endpoints
-                // These endpoints are called by other microservices
-                .requestMatchers(
-                    "/**/find-by-value",           // Contact lookup
-                    "/**/owner/**",                // Owner-based queries
-                    "/**/check-availability"       // Availability checks
-                ).permitAll()
-
                 // Public: Authentication endpoints
+                // These endpoints are for user login, registration, password reset, etc.
+                .requestMatchers("/auth/**").permitAll()
+
+                // Public: Internal service-to-service endpoints
+                // Pattern: /api/v1/{service-name}/{endpoint}
+                // These endpoints are called by other microservices without JWT
+                // Examples:
+                //   - /api/v1/contacts/find-by-value (Contact lookup by email/phone)
+                //   - /api/v1/contacts/owner/123 (Get contacts by owner)
+                //   - /api/v1/contacts/check-availability (Check if contact exists)
                 .requestMatchers(
-                    "/**/auth/**"                  // Login, register, setup-password, check-contact
+                    "/api/v1/*/find-by-value",      // Find contact by value (email/phone)
+                    "/api/v1/*/owner/**",            // Owner-based queries (get by owner ID)
+                    "/api/v1/*/check-availability"   // Availability checks
                 ).permitAll()
 
                 // Public: Swagger/OpenAPI (development only - disable in production via config)
@@ -104,6 +110,24 @@ public class DefaultSecurityConfig {
     @ConditionalOnMissingBean(ObjectMapper.class)
     public ObjectMapper objectMapper() {
         return new ObjectMapper();
+    }
+
+    /**
+     * Dummy UserDetailsService to prevent Spring Boot auto-configuration warnings
+     *
+     * This bean is required by Spring Security but not actually used in our JWT-based
+     * authentication system. All authentication is handled by JwtAuthenticationFilter
+     * which extracts user information from JWT tokens.
+     *
+     * Without this bean, Spring Boot would auto-configure a default UserDetailsService
+     * with a random password, causing unnecessary warnings in logs.
+     */
+    @Bean
+    @ConditionalOnMissingBean(UserDetailsService.class)
+    public UserDetailsService userDetailsService() {
+        // Return an empty in-memory user details manager
+        // This will never be used as JWT filter handles all authentication
+        return new InMemoryUserDetailsManager();
     }
 }
 

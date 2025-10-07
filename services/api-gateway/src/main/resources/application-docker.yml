@@ -15,8 +15,8 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      timeout: ${REDIS_CONNECTION_TIMEOUT:2000}ms
-      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000}ms
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000ms}
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000ms}
       lettuce:
         pool:
           max-active: ${REDIS_POOL_MAX_ACTIVE:8}
@@ -34,48 +34,70 @@ spring:
   cloud:
     gateway:
       routes:
-        # User Service Routes
-        - id: user-service
+        # User Service - Public Auth Routes (No Rate Limiting)
+        # Pattern: /api/v1/users/auth/** - Authentication endpoints
+        # Gateway strips /api/v1/users, forwards /auth/** to service
+        - id: user-service-public
+          uri: ${USER_SERVICE_URL:http://user-service:8081}
+          predicates:
+            - Path=/api/v1/users/auth/**
+          filters:
+            - StripPrefix=3
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user-service
+
+        # User Service - Protected Routes (With Rate Limiting)
+        # Pattern: /api/v1/users/** (excluding auth)
+        # Gateway strips /api/v1/users, forwards /** to service
+        - id: user-service-protected
           uri: ${USER_SERVICE_URL:http://user-service:8081}
           predicates:
             - Path=/api/v1/users/**
           filters:
+            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: userServiceCircuitBreaker
                 fallbackUri: forward:/fallback/user-service
             - name: RequestRateLimiter
               args:
+                key-resolver: "#{@smartKeyResolver}"
                 redis-rate-limiter.replenishRate: 50
                 redis-rate-limiter.burstCapacity: 100
 
-        # Company Service Routes
+        # Company Service Routes (Protected - With Rate Limiting)
         - id: company-service
           uri: ${COMPANY_SERVICE_URL:http://company-service:8083}
           predicates:
             - Path=/api/v1/companies/**
           filters:
+            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: companyServiceCircuitBreaker
                 fallbackUri: forward:/fallback/company-service
             - name: RequestRateLimiter
               args:
+                key-resolver: "#{@smartKeyResolver}"
                 redis-rate-limiter.replenishRate: 50
                 redis-rate-limiter.burstCapacity: 100
 
-        # Contact Service Routes
+        # Contact Service Routes (Protected - With Rate Limiting)
         - id: contact-service
           uri: ${CONTACT_SERVICE_URL:http://contact-service:8082}
           predicates:
             - Path=/api/v1/contacts/**
           filters:
+            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: contactServiceCircuitBreaker
                 fallbackUri: forward:/fallback/contact-service
             - name: RequestRateLimiter
               args:
+                key-resolver: "#{@smartKeyResolver}"
                 redis-rate-limiter.replenishRate: 50
                 redis-rate-limiter.burstCapacity: 100
 
@@ -136,9 +158,9 @@ management:
   endpoint:
     health:
       show-details: when-authorized
-  metrics:
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: true
 
 # =============================================================================

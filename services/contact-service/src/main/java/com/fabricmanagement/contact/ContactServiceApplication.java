@@ -2,6 +2,7 @@ package com.fabricmanagement.contact;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -20,10 +21,13 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * Architecture: Clean Architecture + CQRS + Event Sourcing
  * Port: 8082
  */
-@SpringBootApplication(scanBasePackages = {
-    "com.fabricmanagement.contact",
-    "com.fabricmanagement.shared"
-})
+@SpringBootApplication(
+    scanBasePackages = {
+        "com.fabricmanagement.contact",
+        "com.fabricmanagement.shared"
+    },
+    exclude = {RedisRepositoriesAutoConfiguration.class}
+)
 @EnableJpaRepositories(basePackages = "com.fabricmanagement.contact.infrastructure.repository")
 @EnableCaching
 @EnableKafka

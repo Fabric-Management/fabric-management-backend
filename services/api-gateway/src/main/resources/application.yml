@@ -21,20 +21,46 @@ spring:
   # ===========================================================================
   cloud:
     gateway:
-      # Route definitions
       routes:
-        # User Service Routes
-        - id: user-service
+        # User Service - Public Auth Routes (No Rate Limiting)
+        # Pattern: /api/v1/users/auth/** - Authentication endpoints
+        # Gateway strips /api/v1/users, forwards /auth/** to service
+        - id: user-service-public
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/users/auth/**
+          filters:
+            - StripPrefix=3
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user-service
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET,POST
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: true
+
+        # User Service - Protected Routes (With Rate Limiting)
+        # Pattern: /api/v1/users/** (excluding auth)
+        # Gateway strips /api/v1/users, forwards /** to service
+        - id: user-service-protected
           uri: ${USER_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/users/**
           filters:
+            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: userServiceCircuitBreaker
                 fallbackUri: forward:/fallback/user-service
             - name: RequestRateLimiter
               args:
+                key-resolver: "#{@smartKeyResolver}"
                 redis-rate-limiter.replenishRate: 50
                 redis-rate-limiter.burstCapacity: 100
                 redis-rate-limiter.requestedTokens: 1
@@ -48,18 +74,20 @@ spring:
                   factor: 2
                   basedOnPreviousValue: true
 
-        # Company Service Routes
+        # Company Service Routes (Protected - With Rate Limiting)
         - id: company-service
           uri: ${COMPANY_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/v1/companies/**
           filters:
+            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: companyServiceCircuitBreaker
                 fallbackUri: forward:/fallback/company-service
             - name: RequestRateLimiter
               args:
+                key-resolver: "#{@smartKeyResolver}"
                 redis-rate-limiter.replenishRate: 50
                 redis-rate-limiter.burstCapacity: 100
                 redis-rate-limiter.requestedTokens: 1
@@ -71,18 +99,20 @@ spring:
                   firstBackoff: 50ms
                   maxBackoff: 500ms
 
-        # Contact Service Routes
+        # Contact Service Routes (Protected - With Rate Limiting)
         - id: contact-service
           uri: ${CONTACT_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/v1/contacts/**
           filters:
+            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: contactServiceCircuitBreaker
                 fallbackUri: forward:/fallback/contact-service
             - name: RequestRateLimiter
               args:
+                key-resolver: "#{@smartKeyResolver}"
                 redis-rate-limiter.replenishRate: 50
                 redis-rate-limiter.burstCapacity: 100
                 redis-rate-limiter.requestedTokens: 1
@@ -95,29 +125,32 @@ spring:
                   maxBackoff: 500ms
 
       # Global CORS Configuration
-      globalcors:
-        cors-configurations:
-          "[/**]":
-            allowedOrigins:
-              - "http://localhost:3000"
-              - "http://localhost:4200"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - PATCH
-              - OPTIONS
-            allowedHeaders:
-              - "Authorization"
-              - "Content-Type"
-              - "X-Requested-With"
-              - "Accept"
-              - "Origin"
-            allowCredentials: true
-            maxAge: 3600
+      # Updated to Spring Cloud Gateway 4.x format
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              "[/**]":
+                allowedOrigins:
+                  - "http://localhost:3000"
+                  - "http://localhost:4200"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - PATCH
+                  - OPTIONS
+                allowedHeaders:
+                  - "Authorization"
+                  - "Content-Type"
+                  - "X-Requested-With"
+                  - "Accept"
+                  - "Origin"
+                allowCredentials: true
+                maxAge: 3600
 
-      # Default filters for all routes
+      # Default filters for all routes (kept at gateway level)
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
         - AddRequestHeader=X-Gateway-Request, true
@@ -131,8 +164,8 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      timeout: ${REDIS_CONNECTION_TIMEOUT:2000}ms
-      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000}ms
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000ms}
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000ms}
       lettuce:
         pool:
           max-active: ${REDIS_POOL_MAX_ACTIVE:8}
@@ -227,11 +260,9 @@ management:
   endpoint:
     health:
       show-details: always
-    gateway:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: true
 
 # =============================================================================

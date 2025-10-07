@@ -1,5 +1,6 @@
 package com.fabricmanagement.user.application.service;
 
+import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.security.jwt.JwtTokenProvider;
 import com.fabricmanagement.user.api.dto.*;
 import com.fabricmanagement.user.domain.aggregate.User;
@@ -43,7 +44,8 @@ public class AuthService {
 
         try {
             // Find contact in contact service
-            List<ContactDto> contacts = contactServiceClient.findByContactValue(request.getContactValue());
+            ApiResponse<List<ContactDto>> response = contactServiceClient.findByContactValue(request.getContactValue());
+            List<ContactDto> contacts = response != null && response.getData() != null ? response.getData() : null;
 
             if (contacts == null || contacts.isEmpty()) {
                 return CheckContactResponse.builder()
@@ -98,7 +100,8 @@ public class AuthService {
         log.info("Setting up password for contact: {}", request.getContactValue());
 
         // Find contact
-        List<ContactDto> contacts = contactServiceClient.findByContactValue(request.getContactValue());
+        ApiResponse<List<ContactDto>> response = contactServiceClient.findByContactValue(request.getContactValue());
+        List<ContactDto> contacts = response != null && response.getData() != null ? response.getData() : null;
         if (contacts == null || contacts.isEmpty()) {
             throw new RuntimeException("Contact not found");
         }
@@ -135,7 +138,8 @@ public class AuthService {
         log.info("Login attempt for contact: {}", request.getContactValue());
 
         // Find contact
-        List<ContactDto> contacts = contactServiceClient.findByContactValue(request.getContactValue());
+        ApiResponse<List<ContactDto>> response = contactServiceClient.findByContactValue(request.getContactValue());
+        List<ContactDto> contacts = response != null && response.getData() != null ? response.getData() : null;
         if (contacts == null || contacts.isEmpty()) {
             throw new RuntimeException("Invalid credentials");
         }
