@@ -375,6 +375,52 @@ graph LR
     QH --> VIEW
 ```
 
+## 🎯 Exception Handling Architecture
+
+### Conditional Exception Handler Pattern
+
+The system uses Spring Boot's `@ConditionalOnMissingBean` pattern to provide flexible exception handling while maintaining microservices autonomy.
+
+```mermaid
+graph TB
+    subgraph "Exception Handling Strategy"
+        SHARED[Shared GlobalExceptionHandler<br/>@ConditionalOnMissingBean<br/>Default for all services]
+
+        subgraph "Service-Specific Handlers"
+            USER[UserServiceExceptionHandler<br/>@Component serviceExceptionHandler<br/>Custom authentication errors]
+            COMPANY[CompanyExceptionHandler<br/>@Component serviceExceptionHandler<br/>Custom business rules]
+        end
+
+        subgraph "Services Without Custom Handlers"
+            CONTACT[Contact Service<br/>Uses Shared Handler]
+        end
+    end
+
+    SHARED -.->|Auto-disabled when<br/>custom handler present| USER
+    SHARED -.->|Auto-disabled when<br/>custom handler present| COMPANY
+    SHARED -->|Auto-enabled when<br/>no custom handler| CONTACT
+```
+
+### Exception Handler Configuration
+
+| Service             | Handler Type  | Bean Name                 | Status     |
+| ------------------- | ------------- | ------------------------- | ---------- |
+| **user-service**    | Custom        | `serviceExceptionHandler` | ✅ Active  |
+| **company-service** | Custom        | `serviceExceptionHandler` | ✅ Active  |
+| **contact-service** | Shared        | `globalExceptionHandler`  | ✅ Active  |
+| **Future services** | Auto (Shared) | `globalExceptionHandler`  | ✅ Default |
+
+### Benefits
+
+- ✅ **Microservices Autonomy** - Each service chooses its exception handling strategy
+- ✅ **Zero Coupling** - No inheritance between service and shared handlers
+- ✅ **Convention over Configuration** - Automatic, declarative configuration
+- ✅ **Flexibility** - Services can add/remove custom handlers without affecting others
+
+For detailed implementation guide, see [Bean Conflict Resolution](../troubleshooting/BEAN_CONFLICT_RESOLUTION.md).
+
+---
+
 ## 🛡️ Security Architecture
 
 ### Authentication & Authorization

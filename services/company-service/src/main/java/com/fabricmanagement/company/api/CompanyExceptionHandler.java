@@ -7,6 +7,7 @@ import com.fabricmanagement.company.domain.exception.UnauthorizedCompanyAccessEx
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,8 +20,11 @@ import java.util.Map;
 /**
  * Company Service Exception Handler
  *
- * Handles company-specific exceptions and returns appropriate error responses
+ * Service-specific exception handling for company-service.
+ * When this bean is present, the shared GlobalExceptionHandler is disabled,
+ * maintaining microservices autonomy and loose coupling.
  */
+@Component("serviceExceptionHandler")
 @RestControllerAdvice
 @Slf4j
 public class CompanyExceptionHandler {
