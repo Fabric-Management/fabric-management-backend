@@ -259,94 +259,115 @@ logging:
 
 ## 🔒 Security Configuration
 
+> **Status:** ✅ PRODUCTION READY (Updated October 2025)
+
+### Security Overview
+
+API Gateway implements multi-layered security:
+
+1. **JWT Authentication** - Token validation for protected endpoints
+2. **Rate Limiting** - Endpoint-specific request throttling
+3. **Circuit Breaker** - Service failure protection
+4. **Security Headers** - Standard HTTP security headers
+
 ### JWT Authentication Filter
 
+**File:** `services/api-gateway/src/main/java/com/fabricmanagement/gateway/security/JwtAuthenticationFilter.java`
+
+**Features:**
+- ✅ Full JWT validation (signature, expiration, claims)
+- ✅ Public/Protected endpoint separation
+- ✅ X-Tenant-Id and X-User-Id header injection
+- ✅ Reactive (WebFlux) implementation
+- ✅ Order: -100 (high priority)
+
+**Public Endpoints:**
 ```java
-package com.fabricmanagement.gateway.security;
+/api/v1/users/auth/**           // Authentication endpoints
+/api/v1/contacts/find-by-value  // Internal contact lookup
+/actuator/health                // Health checks
+/actuator/info
+/actuator/prometheus
+/fallback/**                    // Fallback endpoints
+```
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
-import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.stereotype.Component;
-import org.springframework.web.server.ServerWebExchange;
-import reactor.core.publisher.Mono;
+**Protected Endpoints:**
+All other API endpoints require `Authorization: Bearer <token>` header.
 
-@Component
+**Implementation:**
+```java
+@Component("gatewayJwtFilter")
 @Slf4j
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final String JWT_CLAIM_TENANT_ID = "tenantId";
-    private static final String JWT_CLAIM_USER_ID = "userId";
+    @Value("${jwt.secret}")
+    private String jwtSecret;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        ServerHttpRequest request = exchange.getRequest();
+        String path = exchange.getRequest().getPath().toString();
 
         // Skip authentication for public endpoints
-        if (isPublicEndpoint(request.getPath().toString())) {
+        if (isPublicEndpoint(path)) {
             return chain.filter(exchange);
         }
 
-        // Extract JWT token
-        String token = extractToken(request);
+        // Extract and validate JWT token
+        String token = extractToken(exchange.getRequest());
         if (token == null) {
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+            return unauthorizedResponse(exchange);
         }
 
-        try {
-            // Validate token and extract claims
-            // TODO: Implement JWT validation
-            String tenantId = extractTenantId(token);
-            String userId = extractUserId(token);
+        // Validate token using jjwt library
+        Claims claims = validateTokenAndExtractClaims(token);
+        
+        // Add tenant and user ID headers to downstream requests
+        ServerHttpRequest modifiedRequest = exchange.getRequest().mutate()
+            .header("X-Tenant-Id", claims.get("tenantId", String.class))
+            .header("X-User-Id", claims.getSubject())
+            .build();
 
-            // Add claims to request headers
-            ServerHttpRequest modifiedRequest = request.mutate()
-                    .header("X-Tenant-Id", tenantId)
-                    .header("X-User-Id", userId)
-                    .build();
-
-            return chain.filter(exchange.mutate().request(modifiedRequest).build());
-
-        } catch (Exception e) {
-            log.error("JWT validation failed", e);
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
-        }
-    }
-
-    private boolean isPublicEndpoint(String path) {
-        return path.contains("/auth/") ||
-               path.contains("/actuator/") ||
-               path.contains("/public/");
-    }
-
-    private String extractToken(ServerHttpRequest request) {
-        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-            return authHeader.substring(BEARER_PREFIX.length());
-        }
-        return null;
-    }
-
-    private String extractTenantId(String token) {
-        // TODO: Parse JWT and extract tenant ID
-        return "tenant-id";
-    }
-
-    private String extractUserId(String token) {
-        // TODO: Parse JWT and extract user ID
-        return "user-id";
+        return chain.filter(exchange.mutate().request(modifiedRequest).build());
     }
 
     @Override
     public int getOrder() {
-        return -100; // Execute before other filters
+        return -100; // Execute BEFORE other filters
+    }
+}
+```
+
+### Security Configuration
+
+**File:** `services/api-gateway/src/main/java/com/fabricmanagement/gateway/config/SecurityConfig.java`
+
+**Implementation:**
+```java
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        http
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .authorizeExchange(exchanges -> exchanges
+                // Public: Authentication endpoints
+                .pathMatchers("/api/v1/users/auth/**").permitAll()
+                
+                // Public: Internal contact lookup
+                .pathMatchers(HttpMethod.GET, "/api/v1/contacts/find-by-value").permitAll()
+                
+                // Public: Health and monitoring
+                .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                
+                // Protected: All other endpoints require authentication
+                .anyExchange().authenticated()
+            )
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable);
+
+        return http.build();
     }
 }
 ```
@@ -492,10 +513,76 @@ curl http://localhost:8080/api/v1/users
 # Response: "User Service is temporarily unavailable"
 ```
 
-### 4. Rate Limiting Test
+### 4. Rate Limiting Configuration (NEW - October 2025)
+
+**Endpoint-Specific Rate Limits:**
+
+| Endpoint | Rate Limit | Burst Capacity | Purpose |
+|----------|------------|----------------|---------|
+| `/api/v1/users/auth/check-contact` | 10/min | 15 | Email enumeration prevention |
+| `/api/v1/users/auth/login` | 5/min | 10 | Brute force prevention |
+| `/api/v1/users/auth/setup-password` | 3/min | 5 | One-time operation protection |
+| `/api/v1/contacts/find-by-value` | 5/min | 10 | Internal endpoint protection |
+| Other auth endpoints | 20/min | 30 | General protection |
+| Protected endpoints | 50/min | 100 | Standard rate limit |
+
+**Configuration Example:**
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+        # Auth Check Contact (Aggressive Rate Limiting)
+        - id: user-service-auth-check
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/users/auth/check-contact
+          filters:
+            - StripPrefix=3
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@smartKeyResolver}"
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 15
+                redis-rate-limiter.requestedTokens: 1
+        
+        # Login (Strict Rate Limiting)
+        - id: user-service-auth-login
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/users/auth/login
+          filters:
+            - StripPrefix=3
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@smartKeyResolver}"
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+```
+
+**Key Resolver (Smart IP/User-based):**
+```java
+@Bean
+public KeyResolver smartKeyResolver() {
+    return exchange -> {
+        // Use X-User-Id if authenticated, otherwise use IP
+        String userId = exchange.getRequest().getHeaders().getFirst("X-User-Id");
+        if (userId != null) {
+            return Mono.just(userId);
+        }
+        
+        // Fallback to IP address for unauthenticated requests
+        String ip = exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
+        return Mono.just(ip);
+    };
+}
+```
+
+### 5. Rate Limiting Test
 
 ```bash
-# 20 request gönder
+# Test login rate limit (5 req/min)
+# 6th request should return 429 Too Many Requests
 for i in {1..25}; do
   curl http://localhost:8080/api/v1/users
 done

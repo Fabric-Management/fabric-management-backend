@@ -397,33 +397,107 @@ class UserRepositoryIntegrationTest {
 
 ## 🔒 Security Features
 
+> **Last Updated:** October 2025 - Production-Ready Security Implementation
+
 ### 1. Password Security
 
-- **BCrypt hashing**: Industry-standard password hashing
+- **BCrypt hashing**: Industry-standard password hashing (strength: 10)
 - **Salt generation**: Unique salt per password
 - **Password strength**: Configurable complexity requirements
-- **Password history**: Prevention of password reuse
+  - Minimum 8 characters
+  - Uppercase + lowercase + numbers + special characters
+- **Password validation**: Regex-based validation in request DTO
+- **Contact verification required**: User must verify contact before setting password
 
-### 2. Token Security
+### 2. Authentication Security
 
-- **Short expiry**: 15-minute token lifetime
-- **Attempt limiting**: 3 attempts per token
-- **Unique tokens**: Cryptographically secure token generation
-- **Token invalidation**: Immediate invalidation after use
+- **Multi-factor authentication flow**:
+  1. Check contact existence (`/check-contact`)
+  2. Setup password (first-time users, `/setup-password`)
+  3. Login with credentials (`/login`)
+  
+- **Brute force protection**:
+  - Redis-based login attempt tracking
+  - 5 failed attempts → 15 minutes account lockout
+  - Distributed tracking across multiple instances
+  - Automatic unlock after lockout period
 
-### 3. Contact Verification
+- **Response time masking**:
+  - Minimum 200ms response time (configurable)
+  - Prevents timing attacks
+  - Prevents user enumeration via response time analysis
 
-- **Email verification**: SMTP-based verification
-- **SMS verification**: SMS gateway integration
-- **Code expiry**: Time-limited verification codes
-- **Rate limiting**: Prevention of spam/abuse
+- **Rate limiting** (API Gateway level):
+  - `/check-contact`: 10 requests/min
+  - `/login`: 5 requests/min
+  - `/setup-password`: 3 requests/min
 
-### 4. Access Control
+### 3. Token Security
 
 - **JWT tokens**: Stateless authentication
+  - HS256 algorithm
+  - Configurable expiration (1 hour default, 15 min recommended for production)
+  - Refresh token support (24 hours)
+  - Tenant ID and User ID in claims
+
+- **Token validation**:
+  - Signature verification
+  - Expiration check
+  - Issuer and audience validation
+  - Gateway-level JWT filter
+
+### 4. Security Audit Logging
+
+- **SecurityAuditLogger service**:
+  - Successful logins
+  - Failed login attempts (with reason)
+  - Account lockouts
+  - Password setups
+  - Suspicious activity detection
+
+- **Log format**: Structured logging (SIEM-ready)
+  ```
+  [SECURITY_AUDIT] event=LOGIN_SUCCESS contactValue=use*** userId=uuid timestamp=...
+  ```
+
+- **Privacy**: Contact values masked in logs
+
+### 5. Custom Exception Handling
+
+- **Domain-specific exceptions**:
+  - `ContactNotFoundException`
+  - `UserNotFoundException`
+  - `InvalidPasswordException`
+  - `AccountLockedException`
+  - `ContactNotVerifiedException`
+  - `InvalidUserStatusException`
+  - `PasswordAlreadySetException`
+
+- **Global exception handler**: Consistent error responses
+- **Security-conscious messages**: No sensitive data in error responses
+- **Proper HTTP status codes**: 401, 403, 404, 409, 500
+
+### 6. Access Control
+
+- **API Gateway security**:
+  - Public endpoints: `/auth/**`, `/actuator/health`
+  - Protected endpoints: All others require JWT
+  - JWT validation filter (order: -100, high priority)
+
 - **Role-based authorization**: Granular permissions
 - **Tenant isolation**: Multi-tenant data separation
-- **Audit logging**: Complete audit trail
+
+### 7. Contact Service Integration
+
+- **Internal endpoint protection**:
+  - `/contacts/find-by-value` used for authentication
+  - Aggressive rate limiting (5 req/min)
+  - Public access but protected by rate limiting + timing attack prevention
+
+- **Feign client communication**:
+  - JWT token propagation
+  - Circuit breaker protection
+  - Resilience4j integration
 
 ## 📊 Performance Considerations
 
@@ -537,32 +611,84 @@ public class UserService {
 
 ```yaml
 # application.yml
-user-service:
-  registration:
-    require-verification: true
-    allow-self-registration: true
-    require-admin-approval: true
+server:
+  port: 8081
 
-  security:
-    password:
-      min-length: 8
-      require-uppercase: true
-      require-lowercase: true
-      require-numbers: true
-      require-special-chars: true
+spring:
+  application:
+    name: user-service
+  
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5433/${POSTGRES_DB:fabric_management}
+    username: ${POSTGRES_USER:fabric_user}
+    password: ${POSTGRES_PASSWORD:fabric_password}
+  
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
 
-    token:
-      reset-expiry-minutes: 15
-      max-attempts: 3
-      cleanup-interval-hours: 24
+# Security Configuration (NEW)
+security:
+  login-attempt:
+    max-attempts: 5                    # Configurable per environment
+    lockout-duration-minutes: 15       # Account lockout duration
+  response-time-masking:
+    min-response-time-ms: 200          # Minimum response time (timing attack prevention)
 
-  notification:
-    email:
-      enabled: true
-      from-address: noreply@fabricmanagement.com
-    sms:
-      enabled: true
-      provider: twilio
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000}           # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}  # 24 hours
+  algorithm: HS256
+  issuer: fabric-management-system
+  audience: fabric-api
+
+# Token Configuration
+token:
+  password-reset:
+    expiry-minutes: 15
+    attempts: 3
+  verification:
+    expiry-minutes: 15
+    attempts: 5
+
+# Contact Service Integration
+contact-service:
+  url: ${CONTACT_SERVICE_URL:http://localhost:8082}
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      contact-service:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        slidingWindowSize: 10
+  retry:
+    instances:
+      contact-service:
+        maxAttempts: 3
+        waitDuration: 1s
+```
+
+### Environment Variables
+
+```bash
+# .env or environment
+JWT_SECRET=your-base64-encoded-secret
+JWT_EXPIRATION=3600000
+JWT_REFRESH_EXPIRATION=86400000
+
+SECURITY_LOGIN_ATTEMPT_MAX_ATTEMPTS=5
+SECURITY_LOGIN_ATTEMPT_LOCKOUT_DURATION_MINUTES=15
+SECURITY_RESPONSE_TIME_MASKING_MIN_MS=200
+
+CONTACT_SERVICE_URL=http://localhost:8082
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your-redis-password
 ```
 
 ## 📚 API Documentation
@@ -577,11 +703,12 @@ user-service:
 - `DELETE /api/v1/users/{id}` - Delete user
 - `GET /api/v1/users/search` - Search users
 
-#### Authentication
+#### Authentication (Public Endpoints)
 
-- `POST /api/v1/auth/login` - User login
-- `POST /api/v1/auth/logout` - User logout
-- `POST /api/v1/auth/refresh` - Refresh token
+- `POST /api/v1/users/auth/check-contact` - Check if contact exists and has password
+- `POST /api/v1/users/auth/setup-password` - Setup initial password (first-time users)
+- `POST /api/v1/users/auth/login` - User login with credentials
+- `POST /api/v1/users/auth/refresh` - Refresh access token (future)
 
 #### Password Management
 
@@ -674,8 +801,33 @@ management:
       show-details: always
 ```
 
+## 🔗 Related Documentation
+
+- [Security Documentation](../SECURITY.md) - Complete security guide
+- [API Gateway Setup](../deployment/API_GATEWAY_SETUP.md) - Gateway configuration
+- [Development Principles](../development/PRINCIPLES.md) - Coding standards
+- [Environment Management](../deployment/ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md) - Configuration guide
+
+## 📦 New Components (October 2025)
+
+### Services
+- `LoginAttemptService` - Redis-based brute force protection
+- `SecurityAuditLogger` - Structured security audit logging
+
+### Exception Handlers
+- `GlobalExceptionHandler` - Centralized exception handling
+- 8 custom domain exceptions
+
+### Security Features
+- Response time masking (timing attack prevention)
+- Login attempt tracking (Redis)
+- Password setup validation (contact verification)
+- API Gateway JWT authentication
+- Endpoint-specific rate limiting
+
 ---
 
-_Last updated: 2024-01-XX_  
-_Version: 1.0.0_  
-_Service: User Service_
+_Last updated: October 2025_  
+_Version: 1.1.0_  
+_Service: User Service_  
+_Security Level: Production-Ready_

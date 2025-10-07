@@ -44,15 +44,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String HEADER_USER_ID = "X-User-Id";
     
     /**
-     * Public paths (after StripPrefix filter)
-     * Note: Gateway routes use StripPrefix=3, so paths are already stripped
-     * Example: /api/v1/users/auth/login → /auth/login (after strip)
+     * Public paths (BEFORE StripPrefix filter - checking original request path)
+     * These paths don't require JWT authentication
      */
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
-        "/auth",        // Auth endpoints (stripped from /api/v1/users/auth)
-        "/actuator",    // Actuator endpoints
-        "/fallback",    // Fallback endpoints
-        "/gateway"      // Gateway management endpoints
+        "/api/v1/users/auth/",        // All auth endpoints
+        "/api/v1/contacts/find-by-value",  // Internal contact lookup (for auth)
+        "/actuator/health",           // Health check
+        "/actuator/info",             // Info endpoint
+        "/actuator/prometheus",       // Prometheus metrics
+        "/fallback/",                 // Fallback endpoints
+        "/gateway/"                   // Gateway management endpoints
     );
 
     @Value("${jwt.secret}")
@@ -149,6 +151,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return 100; // Execute after Spring Security filters
+        return -100; // Execute BEFORE other filters (high priority)
     }
 }

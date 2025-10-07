@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -261,16 +262,27 @@ public class ContactController {
     }
 
     /**
-     * Finds contacts by contact value (email or phone)
+     * Finds contact by contact value (email or phone)
      * Used for authentication purposes - no auth required
+     * 
+     * INTERNAL USE ONLY - Should only be called by User Service
+     * Public access but with aggressive rate limiting in API Gateway
+     * 
+     * Security considerations:
+     * - Email enumeration attack possible (mitigated by rate limiting + timing attack prevention in User Service)
+     * - Response is minimal (no sensitive data exposed)
+     * - Used only during authentication flow
      */
     @GetMapping("/find-by-value")
-    public ResponseEntity<ApiResponse<List<ContactResponse>>> findByContactValue(
+    public ResponseEntity<ApiResponse<ContactResponse>> findByContactValue(
             @RequestParam String contactValue) {
 
-        log.debug("Finding contacts by value: {}", contactValue);
+        log.debug("Finding contact by value: {}", contactValue);
 
-        List<ContactResponse> contacts = contactService.findByContactValue(contactValue);
-        return ResponseEntity.ok(ApiResponse.success(contacts));
+        Optional<ContactResponse> contact = contactService.findByContactValue(contactValue);
+        return contact
+                .map(c -> ResponseEntity.ok(ApiResponse.success(c)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("Contact not found", "CONTACT_NOT_FOUND")));
     }
 }
