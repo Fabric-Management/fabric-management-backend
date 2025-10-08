@@ -1,6 +1,8 @@
 package com.fabricmanagement.user.infrastructure.repository;
 
 import com.fabricmanagement.user.domain.aggregate.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -57,4 +59,37 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      */
     @Query("SELECT u FROM User u WHERE u.id = :userId AND u.tenantId = :tenantId AND u.deleted = false")
     Optional<User> findByIdAndTenantId(@Param("userId") UUID userId, @Param("tenantId") UUID tenantId);
+    
+    /**
+     * Find active (non-deleted) user by ID and tenant ID
+     * 
+     * This is a convenience method that combines the most common query pattern.
+     * Replaces the repeated code pattern:
+     * findById(id).filter(u -> !u.isDeleted()).filter(u -> u.getTenantId().equals(tenantId))
+     */
+    @Query("SELECT u FROM User u WHERE u.id = :id AND u.tenantId = :tenantId AND u.deleted = false")
+    Optional<User> findActiveByIdAndTenantId(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
+    
+    /**
+     * Find users by tenant ID with pagination
+     */
+    @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.deleted = false")
+    Page<User> findByTenantIdPaginated(@Param("tenantId") UUID tenantId, Pageable pageable);
+    
+    /**
+     * Search users by criteria with pagination
+     * Dynamic query based on provided parameters (null parameters are ignored)
+     */
+    @Query("SELECT u FROM User u WHERE " +
+           "u.tenantId = :tenantId AND u.deleted = false AND " +
+           "(:firstName IS NULL OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', :firstName, '%'))) AND " +
+           "(:lastName IS NULL OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :lastName, '%'))) AND " +
+           "(:status IS NULL OR u.status = CAST(:status AS com.fabricmanagement.user.domain.valueobject.UserStatus))")
+    Page<User> searchUsersPaginated(
+        @Param("tenantId") UUID tenantId,
+        @Param("firstName") String firstName,
+        @Param("lastName") String lastName,
+        @Param("status") String status,
+        Pageable pageable
+    );
 }

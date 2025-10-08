@@ -31,19 +31,19 @@ public interface ContactServiceClient {
      * Gets contacts by owner ID (company ID)
      */
     @GetMapping("/owner/{ownerId}")
-    List<ContactDto> getContactsByOwner(@PathVariable("ownerId") String ownerId);
+    List<ContactDto> getContactsByOwner(@PathVariable("ownerId") UUID ownerId);
 
     /**
      * Gets verified contacts for a company
      */
     @GetMapping("/owner/{ownerId}/verified")
-    List<ContactDto> getVerifiedContacts(@PathVariable("ownerId") String ownerId);
+    List<ContactDto> getVerifiedContacts(@PathVariable("ownerId") UUID ownerId);
 
     /**
      * Gets primary contact for a company
      */
     @GetMapping("/owner/{ownerId}/primary")
-    ContactDto getPrimaryContact(@PathVariable("ownerId") String ownerId);
+    ContactDto getPrimaryContact(@PathVariable("ownerId") UUID ownerId);
 
     /**
      * Gets a specific contact

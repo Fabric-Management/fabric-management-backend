@@ -56,20 +56,29 @@ public class DefaultSecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
 
                 // Public: Authentication endpoints
-                // These endpoints are for user login, registration, password reset, etc.
-                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/api/v1/users/auth/**").permitAll()
 
                 // Public: Internal service-to-service endpoints
-                // Pattern: /api/v1/{service-name}/{endpoint}
-                // These endpoints are called by other microservices without JWT
-                // Examples:
-                //   - /api/v1/contacts/find-by-value (Contact lookup by email/phone)
-                //   - /api/v1/contacts/owner/123 (Get contacts by owner)
-                //   - /api/v1/contacts/check-availability (Check if contact exists)
+                // 
+                // Service-Aware Pattern: Each service knows its full base path
+                // All paths use the format: /api/v1/{service}/{endpoint}
+                // 
+                // This pattern ensures:
+                // - Single source of truth for paths
+                // - Services are self-contained and testable independently
+                // - No path transformation needed in API Gateway
+                // - Clear and maintainable security configuration
                 .requestMatchers(
-                    "/api/v1/*/find-by-value",      // Find contact by value (email/phone)
-                    "/api/v1/*/owner/**",            // Owner-based queries (get by owner ID)
-                    "/api/v1/*/check-availability"   // Availability checks
+                    // Contact Service - Internal endpoints
+                    "/api/v1/contacts/find-by-value",      // Used by User Service for auth
+                    "/api/v1/contacts/owner/**",           // Owner-based queries
+                    "/api/v1/contacts/check-availability", // Availability checks
+                    "/api/v1/contacts/batch/by-owners",    // Batch fetching (NEW - for N+1 optimization)
+                    
+                    // User Service - Internal endpoints (called by Company Service)
+                    "/api/v1/users/{userId}",              // Get user by ID
+                    "/api/v1/users/{userId}/exists",       // Check user exists
+                    "/api/v1/users/company/**"             // Company-related queries
                 ).permitAll()
 
                 // Public: Swagger/OpenAPI (development only - disable in production via config)

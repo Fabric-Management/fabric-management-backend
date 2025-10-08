@@ -33,7 +33,7 @@ public class CompanyContactService {
         log.info("Adding contact to company: {} by user: {}", companyId, addedBy);
         
         CreateContactDto contactRequest = CreateContactDto.builder()
-            .ownerId(companyId.toString())
+            .ownerId(companyId.toString())  // CreateContactDto still uses String (API input validation)
             .ownerType("COMPANY")
             .contactValue(request.getContactValue())
             .contactType(request.getContactType())
@@ -74,7 +74,7 @@ public class CompanyContactService {
         log.info("Creating contact for company: {}", companyId);
         
         CreateContactDto request = CreateContactDto.builder()
-            .ownerId(companyId.toString())
+            .ownerId(companyId.toString())  // CreateContactDto still uses String (API input validation)
             .ownerType("COMPANY")
             .contactValue(contactValue)
             .contactType(contactType)
@@ -93,7 +93,7 @@ public class CompanyContactService {
      */
     public List<ContactDto> getCompanyContacts(UUID companyId) {
         log.debug("Getting contacts for company: {}", companyId);
-        return contactServiceClient.getContactsByOwner(companyId.toString());
+        return contactServiceClient.getContactsByOwner(companyId);
     }
     
     /**
@@ -101,7 +101,7 @@ public class CompanyContactService {
      */
     public List<ContactDto> getVerifiedCompanyContacts(UUID companyId) {
         log.debug("Getting verified contacts for company: {}", companyId);
-        return contactServiceClient.getVerifiedContacts(companyId.toString());
+        return contactServiceClient.getVerifiedContacts(companyId);
     }
     
     /**
@@ -111,7 +111,7 @@ public class CompanyContactService {
         log.debug("Getting primary contact for company: {}", companyId);
         
         try {
-            return contactServiceClient.getPrimaryContact(companyId.toString());
+            return contactServiceClient.getPrimaryContact(companyId);
         } catch (Exception e) {
             log.warn("No primary contact found for company: {}", companyId);
             return null;

@@ -339,6 +339,20 @@ class UserServiceContractTest {
 - [ ] Proper exception handling
 - [ ] Standardized API responses
 
+### **🆔 UUID Type Safety (MANDATORY)** ⭐⭐⭐
+
+- [ ] Database columns use UUID type (not VARCHAR)
+- [ ] Entity fields are UUID type (not String)
+- [ ] Repository parameters are UUID type
+- [ ] Service methods use UUID parameters
+- [ ] Controller @PathVariable uses UUID type
+- [ ] Feign Client parameters are UUID type
+- [ ] UUID→String conversion ONLY at boundaries (DTO, Kafka, Logs)
+- [ ] No manual UUID manipulation in business logic
+- [ ] Tenant ID always from SecurityContext (never from request)
+
+**📚 See:** [DATA_TYPES_STANDARDS.md](DATA_TYPES_STANDARDS.md) - Complete UUID guide
+
 ### Microservices
 
 - [ ] Service autonomy
@@ -354,6 +368,7 @@ class UserServiceContractTest {
 - [ ] Input validation
 - [ ] SQL injection prevention
 - [ ] XSS protection
+- [ ] UUID type safety enforced (prevents ID manipulation)
 
 ### DevOps
 
@@ -368,7 +383,7 @@ class UserServiceContractTest {
 ## 🔗 Related Documents
 
 - [Microservices & API Gateway Standards](MICROSERVICES_API_STANDARDS.md) - ⭐⭐⭐ API Gateway ve Controller standartları
-- [Data Types Standards](DATA_TYPES_STANDARDS.md) - ⭐ UUID ve identifier standartları
+- [Data Types Standards](DATA_TYPES_STANDARDS.md) - ⭐⭐⭐ **UUID ve identifier standartları (MANDATORY)**
 - [Code Structure Guide](CODE_STRUCTURE_GUIDE.md) - Proje organizasyonu
 - [Database Guide](../database/DATABASE_GUIDE.md) - Veritabanı standartları
 - [Architecture Guide](../architecture/README.md) - Sistem mimarisi

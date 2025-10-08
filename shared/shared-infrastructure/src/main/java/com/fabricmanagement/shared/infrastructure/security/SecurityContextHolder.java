@@ -1,5 +1,6 @@
 package com.fabricmanagement.shared.infrastructure.security;
 
+import com.fabricmanagement.shared.infrastructure.exception.UnauthorizedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -94,15 +95,6 @@ public final class SecurityContextHolder {
     private static Authentication getAuthentication() {
         SecurityContext context = org.springframework.security.core.context.SecurityContextHolder.getContext();
         return context.getAuthentication();
-    }
-}
-
-/**
- * Exception thrown when user is not authorized
- */
-class UnauthorizedException extends RuntimeException {
-    public UnauthorizedException(String message) {
-        super(message);
     }
 }
 

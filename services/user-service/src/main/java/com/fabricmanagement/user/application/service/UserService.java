@@ -1,33 +1,46 @@
 package com.fabricmanagement.user.application.service;
 
-import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.application.response.PagedResponse;
+import com.fabricmanagement.shared.domain.exception.UserNotFoundException;
 import com.fabricmanagement.user.api.dto.CreateUserRequest;
 import com.fabricmanagement.user.api.dto.UpdateUserRequest;
 import com.fabricmanagement.user.api.dto.UserResponse;
+import com.fabricmanagement.user.application.mapper.UserMapper;
 import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.user.domain.event.UserDeletedEvent;
 import com.fabricmanagement.user.domain.event.UserUpdatedEvent;
 import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
-import com.fabricmanagement.user.infrastructure.client.ContactServiceClient;
-import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
 import com.fabricmanagement.user.infrastructure.messaging.UserEventPublisher;
 import com.fabricmanagement.user.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * User Service
  * 
- * Application service for user management operations
+ * Application service for user management operations.
+ * Orchestrates business logic and delegates mapping to UserMapper.
+ * 
+ * Responsibilities:
+ * - Transaction management
+ * - Business logic orchestration
+ * - Event publishing
+ * - Validation coordination
+ * 
+ * Does NOT:
+ * - Handle mapping (delegated to UserMapper)
+ * - Handle HTTP concerns (delegated to Controllers)
+ * - Contain domain logic (delegated to User aggregate)
  */
 @Service
 @RequiredArgsConstructor
@@ -35,8 +48,9 @@ import java.util.stream.Collectors;
 public class UserService {
     
     private final UserRepository userRepository;
-    private final ContactServiceClient contactServiceClient;
+    private final UserMapper userMapper;
     private final UserEventPublisher eventPublisher;
+    private final UserSearchService userSearchService;
     
     /**
      * Gets a user by ID
@@ -45,12 +59,8 @@ public class UserService {
     public UserResponse getUser(UUID userId, UUID tenantId) {
         log.debug("Getting user: {} for tenant: {}", userId, tenantId);
         
-        User user = userRepository.findById(userId)
-                .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId))
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        
-        return mapToResponse(user);
+        User user = findActiveUserOrThrow(userId, tenantId);
+        return userMapper.toResponse(user);
     }
     
     /**
@@ -60,10 +70,7 @@ public class UserService {
     public boolean userExists(UUID userId, UUID tenantId) {
         log.debug("Checking if user exists: {} for tenant: {}", userId, tenantId);
         
-        return userRepository.findById(userId)
-                .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId))
-                .isPresent();
+        return userRepository.findActiveByIdAndTenantId(userId, tenantId).isPresent();
     }
     
     /**
@@ -84,9 +91,7 @@ public class UserService {
         log.info("Found {} users for tenant {} (company filter not applied in User Service)", 
             users.size(), tenantId);
         
-        return users.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return userMapper.toResponseList(users);
     }
     
     /**
@@ -162,10 +167,7 @@ public class UserService {
     public void updateUser(UUID userId, UpdateUserRequest request, UUID tenantId, String updatedBy) {
         log.info("Updating user: {} for tenant: {}", userId, tenantId);
         
-        User user = userRepository.findById(userId)
-                .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId))
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        User user = findActiveUserOrThrow(userId, tenantId);
         
         // Update fields
         if (request.getFirstName() != null) {
@@ -214,10 +216,7 @@ public class UserService {
     public void deleteUser(UUID userId, UUID tenantId, String deletedBy) {
         log.info("Deleting user: {} for tenant: {}", userId, tenantId);
         
-        User user = userRepository.findById(userId)
-                .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId))
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        User user = findActiveUserOrThrow(userId, tenantId);
         
         user.setDeleted(true);
         user.setUpdatedBy(deletedBy);
@@ -237,7 +236,11 @@ public class UserService {
     }
     
     /**
-     * Lists all users for a tenant
+     * Lists all users for a tenant (non-paginated)
+     * 
+     * Note: For large datasets, use listUsersPaginated() instead
+     * 
+     * Performance: Uses optimized batch contact fetching (1 API call for all users)
      */
     @Transactional(readOnly = true)
     public List<UserResponse> listUsers(UUID tenantId) {
@@ -245,125 +248,64 @@ public class UserService {
         
         List<User> users = userRepository.findByTenantId(tenantId);
         
-        return users.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        // Use optimized batch fetching (fixes N+1 query problem)
+        return userMapper.toResponseListOptimized(users);
+    }
+    
+    /**
+     * Lists users for a tenant with pagination
+     * 
+     * Performance: Uses optimized batch contact fetching
+     */
+    @Transactional(readOnly = true)
+    public PagedResponse<UserResponse> listUsersPaginated(UUID tenantId, Pageable pageable) {
+        log.debug("Listing users for tenant: {} with pagination (page: {}, size: {})", 
+                  tenantId, pageable.getPageNumber(), pageable.getPageSize());
+        
+        Page<User> userPage = userRepository.findByTenantIdPaginated(tenantId, pageable);
+        
+        // Use optimized batch contact fetching
+        List<UserResponse> userResponses = userMapper.toResponseListOptimized(userPage.getContent());
+        
+        return PagedResponse.<UserResponse>builder()
+                .content(userResponses)
+                .page(userPage.getNumber())
+                .size(userPage.getSize())
+                .totalElements(userPage.getTotalElements())
+                .totalPages(userPage.getTotalPages())
+                .first(userPage.isFirst())
+                .last(userPage.isLast())
+                .build();
     }
     
     /**
      * Searches users by criteria
+     * Delegates to UserSearchService for better separation of concerns
      */
     @Transactional(readOnly = true)
     public List<UserResponse> searchUsers(UUID tenantId, String firstName, String lastName, 
                                          String email, String status) {
-        log.debug("Searching users with criteria for tenant: {}", tenantId);
-        
-        List<User> users = userRepository.findByTenantId(tenantId);
-        
-        // Apply filters
-        if (firstName != null && !firstName.isEmpty()) {
-            users = users.stream()
-                    .filter(u -> u.getFirstName().toLowerCase().contains(firstName.toLowerCase()))
-                    .collect(Collectors.toList());
-        }
-        if (lastName != null && !lastName.isEmpty()) {
-            users = users.stream()
-                    .filter(u -> u.getLastName().toLowerCase().contains(lastName.toLowerCase()))
-                    .collect(Collectors.toList());
-        }
-        if (email != null && !email.isEmpty()) {
-            // Filter by checking contacts via Contact Service
-            // Note: This is a simplified implementation
-            // In production, consider using a database query for better performance
-            final String emailLower = email.toLowerCase();
-            users = users.stream()
-                    .filter(u -> {
-                        try {
-                            ApiResponse<List<ContactDto>> response = contactServiceClient.getContactsByOwner(u.getId().toString());
-                            List<ContactDto> contacts = response != null && response.getData() != null ? response.getData() : null;
-                            return contacts != null && contacts.stream()
-                                    .anyMatch(c -> c.getContactValue().toLowerCase().contains(emailLower));
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    })
-                    .collect(Collectors.toList());
-        }
-        if (status != null && !status.isEmpty()) {
-            users = users.stream()
-                    .filter(u -> u.getStatus().name().equals(status))
-                    .collect(Collectors.toList());
-        }
-        
-        return users.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return userSearchService.searchUsers(tenantId, firstName, lastName, email, status);
     }
     
     /**
-     * Maps User entity to UserResponse DTO
+     * Searches users by criteria with pagination
+     * Delegates to UserSearchService for better separation of concerns
      */
-    private UserResponse mapToResponse(User user) {
-        // Get primary contact from Contact Service
-        String email = null;
-        String phone = null;
-        
-        try {
-            ApiResponse<List<ContactDto>> response = contactServiceClient.getContactsByOwner(user.getId().toString());
-            List<ContactDto> contacts = response != null && response.getData() != null ? response.getData() : null;
-
-            // Find primary email and phone
-            if (contacts != null) {
-            for (ContactDto contact : contacts) {
-                if ("EMAIL".equals(contact.getContactType()) && contact.isPrimary()) {
-                    email = contact.getContactValue();
-                } else if ("PHONE".equals(contact.getContactType()) && contact.isPrimary()) {
-                    phone = contact.getContactValue();
-                }
-            }
-            
-            // If no primary, get first of each type
-            if (email == null) {
-                email = contacts.stream()
-                        .filter(c -> "EMAIL".equals(c.getContactType()))
-                        .findFirst()
-                        .map(ContactDto::getContactValue)
-                        .orElse(null);
-            }
-            
-            if (phone == null) {
-                phone = contacts.stream()
-                        .filter(c -> "PHONE".equals(c.getContactType()))
-                        .findFirst()
-                        .map(ContactDto::getContactValue)
-                        .orElse(null);
-            }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to fetch contacts for user {}: {}", user.getId(), e.getMessage());
-        }
-        
-        return UserResponse.builder()
-                .id(user.getId())
-                .tenantId(user.getTenantId()) // Already UUID
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .displayName(user.getDisplayName())
-                .email(email)
-                .phone(phone)
-                .status(user.getStatus() != null ? user.getStatus().name() : null)
-                .registrationType(user.getRegistrationType() != null ? user.getRegistrationType().name() : null)
-                .role(user.getRole())
-                .lastLoginAt(user.getLastLoginAt())
-                .lastLoginIp(user.getLastLoginIp())
-                .preferences(user.getPreferences())
-                .settings(user.getSettings())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .createdBy(user.getCreatedBy())
-                .updatedBy(user.getUpdatedBy())
-                .version(user.getVersion())
-                .build();
+    @Transactional(readOnly = true)
+    public PagedResponse<UserResponse> searchUsersPaginated(UUID tenantId, String firstName, 
+                                                            String lastName, String status, 
+                                                            Pageable pageable) {
+        return userSearchService.searchUsersPaginated(tenantId, firstName, lastName, status, pageable);
+    }
+    
+    /**
+     * Helper method to find active user by ID and tenant ID
+     * Throws UserNotFoundException if not found
+     */
+    private User findActiveUserOrThrow(UUID userId, UUID tenantId) {
+        return userRepository.findActiveByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new UserNotFoundException(userId.toString()));
     }
 }
 
