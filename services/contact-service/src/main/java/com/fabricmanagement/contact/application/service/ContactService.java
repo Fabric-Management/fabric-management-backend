@@ -340,6 +340,24 @@ public class ContactService {
     }
 
     /**
+     * Lists all contacts (ADMIN only)
+     * 
+     * WARNING: This can return a large dataset. Use with caution.
+     * Consider using paginated version in the future.
+     */
+    @Transactional(readOnly = true)
+    public List<ContactResponse> listAllContacts() {
+        log.debug("Listing all contacts (ADMIN operation)");
+        
+        List<Contact> contacts = contactRepository.findAll();
+        
+        return contacts.stream()
+            .filter(Contact::isNotDeleted)
+            .map(this::toContactResponse)
+            .collect(Collectors.toList());
+    }
+    
+    /**
      * Gets contacts by multiple owner IDs (batch operation)
      * 
      * NEW: Added to prevent N+1 query problem in User Service

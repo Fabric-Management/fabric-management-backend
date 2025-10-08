@@ -34,6 +34,21 @@ public class ContactController {
     private final ContactService contactService;
     
     /**
+     * Lists all contacts (ADMIN only)
+     * 
+     * WARNING: Returns all contacts in the system. Use with caution.
+     * For better performance, use /search endpoint with filters.
+     */
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<List<ContactResponse>>> listAllContacts() {
+        log.debug("Listing all contacts (ADMIN operation)");
+        
+        List<ContactResponse> contacts = contactService.listAllContacts();
+        return ResponseEntity.ok(ApiResponse.success(contacts));
+    }
+    
+    /**
      * Creates a new contact
      */
     @PostMapping
