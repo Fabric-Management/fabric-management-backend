@@ -24,10 +24,10 @@ import java.util.UUID;
  * Follows Clean Architecture principles - only handles HTTP concerns.
  * 
  * API Version: v1
- * Base Path: /api/v1/users
+ * Base Path: / (Gateway strips /api/v1/users prefix)
  */
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("/")
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {

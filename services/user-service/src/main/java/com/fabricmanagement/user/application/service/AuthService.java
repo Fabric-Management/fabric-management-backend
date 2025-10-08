@@ -269,17 +269,17 @@ public class AuthService {
 
             String accessToken = jwtTokenProvider.generateToken(
                     user.getId().toString(),
-                    user.getTenantId(),
+                    user.getTenantId().toString(), // JWT requires String for JSON serialization
                     claims
             );
 
             String refreshToken = jwtTokenProvider.generateRefreshToken(
                     user.getId().toString(),
-                    user.getTenantId()
+                    user.getTenantId().toString() // JWT requires String for JSON serialization
             );
 
             // 9. Audit log
-            auditLogger.logSuccessfulLogin(contactValue, userId.toString(), user.getTenantId());
+            auditLogger.logSuccessfulLogin(contactValue, userId.toString(), user.getTenantId().toString());
             
             log.info("Login successful for user: {}", userId);
 
@@ -287,7 +287,7 @@ public class AuthService {
                     .accessToken(accessToken)
                     .refreshToken(refreshToken)
                     .userId(user.getId())
-                    .tenantId(UUID.fromString(user.getTenantId()))
+                    .tenantId(user.getTenantId()) // Already UUID, no conversion needed
                     .firstName(user.getFirstName())
                     .lastName(user.getLastName())
                     .email(contact.getContactValue())

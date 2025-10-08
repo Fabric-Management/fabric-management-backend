@@ -23,10 +23,10 @@ import java.util.UUID;
  * Follows Clean Architecture principles - only handles HTTP concerns.
  * 
  * API Version: v1
- * Base Path: /api/v1/contacts
+ * Base Path: / (Gateway strips /api/v1/contacts prefix)
  */
 @RestController
-@RequestMapping("/api/v1/contacts")
+@RequestMapping("/")
 @RequiredArgsConstructor
 @Slf4j
 public class ContactController {
@@ -43,6 +43,7 @@ public class ContactController {
         
         // Validate access: users can only create contacts for themselves unless they're admin
         String currentUserId = SecurityContextHolder.getCurrentUserId();
+        // Note: ownerId is String in request DTO to handle both UUID and legacy formats
         if (!currentUserId.equals(request.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
             log.warn("Unauthorized contact creation attempt by user {} for owner {}", currentUserId, request.getOwnerId());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -59,18 +60,18 @@ public class ContactController {
      */
     @GetMapping("/owner/{ownerId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<ContactResponse>>> getContactsByOwner(@PathVariable String ownerId) {
+    public ResponseEntity<ApiResponse<List<ContactResponse>>> getContactsByOwner(@PathVariable UUID ownerId) {
         log.debug("Getting contacts for owner: {}", ownerId);
         
         // Validate access
         String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(ownerId) && !SecurityContextHolder.hasRole("ADMIN")) {
+        if (!currentUserId.equals(ownerId.toString()) && !SecurityContextHolder.hasRole("ADMIN")) {
             log.warn("Unauthorized contact access attempt by user {} for owner {}", currentUserId, ownerId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to view these contacts", "FORBIDDEN"));
         }
         
-        List<ContactResponse> contacts = contactService.getContactsByOwner(ownerId);
+        List<ContactResponse> contacts = contactService.getContactsByOwner(ownerId.toString());
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
@@ -211,18 +212,18 @@ public class ContactController {
      */
     @GetMapping("/owner/{ownerId}/primary")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<ContactResponse>> getPrimaryContact(@PathVariable String ownerId) {
+    public ResponseEntity<ApiResponse<ContactResponse>> getPrimaryContact(@PathVariable UUID ownerId) {
         log.debug("Getting primary contact for owner: {}", ownerId);
         
         // Validate access
         String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(ownerId) && !SecurityContextHolder.hasRole("ADMIN")) {
+        if (!currentUserId.equals(ownerId.toString()) && !SecurityContextHolder.hasRole("ADMIN")) {
             log.warn("Unauthorized contact access attempt by user {} for owner {}", currentUserId, ownerId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to view these contacts", "FORBIDDEN"));
         }
         
-        ContactResponse contact = contactService.getPrimaryContact(ownerId);
+        ContactResponse contact = contactService.getPrimaryContact(ownerId.toString());
         return ResponseEntity.ok(ApiResponse.success(contact));
     }
     
@@ -244,20 +245,20 @@ public class ContactController {
     @GetMapping("/search")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<ContactResponse>>> searchContacts(
-            @RequestParam String ownerId,
+            @RequestParam UUID ownerId,
             @RequestParam(required = false) String contactType) {
 
         log.debug("Searching contacts for owner: {} with type: {}", ownerId, contactType);
 
         // Validate access
         String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(ownerId) && !SecurityContextHolder.hasRole("ADMIN")) {
+        if (!currentUserId.equals(ownerId.toString()) && !SecurityContextHolder.hasRole("ADMIN")) {
             log.warn("Unauthorized contact search attempt by user {} for owner {}", currentUserId, ownerId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to search these contacts", "FORBIDDEN"));
         }
 
-        List<ContactResponse> contacts = contactService.searchContacts(ownerId, contactType);
+        List<ContactResponse> contacts = contactService.searchContacts(ownerId.toString(), contactType);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
 

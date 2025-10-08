@@ -76,14 +76,14 @@ fabric-management-backend/
 
 ### 🎯 Security Score
 
-| Category | Score |
-|----------|-------|
-| API Gateway Security | 9/10 |
-| Rate Limiting | 9/10 |
-| Authentication Flow | 9/10 |
-| Exception Handling | 9/10 |
-| Brute Force Protection | 9/10 |
-| **Overall** | **8.8/10** |
+| Category               | Score      |
+| ---------------------- | ---------- |
+| API Gateway Security   | 9/10       |
+| Rate Limiting          | 9/10       |
+| Authentication Flow    | 9/10       |
+| Exception Handling     | 9/10       |
+| Brute Force Protection | 9/10       |
+| **Overall**            | **8.8/10** |
 
 See [SECURITY.md](docs/SECURITY.md) for detailed security documentation.
 
@@ -98,17 +98,19 @@ See [SECURITY.md](docs/SECURITY.md) for detailed security documentation.
 
 ## 📚 Documentation
 
-| Document                                                                                    | Description                              |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| [🔐 Security Documentation](docs/SECURITY.md) | **NEW** - Complete security guide and best practices |
-| [👤 User Service](docs/services/user-service.md) | User service documentation with security features |
-| [🚪 API Gateway Setup](docs/deployment/API_GATEWAY_SETUP.md) | Gateway configuration with rate limiting |
-| [Spring Boot Best Practices Analysis](docs/analysis/SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md) | Code quality and best practices analysis |
-| [Microservice Development Analysis](docs/analysis/MICROSERVICE_DEVELOPMENT_ANALYSIS.md)     | Microservice architecture analysis       |
-| [Architecture Guide](docs/architecture/README.md)                                           | System architecture overview             |
-| [API Documentation](docs/api/README.md)                                                     | REST API specifications                  |
-| [Deployment Guide](docs/deployment/README.md)                                               | Production deployment instructions       |
-| [Development Guide](docs/development/README.md)                                             | Development setup and guidelines         |
+| Document                                                                                        | Description                                              |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| [⭐⭐⭐ Microservices & API Gateway Standards](docs/development/MICROSERVICES_API_STANDARDS.md) | **CRITICAL** - Controller routing & API Gateway patterns |
+| [🔐 Security Documentation](docs/SECURITY.md)                                                   | Complete security guide and best practices               |
+| [🔢 Data Types Standards](docs/development/DATA_TYPES_STANDARDS.md)                             | UUID and identifier usage standards                      |
+| [👤 User Service](docs/services/user-service.md)                                                | User service documentation with security features        |
+| [🚪 API Gateway Setup](docs/deployment/API_GATEWAY_SETUP.md)                                    | Gateway configuration with rate limiting                 |
+| [Spring Boot Best Practices Analysis](docs/analysis/SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md)     | Code quality and best practices analysis                 |
+| [Microservice Development Analysis](docs/analysis/MICROSERVICE_DEVELOPMENT_ANALYSIS.md)         | Microservice architecture analysis                       |
+| [Architecture Guide](docs/architecture/README.md)                                               | System architecture overview                             |
+| [API Documentation](docs/api/README.md)                                                         | REST API specifications                                  |
+| [Deployment Guide](docs/deployment/README.md)                                                   | Production deployment instructions                       |
+| [Development Guide](docs/development/README.md)                                                 | Development setup and guidelines                         |
 
 ## 🔧 Available Commands
 
@@ -137,15 +139,15 @@ make prune          # Docker system prune
 
 ## 🏗️ Services
 
-| Service         | Port | Description                        | Status |
-| --------------- | ---- | ---------------------------------- | ------ |
+| Service         | Port | Description                        | Status        |
+| --------------- | ---- | ---------------------------------- | ------------- |
 | API Gateway     | 8080 | Central entry point with JWT auth  | ✅ Production |
 | User Service    | 8081 | User management and authentication | ✅ Production |
 | Contact Service | 8082 | Contact information management     | ✅ Production |
 | Company Service | 8083 | Company and tenant management      | ✅ Production |
-| PostgreSQL      | 5433 | Primary database                   | ✅ Ready |
-| Redis           | 6379 | Caching + Rate limiting            | ✅ Ready |
-| Kafka           | 9092 | Event streaming                    | ✅ Ready |
+| PostgreSQL      | 5433 | Primary database                   | ✅ Ready      |
+| Redis           | 6379 | Caching + Rate limiting            | ✅ Ready      |
+| Kafka           | 9092 | Event streaming                    | ✅ Ready      |
 
 ## 🔐 Security Features
 
