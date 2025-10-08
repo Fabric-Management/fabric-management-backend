@@ -112,7 +112,7 @@ public class UserController {
      * Creates a new user
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UUID>> createUser(
             @Valid @RequestBody CreateUserRequest request,
             @CurrentSecurityContext SecurityContext ctx) {
@@ -146,7 +146,7 @@ public class UserController {
      * Deletes a user (soft delete)
      */
     @DeleteMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
             @PathVariable UUID userId,
             @CurrentSecurityContext SecurityContext ctx) {
@@ -164,7 +164,7 @@ public class UserController {
      * For large datasets, use the paginated version with ?page=0&size=20
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers(
             @CurrentSecurityContext SecurityContext ctx) {
         
@@ -185,7 +185,7 @@ public class UserController {
      * Example: GET /api/v1/users/paged?page=0&size=10&sort=firstName,asc
      */
     @GetMapping("/paged")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<PagedResponse<UserResponse>> listUsersPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -214,7 +214,7 @@ public class UserController {
      * Note: For large datasets, use /search/paged endpoint
      */
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> searchUsers(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
@@ -245,7 +245,7 @@ public class UserController {
      * Note: Email search not supported (requires batch contact API - see IMPROVEMENTS.md)
      */
     @GetMapping("/search/paged")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<PagedResponse<UserResponse>> searchUsersPaginated(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
