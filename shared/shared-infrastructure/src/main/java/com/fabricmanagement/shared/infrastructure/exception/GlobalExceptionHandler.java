@@ -2,6 +2,7 @@ package com.fabricmanagement.shared.infrastructure.exception;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -18,9 +19,15 @@ import java.util.List;
  * 
  * Centralized exception handling for all microservices.
  * Provides consistent error responses across the system.
+ * 
+ * This handler is conditionally enabled only if a service-specific 
+ * exception handler is not present, allowing services to override
+ * with their own custom exception handling while maintaining 
+ * microservices autonomy.
  */
 @Slf4j
 @RestControllerAdvice
+@ConditionalOnMissingBean(name = "serviceExceptionHandler")
 public class GlobalExceptionHandler {
 
     /**

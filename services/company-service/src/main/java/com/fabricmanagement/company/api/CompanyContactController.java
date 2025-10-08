@@ -20,10 +20,10 @@ import java.util.UUID;
  * Follows Clean Architecture principles.
  * 
  * API Version: v1
- * Base Path: /api/v1/companies/{companyId}/contacts
+ * Base Path: /{companyId}/contacts (Gateway strips /api/v1/companies prefix)
  */
 @RestController
-@RequestMapping("/api/v1/companies/{companyId}/contacts")
+@RequestMapping("/{companyId}/contacts")
 @RequiredArgsConstructor
 @Slf4j
 public class CompanyContactController {

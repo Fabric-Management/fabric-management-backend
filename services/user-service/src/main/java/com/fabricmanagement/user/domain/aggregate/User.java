@@ -35,7 +35,7 @@ import java.util.UUID;
 public class User extends BaseEntity {
 
     @Column(name = "tenant_id", nullable = false)
-    private String tenantId;
+    private UUID tenantId;
     
     @Column(name = "first_name", nullable = false)
     private String firstName;
@@ -101,7 +101,7 @@ public class User extends BaseEntity {
         }
 
         User user = User.builder()
-            .tenantId(tenantId.toString())
+            .tenantId(tenantId) // UUID → UUID (no conversion)
             .firstName(firstName)
             .lastName(lastName)
             .displayName(firstName + " " + lastName)
@@ -111,7 +111,7 @@ public class User extends BaseEntity {
         // Add domain event
         user.addDomainEvent(UserCreatedEvent.builder()
             .userId(user.getId())
-            .tenantId(tenantId.toString())
+            .tenantId(tenantId.toString()) // UUID → String for Kafka event
             .firstName(firstName)
             .lastName(lastName)
             .email(contactValue)
@@ -134,7 +134,7 @@ public class User extends BaseEntity {
         // Add domain event
         addDomainEvent(UserUpdatedEvent.builder()
             .userId(this.getId())
-            .tenantId(this.tenantId)
+            .tenantId(this.tenantId.toString()) // UUID → String for Kafka event
             .firstName(firstName)
             .lastName(lastName)
             .status(this.status.name())
@@ -150,7 +150,7 @@ public class User extends BaseEntity {
         
         addDomainEvent(UserUpdatedEvent.builder()
             .userId(this.getId())
-            .tenantId(this.tenantId)
+            .tenantId(this.tenantId.toString()) // UUID → String for Kafka event
             .firstName(this.firstName)
             .lastName(this.lastName)
             .status(this.status.name())
@@ -190,7 +190,7 @@ public class User extends BaseEntity {
         
         addDomainEvent(UserDeletedEvent.builder()
             .userId(this.getId())
-            .tenantId(this.tenantId)
+            .tenantId(this.tenantId.toString()) // UUID → String for Kafka event
             .timestamp(LocalDateTime.now())
             .build());
     }
@@ -280,7 +280,7 @@ public class User extends BaseEntity {
         // Add domain event
         addDomainEvent(UserUpdatedEvent.builder()
             .userId(this.getId())
-            .tenantId(this.tenantId)
+            .tenantId(this.tenantId.toString()) // UUID → String for Kafka event
             .firstName(this.firstName)
             .lastName(this.lastName)
             .status(UserStatus.ACTIVE.name())
@@ -320,7 +320,7 @@ public class User extends BaseEntity {
         // Add domain event
         addDomainEvent(UserUpdatedEvent.builder()
             .userId(this.getId())
-            .tenantId(this.tenantId)
+            .tenantId(this.tenantId.toString()) // UUID → String for Kafka event
             .firstName(this.firstName)
             .lastName(this.lastName)
             .status(this.status.name())

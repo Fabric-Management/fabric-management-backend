@@ -24,7 +24,7 @@ $$ LANGUAGE plpgsql;
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id VARCHAR(255),
+    tenant_id UUID NOT NULL,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     display_name VARCHAR(100),
@@ -196,13 +196,13 @@ INSERT INTO users (
     updated_by
 ) VALUES (
     '00000000-0000-0000-0000-000000000001'::UUID,
-    '00000000-0000-0000-0000-000000000000',  -- Default tenant ID
+    '00000000-0000-0000-0000-000000000000'::UUID,  -- Default tenant ID
     'Super',
     'Admin',
     'Super Administrator',
     'ACTIVE',
     'SUPER_ADMIN',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',  -- bcrypt hash of 'Admin@123'
+    '$2b$12$9fPRsXGTeGgJ0kgRwEBG1OmVXKwpdniaEcBRg0vgdBGAynJFRkIaS',  -- bcrypt hash of 'Admin@123'
     'SYSTEM_CREATED',
     'SYSTEM',
     'SYSTEM'

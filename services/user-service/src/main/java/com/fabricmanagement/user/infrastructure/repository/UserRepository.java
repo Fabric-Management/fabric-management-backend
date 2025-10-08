@@ -56,5 +56,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * Find user by ID and tenant ID
      */
     @Query("SELECT u FROM User u WHERE u.id = :userId AND u.tenantId = :tenantId AND u.deleted = false")
-    Optional<User> findByIdAndTenantId(@Param("userId") UUID userId, @Param("tenantId") String tenantId);
+    Optional<User> findByIdAndTenantId(@Param("userId") UUID userId, @Param("tenantId") UUID tenantId);
 }

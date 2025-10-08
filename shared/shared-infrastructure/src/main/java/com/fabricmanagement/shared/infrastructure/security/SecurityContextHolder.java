@@ -22,7 +22,7 @@ public final class SecurityContextHolder {
     /**
      * Gets current tenant ID from JWT token
      * 
-     * @return tenant ID from security context
+     * @return tenant ID from security context as UUID
      * @throws UnauthorizedException if tenant ID not found or invalid
      */
     public static UUID getCurrentTenantId() {
@@ -33,7 +33,7 @@ public final class SecurityContextHolder {
             throw new UnauthorizedException("Authentication required");
         }
         
-        // Extract tenant ID from JWT claims
+        // Extract tenant ID from JWT claims (stored in details by JwtAuthenticationFilter)
         Object tenantIdClaim = authentication.getDetails();
         if (tenantIdClaim instanceof String) {
             try {

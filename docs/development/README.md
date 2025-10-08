@@ -469,17 +469,19 @@ this.items.add(newItem);
 #### 5. ID Type Standards
 
 ```java
-// ✅ Correct: String IDs for database compatibility
+// ✅ CORRECT: UUID for system-generated identifiers
 @Column(name = "tenant_id", nullable = false)
-private String tenantId;
+private UUID tenantId;
 
 @Column(name = "user_id", nullable = false)
-private String userId;
-
-// ❌ Wrong: UUID fields (database compatibility issues)
-private UUID tenantId;
 private UUID userId;
+
+// ❌ WRONG: String for UUIDs (loses type safety)
+private String tenantId;  // ❌ Should be UUID
+private String userId;    // ❌ Should be UUID
 ```
+
+**See:** [Data Types Standards](DATA_TYPES_STANDARDS.md) for complete UUID implementation guide.
 
 #### 6. Domain Events Handling
 
@@ -803,7 +805,15 @@ logging:
 
 ## 📚 Resources
 
-### Documentation
+### Internal Documentation
+
+- [Microservices & API Gateway Standards](MICROSERVICES_API_STANDARDS.md) - ⭐⭐⭐ CRITICAL: API Gateway & Controller standards
+- [Data Types Standards](DATA_TYPES_STANDARDS.md) - ⭐ UUID and identifier standards
+- [Development Principles](PRINCIPLES.md) - Coding principles and best practices
+- [Code Structure Guide](CODE_STRUCTURE_GUIDE.md) - Project organization
+- [Quick Start Guide](QUICK_START.md) - Getting started
+
+### External Documentation
 
 - [Spring Boot Reference](https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/)
 - [Spring Security Reference](https://docs.spring.io/spring-security/reference/)

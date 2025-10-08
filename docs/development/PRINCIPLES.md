@@ -367,10 +367,11 @@ class UserServiceContractTest {
 
 ## 🔗 Related Documents
 
-- [Spring Boot Best Practices Analysis](../analysis/SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md) - Detaylı kod analizi
-- [Microservice Development Analysis](../analysis/MICROSERVICE_DEVELOPMENT_ANALYSIS.md) - Mikroservis analizi
-- [Architecture Guide](../architecture/README.md) - Sistem mimarisi
+- [Microservices & API Gateway Standards](MICROSERVICES_API_STANDARDS.md) - ⭐⭐⭐ API Gateway ve Controller standartları
+- [Data Types Standards](DATA_TYPES_STANDARDS.md) - ⭐ UUID ve identifier standartları
+- [Code Structure Guide](CODE_STRUCTURE_GUIDE.md) - Proje organizasyonu
 - [Database Guide](../database/DATABASE_GUIDE.md) - Veritabanı standartları
+- [Architecture Guide](../architecture/README.md) - Sistem mimarisi
 
 ---
 

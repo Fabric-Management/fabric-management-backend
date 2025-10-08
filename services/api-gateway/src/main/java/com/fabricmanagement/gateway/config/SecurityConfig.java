@@ -2,7 +2,6 @@ package com.fabricmanagement.gateway.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
@@ -29,24 +28,9 @@ public class SecurityConfig {
         http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
-                // Public: Authentication endpoints
-                .pathMatchers("/api/v1/users/auth/**").permitAll()
-                
-                // Public: Internal contact lookup (used by User Service for auth)
-                .pathMatchers(HttpMethod.GET, "/api/v1/contacts/find-by-value").permitAll()
-                
-                // Public: Health and monitoring
-                .pathMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
-                
-                // Public: Fallback endpoints
-                .pathMatchers("/fallback/**").permitAll()
-                
-                // Public: Gateway management
-                .pathMatchers("/gateway/**").permitAll()
-                
-                // Protected: All other endpoints require authentication
-                // JWT validation is done by JwtAuthenticationFilter
-                .anyExchange().authenticated()
+                // Allow all requests - JWT validation is done by backend services
+                // Gateway acts as a simple routing layer (pass-through)
+                .anyExchange().permitAll()
             )
             .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
             .formLogin(ServerHttpSecurity.FormLoginSpec::disable);

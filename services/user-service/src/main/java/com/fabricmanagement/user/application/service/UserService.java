@@ -47,7 +47,7 @@ public class UserService {
         
         User user = userRepository.findById(userId)
                 .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId.toString()))
+                .filter(u -> u.getTenantId().equals(tenantId))
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         
         return mapToResponse(user);
@@ -62,7 +62,7 @@ public class UserService {
         
         return userRepository.findById(userId)
                 .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId.toString()))
+                .filter(u -> u.getTenantId().equals(tenantId))
                 .isPresent();
     }
     
@@ -119,7 +119,7 @@ public class UserService {
         // Create user
         User user = User.builder()
                 .id(UUID.randomUUID())
-                .tenantId(tenantId.toString())
+                .tenantId(tenantId)
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .displayName(request.getDisplayName())
@@ -141,7 +141,7 @@ public class UserService {
         // Publish UserCreatedEvent to Kafka
         UserCreatedEvent event = UserCreatedEvent.builder()
                 .userId(user.getId())
-                .tenantId(user.getTenantId())
+                .tenantId(user.getTenantId().toString()) // Kafka events use String
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .email(request.getEmail())
@@ -164,7 +164,7 @@ public class UserService {
         
         User user = userRepository.findById(userId)
                 .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId.toString()))
+                .filter(u -> u.getTenantId().equals(tenantId))
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         
         // Update fields
@@ -197,7 +197,7 @@ public class UserService {
         // Publish UserUpdatedEvent to Kafka
         UserUpdatedEvent event = UserUpdatedEvent.builder()
                 .userId(user.getId())
-                .tenantId(user.getTenantId())
+                .tenantId(user.getTenantId().toString()) // Kafka events use String
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .status(user.getStatus().name())
@@ -216,7 +216,7 @@ public class UserService {
         
         User user = userRepository.findById(userId)
                 .filter(u -> !u.isDeleted())
-                .filter(u -> u.getTenantId().equals(tenantId.toString()))
+                .filter(u -> u.getTenantId().equals(tenantId))
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         
         user.setDeleted(true);
@@ -229,7 +229,7 @@ public class UserService {
         // Publish UserDeletedEvent to Kafka
         UserDeletedEvent event = UserDeletedEvent.builder()
                 .userId(user.getId())
-                .tenantId(user.getTenantId())
+                .tenantId(user.getTenantId().toString()) // Kafka events use String
                 .timestamp(LocalDateTime.now())
                 .build();
         
@@ -345,7 +345,7 @@ public class UserService {
         
         return UserResponse.builder()
                 .id(user.getId())
-                .tenantId(UUID.fromString(user.getTenantId()))
+                .tenantId(user.getTenantId()) // Already UUID
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .displayName(user.getDisplayName())
