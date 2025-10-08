@@ -2,7 +2,6 @@ package com.fabricmanagement.user.infrastructure.client;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
-import com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,28 +23,22 @@ import java.util.UUID;
 public interface ContactServiceClient {
 
     /**
-     * Creates a new contact
-     */
-    @PostMapping
-    ApiResponse<ContactDto> createContact(@RequestBody CreateContactDto request);
-
-    /**
      * Gets contacts by owner ID
      */
     @GetMapping("/owner/{ownerId}")
-    ApiResponse<List<ContactDto>> getContactsByOwner(@PathVariable("ownerId") String ownerId);
+    ApiResponse<List<ContactDto>> getContactsByOwner(@PathVariable("ownerId") UUID ownerId);
 
     /**
      * Gets verified contacts for an owner
      */
     @GetMapping("/owner/{ownerId}/verified")
-    ApiResponse<List<ContactDto>> getVerifiedContacts(@PathVariable("ownerId") String ownerId);
+    ApiResponse<List<ContactDto>> getVerifiedContacts(@PathVariable("ownerId") UUID ownerId);
 
     /**
      * Gets primary contact for an owner
      */
     @GetMapping("/owner/{ownerId}/primary")
-    ApiResponse<ContactDto> getPrimaryContact(@PathVariable("ownerId") String ownerId);
+    ApiResponse<ContactDto> getPrimaryContact(@PathVariable("ownerId") UUID ownerId);
 
     /**
      * Verifies a contact
@@ -83,4 +76,16 @@ public interface ContactServiceClient {
      */
     @GetMapping("/find-by-value")
     ApiResponse<ContactDto> findByContactValue(@RequestParam("contactValue") String contactValue);
+    
+    /**
+     * Gets contacts for multiple owners (batch operation)
+     * 
+     * NEW: Added to prevent N+1 query problem
+     * Performance: 100 users = 1 API call instead of 100 calls
+     * 
+     * Request: List of UUID owner IDs
+     * Response: Map<String, List<ContactDto>> (String key for JSON compatibility)
+     */
+    @PostMapping("/batch/by-owners")
+    ApiResponse<java.util.Map<String, List<ContactDto>>> getContactsByOwnersBatch(@RequestBody List<UUID> ownerIds);
 }

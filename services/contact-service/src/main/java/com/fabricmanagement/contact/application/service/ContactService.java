@@ -44,14 +44,17 @@ public class ContactService {
             throw new IllegalArgumentException("Contact value already exists: " + request.getContactValue());
         }
         
+        // Parse owner ID from String to UUID
+        UUID ownerId = UUID.fromString(request.getOwnerId());
+        
         // If this should be primary, remove primary status from other contacts
         if (request.isPrimary()) {
-            contactRepository.removePrimaryStatusForOwner(request.getOwnerId());
+            contactRepository.removePrimaryStatusForOwner(ownerId);
         }
         
         // Create new contact
         Contact contact = Contact.create(
-            request.getOwnerId(),
+            ownerId,
             Contact.OwnerType.valueOf(request.getOwnerType()),
             request.getContactValue(),
             ContactType.valueOf(request.getContactType()),
@@ -84,7 +87,7 @@ public class ContactService {
      * Gets contacts by owner ID
      */
     @Transactional(readOnly = true)
-    public List<ContactResponse> getContactsByOwner(String ownerId) {
+    public List<ContactResponse> getContactsByOwner(UUID ownerId) {
         log.debug("Getting contacts for owner: {}", ownerId);
         
         List<Contact> contacts = contactRepository.findByOwnerId(ownerId);
@@ -210,7 +213,7 @@ public class ContactService {
      * Searches contacts by owner and type
      */
     @Transactional(readOnly = true)
-    public List<ContactResponse> searchContacts(String ownerId, String contactType) {
+    public List<ContactResponse> searchContacts(UUID ownerId, String contactType) {
         log.debug("Searching contacts for owner: {} with type: {}", ownerId, contactType);
         
         List<Contact> contacts;
@@ -260,7 +263,7 @@ public class ContactService {
      * Gets verified contacts for an owner
      */
     @Transactional(readOnly = true)
-    public List<ContactResponse> getVerifiedContacts(String ownerId) {
+    public List<ContactResponse> getVerifiedContacts(UUID ownerId) {
         log.debug("Getting verified contacts for owner: {}", ownerId);
         
         List<Contact> contacts = contactRepository.findVerifiedContactsByOwner(ownerId);
@@ -274,7 +277,7 @@ public class ContactService {
      * Gets primary contact for an owner
      */
     @Transactional(readOnly = true)
-    public ContactResponse getPrimaryContact(String ownerId) {
+    public ContactResponse getPrimaryContact(UUID ownerId) {
         log.debug("Getting primary contact for owner: {}", ownerId);
 
         Contact contact = contactRepository.findPrimaryContactByOwner(ownerId)
@@ -337,12 +340,42 @@ public class ContactService {
     }
 
     /**
+     * Gets contacts by multiple owner IDs (batch operation)
+     * 
+     * NEW: Added to prevent N+1 query problem in User Service
+     * Returns Map<ownerId, List<ContactResponse>> for easy lookup
+     * 
+     * Example: 100 users = 1 database query instead of 100
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<UUID, List<ContactResponse>> getContactsByOwnersBatch(List<UUID> ownerIds) {
+        log.debug("Getting contacts for {} owners in batch", ownerIds.size());
+        
+        if (ownerIds == null || ownerIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        
+        // Single database query for all owners!
+        List<Contact> allContacts = contactRepository.findByOwnerIdIn(ownerIds);
+        
+        // Group by ownerId
+        return allContacts.stream()
+            .collect(java.util.stream.Collectors.groupingBy(
+                Contact::getOwnerId,
+                java.util.stream.Collectors.mapping(
+                    this::toContactResponse,
+                    java.util.stream.Collectors.toList()
+                )
+            ));
+    }
+    
+    /**
      * Converts Contact entity to ContactResponse DTO
      */
     private ContactResponse toContactResponse(Contact contact) {
         return ContactResponse.builder()
             .id(contact.getId())
-            .ownerId(contact.getOwnerId())
+            .ownerId(contact.getOwnerId().toString())  // DTO uses String for API compatibility
             .ownerType(contact.getOwnerType().name())
             .contactValue(contact.getContactValue())
             .contactType(contact.getContactType().name())

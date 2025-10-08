@@ -23,10 +23,10 @@ import java.util.UUID;
  * Follows Clean Architecture principles - only handles HTTP concerns.
  * 
  * API Version: v1
- * Base Path: / (Gateway strips /api/v1/contacts prefix)
+ * Base Path: /api/v1/contacts
  */
 @RestController
-@RequestMapping("/")
+@RequestMapping("/api/v1/contacts")
 @RequiredArgsConstructor
 @Slf4j
 public class ContactController {
@@ -71,7 +71,7 @@ public class ContactController {
                     .body(ApiResponse.error("You don't have permission to view these contacts", "FORBIDDEN"));
         }
         
-        List<ContactResponse> contacts = contactService.getContactsByOwner(ownerId.toString());
+        List<ContactResponse> contacts = contactService.getContactsByOwner(ownerId);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
@@ -223,7 +223,7 @@ public class ContactController {
                     .body(ApiResponse.error("You don't have permission to view these contacts", "FORBIDDEN"));
         }
         
-        ContactResponse contact = contactService.getPrimaryContact(ownerId.toString());
+        ContactResponse contact = contactService.getPrimaryContact(ownerId);
         return ResponseEntity.ok(ApiResponse.success(contact));
     }
     
@@ -258,7 +258,7 @@ public class ContactController {
                     .body(ApiResponse.error("You don't have permission to search these contacts", "FORBIDDEN"));
         }
 
-        List<ContactResponse> contacts = contactService.searchContacts(ownerId.toString(), contactType);
+        List<ContactResponse> contacts = contactService.searchContacts(ownerId, contactType);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
 
@@ -285,5 +285,50 @@ public class ContactController {
                 .map(c -> ResponseEntity.ok(ApiResponse.success(c)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("Contact not found", "CONTACT_NOT_FOUND")));
+    }
+    
+    /**
+     * Gets contacts for multiple owners (batch operation)
+     * 
+     * NEW ENDPOINT: Added for batch fetching to prevent N+1 query problem
+     * 
+     * INTERNAL USE ONLY - Should only be called by User Service
+     * Public access for service-to-service communication
+     * 
+     * Performance: 100 users = 1 API call + 1 DB query instead of 100 calls + 100 queries
+     * 
+     * Request Body: [UUID, UUID, UUID, ...] as String array
+     * Response: Map<UUID_as_String, List<ContactResponse>>
+     * 
+     * Example:
+     * POST /api/v1/contacts/batch/by-owners
+     * Body: ["123e4567-e89b-12d3-a456-426614174000", "223e4567-..."]
+     * Response: {
+     *   "123e4567-...": [{ "contactValue": "email@test.com", ... }],
+     *   "223e4567-...": [{ "contactValue": "phone@test.com", ... }]
+     * }
+     */
+    @PostMapping("/batch/by-owners")
+    public ResponseEntity<ApiResponse<java.util.Map<String, List<ContactResponse>>>> getContactsByOwnersBatch(
+            @RequestBody List<UUID> ownerIds) {
+        
+        log.info("Batch fetching contacts for {} owners", ownerIds != null ? ownerIds.size() : 0);
+        
+        if (ownerIds == null || ownerIds.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.success(java.util.Collections.emptyMap()));
+        }
+        
+        java.util.Map<UUID, List<ContactResponse>> contactsMap = 
+            contactService.getContactsByOwnersBatch(ownerIds);
+        
+        // Convert UUID keys to String for API response compatibility
+        java.util.Map<String, List<ContactResponse>> stringKeyMap = contactsMap.entrySet().stream()
+            .collect(java.util.stream.Collectors.toMap(
+                entry -> entry.getKey().toString(),
+                java.util.Map.Entry::getValue
+            ));
+        
+        return ResponseEntity.ok(ApiResponse.success(stringKeyMap, 
+            "Batch contacts retrieved successfully for " + ownerIds.size() + " owners"));
     }
 }

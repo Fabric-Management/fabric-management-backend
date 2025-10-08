@@ -15,6 +15,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Contact Aggregate Root
@@ -30,7 +31,7 @@ import java.util.List;
 public class Contact extends BaseEntity {
     
     @Column(name = "owner_id", nullable = false)
-    private String ownerId;  // Can be userId or companyId
+    private UUID ownerId;  // userId or companyId (UUID for type safety)
     
     @Column(name = "owner_type", nullable = false)
     @Enumerated(EnumType.STRING)
@@ -76,7 +77,7 @@ public class Contact extends BaseEntity {
      * Creates a new contact
      */
     public static Contact create(
-        String ownerId,
+        UUID ownerId,
         OwnerType ownerType,
         String contactValue,
         ContactType contactType,
@@ -93,7 +94,7 @@ public class Contact extends BaseEntity {
         
         contact.addDomainEvent(new ContactCreatedEvent(
             contact.getId(),
-            ownerId,
+            ownerId.toString(),  // Event uses String for Kafka serialization
             ownerType.name(),
             contactValue,
             contactType.name()
@@ -125,7 +126,7 @@ public class Contact extends BaseEntity {
         
         addDomainEvent(new ContactUpdatedEvent(
             this.getId(),
-            this.ownerId,
+            this.ownerId.toString(),  // Event uses String for Kafka serialization
             this.ownerType.name(),
             "VERIFIED"
         ));
@@ -152,7 +153,7 @@ public class Contact extends BaseEntity {
         
         addDomainEvent(new ContactUpdatedEvent(
             this.getId(),
-            this.ownerId,
+            this.ownerId.toString(),  // Event uses String for Kafka serialization
             this.ownerType.name(),
             "PRIMARY_CHANGED"
         ));
@@ -176,7 +177,7 @@ public class Contact extends BaseEntity {
         
         addDomainEvent(new ContactDeletedEvent(
             this.getId(),
-            this.ownerId,
+            this.ownerId.toString(),  // Event uses String for Kafka serialization
             this.ownerType.name()
         ));
     }

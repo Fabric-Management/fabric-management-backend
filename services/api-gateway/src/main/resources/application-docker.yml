@@ -36,13 +36,11 @@ spring:
       routes:
         # User Service - Public Auth Routes (No Rate Limiting)
         # Pattern: /api/v1/users/auth/** - Authentication endpoints
-        # Gateway strips /api/v1/users, forwards /auth/** to service
         - id: user-service-public
           uri: ${USER_SERVICE_URL:http://user-service:8081}
           predicates:
             - Path=/api/v1/users/auth/**
           filters:
-            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: userServiceCircuitBreaker
@@ -50,13 +48,11 @@ spring:
 
         # User Service - Protected Routes (With Rate Limiting)
         # Pattern: /api/v1/users/** (excluding auth)
-        # Gateway strips /api/v1/users, forwards /** to service
         - id: user-service-protected
           uri: ${USER_SERVICE_URL:http://user-service:8081}
           predicates:
             - Path=/api/v1/users/**
           filters:
-            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: userServiceCircuitBreaker
@@ -73,7 +69,6 @@ spring:
           predicates:
             - Path=/api/v1/companies/**
           filters:
-            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: companyServiceCircuitBreaker
@@ -90,7 +85,6 @@ spring:
           predicates:
             - Path=/api/v1/contacts/**
           filters:
-            - StripPrefix=3
             - name: CircuitBreaker
               args:
                 name: contactServiceCircuitBreaker

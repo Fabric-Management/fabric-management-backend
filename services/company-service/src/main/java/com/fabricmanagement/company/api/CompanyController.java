@@ -23,10 +23,10 @@ import java.util.UUID;
  * Follows Clean Architecture principles - only handles HTTP concerns.
  * 
  * API Version: v1
- * Base Path: / (Gateway strips /api/v1/companies prefix)
+ * Base Path: /api/v1/companies
  */
 @RestController
-@RequestMapping("/")
+@RequestMapping("/api/v1/companies")
 @RequiredArgsConstructor
 @Slf4j
 public class CompanyController {

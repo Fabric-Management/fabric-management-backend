@@ -23,7 +23,7 @@ $$ LANGUAGE plpgsql;
 -- Contacts table
 CREATE TABLE IF NOT EXISTS contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id VARCHAR(255) NOT NULL,
+    owner_id UUID NOT NULL,  -- Changed from VARCHAR to UUID (security + type safety)
     owner_type VARCHAR(50) NOT NULL,
     contact_value VARCHAR(500) NOT NULL,
     contact_type VARCHAR(50) NOT NULL,
@@ -113,7 +113,7 @@ INSERT INTO contacts (
     updated_by
 ) VALUES (
     '00000000-0000-0000-0000-000000000001'::UUID,
-    '00000000-0000-0000-0000-000000000001',  -- Super Admin User ID
+    '00000000-0000-0000-0000-000000000001'::UUID,  -- Super Admin User ID (now UUID)
     'USER',
     'admin@system.local',
     'EMAIL',
