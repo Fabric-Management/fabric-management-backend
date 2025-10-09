@@ -4,7 +4,7 @@
 **Duration:** 5 dakika okuma  
 **Purpose:** Ne yaptık, nasıl kullanılır, neden yaptık?  
 **Status:** ✅ IMPLEMENTED - Production Ready  
-**Last Updated:** 2025-10-09 14:52 UTC+1
+**Last Updated:** 2025-10-09 19:20 UTC+1
 
 ---
 
@@ -142,8 +142,8 @@ services/company-service/domain/aggregate/
 3. **No Code Duplication**
 
    ```java
-   ✅ @CurrentSecurityContext SecurityContext ctx
-   ❌ SecurityContextHolder.getCurrentTenantId()  // Her yerde tekrar!
+   ✅ @AuthenticationPrincipal SecurityContext ctx  // Spring Security native!
+   ❌ Manual SecurityContext extraction from ThreadLocal  // Anti-pattern!
    ```
 
 4. **Centralized Error Messages**
@@ -182,9 +182,9 @@ services/company-service/domain/aggregate/
 
   - Department, CompanyRelationship, UserPermission
 
-- [ ] **Day 5:** JWT & SecurityContext update
+- [x] **Day 5:** JWT & SecurityContext update
   - Token'a yeni claim'ler ekle
-  - SecurityContextResolver güncelle
+  - JwtAuthenticationFilter'da SecurityContext as principal pattern
 
 **Test:**
 

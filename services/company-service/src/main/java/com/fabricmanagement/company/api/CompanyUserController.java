@@ -2,13 +2,14 @@ package com.fabricmanagement.company.api;
 
 import com.fabricmanagement.company.application.dto.AddUserToCompanyRequest;
 import com.fabricmanagement.company.application.service.CompanyUserService;
+import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
-import com.fabricmanagement.shared.infrastructure.security.SecurityContextHolder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -17,7 +18,7 @@ import java.util.UUID;
  * Company User Management Controller
  * 
  * Handles user-company relationships.
- * Follows Clean Architecture principles.
+ * Uses Spring Security's @AuthenticationPrincipal - 100% framework-native!
  * 
  * API Version: v1
  * Base Path: /{companyId}/users (Gateway strips /api/v1/companies prefix)
@@ -37,14 +38,12 @@ public class CompanyUserController {
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> addUserToCompany(
             @PathVariable UUID companyId,
-            @Valid @RequestBody AddUserToCompanyRequest request) {
+            @Valid @RequestBody AddUserToCompanyRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Adding user {} to company {}", request.getUserId(), companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String addedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyUserService.addUserToCompany(companyId, request, tenantId, addedBy);
+        companyUserService.addUserToCompany(companyId, request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "User added to company successfully"));
     }
@@ -56,14 +55,12 @@ public class CompanyUserController {
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> removeUserFromCompany(
             @PathVariable UUID companyId,
-            @PathVariable UUID userId) {
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Removing user {} from company {}", userId, companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String removedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyUserService.removeUserFromCompany(companyId, userId, tenantId, removedBy);
+        companyUserService.removeUserFromCompany(companyId, userId, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "User removed from company successfully"));
     }
@@ -76,14 +73,12 @@ public class CompanyUserController {
     public ResponseEntity<ApiResponse<Void>> updateUserRole(
             @PathVariable UUID companyId,
             @PathVariable UUID userId,
-            @RequestParam String role) {
+            @RequestParam String role,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Updating role for user {} in company {} to {}", userId, companyId, role);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String updatedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyUserService.updateUserRole(companyId, userId, role, tenantId, updatedBy);
+        companyUserService.updateUserRole(companyId, userId, role, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "User role updated successfully"));
     }

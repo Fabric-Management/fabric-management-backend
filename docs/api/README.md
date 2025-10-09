@@ -456,5 +456,7 @@ prism mock openapi.yaml --port 3000
 
 ---
 
-_Last updated: 2024-01-XX_
-_API Version: 1.0.0_
+**Last Updated:** 2025-10-09 20:15 UTC+1  
+**Version:** 1.0.0  
+**Status:** ✅ Active  
+**API Version:** v1

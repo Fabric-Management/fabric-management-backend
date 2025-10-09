@@ -16,7 +16,8 @@ import java.util.UUID;
 @FeignClient(
     name = "user-service",
     url = "${user-service.url:http://localhost:8081}",
-    path = "/api/v1/users"
+    path = "/api/v1/users",
+    configuration = com.fabricmanagement.company.infrastructure.config.FeignClientConfig.class
 )
 public interface UserServiceClient {
 

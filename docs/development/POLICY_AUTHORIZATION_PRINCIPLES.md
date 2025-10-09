@@ -5,7 +5,7 @@
 **Mandatory:** ✅ Bu kurallara UYULMALIDIR  
 **Review:** Her PR bu kurallara göre kontrol edilecek  
 **Status:** ✅ ACTIVE & ENFORCED  
-**Last Updated:** 2025-10-09 14:52 UTC+1
+**Last Updated:** 2025-10-09 19:20 UTC+1
 
 ---
 
@@ -66,7 +66,7 @@ public class PolicyController {
     private final PolicyEngine policyEngine;  // Delegate
 
     @GetMapping("/check")
-    public ApiResponse<PolicyDecision> check(@CurrentSecurityContext SecurityContext ctx) {
+    public ApiResponse<PolicyDecision> check(@AuthenticationPrincipal SecurityContext ctx) {
         return ApiResponse.success(policyEngine.evaluate(ctx, request));
     }
 }
@@ -130,17 +130,17 @@ public class UserSearchService { }  // 80 lines
 ### 4. 🚫 DRY (Don't Repeat Yourself)
 
 ```java
-// ❌ YANLIŞ: Her controller'da tekrar
+// ❌ YANLIŞ: Manual extraction (boilerplate everywhere)
 @GetMapping
-public Response getUsers() {
-    UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-    String userId = SecurityContextHolder.getCurrentUserId();
-    // ...
+public Response getUsers(Authentication auth) {
+    String userId = (String) auth.getPrincipal();
+    UUID tenantId = UUID.fromString((String) auth.getDetails());
+    // Repetitive boilerplate code!
 }
 
-// ✅ DOĞRU: Annotation ile inject
+// ✅ DOĞRU: Spring Security native @AuthenticationPrincipal
 @GetMapping
-public Response getUsers(@CurrentSecurityContext SecurityContext ctx) {
+public Response getUsers(@AuthenticationPrincipal SecurityContext ctx) {
     ctx.getTenantId();  // Clean!
     ctx.getUserId();    // Clean!
 }
@@ -149,7 +149,7 @@ public Response getUsers(@CurrentSecurityContext SecurityContext ctx) {
 **No Code Duplication:**
 
 - Use `shared` modules for common logic
-- Use `@CurrentSecurityContext` instead of SecurityContextHolder
+- Use Spring Security's `@AuthenticationPrincipal` for security context
 - Use base classes (`BaseEntity`, `BaseException`)
 - Use message keys instead of hard-coded strings
 
@@ -776,5 +776,5 @@ Before committing code, verify:
 **Document Owner:** Tech Lead  
 **Reviewers:** All Developers  
 **Status:** ✅ Active & Enforced  
-**Last Updated:** 2025-10-09 14:52 UTC+1  
+**Last Updated:** 2025-10-09 19:20 UTC+1  
 **Version:** 2.0 (Added PolicyConstants principle)

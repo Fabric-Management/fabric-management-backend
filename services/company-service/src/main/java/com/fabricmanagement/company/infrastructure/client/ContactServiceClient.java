@@ -17,7 +17,8 @@ import java.util.UUID;
 @FeignClient(
     name = "contact-service",
     url = "${contact-service.url:http://localhost:8082}",
-    path = "/api/v1/contacts"
+    path = "/api/v1/contacts",
+    configuration = com.fabricmanagement.company.infrastructure.config.FeignClientConfig.class
 )
 public interface ContactServiceClient {
 

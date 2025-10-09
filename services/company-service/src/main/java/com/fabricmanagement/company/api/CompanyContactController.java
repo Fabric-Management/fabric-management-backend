@@ -2,13 +2,14 @@ package com.fabricmanagement.company.api;
 
 import com.fabricmanagement.company.application.dto.AddContactToCompanyRequest;
 import com.fabricmanagement.company.application.service.CompanyContactService;
+import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
-import com.fabricmanagement.shared.infrastructure.security.SecurityContextHolder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -17,7 +18,7 @@ import java.util.UUID;
  * Company Contact Management Controller
  * 
  * Handles company contact information.
- * Follows Clean Architecture principles.
+ * Uses Spring Security's @AuthenticationPrincipal - 100% framework-native!
  * 
  * API Version: v1
  * Base Path: /{companyId}/contacts (Gateway strips /api/v1/companies prefix)
@@ -37,14 +38,12 @@ public class CompanyContactController {
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<UUID>> addContactToCompany(
             @PathVariable UUID companyId,
-            @Valid @RequestBody AddContactToCompanyRequest request) {
+            @Valid @RequestBody AddContactToCompanyRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Adding contact to company {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String addedBy = SecurityContextHolder.getCurrentUserId();
-        
-        UUID contactId = companyContactService.addContactToCompany(companyId, request, tenantId, addedBy);
+        UUID contactId = companyContactService.addContactToCompany(companyId, request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(contactId, "Contact added to company successfully"));
     }
@@ -56,14 +55,12 @@ public class CompanyContactController {
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> removeContactFromCompany(
             @PathVariable UUID companyId,
-            @PathVariable UUID contactId) {
+            @PathVariable UUID contactId,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Removing contact {} from company {}", contactId, companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String removedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyContactService.removeContactFromCompany(companyId, contactId, tenantId, removedBy);
+        companyContactService.removeContactFromCompany(companyId, contactId, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Contact removed from company successfully"));
     }
@@ -75,14 +72,12 @@ public class CompanyContactController {
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> setPrimaryContact(
             @PathVariable UUID companyId,
-            @PathVariable UUID contactId) {
+            @PathVariable UUID contactId,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Setting contact {} as primary for company {}", contactId, companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String updatedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyContactService.setPrimaryContact(companyId, contactId, tenantId, updatedBy);
+        companyContactService.setPrimaryContact(companyId, contactId, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Primary contact set successfully"));
     }

@@ -3,6 +3,7 @@ package com.fabricmanagement.company;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * - Company user management
  * - Company billing and subscription management
  * - Integration with Contact Service for company contact management
+ * - Policy Authorization Management (UserPermission, PolicyAudit)
  * 
  * Architecture: Clean Architecture + CQRS + Event Sourcing
  * Port: 8083
@@ -31,7 +33,14 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     },
     exclude = {RedisRepositoriesAutoConfiguration.class}
 )
-@EnableJpaRepositories(basePackages = "com.fabricmanagement.company.infrastructure.repository")
+@EnableJpaRepositories(basePackages = {
+    "com.fabricmanagement.company.infrastructure.repository",
+    "com.fabricmanagement.shared.infrastructure.policy.repository"
+})
+@EntityScan(basePackages = {
+    "com.fabricmanagement.company.domain",
+    "com.fabricmanagement.shared.domain"
+})
 @EnableCaching
 @EnableKafka
 @EnableAsync

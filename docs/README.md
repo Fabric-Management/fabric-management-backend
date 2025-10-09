@@ -7,9 +7,9 @@
 
 ## 🎯 Hızlı Başlangıç
 
-| Yeni Başlıyorsanız                                | Geliştirici İseniz                            | DevOps İseniz                                        |
-| ------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------- |
-| → [Quick Start Guide](development/QUICK_START.md) | → [Developer Handbook](DEVELOPER_HANDBOOK.md) | → [Deployment Guide](deployment/DEPLOYMENT_GUIDE.md) |
+| Yeni Başlıyorsanız                                | Geliştirici İseniz                            | AI Assistant İseniz                            | DevOps İseniz                                        |
+| ------------------------------------------------- | --------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------- |
+| → [Quick Start Guide](development/QUICK_START.md) | → [Developer Handbook](DEVELOPER_HANDBOOK.md) | → [🤖 AI Learnings](AI_ASSISTANT_LEARNINGS.md) | → [Deployment Guide](deployment/DEPLOYMENT_GUIDE.md) |
 
 ---
 

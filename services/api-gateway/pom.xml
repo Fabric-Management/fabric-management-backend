@@ -43,6 +43,28 @@
             <groupId>com.fabricmanagement</groupId>
             <artifactId>shared-infrastructure</artifactId>
             <version>${project.version}</version>
+            <exclusions>
+                <!-- Exclude Spring Web (conflicts with WebFlux) -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </exclusion>
+                <!-- Exclude JPA (Gateway doesn't need database) -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-jpa</artifactId>
+                </exclusion>
+                <!-- Exclude Flyway (Gateway doesn't need migrations) -->
+                <exclusion>
+                    <groupId>org.flywaydb</groupId>
+                    <artifactId>flyway-core</artifactId>
+                </exclusion>
+                <!-- Exclude PostgreSQL (Gateway doesn't need database) -->
+                <exclusion>
+                    <groupId>org.postgresql</groupId>
+                    <artifactId>postgresql</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Shared Security -->

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS policy_registry (
     created_by VARCHAR(100),
     updated_by VARCHAR(100),
     version BIGINT NOT NULL DEFAULT 0,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
     
     CONSTRAINT chk_registry_operation CHECK (operation IN ('READ', 'WRITE', 'DELETE', 'APPROVE', 'EXPORT', 'MANAGE')),
     CONSTRAINT chk_registry_scope CHECK (scope IN ('SELF', 'COMPANY', 'CROSS_COMPANY', 'GLOBAL'))
@@ -39,9 +40,10 @@ COMMENT ON COLUMN policy_registry.endpoint IS 'Endpoint pattern. Example: /api/v
 COMMENT ON COLUMN policy_registry.policy_version IS 'Policy version. Auto-incremented on update. Format: v1, v1.1, v1.2';
 COMMENT ON COLUMN policy_registry.version IS 'Optimistic locking version (from BaseEntity)';
 COMMENT ON COLUMN policy_registry.active IS 'If FALSE, policy is disabled (fallback to deny)';
+COMMENT ON COLUMN policy_registry.deleted IS 'Soft delete flag (from BaseEntity)';
 
-CREATE UNIQUE INDEX uk_registry_endpoint ON policy_registry(endpoint) WHERE active = TRUE;
-CREATE INDEX idx_registry_lookup ON policy_registry(endpoint, operation, active) WHERE active = TRUE;
+CREATE UNIQUE INDEX uk_registry_endpoint ON policy_registry(endpoint) WHERE active = TRUE AND deleted = FALSE;
+CREATE INDEX idx_registry_lookup ON policy_registry(endpoint, operation, active) WHERE active = TRUE AND deleted = FALSE;
 CREATE INDEX idx_registry_allowed_types ON policy_registry USING GIN (allowed_company_types);
 CREATE INDEX idx_registry_default_roles ON policy_registry USING GIN (default_roles);
 

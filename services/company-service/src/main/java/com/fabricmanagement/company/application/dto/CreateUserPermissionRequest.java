@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.company.application.dto;
 
 import com.fabricmanagement.shared.domain.policy.DataScope;
 import com.fabricmanagement.shared.domain.policy.OperationType;
@@ -15,11 +15,6 @@ import java.util.UUID;
 
 /**
  * Create User Permission Request DTO
- * 
- * Used in Advanced Settings to grant/deny specific permissions to users.
- * 
- * Example: Grant user X permission to DELETE companies (override role restrictions)
- * Example: Deny user Y permission to READ sensitive data (explicit restriction)
  */
 @Data
 @Builder
@@ -42,8 +37,7 @@ public class CreateUserPermissionRequest {
     @NotNull(message = "Data scope is required")
     private DataScope scope;
     
-    private LocalDateTime expiresAt; // Optional: permission expiration
-    
-    private String reason; // Optional: justification for the permission
+    private LocalDateTime expiresAt;
+    private String reason;
 }
 
