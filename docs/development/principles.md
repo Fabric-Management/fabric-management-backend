@@ -6,6 +6,113 @@ Bu doküman, Fabric Management System geliştirmesinde uyulması gereken temel p
 
 ---
 
+## ⚠️ **CRITICAL PROJECT PRINCIPLES** ⚠️
+
+### 🚫 **NO USERNAME PRINCIPLE** 🚫
+
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║                                                                   ║
+║  ⛔ THIS PROJECT DOES NOT USE USERNAME! ⛔                       ║
+║                                                                   ║
+║  ❌ NO username field in User entity                             ║
+║  ❌ NO username in authentication                                ║
+║  ❌ NO username in JWT tokens                                    ║
+║  ❌ NO username anywhere in the codebase                         ║
+║                                                                   ║
+║  ✅ USE: contactValue (email or phone)                           ║
+║  ✅ USE: userId (UUID as string in JWT)                          ║
+║  ✅ USE: User.getId() for identification                         ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+#### **WHY NO USERNAME?**
+
+**Business Requirement:**
+- Users authenticate with **email** or **phone number** (contactValue)
+- No separate username registration/management
+- Simplifies user experience
+- Aligns with modern authentication patterns
+
+**Technical Benefits:**
+1. ✅ **Reduced Complexity**: One less field to manage
+2. ✅ **Better UX**: Users remember their email/phone
+3. ✅ **Security**: UUID-based identification (no enumeration attacks)
+4. ✅ **Privacy**: JWT contains UUID, not email/phone
+5. ✅ **GDPR Compliant**: No PII in JWT tokens
+
+#### **CORRECT TERMINOLOGY**
+
+| ❌ WRONG | ✅ CORRECT | Usage |
+|---------|-----------|-------|
+| `username` | `userId` | JWT 'sub' claim, Spring Security principal |
+| `username` | `contactValue` | Login request (email/phone) |
+| `extractUsername()` | `extractUserId()` | JWT token parsing |
+| `String username` | `String userId` | Method parameters |
+| `user.getUsername()` | `user.getId()` | Entity identification |
+
+#### **CODE EXAMPLES**
+
+**❌ WRONG:**
+```java
+// NEVER DO THIS!
+@Entity
+public class User {
+    private String username;  // ❌ NO!
+}
+
+// Login
+public void login(String username, String password) { } // ❌ NO!
+
+// JWT
+String username = jwtTokenProvider.extractUsername(token); // ❌ DEPRECATED!
+```
+
+**✅ CORRECT:**
+```java
+// This is the way!
+@Entity
+public class User {
+    private UUID id;  // ✅ Identification via UUID
+    // No username field!
+}
+
+// Login
+public LoginResponse login(String contactValue, String password) { } // ✅ YES!
+
+// JWT
+String userId = jwtTokenProvider.extractUserId(token); // ✅ YES!
+
+// JWT Payload
+{
+  "sub": "550e8400-e29b-41d4-a716-446655440000",  // ✅ userId (UUID)
+  "tenantId": "7c9e6679-7425-40de-963d-42a6ee08cd6c",
+  "role": "ADMIN"
+  // NO username field!
+}
+```
+
+#### **ENFORCEMENT CHECKLIST**
+
+Before committing code, verify:
+
+- [ ] No `username` field in entities
+- [ ] No `username` in DTOs (except deprecated UserDto with clear note)
+- [ ] No `username` in method parameters
+- [ ] No `username` in JWT claims
+- [ ] Authentication uses `contactValue`
+- [ ] JWT 'sub' claim = `userId` (UUID)
+- [ ] Code uses `userId`, not `username`
+
+#### **SEE ALSO**
+
+- 📝 [SECURITY.md](../SECURITY.md) - UUID-based JWT security
+- 🔐 [User Service Documentation](../services/user-service.md) - Authentication flow
+- 📊 [API Documentation](../api/README.md) - Login endpoint examples
+
+---
+
 ## ☕ Spring Boot Coding Principles
 
 ### 1. Temel Kod Kalitesi

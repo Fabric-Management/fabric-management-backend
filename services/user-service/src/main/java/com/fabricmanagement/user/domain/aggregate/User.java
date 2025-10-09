@@ -28,6 +28,14 @@ import java.util.UUID;
  * 
  * Represents a user in the system with all business rules and invariants.
  * Follows Domain-Driven Design principles with event sourcing.
+ * 
+ * ⚠️ CRITICAL: NO USERNAME FIELD!
+ * 
+ * This entity does NOT have a username field by design.
+ * Authentication uses contactValue (email/phone) via Contact entity.
+ * Identification uses UUID (getId()).
+ * 
+ * See: docs/development/PRINCIPLES.md → "NO USERNAME PRINCIPLE"
  */
 @Entity
 @Table(name = "users")
