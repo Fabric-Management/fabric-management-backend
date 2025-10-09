@@ -111,6 +111,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             }
 
             // Add headers to downstream request (including role and company)
+            // IMPORTANT: Keep Authorization header for downstream JWT validation
             ServerHttpRequest.Builder requestBuilder = request.mutate()
                 .header(HEADER_TENANT_ID, tenantId)
                 .header(HEADER_USER_ID, userId);
@@ -124,6 +125,13 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             
             if (companyId != null && !companyId.isEmpty()) {
                 requestBuilder.header(HEADER_COMPANY_ID, companyId);
+            }
+            
+            // CRITICAL: Forward Authorization header to downstream services
+            // Backend services need the JWT for their own security validation
+            String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            if (authHeader != null) {
+                requestBuilder.header(HttpHeaders.AUTHORIZATION, authHeader);
             }
             
             log.debug("Authenticated request: tenant={}, user={}, role={}, company={}, path={}", 

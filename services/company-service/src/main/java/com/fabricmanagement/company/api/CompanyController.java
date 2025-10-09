@@ -3,14 +3,15 @@ package com.fabricmanagement.company.api;
 import com.fabricmanagement.company.application.dto.*;
 import com.fabricmanagement.company.application.service.CompanyService;
 import com.fabricmanagement.company.domain.valueobject.CompanyStatus;
+import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
-import com.fabricmanagement.shared.infrastructure.security.SecurityContextHolder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,6 +22,8 @@ import java.util.UUID;
  * 
  * Provides API endpoints for company management.
  * Follows Clean Architecture principles - only handles HTTP concerns.
+ * 
+ * Uses Spring Security's @AuthenticationPrincipal - 100% framework-native!
  * 
  * API Version: v1
  * Base Path: /api/v1/companies
@@ -38,13 +41,13 @@ public class CompanyController {
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
-    public ResponseEntity<ApiResponse<UUID>> createCompany(@Valid @RequestBody CreateCompanyRequest request) {
+    public ResponseEntity<ApiResponse<UUID>> createCompany(
+            @Valid @RequestBody CreateCompanyRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Creating company: {}", request.getName());
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String createdBy = SecurityContextHolder.getCurrentUserId();
-        
-        UUID companyId = companyService.createCompany(request, tenantId, createdBy);
+        UUID companyId = companyService.createCompany(request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(companyId, "Company created successfully"));
@@ -55,11 +58,13 @@ public class CompanyController {
      */
     @GetMapping("/{companyId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<CompanyResponse>> getCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<CompanyResponse>> getCompany(
+            @PathVariable UUID companyId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.debug("Getting company: {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        CompanyResponse company = companyService.getCompany(companyId, tenantId);
+        CompanyResponse company = companyService.getCompany(companyId, ctx.getTenantId());
         
         return ResponseEntity.ok(ApiResponse.success(company));
     }
@@ -69,11 +74,12 @@ public class CompanyController {
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<CompanyResponse>>> listCompanies() {
+    public ResponseEntity<ApiResponse<List<CompanyResponse>>> listCompanies(
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.debug("Listing companies");
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        List<CompanyResponse> companies = companyService.listCompanies(tenantId);
+        List<CompanyResponse> companies = companyService.listCompanies(ctx.getTenantId());
         
         return ResponseEntity.ok(ApiResponse.success(companies));
     }
@@ -85,14 +91,12 @@ public class CompanyController {
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> updateCompany(
             @PathVariable UUID companyId,
-            @Valid @RequestBody UpdateCompanyRequest request) {
+            @Valid @RequestBody UpdateCompanyRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Updating company: {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String updatedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyService.updateCompany(companyId, request, tenantId, updatedBy);
+        companyService.updateCompany(companyId, request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Company updated successfully"));
     }
@@ -102,13 +106,13 @@ public class CompanyController {
      */
     @DeleteMapping("/{companyId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<Void>> deleteCompany(
+            @PathVariable UUID companyId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Deleting company: {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String deletedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyService.deleteCompany(companyId, tenantId, deletedBy);
+        companyService.deleteCompany(companyId, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Company deleted successfully"));
     }
@@ -118,13 +122,13 @@ public class CompanyController {
      */
     @PostMapping("/{companyId}/activate")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> activateCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<Void>> activateCompany(
+            @PathVariable UUID companyId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Activating company: {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String updatedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyService.activateCompany(companyId, tenantId, updatedBy);
+        companyService.activateCompany(companyId, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Company activated successfully"));
     }
@@ -134,13 +138,13 @@ public class CompanyController {
      */
     @PostMapping("/{companyId}/deactivate")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivateCompany(@PathVariable UUID companyId) {
+    public ResponseEntity<ApiResponse<Void>> deactivateCompany(
+            @PathVariable UUID companyId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Deactivating company: {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String updatedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyService.deactivateCompany(companyId, tenantId, updatedBy);
+        companyService.deactivateCompany(companyId, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Company deactivated successfully"));
     }
@@ -151,12 +155,12 @@ public class CompanyController {
     @GetMapping("/status/{status}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompaniesByStatus(
-            @PathVariable CompanyStatus status) {
+            @PathVariable CompanyStatus status,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Getting companies with status: {}", status);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        List<CompanyResponse> companies = companyService.getCompaniesByStatus(status, tenantId);
+        List<CompanyResponse> companies = companyService.getCompaniesByStatus(status, ctx.getTenantId());
         
         return ResponseEntity.ok(ApiResponse.success(companies));
     }
@@ -169,13 +173,13 @@ public class CompanyController {
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> searchCompanies(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String industry,
-            @RequestParam(required = false) String companyType) {
+            @RequestParam(required = false) String companyType,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Searching companies with criteria: name={}, industry={}, companyType={}",
                 name, industry, companyType);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        List<CompanyResponse> companies = companyService.searchCompanies(tenantId, name, industry, companyType);
+        List<CompanyResponse> companies = companyService.searchCompanies(ctx.getTenantId(), name, industry, companyType);
         
         return ResponseEntity.ok(ApiResponse.success(companies));
     }
@@ -187,14 +191,12 @@ public class CompanyController {
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> updateCompanySettings(
             @PathVariable UUID companyId,
-            @Valid @RequestBody UpdateCompanySettingsRequest request) {
+            @Valid @RequestBody UpdateCompanySettingsRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Updating company settings: {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String updatedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyService.updateCompanySettings(companyId, request, tenantId, updatedBy);
+        companyService.updateCompanySettings(companyId, request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Company settings updated successfully"));
     }
@@ -206,14 +208,12 @@ public class CompanyController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> updateSubscription(
             @PathVariable UUID companyId,
-            @Valid @RequestBody UpdateSubscriptionRequest request) {
+            @Valid @RequestBody UpdateSubscriptionRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Updating company subscription: {}", companyId);
         
-        UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-        String updatedBy = SecurityContextHolder.getCurrentUserId();
-        
-        companyService.updateSubscription(companyId, request, tenantId, updatedBy);
+        companyService.updateSubscription(companyId, request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Company subscription updated successfully"));
     }

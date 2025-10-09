@@ -275,6 +275,7 @@ API Gateway implements multi-layered security:
 **File:** `services/api-gateway/src/main/java/com/fabricmanagement/gateway/security/JwtAuthenticationFilter.java`
 
 **Features:**
+
 - ✅ Full JWT validation (signature, expiration, claims)
 - ✅ Public/Protected endpoint separation
 - ✅ X-Tenant-Id and X-User-Id header injection
@@ -282,6 +283,7 @@ API Gateway implements multi-layered security:
 - ✅ Order: -100 (high priority)
 
 **Public Endpoints:**
+
 ```java
 /api/v1/users/auth/**           // Authentication endpoints
 /api/v1/contacts/find-by-value  // Internal contact lookup
@@ -295,6 +297,7 @@ API Gateway implements multi-layered security:
 All other API endpoints require `Authorization: Bearer <token>` header.
 
 **Implementation:**
+
 ```java
 @Component("gatewayJwtFilter")
 @Slf4j
@@ -320,7 +323,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         // Validate token using jjwt library
         Claims claims = validateTokenAndExtractClaims(token);
-        
+
         // Add tenant and user ID headers to downstream requests
         ServerHttpRequest modifiedRequest = exchange.getRequest().mutate()
             .header("X-Tenant-Id", claims.get("tenantId", String.class))
@@ -342,6 +345,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 **File:** `services/api-gateway/src/main/java/com/fabricmanagement/gateway/config/SecurityConfig.java`
 
 **Implementation:**
+
 ```java
 @Configuration
 @EnableWebFluxSecurity
@@ -354,13 +358,13 @@ public class SecurityConfig {
             .authorizeExchange(exchanges -> exchanges
                 // Public: Authentication endpoints
                 .pathMatchers("/api/v1/users/auth/**").permitAll()
-                
+
                 // Public: Internal contact lookup
                 .pathMatchers(HttpMethod.GET, "/api/v1/contacts/find-by-value").permitAll()
-                
+
                 // Public: Health and monitoring
                 .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                
+
                 // Protected: All other endpoints require authentication
                 .anyExchange().authenticated()
             )
@@ -517,16 +521,17 @@ curl http://localhost:8080/api/v1/users
 
 **Endpoint-Specific Rate Limits:**
 
-| Endpoint | Rate Limit | Burst Capacity | Purpose |
-|----------|------------|----------------|---------|
-| `/api/v1/users/auth/check-contact` | 10/min | 15 | Email enumeration prevention |
-| `/api/v1/users/auth/login` | 5/min | 10 | Brute force prevention |
-| `/api/v1/users/auth/setup-password` | 3/min | 5 | One-time operation protection |
-| `/api/v1/contacts/find-by-value` | 5/min | 10 | Internal endpoint protection |
-| Other auth endpoints | 20/min | 30 | General protection |
-| Protected endpoints | 50/min | 100 | Standard rate limit |
+| Endpoint                            | Rate Limit | Burst Capacity | Purpose                       |
+| ----------------------------------- | ---------- | -------------- | ----------------------------- |
+| `/api/v1/users/auth/check-contact`  | 10/min     | 15             | Email enumeration prevention  |
+| `/api/v1/users/auth/login`          | 5/min      | 10             | Brute force prevention        |
+| `/api/v1/users/auth/setup-password` | 3/min      | 5              | One-time operation protection |
+| `/api/v1/contacts/find-by-value`    | 5/min      | 10             | Internal endpoint protection  |
+| Other auth endpoints                | 20/min     | 30             | General protection            |
+| Protected endpoints                 | 50/min     | 100            | Standard rate limit           |
 
 **Configuration Example:**
+
 ```yaml
 spring:
   cloud:
@@ -545,7 +550,7 @@ spring:
                 redis-rate-limiter.replenishRate: 10
                 redis-rate-limiter.burstCapacity: 15
                 redis-rate-limiter.requestedTokens: 1
-        
+
         # Login (Strict Rate Limiting)
         - id: user-service-auth-login
           uri: ${USER_SERVICE_URL:http://localhost:8081}
@@ -561,6 +566,7 @@ spring:
 ```
 
 **Key Resolver (Smart IP/User-based):**
+
 ```java
 @Bean
 public KeyResolver smartKeyResolver() {
@@ -570,7 +576,7 @@ public KeyResolver smartKeyResolver() {
         if (userId != null) {
             return Mono.just(userId);
         }
-        
+
         // Fallback to IP address for unauthenticated requests
         String ip = exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
         return Mono.just(ip);
@@ -649,5 +655,6 @@ filters:
 
 ---
 
-**Son Güncelleme:** October 2, 2025
-**Versiyon:** 1.0.0
+**Last Updated:** 2025-10-09 20:15 UTC+1  
+**Version:** 1.0.0  
+**Status:** ✅ Active

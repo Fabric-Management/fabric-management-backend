@@ -35,15 +35,15 @@ Bu kılavuz, Fabric Management System'e yeni bir mikroservis veya modül eklerke
 Başlamadan önce aşağıdaki bilgileri belirleyin:
 
 ```yaml
-Servis Adı: order-service          # Kebab-case
-Port: 8084                          # 8080-8099 arası
-JMX Port: 9014                      # 9010-9029 arası
-Context Path: /api/v1/orders        # REST API base path
-Dependencies:                       # Diğer servislere bağımlılıklar
+Servis Adı: order-service # Kebab-case
+Port: 8084 # 8080-8099 arası
+JMX Port: 9014 # 9010-9029 arası
+Context Path: /api/v1/orders # REST API base path
+Dependencies: # Diğer servislere bağımlılıklar
   - user-service
   - company-service
-Database: order_db                  # Gerekiyorsa
-Kafka Topics:                       # Event-driven iletişim
+Database: order_db # Gerekiyorsa
+Kafka Topics: # Event-driven iletişim
   - order-events
   - payment-events
 ```
@@ -542,12 +542,12 @@ ORDER_SERVICE_JMX_PORT=9014
 
 ### 3. Ortam Değişkenleri Standardı
 
-| Kategori | Format | Örnek |
-|----------|--------|-------|
-| Port | `{SERVICE}_PORT` | `ORDER_SERVICE_PORT=8084` |
-| URL | `{SERVICE}_URL` | `ORDER_SERVICE_URL=http://localhost:8084` |
-| JMX | `{SERVICE}_JMX_PORT` | `ORDER_SERVICE_JMX_PORT=9014` |
-| Host | `{SERVICE}_HOST` | `ORDER_SERVICE_HOST=localhost` |
+| Kategori | Format               | Örnek                                     |
+| -------- | -------------------- | ----------------------------------------- |
+| Port     | `{SERVICE}_PORT`     | `ORDER_SERVICE_PORT=8084`                 |
+| URL      | `{SERVICE}_URL`      | `ORDER_SERVICE_URL=http://localhost:8084` |
+| JMX      | `{SERVICE}_JMX_PORT` | `ORDER_SERVICE_JMX_PORT=9014`             |
+| Host     | `{SERVICE}_HOST`     | `ORDER_SERVICE_HOST=localhost`            |
 
 ---
 
@@ -623,7 +623,7 @@ resilience4j:
         baseConfig: default
       contactServiceCircuitBreaker:
         baseConfig: default
-      orderServiceCircuitBreaker:    # ✅ YENİ
+      orderServiceCircuitBreaker: # ✅ YENİ
         baseConfig: default
 
   retry:
@@ -795,20 +795,24 @@ docker exec fabric-kafka kafka-consumer-groups \
 ### DO's ✅
 
 1. **Universal Dockerfile Kullan**
+
    - Tek `Dockerfile.service` tüm servisleri destekler
    - DRY prensibine uygun
 
 2. **ENV Değişkenlerini Merkezi Yönet**
+
    - `.env.example` template olarak
    - `.env` local development için
 
 3. **Shared Configuration Blocks Kullan**
+
    ```yaml
    x-logging: &default-logging
    x-healthcheck: &healthcheck-defaults
    ```
 
 4. **Tutarlı Naming Convention**
+
    ```bash
    {SERVICE}_PORT
    {SERVICE}_URL
@@ -816,6 +820,7 @@ docker exec fabric-kafka kafka-consumer-groups \
    ```
 
 5. **Circuit Breaker ve Retry Ekle**
+
    - Resilience4j ile fault tolerance
    - API Gateway level'da
 
@@ -826,10 +831,12 @@ docker exec fabric-kafka kafka-consumer-groups \
 ### DON'Ts ❌
 
 1. **❌ Her Servis İçin Ayrı Dockerfile Oluşturma**
+
    - Boilerplate kod tekrarı
    - Bakım maliyeti artar
 
 2. **❌ Hardcoded Değerler**
+
    ```yaml
    # ❌ YANLIŞ
    uri: http://localhost:8084
@@ -839,11 +846,13 @@ docker exec fabric-kafka kafka-consumer-groups \
    ```
 
 3. **❌ Port Çakışmaları**
+
    - Her servis unique port kullanmalı
    - 8080-8099: Servisler
    - 9010-9029: JMX
 
 4. **❌ Dokümantasyon Eksikliği**
+
    - Her servis README.md içermeli
    - API endpoints dokümante edilmeli
 
@@ -939,8 +948,9 @@ Her servis bu kılavuza uygun şekilde yapılandırılmıştır.
 
 ---
 
-**Son Güncelleme:** 2025-10-03
-**Versiyon:** 1.0.0
-**Hazırlayan:** DevOps & Architecture Team
+**Last Updated:** 2025-10-09 20:15 UTC+1  
+**Version:** 1.0.0  
+**Status:** ✅ Active  
+**Prepared By:** DevOps & Architecture Team
 
 > **Not**: Bu kılavuz, projedeki tüm mevcut servislerin analizi sonucu hazırlanmıştır ve DRY, KISS prensipleriyle tam uyumludur. Yeni bir servis eklerken bu kılavuzu takip ederek tutarlılığı koruyabilirsiniz.

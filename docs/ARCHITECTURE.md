@@ -1,7 +1,7 @@
 # 🏗️ Fabric Management - Mikroservis Mimarisi
 
-**Versiyon:** 2.0  
-**Tarih:** 8 Ekim 2025  
+**Versiyon:** 2.1  
+**Tarih:** 9 Ekim 2025 (Spring Security Native Migration)  
 **Prensip:** Clean Architecture + SOLID + DRY + KISS + YAGNI  
 **Hedef:** Enterprise-grade, bakanlıkların imrendiği profesyonel mimari
 
@@ -53,12 +53,12 @@ Hedef: 150 satır ✅
 #### 2️⃣ Kod Tekrarı %35 (DRY İhlali)
 
 ```
-❌ Her controller'da:
-UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-String userId = SecurityContextHolder.getCurrentUserId();
+❌ Her controller'da manuel extraction:
+Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+UUID tenantId = UUID.fromString((String) auth.getDetails());
 
-✅ Çözüm:
-@CurrentSecurityContext SecurityContext ctx
+✅ Çözüm: Spring Security Native
+@AuthenticationPrincipal SecurityContext ctx
 ```
 
 #### 3️⃣ N+1 Query Problem
@@ -230,14 +230,8 @@ shared/
 │       ├── context/                            # Security Context ✨
 │       │   └── SecurityContext.java            [User/tenant info]
 │       │
-│       ├── annotation/                         # Custom Annotations ✨
-│       │   ├── CurrentSecurityContext.java     [@CurrentSecurityContext]
-│       │   ├── AdminOnly.java                  [@AdminOnly]
-│       │   ├── AdminOrManager.java
-│       │   └── Authenticated.java
-│       │
-│       ├── resolver/                           # Argument Resolvers ✨
-│       │   └── SecurityContextResolver.java    [Resolves context]
+│       ├── annotation/                         # (REMOVED - Using Spring Security native)
+│       │                                        # @AuthenticationPrincipal SecurityContext
 │       │
 │       ├── exception/                          # Global Handler ✅
 │       │   └── GlobalExceptionHandler.java     [SINGLE for ALL]
@@ -315,7 +309,7 @@ public class UserController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(
             @PathVariable UUID id,
-            @CurrentSecurityContext SecurityContext ctx) {  // ✅ Clean injection
+            @AuthenticationPrincipal SecurityContext ctx) {  // ✅ Spring Security native!
 
         UserResponse user = userService.getUser(id, ctx.getTenantId());
         return ResponseEntity.ok(ApiResponse.success(user));
@@ -637,12 +631,13 @@ services/{service}/application/mapper/
 
 # 2. SecurityContext injection
 shared/shared-application/
-  ├─ context/SecurityContext.java
-  ├─ annotation/@CurrentSecurityContext.java
-  └─ resolver/SecurityContextResolver.java
+  └─ context/SecurityContext.java  # Simple POJO
+
+shared/shared-security/
+  └─ filter/JwtAuthenticationFilter.java  # Sets SecurityContext as principal
 
 # 3. Controller'ları güncelle
-@CurrentSecurityContext SecurityContext ctx
+@AuthenticationPrincipal SecurityContext ctx  # Spring Security native!
 ```
 
 #### Hafta 2: Repository & Exception
@@ -825,6 +820,7 @@ Principles:
 ---
 
 **Hazırlayan:** Backend Ekibi  
-**Tarih:** 8 Ekim 2025  
+**Tarih:** 9 Ekim 2025  
+**Son Güncelleme:** Spring Security Native Migration  
 **Versiyon:** 2.0  
 **Durum:** ✅ Production Ready

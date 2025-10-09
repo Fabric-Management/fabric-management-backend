@@ -27,6 +27,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Shared Application (for SecurityContext) -->
+        <dependency>
+            <groupId>com.fabricmanagement</groupId>
+            <artifactId>shared-application</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Spring Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

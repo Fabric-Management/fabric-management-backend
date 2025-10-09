@@ -18,18 +18,18 @@ import java.util.UUID;
 @Repository
 public interface CompanyRelationshipRepository extends JpaRepository<CompanyRelationship, UUID> {
     
-    @Query("SELECT r FROM CompanyRelationship r WHERE r.sourceCompanyId = :companyId")
+    @Query("SELECT r FROM CompanyRelationship r WHERE r.sourceCompanyId = :companyId AND r.deleted = false")
     List<CompanyRelationship> findBySourceCompanyId(@Param("companyId") UUID companyId);
     
-    @Query("SELECT r FROM CompanyRelationship r WHERE r.targetCompanyId = :companyId")
+    @Query("SELECT r FROM CompanyRelationship r WHERE r.targetCompanyId = :companyId AND r.deleted = false")
     List<CompanyRelationship> findByTargetCompanyId(@Param("companyId") UUID companyId);
     
-    @Query("SELECT r FROM CompanyRelationship r WHERE r.sourceCompanyId = :sourceId AND r.targetCompanyId = :targetId")
+    @Query("SELECT r FROM CompanyRelationship r WHERE r.sourceCompanyId = :sourceId AND r.targetCompanyId = :targetId AND r.deleted = false")
     Optional<CompanyRelationship> findBySourceAndTarget(@Param("sourceId") UUID sourceId, 
                                                          @Param("targetId") UUID targetId);
     
     @Query("SELECT r FROM CompanyRelationship r WHERE " +
-           "(r.sourceCompanyId = :companyId OR r.targetCompanyId = :companyId) AND r.status = 'ACTIVE'")
+           "(r.sourceCompanyId = :companyId OR r.targetCompanyId = :companyId) AND r.status = 'ACTIVE' AND r.deleted = false")
     List<CompanyRelationship> findActiveRelationships(@Param("companyId") UUID companyId);
 }
 

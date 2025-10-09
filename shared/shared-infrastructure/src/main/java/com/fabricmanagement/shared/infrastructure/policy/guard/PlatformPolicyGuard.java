@@ -7,7 +7,6 @@ import com.fabricmanagement.shared.infrastructure.policy.repository.PolicyRegist
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -162,10 +161,10 @@ public class PlatformPolicyGuard {
         }
         
         try {
-            List<String> allowedTypes = policyRegistryRepository.getAllowedCompanyTypes(endpoint);
+            String[] allowedTypes = policyRegistryRepository.getAllowedCompanyTypes(endpoint);
             
-            if (allowedTypes != null && !allowedTypes.isEmpty()) {
-                return allowedTypes.toArray(new String[0]);
+            if (allowedTypes != null && allowedTypes.length > 0) {
+                return allowedTypes;
             }
             
             // No restrictions defined - all company types allowed

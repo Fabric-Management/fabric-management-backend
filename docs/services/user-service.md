@@ -415,14 +415,15 @@ class UserRepositoryIntegrationTest {
   1. Check contact existence (`/check-contact`)
   2. Setup password (first-time users, `/setup-password`)
   3. Login with credentials (`/login`)
-  
 - **Brute force protection**:
+
   - Redis-based login attempt tracking
   - 5 failed attempts → 15 minutes account lockout
   - Distributed tracking across multiple instances
   - Automatic unlock after lockout period
 
 - **Response time masking**:
+
   - Minimum 200ms response time (configurable)
   - Prevents timing attacks
   - Prevents user enumeration via response time analysis
@@ -435,6 +436,7 @@ class UserRepositoryIntegrationTest {
 ### 3. Token Security
 
 - **JWT tokens**: Stateless authentication
+
   - HS256 algorithm
   - Configurable expiration (1 hour default, 15 min recommended for production)
   - Refresh token support (24 hours)
@@ -449,6 +451,7 @@ class UserRepositoryIntegrationTest {
 ### 4. Security Audit Logging
 
 - **SecurityAuditLogger service**:
+
   - Successful logins
   - Failed login attempts (with reason)
   - Account lockouts
@@ -456,6 +459,7 @@ class UserRepositoryIntegrationTest {
   - Suspicious activity detection
 
 - **Log format**: Structured logging (SIEM-ready)
+
   ```
   [SECURITY_AUDIT] event=LOGIN_SUCCESS contactValue=use*** userId=uuid timestamp=...
   ```
@@ -465,6 +469,7 @@ class UserRepositoryIntegrationTest {
 ### 5. Custom Exception Handling
 
 - **Domain-specific exceptions**:
+
   - `ContactNotFoundException`
   - `UserNotFoundException`
   - `InvalidPasswordException`
@@ -480,6 +485,7 @@ class UserRepositoryIntegrationTest {
 ### 6. Access Control
 
 - **API Gateway security**:
+
   - Public endpoints: `/auth/**`, `/actuator/health`
   - Protected endpoints: All others require JWT
   - JWT validation filter (order: -100, high priority)
@@ -490,6 +496,7 @@ class UserRepositoryIntegrationTest {
 ### 7. Contact Service Integration
 
 - **Internal endpoint protection**:
+
   - `/contacts/find-by-value` used for authentication
   - Aggressive rate limiting (5 req/min)
   - Public access but protected by rate limiting + timing attack prevention
@@ -617,12 +624,12 @@ server:
 spring:
   application:
     name: user-service
-  
+
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5433/${POSTGRES_DB:fabric_management}
     username: ${POSTGRES_USER:fabric_user}
     password: ${POSTGRES_PASSWORD:fabric_password}
-  
+
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
@@ -631,16 +638,16 @@ spring:
 # Security Configuration (NEW)
 security:
   login-attempt:
-    max-attempts: 5                    # Configurable per environment
-    lockout-duration-minutes: 15       # Account lockout duration
+    max-attempts: 5 # Configurable per environment
+    lockout-duration-minutes: 15 # Account lockout duration
   response-time-masking:
-    min-response-time-ms: 200          # Minimum response time (timing attack prevention)
+    min-response-time-ms: 200 # Minimum response time (timing attack prevention)
 
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:3600000}           # 1 hour
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}  # 24 hours
+  expiration: ${JWT_EXPIRATION:3600000} # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours
   algorithm: HS256
   issuer: fabric-management-system
   audience: fabric-api
@@ -811,14 +818,17 @@ management:
 ## 📦 New Components (October 2025)
 
 ### Services
+
 - `LoginAttemptService` - Redis-based brute force protection
 - `SecurityAuditLogger` - Structured security audit logging
 
 ### Exception Handlers
+
 - `GlobalExceptionHandler` - Centralized exception handling
 - 8 custom domain exceptions
 
 ### Security Features
+
 - Response time masking (timing attack prevention)
 - Login attempt tracking (Redis)
 - Password setup validation (contact verification)
@@ -827,7 +837,8 @@ management:
 
 ---
 
-_Last updated: October 2025_  
-_Version: 1.1.0_  
-_Service: User Service_  
-_Security Level: Production-Ready_
+**Last Updated:** 2025-10-09 20:15 UTC+1  
+**Version:** 1.1.0  
+**Service:** User Service  
+**Status:** ✅ Production Ready  
+**Security Level:** Production-Ready

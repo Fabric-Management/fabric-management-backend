@@ -34,6 +34,7 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
         SELECT p FROM UserPermission p 
         WHERE p.userId = :userId 
         AND p.status = 'ACTIVE'
+        AND p.deleted = false
         AND (p.validFrom IS NULL OR p.validFrom <= :now)
         AND (p.validUntil IS NULL OR p.validUntil > :now)
         """)
@@ -57,6 +58,7 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
         AND p.endpoint = :endpoint
         AND p.operation = :operation
         AND p.status = 'ACTIVE'
+        AND p.deleted = false
         AND (p.validFrom IS NULL OR p.validFrom <= :now)
         AND (p.validUntil IS NULL OR p.validUntil > :now)
         ORDER BY p.permissionType DESC
@@ -84,6 +86,7 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
         AND p.operation = :operation
         AND p.permissionType = 'DENY'
         AND p.status = 'ACTIVE'
+        AND p.deleted = false
         AND (p.validFrom IS NULL OR p.validFrom <= :now)
         AND (p.validUntil IS NULL OR p.validUntil > :now)
         """)
@@ -110,6 +113,7 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
         AND p.operation = :operation
         AND p.permissionType = 'ALLOW'
         AND p.status = 'ACTIVE'
+        AND p.deleted = false
         AND (p.validFrom IS NULL OR p.validFrom <= :now)
         AND (p.validUntil IS NULL OR p.validUntil > :now)
         """)
@@ -140,7 +144,12 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
      * @param userId user ID
      * @return list of all permissions
      */
-    List<UserPermission> findByUserId(UUID userId);
+    @Query("""
+        SELECT p FROM UserPermission p 
+        WHERE p.userId = :userId 
+        AND p.deleted = false
+        """)
+    List<UserPermission> findByUserId(@Param("userId") UUID userId);
     
     /**
      * Find permissions by type
@@ -149,6 +158,15 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
      * @param permissionType ALLOW or DENY
      * @return list of permissions
      */
-    List<UserPermission> findByUserIdAndPermissionType(UUID userId, PermissionType permissionType);
+    @Query("""
+        SELECT p FROM UserPermission p 
+        WHERE p.userId = :userId 
+        AND p.permissionType = :permissionType
+        AND p.deleted = false
+        """)
+    List<UserPermission> findByUserIdAndPermissionType(
+        @Param("userId") UUID userId, 
+        @Param("permissionType") PermissionType permissionType
+    );
 }
 

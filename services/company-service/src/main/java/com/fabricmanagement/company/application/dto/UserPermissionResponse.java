@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.company.application.dto;
 
 import com.fabricmanagement.shared.domain.policy.DataScope;
 import com.fabricmanagement.shared.domain.policy.OperationType;
@@ -13,8 +13,6 @@ import java.util.UUID;
 
 /**
  * User Permission Response DTO
- * 
- * Returns user permission details from Advanced Settings.
  */
 @Data
 @Builder
@@ -30,7 +28,7 @@ public class UserPermissionResponse {
     private DataScope scope;
     private LocalDateTime expiresAt;
     private String reason;
-    private String status; // ACTIVE, EXPIRED
+    private String status;
     private LocalDateTime createdAt;
     private UUID createdBy;
     private LocalDateTime updatedAt;

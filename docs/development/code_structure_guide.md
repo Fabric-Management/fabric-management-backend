@@ -389,4 +389,7 @@ public UserDTO getUser(@PathVariable UUID id) {
 
 ---
 
-**Sorularınız mı var?** Slack: #fabric-dev | Güncelleme: October 2025
+**Sorularınız mı var?** Slack: #fabric-dev  
+**Last Updated:** 2025-10-09 20:00 UTC+1  
+**Version:** 1.0.0  
+**Status:** ✅ Active

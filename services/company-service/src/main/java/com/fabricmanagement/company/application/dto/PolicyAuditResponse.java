@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.company.application.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,8 +10,6 @@ import java.util.UUID;
 
 /**
  * Policy Audit Response DTO
- * 
- * Returns audit log entry for a policy decision.
  */
 @Data
 @Builder
@@ -25,12 +23,12 @@ public class PolicyAuditResponse {
     private String endpoint;
     private String httpMethod;
     private String operation;
-    private String decision; // ALLOW / DENY
+    private String decision;
     private String reason;
     private String policyVersion;
     private Long latencyMs;
     private String correlationId;
     private LocalDateTime decidedAt;
-    private String metadata; // JSON string
+    private String metadata;
 }
 

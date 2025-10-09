@@ -608,5 +608,23 @@ graph TB
 
 ---
 
-_Last updated: 2024-01-XX_
-_Version: 1.0.0_
+## 📚 Complete Architecture Documentation
+
+For comprehensive architecture details, see the main architecture document:
+
+**👉 [ARCHITECTURE.md](../ARCHITECTURE.md)** - Complete system architecture with:
+
+- Generic Microservice Template
+- Shared Modules Structure
+- Layer Responsibilities
+- Shared vs Service-Specific Guidelines
+- Error Message Management
+- Refactoring Guides
+
+This README provides a high-level overview. For detailed implementation patterns and decisions, always refer to the main ARCHITECTURE.md document.
+
+---
+
+**Last Updated:** 2025-10-09 20:00 UTC+1  
+**Version:** 2.0.0  
+**Status:** ✅ Active - See ARCHITECTURE.md for details

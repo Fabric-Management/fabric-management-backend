@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS user_permissions (
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by VARCHAR(100),
+    updated_by VARCHAR(100),
     version BIGINT NOT NULL DEFAULT 0,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
     
     CONSTRAINT chk_permissions_operation CHECK (operation IN ('READ', 'WRITE', 'DELETE', 'APPROVE', 'EXPORT', 'MANAGE')),
     CONSTRAINT chk_permissions_scope CHECK (scope IN ('SELF', 'COMPANY', 'CROSS_COMPANY', 'GLOBAL')),
@@ -36,10 +39,10 @@ CREATE TABLE IF NOT EXISTS user_permissions (
 
 COMMENT ON TABLE user_permissions IS 'User-specific permission grants (V5)';
 
-CREATE INDEX idx_permissions_user ON user_permissions(user_id) WHERE status = 'ACTIVE';
-CREATE INDEX idx_permissions_user_endpoint ON user_permissions(user_id, endpoint) WHERE status = 'ACTIVE';
-CREATE INDEX idx_permissions_valid_until ON user_permissions(valid_until) WHERE valid_until IS NOT NULL AND status = 'ACTIVE';
-CREATE INDEX idx_permissions_lookup ON user_permissions(user_id, endpoint, operation, scope) WHERE status = 'ACTIVE';
+CREATE INDEX idx_permissions_user ON user_permissions(user_id) WHERE status = 'ACTIVE' AND deleted = FALSE;
+CREATE INDEX idx_permissions_user_endpoint ON user_permissions(user_id, endpoint) WHERE status = 'ACTIVE' AND deleted = FALSE;
+CREATE INDEX idx_permissions_valid_until ON user_permissions(valid_until) WHERE valid_until IS NOT NULL AND status = 'ACTIVE' AND deleted = FALSE;
+CREATE INDEX idx_permissions_lookup ON user_permissions(user_id, endpoint, operation, scope) WHERE status = 'ACTIVE' AND deleted = FALSE;
 
 CREATE TRIGGER update_user_permissions_updated_at
     BEFORE UPDATE ON user_permissions

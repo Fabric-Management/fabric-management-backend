@@ -3,7 +3,9 @@
 **Purpose:** Kod kalitesini korumak, mimari bütünlüğü sağlamak  
 **Scope:** Policy Authorization implementation için özel kurallar  
 **Mandatory:** ✅ Bu kurallara UYULMALIDIR  
-**Review:** Her PR bu kurallara göre kontrol edilecek
+**Review:** Her PR bu kurallara göre kontrol edilecek  
+**Status:** ✅ ACTIVE & ENFORCED  
+**Last Updated:** 2025-10-09 19:20 UTC+1
 
 ---
 
@@ -64,7 +66,7 @@ public class PolicyController {
     private final PolicyEngine policyEngine;  // Delegate
 
     @GetMapping("/check")
-    public ApiResponse<PolicyDecision> check(@CurrentSecurityContext SecurityContext ctx) {
+    public ApiResponse<PolicyDecision> check(@AuthenticationPrincipal SecurityContext ctx) {
         return ApiResponse.success(policyEngine.evaluate(ctx, request));
     }
 }
@@ -128,17 +130,17 @@ public class UserSearchService { }  // 80 lines
 ### 4. 🚫 DRY (Don't Repeat Yourself)
 
 ```java
-// ❌ YANLIŞ: Her controller'da tekrar
+// ❌ YANLIŞ: Manual extraction (boilerplate everywhere)
 @GetMapping
-public Response getUsers() {
-    UUID tenantId = SecurityContextHolder.getCurrentTenantId();
-    String userId = SecurityContextHolder.getCurrentUserId();
-    // ...
+public Response getUsers(Authentication auth) {
+    String userId = (String) auth.getPrincipal();
+    UUID tenantId = UUID.fromString((String) auth.getDetails());
+    // Repetitive boilerplate code!
 }
 
-// ✅ DOĞRU: Annotation ile inject
+// ✅ DOĞRU: Spring Security native @AuthenticationPrincipal
 @GetMapping
-public Response getUsers(@CurrentSecurityContext SecurityContext ctx) {
+public Response getUsers(@AuthenticationPrincipal SecurityContext ctx) {
     ctx.getTenantId();  // Clean!
     ctx.getUserId();    // Clean!
 }
@@ -147,13 +149,70 @@ public Response getUsers(@CurrentSecurityContext SecurityContext ctx) {
 **No Code Duplication:**
 
 - Use `shared` modules for common logic
-- Use `@CurrentSecurityContext` instead of SecurityContextHolder
+- Use Spring Security's `@AuthenticationPrincipal` for security context
 - Use base classes (`BaseEntity`, `BaseException`)
 - Use message keys instead of hard-coded strings
 
 ---
 
-### 5. 🌍 Centralized Error Messages (MANDATORY)
+### 5. 🌍 Centralized Constants (MANDATORY)
+
+**Policy Constants Example:**
+
+```java
+// ✅ DOĞRU: PolicyConstants class
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public final class PolicyConstants {
+
+    // Decision types
+    public static final String DECISION_ALLOW = "ALLOW";
+    public static final String DECISION_DENY = "DENY";
+
+    // Policy version
+    public static final String POLICY_VERSION_DEFAULT = "1.0";
+
+    // Cache configuration
+    public static final int CACHE_TTL_MINUTES = 5;
+    public static final String CACHE_KEY_SEPARATOR = "::";
+
+    // Permission status
+    public static final String PERMISSION_STATUS_ACTIVE = "ACTIVE";
+
+    // Denial reasons
+    public static final String REASON_GUARDRAIL = "company_type_guardrail_";
+    public static final String REASON_PLATFORM = "platform_policy_";
+    public static final String REASON_USER_GRANT = "user_grant_";
+    public static final String REASON_SCOPE = "scope_violation_";
+    public static final String REASON_ROLE = "role_access_denied";
+    public static final String REASON_ERROR = "policy_evaluation_error";
+}
+
+// Usage
+String decision = PolicyConstants.DECISION_ALLOW;
+String version = PolicyConstants.POLICY_VERSION_DEFAULT;
+int ttl = PolicyConstants.CACHE_TTL_MINUTES;
+```
+
+**Rules:**
+
+- All magic strings → Constants
+- All magic numbers → Constants
+- Constants class in infrastructure package
+- `private` constructor (utility class)
+- `public static final` fields
+- Grouped by category
+
+**Why?**
+
+- Easy to change
+- Type-safe
+- IDE autocomplete
+- Prevents typos
+- Single source of truth
+
+---
+
+### 6. 🌍 Centralized Error Messages (MANDATORY)
 
 ```java
 // ❌ YANLIŞ: Hard-coded
@@ -195,7 +254,7 @@ shared-infrastructure/resources/messages/
 
 ---
 
-### 6. 🎭 Separation of Concerns
+### 7. 🎭 Separation of Concerns
 
 | Concern            | Belongs To       | Example                         |
 | ------------------ | ---------------- | ------------------------------- |
@@ -232,7 +291,7 @@ public class User extends BaseEntity { }
 
 ## 🔐 Policy-Specific Rules
 
-### 7. PDP Must Be Stateless
+### 8. PDP Must Be Stateless
 
 ```java
 // ✅ DOĞRU: Stateless PolicyEngine
@@ -262,7 +321,7 @@ public class PolicyEngine {
 
 ---
 
-### 8. Policy Decision Immutability
+### 9. Policy Decision Immutability
 
 ```java
 // ✅ DOĞRU: Immutable decision
@@ -289,7 +348,7 @@ public class PolicyDecision {
 
 ---
 
-### 9. First DENY Wins (Security)
+### 10. First DENY Wins (Security)
 
 ```java
 // ✅ DOĞRU: Check order
@@ -327,7 +386,7 @@ public PolicyDecision evaluate(PolicyContext ctx) {
 
 ---
 
-### 10. Double Validation (Defense in Depth)
+### 11. Double Validation (Defense in Depth)
 
 ```java
 // 1️⃣ Gateway (PEP) - First check
@@ -362,7 +421,7 @@ public class UserService {
 
 ---
 
-### 11. Scope Validation Pattern
+### 12. Scope Validation Pattern
 
 ```java
 // ✅ DOĞRU: Explicit scope validation
@@ -392,7 +451,7 @@ public User getUser(UUID userId) {
 
 ---
 
-### 12. Audit Everything
+### 13. Audit Everything
 
 ```java
 // ✅ DOĞRU: Comprehensive audit
@@ -716,6 +775,6 @@ Before committing code, verify:
 
 **Document Owner:** Tech Lead  
 **Reviewers:** All Developers  
-**Status:** ✅ Active  
-**Last Updated:** 2025-10-08  
-**Version:** 1.0
+**Status:** ✅ Active & Enforced  
+**Last Updated:** 2025-10-09 19:20 UTC+1  
+**Version:** 2.0 (Added PolicyConstants principle)

@@ -28,7 +28,8 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
      * @param endpoint API endpoint
      * @return optional policy
      */
-    Optional<PolicyRegistry> findByEndpointAndActiveTrue(String endpoint);
+    @Query("SELECT p FROM PolicyRegistry p WHERE p.endpoint = :endpoint AND p.active = true AND p.deleted = false")
+    Optional<PolicyRegistry> findByEndpointAndActiveTrue(@Param("endpoint") String endpoint);
     
     /**
      * Find active policy by endpoint and operation
@@ -37,9 +38,10 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
      * @param operation operation type
      * @return optional policy
      */
+    @Query("SELECT p FROM PolicyRegistry p WHERE p.endpoint = :endpoint AND p.operation = :operation AND p.active = true AND p.deleted = false")
     Optional<PolicyRegistry> findByEndpointAndOperationAndActiveTrue(
-        String endpoint, 
-        OperationType operation
+        @Param("endpoint") String endpoint, 
+        @Param("operation") OperationType operation
     );
     
     /**
@@ -47,6 +49,7 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
      * 
      * @return list of active policies
      */
+    @Query("SELECT p FROM PolicyRegistry p WHERE p.active = true AND p.deleted = false")
     List<PolicyRegistry> findByActiveTrue();
     
     /**
@@ -58,6 +61,7 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
         SELECT p FROM PolicyRegistry p 
         WHERE p.requiresGrant = true 
         AND p.active = true
+        AND p.deleted = false
         """)
     List<PolicyRegistry> findPoliciesRequiringGrant();
     
@@ -67,11 +71,12 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
      * @param companyType company type
      * @return list of policies
      */
-    @Query("""
-        SELECT p FROM PolicyRegistry p 
-        WHERE :companyType = ANY(p.allowedCompanyTypes) 
-        AND p.active = true
-        """)
+    @Query(value = """
+        SELECT * FROM policy_registry 
+        WHERE :companyType = ANY(allowed_company_types) 
+        AND active = true
+        AND deleted = false
+        """, nativeQuery = true)
     List<PolicyRegistry> findByCompanyType(@Param("companyType") String companyType);
     
     /**
@@ -80,11 +85,12 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
      * @param role user role
      * @return list of policies
      */
-    @Query("""
-        SELECT p FROM PolicyRegistry p 
-        WHERE :role = ANY(p.defaultRoles) 
-        AND p.active = true
-        """)
+    @Query(value = """
+        SELECT * FROM policy_registry 
+        WHERE :role = ANY(default_roles) 
+        AND active = true
+        AND deleted = false
+        """, nativeQuery = true)
     List<PolicyRegistry> findByRole(@Param("role") String role);
     
     /**
@@ -97,6 +103,7 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
         SELECT COALESCE(p.requiresGrant, false) FROM PolicyRegistry p 
         WHERE p.endpoint = :endpoint 
         AND p.active = true
+        AND p.deleted = false
         """)
     Boolean requiresGrant(@Param("endpoint") String endpoint);
     
@@ -106,12 +113,14 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
      * @param endpoint API endpoint
      * @return list of allowed company types
      */
-    @Query("""
-        SELECT p.allowedCompanyTypes FROM PolicyRegistry p 
-        WHERE p.endpoint = :endpoint 
-        AND p.active = true
-        """)
-    List<String> getAllowedCompanyTypes(@Param("endpoint") String endpoint);
+    @Query(value = """
+        SELECT allowed_company_types FROM policy_registry 
+        WHERE endpoint = :endpoint 
+        AND active = true
+        AND deleted = false
+        LIMIT 1
+        """, nativeQuery = true)
+    String[] getAllowedCompanyTypes(@Param("endpoint") String endpoint);
     
     /**
      * Get default roles for endpoint
@@ -119,11 +128,13 @@ public interface PolicyRegistryRepository extends JpaRepository<PolicyRegistry, 
      * @param endpoint API endpoint
      * @return list of default roles
      */
-    @Query("""
-        SELECT p.defaultRoles FROM PolicyRegistry p 
-        WHERE p.endpoint = :endpoint 
-        AND p.active = true
-        """)
-    List<String> getDefaultRoles(@Param("endpoint") String endpoint);
+    @Query(value = """
+        SELECT default_roles FROM policy_registry 
+        WHERE endpoint = :endpoint 
+        AND active = true
+        AND deleted = false
+        LIMIT 1
+        """, nativeQuery = true)
+    String[] getDefaultRoles(@Param("endpoint") String endpoint);
 }
 

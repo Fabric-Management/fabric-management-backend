@@ -454,6 +454,7 @@ docker exec -i fabric-postgres psql -U ${POSTGRES_USER} ${POSTGRES_DB} < backup.
 
 ---
 
-**Document Status**: ✅ CURRENT & ACCURATE
-**Last Verified**: 02 October 2025
-**Maintained By**: Development Team
+**Last Updated:** 2025-10-09 20:15 UTC+1  
+**Version:** 2.0  
+**Status:** ✅ Current & Accurate  
+**Maintained By:** Development Team

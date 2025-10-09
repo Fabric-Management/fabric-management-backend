@@ -1,5 +1,6 @@
 package com.fabricmanagement.shared.security.filter;
 
+import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.security.jwt.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,16 +18,25 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * JWT Authentication Filter for Servlet-based Microservices
  *
  * Validates JWT tokens and sets authentication in Spring Security context.
- * Extracts tenant ID and user ID from JWT and adds them to request attributes.
+ * 
+ * SPRING SECURITY NATIVE PATTERN:
+ * - Creates SecurityContext object with all user info
+ * - Sets SecurityContext as Authentication principal
+ * - Controllers use @AuthenticationPrincipal SecurityContext to access user info
+ * 
+ * NO CUSTOM ArgumentResolver needed - Spring Security native @AuthenticationPrincipal!
  *
  * Public endpoints are skipped (configured in SecurityConfig).
  *
  * This filter is automatically applied to all requests through SecurityFilterChain.
+ * 
+ * Version: 2.0 (Spring Security Native Pattern)
  */
 @Slf4j
 @Component
@@ -35,8 +45,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String AUTHORIZATION_HEADER = "Authorization";
-    private static final String TENANT_ID_ATTRIBUTE = "X-Tenant-Id";
-    private static final String USER_ID_ATTRIBUTE = "X-User-Id";
+    
+    // Header names (set by API Gateway)
+    private static final String HEADER_COMPANY_ID = "X-Company-Id";
 
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -75,11 +86,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 // Set authentication in Security Context
+                // SecurityContext object will be available via @AuthenticationPrincipal
                 setAuthentication(request, userId, tenantId, role);
-
-                // Add tenant and user info to request attributes for downstream use
-                request.setAttribute(TENANT_ID_ATTRIBUTE, tenantId);
-                request.setAttribute(USER_ID_ATTRIBUTE, userId);
 
                 log.debug("JWT authenticated: user={}, tenant={}, path={}",
                         userId, tenantId, request.getRequestURI());
@@ -109,12 +117,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /**
      * Set authentication in Spring Security context
      * 
+     * SPRING SECURITY NATIVE PATTERN:
+     * - Principal = SecurityContext object (not just userId!)
+     * - Controllers use @AuthenticationPrincipal SecurityContext
+     * - No custom ArgumentResolver needed!
+     * 
      * @param request HTTP request
      * @param userId user ID (UUID as string)
      * @param tenantId tenant ID (UUID as string)
      * @param role user role (e.g., "ADMIN", "SUPER_ADMIN", "USER")
      */
     private void setAuthentication(HttpServletRequest request, String userId, String tenantId, String role) {
+        // Extract additional info from headers (set by API Gateway)
+        String companyIdHeader = request.getHeader(HEADER_COMPANY_ID);
+        UUID companyId = null;
+        if (companyIdHeader != null && !companyIdHeader.isEmpty()) {
+            try {
+                companyId = UUID.fromString(companyIdHeader);
+            } catch (IllegalArgumentException e) {
+                log.error("Invalid companyId UUID format in header: {}", companyIdHeader);
+            }
+        }
+        
         // Extract role from JWT and create authorities
         // Spring Security expects "ROLE_" prefix
         List<SimpleGrantedAuthority> authorities;
@@ -128,20 +152,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
             log.warn("No role in JWT for user: {}, defaulting to ROLE_USER", userId);
         }
+        
+        // Build SecurityContext object with all user information
+        // This will be the Authentication principal!
+        SecurityContext securityContext = SecurityContext.builder()
+            .userId(userId)
+            .tenantId(UUID.fromString(tenantId))
+            .roles(new String[]{role != null ? role : "USER"})
+            .companyId(companyId)
+            .build();
 
-        // Create authentication token
-        // Principal = userId (UUID as string)
+        // SPRING SECURITY NATIVE PATTERN:
+        // Set SecurityContext as principal (not just userId!)
+        // Now controllers can use @AuthenticationPrincipal SecurityContext
         UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                new UsernamePasswordAuthenticationToken(
+                    securityContext,  // ← Principal is SecurityContext!
+                    null, 
+                    authorities
+                );
 
-        // Set tenantId as details (SecurityContextHolder expects tenantId here)
-        authentication.setDetails(tenantId);
-
-        // Set authentication in context
+        // Set authentication in Spring Security context
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        log.trace("Security context set for user: {}, tenant: {}, authorities: {}", 
-                 userId, tenantId, authorities);
+        log.debug("Security context set: user={}, tenant={}, company={}, role={}", 
+                 userId, tenantId, companyId, role);
     }
 
     /**

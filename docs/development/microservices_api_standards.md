@@ -38,9 +38,12 @@ Bu doküman, Fabric Management System'deki tüm microservisler ve API Gateway i�
 
 ## ✅ RULE 1: Controller Base Path Standards
 
-### 🔴 ZORUNLU KURAL: Gateway Strips Prefix
+### 🔴 ZORUNLU KURAL: Service-Aware Pattern (Full Paths)
 
-> **API Gateway tüm servislerde `/api/v1/{service}` prefix'ini çıkarır (StripPrefix=3)**
+> **API Gateway does NOT strip prefix. All services use full paths: `/api/v1/{service}`**
+
+**⚠️ UPDATED:** October 8, 2025 - Migration to Service-Aware Pattern completed  
+**Reference:** See [path_pattern_standardization.md](./path_pattern_standardization.md) for complete migration details
 
 ### Standard Pattern
 
@@ -54,54 +57,53 @@ spring:
           uri: http://localhost:8081
           predicates:
             - Path=/api/v1/users/**
-          filters:
-            - StripPrefix=3 # ✅ Removes /api/v1/users
+          # ✅ NO StripPrefix filter!
 ```
 
 ### Controller Implementation
 
-#### ✅ CORRECT: Root Path Mapping
+#### ✅ CORRECT: Full Path Mapping
 
 ```java
 /**
  * User REST Controller
  *
  * API Version: v1
- * Base Path: / (Gateway strips /api/v1/users prefix)
+ * Base Path: /api/v1/users (Service-Aware Pattern)
  *
  * External URL: /api/v1/users/**
- * Service URL: /**
+ * Service URL: /api/v1/users/**
  */
 @RestController
-@RequestMapping("/")  // ✅ CORRECT - Gateway already stripped prefix
+@RequestMapping("/api/v1/users")  // ✅ CORRECT - Full path
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
 
-    @GetMapping("/{userId}")  // Receives: /{userId}
+    @GetMapping("/{userId}")  // Full path: /api/v1/users/{userId}
     public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable UUID userId) {
         // Implementation
     }
 
-    @GetMapping  // Receives: /
+    @GetMapping  // Full path: /api/v1/users
     public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers() {
         // Implementation
     }
 }
 ```
 
-#### ❌ WRONG: Full Path in Controller
+#### ❌ WRONG: Root Path in Controller
 
 ```java
 @RestController
-@RequestMapping("/api/v1/users")  // ❌ WRONG - Gateway strips this!
+@RequestMapping("/")  // ❌ WRONG - Old pattern (before Oct 8, 2025)
 @RequiredArgsConstructor
 public class UserController {
 
     @GetMapping("/{userId}")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable UUID userId) {
-        // This will NEVER be reached!
-        // Gateway forwards to /api/v1/users/{userId} instead of /{userId}
+        // This is the OLD pattern (deprecated)
+        // Use full path: @RequestMapping("/api/v1/users")
     }
 }
 ```
@@ -116,24 +118,27 @@ public class UserController {
 /**
  * Company Contact Controller
  *
- * External URL: /api/v1/companies/{companyId}/contacts/**
- * Service URL: /{companyId}/contacts/**
+ * API Version: v1
+ * Base Path: /api/v1/companies (Service-Aware Pattern)
  *
- * Gateway strips: /api/v1/companies
+ * External URL: /api/v1/companies/{companyId}/contacts/**
+ * Service URL: /api/v1/companies/{companyId}/contacts/**
+ *
+ * Note: This controller is part of company-service
  */
 @RestController
-@RequestMapping("/{companyId}/contacts")  // ✅ CORRECT
+@RequestMapping("/{companyId}/contacts")  // ✅ CORRECT - Nested under /api/v1/companies
 @RequiredArgsConstructor
 public class CompanyContactController {
 
-    @PostMapping  // POST /{companyId}/contacts
+    @PostMapping  // POST /api/v1/companies/{companyId}/contacts
     public ResponseEntity<ApiResponse<UUID>> addContact(
             @PathVariable UUID companyId,
             @Valid @RequestBody AddContactRequest request) {
         // Implementation
     }
 
-    @DeleteMapping("/{contactId}")  // DELETE /{companyId}/contacts/{contactId}
+    @DeleteMapping("/{contactId}")  // DELETE /api/v1/companies/{companyId}/contacts/{contactId}
     public ResponseEntity<ApiResponse<Void>> removeContact(
             @PathVariable UUID companyId,
             @PathVariable UUID contactId) {
@@ -601,8 +606,8 @@ spring:
           uri: ${USER_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/users/auth/**
+          # ✅ NO StripPrefix - Service-Aware Pattern
           filters:
-            - StripPrefix=3 # ✅ Always 3 for /api/v1/{service}
             - name: RequestRateLimiter
               args:
                 redis-rate-limiter.replenishRate: 10
@@ -613,8 +618,8 @@ spring:
           uri: ${USER_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/users/**
+          # ✅ NO StripPrefix - Service-Aware Pattern
           filters:
-            - StripPrefix=3 # ✅ Consistent stripping
             - name: RequestRateLimiter
               args:
                 redis-rate-limiter.replenishRate: 50
@@ -630,13 +635,13 @@ spring:
 - [ ] **Gateway Configuration**
 
   - [ ] Route configured in `api-gateway/application.yml`
-  - [ ] StripPrefix=3 for `/api/v1/{service}` paths
+  - [ ] NO StripPrefix (Service-Aware Pattern)
   - [ ] Rate limiting configured
   - [ ] Circuit breaker configured
 
 - [ ] **Controller Standards**
 
-  - [ ] Base path: `@RequestMapping("/")`
+  - [ ] Base path: `@RequestMapping("/api/v1/{service}")` ✅ Full path!
   - [ ] All system IDs are UUID type
   - [ ] All endpoints return `ApiResponse<T>`
   - [ ] Security annotations applied
@@ -688,19 +693,21 @@ spring:
 
 ## 🔄 Migration Guide (Existing Services)
 
-### Step 1: Update Controller Base Path
+### Step 1: Verify Controller Base Path
 
 ```java
-// Before ❌
+// ✅ CURRENT PATTERN (Service-Aware)
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("/api/v1/users")  // Full path
 public class UserController { }
 
-// After ✅
+// ❌ OLD PATTERN (Before Oct 8, 2025 - Deprecated)
 @RestController
-@RequestMapping("/")
+@RequestMapping("/")  // Root path with StripPrefix
 public class UserController { }
 ```
+
+**⚠️ NOTE:** All services migrated to Service-Aware Pattern on October 8, 2025. No action needed.
 
 ### Step 2: Fix UUID Path Variables
 
@@ -725,10 +732,10 @@ public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable UUID user
  * User REST Controller
  *
  * API Version: v1
- * Base Path: / (Gateway strips /api/v1/users prefix)  // ✅ Add this comment
+ * Base Path: /api/v1/users (Service-Aware Pattern)
  *
  * External URL: /api/v1/users/**
- * Service URL: /**
+ * Service URL: /api/v1/users/**
  */
 ```
 
@@ -741,27 +748,28 @@ mvn clean package -pl services/user-service -am -DskipTests
 # Restart container
 docker compose restart user-service
 
-# Test endpoints
-# External: http://localhost:8080/api/v1/users/{userId}
+# Test endpoints (both should work identically)
+curl http://localhost:8080/api/v1/users/{userId}  # Via Gateway
+curl http://localhost:8081/api/v1/users/{userId}  # Direct to service
 ```
 
 ---
 
 ## 🚨 Common Mistakes & Solutions
 
-### Mistake 1: Double Path in Controller
+### Mistake 1: Using Old Root Path Pattern
 
 ```java
-// ❌ WRONG
-@RequestMapping("/api/v1/users")  // Gateway already strips this!
+// ❌ WRONG (Old pattern - before Oct 8, 2025)
+@RequestMapping("/")  // Deprecated pattern with StripPrefix
 public class UserController {
-    @GetMapping("/{id}")  // Results in: /api/v1/users/api/v1/users/{id} - 404!
+    @GetMapping("/{id}")  // Old pattern, don't use
 }
 
-// ✅ CORRECT
-@RequestMapping("/")  // Gateway forwards to root
+// ✅ CORRECT (Current Service-Aware Pattern)
+@RequestMapping("/api/v1/users")  // Full path, no stripping
 public class UserController {
-    @GetMapping("/{id}")  // Results in: /{id} - Works!
+    @GetMapping("/{id}")  // Results in: /api/v1/users/{id} - Works!
 }
 ```
 
@@ -818,10 +826,13 @@ public ResponseEntity<ApiResponse<UUID>> create(@Valid @RequestBody CreateReques
  * {Resource} REST Controller
  *
  * API Version: v1
- * Base Path: / (Gateway strips /api/v1/{resource} prefix)
+ * Base Path: /api/v1/{resource} (Service-Aware Pattern)
+ *
+ * External URL: /api/v1/{resource}/**
+ * Service URL: /api/v1/{resource}/**
  */
 @RestController
-@RequestMapping("/")
+@RequestMapping("/api/v1/{resource}")  // ✅ Full path
 @RequiredArgsConstructor
 @Slf4j
 public class ResourceController {
@@ -882,15 +893,15 @@ public class ResourceController {
 
 Before deploying a service, verify:
 
-- [ ] Controller base path is `/`
+- [ ] Controller base path is `/api/v1/{service}` ✅ Full path (Service-Aware Pattern)
 - [ ] All system-generated IDs are UUID type
 - [ ] All endpoints return `ApiResponse<T>`
 - [ ] Tenant ID from `SecurityContextHolder`, never from request
 - [ ] User ID from `SecurityContextHolder`, never from request
 - [ ] `@PreAuthorize` annotations on protected endpoints
 - [ ] `@Valid` on request DTOs
-- [ ] GlobalExceptionHandler implemented
-- [ ] Gateway route configured with `StripPrefix=3`
+- [ ] GlobalExceptionHandler implemented (or use shared)
+- [ ] Gateway route configured WITHOUT StripPrefix ✅ Service-Aware Pattern
 - [ ] Rate limiting configured
 - [ ] Circuit breaker configured
 - [ ] Tests cover all endpoints
@@ -899,6 +910,9 @@ Before deploying a service, verify:
 
 ---
 
+**Last Updated:** 2025-10-09 20:15 UTC+1  
+**Version:** 2.0 (Service-Aware Pattern Migration)  
+**Status:** ✅ Active - Aligned with path_pattern_standardization.md  
 **Document Owner:** Architecture Team  
 **Review Frequency:** Quarterly  
 **Next Review:** 2026-01-08

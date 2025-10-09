@@ -2,13 +2,14 @@ package com.fabricmanagement.contact.api;
 
 import com.fabricmanagement.contact.application.dto.*;
 import com.fabricmanagement.contact.application.service.ContactService;
+import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
-import com.fabricmanagement.shared.infrastructure.security.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -20,7 +21,7 @@ import java.util.UUID;
  * Contact REST Controller
  * 
  * Provides API endpoints for contact management.
- * Follows Clean Architecture principles - only handles HTTP concerns.
+ * Uses Spring Security's @AuthenticationPrincipal - 100% framework-native!
  * 
  * API Version: v1
  * Base Path: /api/v1/contacts
@@ -53,14 +54,15 @@ public class ContactController {
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<ContactResponse>> createContact(@Valid @RequestBody CreateContactRequest request) {
+    public ResponseEntity<ApiResponse<ContactResponse>> createContact(
+            @Valid @RequestBody CreateContactRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Creating contact for owner: {}", request.getOwnerId());
         
         // Validate access: users can only create contacts for themselves unless they're admin
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        // Note: ownerId is String in request DTO to handle both UUID and legacy formats
-        if (!currentUserId.equals(request.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact creation attempt by user {} for owner {}", currentUserId, request.getOwnerId());
+        if (!ctx.getUserId().equals(request.getOwnerId()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact creation attempt by user {} for owner {}", ctx.getUserId(), request.getOwnerId());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to create contacts for this owner", "FORBIDDEN"));
         }
@@ -75,13 +77,15 @@ public class ContactController {
      */
     @GetMapping("/owner/{ownerId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<ContactResponse>>> getContactsByOwner(@PathVariable UUID ownerId) {
+    public ResponseEntity<ApiResponse<List<ContactResponse>>> getContactsByOwner(
+            @PathVariable UUID ownerId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.debug("Getting contacts for owner: {}", ownerId);
         
         // Validate access
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(ownerId.toString()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact access attempt by user {} for owner {}", currentUserId, ownerId);
+        if (!ctx.getUserId().equals(ownerId.toString()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact access attempt by user {} for owner {}", ctx.getUserId(), ownerId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to view these contacts", "FORBIDDEN"));
         }
@@ -95,15 +99,17 @@ public class ContactController {
      */
     @GetMapping("/{contactId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<ContactResponse>> getContact(@PathVariable UUID contactId) {
+    public ResponseEntity<ApiResponse<ContactResponse>> getContact(
+            @PathVariable UUID contactId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.debug("Getting contact: {}", contactId);
         
         ContactResponse contact = contactService.getContact(contactId);
         
         // Validate access
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(contact.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact access attempt by user {} for contact {}", currentUserId, contactId);
+        if (!ctx.getUserId().equals(contact.getOwnerId()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact access attempt by user {} for contact {}", ctx.getUserId(), contactId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to view this contact", "FORBIDDEN"));
         }
@@ -118,15 +124,15 @@ public class ContactController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> updateContact(
             @PathVariable UUID contactId,
-            @Valid @RequestBody UpdateContactRequest request) {
+            @Valid @RequestBody UpdateContactRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Updating contact: {}", contactId);
         
         // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(existingContact.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact update attempt by user {} for contact {}", currentUserId, contactId);
+        if (!ctx.getUserId().equals(existingContact.getOwnerId()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact update attempt by user {} for contact {}", ctx.getUserId(), contactId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to update this contact", "FORBIDDEN"));
         }
@@ -140,14 +146,16 @@ public class ContactController {
      */
     @DeleteMapping("/{contactId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> deleteContact(@PathVariable UUID contactId) {
+    public ResponseEntity<ApiResponse<Void>> deleteContact(
+            @PathVariable UUID contactId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Deleting contact: {}", contactId);
         
         // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(existingContact.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact deletion attempt by user {} for contact {}", currentUserId, contactId);
+        if (!ctx.getUserId().equals(existingContact.getOwnerId()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact deletion attempt by user {} for contact {}", ctx.getUserId(), contactId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to delete this contact", "FORBIDDEN"));
         }
@@ -161,14 +169,16 @@ public class ContactController {
      */
     @PutMapping("/{contactId}/primary")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> setPrimaryContact(@PathVariable UUID contactId) {
+    public ResponseEntity<ApiResponse<Void>> setPrimaryContact(
+            @PathVariable UUID contactId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Setting contact as primary: {}", contactId);
         
         // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(existingContact.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact update attempt by user {} for contact {}", currentUserId, contactId);
+        if (!ctx.getUserId().equals(existingContact.getOwnerId()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact update attempt by user {} for contact {}", ctx.getUserId(), contactId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to update this contact", "FORBIDDEN"));
         }
@@ -182,14 +192,16 @@ public class ContactController {
      */
     @PostMapping("/{contactId}/send-verification")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> sendVerificationCode(@PathVariable UUID contactId) {
+    public ResponseEntity<ApiResponse<Void>> sendVerificationCode(
+            @PathVariable UUID contactId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.info("Sending verification code to contact: {}", contactId);
 
         // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(existingContact.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized send verification attempt by user {} for contact {}", currentUserId, contactId);
+        if (!ctx.getUserId().equals(existingContact.getOwnerId()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized send verification attempt by user {} for contact {}", ctx.getUserId(), contactId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("You don't have permission to send verification for this contact", "FORBIDDEN"));
         }
@@ -205,15 +217,15 @@ public class ContactController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> verifyContact(
             @PathVariable UUID contactId,
-            @RequestParam String code) {
+            @RequestParam String code,
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Verifying contact: {}", contactId);
         
         // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(existingContact.getOwnerId()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact verification attempt by user {} for contact {}", currentUserId, contactId);
+        if (!ctx.getUserId().equals(existingContact.getOwnerId()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact verification attempt by user {} for contact {}", ctx.getUserId(), contactId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to verify this contact", "FORBIDDEN"));
         }
@@ -227,13 +239,15 @@ public class ContactController {
      */
     @GetMapping("/owner/{ownerId}/primary")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<ContactResponse>> getPrimaryContact(@PathVariable UUID ownerId) {
+    public ResponseEntity<ApiResponse<ContactResponse>> getPrimaryContact(
+            @PathVariable UUID ownerId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
         log.debug("Getting primary contact for owner: {}", ownerId);
         
         // Validate access
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(ownerId.toString()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact access attempt by user {} for owner {}", currentUserId, ownerId);
+        if (!ctx.getUserId().equals(ownerId.toString()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact access attempt by user {} for owner {}", ctx.getUserId(), ownerId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to view these contacts", "FORBIDDEN"));
         }
@@ -261,14 +275,14 @@ public class ContactController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<ContactResponse>>> searchContacts(
             @RequestParam UUID ownerId,
-            @RequestParam(required = false) String contactType) {
+            @RequestParam(required = false) String contactType,
+            @AuthenticationPrincipal SecurityContext ctx) {
 
         log.debug("Searching contacts for owner: {} with type: {}", ownerId, contactType);
 
         // Validate access
-        String currentUserId = SecurityContextHolder.getCurrentUserId();
-        if (!currentUserId.equals(ownerId.toString()) && !SecurityContextHolder.hasRole("ADMIN")) {
-            log.warn("Unauthorized contact search attempt by user {} for owner {}", currentUserId, ownerId);
+        if (!ctx.getUserId().equals(ownerId.toString()) && !ctx.hasRole("ADMIN")) {
+            log.warn("Unauthorized contact search attempt by user {} for owner {}", ctx.getUserId(), ownerId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(ApiResponse.error("You don't have permission to search these contacts", "FORBIDDEN"));
         }

@@ -1,6 +1,5 @@
 package com.fabricmanagement.user.api;
 
-import com.fabricmanagement.shared.application.annotation.CurrentSecurityContext;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.application.response.PagedResponse;
@@ -17,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,10 +28,10 @@ import java.util.UUID;
  * Provides API endpoints for user management.
  * Follows Clean Architecture principles - only handles HTTP concerns.
  * 
- * Benefits of @CurrentSecurityContext:
- * - No repetitive SecurityContextHolder.getCurrentTenantId() calls
- * - Cleaner and more testable code
- * - Single source of truth for security context
+ * Uses Spring Security's @AuthenticationPrincipal to inject SecurityContext:
+ * - Pure Spring Security - no custom annotations
+ * - Framework-native approach
+ * - Clean and testable code
  * 
  * API Version: v1
  * Base Path: /api/v1/users
@@ -52,7 +52,7 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(
             @PathVariable UUID userId,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Getting user: {} for tenant: {}", userId, ctx.getTenantId());
         
@@ -68,7 +68,7 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Boolean>> userExists(
             @PathVariable UUID userId,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Checking if user exists: {} for tenant: {}", userId, ctx.getTenantId());
         
@@ -84,7 +84,7 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<UserResponse>>> getUsersByCompany(
             @PathVariable UUID companyId,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Getting users for company: {} and tenant: {}", companyId, ctx.getTenantId());
         
@@ -100,7 +100,7 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Integer>> getUserCountForCompany(
             @PathVariable UUID companyId,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Getting user count for company: {} and tenant: {}", companyId, ctx.getTenantId());
         
@@ -115,7 +115,7 @@ public class UserController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UUID>> createUser(
             @Valid @RequestBody CreateUserRequest request,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Creating user: {} for tenant: {}", request.getEmail(), ctx.getTenantId());
         
@@ -133,7 +133,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> updateUser(
             @PathVariable UUID userId,
             @Valid @RequestBody UpdateUserRequest request,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Updating user: {} for tenant: {}", userId, ctx.getTenantId());
         
@@ -149,7 +149,7 @@ public class UserController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
             @PathVariable UUID userId,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.info("Deleting user: {} for tenant: {}", userId, ctx.getTenantId());
         
@@ -167,7 +167,7 @@ public class UserController {
    @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers(
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Listing users for tenant: {}", ctx.getTenantId());
         
@@ -190,7 +190,7 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Listing users for tenant: {} with pagination (page: {}, size: {})", 
                   ctx.getTenantId(), page, size);
@@ -220,7 +220,7 @@ public class UserController {
             @RequestParam(required = false) String lastName,
             @RequestParam(required = false) String email,
             @RequestParam(required = false) String status,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Searching users for tenant {} with criteria: firstName={}, lastName={}, email={}, status={}",
                 ctx.getTenantId(), firstName, lastName, email, status);
@@ -253,7 +253,7 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort,
-            @CurrentSecurityContext SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx) {
         
         log.debug("Searching users for tenant {} with pagination - criteria: firstName={}, lastName={}, status={}, page={}, size={}",
                 ctx.getTenantId(), firstName, lastName, status, page, size);

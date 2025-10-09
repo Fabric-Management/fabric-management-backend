@@ -3,6 +3,7 @@ package com.fabricmanagement.contact;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -24,11 +25,18 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @SpringBootApplication(
     scanBasePackages = {
         "com.fabricmanagement.contact",
-        "com.fabricmanagement.shared"
+        "com.fabricmanagement.shared.domain",
+        "com.fabricmanagement.shared.application",
+        "com.fabricmanagement.shared.security"
+        // NOTE: shared.infrastructure.policy excluded (Contact Service doesn't need policy features)
     },
     exclude = {RedisRepositoriesAutoConfiguration.class}
 )
 @EnableJpaRepositories(basePackages = "com.fabricmanagement.contact.infrastructure.repository")
+@EntityScan(basePackages = {
+    "com.fabricmanagement.contact.domain",
+    "com.fabricmanagement.shared.domain"
+})
 @EnableCaching
 @EnableKafka
 @EnableAsync
