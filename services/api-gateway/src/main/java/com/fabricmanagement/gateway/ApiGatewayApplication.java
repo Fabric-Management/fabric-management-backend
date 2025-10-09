@@ -38,12 +38,26 @@ import org.springframework.context.annotation.FilterType;
     basePackages = {
         "com.fabricmanagement.gateway",
         "com.fabricmanagement.shared.domain",
-        "com.fabricmanagement.shared.application"
+        "com.fabricmanagement.shared.application",
+        "com.fabricmanagement.shared.infrastructure.policy.engine",
+        "com.fabricmanagement.shared.infrastructure.policy.guard",
+        "com.fabricmanagement.shared.infrastructure.policy.resolver",
+        "com.fabricmanagement.shared.infrastructure.policy.cache"
     },
-    excludeFilters = @ComponentScan.Filter(
-        type = FilterType.REGEX,
-        pattern = "com\\.fabricmanagement\\.shared\\.security\\..*"
-    )
+    excludeFilters = {
+        @ComponentScan.Filter(
+            type = FilterType.REGEX,
+            pattern = "com\\.fabricmanagement\\.shared\\.security\\..*"
+        ),
+        @ComponentScan.Filter(
+            type = FilterType.REGEX,
+            pattern = "com\\.fabricmanagement\\.shared\\.infrastructure\\.policy\\.repository\\..*"
+        ),
+        @ComponentScan.Filter(
+            type = FilterType.REGEX,
+            pattern = "com\\.fabricmanagement\\.shared\\.infrastructure\\.policy\\.audit\\..*"
+        )
+    }
 )
 public class ApiGatewayApplication {
 

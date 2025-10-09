@@ -38,6 +38,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Shared Infrastructure (for PolicyEngine) -->
+        <dependency>
+            <groupId>com.fabricmanagement</groupId>
+            <artifactId>shared-infrastructure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Shared Security -->
         <dependency>
             <groupId>com.fabricmanagement</groupId>

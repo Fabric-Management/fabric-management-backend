@@ -53,6 +53,9 @@ public class PolicyDecisionAudit {
     @Column(name = "endpoint", nullable = false, length = 200)
     private String endpoint;
     
+    @Column(name = "http_method", length = 10)
+    private String httpMethod; // GET, POST, PUT, DELETE, etc.
+    
     @Column(name = "operation", nullable = false, length = 50)
     private String operation;
     

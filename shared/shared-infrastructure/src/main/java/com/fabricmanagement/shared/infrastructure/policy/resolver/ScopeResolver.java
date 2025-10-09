@@ -151,8 +151,8 @@ public class ScopeResolver {
         }
         
         // For different company access, check trust relationship
-        // TODO: Implement CompanyRelationship check
-        // For now, allow CROSS_COMPANY scope for INTERNAL users only
+        // Future improvement: Call Company Service API to check CompanyRelationship
+        // Current logic: Allow CROSS_COMPANY scope for INTERNAL users only (safe default)
         if (context.isInternal()) {
             return null; // Internal users can access cross-company data
         }

@@ -4,7 +4,6 @@ import com.fabricmanagement.shared.domain.policy.PolicyContext;
 import com.fabricmanagement.shared.domain.policy.UserPermission;
 import com.fabricmanagement.shared.infrastructure.policy.constants.PolicyConstants;
 import com.fabricmanagement.shared.infrastructure.policy.repository.UserPermissionRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -56,12 +55,22 @@ import java.util.List;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class UserGrantResolver {
     
     private static final String GRANT_PREFIX = PolicyConstants.REASON_USER_GRANT;
     
     private final UserPermissionRepository userPermissionRepository;
+    
+    /**
+     * Constructor with optional repository
+     * 
+     * @param userPermissionRepository optional (may be null in reactive contexts)
+     */
+    public UserGrantResolver(
+        @org.springframework.beans.factory.annotation.Autowired(required = false)
+        UserPermissionRepository userPermissionRepository) {
+        this.userPermissionRepository = userPermissionRepository;
+    }
     
     /**
      * Check if user has explicit DENY grant
@@ -70,6 +79,11 @@ public class UserGrantResolver {
      * @return denial reason if explicit deny exists, null otherwise
      */
     public String checkUserDeny(PolicyContext context) {
+        if (userPermissionRepository == null) {
+            log.debug("UserPermission repository not available, skipping user deny check");
+            return null;
+        }
+        
         try {
             List<UserPermission> denyGrants = userPermissionRepository.findDenyPermissions(
                 context.getUserId(),
@@ -108,6 +122,11 @@ public class UserGrantResolver {
      * @return true if explicit allow exists
      */
     public boolean hasUserAllow(PolicyContext context) {
+        if (userPermissionRepository == null) {
+            log.debug("UserPermission repository not available, skipping user allow check");
+            return false;
+        }
+        
         try {
             List<UserPermission> allowGrants = userPermissionRepository.findAllowPermissions(
                 context.getUserId(),
@@ -140,6 +159,10 @@ public class UserGrantResolver {
      * @return count of effective grants
      */
     public int getEffectiveGrantsCount(java.util.UUID userId) {
+        if (userPermissionRepository == null) {
+            return 0;
+        }
+        
         try {
             List<UserPermission> grants = userPermissionRepository.findEffectivePermissionsForUser(
                 userId,
