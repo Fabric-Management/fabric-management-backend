@@ -6,6 +6,33 @@
 
 > **Modern, maintainable, and production-ready fabric management system**
 
+---
+
+## ⚠️ **CRITICAL: NO USERNAME IN THIS PROJECT** ⚠️
+
+```
+╔════════════════════════════════════════════════════════════╗
+║                                                            ║
+║  🚫 THIS PROJECT DOES NOT USE USERNAME!                   ║
+║                                                            ║
+║  ✅ Authentication: contactValue (email/phone)            ║
+║  ✅ Identification: userId (UUID)                          ║
+║  ✅ JWT 'sub' claim: userId (UUID string)                 ║
+║                                                            ║
+║  📖 See: docs/development/PRINCIPLES.md                   ║
+║          → "NO USERNAME PRINCIPLE"                         ║
+║                                                            ║
+╚════════════════════════════════════════════════════════════╝
+```
+
+**Quick Reference:**
+
+- 🔐 **Login**: Use `contactValue` (email or phone), NOT `username`
+- 🆔 **User ID**: Always UUID, never username
+- 🎫 **JWT**: Contains `userId` (UUID), NOT `username` or email
+
+---
+
 ## 📋 Overview
 
 Fabric Management System is a comprehensive platform for fabric manufacturing, inventory management, and order processing built with Spring Boot best practices and clean architecture principles.

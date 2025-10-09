@@ -42,27 +42,41 @@ public class JwtTokenProvider {
 
     /**
      * Generate JWT token
+     * 
+     * @param userId user ID (UUID as string) - will be set as 'sub' claim
+     * @param tenantId tenant ID (UUID as string)
+     * @param claims additional claims to include in token
+     * @return JWT token string
      */
-    public String generateToken(String username, String tenantId, Map<String, Object> claims) {
+    public String generateToken(String userId, String tenantId, Map<String, Object> claims) {
         Map<String, Object> tokenClaims = new HashMap<>(claims);
         tokenClaims.put("tenantId", tenantId);
         
-        return createToken(tokenClaims, username, jwtExpiration);
+        return createToken(tokenClaims, userId, jwtExpiration);
     }
 
     /**
      * Generate refresh token
+     * 
+     * @param userId user ID (UUID as string) - will be set as 'sub' claim
+     * @param tenantId tenant ID (UUID as string)
+     * @return JWT refresh token string
      */
-    public String generateRefreshToken(String username, String tenantId) {
+    public String generateRefreshToken(String userId, String tenantId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("tenantId", tenantId);
         claims.put("type", "refresh");
         
-        return createToken(claims, username, refreshExpiration);
+        return createToken(claims, userId, refreshExpiration);
     }
 
     /**
      * Create JWT token
+     * 
+     * @param claims token claims
+     * @param subject subject (user ID as UUID string)
+     * @param expiration expiration time in milliseconds
+     * @return JWT token string
      */
     private String createToken(Map<String, Object> claims, String subject, long expiration) {
         Date now = new Date();
@@ -80,10 +94,26 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Extract username from token
+     * Extract user ID from token
+     * 
+     * @param token JWT token
+     * @return user ID (UUID as string) from 'sub' claim
      */
-    public String extractUsername(String token) {
+    public String extractUserId(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    /**
+     * Extract username from token
+     * 
+     * @deprecated Use {@link #extractUserId(String)} instead. 
+     *             The 'sub' claim contains user ID (UUID), not username.
+     * @param token JWT token
+     * @return user ID (UUID as string) from 'sub' claim
+     */
+    @Deprecated
+    public String extractUsername(String token) {
+        return extractUserId(token);
     }
 
     /**
@@ -91,6 +121,13 @@ public class JwtTokenProvider {
      */
     public String extractTenantId(String token) {
         return extractClaim(token, claims -> claims.get("tenantId", String.class));
+    }
+
+    /**
+     * Extract role from token
+     */
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
     }
 
     /**

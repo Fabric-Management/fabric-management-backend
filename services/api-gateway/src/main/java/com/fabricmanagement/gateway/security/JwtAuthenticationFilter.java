@@ -42,6 +42,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HEADER_TENANT_ID = "X-Tenant-Id";
     private static final String HEADER_USER_ID = "X-User-Id";
+    private static final String HEADER_USER_ROLE = "X-User-Role";
     
     /**
      * Public paths (BEFORE StripPrefix filter - checking original request path)
@@ -85,22 +86,43 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             // Validate token and extract claims
             Claims claims = validateTokenAndExtractClaims(token);
 
-            // Extract tenant and user IDs
+            // Extract tenant, user IDs, and role
             String tenantId = claims.get("tenantId", String.class);
             String userId = claims.getSubject(); // 'sub' claim
+            String role = claims.get("role", String.class);
 
+            // Validate presence
             if (tenantId == null || userId == null) {
                 log.warn("Missing tenantId or userId in JWT claims");
                 return unauthorizedResponse(exchange);
             }
 
-            // Add headers to downstream request
-            ServerHttpRequest modifiedRequest = request.mutate()
-                .header(HEADER_TENANT_ID, tenantId)
-                .header(HEADER_USER_ID, userId)
-                .build();
+            // SECURITY: Validate UUID format (Defense in Depth - First Line)
+            if (!isValidUuid(tenantId)) {
+                log.error("Invalid tenantId UUID format in JWT: {}", tenantId);
+                return unauthorizedResponse(exchange);
+            }
+            
+            if (!isValidUuid(userId)) {
+                log.error("Invalid userId UUID format in JWT: {}", userId);
+                return unauthorizedResponse(exchange);
+            }
 
-            log.debug("Authenticated request: tenant={}, user={}, path={}", tenantId, userId, path);
+            // Add headers to downstream request (including role)
+            ServerHttpRequest.Builder requestBuilder = request.mutate()
+                .header(HEADER_TENANT_ID, tenantId)
+                .header(HEADER_USER_ID, userId);
+            
+            if (role != null && !role.isEmpty()) {
+                requestBuilder.header(HEADER_USER_ROLE, role);
+                log.debug("Authenticated request: tenant={}, user={}, role={}, path={}", tenantId, userId, role, path);
+            } else {
+                log.warn("No role in JWT for user: {}, defaulting to USER", userId);
+                requestBuilder.header(HEADER_USER_ROLE, "USER");
+                log.debug("Authenticated request: tenant={}, user={}, role=USER (default), path={}", tenantId, userId, path);
+            }
+            
+            ServerHttpRequest modifiedRequest = requestBuilder.build();
 
             return chain.filter(exchange.mutate().request(modifiedRequest).build());
 
@@ -147,6 +169,28 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private Mono<Void> unauthorizedResponse(ServerWebExchange exchange) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         return exchange.getResponse().setComplete();
+    }
+
+    /**
+     * Validates UUID format
+     * 
+     * SECURITY: First line of defense against malformed UUIDs
+     * Prevents malicious data from reaching downstream services
+     * 
+     * @param uuid string to validate
+     * @return true if valid UUID format
+     */
+    private boolean isValidUuid(String uuid) {
+        if (uuid == null || uuid.isEmpty()) {
+            return false;
+        }
+        
+        try {
+            java.util.UUID.fromString(uuid);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     @Override
