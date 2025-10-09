@@ -3,7 +3,9 @@ package com.fabricmanagement.shared.infrastructure.policy;
 import com.fabricmanagement.shared.domain.policy.*;
 import com.fabricmanagement.shared.infrastructure.policy.engine.PolicyEngine;
 import com.fabricmanagement.shared.infrastructure.policy.guard.CompanyTypeGuard;
+import com.fabricmanagement.shared.infrastructure.policy.guard.PlatformPolicyGuard;
 import com.fabricmanagement.shared.infrastructure.policy.resolver.ScopeResolver;
+import com.fabricmanagement.shared.infrastructure.policy.resolver.UserGrantResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,12 @@ class PolicyEngineTest {
     @Mock
     private ScopeResolver scopeResolver;
     
+    @Mock
+    private PlatformPolicyGuard platformPolicyGuard;
+    
+    @Mock
+    private UserGrantResolver userGrantResolver;
+    
     @InjectMocks
     private PolicyEngine policyEngine;
     
@@ -63,6 +71,8 @@ class PolicyEngineTest {
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null); // No guardrail violation
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null); // No platform policy violation
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null); // No user deny
         when(scopeResolver.validateScope(any())).thenReturn(null); // Valid scope
         
         // When
@@ -75,6 +85,8 @@ class PolicyEngineTest {
         assertNotNull(decision.getDecidedAt());
         
         verify(companyTypeGuard).checkGuardrails(context);
+        verify(platformPolicyGuard).checkPlatformPolicy(context);
+        verify(userGrantResolver).checkUserDeny(context);
         verify(scopeResolver).validateScope(context);
     }
     
@@ -102,6 +114,8 @@ class PolicyEngineTest {
         assertEquals(correlationId, decision.getCorrelationId());
         
         verify(companyTypeGuard).checkGuardrails(context);
+        verify(platformPolicyGuard, never()).checkPlatformPolicy(any()); // Should not reach platform check
+        verify(userGrantResolver, never()).checkUserDeny(any()); // Should not reach user deny
         verify(scopeResolver, never()).validateScope(any()); // Should not reach scope validation
     }
     
@@ -117,6 +131,8 @@ class PolicyEngineTest {
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
         when(scopeResolver.validateScope(any())).thenReturn("scope_violation_self_not_owner");
         
         // When
@@ -141,6 +157,9 @@ class PolicyEngineTest {
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
+        when(userGrantResolver.hasUserAllow(any())).thenReturn(false);
         
         // When
         PolicyDecision decision = policyEngine.evaluate(context);
@@ -162,6 +181,8 @@ class PolicyEngineTest {
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
         when(scopeResolver.validateScope(any())).thenReturn(null);
         
         // When
@@ -184,6 +205,9 @@ class PolicyEngineTest {
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
+        when(userGrantResolver.hasUserAllow(any())).thenReturn(false); // No explicit allow grant
         
         // When
         PolicyDecision decision = policyEngine.evaluate(context);
@@ -205,6 +229,8 @@ class PolicyEngineTest {
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
         when(scopeResolver.validateScope(any())).thenReturn(null);
         
         // When
@@ -254,6 +280,7 @@ class PolicyEngineTest {
         
         // Then
         assertTrue(allowed);
+        verify(companyTypeGuard).checkGuardrails(context);
     }
     
     @Test
