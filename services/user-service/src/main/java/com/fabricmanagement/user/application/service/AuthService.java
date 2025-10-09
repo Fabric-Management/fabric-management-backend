@@ -266,6 +266,7 @@ public class AuthService {
             claims.put("role", user.getRole());
             claims.put("firstName", user.getFirstName());
             claims.put("lastName", user.getLastName());
+            claims.put("companyId", user.getCompanyId() != null ? user.getCompanyId().toString() : null);
 
             String accessToken = jwtTokenProvider.generateToken(
                     user.getId().toString(),

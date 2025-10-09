@@ -4,7 +4,6 @@ import com.fabricmanagement.shared.domain.policy.PolicyContext;
 import com.fabricmanagement.shared.domain.policy.PolicyRegistry;
 import com.fabricmanagement.shared.infrastructure.policy.constants.PolicyConstants;
 import com.fabricmanagement.shared.infrastructure.policy.repository.PolicyRegistryRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -35,12 +34,22 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PlatformPolicyGuard {
     
     private static final String PLATFORM_PREFIX = PolicyConstants.REASON_PLATFORM;
     
     private final PolicyRegistryRepository policyRegistryRepository;
+    
+    /**
+     * Constructor with optional repository
+     * 
+     * @param policyRegistryRepository optional (may be null in reactive contexts)
+     */
+    public PlatformPolicyGuard(
+        @org.springframework.beans.factory.annotation.Autowired(required = false)
+        PolicyRegistryRepository policyRegistryRepository) {
+        this.policyRegistryRepository = policyRegistryRepository;
+    }
     
     /**
      * Check platform-wide policies
@@ -49,6 +58,12 @@ public class PlatformPolicyGuard {
      * @return denial reason if policy violated, null if allowed
      */
     public String checkPlatformPolicy(PolicyContext context) {
+        // If repository not available (e.g., Gateway), skip platform policy check
+        if (policyRegistryRepository == null) {
+            log.debug("PolicyRegistry repository not available, skipping platform policy check");
+            return null;
+        }
+        
         try {
             String endpoint = context.getEndpoint();
             
@@ -106,6 +121,10 @@ public class PlatformPolicyGuard {
      * @return true if additional checks required
      */
     public boolean requiresGrant(String endpoint) {
+        if (policyRegistryRepository == null) {
+            return false; // No registry, no requirements
+        }
+        
         try {
             Boolean requiresGrant = policyRegistryRepository.requiresGrant(endpoint);
             
@@ -138,6 +157,10 @@ public class PlatformPolicyGuard {
      * @return array of allowed company types (null = all allowed)
      */
     public String[] getAllowedCompanyTypes(String endpoint) {
+        if (policyRegistryRepository == null) {
+            return null; // No registry, all types allowed
+        }
+        
         try {
             List<String> allowedTypes = policyRegistryRepository.getAllowedCompanyTypes(endpoint);
             

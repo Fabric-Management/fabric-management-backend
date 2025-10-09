@@ -8,7 +8,6 @@ import com.fabricmanagement.shared.infrastructure.policy.guard.CompanyTypeGuard;
 import com.fabricmanagement.shared.infrastructure.policy.guard.PlatformPolicyGuard;
 import com.fabricmanagement.shared.infrastructure.policy.resolver.ScopeResolver;
 import com.fabricmanagement.shared.infrastructure.policy.resolver.UserGrantResolver;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -64,16 +63,37 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PolicyEngine {
     
     private static final String POLICY_VERSION = PolicyConstants.POLICY_VERSION_DEFAULT;
     
-    // Injected dependencies (stateless components)
+    // Required dependencies (always available)
     private final CompanyTypeGuard companyTypeGuard;
     private final ScopeResolver scopeResolver;
+    
+    // Optional dependencies (may not be available in reactive contexts like Gateway)
     private final PlatformPolicyGuard platformPolicyGuard;
     private final UserGrantResolver userGrantResolver;
+    
+    /**
+     * Constructor with optional dependencies
+     * 
+     * @param companyTypeGuard required
+     * @param scopeResolver required
+     * @param platformPolicyGuard optional (null in Gateway)
+     * @param userGrantResolver optional (null in Gateway)
+     */
+    public PolicyEngine(CompanyTypeGuard companyTypeGuard,
+                       ScopeResolver scopeResolver,
+                       @org.springframework.beans.factory.annotation.Autowired(required = false) 
+                       PlatformPolicyGuard platformPolicyGuard,
+                       @org.springframework.beans.factory.annotation.Autowired(required = false) 
+                       UserGrantResolver userGrantResolver) {
+        this.companyTypeGuard = companyTypeGuard;
+        this.scopeResolver = scopeResolver;
+        this.platformPolicyGuard = platformPolicyGuard;
+        this.userGrantResolver = userGrantResolver;
+    }
     
     /**
      * Evaluate authorization request
@@ -95,26 +115,33 @@ public class PolicyEngine {
                 return createDenyDecision(guardrailDenial, context, startTime);
             }
             
-            // Step 2: Platform Policy
-            String platformDenial = platformPolicyGuard.checkPlatformPolicy(context);
-            if (platformDenial != null) {
-                log.info("Policy DENIED by platform policy: {}", platformDenial);
-                return createDenyDecision(platformDenial, context, startTime);
+            // Step 2: Platform Policy (optional - skip if not available)
+            if (platformPolicyGuard != null) {
+                String platformDenial = platformPolicyGuard.checkPlatformPolicy(context);
+                if (platformDenial != null) {
+                    log.info("Policy DENIED by platform policy: {}", platformDenial);
+                    return createDenyDecision(platformDenial, context, startTime);
+                }
             }
             
-            // Step 3: User-specific DENY grants
-            // User explicit DENY takes precedence over everything
-            String userDeny = userGrantResolver.checkUserDeny(context);
-            if (userDeny != null) {
-                log.info("Policy DENIED by user explicit deny: {}", userDeny);
-                return createDenyDecision(userDeny, context, startTime);
+            // Step 3: User-specific DENY grants (optional - skip if not available)
+            if (userGrantResolver != null) {
+                String userDeny = userGrantResolver.checkUserDeny(context);
+                if (userDeny != null) {
+                    log.info("Policy DENIED by user explicit deny: {}", userDeny);
+                    return createDenyDecision(userDeny, context, startTime);
+                }
             }
             
             // Step 4: Role Default Access
             boolean roleAllowed = checkRoleDefaultAccess(context);
             if (!roleAllowed) {
-                // Check if user has explicit ALLOW grant (can override role restriction)
-                boolean hasUserAllow = userGrantResolver.hasUserAllow(context);
+                // Check if user has explicit ALLOW grant (optional - skip if not available)
+                boolean hasUserAllow = false;
+                if (userGrantResolver != null) {
+                    hasUserAllow = userGrantResolver.hasUserAllow(context);
+                }
+                
                 if (hasUserAllow) {
                     log.info("Policy ALLOWED by user explicit allow grant (overrides role restriction)");
                 } else {

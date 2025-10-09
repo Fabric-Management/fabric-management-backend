@@ -43,6 +43,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String HEADER_TENANT_ID = "X-Tenant-Id";
     private static final String HEADER_USER_ID = "X-User-Id";
     private static final String HEADER_USER_ROLE = "X-User-Role";
+    private static final String HEADER_COMPANY_ID = "X-Company-Id";
     
     /**
      * Public paths (BEFORE StripPrefix filter - checking original request path)
@@ -86,10 +87,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             // Validate token and extract claims
             Claims claims = validateTokenAndExtractClaims(token);
 
-            // Extract tenant, user IDs, and role
+            // Extract tenant, user IDs, role, and company
             String tenantId = claims.get("tenantId", String.class);
             String userId = claims.getSubject(); // 'sub' claim
             String role = claims.get("role", String.class);
+            String companyId = claims.get("companyId", String.class);
 
             // Validate presence
             if (tenantId == null || userId == null) {
@@ -108,19 +110,24 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                 return unauthorizedResponse(exchange);
             }
 
-            // Add headers to downstream request (including role)
+            // Add headers to downstream request (including role and company)
             ServerHttpRequest.Builder requestBuilder = request.mutate()
                 .header(HEADER_TENANT_ID, tenantId)
                 .header(HEADER_USER_ID, userId);
             
             if (role != null && !role.isEmpty()) {
                 requestBuilder.header(HEADER_USER_ROLE, role);
-                log.debug("Authenticated request: tenant={}, user={}, role={}, path={}", tenantId, userId, role, path);
             } else {
                 log.warn("No role in JWT for user: {}, defaulting to USER", userId);
                 requestBuilder.header(HEADER_USER_ROLE, "USER");
-                log.debug("Authenticated request: tenant={}, user={}, role=USER (default), path={}", tenantId, userId, path);
             }
+            
+            if (companyId != null && !companyId.isEmpty()) {
+                requestBuilder.header(HEADER_COMPANY_ID, companyId);
+            }
+            
+            log.debug("Authenticated request: tenant={}, user={}, role={}, company={}, path={}", 
+                tenantId, userId, role, companyId, path);
             
             ServerHttpRequest modifiedRequest = requestBuilder.build();
 
