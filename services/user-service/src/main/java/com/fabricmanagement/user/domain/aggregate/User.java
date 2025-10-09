@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.domain.aggregate;
 
 import com.fabricmanagement.shared.domain.base.BaseEntity;
+import com.fabricmanagement.shared.domain.policy.UserContext;
 import com.fabricmanagement.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.user.domain.event.UserUpdatedEvent;
 import com.fabricmanagement.user.domain.event.UserDeletedEvent;
@@ -12,6 +13,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.Type;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -79,6 +82,60 @@ public class User extends BaseEntity {
     @Type(JsonBinaryType.class)
     @Column(name = "settings", columnDefinition = "jsonb")
     private Map<String, Object> settings;
+    
+    // =========================================================================
+    // POLICY AUTHORIZATION FIELDS (V2.0)
+    // =========================================================================
+    
+    /**
+     * Company ID that user belongs to
+     * NULL for system users (Super Admin)
+     */
+    @Column(name = "company_id")
+    private UUID companyId;
+    
+    /**
+     * Department ID that user belongs to
+     * Only for INTERNAL users. External users don't have departments.
+     */
+    @Column(name = "department_id")
+    private UUID departmentId;
+    
+    /**
+     * Station/Machine ID assignment
+     * Optional. Used for production floor operators.
+     */
+    @Column(name = "station_id")
+    private UUID stationId;
+    
+    /**
+     * User's job title
+     * Examples: "Dokumacı", "Muhasebeci", "Kalite Kontrolcü"
+     */
+    @Column(name = "job_title", length = 100)
+    private String jobTitle;
+    
+    /**
+     * User context - relationship to system
+     * INTERNAL: Our company's employee
+     * CUSTOMER: Customer company's employee
+     * SUPPLIER: Supplier company's employee
+     * SUBCONTRACTOR: Subcontractor's employee
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_context", nullable = false, length = 50)
+    @lombok.Builder.Default
+    private UserContext userContext = UserContext.INTERNAL;
+    
+    /**
+     * Function codes array
+     * Example: ["WEAVING", "QUALITY", "FINANCE"]
+     * 
+     * Note: Using @JdbcTypeCode for Hibernate 6.x compatibility
+     */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "functions", columnDefinition = "text[]")
+    private List<String> functions;
     
     // Domain events (not persisted)
     @Transient

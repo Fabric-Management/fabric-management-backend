@@ -77,10 +77,12 @@ POST /api/v1/users/auth/login
 Content-Type: application/json
 
 {
-  "username": "john.doe@company.com",
+  "contactValue": "john.doe@company.com",
   "password": "securePassword123"
 }
 ```
+
+**Note**: Authentication uses contact info (email or phone). No username field exists.
 
 **Example Response**:
 
@@ -92,15 +94,8 @@ Content-Type: application/json
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "expiresIn": 3600,
-    "user": {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "username": "john.doe@company.com",
-      "firstName": "John",
-      "lastName": "Doe",
-      "email": "john.doe@company.com",
-      "roles": ["USER"],
-      "status": "ACTIVE"
-    }
+    "userId": "123e4567-e89b-12d3-a456-426614174000",
+    "tenantId": "7c9e6679-7425-40de-963d-42a6ee08cd6c"
   }
 }
 ```

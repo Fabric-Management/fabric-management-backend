@@ -163,7 +163,8 @@ public class UserController {
      * 
      * For large datasets, use the paginated version with ?page=0&size=20
      */
-    @GetMapping
+ 
+   @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers(
             @CurrentSecurityContext SecurityContext ctx) {
@@ -172,8 +173,7 @@ public class UserController {
         
         List<UserResponse> users = userService.listUsers(ctx.getTenantId());
         return ResponseEntity.ok(ApiResponse.success(users));
-    }
-    
+    }    
     /**
      * Lists users for the current tenant with pagination
      * 

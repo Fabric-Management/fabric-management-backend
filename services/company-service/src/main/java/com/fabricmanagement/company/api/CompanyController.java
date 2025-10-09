@@ -101,7 +101,7 @@ public class CompanyController {
      * Deletes a company (soft delete)
      */
     @DeleteMapping("/{companyId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteCompany(@PathVariable UUID companyId) {
         log.info("Deleting company: {}", companyId);
         
@@ -117,7 +117,7 @@ public class CompanyController {
      * Activates a company
      */
     @PostMapping("/{companyId}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> activateCompany(@PathVariable UUID companyId) {
         log.info("Activating company: {}", companyId);
         
@@ -133,7 +133,7 @@ public class CompanyController {
      * Deactivates a company
      */
     @PostMapping("/{companyId}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivateCompany(@PathVariable UUID companyId) {
         log.info("Deactivating company: {}", companyId);
         
@@ -203,7 +203,7 @@ public class CompanyController {
      * Updates company subscription
      */
     @PutMapping("/{companyId}/subscription")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> updateSubscription(
             @PathVariable UUID companyId,
             @Valid @RequestBody UpdateSubscriptionRequest request) {

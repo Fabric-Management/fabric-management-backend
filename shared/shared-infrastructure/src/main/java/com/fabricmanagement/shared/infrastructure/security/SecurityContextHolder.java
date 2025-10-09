@@ -52,7 +52,7 @@ public final class SecurityContextHolder {
     /**
      * Gets current user ID from security context
      * 
-     * @return user ID (username/email)
+     * @return user ID (UUID as string)
      */
     public static String getCurrentUserId() {
         Authentication authentication = getAuthentication();
@@ -69,6 +69,27 @@ public final class SecurityContextHolder {
         }
         
         return userId;
+    }
+    
+    /**
+     * Gets current user's role from security context
+     * 
+     * @return user role (without "ROLE_" prefix), or null if not found
+     */
+    public static String getCurrentRole() {
+        Authentication authentication = getAuthentication();
+        
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return null;
+        }
+        
+        return authentication.getAuthorities().stream()
+                .findFirst()
+                .map(grantedAuthority -> {
+                    String authority = grantedAuthority.getAuthority();
+                    return authority.startsWith("ROLE_") ? authority.substring(5) : authority;
+                })
+                .orElse(null);
     }
     
     /**

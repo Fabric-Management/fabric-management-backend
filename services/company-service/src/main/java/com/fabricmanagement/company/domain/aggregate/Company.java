@@ -97,6 +97,42 @@ public class Company extends BaseEntity {
     @Column(name = "current_users", nullable = false)
     private int currentUsers;
     
+    // =========================================================================
+    // POLICY AUTHORIZATION FIELDS (V2.0)
+    // =========================================================================
+    
+    /**
+     * Business type - relationship to system
+     * MANUFACTURER: Main production company (us)
+     * CUSTOMER: Customer company
+     * SUPPLIER: Supplier company
+     * SUBCONTRACTOR: Subcontractor company
+     * 
+     * Note: Different from 'type' field (legal entity type: CORPORATION, LLC, etc.)
+     *       'businessType' is about business relationship
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "business_type", nullable = false, length = 50)
+    @lombok.Builder.Default
+    private com.fabricmanagement.shared.domain.policy.CompanyType businessType 
+        = com.fabricmanagement.shared.domain.policy.CompanyType.INTERNAL;
+    
+    /**
+     * Parent company ID
+     * NULL for MANUFACTURER (we are the parent)
+     * Set for external companies (CUSTOMER/SUPPLIER/SUBCONTRACTOR) - links to us
+     */
+    @Column(name = "parent_company_id")
+    private UUID parentCompanyId;
+    
+    /**
+     * Relationship type to parent company
+     * NULL for MANUFACTURER
+     * CUSTOMER/SUPPLIER/SUBCONTRACTOR for external companies
+     */
+    @Column(name = "relationship_type", length = 50)
+    private String relationshipType;
+    
     // Domain events (transient - not persisted)
     @Transient
     private final List<Object> domainEvents = new ArrayList<>();

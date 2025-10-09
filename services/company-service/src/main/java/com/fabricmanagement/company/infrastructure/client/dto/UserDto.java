@@ -10,6 +10,9 @@ import java.util.UUID;
 
 /**
  * User DTO from User Service
+ * 
+ * Note: This DTO mirrors the User entity structure from user-service.
+ * No username field - authentication uses contact info (email/phone).
  */
 @Data
 @Builder
@@ -17,7 +20,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class UserDto {
     private UUID id;
-    private String username;
     private String email;
     private String firstName;
     private String lastName;

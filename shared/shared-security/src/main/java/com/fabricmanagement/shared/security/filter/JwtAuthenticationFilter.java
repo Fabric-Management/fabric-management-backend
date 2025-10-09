@@ -50,22 +50,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = extractTokenFromRequest(request);
 
             if (token != null && jwtTokenProvider.validateToken(token)) {
-                String username = jwtTokenProvider.extractUsername(token);
+                String userId = jwtTokenProvider.extractUserId(token);
                 String tenantId = jwtTokenProvider.extractTenantId(token);
+                String role = jwtTokenProvider.extractRole(token);
 
-                if (username != null && tenantId != null) {
-                    // Set authentication in Security Context
-                    setAuthentication(request, username, tenantId);
-
-                    // Add tenant and user info to request attributes for downstream use
-                    request.setAttribute(TENANT_ID_ATTRIBUTE, tenantId);
-                    request.setAttribute(USER_ID_ATTRIBUTE, username);
-
-                    log.debug("JWT authenticated: user={}, tenant={}, path={}",
-                            username, tenantId, request.getRequestURI());
-                } else {
-                    log.warn("Invalid JWT claims: missing username or tenantId");
+                // Validate presence
+                if (userId == null || tenantId == null) {
+                    log.warn("Invalid JWT claims: missing userId or tenantId");
+                    filterChain.doFilter(request, response);
+                    return;
                 }
+
+                // SECURITY: Validate UUID format (Defense in Depth - Second Line)
+                if (!isValidUuid(userId)) {
+                    log.error("Invalid userId UUID format in JWT: {}", userId);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                
+                if (!isValidUuid(tenantId)) {
+                    log.error("Invalid tenantId UUID format in JWT: {}", tenantId);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
+                // Set authentication in Security Context
+                setAuthentication(request, userId, tenantId, role);
+
+                // Add tenant and user info to request attributes for downstream use
+                request.setAttribute(TENANT_ID_ATTRIBUTE, tenantId);
+                request.setAttribute(USER_ID_ATTRIBUTE, userId);
+
+                log.debug("JWT authenticated: user={}, tenant={}, path={}",
+                        userId, tenantId, request.getRequestURI());
             }
 
         } catch (Exception e) {
@@ -91,16 +108,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /**
      * Set authentication in Spring Security context
+     * 
+     * @param request HTTP request
+     * @param userId user ID (UUID as string)
+     * @param tenantId tenant ID (UUID as string)
+     * @param role user role (e.g., "ADMIN", "SUPER_ADMIN", "USER")
      */
-    private void setAuthentication(HttpServletRequest request, String username, String tenantId) {
-        // Create authorities (can be extended with roles from JWT claims)
-        List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_USER")
-        );
+    private void setAuthentication(HttpServletRequest request, String userId, String tenantId, String role) {
+        // Extract role from JWT and create authorities
+        // Spring Security expects "ROLE_" prefix
+        List<SimpleGrantedAuthority> authorities;
+        
+        if (role != null && !role.isEmpty()) {
+            String authorityName = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+            authorities = Collections.singletonList(new SimpleGrantedAuthority(authorityName));
+            log.debug("JWT role extracted: {} → authority: {}", role, authorityName);
+        } else {
+            // Fallback to ROLE_USER if no role in JWT
+            authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+            log.warn("No role in JWT for user: {}, defaulting to ROLE_USER", userId);
+        }
 
         // Create authentication token
+        // Principal = userId (UUID as string)
         UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(username, null, authorities);
+                new UsernamePasswordAuthenticationToken(userId, null, authorities);
 
         // Set tenantId as details (SecurityContextHolder expects tenantId here)
         authentication.setDetails(tenantId);
@@ -108,6 +140,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Set authentication in context
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        log.trace("Security context set for user: {}, tenant: {}", username, tenantId);
+        log.trace("Security context set for user: {}, tenant: {}, authorities: {}", 
+                 userId, tenantId, authorities);
+    }
+
+    /**
+     * Validates UUID format
+     * 
+     * SECURITY: Defense in Depth - validates UUID format before setting authentication
+     * Prevents malformed UUIDs from entering security context
+     * 
+     * @param uuid string to validate
+     * @return true if valid UUID format
+     */
+    private boolean isValidUuid(String uuid) {
+        if (uuid == null || uuid.isEmpty()) {
+            return false;
+        }
+        
+        try {
+            java.util.UUID.fromString(uuid);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 }

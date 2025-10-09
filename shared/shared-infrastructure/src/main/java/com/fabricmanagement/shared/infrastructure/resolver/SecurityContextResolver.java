@@ -47,9 +47,12 @@ public class SecurityContextResolver implements HandlerMethodArgumentResolver {
         
         try {
             // Extract from SecurityContextHolder
+            String role = SecurityContextHolder.getCurrentRole();
+            
             return SecurityContext.builder()
                     .tenantId(SecurityContextHolder.getCurrentTenantId())
                     .userId(SecurityContextHolder.getCurrentUserId())
+                    .roles(role != null ? new String[]{role} : new String[0])
                     .build();
                     
         } catch (Exception e) {
