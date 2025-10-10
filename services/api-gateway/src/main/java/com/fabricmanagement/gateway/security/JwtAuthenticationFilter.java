@@ -1,5 +1,11 @@
 package com.fabricmanagement.gateway.security;
 
+import com.fabricmanagement.gateway.constants.FilterOrder;
+import com.fabricmanagement.gateway.constants.GatewayHeaders;
+import com.fabricmanagement.gateway.util.JwtTokenExtractor;
+import com.fabricmanagement.gateway.util.PathMatcher;
+import com.fabricmanagement.gateway.util.ResponseHelper;
+import com.fabricmanagement.gateway.util.UuidValidator;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -10,7 +16,6 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -18,46 +23,22 @@ import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * JWT Authentication Filter
- *
- * Global filter for Gateway that validates JWT tokens and extracts tenant/user information.
- * Adds X-Tenant-Id and X-User-Id headers to downstream requests.
- *
- * Order: -100 (executes before other filters)
- *
- * Public endpoints (no authentication required):
- * - /api/v1/users/auth/**
- * - /actuator/**
- * - /fallback/**
+ * 
+ * Validates JWT tokens and extracts security context.
+ * Adds tenant/user/role headers for downstream services.
  */
 @Component("gatewayJwtFilter")
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final String HEADER_TENANT_ID = "X-Tenant-Id";
-    private static final String HEADER_USER_ID = "X-User-Id";
-    private static final String HEADER_USER_ROLE = "X-User-Role";
-    private static final String HEADER_COMPANY_ID = "X-Company-Id";
-    
-    /**
-     * Public paths (BEFORE StripPrefix filter - checking original request path)
-     * These paths don't require JWT authentication
-     */
-    private static final List<String> PUBLIC_PATHS = Arrays.asList(
-        "/api/v1/users/auth/",        // All auth endpoints
-        "/api/v1/contacts/find-by-value",  // Internal contact lookup (for auth)
-        "/actuator/health",           // Health check
-        "/actuator/info",             // Info endpoint
-        "/actuator/prometheus",       // Prometheus metrics
-        "/fallback/",                 // Fallback endpoints
-        "/gateway/"                   // Gateway management endpoints
-    );
+    private final PathMatcher pathMatcher;
+    private final JwtTokenExtractor tokenExtractor;
+    private final UuidValidator uuidValidator;
+    private final ResponseHelper responseHelper;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -67,110 +48,43 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getPath().toString();
 
-        // Skip authentication for public endpoints
-        boolean isPublic = isPublicEndpoint(path);
-        log.info("JwtAuthenticationFilter - Path: {} | IsPublic: {} | PUBLIC_PATHS: {}", path, isPublic, PUBLIC_PATHS);
-
-        if (isPublic) {
-            log.info("Public endpoint, skipping JWT authentication: {}", path);
+        if (pathMatcher.isPublic(path)) {
+            log.debug("Public endpoint: {}", path);
             return chain.filter(exchange);
         }
 
-        // Extract JWT token
-        String token = extractToken(request);
+        String token = tokenExtractor.extract(request);
         if (token == null) {
-            log.warn("No JWT token found in request to: {}", path);
-            return unauthorizedResponse(exchange);
+            log.warn("No JWT token: {}", path);
+            return responseHelper.unauthorized(exchange);
         }
 
         try {
-            // Validate token and extract claims
-            Claims claims = validateTokenAndExtractClaims(token);
-
-            // Extract tenant, user IDs, role, and company
+            Claims claims = validateToken(token);
+            
             String tenantId = claims.get("tenantId", String.class);
-            String userId = claims.getSubject(); // 'sub' claim
-            String role = claims.get("role", String.class);
-            String companyId = claims.get("companyId", String.class);
-
-            // Validate presence
-            if (tenantId == null || userId == null) {
-                log.warn("Missing tenantId or userId in JWT claims");
-                return unauthorizedResponse(exchange);
+            String userId = claims.getSubject();
+            
+            if (!validateIds(tenantId, userId)) {
+                return responseHelper.unauthorized(exchange);
             }
 
-            // SECURITY: Validate UUID format (Defense in Depth - First Line)
-            if (!isValidUuid(tenantId)) {
-                log.error("Invalid tenantId UUID format in JWT: {}", tenantId);
-                return unauthorizedResponse(exchange);
-            }
+            ServerHttpRequest modifiedRequest = buildRequestWithHeaders(
+                request, tenantId, userId, claims
+            );
             
-            if (!isValidUuid(userId)) {
-                log.error("Invalid userId UUID format in JWT: {}", userId);
-                return unauthorizedResponse(exchange);
-            }
-
-            // Add headers to downstream request (including role and company)
-            // IMPORTANT: Keep Authorization header for downstream JWT validation
-            ServerHttpRequest.Builder requestBuilder = request.mutate()
-                .header(HEADER_TENANT_ID, tenantId)
-                .header(HEADER_USER_ID, userId);
+            log.debug("Authenticated: tenant={}, user={}, path={}", tenantId, userId, path);
             
-            if (role != null && !role.isEmpty()) {
-                requestBuilder.header(HEADER_USER_ROLE, role);
-            } else {
-                log.warn("No role in JWT for user: {}, defaulting to USER", userId);
-                requestBuilder.header(HEADER_USER_ROLE, "USER");
-            }
-            
-            if (companyId != null && !companyId.isEmpty()) {
-                requestBuilder.header(HEADER_COMPANY_ID, companyId);
-            }
-            
-            // CRITICAL: Forward Authorization header to downstream services
-            // Backend services need the JWT for their own security validation
-            String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-            if (authHeader != null) {
-                requestBuilder.header(HttpHeaders.AUTHORIZATION, authHeader);
-            }
-            
-            log.debug("Authenticated request: tenant={}, user={}, role={}, company={}, path={}", 
-                tenantId, userId, role, companyId, path);
-            
-            ServerHttpRequest modifiedRequest = requestBuilder.build();
-
             return chain.filter(exchange.mutate().request(modifiedRequest).build());
 
         } catch (Exception e) {
-            log.error("JWT validation failed for path {}: {}", path, e.getMessage());
-            return unauthorizedResponse(exchange);
+            log.error("JWT validation failed: {}", e.getMessage());
+            return responseHelper.unauthorized(exchange);
         }
     }
 
-    /**
-     * Checks if the path is a public endpoint
-     */
-    private boolean isPublicEndpoint(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
-    }
-
-    /**
-     * Extracts JWT token from Authorization header
-     */
-    private String extractToken(ServerHttpRequest request) {
-        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-            return authHeader.substring(BEARER_PREFIX.length());
-        }
-        return null;
-    }
-
-    /**
-     * Validates JWT token and extracts claims
-     */
-    private Claims validateTokenAndExtractClaims(String token) {
+    private Claims validateToken(String token) {
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-
         return Jwts.parserBuilder()
             .setSigningKey(key)
             .build()
@@ -178,38 +92,38 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             .getBody();
     }
 
-    /**
-     * Returns 401 Unauthorized response
-     */
-    private Mono<Void> unauthorizedResponse(ServerWebExchange exchange) {
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        return exchange.getResponse().setComplete();
+    private boolean validateIds(String tenantId, String userId) {
+        if (tenantId == null || userId == null) {
+            return false;
+        }
+        return uuidValidator.isValid(tenantId) && uuidValidator.isValid(userId);
     }
 
-    /**
-     * Validates UUID format
-     * 
-     * SECURITY: First line of defense against malformed UUIDs
-     * Prevents malicious data from reaching downstream services
-     * 
-     * @param uuid string to validate
-     * @return true if valid UUID format
-     */
-    private boolean isValidUuid(String uuid) {
-        if (uuid == null || uuid.isEmpty()) {
-            return false;
+    private ServerHttpRequest buildRequestWithHeaders(
+            ServerHttpRequest request, String tenantId, String userId, Claims claims) {
+
+        String role = claims.get("role", String.class);
+        String companyId = claims.get("companyId", String.class);
+
+        ServerHttpRequest.Builder builder = request.mutate()
+            .header(GatewayHeaders.TENANT_ID, tenantId)
+            .header(GatewayHeaders.USER_ID, userId)
+            .header(GatewayHeaders.USER_ROLE, role != null ? role : "USER");
+
+        if (companyId != null && !companyId.isEmpty()) {
+            builder.header(GatewayHeaders.COMPANY_ID, companyId);
         }
-        
-        try {
-            java.util.UUID.fromString(uuid);
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
+
+        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null) {
+            builder.header(HttpHeaders.AUTHORIZATION, authHeader);
         }
+
+        return builder.build();
     }
 
     @Override
     public int getOrder() {
-        return -100; // Execute BEFORE other filters (high priority)
+        return FilterOrder.JWT_FILTER;
     }
 }
