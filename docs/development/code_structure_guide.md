@@ -2,23 +2,25 @@
 
 ## 🎯 Özet Tablo
 
-| Ne Yazıyorum?                 | Nereye Yazacağım?             | Örnek Dosya                 |
-| ----------------------------- | ----------------------------- | --------------------------- |
-| **REST API Endpoint**         | `/api/`                       | `UserController.java`       |
-| **İş Mantığı**                | `/application/service/`       | `UserService.java`          |
-| **DTO Request**               | `/api/dto/request/`           | `CreateUserRequest.java`    |
-| **DTO Response**              | `/api/dto/response/`          | `UserResponse.java`         |
-| **DTO → Entity Mapping**      | `/application/mapper/`        | `UserMapper.java`           |
-| **Entity → Event Mapping**    | `/application/mapper/`        | `UserEventMapper.java`      |
-| **Entity (Data)**             | `/domain/aggregate/`          | `User.java`                 |
-| **Value Object/Enum**         | `/domain/valueobject/`        | `UserStatus.java`           |
-| **Domain Event**              | `/domain/event/`              | `UserCreatedEvent.java`     |
-| **Repository**                | `/infrastructure/repository/` | `UserRepository.java`       |
-| **External API Client**       | `/infrastructure/client/`     | `ContactServiceClient.java` |
-| **Kafka Publisher**           | `/infrastructure/messaging/`  | `UserEventPublisher.java`   |
-| **Kafka Listener**            | `/infrastructure/messaging/`  | `CompanyEventListener.java` |
-| **Security Infrastructure**   | `/infrastructure/security/`   | `LoginAttemptTracker.java`  |
-| **Config (Service-Specific)** | `/infrastructure/config/`     | `FeignClientConfig.java`    |
+| Ne Yazıyorum?                 | Nereye Yazacağım?             | Örnek Dosya                         |
+| ----------------------------- | ----------------------------- | ----------------------------------- |
+| **REST API Endpoint**         | `/api/`                       | `UserController.java`               |
+| **İş Mantığı**                | `/application/service/`       | `UserService.java`                  |
+| **DTO Request**               | `/api/dto/request/`           | `CreateUserRequest.java`            |
+| **DTO Response**              | `/api/dto/response/`          | `UserResponse.java`                 |
+| **DTO → Entity Mapping**      | `/application/mapper/`        | `UserMapper.java`                   |
+| **Entity → Event Mapping**    | `/application/mapper/`        | `UserEventMapper.java`              |
+| **Entity (Data)**             | `/domain/aggregate/`          | `User.java`                         |
+| **Value Object/Enum**         | `/domain/valueobject/`        | `UserStatus.java`                   |
+| **Domain Event**              | `/domain/event/`              | `UserCreatedEvent.java`             |
+| **Repository**                | `/infrastructure/repository/` | `UserRepository.java`               |
+| **External API Client**       | `/infrastructure/client/`     | `ContactServiceClient.java`         |
+| **Kafka Publisher**           | `/infrastructure/messaging/`  | `UserEventPublisher.java`           |
+| **Kafka Listener**            | `/infrastructure/messaging/`  | `CompanyEventListener.java`         |
+| **Security Infrastructure**   | `/infrastructure/security/`   | `LoginAttemptTracker.java`          |
+| **Policy Filter** ⭐          | `/infrastructure/security/`   | `PolicyValidationFilter.java`       |
+| **Reactive Audit** ⭐         | `/audit/` (Gateway)           | `ReactivePolicyAuditPublisher.java` |
+| **Config (Service-Specific)** | `/infrastructure/config/`     | `FeignClientConfig.java`            |
 
 ---
 
@@ -85,7 +87,8 @@ services/user-service/src/main/
 │       │       └── ContactVerifiedEvent.java
 │       │
 │       ├── security/                           # Security infrastructure
-│       │   └── LoginAttemptTracker.java       [108 satır] Redis-based
+│       │   ├── LoginAttemptTracker.java       [108 satır] Redis-based
+│       │   └── PolicyValidationFilter.java    [183 satır] ⭐ Defense-in-depth (Phase 3)
 │       │
 │       ├── audit/
 │       │   └── SecurityAuditLogger.java
@@ -109,6 +112,73 @@ services/user-service/src/main/
 - ✅ Multiple mappers OK (SRP: UserMapper, EventMapper, AuthMapper)
 - ✅ Entity = 99 lines (was 408!) - Pure @Getter/@Setter
 - ✅ infrastructure/security/ for Redis-based security features
+- ✅ **PolicyValidationFilter** for defense-in-depth (Phase 3) ⭐ NEW
+
+---
+
+## 📂 API Gateway Structure (Reactive - Phase 3)
+
+**Special Case:** Gateway is reactive (WebFlux), different structure
+
+```
+services/api-gateway/src/main/
+├── java/com/fabricmanagement/gateway/
+│   │
+│   ├── ApiGatewayApplication.java
+│   │
+│   ├── config/
+│   │   ├── SecurityConfig.java
+│   │   └── SmartKeyResolver.java          # Rate limiting
+│   │
+│   ├── constants/                          # Centralized constants
+│   │   ├── GatewayHeaders.java            # Header name constants
+│   │   ├── GatewayPaths.java              # Public path patterns
+│   │   └── FilterOrder.java               # Filter execution order
+│   │
+│   ├── audit/                              ⭐ NEW (Phase 3)
+│   │   └── ReactivePolicyAuditPublisher.java  [89 satır]
+│   │                                       # Kafka-only reactive audit
+│   │
+│   ├── filter/                             # Reactive filters
+│   │   ├── PolicyEnforcementFilter.java   [171 satır] Enhanced
+│   │   └── RequestLoggingFilter.java      [84 satır]
+│   │
+│   ├── security/
+│   │   └── JwtAuthenticationFilter.java   [129 satır]
+│   │
+│   ├── util/                               # Helper utilities
+│   │   ├── UuidValidator.java             # UUID validation
+│   │   ├── PathMatcher.java               # Path matching
+│   │   ├── JwtTokenExtractor.java         # Token extraction
+│   │   └── ResponseHelper.java            # Response building
+│   │
+│   └── fallback/
+│       └── FallbackController.java         # Circuit breaker fallbacks
+│
+└── resources/
+    ├── application.yml
+    └── application-docker.yml
+```
+
+**Key Differences from Services:**
+
+| Aspect           | Services (Spring MVC)             | Gateway (WebFlux)                           |
+| ---------------- | --------------------------------- | ------------------------------------------- |
+| **Filter Type**  | `Filter` (jakarta.servlet)        | `GlobalFilter` (reactive)                   |
+| **Request Type** | `HttpServletRequest`              | `ServerWebExchange`                         |
+| **Return Type**  | `void`                            | `Mono<Void>`                                |
+| **Audit**        | `PolicyAuditService` (DB + Kafka) | `ReactivePolicyAuditPublisher` (Kafka-only) |
+| **Database**     | ✅ Has JPA                        | ❌ No database                              |
+| **Pattern**      | Blocking                          | Non-blocking                                |
+
+**Where to Put Code:**
+
+| Ne Yazıyorum?      | Nereye?       | Örnek                               |
+| ------------------ | ------------- | ----------------------------------- |
+| **Reactive Audit** | `/audit/`     | `ReactivePolicyAuditPublisher.java` |
+| **Global Filter**  | `/filter/`    | `PolicyEnforcementFilter.java`      |
+| **Constants**      | `/constants/` | `GatewayHeaders.java`               |
+| **Helpers**        | `/util/`      | `UuidValidator.java`                |
 
 ---
 
@@ -491,6 +561,125 @@ application/service/LoginAttemptService.java  // Redis = infrastructure!
 
 ---
 
+## 🆕 Phase 3 Additions (Oct 2025)
+
+### 1. Defense-in-Depth Filter (All Services)
+
+**Where:** `infrastructure/security/PolicyValidationFilter.java`
+
+**Purpose:** Secondary policy enforcement (after Gateway)
+
+**Code Pattern:**
+
+```java
+@Component
+@Order(2)  // After JwtAuthenticationFilter (Order 1)
+@RequiredArgsConstructor
+public class PolicyValidationFilter implements Filter {
+    private final PolicyEngine policyEngine;
+
+    @Override
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) {
+        // 1. Extract SecurityContext
+        SecurityContext secCtx = (SecurityContext) authentication.getPrincipal();
+
+        // 2. Build PolicyContext
+        PolicyContext policyCtx = buildPolicyContext(httpRequest, secCtx);
+
+        // 3. Evaluate policy (secondary check)
+        PolicyDecision decision = policyEngine.evaluate(policyCtx);
+
+        // 4. Deny if needed
+        if (decision.isDenied()) {
+            throw new ForbiddenException(decision.getReason());
+        }
+
+        // 5. Continue
+        chain.doFilter(request, response);
+    }
+}
+```
+
+**When to Use:**
+
+- ✅ ALL microservices (user, company, contact)
+- ✅ Place: `infrastructure/security/` folder
+- ✅ Order: 2 (after JWT filter)
+
+---
+
+### 2. Reactive Audit Publisher (Gateway Only)
+
+**Where:** `audit/ReactivePolicyAuditPublisher.java`
+
+**Purpose:** Non-blocking audit for reactive Gateway
+
+**Code Pattern:**
+
+```java
+@Component
+@RequiredArgsConstructor
+public class ReactivePolicyAuditPublisher {
+
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
+
+    public Mono<Void> publishDecision(PolicyContext context, PolicyDecision decision, long latencyMs) {
+        return Mono.fromRunnable(() -> publishSync(context, decision, latencyMs))
+            .subscribeOn(Schedulers.boundedElastic())
+            .onErrorResume(error -> Mono.empty())
+            .then();
+    }
+}
+```
+
+**When to Use:**
+
+- ✅ Gateway ONLY (reactive context)
+- ✅ No database access needed
+- ✅ Kafka-only pattern
+- ❌ NOT for services (use PolicyAuditService)
+
+---
+
+### 3. Optional Dependency Pattern
+
+**Where:** Any shared component used in mixed contexts
+
+**Code Pattern:**
+
+```java
+@Component
+public class PolicyEngine {
+
+    private final PolicyRegistryRepository policyRegistryRepository;  // Optional
+
+    public PolicyEngine(
+            CompanyTypeGuard companyTypeGuard,
+            @Autowired(required = false) PolicyRegistryRepository policyRegistryRepository) {
+        this.policyRegistryRepository = policyRegistryRepository;
+    }
+
+    private boolean checkRoles(PolicyContext context) {
+        // Try database (if available)
+        if (policyRegistryRepository != null) {
+            return checkFromDatabase(context);
+        }
+
+        // Fallback (if not available)
+        return checkFromFallback(context);
+    }
+}
+```
+
+**When to Use:**
+
+- Component used in Gateway (no DB) AND Services (with DB)
+- Need graceful degradation
+- Single implementation for multiple contexts
+
+---
+
 ## 🧩 Shared Modules Yapısı
 
 **DRY Prensibi:** Tüm microservice'ler bu modülleri kullanır - kod tekrarı %0
@@ -543,6 +732,7 @@ shared/
 
 ---
 
-**Last Updated:** 2025-10-10 (User-Service Refactoring + Shared Modules Structure)  
-**Version:** 2.1.0  
-**Status:** ✅ Production Ready
+**Last Updated:** 2025-10-10 (Phase 3 Integration - Defense-in-Depth + Reactive Patterns)  
+**Version:** 3.0.0  
+**Status:** ✅ Production Ready  
+**New Patterns:** Defense-in-Depth Filter, Reactive Audit, Optional Dependencies

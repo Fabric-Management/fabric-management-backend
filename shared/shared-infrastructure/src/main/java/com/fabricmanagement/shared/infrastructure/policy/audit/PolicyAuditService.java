@@ -1,14 +1,17 @@
 package com.fabricmanagement.shared.infrastructure.policy.audit;
 
+import com.fabricmanagement.shared.domain.policy.PolicyAuditEvent;
 import com.fabricmanagement.shared.domain.policy.PolicyContext;
 import com.fabricmanagement.shared.domain.policy.PolicyDecision;
 import com.fabricmanagement.shared.domain.policy.PolicyDecisionAudit;
 import com.fabricmanagement.shared.infrastructure.policy.constants.PolicyConstants;
 import com.fabricmanagement.shared.infrastructure.policy.repository.PolicyDecisionAuditRepository;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -73,11 +76,36 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PolicyAuditService {
     
+    private static final String KAFKA_TOPIC = "policy.audit";
+    
     private final PolicyDecisionAuditRepository auditRepository;
-    // TODO: Inject KafkaTemplate for async event publishing (Phase 3)
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
+    
+    /**
+     * Constructor with optional Kafka dependency
+     * 
+     * @param auditRepository required for database audit logging
+     * @param kafkaTemplate optional for Kafka event publishing (Phase 3)
+     * @param objectMapper required for JSON serialization
+     */
+    public PolicyAuditService(
+            PolicyDecisionAuditRepository auditRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper) {
+        this.auditRepository = auditRepository;
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
+        
+        if (kafkaTemplate != null) {
+            log.info("PolicyAuditService initialized with Kafka publishing enabled (Topic: {})", KAFKA_TOPIC);
+        } else {
+            log.info("PolicyAuditService initialized without Kafka (DB logging only)");
+        }
+    }
     
     /**
      * Log policy decision (async)
@@ -134,8 +162,8 @@ public class PolicyAuditService {
             // Save to database (async)
             auditRepository.save(audit);
             
-            // TODO: Publish to Kafka for event-driven processing (Phase 3)
-            // kafkaTemplate.send("policy.audit", createKafkaEvent(audit));
+            // Publish to Kafka for event-driven processing (Phase 3)
+            publishToKafka(audit);
             
         } catch (Exception e) {
             // Fail-safe: Don't let audit failure affect main request
@@ -247,6 +275,54 @@ public class PolicyAuditService {
         } catch (Exception e) {
             log.error("Error getting audit stats", e);
             return "Error getting stats";
+        }
+    }
+    
+    // =========================================================================
+    // KAFKA PUBLISHING (Phase 3)
+    // =========================================================================
+    
+    /**
+     * Publish audit event to Kafka (Phase 3)
+     * 
+     * Fire-and-forget pattern for event-driven processing.
+     * Failures are logged but don't affect main audit flow.
+     * 
+     * @param audit policy decision audit record
+     */
+    private void publishToKafka(PolicyDecisionAudit audit) {
+        // Skip if Kafka not available
+        if (kafkaTemplate == null) {
+            log.trace("Kafka not available, skipping event publishing");
+            return;
+        }
+        
+        try {
+            // Create event from audit record
+            PolicyAuditEvent event = PolicyAuditEvent.fromAudit(audit);
+            
+            // Serialize to JSON
+            String eventJson = objectMapper.writeValueAsString(event);
+            
+            // Publish to Kafka (fire-and-forget)
+            // Key: correlationId for event ordering
+            String key = audit.getCorrelationId() != null ? audit.getCorrelationId() : 
+                        (audit.getRequestId() != null ? audit.getRequestId() : audit.getId().toString());
+            
+            kafkaTemplate.send(KAFKA_TOPIC, key, eventJson);
+            
+            log.debug("Published PolicyAuditEvent to Kafka. Topic: {}, Key: {}, Decision: {}", 
+                KAFKA_TOPIC, key, audit.getDecision());
+            
+        } catch (JsonProcessingException e) {
+            // Fail-safe: Log error but don't throw (audit already saved to DB)
+            log.error("Failed to serialize PolicyAuditEvent to JSON. Audit ID: {}, Decision: {}",
+                audit.getId(), audit.getDecision(), e);
+                
+        } catch (Exception e) {
+            // Fail-safe: Log error but don't throw (audit already saved to DB)
+            log.error("Failed to publish PolicyAuditEvent to Kafka. Audit ID: {}, Decision: {}",
+                audit.getId(), audit.getDecision(), e);
         }
     }
 }

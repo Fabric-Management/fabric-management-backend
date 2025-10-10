@@ -1,5 +1,6 @@
 package com.fabricmanagement.gateway.filter;
 
+import com.fabricmanagement.gateway.audit.ReactivePolicyAuditPublisher;
 import com.fabricmanagement.gateway.constants.FilterOrder;
 import com.fabricmanagement.gateway.constants.GatewayHeaders;
 import com.fabricmanagement.gateway.util.PathMatcher;
@@ -34,6 +35,7 @@ import java.util.UUID;
 public class PolicyEnforcementFilter implements GlobalFilter, Ordered {
     
     private final PolicyEngine policyEngine;
+    private final ReactivePolicyAuditPublisher auditPublisher;
     private final PathMatcher pathMatcher;
     private final UuidValidator uuidValidator;
     private final ResponseHelper responseHelper;
@@ -63,9 +65,13 @@ public class PolicyEnforcementFilter implements GlobalFilter, Ordered {
         }
         
         PolicyContext context = buildPolicyContext(request, userId, tenantId);
+        final long startTime = System.currentTimeMillis();
         
         return evaluatePolicyAsync(context)
-            .flatMap(decision -> handleDecision(decision, exchange, chain, request, userId, path))
+            .flatMap((PolicyDecision decision) -> {
+                long latencyMs = System.currentTimeMillis() - startTime;
+                return handleDecisionWithAudit(decision, context, latencyMs, exchange, chain, userId, path);
+            })
             .onErrorResume(error -> {
                 log.error("Policy evaluation error: {}", error.getMessage());
                 return responseHelper.forbidden(exchange, "policy_evaluation_error");
@@ -77,22 +83,32 @@ public class PolicyEnforcementFilter implements GlobalFilter, Ordered {
             .subscribeOn(Schedulers.boundedElastic());
     }
     
-    private Mono<Void> handleDecision(PolicyDecision decision, ServerWebExchange exchange,
-                                      GatewayFilterChain chain, ServerHttpRequest request,
-                                      UUID userId, String path) {
+    private Mono<Void> handleDecisionWithAudit(PolicyDecision decision, PolicyContext context, long latencyMs,
+                                               ServerWebExchange exchange, GatewayFilterChain chain,
+                                               UUID userId, String path) {
+        // Publish audit event (fire-and-forget, non-blocking)
+        auditPublisher.publishDecision(context, decision, latencyMs)
+            .subscribe(
+                null,
+                error -> log.error("Audit publishing failed (non-blocking): {}", error.getMessage())
+            );
+        
+        ServerHttpRequest request = exchange.getRequest();
+        
         if (decision.isAllowed()) {
-            log.info("Policy ALLOW - User: {}, Path: {}", userId, path);
+            log.info("Policy ALLOW - User: {}, Path: {}, Latency: {}ms, Reason: {}", 
+                userId, path, latencyMs, decision.getReason());
             
             ServerHttpRequest modifiedRequest = request.mutate()
                 .header(GatewayHeaders.POLICY_DECISION, "ALLOW")
                 .header(GatewayHeaders.POLICY_REASON, decision.getReason())
-                .header(GatewayHeaders.CORRELATION_ID, UUID.randomUUID().toString())
+                .header(GatewayHeaders.CORRELATION_ID, context.getCorrelationId())
                 .build();
             
             return chain.filter(exchange.mutate().request(modifiedRequest).build());
         } else {
-            log.warn("Policy DENY - User: {}, Path: {}, Reason: {}", 
-                userId, path, decision.getReason());
+            log.warn("Policy DENY - User: {}, Path: {}, Latency: {}ms, Reason: {}", 
+                userId, path, latencyMs, decision.getReason());
             return responseHelper.forbidden(exchange, decision.getReason());
         }
     }

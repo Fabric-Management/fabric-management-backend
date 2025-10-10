@@ -4,21 +4,23 @@ import com.fabricmanagement.shared.domain.policy.*;
 import com.fabricmanagement.shared.infrastructure.policy.engine.PolicyEngine;
 import com.fabricmanagement.shared.infrastructure.policy.guard.CompanyTypeGuard;
 import com.fabricmanagement.shared.infrastructure.policy.guard.PlatformPolicyGuard;
+import com.fabricmanagement.shared.infrastructure.policy.repository.PolicyRegistryRepository;
 import com.fabricmanagement.shared.infrastructure.policy.resolver.ScopeResolver;
 import com.fabricmanagement.shared.infrastructure.policy.resolver.UserGrantResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -45,7 +47,9 @@ class PolicyEngineTest {
     @Mock
     private UserGrantResolver userGrantResolver;
     
-    @InjectMocks
+    @Mock
+    private PolicyRegistryRepository policyRegistryRepository;
+    
     private PolicyEngine policyEngine;
     
     private UUID userId;
@@ -57,6 +61,15 @@ class PolicyEngineTest {
         userId = UUID.randomUUID();
         companyId = UUID.randomUUID();
         correlationId = UUID.randomUUID().toString();
+        
+        // Manual injection because of optional dependencies
+        policyEngine = new PolicyEngine(
+            companyTypeGuard,
+            scopeResolver,
+            platformPolicyGuard,
+            userGrantResolver,
+            policyRegistryRepository
+        );
     }
     
     @Test
@@ -302,6 +315,147 @@ class PolicyEngineTest {
         
         // Then
         assertFalse(allowed);
+    }
+    
+    // =========================================================================
+    // POLICY REGISTRY LOOKUP TESTS (Phase 3)
+    // =========================================================================
+    
+    @Test
+    @DisplayName("Should use PolicyRegistry default roles when available")
+    void shouldUsePolicyRegistryDefaultRoles() {
+        // Given
+        PolicyContext context = createContext(
+            CompanyType.INTERNAL,
+            OperationType.WRITE,
+            DataScope.COMPANY,
+            List.of("ADMIN") // User has ADMIN role
+        );
+        
+        // Create policy that requires ADMIN role
+        PolicyRegistry policy = PolicyRegistry.builder()
+            .id(UUID.randomUUID())
+            .endpoint("/api/test")
+            .operation(OperationType.WRITE)
+            .defaultRoles(List.of("ADMIN", "SUPER_ADMIN"))
+            .active(true)
+            .build();
+        
+        when(policyRegistryRepository.findByEndpointAndOperationAndActiveTrue(
+            eq("/api/test"), eq(OperationType.WRITE)))
+            .thenReturn(Optional.of(policy));
+        
+        when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
+        when(scopeResolver.validateScope(any())).thenReturn(null);
+        
+        // When
+        PolicyDecision decision = policyEngine.evaluate(context);
+        
+        // Then
+        assertTrue(decision.isAllowed());
+        verify(policyRegistryRepository).findByEndpointAndOperationAndActiveTrue(
+            "/api/test", OperationType.WRITE);
+    }
+    
+    @Test
+    @DisplayName("Should DENY when user lacks PolicyRegistry required role")
+    void shouldDenyWhenUserLacksRegistryRole() {
+        // Given
+        PolicyContext context = createContext(
+            CompanyType.INTERNAL,
+            OperationType.DELETE,
+            DataScope.COMPANY,
+            List.of("USER") // User only has USER role
+        );
+        
+        // Create policy that requires ADMIN role
+        PolicyRegistry policy = PolicyRegistry.builder()
+            .id(UUID.randomUUID())
+            .endpoint("/api/test")
+            .operation(OperationType.DELETE)
+            .defaultRoles(List.of("ADMIN", "SUPER_ADMIN")) // USER not in list
+            .active(true)
+            .build();
+        
+        when(policyRegistryRepository.findByEndpointAndOperationAndActiveTrue(
+            eq("/api/test"), eq(OperationType.DELETE)))
+            .thenReturn(Optional.of(policy));
+        
+        when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
+        when(userGrantResolver.hasUserAllow(any())).thenReturn(false);
+        
+        // When
+        PolicyDecision decision = policyEngine.evaluate(context);
+        
+        // Then
+        assertFalse(decision.isAllowed());
+        assertEquals("role_no_default_access", decision.getReason());
+        verify(policyRegistryRepository).findByEndpointAndOperationAndActiveTrue(
+            "/api/test", OperationType.DELETE);
+    }
+    
+    @Test
+    @DisplayName("Should fallback to default logic when PolicyRegistry not found")
+    void shouldFallbackWhenPolicyRegistryNotFound() {
+        // Given
+        PolicyContext context = createContext(
+            CompanyType.INTERNAL,
+            OperationType.READ,
+            DataScope.COMPANY,
+            List.of("MANAGER")
+        );
+        
+        when(policyRegistryRepository.findByEndpointAndOperationAndActiveTrue(any(), any()))
+            .thenReturn(Optional.empty()); // No policy found
+        
+        when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
+        when(scopeResolver.validateScope(any())).thenReturn(null);
+        
+        // When
+        PolicyDecision decision = policyEngine.evaluate(context);
+        
+        // Then
+        assertTrue(decision.isAllowed()); // MANAGER has default access
+        verify(policyRegistryRepository).findByEndpointAndOperationAndActiveTrue(any(), any());
+    }
+    
+    @Test
+    @DisplayName("Should fallback to default logic when PolicyRegistry unavailable")
+    void shouldFallbackWhenPolicyRegistryUnavailable() {
+        // Given
+        // Create engine without PolicyRegistry
+        PolicyEngine engineWithoutRegistry = new PolicyEngine(
+            companyTypeGuard,
+            scopeResolver,
+            platformPolicyGuard,
+            userGrantResolver,
+            null // No repository
+        );
+        
+        PolicyContext context = createContext(
+            CompanyType.INTERNAL,
+            OperationType.WRITE,
+            DataScope.COMPANY,
+            List.of("ADMIN")
+        );
+        
+        when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
+        when(platformPolicyGuard.checkPlatformPolicy(any())).thenReturn(null);
+        when(userGrantResolver.checkUserDeny(any())).thenReturn(null);
+        when(scopeResolver.validateScope(any())).thenReturn(null);
+        
+        // When
+        PolicyDecision decision = engineWithoutRegistry.evaluate(context);
+        
+        // Then
+        assertTrue(decision.isAllowed()); // Should use fallback logic (ADMIN allowed)
+        verify(policyRegistryRepository, never()).findByEndpointAndOperationAndActiveTrue(any(), any());
     }
     
     // =========================================================================
