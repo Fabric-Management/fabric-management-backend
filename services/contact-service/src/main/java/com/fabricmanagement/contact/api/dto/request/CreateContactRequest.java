@@ -1,4 +1,4 @@
-package com.fabricmanagement.contact.application.dto;
+package com.fabricmanagement.contact.api.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
@@ -9,11 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Create Contact Request DTO
- * 
- * Note: Uses @JsonProperty for boolean fields to maintain consistent JSON naming
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -34,10 +29,11 @@ public class CreateContactRequest {
     private String contactType; // EMAIL, PHONE, ADDRESS
 
     @NotNull(message = "Primary flag is required")
-    @JsonProperty("isPrimary") // Ensures JSON uses "isPrimary" not "primary"
+    @JsonProperty("isPrimary")
     private boolean isPrimary;
 
     @Builder.Default
     @JsonProperty("autoVerified")
-    private boolean autoVerified = false; // For internal creation
+    private boolean autoVerified = false;
 }
+

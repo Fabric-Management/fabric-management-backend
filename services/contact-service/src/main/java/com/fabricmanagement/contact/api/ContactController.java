@@ -1,6 +1,7 @@
 package com.fabricmanagement.contact.api;
 
-import com.fabricmanagement.contact.application.dto.*;
+import com.fabricmanagement.contact.api.dto.request.*;
+import com.fabricmanagement.contact.api.dto.response.*;
 import com.fabricmanagement.contact.application.service.ContactService;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
@@ -19,15 +20,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Contact REST Controller
- * 
- * Provides API endpoints for contact management.
- * Uses Spring Security's @AuthenticationPrincipal - 100% framework-native!
- * 
- * API Version: v1
- * Base Path: /api/v1/contacts
- */
 @RestController
 @RequestMapping("/api/v1/contacts")
 @RequiredArgsConstructor
@@ -36,12 +28,6 @@ public class ContactController {
     
     private final ContactService contactService;
     
-    /**
-     * Lists all contacts (ADMIN only)
-     * 
-     * WARNING: Returns all contacts in the system. Use with caution.
-     * For better performance, use /search endpoint with filters.
-     */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<ContactResponse>>> listAllContacts() {
@@ -51,9 +37,6 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
-    /**
-     * Creates a new contact
-     */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ContactResponse>> createContact(
@@ -62,23 +45,8 @@ public class ContactController {
         
         log.info("Creating contact for owner: {} (type: {})", request.getOwnerId(), request.getOwnerType());
         
-        // ✅ LOOSE COUPLING: Contact Service does NOT validate owner existence
-        // Ownership validation is delegated to calling service (User/Company Service)
-        // This allows Contact Service to remain independent and deployable
-        
-        // Basic role-based authorization (not ownership validation)
-        // ✅ NO HARDCODED STRINGS - using SecurityConstants
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_COMPANY_MANAGER);
-        boolean isSelfOwner = ctx.getUserId().equals(request.getOwnerId());
-        
-        if (!isAdmin && !isSelfOwner) {
-            log.warn("Insufficient permissions: user {} attempting to create contact for owner {}", 
-                ctx.getUserId(), request.getOwnerId());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, request.getOwnerId())) {
+            return forbiddenResponse();
         }
         
         ContactResponse response = contactService.createContact(request);
@@ -86,40 +54,22 @@ public class ContactController {
                 .body(ApiResponse.success(response, ServiceConstants.MSG_CONTACT_CREATED));
     }
     
-    /**
-     * Gets contacts by owner ID
-     * 
-     * Optional ownerType parameter for filtering (COMPANY, USER)
-     */
     @GetMapping("/owner/{ownerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<ContactResponse>>> getContactsByOwner(
             @PathVariable UUID ownerId,
-            @RequestParam(value = "ownerType", required = false) String ownerType,
             @AuthenticationPrincipal SecurityContext ctx) {
         
-        log.debug("Getting contacts for owner: {} (type: {})", ownerId, ownerType);
+        log.debug("Getting contacts for owner: {}", ownerId);
         
-        // ✅ LOOSE COUPLING: Simplified authorization (NO HARDCODED STRINGS!)
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_COMPANY_MANAGER);
-        boolean isSelfOwner = ctx.getUserId().equals(ownerId.toString());
-        
-        if (!isAdmin && !isSelfOwner) {
-            log.warn("Unauthorized contact access: user {} for owner {}", ctx.getUserId(), ownerId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, ownerId.toString())) {
+            return forbiddenResponse();
         }
         
         List<ContactResponse> contacts = contactService.getContactsByOwner(ownerId);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
-    /**
-     * Gets a contact by ID
-     */
     @GetMapping("/{contactId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ContactResponse>> getContact(
@@ -130,23 +80,13 @@ public class ContactController {
         
         ContactResponse contact = contactService.getContact(contactId);
         
-        // Validate access (NO HARDCODED STRINGS!)
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN);
-        boolean isOwner = ctx.getUserId().equals(contact.getOwnerId());
-        if (!isOwner && !isAdmin) {
-            log.warn("Unauthorized contact access attempt by user {} for contact {}", ctx.getUserId(), contactId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, contact.getOwnerId())) {
+            return forbiddenResponse();
         }
         
         return ResponseEntity.ok(ApiResponse.success(contact));
     }
     
-    /**
-     * Updates a contact
-     */
     @PutMapping("/{contactId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> updateContact(
@@ -156,25 +96,15 @@ public class ContactController {
         
         log.info("Updating contact: {}", contactId);
         
-        // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN);
-        boolean isOwner = ctx.getUserId().equals(existingContact.getOwnerId());
-        if (!isOwner && !isAdmin) {
-            log.warn("Unauthorized contact update attempt by user {} for contact {}", ctx.getUserId(), contactId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, existingContact.getOwnerId())) {
+            return forbiddenResponse();
         }
         
         contactService.updateContact(contactId, request);
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_UPDATED));
     }
     
-    /**
-     * Deletes a contact (soft delete)
-     */
     @DeleteMapping("/{contactId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteContact(
@@ -183,25 +113,15 @@ public class ContactController {
         
         log.info("Deleting contact: {}", contactId);
         
-        // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN);
-        boolean isOwner = ctx.getUserId().equals(existingContact.getOwnerId());
-        if (!isOwner && !isAdmin) {
-            log.warn("Unauthorized contact deletion attempt by user {} for contact {}", ctx.getUserId(), contactId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, existingContact.getOwnerId())) {
+            return forbiddenResponse();
         }
         
         contactService.deleteContact(contactId);
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_DELETED));
     }
     
-    /**
-     * Sets a contact as primary
-     */
     @PutMapping("/{contactId}/primary")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> setPrimaryContact(
@@ -210,25 +130,15 @@ public class ContactController {
         
         log.info("Setting contact as primary: {}", contactId);
         
-        // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN);
-        boolean isOwner = ctx.getUserId().equals(existingContact.getOwnerId());
-        if (!isOwner && !isAdmin) {
-            log.warn("Unauthorized contact update attempt by user {} for contact {}", ctx.getUserId(), contactId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, existingContact.getOwnerId())) {
+            return forbiddenResponse();
         }
         
         contactService.setPrimaryContact(contactId);
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_SET_PRIMARY));
     }
     
-    /**
-     * Sends verification code to a contact
-     */
     @PostMapping("/{contactId}/send-verification")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> sendVerificationCode(
@@ -237,25 +147,15 @@ public class ContactController {
         
         log.info("Sending verification code to contact: {}", contactId);
 
-        // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN);
-        boolean isOwner = ctx.getUserId().equals(existingContact.getOwnerId());
-        if (!isOwner && !isAdmin) {
-            log.warn("Unauthorized send verification attempt by user {} for contact {}", ctx.getUserId(), contactId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                    SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, existingContact.getOwnerId())) {
+            return forbiddenResponse();
         }
 
         contactService.sendVerificationCode(contactId);
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_VERIFICATION_CODE_SENT));
     }
 
-    /**
-     * Verifies a contact
-     */
     @PutMapping("/{contactId}/verify")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> verifyContact(
@@ -265,57 +165,31 @@ public class ContactController {
         
         log.info("Verifying contact: {}", contactId);
         
-        // Validate access
         ContactResponse existingContact = contactService.getContact(contactId);
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN);
-        boolean isOwner = ctx.getUserId().equals(existingContact.getOwnerId());
-        if (!isOwner && !isAdmin) {
-            log.warn("Unauthorized contact verification attempt by user {} for contact {}", ctx.getUserId(), contactId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, existingContact.getOwnerId())) {
+            return forbiddenResponse();
         }
 
         contactService.verifyContact(contactId, code);
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_VERIFIED));
     }
     
-    /**
-     * Gets primary contact for an owner
-     * 
-     * Optional parameters for filtering by owner type and contact medium
-     */
     @GetMapping("/owner/{ownerId}/primary")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ContactResponse>> getPrimaryContact(
             @PathVariable UUID ownerId,
-            @RequestParam(value = "ownerType", required = false) String ownerType,
-            @RequestParam(value = "contactMedium", required = false) String contactMedium,
             @AuthenticationPrincipal SecurityContext ctx) {
         
-        log.debug("Getting primary contact for owner: {} (type: {}, medium: {})", ownerId, ownerType, contactMedium);
+        log.debug("Getting primary contact for owner: {}", ownerId);
         
-        // ✅ LOOSE COUPLING: Simplified authorization
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_COMPANY_MANAGER);
-        boolean isSelfOwner = ctx.getUserId().equals(ownerId.toString());
-        
-        if (!isAdmin && !isSelfOwner) {
-            log.warn("Unauthorized contact access: user {} for owner {}", ctx.getUserId(), ownerId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, ownerId.toString())) {
+            return forbiddenResponse();
         }
         
         ContactResponse contact = contactService.getPrimaryContact(ownerId);
         return ResponseEntity.ok(ApiResponse.success(contact));
     }
     
-    /**
-     * Checks if a contact value is available
-     */
     @PostMapping("/check-availability")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Boolean>> checkAvailability(@RequestParam String contactValue) {
@@ -325,9 +199,6 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(available));
     }
 
-    /**
-     * Searches contacts by type and owner
-     */
     @GetMapping("/search")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<ContactResponse>>> searchContacts(
@@ -337,32 +208,14 @@ public class ContactController {
 
         log.debug("Searching contacts for owner: {} with type: {}", ownerId, contactType);
 
-        // Validate access (NO HARDCODED STRINGS!)
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || ctx.hasRole(SecurityConstants.ROLE_ADMIN);
-        boolean isOwner = ctx.getUserId().equals(ownerId.toString());
-        if (!isOwner && !isAdmin) {
-            log.warn("Unauthorized contact search attempt by user {} for owner {}", ctx.getUserId(), ownerId);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
-                        SecurityConstants.ERROR_CODE_FORBIDDEN));
+        if (!hasAccess(ctx, ownerId.toString())) {
+            return forbiddenResponse();
         }
 
         List<ContactResponse> contacts = contactService.searchContacts(ownerId, contactType);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
 
-    /**
-     * Finds contact by contact value (email or phone)
-     * Used for authentication purposes - no auth required
-     * 
-     * INTERNAL USE ONLY - Should only be called by User Service
-     * Public access but with aggressive rate limiting in API Gateway
-     * 
-     * Security considerations:
-     * - Email enumeration attack possible (mitigated by rate limiting + timing attack prevention in User Service)
-     * - Response is minimal (no sensitive data exposed)
-     * - Used only during authentication flow
-     */
     @GetMapping("/find-by-value")
     public ResponseEntity<ApiResponse<ContactResponse>> findByContactValue(
             @RequestParam String contactValue) {
@@ -376,50 +229,40 @@ public class ContactController {
                         .body(ApiResponse.error("Contact not found", "CONTACT_NOT_FOUND")));
     }
     
-    /**
-     * Gets contacts for multiple owners (batch operation)
-     * 
-     * NEW ENDPOINT: Added for batch fetching to prevent N+1 query problem
-     * 
-     * INTERNAL USE ONLY - Should only be called by User Service
-     * Public access for service-to-service communication
-     * 
-     * Performance: 100 users = 1 API call + 1 DB query instead of 100 calls + 100 queries
-     * 
-     * Request Body: [UUID, UUID, UUID, ...] as String array
-     * Response: Map<UUID_as_String, List<ContactResponse>>
-     * 
-     * Example:
-     * POST /api/v1/contacts/batch/by-owners
-     * Body: ["123e4567-e89b-12d3-a456-426614174000", "223e4567-..."]
-     * Response: {
-     *   "123e4567-...": [{ "contactValue": "email@test.com", ... }],
-     *   "223e4567-...": [{ "contactValue": "phone@test.com", ... }]
-     * }
-     */
     @PostMapping("/batch/by-owners")
     public ResponseEntity<ApiResponse<java.util.Map<String, List<ContactResponse>>>> getContactsByOwnersBatch(
-            @RequestBody List<UUID> ownerIds,
-            @RequestParam(value = "ownerType", required = false) String ownerType) {
+            @RequestBody List<UUID> ownerIds) {
         
-        log.info("Batch fetching contacts for {} owners (type: {})", 
-            ownerIds != null ? ownerIds.size() : 0, ownerType);
+        log.info("Batch fetching contacts for {} owners", ownerIds != null ? ownerIds.size() : 0);
         
         if (ownerIds == null || ownerIds.isEmpty()) {
             return ResponseEntity.ok(ApiResponse.success(java.util.Collections.emptyMap()));
         }
         
         java.util.Map<UUID, List<ContactResponse>> contactsMap = 
-            contactService.getContactsByOwnersBatch(ownerIds);
+                contactService.getContactsByOwnersBatch(ownerIds);
         
-        // Convert UUID keys to String for API response compatibility
         java.util.Map<String, List<ContactResponse>> stringKeyMap = contactsMap.entrySet().stream()
-            .collect(java.util.stream.Collectors.toMap(
-                entry -> entry.getKey().toString(),
-                java.util.Map.Entry::getValue
-            ));
+                .collect(java.util.stream.Collectors.toMap(
+                        entry -> entry.getKey().toString(),
+                        java.util.Map.Entry::getValue
+                ));
         
         return ResponseEntity.ok(ApiResponse.success(stringKeyMap, 
-            ServiceConstants.MSG_BATCH_CONTACTS_RETRIEVED + " for " + ownerIds.size() + " owners"));
+                ServiceConstants.MSG_BATCH_CONTACTS_RETRIEVED + " for " + ownerIds.size() + " owners"));
+    }
+
+    private boolean hasAccess(SecurityContext ctx, String ownerId) {
+        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
+                         ctx.hasRole(SecurityConstants.ROLE_ADMIN) || 
+                         ctx.hasRole(SecurityConstants.ROLE_COMPANY_MANAGER);
+        boolean isOwner = ctx.getUserId().equals(ownerId);
+        return isAdmin || isOwner;
+    }
+
+    private <T> ResponseEntity<ApiResponse<T>> forbiddenResponse() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS, 
+                        SecurityConstants.ERROR_CODE_FORBIDDEN));
     }
 }

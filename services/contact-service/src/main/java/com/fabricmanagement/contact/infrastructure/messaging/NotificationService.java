@@ -1,4 +1,4 @@
-package com.fabricmanagement.contact.application.service;
+package com.fabricmanagement.contact.infrastructure.messaging;
 
 import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import com.fabricmanagement.shared.infrastructure.constants.NotificationConstants;
@@ -12,11 +12,6 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Notification Service
- * 
- * Handles sending notifications (email, SMS, etc.) via Kafka messaging
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,9 +31,6 @@ public class NotificationService {
     @Value("${notification.code-expiry-minutes:" + NotificationConstants.DEFAULT_CODE_EXPIRY_MINUTES + "}")
     private int codeExpiryMinutes;
     
-    /**
-     * Sends verification code to a contact
-     */
     public void sendVerificationCode(String contactValue, String code, ContactType type) {
         if (!notificationEnabled) {
             log.warn("Notifications are disabled. Verification code for {} ({}): {}", contactValue, type, code);
@@ -60,13 +52,9 @@ public class NotificationService {
             }
         } catch (Exception e) {
             log.error("Failed to send verification code to {} ({}): {}", contactValue, type, e.getMessage(), e);
-            // In production, you might want to implement retry mechanism or store failed notifications
         }
     }
     
-    /**
-     * Sends email verification via Kafka
-     */
     private void sendEmailVerification(String email, String code) {
         Map<String, Object> emailPayload = new HashMap<>();
         emailPayload.put("to", email);
@@ -80,9 +68,6 @@ public class NotificationService {
         log.info("📧 Email verification queued for {}", email);
     }
     
-    /**
-     * Sends SMS verification via Kafka
-     */
     private void sendSmsVerification(String phone, String code) {
         Map<String, Object> smsPayload = new HashMap<>();
         smsPayload.put("to", phone);
@@ -95,9 +80,6 @@ public class NotificationService {
         log.info("📱 SMS verification queued for {}", phone);
     }
     
-    /**
-     * Sends a notification when contact is verified
-     */
     public void sendContactVerifiedNotification(String contactValue, ContactType type) {
         if (!notificationEnabled) {
             return;
@@ -121,3 +103,4 @@ public class NotificationService {
         }
     }
 }
+

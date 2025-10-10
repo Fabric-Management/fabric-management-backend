@@ -1,4 +1,4 @@
-package com.fabricmanagement.contact.application.dto;
+package com.fabricmanagement.contact.api.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,9 +8,6 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * Contact Response DTO
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -28,3 +25,4 @@ public class ContactResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
+

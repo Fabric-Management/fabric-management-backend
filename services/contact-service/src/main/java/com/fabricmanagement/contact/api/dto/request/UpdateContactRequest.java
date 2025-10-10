@@ -1,4 +1,4 @@
-package com.fabricmanagement.contact.application.dto;
+package com.fabricmanagement.contact.api.dto.request;
 
 import com.fabricmanagement.shared.infrastructure.constants.ValidationConstants;
 import jakarta.validation.constraints.Pattern;
@@ -8,9 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Update Contact Request DTO
- */
 @Data
 @Builder
 @NoArgsConstructor

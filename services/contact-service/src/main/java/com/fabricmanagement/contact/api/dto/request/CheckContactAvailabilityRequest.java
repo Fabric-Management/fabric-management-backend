@@ -1,19 +1,19 @@
-package com.fabricmanagement.contact.application.dto;
+package com.fabricmanagement.contact.api.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Contact Availability Response DTO
- */
+import jakarta.validation.constraints.NotBlank;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ContactAvailabilityResponse {
+public class CheckContactAvailabilityRequest {
     
+    @NotBlank(message = "Contact value is required")
     private String contactValue;
-    private boolean available;
 }
+
