@@ -6,18 +6,23 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * Response DTO for Company
+ * 
+ * Implements Serializable for Redis caching support
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CompanyResponse {
+public class CompanyResponse implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
     
     private UUID id;
     private UUID tenantId;

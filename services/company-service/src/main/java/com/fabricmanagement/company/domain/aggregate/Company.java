@@ -201,6 +201,32 @@ public class Company extends BaseEntity {
             this.getType().toString()
         ));
     }
+    
+    /**
+     * Sets registration details (tax ID and registration number)
+     * Used during company creation for optional registration fields
+     */
+    public void setRegistrationDetails(String taxId, String registrationNumber) {
+        this.taxId = taxId;
+        this.registrationNumber = registrationNumber;
+    }
+    
+    /**
+     * Configures policy authorization fields
+     * Sets business type, parent company relationship
+     * 
+     * @param businessType INTERNAL, CUSTOMER, SUPPLIER, SUBCONTRACTOR
+     * @param parentCompanyId Parent company UUID (for external companies)
+     * @param relationshipType Business relationship type
+     */
+    public void configurePolicyFields(
+            com.fabricmanagement.shared.domain.policy.CompanyType businessType,
+            UUID parentCompanyId,
+            String relationshipType) {
+        this.businessType = businessType;
+        this.parentCompanyId = parentCompanyId;
+        this.relationshipType = relationshipType;
+    }
 
     /**
      * Updates company settings

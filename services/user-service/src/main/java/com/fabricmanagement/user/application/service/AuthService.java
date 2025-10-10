@@ -70,7 +70,7 @@ public class AuthService {
 
             // Get user by owner_id from contact
             ContactDto contact = response.getData();
-            UUID userId = UUID.fromString(contact.getOwnerId());
+            UUID userId = contact.getOwnerId(); // Already UUID, no conversion needed
 
             User user = userRepository.findById(userId)
                     .filter(u -> !u.isDeleted())
@@ -164,7 +164,7 @@ public class AuthService {
             throw new ContactNotVerifiedException(request.getContactValue());
         }
 
-        UUID userId = UUID.fromString(contact.getOwnerId());
+        UUID userId = contact.getOwnerId(); // Already UUID, no conversion needed
 
         // 3. Get and validate user
         User user = userRepository.findById(userId)
@@ -225,7 +225,7 @@ public class AuthService {
             }
 
             ContactDto contact = response.getData();
-            UUID userId = UUID.fromString(contact.getOwnerId());
+            UUID userId = contact.getOwnerId(); // Already UUID, no conversion needed
 
             // 2. Get user
             User user = userRepository.findById(userId)

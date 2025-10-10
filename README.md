@@ -3,8 +3,20 @@
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.java.net/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Architecture](https://img.shields.io/badge/Architecture-v3.0-blue.svg)](docs/ARCHITECTURE.md)
 
 > **Modern, maintainable, and production-ready fabric management system**
+
+## 🎉 Latest Update: Architecture v3.0 (Oct 10, 2025)
+
+**Major architecture refactoring completed!**
+
+- ✅ Loose Coupling (removed facade controllers)
+- ✅ Database Cleanup (43% reduction)
+- ✅ Feign + Resilience4j (circuit breaker + fallback)
+- ✅ Centralized Constants (no hardcoded values)
+
+👉 [View Full Changelog](docs/reports/2025-Q4/october/ARCHITECTURE_REFACTORING_OCT_10_2025.md)
 
 ---
 
@@ -66,27 +78,15 @@ mvn spring-boot:run
 
 ```
 fabric-management-backend/
-├── docs/                      # Documentation
-│   ├── analysis/             # Analysis reports
-│   │   ├── SPRING_BOOT_BEST_PRACTICES_ANALYSIS.md
-│   │   └── MICROSERVICE_DEVELOPMENT_ANALYSIS.md
-│   ├── architecture/         # Architecture documentation
-│   ├── api/                  # API documentation
-│   ├── deployment/           # Deployment guides
-│   └── development/          # Development guides
-├── services/                 # Microservices
-│   ├── user-service/
-│   ├── company-service/
-│   └── contact-service/
-├── shared/                   # Shared modules
-├── scripts/                  # Utility scripts
-│   ├── deploy.sh            # Main deployment script
-│   ├── run-migrations.sh    # Database migration script
-│   └── docker-entrypoint.sh # Docker entrypoint
-├── monitoring/              # Monitoring configuration
-├── docker-compose.yml       # Docker infrastructure
-└── Makefile                # Build automation
+├── docs/                    # 📚 All documentation
+├── services/                # 🚀 Microservices (user, company, contact, api-gateway)
+├── shared/                  # 🔗 Shared modules (domain, infrastructure, security)
+├── scripts/                 # 🛠️ Utility scripts
+├── monitoring/              # 📊 Prometheus & Grafana config
+└── docker-compose.yml       # 🐳 Docker infrastructure
 ```
+
+**📖 Complete structure:** [docs/development/CODE_STRUCTURE_GUIDE.md](docs/development/CODE_STRUCTURE_GUIDE.md)
 
 ## 📊 Current Status
 
@@ -135,6 +135,23 @@ See [SECURITY.md](docs/SECURITY.md) for detailed security documentation.
 - **Messaging**: Apache Kafka
 - **Containerization**: Docker, Docker Compose
 - **Build**: Maven
+
+## 🏛️ Architecture Principles
+
+Our microservice architecture is built on solid software engineering principles:
+
+- ✅ **Domain-Driven Design (DDD)** - Business logic organized around domain concepts
+- ✅ **Clean Architecture** - Clear separation of concerns with defined boundaries
+- ✅ **Loose Coupling** - Minimal dependencies between services and components
+  - Event-driven communication via Kafka
+  - Interface-based Feign clients with fallbacks
+  - Database per service pattern
+  - DTO layer separates API contracts from domain models
+- ✅ **SOLID Principles** - Object-oriented design principles
+- ✅ **CQRS Pattern** - Command Query Responsibility Segregation
+- ✅ **Event Sourcing** - Audit trail and state replay capability
+
+**See:** [Architecture Guide](docs/architecture/README.md) | [Development Principles](docs/development/principles.md)
 
 ## 📚 Documentation
 

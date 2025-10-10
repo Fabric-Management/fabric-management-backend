@@ -50,43 +50,10 @@ CREATE TABLE IF NOT EXISTS companies (
     deleted BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- Company events table (for event sourcing)
-CREATE TABLE IF NOT EXISTS company_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id UUID NOT NULL,
-    event_type VARCHAR(50) NOT NULL,
-    event_data JSONB NOT NULL,
-    event_version INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT fk_event_company FOREIGN KEY (company_id) REFERENCES companies(id)
-);
-
--- Company users table (many-to-many relationship)
-CREATE TABLE IF NOT EXISTS company_users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id UUID NOT NULL,
-    user_id UUID NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'USER',
-    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    
-    CONSTRAINT fk_company_user_company FOREIGN KEY (company_id) REFERENCES companies(id),
-    CONSTRAINT uk_company_user UNIQUE (company_id, user_id)
-);
-
--- Company settings table (for complex settings)
-CREATE TABLE IF NOT EXISTS company_settings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    company_id UUID NOT NULL,
-    setting_key VARCHAR(100) NOT NULL,
-    setting_value JSONB NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT fk_setting_company FOREIGN KEY (company_id) REFERENCES companies(id),
-    CONSTRAINT uk_company_setting UNIQUE (company_id, setting_key)
-);
+-- Removed tables (not needed):
+-- - company_events: Event sourcing not implemented, using Outbox Pattern
+-- - company_users: Using users.company_id (1-to-1 relationship sufficient)
+-- - company_settings: Using companies.settings JSONB instead
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_companies_tenant_id ON companies (tenant_id);
@@ -98,17 +65,6 @@ CREATE INDEX IF NOT EXISTS idx_companies_active ON companies (is_active);
 CREATE INDEX IF NOT EXISTS idx_companies_deleted ON companies (deleted);
 CREATE INDEX IF NOT EXISTS idx_companies_created_at ON companies (created_at);
 
-CREATE INDEX IF NOT EXISTS idx_events_company_id ON company_events (company_id);
-CREATE INDEX IF NOT EXISTS idx_events_type ON company_events (event_type);
-CREATE INDEX IF NOT EXISTS idx_events_created_at ON company_events (created_at);
-
-CREATE INDEX IF NOT EXISTS idx_company_users_company_id ON company_users (company_id);
-CREATE INDEX IF NOT EXISTS idx_company_users_user_id ON company_users (user_id);
-CREATE INDEX IF NOT EXISTS idx_company_users_active ON company_users (is_active);
-
-CREATE INDEX IF NOT EXISTS idx_company_settings_company_id ON company_settings (company_id);
-CREATE INDEX IF NOT EXISTS idx_company_settings_key ON company_settings (setting_key);
-
 -- =============================================================================
 -- TRIGGERS (Auto-update timestamps)
 -- =============================================================================
@@ -116,12 +72,6 @@ CREATE INDEX IF NOT EXISTS idx_company_settings_key ON company_settings (setting
 DROP TRIGGER IF EXISTS trg_set_updated_at_companies ON companies;
 CREATE TRIGGER trg_set_updated_at_companies
   BEFORE UPDATE ON companies
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
-DROP TRIGGER IF EXISTS trg_set_updated_at_company_settings ON company_settings;
-CREATE TRIGGER trg_set_updated_at_company_settings
-  BEFORE UPDATE ON company_settings
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 

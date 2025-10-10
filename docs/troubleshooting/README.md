@@ -1,220 +1,115 @@
-# 🔧 Troubleshooting Guide
+# 🔧 Troubleshooting Documentation
 
-This directory contains detailed troubleshooting guides for common issues encountered in the Fabric Management System.
-
-## 📋 Available Guides
-
-### ✅ Resolved Issues
-
-1. **[Flyway Checksum Mismatch](./FLYWAY_CHECKSUM_MISMATCH.md)**
-
-   - **Issue:** Services failing with Flyway validation errors
-   - **Root Cause:** Multiple services sharing same Flyway schema history table
-   - **Solution:** Separate Flyway history tables per microservice
-   - **Status:** ✅ Resolved (October 6, 2025)
-
-2. **[Bean Conflict Resolution](./BEAN_CONFLICT_RESOLUTION.md)**
-   - **Issue:** Spring Bean conflict - GlobalExceptionHandler
-   - **Root Cause:** Multiple `@RestControllerAdvice` beans with same name
-   - **Solution:** @ConditionalOnMissingBean pattern for flexible exception handling
-   - **Status:** ✅ Resolved (October 7, 2025)
+**Last Updated:** October 10, 2025  
+**Purpose:** Troubleshooting guides and common solutions  
+**Status:** ✅ Active
 
 ---
 
-## 🔍 Quick Issue Reference
+## 📚 Documentation Index
 
-### Startup Issues
+### 🆘 Quick Reference
 
-| Symptom                              | Likely Cause             | Guide                                                     |
-| ------------------------------------ | ------------------------ | --------------------------------------------------------- |
-| `ConflictingBeanDefinitionException` | Bean name conflict       | [Bean Conflict Resolution](./BEAN_CONFLICT_RESOLUTION.md) |
-| `FlywayValidateException`            | Flyway checksum mismatch | [Flyway Checksum Mismatch](./FLYWAY_CHECKSUM_MISMATCH.md) |
-| Service won't start                  | Check Docker logs        | See below                                                 |
-| Port already in use                  | Another service running  | See below                                                 |
+| Document                                                           | Description                                       | When to Use              |
+| ------------------------------------------------------------------ | ------------------------------------------------- | ------------------------ |
+| [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md) | ⭐ **Quick fixes, debug commands, health checks** | First stop for any issue |
 
-### Database Issues
+### 🐛 Resolved Issues (Detailed Guides)
 
-| Symptom                  | Likely Cause            | Guide                                                     |
-| ------------------------ | ----------------------- | --------------------------------------------------------- |
-| Connection refused       | Database not ready      | Wait for health check                                     |
-| Migration checksum error | Modified migration file | [Flyway Checksum Mismatch](./FLYWAY_CHECKSUM_MISMATCH.md) |
-| Table already exists     | Database not clean      | Run `docker compose down -v`                              |
-
-### Kafka Issues
-
-| Symptom                | Likely Cause           | Solution           |
-| ---------------------- | ---------------------- | ------------------ |
-| `LEADER_NOT_AVAILABLE` | Topics not created yet | Wait ~30 seconds   |
-| Consumer not receiving | Topic doesn't exist    | Check Kafka logs   |
-| Producer timeout       | Kafka not ready        | Check Kafka health |
+| Issue               | Document                                                     | Status      | Date Resolved |
+| ------------------- | ------------------------------------------------------------ | ----------- | ------------- |
+| **Bean Conflicts**  | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md) | ✅ Resolved | Oct 7, 2025   |
+| **Flyway Checksum** | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md) | ✅ Resolved | Oct 6, 2025   |
 
 ---
 
-## 🚀 Common Solutions
+## 🎯 Quick Navigation
 
-### Full System Reset
+### By Problem Type
 
-```bash
-# Stop all containers
-docker compose down
+| Problem Type            | What to Check                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| **🚀 Startup Issues**   | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)  |
+| **🗄️ Database Issues**  | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
+| **📨 Kafka Issues**     | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#kafka-issues)    |
+| **🔗 Bean Conflicts**   | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md)                       |
+| **📋 Migration Issues** | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md)                       |
 
-# Remove all volumes (WARNING: Deletes all data)
-docker compose down -v
+### By Symptom
 
-# Rebuild everything
-docker compose build --no-cache
+| Symptom                              | Likely Issue       | Guide                                                                        |
+| ------------------------------------ | ------------------ | ---------------------------------------------------------------------------- |
+| Service won't start                  | Check logs         | [Common Issues - Startup](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)   |
+| `ConflictingBeanDefinitionException` | Bean name conflict | [Bean Conflict Resolution](./BEAN_CONFLICT_RESOLUTION.md)                    |
+| `FlywayValidateException`            | Migration checksum | [Flyway Checksum](./FLYWAY_CHECKSUM_MISMATCH.md)                             |
+| Connection refused                   | Database not ready | [Common Issues - Database](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
+| `LEADER_NOT_AVAILABLE`               | Kafka not ready    | [Common Issues - Kafka](./COMMON_ISSUES_AND_SOLUTIONS.md#kafka-issues)       |
 
-# Start fresh
-docker compose up -d
+---
 
-# Check health
-docker compose ps
-```
+## 🛠️ Essential Commands
 
-### Service-Specific Reset
-
-```bash
-# Rebuild single service
-docker compose build --no-cache user-service
-
-# Restart single service
-docker compose restart user-service
-
-# View logs
-docker compose logs user-service -f
-```
-
-### Check Service Health
+### Quick Health Check
 
 ```bash
 # Check all services
 docker compose ps
 
-# Check specific service
-docker compose ps user-service
-
-# View health check logs
-docker compose logs user-service | grep -i health
+# Full health check
+curl http://localhost:8081/actuator/health  # User Service
+curl http://localhost:8082/actuator/health  # Contact Service
+curl http://localhost:8083/actuator/health  # Company Service
 ```
 
----
-
-## 🐛 Debugging Tips
-
-### View Logs
+### Quick Debug
 
 ```bash
-# Follow logs for all services
-docker compose logs -f
-
-# Follow logs for specific service
+# View logs
 docker compose logs -f user-service
 
-# View last 50 lines
-docker compose logs user-service | tail -50
-
-# View first 150 lines (startup)
-docker compose logs user-service | head -150
-
-# Search for errors
-docker compose logs user-service | grep -i error
-
-# Search for exceptions
-docker compose logs user-service | grep -i exception
+# Full system reset (if all else fails)
+docker compose down -v && docker compose up -d
 ```
 
-### Check Service Details
+**📖 For complete command reference:** [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#debugging-commands)
 
-```bash
-# Inspect service
-docker compose exec user-service bash
+---
 
-# Check environment variables
-docker compose exec user-service env
+## 📊 Troubleshooting Flow
 
-# Check Java version
-docker compose exec user-service java -version
-
-# Check service health endpoint
-curl http://localhost:8081/actuator/health
 ```
+1. Check Service Status
+   ↓
+   docker compose ps
+   ↓
+   All healthy? → Problem might be application-level
+   ↓
+   Some unhealthy? → Go to step 2
 
-### Database Debugging
+2. Check Logs
+   ↓
+   docker compose logs <service>
+   ↓
+   Bean conflict? → BEAN_CONFLICT_RESOLUTION.md
+   Flyway error? → FLYWAY_CHECKSUM_MISMATCH.md
+   Other error? → COMMON_ISSUES_AND_SOLUTIONS.md
 
-```bash
-# Connect to PostgreSQL
-docker compose exec postgres psql -U fabric_user -d fabric_management
+3. Check Dependencies
+   ↓
+   Database ready? → docker compose exec postgres pg_isready
+   Kafka ready? → docker compose ps kafka
+   Redis ready? → docker compose exec redis redis-cli ping
 
-# List all tables
-\dt
-
-# List Flyway history tables
-\dt *flyway*
-
-# Check specific table
-SELECT * FROM user_flyway_schema_history;
-
-# Exit
-\q
-```
-
-### Kafka Debugging
-
-```bash
-# List topics
-docker compose exec kafka kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --list
-
-# Check consumer groups
-docker compose exec kafka kafka-consumer-groups.sh \
-  --bootstrap-server localhost:9092 \
-  --list
-
-# View topic messages
-docker compose exec kafka kafka-console-consumer.sh \
-  --bootstrap-server localhost:9092 \
-  --topic contact.created \
-  --from-beginning
+4. Still Not Working?
+   ↓
+   Full system reset → docker compose down -v && docker compose up -d
 ```
 
 ---
 
-## 📊 Health Check Reference
+## 🆘 When to Create New Guide
 
-### Expected Healthy State
-
-```bash
-$ docker compose ps
-
-NAME                     STATUS
-fabric-api-gateway       Up X minutes (healthy)
-fabric-company-service   Up X minutes (healthy)
-fabric-contact-service   Up X minutes (healthy)
-fabric-kafka             Up X minutes (healthy)
-fabric-postgres          Up X minutes (healthy)
-fabric-redis             Up X minutes (healthy)
-fabric-user-service      Up X minutes (healthy)
-fabric-zookeeper         Up X minutes (healthy)
-```
-
-### Service Ports
-
-| Service         | Port | Health Check                                             |
-| --------------- | ---- | -------------------------------------------------------- |
-| API Gateway     | 8080 | `curl http://localhost:8080/actuator/health`             |
-| User Service    | 8081 | `curl http://localhost:8081/actuator/health`             |
-| Contact Service | 8082 | `curl http://localhost:8082/actuator/health`             |
-| Company Service | 8083 | `curl http://localhost:8083/actuator/health`             |
-| PostgreSQL      | 5432 | `docker compose exec postgres pg_isready`                |
-| Redis           | 6379 | `docker compose exec redis redis-cli ping`               |
-| Kafka           | 9092 | `docker compose exec kafka kafka-broker-api-versions.sh` |
-
----
-
-## 🆘 When to Create a New Troubleshooting Guide
-
-Create a new guide when:
+Create a new troubleshooting guide when:
 
 - ✅ Issue takes >30 minutes to debug
 - ✅ Issue is likely to recur
@@ -222,40 +117,24 @@ Create a new guide when:
 - ✅ Solution involves multiple steps
 - ✅ Affects multiple developers
 
-### Guide Template
-
-```markdown
-# [Issue Name] - [Status]
-
-## Problem Description
-
-[Clear description of the issue and symptoms]
-
-## Root Cause Analysis
-
-[Why the issue occurred]
-
-## Solution
-
-[Step-by-step solution]
-
-## Prevention
-
-[How to avoid this issue in the future]
-
-## Status
-
-[Resolved/In Progress/Known Issue]
-```
+**Template available in:** [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#when-to-create-a-new-troubleshooting-guide)
 
 ---
 
-## 📚 Related Documentation
+## 🔗 Related Documentation
 
-- [Architecture Guide](../architecture/) - System design and patterns
-- [Development Guide](../development/) - Setup and standards
-- [Deployment Guide](../deployment/) - Production deployment
-- [Database Guide](../database/) - Database schema and migrations
+### Internal Links
+
+- [Architecture](../architecture/README.md) - System design patterns
+- [Development Guide](../development/README.md) - Development setup
+- [Deployment Guide](../deployment/README.md) - Production deployment
+- [Database Guide](../database/DATABASE_GUIDE.md) - Database schema
+
+### External Resources
+
+- [Spring Boot Troubleshooting](https://docs.spring.io/spring-boot/docs/current/reference/html/howto.html)
+- [Docker Troubleshooting](https://docs.docker.com/config/daemon/troubleshoot/)
+- [PostgreSQL Error Codes](https://www.postgresql.org/docs/current/errcodes-appendix.html)
 
 ---
 
@@ -263,14 +142,39 @@ Create a new guide when:
 
 Found a new issue? Solved a tricky problem?
 
-1. Document it following the template above
-2. Add it to this README
-3. Submit a PR
-4. Help your fellow developers! 🎉
+1. **Document it** using the template in COMMON_ISSUES_AND_SOLUTIONS.md
+2. **Add to index** in this README
+3. **Submit PR** with clear description
+4. **Help your teammates** 🎉
+
+### Contribution Guidelines
+
+- Use clear, descriptive titles
+- Include root cause analysis
+- Provide step-by-step solutions
+- Add prevention tips
+- Update this index
 
 ---
 
-**Last Updated:** 2025-10-09 20:15 UTC+1  
-**Version:** 1.0.0  
-**Status:** ✅ Active  
-**Maintainer:** Development Team
+## 📞 Support
+
+### Getting Help
+
+- **Slack**: #fabric-troubleshooting (urgent issues)
+- **Slack**: #fabric-dev (general questions)
+- **Office Hours**: Daily standup (9:00 AM)
+
+### Escalation Path
+
+1. Check this documentation
+2. Ask in #fabric-dev
+3. Create GitHub issue with `bug` label
+4. Tag @team-lead for urgent issues
+
+---
+
+**Maintained By:** Development Team  
+**Last Updated:** 2025-10-10  
+**Version:** 2.0 (Reorganized & Enhanced)  
+**Status:** ✅ Active - Updated with new issues as they occur

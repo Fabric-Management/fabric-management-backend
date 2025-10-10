@@ -525,103 +525,29 @@ grep "LOGIN" logs/api-gateway.log | grep "suspicious-ip"
 
 ---
 
-## 🛡️ Defense in Depth: UUID Validation
+## 🛡️ UUID Security & Validation
 
 ### Why UUID Validation Matters
 
-**Security Risk:** JWT tokens contain `tenantId` and `userId` as strings. Without validation:
+JWT tokens contain `tenantId` and `userId` as strings. Multi-layer validation prevents:
 
-- ❌ Malformed UUIDs can reach downstream services
+- ❌ Malformed UUIDs reaching services
 - ❌ DOS attacks via exception flooding
-- ❌ Log pollution and information leakage
-- ❌ Potential SQL injection vectors (if mishandled)
+- ❌ Log pollution & information leakage
 
-### Multi-Layer UUID Protection
+### Validation Strategy
 
-#### Layer 1: API Gateway (First Line of Defense) ✅
+**3-Layer Defense:**
 
-```java
-// api-gateway/.../JwtAuthenticationFilter.java
-String tenantId = claims.get("tenantId", String.class);
-String userId = claims.getSubject();
+1. **API Gateway** - Validate before routing (fast fail)
+2. **Shared Security** - Validate before authentication
+3. **SecurityContext** - Type-safe UUID conversion
 
-// SECURITY: Validate UUID format BEFORE downstream propagation
-if (!isValidUuid(tenantId) || !isValidUuid(userId)) {
-    log.error("Invalid UUID format in JWT");
-    return unauthorizedResponse(exchange); // 401 - STOP HERE!
-}
-```
+**📖 Complete UUID security guide:** [development/DATA_TYPES_STANDARDS.md](./development/DATA_TYPES_STANDARDS.md)
 
-**Benefits:**
+### Key Principle
 
-- 🛡️ Blocks malformed data at entry point
-- 🚀 Reduces load on downstream services
-- 📊 Clear audit trail at gateway level
-- ⚡ Fast fail without service invocation
-
-#### Layer 2: Shared-Security Filter (Second Line) ✅
-
-```java
-// shared-security/.../JwtAuthenticationFilter.java
-String userId = jwtTokenProvider.extractUserId(token);
-String tenantId = jwtTokenProvider.extractTenantId(token);
-
-// SECURITY: Validate before setting authentication context
-if (!isValidUuid(userId) || !isValidUuid(tenantId)) {
-    log.error("Invalid UUID format, skipping authentication");
-    filterChain.doFilter(request, response); // Continue without auth
-    return;
-}
-```
-
-**Benefits:**
-
-- 🛡️ Protection for direct service calls (bypassing gateway)
-- 🔐 Prevents malformed UUIDs in security context
-- ✅ Consistent validation across all services
-
-#### Layer 3: SecurityContextHolder (Third Line) ✅
-
-```java
-// shared-infrastructure/.../SecurityContextHolder.java
-public static UUID getCurrentTenantId() {
-    try {
-        return UUID.fromString((String) tenantIdClaim);
-    } catch (IllegalArgumentException e) {
-        log.error("Invalid tenant ID format: {}", tenantIdClaim);
-        throw new UnauthorizedException("Invalid tenant ID in token");
-    }
-}
-```
-
-**Benefits:**
-
-- 🛡️ Final safety net before database operations
-- 📝 Structured exception with clear error message
-- 🔒 Type-safe UUID conversion
-
-### UUID Validation Best Practices
-
-1. **Validate Early**: Check at API Gateway before downstream propagation
-2. **Fail Fast**: Return 401/403 immediately on invalid format
-3. **Log Clearly**: Security logs should capture validation failures
-4. **No Exceptions in Prod**: Validation should prevent exceptions, not rely on them
-5. **Consistent Format**: Always use standard UUID format (RFC 4122)
-
-### Why String in JWT?
-
-**Question:** "Is using String for tenantId/userId normal? Does it create security risk?"
-
-**Answer:**
-
-- ✅ **Normal and Required**: JWT specification requires JSON-compatible types → UUID must be string
-- ✅ **Not Inherently Risky**: Risk comes from lack of validation, not string type
-- ✅ **Proper Flow**: `UUID → String (JWT) → Validate → UUID (app)`
-- ❌ **Risky Without Validation**: Malformed strings can cause downstream issues
-
-**Key Principle:**
-
-> "Trust, but verify. Accept strings from JWT, but validate UUID format before use."
+> "UUID in JWT as string is normal. Validate format, convert to UUID type internally."
 
 ---
 

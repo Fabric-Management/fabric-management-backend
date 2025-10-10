@@ -42,13 +42,20 @@ COMMENT ON COLUMN policy_registry.version IS 'Optimistic locking version (from B
 COMMENT ON COLUMN policy_registry.active IS 'If FALSE, policy is disabled (fallback to deny)';
 COMMENT ON COLUMN policy_registry.deleted IS 'Soft delete flag (from BaseEntity)';
 
-CREATE UNIQUE INDEX uk_registry_endpoint ON policy_registry(endpoint) WHERE active = TRUE AND deleted = FALSE;
-CREATE INDEX idx_registry_lookup ON policy_registry(endpoint, operation, active) WHERE active = TRUE AND deleted = FALSE;
-CREATE INDEX idx_registry_allowed_types ON policy_registry USING GIN (allowed_company_types);
-CREATE INDEX idx_registry_default_roles ON policy_registry USING GIN (default_roles);
+-- Indexes (IF NOT EXISTS)
+CREATE UNIQUE INDEX IF NOT EXISTS uk_registry_endpoint ON policy_registry(endpoint) WHERE active = TRUE AND deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_registry_lookup ON policy_registry(endpoint, operation, active) WHERE active = TRUE AND deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_registry_allowed_types ON policy_registry USING GIN (allowed_company_types);
+CREATE INDEX IF NOT EXISTS idx_registry_default_roles ON policy_registry USING GIN (default_roles);
 
-CREATE TRIGGER update_policy_registry_updated_at
-    BEFORE UPDATE ON policy_registry
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Trigger (IF NOT EXISTS)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_policy_registry_updated_at') THEN
+        CREATE TRIGGER update_policy_registry_updated_at
+            BEFORE UPDATE ON policy_registry
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 

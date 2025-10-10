@@ -2,18 +2,21 @@ package com.fabricmanagement.company.infrastructure.config;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Feign Client Configuration
  *
  * Configures Feign clients to propagate JWT tokens from incoming requests
  * to outgoing inter-service calls.
+ * 
+ * ✅ SECURITY:
+ * - JWT token automatically forwarded to Contact Service
+ * - Maintains authentication context across services
  */
 @Configuration
 public class FeignClientConfig {

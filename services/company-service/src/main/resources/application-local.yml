@@ -1,0 +1,129 @@
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - COMPANY SERVICE LOCAL DEVELOPMENT CONFIGURATION
+# =============================================================================
+# This profile is used for local development when running the service
+# with Maven (mvn spring-boot:run) while infrastructure runs in Docker
+# =============================================================================
+
+spring:
+  # ===========================================================================
+  # DATABASE CONFIGURATION
+  # ===========================================================================
+  datasource:
+    url: jdbc:postgresql://localhost:5433/fabric_management
+    username: fabric_user
+    password: local_dev_2024
+
+  # ===========================================================================
+  # FLYWAY CONFIGURATION
+  # ===========================================================================
+  flyway:
+    table: flyway_schema_history_company
+
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: local_redis_pass
+
+  # ===========================================================================
+  # KAFKA CONFIGURATION
+  # ===========================================================================
+  kafka:
+    bootstrap-servers: localhost:9092
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: 8083
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  secret: "EgUbMz7OOW7+57Ehxr2jUc7mFlEQPrs/XZirqOjhI4OF42Z+sW6hF7Rj9OMEjeCBBZHuzaBICuAlMtNMMZT+6A=="
+  expiration: 3600000 # 1 hour
+  refresh-expiration: 86400000 # 24 hours
+  algorithm: HS256
+  issuer: fabric-management-system
+  audience: fabric-api
+
+# =============================================================================
+# EXTERNAL SERVICES CONFIGURATION
+# =============================================================================
+contact-service:
+  url: http://localhost:8082
+
+user-service:
+  url: http://localhost:8081
+
+# =============================================================================
+# RESILIENCE4J CONFIGURATION (Circuit Breaker)
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      contact-service:
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: 10
+        record-exceptions:
+          - feign.FeignException
+          - java.net.ConnectException
+
+  timelimiter:
+    instances:
+      contact-service:
+        timeout-duration: 3s
+
+# Enable Feign with circuit breaker
+feign:
+  circuitbreaker:
+    enabled: true
+  client:
+    config:
+      default:
+        connect-timeout: 5000
+        read-timeout: 5000
+
+# =============================================================================
+# DUPLICATE DETECTION CONFIGURATION
+# =============================================================================
+company:
+  duplicate-detection:
+    # Name similarity threshold (0.0-1.0). Higher = more strict
+    # 0.80 = 80% similar names will be flagged
+    name-similarity-threshold: 0.80
+
+    # Database trigram search threshold for fuzzy matching
+    # 0.30 = 30% similar names in database query
+    database-search-threshold: 0.30
+
+    # Autocomplete settings
+    autocomplete-max-results: 10
+    autocomplete-min-length: 2
+
+    # Fuzzy search settings
+    fuzzy-search-min-length: 3
+
+    # Feature flags
+    enable-full-text-search: true
+    block-on-tax-id-match: true
+    block-on-registration-match: true
+
+# =============================================================================
+# LOGGING CONFIGURATION (More verbose for local development)
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.company: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

@@ -49,7 +49,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- Delete User (Super Admin only, high risk)
 INSERT INTO policy_registry (
@@ -74,7 +74,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- =====================================================================================
 -- COMPANY MANAGEMENT POLICIES
@@ -103,7 +103,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- Delete Company (Super Admin only, critical operation)
 INSERT INTO policy_registry (
@@ -128,7 +128,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- Cross-Company Access (Grant required for CUSTOMER/SUPPLIER)
 INSERT INTO policy_registry (
@@ -153,7 +153,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- =====================================================================================
 -- CONTACT MANAGEMENT POLICIES
@@ -182,7 +182,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- =====================================================================================
 -- SYSTEM-WIDE POLICIES
@@ -211,7 +211,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- Export Operations (Manager+, audit logged)
 INSERT INTO policy_registry (
@@ -236,7 +236,7 @@ INSERT INTO policy_registry (
     'SYSTEM',  -- PolicyConstants.UPDATED_BY_SYSTEM
     0,         -- BaseEntity.VERSION_INITIAL
     false      -- BaseEntity.DELETED_FALSE
-);
+) ON CONFLICT (endpoint) DO NOTHING;
 
 -- =====================================================================================
 -- NOTES

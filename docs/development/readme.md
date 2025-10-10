@@ -1,866 +1,219 @@
-# 👨‍💻 Development Guide
-
-## 📋 Overview
-
-This guide provides comprehensive instructions for setting up, developing, and contributing to the Fabric Management System. Follow these guidelines to ensure consistency, quality, and maintainability across the codebase.
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- **Java 21** or higher
-- **Maven 3.9+**
-- **Docker** and **Docker Compose**
-- **Git**
-- **IDE** (IntelliJ IDEA, Eclipse, VS Code)
-
-### Environment Setup
-
-1. **Clone the repository**:
-
-```bash
-git clone https://github.com/your-org/fabric-management-backend.git
-cd fabric-management-backend
-```
-
-2. **Start infrastructure services**:
-
-```bash
-docker-compose up -d postgres-db redis kafka
-```
-
-3. **Build the project**:
-
-```bash
-mvn clean install
-```
-
-4. **Run tests**:
-
-```bash
-mvn test
-```
-
-## 🏗️ Project Structure
-
-```
-fabric-management-backend/
-├── shared/                          # Shared libraries
-│   ├── shared-domain/              # Domain primitives
-│   ├── shared-infrastructure/      # Infrastructure utilities
-│   ├── shared-application/          # Application utilities
-│   └── shared-security/            # Security utilities
-├── services/                        # Microservices
-│   ├── user-service/               # User management
-│   ├── contact-service/            # Contact management
-│   ├── company-service/            # Company management
-│   └── ...                         # Other services
-├── infrastructure/                  # Infrastructure services
-│   ├── api-gateway/                # API Gateway
-│   ├── service-discovery/          # Service Discovery
-│   └── config-server/              # Config Server
-├── deployment/                      # Deployment configurations
-├── docs/                           # Documentation
-└── scripts/                        # Automation scripts
-```
-
-## 🎯 Development Standards
-
-### Code Style
-
-We follow **Google Java Style Guide** with some modifications:
-
-```java
-// ✅ Good: Clear, descriptive naming
-public class UserService {
-    private final UserRepository userRepository;
-
-    public UserResponse createUser(CreateUserRequest request) {
-        // Implementation
-    }
-}
-
-// ❌ Bad: Unclear naming
-public class UsrSvc {
-    private final UsrRepo repo;
-
-    public UsrResp crtUsr(CrtUsrReq req) {
-        // Implementation
-    }
-}
-```
-
-### Naming Conventions
-
-| Element       | Convention       | Example                            |
-| ------------- | ---------------- | ---------------------------------- |
-| **Classes**   | PascalCase       | `UserService`, `CreateUserRequest` |
-| **Methods**   | camelCase        | `createUser()`, `findByEmail()`    |
-| **Variables** | camelCase        | `userName`, `isActive`             |
-| **Constants** | UPPER_SNAKE_CASE | `MAX_RETRY_ATTEMPTS`               |
-| **Packages**  | lowercase        | `com.fabricmanagement.user`        |
-
-### File Organization
-
-Each service follows this structure:
-
-```
-service-name/
-├── src/main/java/com/fabricmanagement/service/
-│   ├── ServiceApplication.java
-│   ├── domain/                      # Domain layer
-│   │   ├── aggregate/              # Aggregate roots
-│   │   ├── event/                  # Domain events
-│   │   ├── repository/             # Repository interfaces
-│   │   └── service/                # Domain services
-│   ├── application/                # Application layer
-│   │   ├── command/                # Commands
-│   │   ├── query/                  # Queries
-│   │   ├── handler/                # Command/Query handlers
-│   │   ├── service/                # Application services
-│   │   └── port/                   # Port interfaces
-│   └── infrastructure/             # Infrastructure layer
-│       ├── persistence/            # Database
-│       ├── web/                    # REST controllers
-│       ├── messaging/              # Event handling
-│       └── config/                 # Configuration
-└── src/test/java/                  # Tests
-```
-
-## 🧪 Testing Strategy
-
-### Test Types
-
-1. **Unit Tests** - Test individual components
-2. **Integration Tests** - Test service interactions
-3. **Contract Tests** - Test API contracts
-4. **End-to-End Tests** - Test complete workflows
-
-### Test Structure
-
-```java
-@ExtendWith(MockitoExtension.class)
-class UserServiceTest {
-
-    @Mock
-    private UserRepository userRepository;
-
-    @InjectMocks
-    private UserService userService;
-
-    @Test
-    @DisplayName("Should create user successfully")
-    void shouldCreateUser() {
-        // Given
-        CreateUserRequest request = CreateUserRequest.builder()
-            .contactValue("john.doe@company.com")
-            .contactType("EMAIL")
-            .firstName("John")
-            .lastName("Doe")
-            .build();
-
-        User savedUser = User.builder()
-            .id("user-123")
-            .contactValue("john.doe@company.com")
-            .firstName("John")
-            .lastName("Doe")
-            .status(UserStatus.PENDING_VERIFICATION)
-            .build();
-
-        when(userRepository.save(any(User.class))).thenReturn(savedUser);
-
-        // When
-        UserResponse response = userService.createUser(request);
-
-        // Then
-        assertThat(response).isNotNull();
-        assertThat(response.getContactValue()).isEqualTo("john.doe@company.com");
-        verify(userRepository).save(any(User.class));
-    }
-}
-```
-
-### Domain Entity Testing Standards
-
-**All domain entities MUST have comprehensive tests:**
-
-#### 1. Unit Tests for Aggregates
-
-```java
-@DisplayName("User Aggregate Tests")
-class UserTest {
-
-    @Nested
-    @DisplayName("User Creation Tests")
-    class UserCreationTests {
-
-        @Test
-        @DisplayName("Should create user with contact verification successfully")
-        void shouldCreateUserWithContactVerification() {
-            // When
-            User user = User.createWithContactVerification(
-                "test@example.com", "EMAIL", "John", "Doe", "hashedPassword", "EMPLOYEE"
-            );
-
-            // Then
-            assertThat(user).isNotNull();
-            assertThat(user.getFirstName()).isEqualTo("John");
-            assertThat(user.getStatus()).isEqualTo(UserStatus.PENDING_VERIFICATION);
-            assertThat(user.getContacts()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("Should throw exception when contact value is null")
-        void shouldThrowExceptionWhenContactValueIsNull() {
-            // When & Then
-            assertThatThrownBy(() ->
-                User.createWithContactVerification(null, "EMAIL", "John", "Doe", "password", "EMPLOYEE")
-            ).isInstanceOf(IllegalArgumentException.class)
-             .hasMessage("Contact value cannot be null or empty");
-        }
-    }
-}
-```
-
-#### 2. Value Object Testing
-
-```java
-@DisplayName("UserContact Tests")
-class UserContactTest {
-
-    @Test
-    @DisplayName("Should create email contact successfully")
-    void shouldCreateEmailContactSuccessfully() {
-        // When
-        UserContact contact = UserContact.email("user123", "test@example.com", true, true);
-
-        // Then
-        assertThat(contact).isNotNull();
-        assertThat(contact.getContactValue()).isEqualTo("test@example.com");
-        assertThat(contact.getContactType()).isEqualTo(UserContact.ContactType.EMAIL);
-        assertThat(contact.isVerified()).isTrue();
-        assertThat(contact.isPrimary()).isTrue();
-    }
-}
-```
-
-#### 3. Repository Integration Testing
-
-```java
-@DataJpaTest
-@ActiveProfiles("test")
-@DisplayName("User Repository Integration Tests")
-class UserRepositoryIntegrationTest {
-
-    @Autowired
-    private TestEntityManager entityManager;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Test
-    @DisplayName("Should save and retrieve user successfully")
-    void shouldSaveAndRetrieveUserSuccessfully() {
-        // Given
-        User user = User.createWithContactVerification(
-            "test@example.com", "EMAIL", "John", "Doe", "password", "EMPLOYEE"
-        );
-        entityManager.persistAndFlush(user);
-
-        // When
-        Optional<User> foundUser = userRepository.findByContactValue("test@example.com");
-
-        // Then
-        assertThat(foundUser).isPresent();
-        assertThat(foundUser.get().getFirstName()).isEqualTo("John");
-    }
-}
-```
-
-### Test Coverage Requirements
-
-- **Domain Logic**: 100% coverage
-- **Business Rules**: 100% coverage
-- **Repository Methods**: 95% coverage
-- **Service Layer**: 90% coverage
-- **Controller Layer**: 80% coverage
-
-### Test Data Management
-
-```java
-// ✅ Correct: Use builders for test data
-User testUser = User.builder()
-    .id("test-user-123")
-    .firstName("John")
-    .lastName("Doe")
-    .status(UserStatus.ACTIVE)
-    .build();
-
-// ❌ Wrong: Hard-coded test data
-User testUser = new User();
-testUser.setFirstName("John");
-testUser.setLastName("Doe");
-```
-
-### Test Coverage
-
-- **Minimum Coverage**: 80%
-- **Critical Paths**: 95%
-- **Domain Logic**: 100%
-
-### Running Tests
-
-```bash
-# Run all tests
-mvn test
-
-# Run specific test class
-mvn test -Dtest=UserServiceTest
-
-# Run integration tests
-mvn verify
-
-# Generate coverage report
-mvn jacoco:report
-```
-
-## 🔧 Development Workflow
-
-### Git Workflow
-
-1. **Create feature branch**:
-
-```bash
-git checkout -b feature/user-authentication
-```
-
-2. **Make changes and commit**:
-
-```bash
-git add .
-git commit -m "feat: add user authentication endpoint"
-```
-
-3. **Push and create PR**:
-
-```bash
-git push origin feature/user-authentication
-```
-
-### Commit Message Format
-
-We use **Conventional Commits**:
-
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-**Types**:
-
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes
-- `refactor`: Code refactoring
-- `test`: Adding tests
-- `chore`: Maintenance tasks
-
-**Examples**:
-
-```
-feat(user): add user registration endpoint
-fix(auth): resolve JWT token expiration issue
-docs(api): update authentication documentation
-```
-
-### Code Review Process
-
-1. **Self-review** your changes
-2. **Run tests** and ensure they pass
-3. **Create pull request** with clear description
-4. **Request review** from team members
-5. **Address feedback** and make changes
-6. **Merge** after approval
-
-## 🏗️ Domain Entity Standards
-
-### JPA Entity Implementation
-
-**All domain entities MUST follow these standards:**
-
-#### 1. Entity Annotation Requirements
-
-```java
-@Entity
-@Table(name = "table_name")
-@Getter
-@Setter
-@NoArgsConstructor
-@SuperBuilder
-public class DomainEntity extends BaseEntity {
-    // Implementation
-}
-```
-
-#### 2. Field Mapping Standards
-
-```java
-// ✅ Correct: Proper JPA annotations
-@Column(name = "field_name", nullable = false)
-private String fieldName;
-
-@Enumerated(EnumType.STRING)
-@Column(name = "status", nullable = false)
-private EntityStatus status;
-
-@OneToMany(mappedBy = "parentId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-private List<ChildEntity> children;
-
-// ❌ Wrong: Missing annotations
-private String fieldName; // No @Column
-private EntityStatus status; // No @Enumerated
-```
-
-#### 3. Builder Pattern Usage
-
-```java
-// ✅ Correct: Immutable builder pattern
-public static DomainEntity create(String name, String type) {
-    return DomainEntity.builder()
-        .name(name)
-        .type(type)
-        .status(EntityStatus.ACTIVE)
-        .build();
-}
-
-// ❌ Wrong: Constructor usage
-public DomainEntity(String name, String type) {
-    this.name = name;
-    this.type = type;
-}
-```
-
-#### 4. Immutable Updates
-
-```java
-// ✅ Correct: Index-based updates (thread-safe)
-for (int i = 0; i < this.items.size(); i++) {
-    Item item = this.items.get(i);
-    if (item.getId().equals(itemId)) {
-        Item updatedItem = Item.builder()
-            .id(item.getId())
-            .name(newName)
-            .status(item.getStatus())
-            .build();
-        this.items.set(i, updatedItem);
-        break;
-    }
-}
-
-// ❌ Wrong: List manipulation (not thread-safe)
-this.items.remove(item);
-this.items.add(newItem);
-```
-
-#### 5. ID Type Standards
-
-```java
-// ✅ CORRECT: UUID for system-generated identifiers
-@Column(name = "tenant_id", nullable = false)
-private UUID tenantId;
-
-@Column(name = "user_id", nullable = false)
-private UUID userId;
-
-// ❌ WRONG: String for UUIDs (loses type safety)
-private String tenantId;  // ❌ Should be UUID
-private String userId;    // ❌ Should be UUID
-```
-
-**See:** [Data Types Standards](DATA_TYPES_STANDARDS.md) for complete UUID implementation guide.
-
-#### 6. Domain Events Handling
-
-```java
-// ✅ Correct: Transient domain events
-@Transient
-private final List<Object> domainEvents = new ArrayList<>();
-
-private void addDomainEvent(Object event) {
-    this.domainEvents.add(event);
-}
-
-public List<Object> getAndClearDomainEvents() {
-    List<Object> events = new ArrayList<>(this.domainEvents);
-    this.domainEvents.clear();
-    return events;
-}
-```
-
-### Value Object Standards
-
-**Value Objects MUST be immutable:**
-
-```java
-@Value
-@Builder
-public class ContactInfo {
-    String contactValue;
-    ContactType contactType;
-    boolean isVerified;
-    boolean isPrimary;
-
-    public static ContactInfo email(String userId, String email, boolean verified, boolean primary) {
-        return ContactInfo.builder()
-            .userId(userId)
-            .contactValue(email)
-            .contactType(ContactType.EMAIL)
-            .isVerified(verified)
-            .isPrimary(primary)
-            .build();
-    }
-}
-```
-
-### Repository Standards
-
-**Repository interfaces MUST follow these patterns:**
-
-```java
-@Repository
-public interface UserRepository extends JpaRepository<User, String> {
-
-    // ✅ Correct: Specific query methods
-    Optional<User> findByContactValue(String contactValue);
-
-    List<User> findByStatusAndDeletedFalse(UserStatus status);
-
-    @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.deleted = false")
-    List<User> findActiveUsersByTenant(@Param("tenantId") String tenantId);
-
-    // ❌ Wrong: Generic methods without business context
-    List<User> findAll();
-    Optional<User> findById(String id); // Use inherited method
-}
-```
-
-## 🏗️ Architecture Patterns
-
-### Clean Architecture
-
-```mermaid
-graph TB
-    subgraph "Infrastructure Layer"
-        WEB[REST Controllers]
-        DB[JPA Repositories]
-        MSG[Event Publishers]
-    end
-
-    subgraph "Application Layer"
-        CMD[Command Handlers]
-        QRY[Query Handlers]
-        SVC[Application Services]
-    end
-
-    subgraph "Domain Layer"
-        AGG[Aggregate Roots]
-        EVT[Domain Events]
-        REPO[Repository Interfaces]
-    end
-
-    WEB --> CMD
-    WEB --> QRY
-    CMD --> AGG
-    QRY --> AGG
-    AGG --> EVT
-    EVT --> MSG
-    CMD --> REPO
-    QRY --> REPO
-    REPO --> DB
-```
-
-### CQRS Implementation
-
-```java
-// Command
-public class CreateUserCommand {
-    private String username;
-    private String email;
-    // getters, setters
-}
-
-// Command Handler
-@Component
-public class CreateUserCommandHandler {
-
-    public UserResponse handle(CreateUserCommand command) {
-        // Command handling logic
-    }
-}
-
-// Query
-public class GetUserQuery {
-    private UUID userId;
-    // getters, setters
-}
-
-// Query Handler
-@Component
-public class GetUserQueryHandler {
-
-    public UserResponse handle(GetUserQuery query) {
-        // Query handling logic
-    }
-}
-```
-
-### Event Sourcing
-
-```java
-// Domain Event
-public class UserCreatedEvent extends DomainEvent {
-    private String username;
-    private String email;
-
-    public UserCreatedEvent(String username, String email) {
-        super();
-        this.username = username;
-        this.email = email;
-    }
-}
-
-// Event Handler
-@Component
-public class UserCreatedEventHandler {
-
-    @EventListener
-    public void handle(UserCreatedEvent event) {
-        // Handle the event
-    }
-}
-```
-
-## 🔒 Security Guidelines
-
-### Authentication
-
-```java
-@RestController
-@RequestMapping("/api/v1/users")
-@PreAuthorize("hasRole('USER')")
-public class UserController {
-
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<UserResponse> getCurrentUser() {
-        // Implementation
-    }
-}
-```
-
-### Input Validation
-
-```java
-public class CreateUserRequest {
-
-    @NotBlank(message = "Username is required")
-    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
-    private String username;
-
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email must be valid")
-    private String email;
-
-    // getters, setters
-}
-```
-
-### Data Protection
-
-- **Never log sensitive data** (passwords, tokens)
-- **Use parameterized queries** to prevent SQL injection
-- **Validate all inputs** at API boundaries
-- **Implement rate limiting** for public endpoints
-
-## 📊 Performance Guidelines
-
-### Database Optimization
-
-```java
-// ✅ Good: Use specific queries
-@Query("SELECT u FROM User u WHERE u.email = :email AND u.deleted = false")
-Optional<User> findByEmailAndDeletedFalse(@Param("email") String email);
-
-// ❌ Bad: Load all data
-List<User> users = userRepository.findAll();
-```
-
-### Caching Strategy
-
-```java
-@Service
-public class UserService {
-
-    @Cacheable(value = "users", key = "#userId")
-    public UserResponse getUser(UUID userId) {
-        // Implementation
-    }
-
-    @CacheEvict(value = "users", key = "#userId")
-    public UserResponse updateUser(UUID userId, UpdateUserRequest request) {
-        // Implementation
-    }
-}
-```
-
-### Async Processing
-
-```java
-@Service
-public class NotificationService {
-
-    @Async
-    public CompletableFuture<Void> sendEmail(String email, String message) {
-        // Async email sending
-        return CompletableFuture.completedFuture(null);
-    }
-}
-```
-
-## 🐛 Debugging
-
-### Logging
-
-```java
-@Slf4j
-@Service
-public class UserService {
-
-    public UserResponse createUser(CreateUserRequest request) {
-        log.info("Creating user with username: {}", request.getUsername());
-
-        try {
-            User user = userRepository.save(user);
-            log.info("User created successfully with ID: {}", user.getId());
-            return userMapper.toResponse(user);
-        } catch (Exception e) {
-            log.error("Failed to create user: {}", e.getMessage(), e);
-            throw new UserCreationException("Failed to create user", e);
-        }
-    }
-}
-```
-
-### Debug Configuration
-
-```yaml
-# application-local.yml
-logging:
-  level:
-    com.fabricmanagement: DEBUG
-    org.springframework.web: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-```
-
-## 🔧 IDE Configuration
-
-### IntelliJ IDEA
-
-1. **Install plugins**:
-
-   - Lombok Plugin
-   - MapStruct Plugin
-   - Spring Boot Plugin
-
-2. **Code style settings**:
-
-   - Import `google-java-style.xml`
-   - Enable "Reformat code on save"
-
-3. **Run configurations**:
-   - Create Spring Boot run configurations
-   - Set VM options: `-Xmx2g -Xms1g`
-
-### VS Code
-
-1. **Install extensions**:
-
-   - Extension Pack for Java
-   - Spring Boot Extension Pack
-   - Lombok Annotations Support
-
-2. **Settings**:
-
-```json
-{
-  "java.format.settings.url": "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml",
-  "java.saveActions.organizeImports": true
-}
-```
-
-## 📚 Resources
-
-### Internal Documentation
-
-- [Microservices & API Gateway Standards](MICROSERVICES_API_STANDARDS.md) - ⭐⭐⭐ CRITICAL: API Gateway & Controller standards
-- [Data Types Standards](DATA_TYPES_STANDARDS.md) - ⭐ UUID and identifier standards
-- [Development Principles](PRINCIPLES.md) - Coding principles and best practices
-- [Code Structure Guide](CODE_STRUCTURE_GUIDE.md) - Project organization
-- [Quick Start Guide](QUICK_START.md) - Getting started
-
-### External Documentation
-
-- [Spring Boot Reference](https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/)
-- [Spring Security Reference](https://docs.spring.io/spring-security/reference/)
-- [JPA Specification](https://jakarta.ee/specifications/persistence/)
-
-### Tools
-
-- [Postman](https://www.postman.com/) - API testing
-- [DBeaver](https://dbeaver.io/) - Database management
-- [RedisInsight](https://redis.com/redis-enterprise/redis-insight/) - Redis management
-
-### Learning
-
-- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
-- [Domain-Driven Design](https://martinfowler.com/bliki/DomainDrivenDesign.html)
-- [CQRS Pattern](https://martinfowler.com/bliki/CQRS.html)
-
-## 🤝 Contributing
-
-### Getting Started
-
-1. **Fork the repository**
-2. **Create feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes**
-4. **Add tests** for new functionality
-5. **Run tests**: `mvn test`
-6. **Commit changes**: `git commit -m 'feat: add amazing feature'`
-7. **Push to branch**: `git push origin feature/amazing-feature`
-8. **Open Pull Request**
-
-### Pull Request Guidelines
-
-- **Clear description** of changes
-- **Reference issues** if applicable
-- **Include tests** for new features
-- **Update documentation** if needed
-- **Ensure CI passes**
-
-## 📞 Support
-
-- **Slack**: #fabric-management-dev
-- **Email**: dev-team@fabricmanagement.com
-- **Office Hours**: Tuesday & Thursday 2-4 PM
-- **Documentation**: [docs.fabricmanagement.com](https://docs.fabricmanagement.com)
+# 📖 Development Documentation
+
+**Last Updated:** October 10, 2025  
+**Purpose:** Complete development guide and standards for Fabric Management System  
+**Status:** ✅ Active
 
 ---
 
-**Last Updated:** 2025-10-09 20:00 UTC+1  
-**Version:** 2.0.0  
-**Status:** ✅ Active - Production Ready
+## 📚 Documentation Index
+
+### 🎯 Getting Started
+
+| Document | Description | Priority | Time |
+|----------|-------------|----------|------|
+| [GETTING_STARTED.md](./GETTING_STARTED.md) | ⭐ **Complete onboarding** - Quick start, local dev, hot reload | 🔴 High | 25 min |
+
+### 📐 Core Standards & Principles
+
+| Document | Description | Priority | Time |
+|----------|-------------|----------|------|
+| [PRINCIPLES.md](./PRINCIPLES.md) | ⭐ **Core principles: SOLID, DRY, KISS, YAGNI, Loose Coupling, NO USERNAME** | 🔴 **CRITICAL** | 45 min |
+| [CODE_STRUCTURE_GUIDE.md](./CODE_STRUCTURE_GUIDE.md) | Where to write code - file organization | 🟡 Medium | 20 min |
+| [CODE_MIGRATION_GUIDE.md](./CODE_MIGRATION_GUIDE.md) | Before/after patterns, refactoring examples | 🟢 Low | 20 min |
+
+### 🌐 API & Data Standards
+
+| Document | Description | Priority | Time |
+|----------|-------------|----------|------|
+| [MICROSERVICES_API_STANDARDS.md](./MICROSERVICES_API_STANDARDS.md) | ⭐ **API Gateway routing, controller patterns** | 🔴 **MANDATORY** | 35 min |
+| [DATA_TYPES_STANDARDS.md](./DATA_TYPES_STANDARDS.md) | ⭐ **UUID usage standards - 100% compliance required** | 🔴 **MANDATORY** | 30 min |
+
+### 🔐 Security & Authorization
+
+| Document | Description | Priority | Time |
+|----------|-------------|----------|------|
+| [POLICY_AUTHORIZATION.md](./POLICY_AUTHORIZATION.md) | ⭐ **Policy authorization index** | 🟡 Medium | 5 min |
+| ├─ [POLICY_AUTHORIZATION_PRINCIPLES.md](./POLICY_AUTHORIZATION_PRINCIPLES.md) | Detailed principles & architecture | 🟡 Medium | 40 min |
+| └─ [POLICY_AUTHORIZATION_QUICK_START.md](./POLICY_AUTHORIZATION_QUICK_START.md) | Quick implementation guide | 🟢 Low | 20 min |
+
+---
+
+## 🎓 Learning Paths
+
+### 🆕 New Developers (First Week)
+
+```
+Day 1:
+├─ QUICK_START.md (15 min)
+├─ LOCAL_DEVELOPMENT_GUIDE.md (30 min)
+└─ Setup local environment
+
+Day 2-3:
+├─ PRINCIPLES.md (45 min) ⚠️ MANDATORY
+├─ CODE_STRUCTURE_GUIDE.md (20 min)
+└─ Write first endpoint
+
+Day 4-5:
+├─ MICROSERVICES_API_STANDARDS.md (35 min) ⚠️ MANDATORY
+├─ DATA_TYPES_STANDARDS.md (30 min) ⚠️ MANDATORY
+├─ POLICY_AUTHORIZATION.md (5 min) - Overview
+└─ Code review & feedback
+```
+
+### 👨‍💻 Experienced Developers (First Day)
+
+```
+Priority Reading (2 hours):
+├─ PRINCIPLES.md (45 min) - Understand NO USERNAME, SOLID, Loose Coupling
+├─ DATA_TYPES_STANDARDS.md (30 min) - UUID compliance is mandatory
+├─ MICROSERVICES_API_STANDARDS.md (35 min) - API Gateway patterns
+└─ Start coding with team standards
+```
+
+### 🏗️ Architects & Tech Leads
+
+```
+Complete Review (4 hours):
+├─ Read all documents in order
+├─ Understand architectural decisions
+├─ Review PRINCIPLES.md Loose Coupling section
+└─ Guide team on standards
+```
+
+---
+
+## ⚠️ Critical Standards (MUST READ)
+
+### 🚨 Mandatory Compliance
+
+Before writing any code, you MUST read and understand:
+
+1. **[PRINCIPLES.md](./PRINCIPLES.md)** - Core principles including:
+   - ⛔ **NO USERNAME PRINCIPLE** - System uses `contactValue` (email/phone) for auth
+   - 🏗️ **SOLID Principles** - Code quality standards
+   - 🔗 **Loose Coupling** - Microservice architecture patterns
+   - 🚫 **Anti-Patterns** - What NOT to do
+
+2. **[DATA_TYPES_STANDARDS.md](./DATA_TYPES_STANDARDS.md)** - UUID Standards:
+   - ⚠️ All IDs MUST be UUID type throughout the stack
+   - ❌ No String IDs in business logic
+   - ✅ Only convert to String at system boundaries
+   - 📊 100% compliance required - Non-compliance rejected in code review
+
+3. **[MICROSERVICES_API_STANDARDS.md](./MICROSERVICES_API_STANDARDS.md)** - API Patterns:
+   - 🎯 Service-Aware Pattern (full paths: `/api/v1/users`)
+   - 🚪 API Gateway routing rules
+   - 🔒 Authentication & authorization patterns
+   - 📝 Request/response standards
+
+---
+
+## 📋 Quick Reference
+
+### 🤔 "How Do I...?"
+
+| Question | Document | Section |
+|----------|----------|---------|
+| Set up local environment? | LOCAL_DEVELOPMENT_GUIDE.md | Setup |
+| Where do I write code? | CODE_STRUCTURE_GUIDE.md | File Organization |
+| How do I use UUIDs? | DATA_TYPES_STANDARDS.md | UUID Implementation |
+| What are the coding principles? | PRINCIPLES.md | SOLID, DRY, KISS |
+| How do I structure APIs? | MICROSERVICES_API_STANDARDS.md | Controller Patterns |
+| How do I implement loose coupling? | PRINCIPLES.md | Loose Coupling Principles |
+| Why no username field? | PRINCIPLES.md | NO USERNAME PRINCIPLE |
+| How do I test my code? | DEVELOPER_GUIDE.md | Testing Strategy |
+| What are the git workflows? | DEVELOPER_GUIDE.md | Development Workflow |
+
+### 🔍 Common Tasks
+
+| Task | Steps | Time |
+|------|-------|------|
+| **Create new endpoint** | 1. Read MICROSERVICES_API_STANDARDS.md<br/>2. Follow Controller Pattern<br/>3. Use UUID for IDs<br/>4. Write tests | 30 min |
+| **Add new entity** | 1. Read CODE_STRUCTURE_GUIDE.md<br/>2. Create in `/domain/entity/`<br/>3. Use UUID for ID<br/>4. Implement Builder pattern | 20 min |
+| **Implement new service** | 1. Read PRINCIPLES.md<br/>2. Follow SOLID principles<br/>3. Use Loose Coupling patterns<br/>4. Add comprehensive tests | 60 min |
+
+---
+
+## ✅ Code Review Checklist
+
+Before submitting PR, verify:
+
+### 🏗️ Architecture & Design
+- [ ] Follows SOLID principles
+- [ ] Implements Loose Coupling patterns
+- [ ] No tight coupling between services
+- [ ] Clean separation of concerns
+
+### 🆔 Data Types
+- [ ] All IDs are UUID type (not String)
+- [ ] UUID used throughout internal stack
+- [ ] String conversion only at boundaries
+- [ ] No manual UUID manipulation
+
+### 🚫 NO USERNAME Compliance
+- [ ] No `username` field in entities
+- [ ] Uses `contactValue` for authentication
+- [ ] JWT contains `userId` (UUID), not username
+- [ ] No username in method parameters
+
+### 🌐 API Standards
+- [ ] Uses full paths (`/api/v1/users`)
+- [ ] Follows Service-Aware Pattern
+- [ ] Proper request/response DTOs
+- [ ] Pagination implemented for lists
+
+### 🧪 Testing
+- [ ] Unit tests written (80%+ coverage)
+- [ ] Domain logic tests (100% coverage)
+- [ ] Integration tests for critical paths
+- [ ] All tests passing
+
+### 📝 Documentation
+- [ ] Code is self-documenting
+- [ ] Complex logic has comments explaining "why"
+- [ ] API endpoints documented
+- [ ] README updated if needed
+
+---
+
+## 🔗 Related Documentation
+
+### Internal Links
+- [Architecture Documentation](../architecture/) - System architecture
+- [API Documentation](../api/) - REST API specs
+- [Deployment Guide](../deployment/) - Deployment instructions
+- [Security Documentation](../SECURITY.md) - Security practices
+
+### Core Documents
+- [AI Assistant Learnings](../AI_ASSISTANT_LEARNINGS.md) - AI behavior guidelines
+- [Main README](../README.md) - Project overview
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Detailed architecture
+
+---
+
+## 📞 Support & Help
+
+### Getting Help
+- **Slack**: #fabric-dev (general), #fabric-backend (backend-specific)
+- **Documentation Issues**: Open GitHub issue with `docs` label
+- **Code Questions**: Ask in daily standup or #fabric-dev
+
+### Office Hours
+- **Technical Lead**: Tuesday & Thursday, 2-4 PM
+- **Architecture Review**: Wednesday, 10 AM - 12 PM
+
+### Contributing to Docs
+1. Read document you want to update
+2. Make changes following existing format
+3. Update "Last Updated" timestamp
+4. Create PR with clear description
+5. Tag documentation maintainer for review
+
+---
+
+**Prepared By:** Backend Team  
+**Last Updated:** 2025-10-10 (Major cleanup & reorganization)  
+**Version:** 2.0  
+**Status:** ✅ Active - All standards enforced
+

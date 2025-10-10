@@ -35,16 +35,35 @@ CREATE TABLE IF NOT EXISTS company_relationships (
 
 COMMENT ON TABLE company_relationships IS 'Company trust relationships (V4)';
 
-ALTER TABLE company_relationships
-    ADD CONSTRAINT fk_relationships_source FOREIGN KEY (source_company_id) REFERENCES companies(id) ON DELETE CASCADE,
-    ADD CONSTRAINT fk_relationships_target FOREIGN KEY (target_company_id) REFERENCES companies(id) ON DELETE CASCADE;
+-- Foreign keys (IF NOT EXISTS)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_relationships_source') THEN
+        ALTER TABLE company_relationships
+            ADD CONSTRAINT fk_relationships_source 
+                FOREIGN KEY (source_company_id) REFERENCES companies(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_relationships_target') THEN
+        ALTER TABLE company_relationships
+            ADD CONSTRAINT fk_relationships_target 
+                FOREIGN KEY (target_company_id) REFERENCES companies(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
-CREATE INDEX idx_relationships_source ON company_relationships(source_company_id);
-CREATE INDEX idx_relationships_target ON company_relationships(target_company_id);
-CREATE INDEX idx_relationships_active ON company_relationships(source_company_id, target_company_id, status) WHERE status = 'ACTIVE';
+-- Indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_relationships_source ON company_relationships(source_company_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_target ON company_relationships(target_company_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_active ON company_relationships(source_company_id, target_company_id, status) WHERE status = 'ACTIVE';
 
-CREATE TRIGGER update_company_relationships_updated_at
-    BEFORE UPDATE ON company_relationships
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Trigger (IF NOT EXISTS)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_company_relationships_updated_at') THEN
+        CREATE TRIGGER update_company_relationships_updated_at
+            BEFORE UPDATE ON company_relationships
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 

@@ -137,6 +137,13 @@ public class UserService {
                 .updatedBy(createdBy)
                 .deleted(false)
                 .version(0L)
+                // Policy-based authorization fields
+                .companyId(request.getCompanyId() != null ? UUID.fromString(request.getCompanyId()) : null)
+                .departmentId(request.getDepartmentId() != null ? UUID.fromString(request.getDepartmentId()) : null)
+                .stationId(request.getStationId() != null ? UUID.fromString(request.getStationId()) : null)
+                .jobTitle(request.getJobTitle())
+                .userContext(request.getUserContext() != null ? 
+                    com.fabricmanagement.shared.domain.policy.UserContext.valueOf(request.getUserContext()) : null)
                 .build();
         
         user = userRepository.save(user);

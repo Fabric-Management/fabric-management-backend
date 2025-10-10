@@ -1,20 +1,29 @@
 # 🔌 API Documentation
 
+**Version:** 1.0.0  
+**Last Updated:** October 10, 2025  
+**API Version:** v1  
+**Status:** ✅ Active
+
+---
+
 ## 📋 Overview
 
 The Fabric Management System provides comprehensive REST APIs following OpenAPI 3.0 specifications. All APIs are designed with modern best practices including versioning, pagination, filtering, and comprehensive error handling.
 
-## 🎯 API Standards
+---
 
-### Base URL
+## 🎯 Base URLs
 
-```
-Production: https://api.fabricmanagement.com/v1
-Staging: https://staging-api.fabricmanagement.com/v1
-Local: http://localhost:8080/api/v1
-```
+| Environment    | Base URL                                          | Status         |
+| -------------- | ------------------------------------------------- | -------------- |
+| **Production** | `https://api.fabricmanagement.com/api/v1`         | 🟢 Live        |
+| **Staging**    | `https://staging-api.fabricmanagement.com/api/v1` | 🟡 Testing     |
+| **Local**      | `http://localhost:8080/api/v1`                    | 🔵 Development |
 
-### Authentication
+---
+
+## 🔐 Authentication
 
 All APIs require JWT-based authentication:
 
@@ -23,21 +32,41 @@ Authorization: Bearer <jwt_token>
 X-Tenant-ID: <tenant_uuid>
 ```
 
-### Response Format
+### Authentication Flow
 
-All APIs return responses in the following format:
+```
+1. POST /api/v1/users/auth/login
+   → Request: { contactValue, password }
+   → Response: { accessToken, refreshToken, userId, tenantId }
+
+2. Use accessToken in subsequent requests
+   → Header: Authorization: Bearer <accessToken>
+
+3. Refresh token when expired
+   → POST /api/v1/users/auth/refresh
+   → Request: { refreshToken }
+```
+
+**Note**: Authentication uses `contactValue` (email or phone), NOT username.  
+See: [NO USERNAME PRINCIPLE](../development/PRINCIPLES.md#-no-username-principle)
+
+---
+
+## 📦 Response Format
+
+### Success Response
 
 ```json
 {
   "success": true,
   "message": "Operation completed successfully",
   "data": { ... },
-  "timestamp": "2024-01-15T10:30:00Z",
+  "timestamp": "2025-10-10T10:30:00Z",
   "requestId": "req_123456789"
 }
 ```
 
-### Error Format
+### Error Response
 
 ```json
 {
@@ -45,32 +74,38 @@ All APIs return responses in the following format:
   "message": "Error description",
   "errorCode": "ERROR_CODE",
   "errors": ["Detailed error messages"],
-  "timestamp": "2024-01-15T10:30:00Z",
+  "timestamp": "2025-10-10T10:30:00Z",
   "requestId": "req_123456789"
 }
 ```
 
+---
+
 ## 🏗️ Service APIs
 
-### Core Services
+### 👤 User Service API
 
-#### User Service API
+**Base Path:** `/api/v1/users`  
+**Port:** 8081  
+**Status:** ✅ Production
 
-**Base URL**: `/api/v1/users`
+#### Endpoints
 
-| Endpoint        | Method | Description            |
-| --------------- | ------ | ---------------------- |
-| `/auth/login`   | POST   | User authentication    |
-| `/auth/logout`  | POST   | User logout            |
-| `/auth/refresh` | POST   | Refresh JWT token      |
-| `/auth/me`      | GET    | Get current user info  |
-| `/users`        | GET    | List users (paginated) |
-| `/users/{id}`   | GET    | Get user by ID         |
-| `/users`        | POST   | Create new user        |
-| `/users/{id}`   | PUT    | Update user            |
-| `/users/{id}`   | DELETE | Delete user            |
+| Endpoint          | Method | Description            | Auth Required |
+| ----------------- | ------ | ---------------------- | ------------- |
+| `/auth/login`     | POST   | User authentication    | ❌ No         |
+| `/auth/logout`    | POST   | User logout            | ✅ Yes        |
+| `/auth/refresh`   | POST   | Refresh JWT token      | ✅ Yes        |
+| `/auth/me`        | GET    | Get current user info  | ✅ Yes        |
+| `/users`          | GET    | List users (paginated) | ✅ Yes        |
+| `/users/{userId}` | GET    | Get user by ID         | ✅ Yes        |
+| `/users`          | POST   | Create new user        | ✅ Yes        |
+| `/users/{userId}` | PUT    | Update user            | ✅ Yes        |
+| `/users/{userId}` | DELETE | Delete user            | ✅ Yes        |
 
-**Example Request**:
+#### Example: Login
+
+**Request:**
 
 ```http
 POST /api/v1/users/auth/login
@@ -82,9 +117,7 @@ Content-Type: application/json
 }
 ```
 
-**Note**: Authentication uses contact info (email or phone). No username field exists.
-
-**Example Response**:
+**Response:**
 
 ```json
 {
@@ -100,9 +133,15 @@ Content-Type: application/json
 }
 ```
 
-#### Contact Service API
+---
 
-**Base URL**: `/api/v1/contacts`
+### 📞 Contact Service API
+
+**Base Path:** `/api/v1/contacts`  
+**Port:** 8082  
+**Status:** ✅ Production
+
+#### Endpoints
 
 | Endpoint                        | Method | Description               |
 | ------------------------------- | ------ | ------------------------- |
@@ -114,30 +153,15 @@ Content-Type: application/json
 | `/contacts/user/{userId}`       | GET    | Get user contacts         |
 | `/contacts/company/{companyId}` | GET    | Get company contacts      |
 
-**Example Request**:
+---
 
-```http
-POST /api/v1/contacts
-Content-Type: application/json
+### 🏢 Company Service API
 
-{
-  "contactType": "USER",
-  "userId": "123e4567-e89b-12d3-a456-426614174000",
-  "personalEmail": "john.doe@company.com",
-  "personalPhone": "+1234567890",
-  "homeAddress": {
-    "street": "123 Main St",
-    "city": "New York",
-    "state": "NY",
-    "postalCode": "10001",
-    "country": "USA"
-  }
-}
-```
+**Base Path:** `/api/v1/companies`  
+**Port:** 8083  
+**Status:** ✅ Production
 
-#### Company Service API
-
-**Base URL**: `/api/v1/companies`
+#### Endpoints
 
 | Endpoint                   | Method | Description                |
 | -------------------------- | ------ | -------------------------- |
@@ -149,133 +173,9 @@ Content-Type: application/json
 | `/companies/{id}/users`    | GET    | Get company users          |
 | `/companies/{id}/settings` | GET    | Get company settings       |
 
-#### Notification Service API
+---
 
-**Base URL**: `/api/v1/notifications`
-
-| Endpoint                        | Method | Description                    |
-| ------------------------------- | ------ | ------------------------------ |
-| `/notifications`                | GET    | List notifications (paginated) |
-| `/notifications/{id}`           | GET    | Get notification by ID         |
-| `/notifications`                | POST   | Send notification              |
-| `/notifications/{id}/mark-read` | PUT    | Mark as read                   |
-| `/notifications/templates`      | GET    | List notification templates    |
-| `/notifications/templates`      | POST   | Create template                |
-
-### Business Services
-
-#### HR Service API
-
-**Base URL**: `/api/v1/hr`
-
-| Endpoint          | Method | Description              |
-| ----------------- | ------ | ------------------------ |
-| `/employees`      | GET    | List employees           |
-| `/employees/{id}` | GET    | Get employee by ID       |
-| `/employees`      | POST   | Create employee          |
-| `/payroll`        | GET    | List payroll records     |
-| `/payroll`        | POST   | Process payroll          |
-| `/leaves`         | GET    | List leave requests      |
-| `/leaves`         | POST   | Create leave request     |
-| `/performance`    | GET    | List performance reviews |
-
-#### Inventory Service API
-
-**Base URL**: `/api/v1/inventory`
-
-| Endpoint         | Method | Description        |
-| ---------------- | ------ | ------------------ |
-| `/products`      | GET    | List products      |
-| `/products/{id}` | GET    | Get product by ID  |
-| `/products`      | POST   | Create product     |
-| `/stock`         | GET    | List stock levels  |
-| `/stock`         | POST   | Update stock       |
-| `/catalog`       | GET    | List catalog items |
-| `/pricing`       | GET    | List pricing rules |
-
-#### Order Service API
-
-**Base URL**: `/api/v1/orders`
-
-| Endpoint              | Method | Description             |
-| --------------------- | ------ | ----------------------- |
-| `/orders`             | GET    | List orders (paginated) |
-| `/orders/{id}`        | GET    | Get order by ID         |
-| `/orders`             | POST   | Create order            |
-| `/orders/{id}`        | PUT    | Update order            |
-| `/orders/{id}/status` | PUT    | Update order status     |
-| `/orders/{id}/items`  | GET    | Get order items         |
-| `/orders/{id}/items`  | POST   | Add order item          |
-
-**Example Request**:
-
-```http
-POST /api/v1/orders
-Content-Type: application/json
-
-{
-  "customerId": "123e4567-e89b-12d3-a456-426614174000",
-  "items": [
-    {
-      "productId": "456e7890-e89b-12d3-a456-426614174000",
-      "quantity": 10,
-      "unitPrice": 25.50
-    }
-  ],
-  "shippingAddress": {
-    "street": "456 Oak Ave",
-    "city": "Los Angeles",
-    "state": "CA",
-    "postalCode": "90210",
-    "country": "USA"
-  },
-  "notes": "Rush delivery requested"
-}
-```
-
-#### Logistics Service API
-
-**Base URL**: `/api/v1/logistics`
-
-| Endpoint                | Method | Description          |
-| ----------------------- | ------ | -------------------- |
-| `/shipments`            | GET    | List shipments       |
-| `/shipments/{id}`       | GET    | Get shipment by ID   |
-| `/shipments`            | POST   | Create shipment      |
-| `/shipments/{id}/track` | GET    | Track shipment       |
-| `/deliveries`           | GET    | List deliveries      |
-| `/routes`               | GET    | List delivery routes |
-
-### Financial Services
-
-#### Financial Service API
-
-**Base URL**: `/api/v1/financial`
-
-| Endpoint         | Method | Description        |
-| ---------------- | ------ | ------------------ |
-| `/accounts`      | GET    | List accounts      |
-| `/accounts/{id}` | GET    | Get account by ID  |
-| `/transactions`  | GET    | List transactions  |
-| `/transactions`  | POST   | Create transaction |
-| `/invoices`      | GET    | List invoices      |
-| `/invoices/{id}` | GET    | Get invoice by ID  |
-| `/invoices`      | POST   | Create invoice     |
-
-#### Payment Service API
-
-**Base URL**: `/api/v1/payments`
-
-| Endpoint                | Method | Description          |
-| ----------------------- | ------ | -------------------- |
-| `/payments`             | GET    | List payments        |
-| `/payments/{id}`        | GET    | Get payment by ID    |
-| `/payments`             | POST   | Process payment      |
-| `/payments/{id}/refund` | POST   | Process refund       |
-| `/methods`              | GET    | List payment methods |
-| `/methods`              | POST   | Add payment method   |
-
-## 📊 Common Patterns
+## 📊 Common API Patterns
 
 ### Pagination
 
@@ -285,7 +185,7 @@ All list endpoints support pagination:
 GET /api/v1/users?page=0&size=20&sort=firstName,asc
 ```
 
-**Response**:
+**Response:**
 
 ```json
 {
@@ -306,7 +206,7 @@ GET /api/v1/users?page=0&size=20&sort=firstName,asc
 
 ### Filtering
 
-Support for dynamic filtering:
+Dynamic filtering support:
 
 ```http
 GET /api/v1/users?filter=firstName:John,status:ACTIVE
@@ -322,30 +222,24 @@ GET /api/v1/users?sort=lastName,asc&sort=firstName,desc
 
 ### Search
 
-Full-text search support:
+Full-text search:
 
 ```http
 GET /api/v1/users?search=John&fields=firstName,lastName,email
 ```
 
+---
+
 ## 🔒 Security
 
-### Authentication Flow
+### Rate Limiting
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Gateway
-    participant UserService
-    participant Database
-
-    Client->>Gateway: POST /auth/login
-    Gateway->>UserService: Validate credentials
-    UserService->>Database: Check user
-    Database-->>UserService: User data
-    UserService-->>Gateway: JWT token
-    Gateway-->>Client: Authentication response
-```
+| Endpoint Type      | Rate Limit          | Status    |
+| ------------------ | ------------------- | --------- |
+| **Authentication** | 5 requests/minute   | ✅ Active |
+| **General APIs**   | 100 requests/minute | ✅ Active |
+| **File Upload**    | 10 requests/minute  | ✅ Active |
+| **Reports**        | 20 requests/minute  | ✅ Active |
 
 ### Authorization Levels
 
@@ -356,25 +250,18 @@ sequenceDiagram
 | **USER**    | Basic operations      |
 | **VIEWER**  | Read-only access      |
 
-### Rate Limiting
-
-| Endpoint Type  | Rate Limit          |
-| -------------- | ------------------- |
-| Authentication | 5 requests/minute   |
-| General APIs   | 100 requests/minute |
-| File Upload    | 10 requests/minute  |
-| Reports        | 20 requests/minute  |
+---
 
 ## 📈 Performance
 
-### Response Times
+### Response Time Targets
 
-| Operation       | Target  | SLA   |
-| --------------- | ------- | ----- |
-| Authentication  | < 200ms | 99.9% |
-| CRUD Operations | < 500ms | 99.5% |
-| Search Queries  | < 1s    | 99%   |
-| Reports         | < 5s    | 95%   |
+| Operation           | Target  | SLA   |
+| ------------------- | ------- | ----- |
+| **Authentication**  | < 200ms | 99.9% |
+| **CRUD Operations** | < 500ms | 99.5% |
+| **Search Queries**  | < 1s    | 99%   |
+| **Reports**         | < 5s    | 95%   |
 
 ### Caching Strategy
 
@@ -383,13 +270,15 @@ sequenceDiagram
 - **Product Catalog**: 1 hour
 - **Static Data**: 24 hours
 
+---
+
 ## 🧪 Testing
 
 ### API Testing Tools
 
-- **Postman Collection**: [Download](postman-collection.json)
-- **OpenAPI Spec**: [View](openapi.yaml)
-- **Swagger UI**: http://localhost:8080/swagger-ui.html
+- **Postman Collection**: Available in `/postman` directory
+- **Swagger UI**: `http://localhost:8080/swagger-ui.html`
+- **OpenAPI Spec**: `http://localhost:8080/v3/api-docs`
 
 ### Test Environment
 
@@ -404,59 +293,66 @@ mvn test -Dtest=*ApiTest
 mvn surefire-report:report
 ```
 
-## 📚 SDKs and Libraries
+---
 
-### Java SDK
+## 📚 API Standards
 
-```xml
-<dependency>
-    <groupId>com.fabricmanagement</groupId>
-    <artifactId>fabric-management-sdk</artifactId>
-    <version>1.0.0</version>
-</dependency>
-```
+For complete API development standards, see:
 
-### JavaScript SDK
+### Required Reading
 
-```bash
-npm install @fabricmanagement/sdk
-```
+| Document                                                                        | Description                                     | Priority     |
+| ------------------------------------------------------------------------------- | ----------------------------------------------- | ------------ |
+| [MICROSERVICES_API_STANDARDS.md](../development/MICROSERVICES_API_STANDARDS.md) | ⭐ **API Gateway routing, controller patterns** | 🔴 MANDATORY |
+| [DATA_TYPES_STANDARDS.md](../development/DATA_TYPES_STANDARDS.md)               | ⭐ **UUID usage standards**                     | 🔴 MANDATORY |
+| [PRINCIPLES.md](../development/PRINCIPLES.md)                                   | Core development principles                     | 🔴 HIGH      |
 
-### Python SDK
+### Key Standards
 
-```bash
-pip install fabric-management-sdk
-```
-
-## 🔧 Development Tools
-
-### API Client Generation
-
-```bash
-# Generate Java client
-openapi-generator generate -i openapi.yaml -g java -o clients/java
-
-# Generate TypeScript client
-openapi-generator generate -i openapi.yaml -g typescript-axios -o clients/typescript
-```
-
-### Mock Server
-
-```bash
-# Start Prism mock server
-prism mock openapi.yaml --port 3000
-```
-
-## 📞 Support
-
-- **API Documentation**: [docs.fabricmanagement.com/api](https://docs.fabricmanagement.com/api)
-- **Developer Portal**: [developers.fabricmanagement.com](https://developers.fabricmanagement.com)
-- **Support Email**: api-support@fabricmanagement.com
-- **Status Page**: [status.fabricmanagement.com](https://status.fabricmanagement.com)
+- ✅ Use full paths: `/api/v1/{resource}` (Service-Aware Pattern)
+- ✅ Use UUID for all IDs (not String)
+- ✅ Use `ApiResponse<T>` wrapper
+- ✅ Use `PagedResponse<T>` for lists
+- ✅ Proper HTTP status codes (200, 201, 404, 400, etc.)
+- ✅ No username - use `contactValue` (email/phone)
 
 ---
 
-**Last Updated:** 2025-10-09 20:15 UTC+1  
+## 🔗 Related Documentation
+
+### Internal Links
+
+- [Development Guide](../development/README.md) - Development standards
+- [Architecture](../architecture/README.md) - System architecture
+- [Security](../SECURITY.md) - Security practices
+- [Deployment](../deployment/README.md) - Deployment guide
+
+### External Resources
+
+- [OpenAPI Specification](https://swagger.io/specification/)
+- [REST API Best Practices](https://restfulapi.net/)
+- [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+
+---
+
+## 📞 Support
+
+### Getting Help
+
+- **API Questions**: #fabric-api on Slack
+- **Bug Reports**: GitHub Issues with `api` label
+- **Feature Requests**: Discuss in #fabric-dev
+- **Documentation**: Update this file via PR
+
+### API Status
+
+- **Status Page**: `https://status.fabricmanagement.com`
+- **Health Check**: `http://localhost:8080/actuator/health`
+- **Metrics**: `http://localhost:8080/actuator/metrics`
+
+---
+
+**Maintained By:** Backend Team  
+**Last Updated:** 2025-10-10  
 **Version:** 1.0.0  
-**Status:** ✅ Active  
-**API Version:** v1
+**Status:** ✅ Active - All APIs operational

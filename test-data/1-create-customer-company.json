@@ -1,0 +1,15 @@
+{
+  "name": "ABC Tekstil San. ve Tic. A.Ş.",
+  "legalName": "ABC Tekstil Sanayi ve Ticaret Anonim Şirketi",
+  "taxId": "1234567890",
+  "registrationNumber": "İST-2024-123456",
+  "type": "CORPORATION",
+  "industry": "MANUFACTURING",
+  "description": "30 yıldır tekstil sektöründe faaliyet gösteren müşteri firmamız",
+  "website": "https://www.abctekstil.com.tr",
+  "logoUrl": "https://www.abctekstil.com.tr/logo.png",
+  "businessType": "CUSTOMER",
+  "parentCompanyId": null,
+  "relationshipType": "CUSTOMER"
+}
+

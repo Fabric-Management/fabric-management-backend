@@ -12,13 +12,20 @@ import java.util.UUID;
  * Contact Service Client
  *
  * Feign client for communicating with Contact Service.
- * URL will be resolved via Service Discovery (future) or configuration.
+ * 
+ * ✅ LOOSE COUPLING:
+ * - Includes fallback for graceful degradation
+ * - Circuit breaker configured in application.yml
+ * - User operations continue even if Contact Service is down
+ * 
+ * URL: Configured via application.yml or service discovery
  */
 @FeignClient(
     name = "contact-service",
     url = "${contact-service.url:http://localhost:8082}",
     path = "/api/v1/contacts",
-    configuration = com.fabricmanagement.user.infrastructure.config.FeignClientConfig.class
+    configuration = com.fabricmanagement.user.infrastructure.config.FeignClientConfig.class,
+    fallback = ContactServiceClientFallback.class  // ← RESILIENCE!
 )
 public interface ContactServiceClient {
 

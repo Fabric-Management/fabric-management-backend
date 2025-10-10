@@ -20,8 +20,9 @@ import java.util.regex.Pattern;
 @NoArgsConstructor
 public class CompanyName {
     
-    private static final Pattern COMPANY_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9\\s\\-&.,()]{2,100}$");
-    private static final String ERROR_MESSAGE = "Company name must be 2-100 characters long and contain only letters, numbers, spaces, hyphens, ampersands, periods, commas, and parentheses";
+    // Unicode pattern to support international characters (Turkish, Arabic, Chinese, etc.)
+    private static final Pattern COMPANY_NAME_PATTERN = Pattern.compile("^[\\p{L}\\p{N}\\s\\-&.,()'/]{2,100}$");
+    private static final String ERROR_MESSAGE = "Company name must be 2-100 characters long and contain only letters, numbers, spaces, and common punctuation";
     
     private String value;
 

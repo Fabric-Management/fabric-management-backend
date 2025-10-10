@@ -33,9 +33,10 @@ CREATE TABLE IF NOT EXISTS policy_decisions_audit (
 
 COMMENT ON TABLE policy_decisions_audit IS 'Immutable policy decision audit log (V6)';
 
-CREATE INDEX idx_audit_user_decision ON policy_decisions_audit(user_id, decision);
-CREATE INDEX idx_audit_endpoint ON policy_decisions_audit(endpoint);
-CREATE INDEX idx_audit_created_at ON policy_decisions_audit(created_at DESC);
-CREATE INDEX idx_audit_correlation ON policy_decisions_audit(correlation_id) WHERE correlation_id IS NOT NULL;
-CREATE INDEX idx_audit_deny_events ON policy_decisions_audit(user_id, endpoint, created_at DESC) WHERE decision = 'DENY';
+-- Indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_audit_user_decision ON policy_decisions_audit(user_id, decision);
+CREATE INDEX IF NOT EXISTS idx_audit_endpoint ON policy_decisions_audit(endpoint);
+CREATE INDEX IF NOT EXISTS idx_audit_created_at ON policy_decisions_audit(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_correlation ON policy_decisions_audit(correlation_id) WHERE correlation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_audit_deny_events ON policy_decisions_audit(user_id, endpoint, created_at DESC) WHERE decision = 'DENY';
 

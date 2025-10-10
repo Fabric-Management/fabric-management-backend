@@ -1,8 +1,61 @@
-# 🔄 Migration Guide - Updated Architecture
+# 🔄 Code Migration & Refactoring Guide
+
+**Last Updated:** October 10, 2025  
+**Purpose:** Migration patterns, refactoring strategies, before/after examples  
+**Status:** ✅ Active
+
+---
 
 ## 📋 Overview
 
-Bu doküman, eski mimari ile yeni mimari arasındaki farkları ve migration stratejisini açıklar.
+Bu doküman eski kod patterns'den yeni architecture'a migration için before/after örnekleri ve refactoring stratejilerini içerir.
+
+---
+
+## 🚀 Refactoring Strategy
+
+### 2-Week Quick Plan
+
+**Week 1: Mappers & Security Context**
+
+- Create Mapper classes (UserMapper, CompanyMapper)
+- Implement SecurityContext injection
+- Update controllers to use @AuthenticationPrincipal
+
+**Week 2: Repository & Exceptions**
+
+- Add custom repository methods
+- Standardize exceptions
+- Implement message keys
+
+### 4-Week Detailed Plan
+
+**Sprint 1 (Week 1-2): Foundation**
+
+- [ ] Mapper classes
+- [ ] SecurityContext injection
+- [ ] BaseController pattern (optional)
+- **Impact:** DRY +40% improvement
+
+**Sprint 2 (Week 3-4): Service Layer**
+
+- [ ] Split services (UserService + UserSearchService)
+- [ ] Custom repository methods
+- [ ] Exception standardization
+- **Impact:** SRP compliance, services ~150 lines
+
+**Sprint 3 (Week 5-6): Performance**
+
+- [ ] Batch API endpoints
+- [ ] N+1 query fixes
+- [ ] Redis cache layer
+- **Impact:** Response time -50%
+
+**Sprint 4 (Week 7-8): Simplification**
+
+- [ ] Remove unnecessary CQRS handlers
+- [ ] Simple CRUD pattern for basic operations
+- **Impact:** Code complexity -70%
 
 ---
 

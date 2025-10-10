@@ -25,6 +25,9 @@ public class CreateCompanyCommand {
     private String description;
     private String website;
     private String logoUrl;
+    private String businessType;
+    private UUID parentCompanyId;
+    private String relationshipType;
     private String createdBy;
 }
 
