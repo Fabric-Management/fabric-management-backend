@@ -1,778 +1,173 @@
-# 🏗️ Fabric Management - Mikroservis Mimarisi
+# 🏗️ Fabric Management - System Architecture
 
-**Versiyon:** 3.0  
-**Tarih:** 10 Ekim 2025 ⚡ **MAJOR REFACTORING**  
-**Prensip:** Clean Architecture + SOLID + DRY + KISS + YAGNI  
-**Hedef:** Enterprise-grade, bakanlıkların imrendiği profesyonel mimari
-
----
-
-## 🚨 IMPORTANT: Architecture Updated (Oct 10, 2025)
-
-**Majör mimari refactoring tamamlandı. Detaylı bilgi için:**  
-👉 **[ARCHITECTURE_REFACTORING_OCT_10_2025.md](./reports/2025-Q4/october/ARCHITECTURE_REFACTORING_OCT_10_2025.md)**
-
-### Key Changes:
-
-1. ✅ **Loose Coupling**: Facade controller'lar kaldırıldı (CompanyContactController, CompanyUserController)
-2. ✅ **Database Cleanup**: 6 gereksiz tablo kaldırıldı (43% azalma)
-3. ✅ **Event Sourcing Removed**: CompanyEventStore kaldırıldı, sadece Outbox Pattern
-4. ✅ **Centralized Constants**: Tüm hardcoded değerler SecurityConstants/ServiceConstants'a taşındı
-5. ✅ **Feign + Resilience4j**: Circuit breaker + fallback mechanism ekl endi
+**Version:** 2.1  
+**Last Updated:** 2025-10-10 (User-Service Refactoring Complete)  
+**Status:** ✅ Production Ready
 
 ---
 
-## 📋 İçindekiler
+## 📋 Quick Navigation
 
-1. [Mimari Değerlendirmesi](#-mimari-değerlendirmesi)
-2. [Generic Microservice Template](#-generic-microservice-template)
-3. [Shared Modules Yapısı](#-shared-modules-yapısı)
-4. [Katman Sorumlulukları](#-katman-sorumlulukları)
-5. [Shared vs Service-Specific](#-shared-vs-service-specific)
-6. [Error Message Management](#-error-message-management)
-7. [Refactoring Guide](#-refactoring-guide)
-8. [Implementation Checklist](#-implementation-checklist)
-
----
-
-## 📊 Mimari Değerlendirmesi
-
-### Genel Skor: 6.7/10 → 8.9/10 (Hedef)
-
-| Kategori                  | Mevcut | Hedef  | İyileştirme |
-| ------------------------- | ------ | ------ | ----------- |
-| **Single Responsibility** | 6.5/10 | 9/10   | +38%        |
-| **DRY**                   | 5/10   | 9/10   | +80%        |
-| **KISS**                  | 7/10   | 9/10   | +29%        |
-| **SOLID**                 | 7.5/10 | 9/10   | +20%        |
-| **YAGNI**                 | 6/10   | 8.5/10 | +42%        |
-
-### Ana Sorunlar
-
-#### 1️⃣ Service Sınıfları Çok Büyük (SRP İhlali)
-
-```
-UserService.java: 370 satır  🔴
-  ├─ Business logic
-  ├─ Mapping logic (65+ satır)
-  ├─ Validation logic
-  └─ Query logic
-
-Hedef: 150 satır ✅
-  ├─ Business logic only
-  ├─ Mapping → UserMapper
-  ├─ Validation → UserValidator
-  └─ Query → UserSearchService
-```
-
-#### 2️⃣ Kod Tekrarı %35 (DRY İhlali)
-
-```
-❌ Her controller'da manuel extraction:
-Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-UUID tenantId = UUID.fromString((String) auth.getDetails());
-
-✅ Çözüm: Spring Security Native
-@AuthenticationPrincipal SecurityContext ctx
-```
-
-#### 3️⃣ N+1 Query Problem
-
-```
-❌ 100 user = 100 Feign call
-✅ Batch API: 100 user = 1 Feign call
-```
-
-#### 4️⃣ Over-Engineering (YAGNI İhlali)
-
-```
-❌ Company Service: 11 handler sınıfı (basit CRUD için)
-✅ Direkt service method yeterli
-```
+| What You Need               | Documentation                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| 🚀 **Get Started**          | [GETTING_STARTED.md](development/GETTING_STARTED.md)                                 |
+| 📁 **Code Structure**       | [CODE_STRUCTURE_GUIDE.md](development/CODE_STRUCTURE_GUIDE.md)                       |
+| 📖 **Coding Principles**    | [PRINCIPLES.md](development/PRINCIPLES.md)                                           |
+| 🌐 **API Standards**        | [MICROSERVICES_API_STANDARDS.md](development/MICROSERVICES_API_STANDARDS.md)         |
+| 🔢 **Data Types**           | [DATA_TYPES_STANDARDS.md](development/DATA_TYPES_STANDARDS.md)                       |
+| 🔐 **Policy Authorization** | [POLICY_AUTHORIZATION_PRINCIPLES.md](development/POLICY_AUTHORIZATION_PRINCIPLES.md) |
+| 🤖 **AI Coding Rules**      | [AI_ASSISTANT_LEARNINGS.md](AI_ASSISTANT_LEARNINGS.md)                               |
+| 🔧 **Services**             | [services/README.md](services/README.md)                                             |
 
 ---
 
-## 🎯 Generic Microservice Template
+## 🎯 System Overview
 
-> **Bu yapı her microservice için standart olarak kullanılır.**  
-> Sadece domain-specific dosyalar değişir, yapı aynı kalır.
+### Architecture Type
 
-```
-{service-name}-service/                        # user-service, company-service, etc.
-│
-├── pom.xml
-├── Dockerfile
-├── README.md
-│
-└── src/
-    ├── main/
-    │   ├── java/com/fabricmanagement/{service}/
-    │   │   │
-    │   │   ├── {Service}Application.java                   # Main class
-    │   │   │
-    │   │   ├── api/                                        # 🌐 API Layer
-    │   │   │   ├── controller/
-    │   │   │   │   ├── {Entity}Controller.java            [~120 satır]
-    │   │   │   │   ├── {Entity}SearchController.java      [~80 satır] (Optional)
-    │   │   │   │   └── {Entity}AuthController.java        [~80 satır] (If needed)
-    │   │   │   │
-    │   │   │   └── dto/
-    │   │   │       ├── request/
-    │   │   │       │   ├── Create{Entity}Request.java
-    │   │   │       │   ├── Update{Entity}Request.java
-    │   │   │       │   └── {Entity}SearchRequest.java
-    │   │   │       │
-    │   │   │       └── response/
-    │   │   │           ├── {Entity}Response.java
-    │   │   │           └── {Entity}ListResponse.java
-    │   │   │
-    │   │   ├── application/                                # 🔧 Application Layer
-    │   │   │   │
-    │   │   │   ├── service/                                # Business Services
-    │   │   │   │   ├── {Entity}Service.java               [~150 satır] ✅
-    │   │   │   │   ├── {Entity}SearchService.java         [~80 satır]  ✅
-    │   │   │   │   └── {Entity}ValidationService.java     [~60 satır]  ✅
-    │   │   │   │
-    │   │   │   ├── mapper/                                 # DTO ↔ Entity ✨
-    │   │   │   │   ├── {Entity}Mapper.java                [~120 satır] ✅
-    │   │   │   │   └── {Entity}ResponseMapper.java        [~80 satır]  ✅
-    │   │   │   │
-    │   │   │   ├── validator/                              # Business Validation ✨
-    │   │   │   │   ├── {Entity}Validator.java             [~60 satır]  ✅
-    │   │   │   │   └── {Field}Validator.java              [~40 satır]  ✅
-    │   │   │   │
-    │   │   │   └── helper/                                 # Utility Helpers ✨
-    │   │   │       ├── {Entity}Enricher.java              [~50 satır]  ✅
-    │   │   │       └── ExternalDataFetcher.java           [~50 satır]  ✅
-    │   │   │
-    │   │   ├── domain/                                     # 🎯 Domain Layer
-    │   │   │   ├── aggregate/
-    │   │   │   │   └── {Entity}.java                      [~250 satır] ✅
-    │   │   │   │
-    │   │   │   ├── service/                                # Domain Services ✨
-    │   │   │   │   └── {Entity}DomainService.java         [~100 satır] ✅
-    │   │   │   │
-    │   │   │   ├── event/                                  # Domain Events
-    │   │   │   │   ├── {Entity}CreatedEvent.java
-    │   │   │   │   ├── {Entity}UpdatedEvent.java
-    │   │   │   │   └── {Entity}DeletedEvent.java
-    │   │   │   │
-    │   │   │   ├── valueobject/
-    │   │   │   │   ├── {Field}VO.java
-    │   │   │   │   └── {Entity}Status.java
-    │   │   │   │
-    │   │   │   └── exception/                              # SADECE Özel Olanlar!
-    │   │   │       └── {Specific}Exception.java           (Generic'ler shared'da)
-    │   │   │
-    │   │   ├── infrastructure/                             # 🏗️ Infrastructure
-    │   │   │   ├── repository/
-    │   │   │   │   └── {Entity}Repository.java
-    │   │   │   │
-    │   │   │   ├── client/                                 # Feign Clients
-    │   │   │   │   ├── {External}ServiceClient.java
-    │   │   │   │   └── dto/
-    │   │   │   │
-    │   │   │   ├── messaging/
-    │   │   │   │   ├── publisher/
-    │   │   │   │   └── listener/
-    │   │   │   │
-    │   │   │   ├── cache/                                  # Optional
-    │   │   │   │   └── {Entity}CacheService.java
-    │   │   │   │
-    │   │   │   └── config/                                 # SADECE Özel Config!
-    │   │   │       └── {Specific}Config.java
-    │   │   │
-    │   │   └── config/                                     # EMPTY! Uses shared
-    │   │
-    │   └── resources/
-    │       ├── application.yml
-    │       ├── application-dev.yml
-    │       ├── application-prod.yml
-    │       └── db/migration/
-    │           └── V1__init_{entity}_schema.sql
-    │
-    └── test/java/com/fabricmanagement/{service}/
-        ├── api/{Entity}ControllerTest.java
-        ├── application/service/{Entity}ServiceTest.java
-        ├── application/mapper/{Entity}MapperTest.java
-        └── domain/aggregate/{Entity}Test.java
-```
+- **Microservices** - Spring Boot based
+- **Event-Driven** - Kafka messaging
+- **API Gateway** - Routing + Auth + Rate limiting
+- **Multi-tenant** - Tenant isolation at all layers
+
+### Core Services
+
+1. **user-service** - User management & authentication
+2. **company-service** - Company & relationships
+3. **contact-service** - Contact information & verification
+4. **api-gateway** - Entry point for all requests
+
+### Shared Modules
+
+- **shared-domain** - Base entities, exceptions, events
+- **shared-application** - Responses, context
+- **shared-infrastructure** - Constants, security, config
+- **shared-security** - JWT, authentication filters
+
+**Details:** [CODE_STRUCTURE_GUIDE.md](development/CODE_STRUCTURE_GUIDE.md)
 
 ---
 
-## 🧩 Shared Modules Yapısı
+## 🏆 Recent Updates (2025-10-10)
 
-> **Tüm microservice'lerin kullandığı ortak modüller.**  
-> DRY prensibi - Kod tekrarı %0
+### User-Service Refactoring
 
-```
-shared/
-│
-├── shared-domain/                              # 🎯 Core Domain Logic
-│   ├── pom.xml
-│   └── src/main/java/com/fabricmanagement/shared/domain/
-│       │
-│       ├── base/                               # Base Classes
-│       │   ├── BaseEntity.java                 [JPA base with audit]
-│       │   └── AggregateRoot.java              [DDD pattern]
-│       │
-│       ├── exception/                          # Generic Exceptions ✅
-│       │   ├── DomainException.java            [Base exception]
-│       │   ├── ResourceNotFoundException.java  [Generic NOT_FOUND]
-│       │   ├── ValidationException.java        [Generic VALIDATION]
-│       │   ├── UnauthorizedException.java      [Generic AUTH]
-│       │   ├── BusinessRuleViolationException.java
-│       │   └── ExternalServiceException.java
-│       │
-│       ├── message/                            # Message Keys ✨
-│       │   ├── ErrorMessageKeys.java           [Error message keys]
-│       │   └── ValidationMessageKeys.java      [Validation keys]
-│       │
-│       ├── event/
-│       │   ├── DomainEvent.java
-│       │   └── DomainEventPublisher.java
-│       │
-│       └── outbox/
-│           └── OutboxEvent.java
-│
-├── shared-application/                         # 🔧 Application Shared
-│   └── src/main/java/com/fabricmanagement/shared/application/
-│       │
-│       ├── response/
-│       │   ├── ApiResponse.java                [Standard API response]
-│       │   └── PaginatedResponse.java
-│       │
-│       ├── context/                            # Security Context ✨
-│       │   └── SecurityContext.java            [User/tenant info]
-│       │
-│       ├── annotation/                         # (REMOVED - Using Spring Security native)
-│       │                                        # @AuthenticationPrincipal SecurityContext
-│       │
-│       ├── exception/                          # Global Handler ✅
-│       │   └── GlobalExceptionHandler.java     [SINGLE for ALL]
-│       │
-│       └── util/
-│           ├── DateUtils.java
-│           └── StringUtils.java
-│
-├── shared-infrastructure/                      # 🏗️ Infrastructure Shared
-│   └── src/main/
-│       ├── java/com/fabricmanagement/shared/infrastructure/
-│       │   │
-│       │   ├── constants/                      # Constants ✨
-│       │   │   ├── ValidationConstants.java
-│       │   │   ├── SecurityRoles.java
-│       │   │   └── CacheKeys.java
-│       │   │
-│       │   ├── security/
-│       │   │   ├── SecurityContextHolder.java
-│       │   │   └── SecurityUtils.java
-│       │   │
-│       │   ├── service/                        # Shared Services ✨
-│       │   │   └── MessageService.java         [i18n resolver]
-│       │   │
-│       │   ├── config/                         # Default Configs ✅
-│       │   │   ├── DefaultWebConfig.java       [For ALL services]
-│       │   │   ├── DefaultJpaConfig.java
-│       │   │   ├── DefaultCacheConfig.java
-│       │   │   ├── MessageSourceConfig.java
-│       │   │   └── SwaggerConfig.java
-│       │   │
-│       │   └── util/
-│       │       ├── JsonUtils.java
-│       │       └── UuidUtils.java
-│       │
-│       └── resources/
-│           └── messages/                       # i18n Messages ✨
-│               ├── errors_en.properties        [English errors]
-│               ├── errors_tr.properties        [Turkish errors]
-│               ├── validations_en.properties
-│               └── validations_tr.properties
-│
-└── shared-security/                            # 🔐 Security Shared
-    └── src/main/java/com/fabricmanagement/shared/security/
-        │
-        ├── config/
-        │   ├── DefaultSecurityConfig.java      [For ALL services]
-        │   └── CorsConfig.java
-        │
-        ├── jwt/
-        │   ├── JwtTokenProvider.java
-        │   ├── JwtAuthenticationFilter.java
-        │   └── JwtTokenValidator.java
-        │
-        └── annotation/
-            ├── RequiresTenant.java
-            └── AuditLog.java
-```
+- ✅ **Entity:** 408 → 99 lines (-76%) - Pure data holder
+- ✅ **UserService:** 320 → 140 lines (-56%) - No mapping logic
+- ✅ **Total:** -700+ lines removed
+- ✅ **Mappers:** 3 focused mappers (SRP applied)
+- ✅ **Pattern:** Anemic Domain Model adopted
+
+**Details:** [AI_ASSISTANT_LEARNINGS.md](AI_ASSISTANT_LEARNINGS.md)
 
 ---
 
-## 📊 Katman Sorumlulukları
+## 📊 Architecture Quality Score
 
-### 🌐 API Layer (Presentation)
-
-**Sorumluluklar:**
-
-```java
-@RestController
-@RequiredArgsConstructor
-public class UserController {
-
-    private final UserService userService;
-
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<UserResponse>> getUser(
-            @PathVariable UUID id,
-            @AuthenticationPrincipal SecurityContext ctx) {  // ✅ Spring Security native!
-
-        UserResponse user = userService.getUser(id, ctx.getTenantId());
-        return ResponseEntity.ok(ApiResponse.success(user));
-    }
-}
-```
-
-✅ **SADECE:**
-
-- HTTP request/response handling
-- Input validation (@Valid)
-- Authorization (@PreAuthorize, custom annotations)
-- SecurityContext injection
-- Response wrapping
-
-❌ **ASLA:**
-
-- Business logic
-- Mapping logic
-- Validation logic
-- Database access
+| Principle                 | Score         |
+| ------------------------- | ------------- |
+| **Single Responsibility** | 9.5/10        |
+| **DRY**                   | 9/10          |
+| **KISS**                  | 9/10          |
+| **YAGNI**                 | 9/10          |
+| **Clean Code**            | 9.5/10        |
+| **Overall**               | **9.2/10** 🏆 |
 
 ---
 
-### 🔧 Application Layer
+## 🎯 Key Principles
 
-#### Service (~150 satır)
+### 1. Anemic Domain Model
 
-```java
-@Service
-@RequiredArgsConstructor
-@Transactional
-public class UserService {
+- Entity = Data holder ONLY
+- No business methods in entities
+- Use @Getter/@Setter (Lombok)
 
-    private final UserRepository repository;
-    private final UserMapper mapper;
-    private final UserValidator validator;
-    private final EventPublisher eventPublisher;
+### 2. Mapper Separation
 
-    public UUID createUser(CreateUserRequest request, UUID tenantId, String createdBy) {
-        validator.validateCreate(request, tenantId);        // ✅ Delegate
+- UserMapper → DTO ↔ Entity
+- EventMapper → Entity → Event
+- NO mapping in Service layer
 
-        User user = mapper.toEntity(request, tenantId, createdBy);  // ✅ Delegate
-        user = repository.save(user);
+### 3. Layer Responsibilities
 
-        eventPublisher.publishUserCreated(user);
-        return user.getId();
-    }
-}
-```
+- **Controller:** HTTP only
+- **Service:** Business logic only
+- **Mapper:** Mapping only
+- **Entity:** Data only
 
-✅ **SADECE:** Orchestration, Transaction, Event publishing  
-❌ **ASLA:** Mapping, Validation, HTTP concerns
+### 4. NO Over-Engineering
 
-#### Mapper (~120 satır)
+- NO validator/ folder (Spring @Valid)
+- NO helper/ folder (private methods)
+- USE Spring/Lombok/Shared modules
 
-```java
-@Component
-@RequiredArgsConstructor
-public class UserMapper {
-
-    private final ContactServiceClient contactClient;
-
-    public UserResponse toResponse(User user) {
-        ContactInfo contact = fetchContactInfo(user.getId());
-
-        return UserResponse.builder()
-            .id(user.getId())
-            .email(contact.getEmail())
-            .build();
-    }
-
-    public User toEntity(CreateUserRequest request, UUID tenantId, String createdBy) {
-        return User.builder()
-            .tenantId(tenantId)
-            .firstName(request.getFirstName())
-            .createdBy(createdBy)
-            .build();
-    }
-}
-```
-
-✅ **SADECE:** DTO ↔ Entity conversion, External data enrichment
-
-#### Validator (~60 satır)
-
-```java
-@Component
-@RequiredArgsConstructor
-public class UserValidator {
-
-    private final UserRepository repository;
-
-    public void validateCreate(CreateUserRequest request, UUID tenantId) {
-        if (repository.existsByEmailAndTenantId(request.getEmail(), tenantId)) {
-            throw new ValidationException(
-                ErrorMessageKeys.DUPLICATE_RESOURCE,
-                "User", request.getEmail()
-            );
-        }
-    }
-}
-```
-
-✅ **SADECE:** Business rule validation, Cross-field validation
+**Full details:** [PRINCIPLES.md](development/PRINCIPLES.md)
 
 ---
 
-### 🎯 Domain Layer
+## 📂 Standard Service Structure
 
-#### Aggregate (~250 satır)
-
-```java
-@Entity
-@Table(name = "users")
-public class User extends BaseEntity {
-
-    private String firstName;
-    private UserStatus status;
-
-    @Transient
-    private final List<Object> domainEvents = new ArrayList<>();
-
-    public static User create(UUID tenantId, String firstName) {
-        User user = User.builder()
-            .tenantId(tenantId)
-            .firstName(firstName)
-            .status(UserStatus.ACTIVE)
-            .build();
-
-        user.addDomainEvent(new UserCreatedEvent(user.getId()));
-        return user;
-    }
-
-    public void activate() {
-        if (this.status == UserStatus.DELETED) {
-            throw new IllegalStateException("Cannot activate deleted user");
-        }
-        this.status = UserStatus.ACTIVE;
-    }
-}
+```
+{service}-service/
+├── api/              # HTTP Layer
+├── application/      # Business Layer
+│   ├── mapper/       # All mapping
+│   └── service/      # Business logic
+├── domain/           # Domain Layer
+│   ├── aggregate/    # Entities (data holders)
+│   ├── event/        # Domain events
+│   └── valueobject/  # Enums, VOs
+└── infrastructure/   # Infrastructure
+    ├── repository/
+    ├── client/
+    ├── messaging/
+    ├── security/
+    └── config/
 ```
 
-✅ **SADECE:** Business invariants, Domain logic, Domain events, State transitions
+**Detailed structure:** [CODE_STRUCTURE_GUIDE.md](development/CODE_STRUCTURE_GUIDE.md)
 
 ---
 
-### 🏗️ Infrastructure Layer
+## 🔗 Documentation Index
 
-#### Repository
+### Development
 
-```java
-@Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
+- [Getting Started](development/GETTING_STARTED.md) - Quick start guide
+- [Code Structure](development/CODE_STRUCTURE_GUIDE.md) - Where code goes
+- [Principles](development/PRINCIPLES.md) - Coding standards
+- [API Standards](development/MICROSERVICES_API_STANDARDS.md) - REST API guidelines
+- [Data Types](development/DATA_TYPES_STANDARDS.md) - Type safety rules
+- [Code Migration](development/CODE_MIGRATION_GUIDE.md) - Refactoring guide
 
-    @Query("SELECT u FROM User u WHERE u.id = :id AND u.tenantId = :tenantId AND u.deleted = false")
-    Optional<User> findActiveByIdAndTenantId(
-        @Param("id") UUID id,
-        @Param("tenantId") UUID tenantId
-    );
+### Authorization
 
-    @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.deleted = false")
-    List<User> findAllActiveByTenantId(@Param("tenantId") UUID tenantId);
+- [Policy Principles](development/POLICY_AUTHORIZATION_PRINCIPLES.md) - Complete guide
+- [Policy Quick Start](development/POLICY_AUTHORIZATION_QUICK_START.md) - Implementation
+- [Policy Overview](development/POLICY_AUTHORIZATION.md) - Summary
 
-    boolean existsByEmailAndTenantId(String email, UUID tenantId);
-}
-```
+### Services
 
-✅ **SADECE:** Data persistence, Custom queries, Common filters
+- [User Service](services/user-service.md)
+- [Company Service](services/company-service.md)
+- [Contact Service](services/contact-service.md)
+- [API Gateway](services/api-gateway.md)
 
----
+### Deployment
 
-## 🎯 Shared vs Service-Specific
+- [Deployment Guide](deployment/DEPLOYMENT_GUIDE.md)
+- [Environment Management](deployment/ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md)
+- [New Service Integration](deployment/NEW_SERVICE_INTEGRATION_GUIDE.md)
 
-### Karar Kuralı
+### Troubleshooting
 
-```java
-IF (tüm service'lerde kullanılır)
-    → shared/ modülüne koy ✅
-ELSE IF (sadece 1 service'e özel)
-    → o service'e koy ✅
-ELSE
-    → Muhtemelen gerekmez (YAGNI) ❌
-```
-
-### Exception
-
-| Exception                 | Shared ✅ | Service ❌      |
-| ------------------------- | --------- | --------------- |
-| ResourceNotFoundException | ✅        | -               |
-| ValidationException       | ✅        | -               |
-| UnauthorizedException     | ✅        | -               |
-| AccountLockedException    | -         | ✅ User only    |
-| MaxUsersLimitException    | -         | ✅ Company only |
-
-### Configuration
-
-| Config                | Shared ✅ | Service ❌      |
-| --------------------- | --------- | --------------- |
-| WebConfig             | ✅        | -               |
-| SecurityConfig        | ✅        | -               |
-| JpaConfig             | ✅        | -               |
-| CacheConfig           | ✅        | -               |
-| NotificationConfig    | -         | ✅ Contact only |
-| SubscriptionScheduler | -         | ✅ Company only |
+- [Common Issues](troubleshooting/COMMON_ISSUES_AND_SOLUTIONS.md)
+- [Bean Conflicts](troubleshooting/BEAN_CONFLICT_RESOLUTION.md)
+- [Flyway Checksum](troubleshooting/FLYWAY_CHECKSUM_MISMATCH.md)
 
 ---
 
-## 🌍 Error Message Management
-
-### Problem: Hard-Coded Messages
-
-```java
-// ❌ KÖTÜ
-throw new Exception("User not found: " + userId);
-throw new Exception("Email is required");
-```
-
-**Sorunlar:**
-
-- 🔴 Consistency yok
-- 🔴 i18n imkansız
-- 🔴 Değişiklik zor
-- 🔴 Test kırılgan
-
-### Çözüm: Merkezi Yönetim
-
-#### 1. Message Keys (Constants)
-
-```java
-// shared-domain/message/ErrorMessageKeys.java
-public final class ErrorMessageKeys {
-
-    public static final String USER_NOT_FOUND = "error.user.not.found";
-    public static final String EMAIL_INVALID = "error.validation.email.invalid";
-    public static final String ACCOUNT_LOCKED = "error.auth.account.locked";
-}
-```
-
-#### 2. Properties Files (i18n)
-
-```properties
-# shared-infrastructure/resources/messages/errors_en.properties
-error.user.not.found=User not found: {0}
-error.validation.email.invalid=Invalid email format: {0}
-error.auth.account.locked=Account locked for {0} minutes
-
-# errors_tr.properties
-error.user.not.found=Kullanıcı bulunamadı: {0}
-error.validation.email.invalid=Geçersiz e-posta formatı: {0}
-error.auth.account.locked=Hesap {0} dakika kilitlendi
-```
-
-#### 3. Message Service
-
-```java
-@Service
-@RequiredArgsConstructor
-public class MessageService {
-
-    private final MessageSource messageSource;
-
-    public String getMessage(String key, Object... params) {
-        return messageSource.getMessage(
-            key,
-            params,
-            LocaleContextHolder.getLocale()  // Accept-Language header
-        );
-    }
-}
-```
-
-#### 4. Exception Classes
-
-```java
-public class ResourceNotFoundException extends DomainException {
-
-    public ResourceNotFoundException(String resource, String id) {
-        super(
-            ErrorMessageKeys.RESOURCE_NOT_FOUND,  // Key
-            new Object[]{resource, id}            // Parameters
-        );
-    }
-}
-```
-
-#### 5. Usage
-
-```java
-// Service
-throw new ResourceNotFoundException("User", userId.toString());
-
-// Response (English)
-"User not found: 123e4567..."
-
-// Response (Turkish)
-"Kullanıcı bulunamadı: 123e4567..."
-```
-
-**Avantajlar:**
-
-- ✅ i18n support (TR/EN otomatik)
-- ✅ DRY (tek yerde tanım)
-- ✅ Consistency %100
-- ✅ Test stable (key bazlı)
-
-**📖 Refactoring strategies:** [development/CODE_MIGRATION_GUIDE.md](./development/CODE_MIGRATION_GUIDE.md)
-
----
-
-## ✅ Implementation Checklist
-
-### New Microservice Creation
-
-```bash
-# 1. Template'den kopyala
-cp -r service-template/ services/new-service/
-
-# 2. Package rename
-com.fabricmanagement.template → com.fabricmanagement.newservice
-
-# 3. Entity rename
-{Entity} → NewEntity
-
-# 4. pom.xml dependencies
-- shared-domain
-- shared-application
-- shared-infrastructure
-- shared-security
-
-# 5. DONE! ✅
-# Exception/Config kopyalama YOK!
-```
-
-### Files to Customize
-
-```
-✅ CUSTOMIZE:
-- {Entity}Controller.java
-- {Entity}Service.java
-- {Entity}Mapper.java
-- {Entity}.java (Aggregate)
-- {Entity}Repository.java
-- DTOs
-- application.yml
-
-❌ NO CUSTOMIZATION (use shared):
-- Exceptions (generic ones)
-- Config files (defaults)
-- Base classes
-- Security config
-```
-
----
-
-## 💡 Best Practices
-
-### ✅ DO
-
-1. ✅ Use shared modules for common functionality
-2. ✅ Keep services small (~150 lines)
-3. ✅ Separate concerns (mapper, validator, helper)
-4. ✅ Use message keys for all errors
-5. ✅ Inject SecurityContext with annotation
-6. ✅ Custom queries in repository
-7. ✅ Test each layer independently
-
-### ❌ DON'T
-
-1. ❌ Copy-paste exception classes
-2. ❌ Copy-paste config files
-3. ❌ Hard-code error messages
-4. ❌ Put mapping logic in service
-5. ❌ Put validation logic in service
-6. ❌ Create service-specific exceptions for generic cases
-7. ❌ Over-engineer with CQRS for simple CRUD
-
----
-
-## 📈 Beklenen Sonuçlar
-
-### Metrikler
-
-| Metrik                         | Önce        | Sonra     | İyileştirme |
-| ------------------------------ | ----------- | --------- | ----------- |
-| **Ortalama Service Satır**     | 350         | 180       | -48%        |
-| **Kod Tekrarı**                | %35         | %10       | -71%        |
-| **Mapping Logic Tekrarı**      | 7 yerde     | 3 mapper  | -57%        |
-| **Handler Sınıf Sayısı**       | 11          | 3         | -73%        |
-| **Response Time (list users)** | 800ms       | 200ms     | -75%        |
-| **External Service Calls**     | 100/request | 1/request | -99%        |
-
-### Kod Kalitesi
-
-| Kategori                  | Önce   | Sonra  |
-| ------------------------- | ------ | ------ |
-| **Single Responsibility** | 6.5/10 | 9/10   |
-| **DRY**                   | 5/10   | 9/10   |
-| **KISS**                  | 7/10   | 9/10   |
-| **SOLID**                 | 7.5/10 | 9/10   |
-| **YAGNI**                 | 6/10   | 8.5/10 |
-
-**Toplam:** 6.7/10 → **8.9/10** (+33%)
-
----
-
-## 🎯 Sonuç
-
-### İdeal Mimari
-
-```
-Microservice (50 dosya)
-  ├─ Controllers (~120 satır)
-  ├─ Services (~150 satır)
-  ├─ Mappers (~100 satır)
-  ├─ Validators (~60 satır)
-  ├─ Aggregates (~250 satır)
-  └─ Repositories (interface)
-
-Shared Modules (41 dosya)
-  ├─ Generic exceptions
-  ├─ Default configs
-  ├─ Message keys & i18n
-  ├─ Global exception handler
-  └─ Security context
-
-Principles:
-  ✅ DRY (Don't Repeat Yourself)
-  ✅ KISS (Keep It Simple)
-  ✅ YAGNI (You Aren't Gonna Need It)
-  ✅ SOLID (All principles)
-  ✅ Loose Coupling (Minimize dependencies)
-  ✅ Clean Architecture
-  ✅ Domain-Driven Design
-```
-
-**Sonuç:**
-
-- 📉 Kod tekrarı: %5
-- 📉 Dosya boyutu: ~100 satır
-- 📈 Maintainability: 9/10
-- 📈 Testability: 9/10
-- 📈 Profesyonellik: 10/10 🏆
-
----
-
-**Hazırlayan:** Backend Ekibi  
-**Tarih:** 9 Ekim 2025  
-**Son Güncelleme:** Spring Security Native Migration  
-**Versiyon:** 2.0  
-**Durum:** ✅ Production Ready
+**Last Updated:** 2025-10-10 (Simplified to Navigation Index)  
+**Version:** 2.1  
+**Status:** ✅ Production Ready

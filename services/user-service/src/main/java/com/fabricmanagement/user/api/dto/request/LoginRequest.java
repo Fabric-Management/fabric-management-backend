@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.user.api.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -21,3 +21,4 @@ public class LoginRequest {
     @NotBlank(message = "Password is required")
     private String password;
 }
+

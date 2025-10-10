@@ -194,7 +194,7 @@ public class CompanyEventListener {
                     user.getStatus() == UserStatus.PENDING_VERIFICATION) {
                     
                     // Deactivate user (soft delete)
-                    user.deactivate();
+                    user.setStatus(UserStatus.INACTIVE);
                     userRepository.save(user);
                     deactivatedCount++;
                     

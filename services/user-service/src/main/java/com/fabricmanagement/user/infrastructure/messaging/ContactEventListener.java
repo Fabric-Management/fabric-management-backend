@@ -57,7 +57,7 @@ public class ContactEventListener {
             // Check if user is pending verification
             if (user.getStatus() == UserStatus.PENDING_VERIFICATION) {
                 // Activate user
-                user.verifyContactAndActivate(event.getContactValue());
+                user.setStatus(UserStatus.ACTIVE);
                 userRepository.save(user);
                 
                 log.info("✅ User {} automatically activated after contact verification", userId);

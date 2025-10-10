@@ -2,102 +2,113 @@
 
 ## 🎯 Özet Tablo
 
-| Ne Yazıyorum?               | Nereye Yazacağım?              | Örnek Dosya                  |
-| --------------------------- | ------------------------------ | ---------------------------- |
-| **REST API Endpoint**       | `/api/controller/`             | `UserController.java`        |
-| **İş Mantığı**              | `/application/service/`        | `UserService.java`           |
-| **Veritabanı Entity**       | `/domain/entity/`              | `User.java`                  |
-| **Veritabanı Sorguları**    | `/infrastructure/persistence/` | `UserRepository.java`        |
-| **DTO (Request/Response)**  | `/api/dto/`                    | `UserDTO.java`               |
-| **Mapper (Dönüşüm)**        | `/application/mapper/`         | `UserMapper.java`            |
-| **Exception**               | `/domain/exception/`           | `UserNotFoundException.java` |
-| **Event**                   | `/domain/event/`               | `UserCreatedEvent.java`      |
-| **Config**                  | `/infrastructure/config/`      | `SecurityConfig.java`        |
-| **External API Client**     | `/infrastructure/client/`      | `EmailServiceClient.java`    |
-| **Kafka Producer/Consumer** | `/infrastructure/messaging/`   | `UserEventPublisher.java`    |
-| **Utility/Helper**          | `/application/util/`           | `StringUtils.java`           |
-| **Constant**                | `/domain/constant/`            | `UserStatus.java`            |
-| **Test**                    | `/src/test/java/...`           | `UserServiceTest.java`       |
+| Ne Yazıyorum?                 | Nereye Yazacağım?             | Örnek Dosya                 |
+| ----------------------------- | ----------------------------- | --------------------------- |
+| **REST API Endpoint**         | `/api/`                       | `UserController.java`       |
+| **İş Mantığı**                | `/application/service/`       | `UserService.java`          |
+| **DTO Request**               | `/api/dto/request/`           | `CreateUserRequest.java`    |
+| **DTO Response**              | `/api/dto/response/`          | `UserResponse.java`         |
+| **DTO → Entity Mapping**      | `/application/mapper/`        | `UserMapper.java`           |
+| **Entity → Event Mapping**    | `/application/mapper/`        | `UserEventMapper.java`      |
+| **Entity (Data)**             | `/domain/aggregate/`          | `User.java`                 |
+| **Value Object/Enum**         | `/domain/valueobject/`        | `UserStatus.java`           |
+| **Domain Event**              | `/domain/event/`              | `UserCreatedEvent.java`     |
+| **Repository**                | `/infrastructure/repository/` | `UserRepository.java`       |
+| **External API Client**       | `/infrastructure/client/`     | `ContactServiceClient.java` |
+| **Kafka Publisher**           | `/infrastructure/messaging/`  | `UserEventPublisher.java`   |
+| **Kafka Listener**            | `/infrastructure/messaging/`  | `CompanyEventListener.java` |
+| **Security Infrastructure**   | `/infrastructure/security/`   | `LoginAttemptTracker.java`  |
+| **Config (Service-Specific)** | `/infrastructure/config/`     | `FeignClientConfig.java`    |
 
 ---
 
-## 📂 Detaylı Klasör Yapısı
+## 📂 Detaylı Klasör Yapısı (2025-10-10 - Production Grade)
 
 ```
-services/
-└── user-service/
-    └── src/
-        ├── main/
-        │   ├── java/com/fabricmanagement/user/
-        │   │   ├── 🎯 api/                    # Dış dünyaya açılan katman
-        │   │   │   ├── controller/            # REST endpoints
-        │   │   │   │   └── UserController.java
-        │   │   │   ├── dto/                   # Data transfer objects
-        │   │   │   │   ├── request/
-        │   │   │   │   │   └── CreateUserRequest.java
-        │   │   │   │   └── response/
-        │   │   │   │       └── UserResponse.java
-        │   │   │   └── filter/                # Security filters
-        │   │   │       └── JwtAuthFilter.java
-        │   │   │
-        │   │   ├── 💼 application/            # İş mantığı katmanı
-        │   │   │   ├── service/               # Business logic
-        │   │   │   │   ├── UserService.java
-        │   │   │   │   └── impl/
-        │   │   │   │       └── UserServiceImpl.java
-        │   │   │   ├── mapper/                # Entity-DTO mapping
-        │   │   │   │   └── UserMapper.java
-        │   │   │   ├── validator/             # Business validations
-        │   │   │   │   └── UserValidator.java
-        │   │   │   └── util/                  # Utilities
-        │   │   │       └── PasswordEncoder.java
-        │   │   │
-        │   │   ├── 🏛️ domain/                 # Domain katmanı
-        │   │   │   ├── entity/                # JPA entities
-        │   │   │   │   └── User.java
-        │   │   │   ├── valueobject/           # Value objects
-        │   │   │   │   └── Email.java
-        │   │   │   ├── event/                 # Domain events
-        │   │   │   │   └── UserCreatedEvent.java
-        │   │   │   ├── exception/             # Domain exceptions
-        │   │   │   │   └── InvalidEmailException.java
-        │   │   │   └── constant/              # Enums & constants
-        │   │   │       └── UserStatus.java
-        │   │   │
-        │   │   └── 🔧 infrastructure/         # Altyapı katmanı
-        │   │       ├── persistence/           # Database access
-        │   │       │   ├── UserRepository.java
-        │   │       │   └── specification/
-        │   │       │       └── UserSpecification.java
-        │   │       ├── config/                # Configurations
-        │   │       │   ├── SecurityConfig.java
-        │   │       │   └── KafkaConfig.java
-        │   │       ├── client/                # External services
-        │   │       │   └── ContactServiceClient.java
-        │   │       ├── messaging/             # Message queue
-        │   │       │   ├── producer/
-        │   │       │   │   └── UserEventProducer.java
-        │   │       │   └── consumer/
-        │   │       │       └── UserEventConsumer.java
-        │   │       └── cache/                 # Cache layer
-        │   │           └── UserCacheService.java
-        │   │
-        │   └── resources/
-        │       ├── application.yml            # Configuration
-        │       ├── application-local.yml      # Local profile
-        │       ├── application-docker.yml     # Docker profile
-        │       └── db/migration/              # Flyway migrations
-        │           └── V1__create_user_table.sql
-        │
-        └── test/
-            └── java/com/fabricmanagement/user/
-                ├── unit/                      # Unit tests
-                │   └── UserServiceTest.java
-                ├── integration/               # Integration tests
-                │   └── UserControllerIT.java
-                └── fixture/                   # Test data
-                    └── UserFixture.java
+services/user-service/src/main/
+├── java/com/fabricmanagement/user/
+│   │
+│   ├── UserServiceApplication.java
+│   │
+│   ├── api/                                    # 🌐 HTTP Layer
+│   │   ├── UserController.java                [186 satır] HTTP only, no logic
+│   │   ├── AuthController.java                [50 satır]
+│   │   └── dto/
+│   │       ├── request/                        # All request DTOs
+│   │       │   ├── CreateUserRequest.java
+│   │       │   ├── UpdateUserRequest.java
+│   │       │   ├── LoginRequest.java
+│   │       │   └── SetupPasswordRequest.java
+│   │       └── response/                       # All response DTOs
+│   │           ├── UserResponse.java
+│   │           ├── LoginResponse.java
+│   │           └── CheckContactResponse.java
+│   │
+│   ├── application/                            # 🔧 Business Layer
+│   │   ├── mapper/                             # ALL mapping logic here
+│   │   │   ├── UserMapper.java                [221 satır] DTO ↔ Entity
+│   │   │   ├── UserEventMapper.java           [47 satır]  Entity → Event
+│   │   │   └── AuthMapper.java                [74 satır]  Auth DTOs
+│   │   │
+│   │   └── service/                            # Business logic ONLY
+│   │       ├── UserService.java               [169 satır] No mapping!
+│   │       └── AuthService.java               [211 satır] No mapping!
+│   │
+│   ├── domain/                                 # 🎯 Domain Layer
+│   │   ├── aggregate/
+│   │   │   └── User.java                      [99 satır] Pure data holder
+│   │   │
+│   │   ├── event/
+│   │   │   ├── UserCreatedEvent.java
+│   │   │   ├── UserUpdatedEvent.java
+│   │   │   └── UserDeletedEvent.java
+│   │   │
+│   │   └── valueobject/
+│   │       ├── UserStatus.java                # Enum
+│   │       └── RegistrationType.java          # Enum
+│   │
+│   └── infrastructure/                         # 🏗️ Infrastructure
+│       ├── repository/
+│       │   └── UserRepository.java
+│       │
+│       ├── client/
+│       │   ├── ContactServiceClient.java
+│       │   ├── ContactServiceClientFallback.java
+│       │   └── dto/ContactDto.java
+│       │
+│       ├── messaging/
+│       │   ├── UserEventPublisher.java
+│       │   ├── CompanyEventListener.java
+│       │   ├── ContactEventListener.java
+│       │   └── event/                          # External events
+│       │       ├── CompanyCreatedEvent.java
+│       │       └── ContactVerifiedEvent.java
+│       │
+│       ├── security/                           # Security infrastructure
+│       │   └── LoginAttemptTracker.java       [108 satır] Redis-based
+│       │
+│       ├── audit/
+│       │   └── SecurityAuditLogger.java
+│       │
+│       └── config/                             # Service-specific only
+│           ├── FeignClientConfig.java
+│           └── KafkaErrorHandlingConfig.java
+│
+└── resources/
+    ├── application.yml
+    ├── application-docker.yml
+    └── db/migration/
+        └── V1__create_user_tables.sql
 ```
+
+**Key Changes (2025-10-10):**
+
+- ✅ NO validator/ folder (Spring @Valid sufficient)
+- ✅ NO helper/ folder (YAGNI - use private methods)
+- ✅ NO domain/service/ folder (YAGNI - entity is data holder)
+- ✅ Multiple mappers OK (SRP: UserMapper, EventMapper, AuthMapper)
+- ✅ Entity = 99 lines (was 408!) - Pure @Getter/@Setter
+- ✅ infrastructure/security/ for Redis-based security features
 
 ---
 
@@ -148,99 +159,101 @@ public class AuthController {
 }
 ```
 
-#### C. Service
+#### C. Service (Business Logic ONLY)
 
 ```java
-// 📍 application/service/AuthService.java
+// 📍 application/service/UserService.java
 @Service
 @RequiredArgsConstructor
-@Transactional
-public class AuthService {
+@Slf4j
+public class UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
-    private final PasswordEncoder passwordEncoder;
-    private final UserEventProducer eventProducer;
+    private final UserEventMapper eventMapper;
+    private final UserEventPublisher eventPublisher;
 
-    public UserResponse register(RegisterUserRequest request) {
-        // 1. Validation
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateEmailException("Email zaten kayıtlı");
-        }
+    @Transactional
+    public UUID createUser(CreateUserRequest request, UUID tenantId, String createdBy) {
+        log.info("Creating user: {} for tenant: {}", request.getEmail(), tenantId);
 
-        // 2. Create entity
-        User user = User.builder()
-            .email(request.getEmail())
-            .password(passwordEncoder.encode(request.getPassword()))
-            .firstName(request.getFirstName())
-            .lastName(request.getLastName())
-            .status(UserStatus.PENDING_VERIFICATION)
-            .build();
-
-        // 3. Save
+        // Mapping → Mapper's job!
+        User user = userMapper.fromCreateRequest(request, tenantId, createdBy);
         user = userRepository.save(user);
 
-        // 4. Publish event
-        eventProducer.publishUserRegistered(
-            new UserRegisteredEvent(user.getId(), user.getEmail())
+        log.info("User created successfully: {}", user.getId());
+
+        // Event building → EventMapper's job!
+        eventPublisher.publishUserCreated(
+            eventMapper.toCreatedEvent(user, request.getEmail())
         );
 
-        // 5. Return response
-        return userMapper.toResponse(user);
+        return user.getId();
     }
 }
 ```
 
-#### D. Repository
+#### D. Mapper (DTO → Entity)
 
 ```java
-// 📍 infrastructure/persistence/UserRepository.java
-@Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
+// 📍 application/mapper/UserMapper.java
+@Component
+@RequiredArgsConstructor
+public class UserMapper {
 
-    Optional<User> findByEmail(String email);
+    public User fromCreateRequest(CreateUserRequest request, UUID tenantId, String createdBy) {
+        return User.builder()
+                .id(UUID.randomUUID())
+                .tenantId(tenantId)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .status(UserStatus.PENDING_VERIFICATION)
+                .createdBy(createdBy)
+                .build();
+    }
 
-    boolean existsByEmail(String email);
-
-    @Query("SELECT u FROM User u WHERE u.status = :status")
-    List<User> findByStatus(@Param("status") UserStatus status);
-
-    @Modifying
-    @Query("UPDATE User u SET u.status = :status WHERE u.id = :id")
-    void updateStatus(@Param("id") UUID id, @Param("status") UserStatus status);
+    public UserResponse toResponse(User user) {
+        // Enrichment with external data (Contact Service)
+        return UserResponse.builder()
+                .id(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
+    }
 }
 ```
 
-#### E. Entity
+#### E. Entity (Pure Data Holder - Anemic Domain)
 
 ```java
-// 📍 domain/entity/User.java
+// 📍 domain/aggregate/User.java
 @Entity
 @Table(name = "users")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
-@AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@SuperBuilder
 public class User extends BaseEntity {
 
-    @Column(unique = true, nullable = false)
-    private String email;
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
-    @Column(nullable = false)
-    private String password;
-
-    @Column(nullable = false)
+    @Column(name = "first_name", nullable = false)
     private String firstName;
 
+    @Column(name = "last_name", nullable = false)
     private String lastName;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false)
     private UserStatus status;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<UserSession> sessions;
+    @Column(name = "password_hash")
+    private String passwordHash;
+
+    // NO BUSINESS METHODS! Only @Getter/@Setter (Lombok)
+    // Business logic → Service layer
+    // Computed properties → Mapper layer
 }
 ```
 
@@ -351,45 +364,185 @@ public UserDTO getUser(@PathVariable UUID id) {
 
 ---
 
+## ⭐ Yeni Prensipler (2025-10-10 Refactoring)
+
+### 1. **Entity = Pure Data Holder (Anemic Domain)**
+
+```java
+// ✅ DOĞRU: Sadece fields
+@Entity
+@Getter
+@Setter
+public class User extends BaseEntity {
+    private String firstName;
+    private String lastName;
+    // NO METHODS!
+}
+
+// ❌ YANLIŞ: Business methods
+public class User {
+    public void updateProfile() { ... }
+    public String getFullName() { ... }
+}
+```
+
+**Neden:** Lombok zaten getter/setter sağlıyor, computed properties → Mapper'da!
+
+---
+
+### 2. **Mapping Logic → Mapper (NOT Service)**
+
+```java
+// ✅ DOĞRU: Service sadece business logic
+@Service
+public class UserService {
+    public UUID createUser(CreateUserRequest request) {
+        User user = userMapper.fromCreateRequest(request, tenantId, createdBy);
+        // Business logic here
+    }
+}
+
+// ❌ YANLIŞ: Service'de mapping
+public class UserService {
+    public UUID createUser(CreateUserRequest request) {
+        User user = User.builder()
+            .firstName(request.getFirstName())
+            // ... 20 satır mapping! ❌
+            .build();
+    }
+}
+```
+
+**Kural:** `.builder()` gördüğünde → Mapper'a taşı!
+
+---
+
+### 3. **Multiple Mappers for SRP**
+
+```java
+// ✅ DOĞRU: Her concern için ayrı mapper
+UserMapper       → DTO ↔ Entity
+UserEventMapper  → Entity → Event
+AuthMapper       → Auth DTOs + JWT claims
+
+// ❌ YANLIŞ: Tek giant mapper
+UserMapper → Her şey burada (SRP ihlali!)
+```
+
+---
+
+### 4. **NO Over-Engineering**
+
+```java
+// ❌ YAPMAYIN:
+- Validator klasörü → Spring @Valid yeterli
+- Helper klasörü → Private method yeterli
+- Builder klasörü → Lombok @Builder yeterli
+
+// ✅ YAPIN:
+- Spring/Lombok'u kullan
+- Private method yaz
+- YAGNI prensibi
+```
+
+---
+
+### 5. **Infrastructure Concerns → infrastructure/ Layer**
+
+```java
+// ✅ DOĞRU:
+infrastructure/security/LoginAttemptTracker.java  // Redis kullanıyor
+
+// ❌ YANLIŞ:
+application/service/LoginAttemptService.java  // Redis = infrastructure!
+```
+
+---
+
 ## 💡 İpuçları
 
-1. **Her katman tek sorumluluk taşımalı**
+1. **Her katman tek sorumluluk**
 
-   - Controller: HTTP request/response
-   - Service: İş mantığı
-   - Repository: Veri erişimi
+   - Controller: HTTP only
+   - Service: Business logic only
+   - Mapper: Mapping only
+   - Entity: Data only
 
-2. **DTO kullanın**
+2. **DTO request/response ayrımı**
 
-   - Entity'leri dışarı açmayın
-   - Request/Response için ayrı DTO'lar
+   - api/dto/request/ klasörü
+   - api/dto/response/ klasörü
 
 3. **Mapper kullanın**
 
-   - MapStruct otomatik mapping sağlar
-   - Boilerplate kod azalır
+   - DTO → Entity: Mapper
+   - Entity → Event: EventMapper
+   - Service'de mapping YOK!
 
-4. **Test yazın**
+4. **Comment'leri minimize edin**
 
-   - Her service method'u için unit test
-   - Her endpoint için integration test
+   - Self-documenting code yazın
+   - Sadece WHY açıklayın, WHAT değil
 
-5. **Exception handling**
-   - Global exception handler kullanın
-   - Anlamlı hata mesajları verin
+5. **Framework'leri sömürün**
+   - Spring: @Valid, @Transactional, PageRequest
+   - Lombok: @Getter, @Setter, @Builder
+   - Shared: PagedResponse, ValidationConstants
+
+---
+
+## 🧩 Shared Modules Yapısı
+
+**DRY Prensibi:** Tüm microservice'ler bu modülleri kullanır - kod tekrarı %0
+
+```
+shared/
+├── shared-domain/                    # Core Domain
+│   ├── base/BaseEntity.java          # JPA audit base
+│   ├── exception/                    # Generic exceptions
+│   │   ├── UserNotFoundException.java
+│   │   ├── ValidationException.java
+│   │   └── UnauthorizedException.java
+│   ├── event/DomainEvent.java
+│   └── policy/UserContext.java       # INTERNAL/CUSTOMER/SUPPLIER
+│
+├── shared-application/               # Application Shared
+│   ├── response/
+│   │   ├── ApiResponse.java          # Standard API response
+│   │   └── PagedResponse.java        # Pagination response
+│   └── context/SecurityContext.java  # User/tenant info
+│
+├── shared-infrastructure/            # Infrastructure Shared
+│   ├── constants/
+│   │   ├── ValidationConstants.java  # Email/phone patterns
+│   │   └── SecurityRoles.java        # ADMIN, SUPER_ADMIN, etc.
+│   ├── security/SecurityContextHolder.java
+│   └── config/                       # Default configs
+│       └── JpaAuditingConfig.java
+│
+└── shared-security/                  # Security Shared
+    ├── config/DefaultSecurityConfig.java
+    ├── jwt/JwtTokenProvider.java
+    └── filter/JwtAuthenticationFilter.java
+```
+
+**Usage:**
+
+- ✅ Import from shared (don't duplicate)
+- ✅ Extend base classes (BaseEntity)
+- ✅ Use shared exceptions
+- ✅ Use PagedResponse factory methods
 
 ---
 
 ## 📚 Daha Fazla Bilgi
 
 - [Development Principles](PRINCIPLES.md) - Kodlama standartları
-- [Quick Start Guide](QUICK_START.md) - Hızlı başlangıç
-- [Testing Guide](TESTING_GUIDE.md) - Test yazma kılavuzu
-- [API Documentation](../api/README.md) - API referansı
+- [Architecture](../ARCHITECTURE.md) - Sistem mimarisi overview
+- [AI Assistant Learnings](../AI_ASSISTANT_LEARNINGS.md) - Kodlama prensipleri
 
 ---
 
-**Sorularınız mı var?** Slack: #fabric-dev  
-**Last Updated:** 2025-10-09 20:00 UTC+1  
-**Version:** 1.0.0  
-**Status:** ✅ Active
+**Last Updated:** 2025-10-10 (User-Service Refactoring + Shared Modules Structure)  
+**Version:** 2.1.0  
+**Status:** ✅ Production Ready

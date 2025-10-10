@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.user.api.dto.request;
 
 import com.fabricmanagement.shared.infrastructure.constants.ValidationConstants;
 import jakarta.validation.constraints.Email;

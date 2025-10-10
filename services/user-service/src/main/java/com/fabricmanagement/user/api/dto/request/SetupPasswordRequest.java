@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.user.api.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -26,3 +26,4 @@ public class SetupPasswordRequest {
             message = "Password must contain uppercase, lowercase, number and special character")
     private String password;
 }
+
