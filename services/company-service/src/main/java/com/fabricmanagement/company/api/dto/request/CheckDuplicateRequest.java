@@ -1,4 +1,4 @@
-package com.fabricmanagement.company.application.dto;
+package com.fabricmanagement.company.api.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

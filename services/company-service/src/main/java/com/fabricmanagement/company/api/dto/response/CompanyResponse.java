@@ -1,4 +1,4 @@
-package com.fabricmanagement.company.application.dto;
+package com.fabricmanagement.company.api.dto.response;
 
 import com.fabricmanagement.company.domain.aggregate.Company;
 import lombok.AllArgsConstructor;

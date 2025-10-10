@@ -1,128 +1,276 @@
-# 🏢 Company Service - Complete Documentation
+# 🏢 Company Service Documentation
 
 **Version:** 2.0  
-**Last Updated:** October 10, 2025  
+**Last Updated:** 2025-10-10  
 **Port:** 8083  
-**Database:** company_db  
-**Status:** ✅ Production
+**Database:** fabric_management (company_schema)  
+**Status:** ✅ Production Ready
 
 ---
 
 ## 📋 Overview
 
-Company Service is the multi-tenancy and company management microservice of Fabric Management System. It implements Clean Architecture with CQRS pattern for optimal separation of read/write operations.
+Company Service manages company profiles, multi-tenancy, and policy data. Implements Clean Architecture with Anemic Domain Model pattern.
 
 ### Core Responsibilities
 
-- Company CRUD operations
-- Multi-tenancy management (tenant isolation)
-- Company status lifecycle
-- Subscription plan management
-- Department management
-- Company settings & preferences
-- Integration with User and Contact services
+- ✅ Company CRUD operations
+- ✅ Multi-tenancy management (tenant isolation)
+- ✅ Company type hierarchy (INTERNAL, CUSTOMER, SUPPLIER)
+- ✅ Subscription plan management
+- ✅ Department management
+- ✅ Duplicate company detection (fuzzy matching)
+- ✅ **Policy data management** (PolicyRegistry, UserPermission, Audit)
 
 ---
 
 ## 🏗️ Architecture
 
-### Clean Architecture Layers
+### Current Architecture (Post-Refactoring - Oct 2025)
 
 ```
-┌─────────────────────────────────────┐
-│  API Layer (Controllers)            │
-│  - CompanyController                │
-│  - REST endpoints & DTOs            │
-└─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│  Application Layer                  │
-│  - CompanyService                   │
-│  - Command/Query handlers (CQRS)   │
-│  - Mappers, Validators              │
-└─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│  Domain Layer                       │
-│  - Company aggregate root           │
-│  - Domain events                    │
-│  - Business rules                   │
-└─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│  Infrastructure Layer               │
-│  - CompanyRepository (JPA)          │
-│  - Feign clients (User, Contact)   │
-│  - Kafka event publishing           │
-└─────────────────────────────────────┘
+company-service/
+├── api/
+│   ├── CompanyController.java [176 satır]
+│   ├── PolicyAuditController.java [85 satır]
+│   ├── UserPermissionController.java [108 satır]
+│   └── dto/
+│       ├── request/
+│       │   ├── CreateCompanyRequest.java
+│       │   ├── UpdateCompanyRequest.java
+│       │   ├── UpdateCompanySettingsRequest.java
+│       │   ├── UpdateSubscriptionRequest.java
+│       │   ├── CheckDuplicateRequest.java
+│       │   └── CreateUserPermissionRequest.java
+│       └── response/
+│           ├── CompanyResponse.java
+│           ├── CheckDuplicateResponse.java
+│           ├── CompanyAutocompleteResponse.java
+│           ├── PolicyAuditResponse.java
+│           └── UserPermissionResponse.java
+│
+├── application/
+│   ├── mapper/
+│   │   ├── CompanyMapper.java [126 satır]
+│   │   ├── CompanyEventMapper.java [47 satır]
+│   │   ├── PolicyAuditMapper.java
+│   │   └── UserPermissionMapper.java
+│   └── service/
+│       ├── CompanyService.java [281 satır]
+│       ├── PolicyAuditQueryService.java [83 satır]
+│       └── UserPermissionService.java [95 satır]
+│
+├── domain/
+│   ├── aggregate/
+│   │   ├── Company.java [109 satır] ← Pure data holder!
+│   │   ├── Department.java
+│   │   └── CompanyRelationship.java
+│   ├── event/
+│   │   ├── CompanyCreatedEvent.java
+│   │   ├── CompanyUpdatedEvent.java
+│   │   └── CompanyDeletedEvent.java
+│   └── valueobject/
+│       ├── CompanyName.java
+│       ├── CompanyStatus.java
+│       ├── CompanyType.java
+│       └── Industry.java
+│
+└── infrastructure/
+    ├── repository/
+    │   └── CompanyRepository.java
+    ├── messaging/
+    │   └── CompanyEventPublisher.java [39 satır]
+    └── config/
+        └── DuplicateDetectionConfig.java
 ```
 
 ### Key Patterns
 
+- ✅ **Anemic Domain Model**: Entity = Pure data holder
+- ✅ **Mapper Separation**: 4 focused mappers
 - ✅ **Clean Architecture**: Clear layer separation
-- ✅ **CQRS**: Command/Query responsibility segregation
-- ✅ **Event Sourcing**: Outbox Pattern for reliable events
-- ✅ **DDD**: Aggregate roots, Value Objects, Domain Events
-- ✅ **Multi-tenancy**: Tenant isolation at database level
+- ✅ **10 Golden Rules**: SRP, DRY, KISS, YAGNI applied
+- ✅ **Policy Data Hub**: Manages policy tables for all services
 
 ---
 
 ## 📦 Domain Model
 
-### Company Aggregate
+### Company Aggregate (109 lines - Anemic Domain)
 
 ```java
 @Entity
 @Table(name = "companies")
+@Getter
+@Setter
+@SuperBuilder
 public class Company extends BaseEntity {
-    private UUID tenantId;          // Multi-tenancy
-    private String companyName;
-    private CompanyType companyType; // INTERNAL, CUSTOMER, SUPPLIER
-    private CompanyStatus status;    // ACTIVE, INACTIVE, SUSPENDED
-    private String taxNumber;
 
-    @OneToMany
-    private List<Department> departments;
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;  // ← UUID type safety!
+
+    @Embedded
+    private CompanyName name;  // Value object
+
+    @Column(name = "legal_name")
+    private String legalName;
+
+    @Column(name = "tax_id")
+    private String taxId;
+
+    @Column(name = "registration_number")
+    private String registrationNumber;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private CompanyType type;  // CORPORATION, LLC, etc.
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "industry", nullable = false)
+    private Industry industry;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private CompanyStatus status;
+
+    @Type(JsonBinaryType.class)
+    @Column(name = "settings", columnDefinition = "jsonb")
+    private Map<String, Object> settings;
+
+    @Type(JsonBinaryType.class)
+    @Column(name = "preferences", columnDefinition = "jsonb")
+    private Map<String, Object> preferences;
+
+    // Subscription
+    @Column(name = "subscription_start_date")
+    private LocalDateTime subscriptionStartDate;
+
+    @Column(name = "subscription_end_date")
+    private LocalDateTime subscriptionEndDate;
+
+    @Column(name = "subscription_plan")
+    private String subscriptionPlan;
+
+    @Column(name = "max_users")
+    private int maxUsers;
+
+    @Column(name = "current_users")
+    private int currentUsers;
+
+    // ========== POLICY FIELDS ==========
+    @Enumerated(EnumType.STRING)
+    @Column(name = "business_type", nullable = false)
+    @lombok.Builder.Default
+    private com.fabricmanagement.shared.domain.policy.CompanyType businessType
+        = com.fabricmanagement.shared.domain.policy.CompanyType.INTERNAL;
+
+    @Column(name = "parent_company_id")
+    private UUID parentCompanyId;
+
+    @Column(name = "relationship_type")
+    private String relationshipType;
+
+    // NO BUSINESS METHODS! (Anemic Domain)
 }
 ```
 
-### Value Objects
+**Key Changes (Oct 2025 Refactoring):**
 
-- `CompanyType`: INTERNAL, CUSTOMER, SUPPLIER, SUBCONTRACTOR
-- `CompanyStatus`: ACTIVE, INACTIVE, SUSPENDED, PENDING_APPROVAL
-- `SubscriptionPlan`: FREE, BASIC, PREMIUM, ENTERPRISE
-
-### Domain Events
-
-- `CompanyCreatedEvent`
-- `CompanyUpdatedEvent`
-- `CompanyStatusChangedEvent`
-- `CompanyDeletedEvent`
-- `DepartmentAddedEvent`
+- ✅ 430 lines → 109 lines (-75%)
+- ✅ Removed 20+ business methods
+- ✅ Pure @Getter/@Setter (Lombok)
+- ✅ Policy fields (businessType, parentCompanyId, relationshipType)
 
 ---
 
-## 🔗 Service Integration
+## 🔐 Policy Data Management
 
-### Feign Clients (with Resilience4j)
+### Managed Tables
+
+Company-Service yönettiği policy tables:
+
+1. **policy_registry** - Platform policy definitions (52 seed data)
+2. **policy_decision_audit** - Authorization decision logs
+3. **user_permissions** - User-specific grants (ALLOW/DENY)
+
+### Policy Endpoints
+
+**Policy Audit (Read-Only):**
+
+```
+GET /api/v1/policy-audit/user/{userId}      - User audit logs
+GET /api/v1/policy-audit/denials            - Deny decisions
+GET /api/v1/policy-audit/stats              - Statistics
+GET /api/v1/policy-audit/trace/{correlationId}  - Trace by correlation
+```
+
+**User Permissions (CRUD):**
+
+```
+POST   /api/v1/user-permissions             - Create permission
+GET    /api/v1/user-permissions/user/{userId}  - Get user permissions
+GET    /api/v1/user-permissions/{id}        - Get permission
+DELETE /api/v1/user-permissions/{id}        - Delete permission
+```
+
+### Policy Services
+
+- `PolicyAuditQueryService` [83 lines] - Read-only audit queries
+- `UserPermissionService` [95 lines] - Permission management
+
+### Why Company-Service?
+
+**Reasoning:**
+
+```
+⚠️ Pragmatic decision (not ideal DDD)
+- Policy data merkezi bir yerde olmalı
+- Diğer servisler Feign client ile erişir
+- Şu anda volume düşük, ayrı service gerekmez
+
+Gelecek: Volume artarsa → Policy-Service oluşturulabilir
+```
+
+**📖 Detaylı analiz:** [POLICY_ARCHITECTURE_ANALYSIS.md](../../POLICY_ARCHITECTURE_ANALYSIS.md)
+
+---
+
+## 🎯 Key Features
+
+### 1. Duplicate Detection
+
+**Stratejiler:**
+
+- Exact match (Tax ID, Registration Number)
+- Fuzzy matching (Company name - PostgreSQL trigram)
+- Autocomplete search (search-as-you-type)
 
 ```java
-// User Service Integration
-@FeignClient(name = "user-service", fallback = UserServiceFallback.class)
-public interface UserServiceClient {
-    ApiResponse<List<UserDto>> getUsersByCompany(UUID companyId);
-}
+// Endpoint
+POST /api/v1/companies/check-duplicate
 
-// Contact Service Integration
-@FeignClient(name = "contact-service", fallback = ContactServiceFallback.class)
-public interface ContactServiceClient {
-    ApiResponse<ContactDto> getCompanyContact(UUID companyId);
+// Response
+{
+  "isDuplicate": true,
+  "matchedCompanyName": "ABC Tekstil A.Ş.",
+  "confidence": 0.85,
+  "recommendation": "Similar company found. Please verify..."
 }
 ```
 
-**Circuit Breaker:** Resilience4j  
-**Fallback:** Returns cached data or empty response  
-**Retry:** 3 attempts with exponential backoff
+### 2. Company Type Hierarchy
+
+```
+INTERNAL (Us)
+    ├─> CUSTOMER (Müşteriler)
+    ├─> SUPPLIER (Tedarikçiler)
+    └─> SUBCONTRACTOR (Alt yükleniciler)
+```
+
+**Business Rules:**
+
+- ✅ INTERNAL başka company create edebilir
+- ❌ CUSTOMER/SUPPLIER company create EDEMEZ (TODO: enforce!)
 
 ---
 
@@ -130,94 +278,55 @@ public interface ContactServiceClient {
 
 ### Company Management
 
-| Endpoint                            | Method | Description                |
-| ----------------------------------- | ------ | -------------------------- |
-| `/api/v1/companies`                 | GET    | List companies (paginated) |
-| `/api/v1/companies/{id}`            | GET    | Get company by ID          |
-| `/api/v1/companies`                 | POST   | Create new company         |
-| `/api/v1/companies/{id}`            | PUT    | Update company             |
-| `/api/v1/companies/{id}`            | DELETE | Soft delete company        |
-| `/api/v1/companies/{id}/activate`   | POST   | Activate company           |
-| `/api/v1/companies/{id}/deactivate` | POST   | Deactivate company         |
+| Method | Endpoint                            | Auth          | Description    |
+| ------ | ----------------------------------- | ------------- | -------------- |
+| POST   | `/api/v1/companies`                 | ADMIN         | Create company |
+| GET    | `/api/v1/companies/{id}`            | Authenticated | Get company    |
+| GET    | `/api/v1/companies`                 | Authenticated | List companies |
+| PUT    | `/api/v1/companies/{id}`            | ADMIN         | Update company |
+| DELETE | `/api/v1/companies/{id}`            | SUPER_ADMIN   | Delete company |
+| POST   | `/api/v1/companies/{id}/activate`   | SUPER_ADMIN   | Activate       |
+| POST   | `/api/v1/companies/{id}/deactivate` | SUPER_ADMIN   | Deactivate     |
 
-### Department Management
+### Duplicate Detection
 
-| Endpoint                                         | Method | Description       |
-| ------------------------------------------------ | ------ | ----------------- |
-| `/api/v1/companies/{companyId}/departments`      | GET    | List departments  |
-| `/api/v1/companies/{companyId}/departments`      | POST   | Add department    |
-| `/api/v1/companies/{companyId}/departments/{id}` | PUT    | Update department |
-
-**📖 Complete API reference:** [docs/api/README.md](../api/README.md)
+| Method | Endpoint                                   | Description            |
+| ------ | ------------------------------------------ | ---------------------- |
+| POST   | `/api/v1/companies/check-duplicate`        | Check for duplicates   |
+| GET    | `/api/v1/companies/autocomplete?q={query}` | Autocomplete search    |
+| GET    | `/api/v1/companies/similar?name={name}`    | Find similar companies |
 
 ---
 
-## 🗄️ Database Schema
+## 🔧 Configuration
 
-### Main Tables
+```yaml
+# application.yml
+server:
+  port: 8083
 
-- `companies` - Company master data
-- `departments` - Company departments
-- `company_settings` - Company preferences
-- `outbox_events` - Event sourcing outbox
-
-### Flyway Migrations
-
-```
-V1__create_companies_table.sql
-V2__create_departments_table.sql
-V3__add_company_indexes.sql
-V4__create_outbox_table.sql
-V5__add_subscription_fields.sql
-```
-
-**📖 Migration strategy:** [docs/deployment/DATABASE_MIGRATION_STRATEGY.md](../deployment/DATABASE_MIGRATION_STRATEGY.md)
-
----
-
-## 🔐 Security
-
-### Authorization
-
-- **Tenant Isolation**: All queries filtered by `tenantId`
-- **Policy Authorization**: Company type-based access control
-- **Role-Based**: ADMIN, COMPANY_MANAGER, EMPLOYEE
-
-### Data Scope
-
-- **SELF**: Own company only
-- **CROSS_COMPANY**: Customer/supplier access (limited)
-- **GLOBAL**: Admin access (full)
-
----
-
-## 🧪 Testing
-
-### Test Coverage
-
-- Domain logic: 100%
-- Service layer: 90%
-- Controller layer: 85%
-- Overall: 92%
-
-### Running Tests
-
-```bash
-mvn test                    # Unit tests
-mvn verify                  # Integration tests
-mvn clean verify jacoco:report  # With coverage
+# Duplicate Detection
+duplicate-detection:
+  fuzzy-search-min-length: 3
+  autocomplete-min-length: 2
+  autocomplete-max-results: 10
+  database-search-threshold: 0.3
+  enable-full-text-search: true
 ```
 
 ---
 
-## 📚 Related Documentation
+## 📖 Related Documentation
 
-- **System Architecture**: [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
-- **Development Principles**: [docs/development/PRINCIPLES.md](../development/PRINCIPLES.md)
-- **API Standards**: [docs/development/MICROSERVICES_API_STANDARDS.md](../development/MICROSERVICES_API_STANDARDS.md)
+- [Policy Authorization](../development/POLICY_AUTHORIZATION.md) - Policy system
+- [Policy Usage Analysis](../../POLICY_USAGE_ANALYSIS_AND_RECOMMENDATIONS.md) - Policy integration guide
+- [Company Refactoring](../../COMPANY_SERVICE_REFACTORING_COMPLETE.md) - Refactoring report
+- [Code Structure](../development/code_structure_guide.md) - Coding standards
 
 ---
 
-**Maintained By:** Backend Team  
 **Last Updated:** 2025-10-10  
-**Status:** ✅ Production Ready
+**Version:** 2.0 (Post-Refactoring)  
+**Status:** ✅ Production Ready  
+**LOC:** 567 lines (Entity: 109, Service: 281, Mappers: 173)  
+**Special:** Policy Data Hub (PolicyRegistry, UserPermission, Audit)

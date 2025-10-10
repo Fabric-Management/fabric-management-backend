@@ -1,166 +1,291 @@
-# 📞 Contact Service - Complete Documentation
+# 📧 Contact Service Documentation
 
 **Version:** 1.0  
-**Last Updated:** October 10, 2025  
+**Last Updated:** 2025-10-10  
 **Port:** 8082  
-**Database:** contact_db  
-**Status:** ✅ Production
+**Database:** fabric_management (contact_schema)  
+**Status:** ✅ Production Ready
 
 ---
 
 ## 📋 Overview
 
-Contact Service manages all contact information (emails, phones, addresses) for users and companies in the Fabric Management System. It implements Clean Architecture with straightforward CRUD operations.
+Contact Service manages contact information (email, phone, address) for users and companies. Simple, focused service with owner-based authorization.
 
 ### Core Responsibilities
 
-- Contact information CRUD (email, phone, address)
-- Multi-contact per user/company
-- Contact verification (email/phone)
-- Primary contact designation
-- Contact history tracking
-- Multi-tenancy support
+- ✅ Contact CRUD operations (email, phone, address, fax, website)
+- ✅ Contact verification (email/phone)
+- ✅ Primary contact management
+- ✅ Owner-based authorization (USER or COMPANY)
+- ✅ Integration with User and Company services
 
 ---
 
 ## 🏗️ Architecture
 
-### Clean Architecture Layers
+### Domain Model
 
 ```
-┌─────────────────────────────────────┐
-│  API Layer (Controllers)            │
-│  - ContactController                │
-│  - REST endpoints & DTOs            │
-└─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│  Application Layer                  │
-│  - ContactService                   │
-│  - ContactMapper                    │
-│  - Validation logic                 │
-└─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│  Domain Layer                       │
-│  - Contact entity                   │
-│  - Domain events                    │
-│  - Business rules                   │
-└─────────────────────────────────────┐
-              ↓
-┌─────────────────────────────────────┐
-│  Infrastructure Layer               │
-│  - ContactRepository (JPA)          │
-│  - Kafka event publishing           │
-└─────────────────────────────────────┘
+contact-service/
+├── api/
+│   ├── ContactController.java
+│   └── dto/
+│       ├── request/
+│       └── response/
+│
+├── application/
+│   ├── mapper/
+│   └── service/
+│       └── ContactService.java
+│
+├── domain/
+│   ├── aggregate/
+│   │   └── Contact.java [232 lines]
+│   ├── event/
+│   │   ├── ContactCreatedEvent.java
+│   │   ├── ContactUpdatedEvent.java
+│   │   └── ContactDeletedEvent.java
+│   └── valueobject/
+│       └── ContactType.java (EMAIL, PHONE, ADDRESS, FAX, WEBSITE)
+│
+└── infrastructure/
+    ├── repository/
+    │   └── ContactRepository.java
+    └── messaging/
+        └── ContactEventPublisher.java
 ```
-
-### Key Patterns
-
-- ✅ **Clean Architecture**: Clear layer separation
-- ✅ **DDD**: Domain-driven design with events
-- ✅ **Event Publishing**: Kafka integration
-- ✅ **Multi-tenancy**: Tenant isolation
 
 ---
 
 ## 📦 Domain Model
 
-### Contact Entity
+### Contact Aggregate
 
 ```java
 @Entity
 @Table(name = "contacts")
+@Getter
+@Setter
+@SuperBuilder
 public class Contact extends BaseEntity {
-    private UUID tenantId;
-    private UUID userId;           // User contact
-    private UUID companyId;        // Company contact
-    private String contactType;    // EMAIL, PHONE, ADDRESS
-    private String contactValue;
-    private boolean isPrimary;
+
+    @Column(name = "owner_id", nullable = false)
+    private UUID ownerId;  // User ID or Company ID
+
+    @Column(name = "owner_type", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private OwnerType ownerType;  // USER or COMPANY
+
+    @Column(name = "contact_value", nullable = false)
+    private String contactValue;  // email, phone, address
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "contact_type", nullable = false)
+    private ContactType contactType;  // EMAIL, PHONE, ADDRESS, FAX, WEBSITE
+
+    @Column(name = "is_verified", nullable = false)
     private boolean isVerified;
+
+    @Column(name = "is_primary", nullable = false)
+    private boolean isPrimary;
+
+    @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
+
+    @Column(name = "verification_code")
+    private String verificationCode;
+
+    @Column(name = "verification_expires_at")
+    private LocalDateTime verificationExpiresAt;
+
+    // Business methods (Domain logic)
+    public void verify(String code) { }
+    public void makePrimary() { }
+    public String generateVerificationCode() { }
 }
 ```
 
-### Contact Types
+**Note:** Contact entity has business methods (NOT anemic domain) - appropriate for this domain!
 
-- `EMAIL`: Email addresses
-- `PHONE`: Phone numbers
-- `ADDRESS`: Physical addresses
+---
+
+## 🔐 Authorization Model
+
+### Owner-Based Authorization (Simple & Sufficient)
+
+```java
+// ✅ DOĞRU: Basit owner check yeterli
+public Contact getContact(UUID contactId, UUID currentUserId) {
+    Contact contact = contactRepository.findById(contactId);
+
+    // Simple check: Owner mı?
+    if (!contact.getOwnerId().equals(currentUserId)) {
+        throw new UnauthorizedException("Not your contact");
+    }
+
+    return contact;
+}
+```
+
+**Why Policy NOT Needed:**
+
+1. ✅ Basit domain (email, phone, address)
+2. ✅ Owner-based access yeterli
+3. ✅ Cross-company contact gereksiz
+4. ✅ Gateway authorization yeterli
+
+**📖 Policy analizi:** [POLICY_USAGE_ANALYSIS_AND_RECOMMENDATIONS.md](../../POLICY_USAGE_ANALYSIS_AND_RECOMMENDATIONS.md)
+
+---
+
+## 🎯 Key Features
+
+### 1. Multi-Type Contact Support
+
+- **EMAIL** - Email addresses
+- **PHONE** - Phone numbers
+- **ADDRESS** - Physical addresses
+- **FAX** - Fax numbers
+- **WEBSITE** - Website URLs
+
+### 2. Contact Verification
+
+```java
+// Email/Phone verification flow
+1. generateVerificationCode() → 6-digit code
+2. Send code via email/SMS
+3. verify(code) → Mark as verified
+4. verifiedAt timestamp set
+```
+
+### 3. Primary Contact Management
+
+```java
+// Only one primary contact per type per owner
+contact.makePrimary()
+  → Other contacts of same type become non-primary
+  → Only verified contacts can be primary
+```
 
 ---
 
 ## 📊 API Endpoints
 
-| Endpoint                               | Method | Description               |
-| -------------------------------------- | ------ | ------------------------- |
-| `/api/v1/contacts`                     | GET    | List contacts (paginated) |
-| `/api/v1/contacts/{id}`                | GET    | Get contact by ID         |
-| `/api/v1/contacts`                     | POST   | Create contact            |
-| `/api/v1/contacts/{id}`                | PUT    | Update contact            |
-| `/api/v1/contacts/{id}`                | DELETE | Delete contact            |
-| `/api/v1/contacts/user/{userId}`       | GET    | Get user contacts         |
-| `/api/v1/contacts/company/{companyId}` | GET    | Get company contacts      |
-| `/api/v1/contacts/{id}/verify`         | POST   | Verify contact            |
-| `/api/v1/contacts/{id}/set-primary`    | POST   | Set as primary            |
+### Contact Management
 
-**📖 Complete API reference:** [docs/api/README.md](../api/README.md)
+| Method | Endpoint                             | Auth  | Description         |
+| ------ | ------------------------------------ | ----- | ------------------- |
+| POST   | `/api/v1/contacts`                   | Owner | Create contact      |
+| GET    | `/api/v1/contacts/{id}`              | Owner | Get contact         |
+| GET    | `/api/v1/contacts/owner/{ownerId}`   | Owner | List owner contacts |
+| PUT    | `/api/v1/contacts/{id}`              | Owner | Update contact      |
+| DELETE | `/api/v1/contacts/{id}`              | Owner | Delete contact      |
+| POST   | `/api/v1/contacts/{id}/verify`       | Owner | Verify contact      |
+| POST   | `/api/v1/contacts/{id}/make-primary` | Owner | Make primary        |
+
+### Internal Endpoints
+
+| Method | Endpoint                                       | Description                       |
+| ------ | ---------------------------------------------- | --------------------------------- |
+| GET    | `/api/v1/contacts/find-by-value?value={email}` | Find contact by value (auth flow) |
+
+**Note:** Internal endpoint used by User-Service for authentication
 
 ---
 
 ## 🗄️ Database Schema
 
-### Main Tables
+```sql
+CREATE TABLE contacts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,                    -- ✅ UUID type!
+    owner_type VARCHAR(20) NOT NULL,           -- USER, COMPANY
+    contact_value VARCHAR(255) NOT NULL,
+    contact_type VARCHAR(20) NOT NULL,         -- EMAIL, PHONE, ADDRESS, FAX, WEBSITE
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    verified_at TIMESTAMP,
+    verification_code VARCHAR(10),
+    verification_expires_at TIMESTAMP,
+    deleted_at TIMESTAMP,
 
-- `contacts` - Contact information
-- `outbox_events` - Event sourcing outbox
+    -- BaseEntity fields
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_by VARCHAR(100),
+    deleted BOOLEAN DEFAULT FALSE,
+    version INTEGER DEFAULT 0,
 
-### Flyway Migrations
+    UNIQUE(owner_id, contact_value)  -- No duplicate contacts per owner
+);
 
-```
-V1__create_contacts_table.sql
-V2__add_contact_indexes.sql
-V3__add_verification_fields.sql
-```
-
----
-
-## 🔐 Security
-
-### Authorization
-
-- **Tenant Isolation**: All queries filtered by `tenantId`
-- **Data Scope**: Users can only access their contacts
-- **Role-Based**: Standard Spring Security roles
-
----
-
-## 🧪 Testing
-
-### Test Coverage
-
-- Service layer: 85%
-- Repository layer: 95%
-- Overall: 88%
-
-### Running Tests
-
-```bash
-mvn test
-mvn verify
+CREATE INDEX idx_contacts_owner ON contacts(owner_id, owner_type);
+CREATE INDEX idx_contacts_value ON contacts(contact_value);
 ```
 
 ---
 
-## 📚 Related Documentation
+## 🤝 Integration Points
 
-- **System Architecture**: [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
-- **API Standards**: [docs/development/MICROSERVICES_API_STANDARDS.md](../development/MICROSERVICES_API_STANDARDS.md)
-- **UUID Standards**: [docs/development/DATA_TYPES_STANDARDS.md](../development/DATA_TYPES_STANDARDS.md)
+### Events Published
+
+- `ContactCreatedEvent` - New contact created
+- `ContactUpdatedEvent` - Contact updated (verified, primary changed)
+- `ContactDeletedEvent` - Contact soft deleted
+- `ContactVerifiedEvent` - Contact verified
+
+### Events Consumed
+
+- `UserCreatedEvent` - User created → Create email contact
+- `CompanyCreatedEvent` - Company created → Create website contact
 
 ---
 
-**Maintained By:** Backend Team  
+## 🔧 Configuration
+
+```yaml
+# application.yml
+server:
+  port: 8082
+
+spring:
+  application:
+    name: contact-service
+
+# Contact verification
+contact:
+  verification:
+    code-expiry-minutes: 15
+    code-length: 6
+```
+
+---
+
+## 📈 Refactoring Status
+
+### TODO (Low Priority)
+
+Contact-Service also needs refactoring:
+
+- ⚠️ Entity has business methods (232 lines) - can be refactored to Anemic Domain
+- ⚠️ No DTO request/response separation
+- ⚠️ No Mapper pattern yet
+
+**📖 Refactoring guide:** Same pattern as User/Company service
+
+---
+
+## 🔗 Related Documentation
+
+- [Code Structure](../development/code_structure_guide.md) - Coding standards
+- [Security Guide](../SECURITY.md) - Security documentation
+- [Policy Usage Analysis](../../POLICY_USAGE_ANALYSIS_AND_RECOMMENDATIONS.md) - Why policy not needed here
+
+---
+
 **Last Updated:** 2025-10-10  
-**Status:** ✅ Production Ready
+**Version:** 1.0  
+**Status:** ✅ Production Ready  
+**Policy Integration:** ❌ NOT NEEDED (Owner-based auth sufficient)
