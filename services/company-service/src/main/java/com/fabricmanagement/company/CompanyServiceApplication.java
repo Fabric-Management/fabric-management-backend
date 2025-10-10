@@ -18,12 +18,16 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * - Company profile and information management
  * - Multi-tenancy support
  * - Company settings and preferences
- * - Company user management
- * - Company billing and subscription management
- * - Integration with Contact Service for company contact management
  * - Policy Authorization Management (UserPermission, PolicyAudit)
+ * - Duplicate detection and prevention
  * 
  * Architecture: Clean Architecture + CQRS + Event Sourcing
+ * 
+ * Microservices Communication:
+ * - Feign clients with circuit breakers (resilient coupling)
+ * - Kafka for async events
+ * - Fallback mechanisms for graceful degradation
+ * 
  * Port: 8083
  */
 @SpringBootApplication(

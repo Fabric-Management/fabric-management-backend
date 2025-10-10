@@ -1,75 +1,32 @@
-# Database Guide
+# 🗄️ Database Operations Guide
 
-## Overview
+**Last Updated:** October 10, 2025  
+**Version:** 1.0  
+**Status:** ✅ Active  
+**Purpose:** Database operations, performance, monitoring
 
-Fabric Management System uses PostgreSQL as its primary database with a microservice-oriented architecture. Each service maintains its own schema and tables, following the Database-per-Service pattern.
+---
 
-## Database Structure
+## 📋 Overview
 
-### Core Principles
+This guide covers database **operations**, **performance tuning**, **monitoring**, and **maintenance**. For architecture and migration strategy, see:
 
-- **Database per Service**: Each microservice has its own logical database schema
-- **Event Sourcing Ready**: Event tables for audit and replay capabilities
-- **Soft Delete**: All entities support soft deletion with `deleted` flag
-- **Optimistic Locking**: Version fields prevent concurrent update conflicts
-- **Audit Fields**: Automatic tracking of created/updated timestamps and users
+- 📖 **Database Architecture**: [ARCHITECTURE.md](../ARCHITECTURE.md) - Database-per-service pattern
+- 📖 **Migration Strategy**: [deployment/DATABASE_MIGRATION_STRATEGY.md](../deployment/DATABASE_MIGRATION_STRATEGY.md) - Flyway & migrations
 
-### Service Schemas
+---
 
-#### User Service
+## 🎯 Quick Reference
 
-- **users**: Core user information and authentication
-- **user_sessions**: Active session management
-- **password_reset_tokens**: Password recovery tokens
-- **user_events**: User domain events for audit
+| Need                  | See                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| Database architecture | [ARCHITECTURE.md](../ARCHITECTURE.md)                                                     |
+| Migration strategy    | [deployment/DATABASE_MIGRATION_STRATEGY.md](../deployment/DATABASE_MIGRATION_STRATEGY.md) |
+| Performance tuning    | This document ⬇️                                                                          |
+| Monitoring queries    | This document ⬇️                                                                          |
+| Backup/restore        | This document ⬇️                                                                          |
 
-#### Contact Service
-
-- **contacts**: Multi-type contact information (email, phone, address)
-- Supports multiple owner types (USER, COMPANY)
-- Verification workflow for email/phone
-
-#### Company Service
-
-- **companies**: Company profiles and settings
-- **company_users**: User-company relationships
-- **company_settings**: Extended configuration
-- **company_events**: Company domain events
-
-## Database Initialization
-
-### 1. Initial Setup
-
-The database is initialized via `scripts/init-db.sql` which:
-
-- Creates required PostgreSQL extensions
-- Configures performance settings
-- Sets up common functions
-- Establishes user permissions
-
-### 2. Migration Strategy
-
-Each service uses Flyway for database migrations:
-
-```
-services/
-├── user-service/src/main/resources/db/migration/
-│   └── V1__create_user_tables.sql
-├── contact-service/src/main/resources/db/migration/
-│   └── V1__create_contact_tables.sql
-└── company-service/src/main/resources/db/migration/
-    └── V1__create_company_tables.sql
-```
-
-### 3. Running Migrations
-
-```bash
-# Run all migrations
-./scripts/run-migrations.sh
-
-# Run specific service migration
-./scripts/run-migrations.sh user-service
-```
+---
 
 ## Common Patterns
 

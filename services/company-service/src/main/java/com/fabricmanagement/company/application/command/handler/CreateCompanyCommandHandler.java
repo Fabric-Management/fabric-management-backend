@@ -33,7 +33,7 @@ public class CreateCompanyCommandHandler {
             throw new CompanyAlreadyExistsException(command.getName());
         }
         
-        // Create company aggregate
+        // ✅ CORRECT: Use factory method (includes validation + domain event)
         Company company = Company.create(
             command.getTenantId(),
             new CompanyName(command.getName()),
@@ -43,21 +43,29 @@ public class CreateCompanyCommandHandler {
             command.getDescription()
         );
         
-        // Set additional fields
-        if (command.getTaxId() != null) {
-            company.updateCompany(command.getLegalName(), command.getDescription(), command.getWebsite());
+        // Set registration details (tax ID, registration number)
+        if (command.getTaxId() != null || command.getRegistrationNumber() != null) {
+            company.setRegistrationDetails(command.getTaxId(), command.getRegistrationNumber());
         }
         
-        if (command.getWebsite() != null || command.getLogoUrl() != null) {
-            company.updateCompany(
-                command.getLegalName() != null ? command.getLegalName() : company.getLegalName(),
-                command.getDescription() != null ? command.getDescription() : company.getDescription(),
-                command.getWebsite()
-            );
+        // Set website and logo
+        if (command.getWebsite() != null) {
+            company.updateCompany(company.getLegalName(), company.getDescription(), command.getWebsite());
         }
         
         if (command.getLogoUrl() != null) {
             company.updateLogo(command.getLogoUrl());
+        }
+        
+        // Configure policy fields (businessType, parentCompany, relationship)
+        if (command.getBusinessType() != null) {
+            com.fabricmanagement.shared.domain.policy.CompanyType businessType = 
+                com.fabricmanagement.shared.domain.policy.CompanyType.valueOf(command.getBusinessType());
+            company.configurePolicyFields(
+                businessType,
+                command.getParentCompanyId(),
+                command.getRelationshipType()
+            );
         }
         
         // Save company

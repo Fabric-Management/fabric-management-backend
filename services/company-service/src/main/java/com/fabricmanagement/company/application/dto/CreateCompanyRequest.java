@@ -20,7 +20,7 @@ public class CreateCompanyRequest {
     
     @NotBlank(message = "Company name is required")
     @Size(min = 2, max = 100, message = "Company name must be between 2 and 100 characters")
-    @Pattern(regexp = "^[a-zA-Z0-9\\s\\-&.,()]+$", message = "Company name contains invalid characters")
+    @Pattern(regexp = "^[\\p{L}\\p{N}\\s\\-&.,()'/]+$", message = "Company name contains invalid characters")
     private String name;
     
     @Size(max = 200, message = "Legal name must not exceed 200 characters")
@@ -40,6 +40,12 @@ public class CreateCompanyRequest {
     
     @Size(max = 2000, message = "Description must not exceed 2000 characters")
     private String description;
+    
+    private String businessType; // INTERNAL, CUSTOMER, SUPPLIER, SUBCONTRACTOR
+    
+    private String parentCompanyId; // Parent company UUID (for external companies)
+    
+    private String relationshipType; // Business relationship type
     
     @Pattern(regexp = "^(https?://)?([\\da-z.-]+)\\.([a-z.]{2,6})[/\\w .-]*/?$", message = "Invalid website URL")
     private String website;

@@ -46,6 +46,17 @@ public class CreateUserRequest {
     
     private String role;
     
+    // Policy-based authorization fields
+    private String companyId; // UUID as String (boundary layer)
+    
+    private String departmentId; // UUID as String (boundary layer)
+    
+    private String stationId; // UUID as String (boundary layer)
+    
+    private String jobTitle;
+    
+    private String userContext; // SUPER_ADMIN, COMPANY_USER, SUPPLIER_USER, etc.
+    
     private Map<String, Object> preferences;
     
     private Map<String, Object> settings;

@@ -30,12 +30,14 @@ Bu doküman, Fabric Management System geliştirmesinde uyulması gereken temel p
 #### **WHY NO USERNAME?**
 
 **Business Requirement:**
+
 - Users authenticate with **email** or **phone number** (contactValue)
 - No separate username registration/management
 - Simplifies user experience
 - Aligns with modern authentication patterns
 
 **Technical Benefits:**
+
 1. ✅ **Reduced Complexity**: One less field to manage
 2. ✅ **Better UX**: Users remember their email/phone
 3. ✅ **Security**: UUID-based identification (no enumeration attacks)
@@ -44,17 +46,18 @@ Bu doküman, Fabric Management System geliştirmesinde uyulması gereken temel p
 
 #### **CORRECT TERMINOLOGY**
 
-| ❌ WRONG | ✅ CORRECT | Usage |
-|---------|-----------|-------|
-| `username` | `userId` | JWT 'sub' claim, Spring Security principal |
-| `username` | `contactValue` | Login request (email/phone) |
-| `extractUsername()` | `extractUserId()` | JWT token parsing |
-| `String username` | `String userId` | Method parameters |
-| `user.getUsername()` | `user.getId()` | Entity identification |
+| ❌ WRONG             | ✅ CORRECT        | Usage                                      |
+| -------------------- | ----------------- | ------------------------------------------ |
+| `username`           | `userId`          | JWT 'sub' claim, Spring Security principal |
+| `username`           | `contactValue`    | Login request (email/phone)                |
+| `extractUsername()`  | `extractUserId()` | JWT token parsing                          |
+| `String username`    | `String userId`   | Method parameters                          |
+| `user.getUsername()` | `user.getId()`    | Entity identification                      |
 
 #### **CODE EXAMPLES**
 
 **❌ WRONG:**
+
 ```java
 // NEVER DO THIS!
 @Entity
@@ -70,6 +73,7 @@ String username = jwtTokenProvider.extractUsername(token); // ❌ DEPRECATED!
 ```
 
 **✅ CORRECT:**
+
 ```java
 // This is the way!
 @Entity
@@ -146,6 +150,7 @@ Controller → Service → Repository → Database
 - **KISS**: Keep It Simple, Stupid
 - **DRY**: Don't Repeat Yourself
 - **YAGNI**: You Aren't Gonna Need It
+- **Loose Coupling**: Minimize dependencies between components
 
 ### 3. Spring Boot Best Practices
 
@@ -536,6 +541,377 @@ DELETE /api/v1/users/{id}     - Delete
 - `404 Not Found` - Resource not found
 - `409 Conflict` - Duplicate resource
 - `500 Internal Server Error` - Server error
+
+---
+
+## 🔗 Loose Coupling Principles
+
+### Nedir?
+
+**Loose Coupling**, yazılım bileşenlerinin birbirine minimum bağımlılıkla tasarlanması prensididir. Bir bileşendeki değişiklik, diğer bileşenleri minimum seviyede etkilemelidir.
+
+### Neden Önemli?
+
+- ✅ **Bakım Kolaylığı**: Bir servis değiştiğinde diğerleri etkilenmez
+- ✅ **Test Edilebilirlik**: Bileşenler bağımsız test edilebilir
+- ✅ **Esneklik**: Teknoloji değişikliği kolay
+- ✅ **Ölçeklenebilirlik**: Servisler bağımsız scale edilebilir
+- ✅ **Paralel Geliştirme**: Ekipler bağımsız çalışabilir
+
+### 1. Dependency Injection (Constructor Injection)
+
+```java
+// ✅ DOĞRU: Loose Coupling with Dependency Injection
+@Service
+@RequiredArgsConstructor
+public class UserService {
+    private final UserRepository userRepository;  // Interface
+    private final EmailService emailService;      // Interface
+    private final EventPublisher eventPublisher;  // Interface
+
+    public void createUser(CreateUserRequest request) {
+        // Dependencies are injected, easily mockable
+        User user = userRepository.save(new User());
+        emailService.sendWelcomeEmail(user);
+        eventPublisher.publish(new UserCreatedEvent(user));
+    }
+}
+
+// ❌ YANLIŞ: Tight Coupling with new keyword
+@Service
+public class UserService {
+    private final UserRepository userRepository = new UserRepositoryImpl();  // Tight coupling!
+    private final EmailService emailService = new SmtpEmailService();        // Hard to test!
+
+    public void createUser(CreateUserRequest request) {
+        // Cannot mock dependencies, hard to test
+    }
+}
+```
+
+### 2. Interface Segregation (Program to Interfaces)
+
+```java
+// ✅ DOĞRU: Depend on interfaces, not concrete classes
+public interface NotificationService {
+    void sendNotification(String userId, String message);
+}
+
+@Service
+public class EmailNotificationService implements NotificationService {
+    public void sendNotification(String userId, String message) {
+        // Email implementation
+    }
+}
+
+@Service
+public class SmsNotificationService implements NotificationService {
+    public void sendNotification(String userId, String message) {
+        // SMS implementation
+    }
+}
+
+@Service
+@RequiredArgsConstructor
+public class UserService {
+    private final NotificationService notificationService;  // Interface!
+
+    public void notifyUser(String userId, String message) {
+        notificationService.sendNotification(userId, message);
+        // Don't care about implementation details
+    }
+}
+
+// ❌ YANLIŞ: Depend on concrete implementation
+@Service
+@RequiredArgsConstructor
+public class UserService {
+    private final EmailNotificationService emailService;  // Concrete class!
+
+    // Now tightly coupled to email, cannot switch to SMS easily
+}
+```
+
+### 3. Event-Driven Communication
+
+```java
+// ✅ DOĞRU: Loose Coupling through events
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+    private final EventPublisher eventPublisher;
+
+    public void createOrder(Order order) {
+        orderRepository.save(order);
+
+        // Publish event - don't call other services directly
+        eventPublisher.publish(new OrderCreatedEvent(order));
+    }
+}
+
+@Component
+@RequiredArgsConstructor
+public class InventoryEventListener {
+    // Listens to events independently
+    @EventListener
+    public void handleOrderCreated(OrderCreatedEvent event) {
+        // Update inventory
+        inventoryService.reserveStock(event.getOrderId());
+    }
+}
+
+@Component
+@RequiredArgsConstructor
+public class NotificationEventListener {
+    // Also listens independently - no direct dependency
+    @EventListener
+    public void handleOrderCreated(OrderCreatedEvent event) {
+        // Send notification
+        notificationService.notifyCustomer(event.getCustomerId());
+    }
+}
+
+// ❌ YANLIŞ: Direct service coupling
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+    private final InventoryService inventoryService;      // Tight coupling!
+    private final NotificationService notificationService; // Tight coupling!
+    private final ShippingService shippingService;        // Tight coupling!
+
+    public void createOrder(Order order) {
+        orderRepository.save(order);
+
+        // Direct calls create tight coupling
+        inventoryService.reserveStock(order);
+        notificationService.notifyCustomer(order.getCustomerId());
+        shippingService.scheduleDelivery(order);
+
+        // If any of these fail, entire operation fails
+        // Adding new listener requires changing this service
+    }
+}
+```
+
+### 4. Feign Clients for Microservices
+
+```java
+// ✅ DOĞRU: Interface-based Feign Client
+@FeignClient(
+    name = "user-service",
+    url = "${services.user-service.url}",
+    fallback = UserServiceClientFallback.class  // Resilience
+)
+public interface UserServiceClient {
+    @GetMapping("/api/v1/users/{userId}")
+    ApiResponse<UserDto> getUser(@PathVariable UUID userId);
+}
+
+@Service
+@RequiredArgsConstructor
+public class CompanyService {
+    private final UserServiceClient userServiceClient;  // Interface!
+
+    public CompanyResponse getCompanyWithOwner(UUID companyId) {
+        Company company = companyRepository.findById(companyId);
+        UserDto owner = userServiceClient.getUser(company.getOwnerId()).getData();
+
+        // Loosely coupled - can switch user-service implementation
+        return mapToResponse(company, owner);
+    }
+}
+
+// ❌ YANLIŞ: Direct HTTP calls
+@Service
+public class CompanyService {
+    private final RestTemplate restTemplate = new RestTemplate();  // Tight coupling!
+
+    public CompanyResponse getCompanyWithOwner(UUID companyId) {
+        Company company = companyRepository.findById(companyId);
+
+        // Hard-coded URL, no fallback, hard to test
+        String url = "http://localhost:8081/api/v1/users/" + company.getOwnerId();
+        UserDto owner = restTemplate.getForObject(url, UserDto.class);
+
+        return mapToResponse(company, owner);
+    }
+}
+```
+
+### 5. Configuration Externalization
+
+```java
+// ✅ DOĞRU: Externalized configuration
+@Configuration
+@ConfigurationProperties(prefix = "app.notification")
+@Data
+public class NotificationConfig {
+    private String emailProvider;    // From application.yml
+    private String smsProvider;      // From application.yml
+    private int retryAttempts;       // From application.yml
+}
+
+@Service
+@RequiredArgsConstructor
+public class NotificationService {
+    private final NotificationConfig config;  // Injected
+
+    public void send(String message) {
+        // Configuration can change without code change
+        if ("sendgrid".equals(config.getEmailProvider())) {
+            // Use SendGrid
+        } else if ("smtp".equals(config.getEmailProvider())) {
+            // Use SMTP
+        }
+    }
+}
+
+// ❌ YANLIŞ: Hard-coded configuration
+@Service
+public class NotificationService {
+    private static final String EMAIL_PROVIDER = "sendgrid";  // Hard-coded!
+    private static final String SMS_PROVIDER = "twilio";      // Hard-coded!
+    private static final int RETRY_ATTEMPTS = 3;              // Hard-coded!
+
+    // Cannot change without recompiling
+}
+```
+
+### 6. DTO Pattern for API Contracts
+
+```java
+// ✅ DOĞRU: DTO layer separates API from domain
+@RestController
+@RequestMapping("/api/v1/users")
+@RequiredArgsConstructor
+public class UserController {
+    private final UserService userService;
+    private final UserMapper userMapper;  // Separate mapping
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable UUID userId) {
+        User user = userService.getUser(userId);
+        UserResponse response = userMapper.toResponse(user);  // DTO conversion
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+}
+
+// Domain can change without breaking API contract
+@Entity
+public class User extends BaseEntity {
+    private String firstName;
+    private String lastName;
+    // Internal structure can change freely
+}
+
+// API contract stays stable
+@Data
+public class UserResponse {
+    private String id;
+    private String fullName;  // Different from domain structure
+    // Stable external contract
+}
+
+// ❌ YANLIŞ: Direct entity exposure
+@RestController
+@RequestMapping("/api/v1/users")
+public class UserController {
+    @GetMapping("/{userId}")
+    public ResponseEntity<User> getUser(@PathVariable UUID userId) {
+        return ResponseEntity.ok(userRepository.findById(userId));  // Exposing entity!
+    }
+}
+// Now API is tightly coupled to database structure
+// Cannot change entity without breaking clients
+```
+
+### 7. Shared Modules Strategy
+
+```java
+// ✅ DOĞRU: Generic shared components
+// shared-domain/exception/ResourceNotFoundException.java
+public class ResourceNotFoundException extends DomainException {
+    // Generic, reusable by all services
+}
+
+// shared-infrastructure/config/DefaultWebConfig.java
+@Configuration
+@ConditionalOnMissingBean(name = "webConfig")  // Can be overridden!
+public class DefaultWebConfig {
+    // Default configuration, services can customize
+}
+
+// ❌ YANLIŞ: Service-specific logic in shared module
+// shared-domain/service/UserService.java  ❌ WRONG!
+public class UserService {
+    // Business logic in shared module creates tight coupling!
+}
+```
+
+### 8. Database per Service Pattern
+
+```
+✅ DOĞRU: Each service has its own database
+
+user-service:
+  database: user_db       # Own database
+  schema: user_schema
+
+company-service:
+  database: company_db    # Own database
+  schema: company_schema
+
+contact-service:
+  database: contact_db    # Own database
+  schema: contact_schema
+
+Benefits:
+- Services can be deployed independently
+- Database schema changes don't affect other services
+- Technology choice freedom (PostgreSQL, MongoDB, etc.)
+- Better fault isolation
+
+❌ YANLIŞ: Shared database
+
+all-services:
+  database: shared_db     # All services use same DB
+  tables:
+    - users             # User service tables
+    - companies         # Company service tables
+    - contacts          # Contact service tables
+
+Problems:
+- Schema changes affect all services
+- Cannot deploy services independently
+- Database becomes bottleneck
+- Tight coupling through database
+```
+
+### Loose Coupling Checklist
+
+Before committing code, verify:
+
+- [ ] Dependencies injected via constructor (not `new` keyword)
+- [ ] Programming to interfaces (not concrete classes)
+- [ ] Events used for service-to-service communication
+- [ ] Feign Clients used for synchronous calls
+- [ ] Configuration externalized to `application.yml`
+- [ ] DTOs used for API contracts (not entities)
+- [ ] Shared modules contain only generic code
+- [ ] Each service has its own database
+- [ ] No direct database access across services
+- [ ] Services can be deployed independently
+
+### Loose Coupling Benefits
+
+| Without Loose Coupling              | With Loose Coupling                 |
+| ----------------------------------- | ----------------------------------- |
+| ❌ Difficult to test (mocking hard) | ✅ Easy to test (mock dependencies) |
+| ❌ Changes cascade across services  | ✅ Changes isolated to one service  |
+| ❌ Cannot deploy independently      | ✅ Independent deployment           |
+| ❌ Technology lock-in               | ✅ Technology freedom               |
+| ❌ Parallel development difficult   | ✅ Teams work independently         |
+| ❌ Single point of failure          | ✅ Better fault isolation           |
 
 ---
 

@@ -1,7 +1,6 @@
 package com.fabricmanagement.company.infrastructure.messaging;
 
 import com.fabricmanagement.company.domain.aggregate.Company;
-import com.fabricmanagement.company.infrastructure.persistence.CompanyEventStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,7 +10,10 @@ import java.util.List;
 /**
  * Company Domain Event Publisher
  * 
- * Listens to entity save events and publishes company domain events
+ * Publishes company domain events to Kafka via Outbox Pattern
+ * 
+ * Note: Removed CompanyEventStore (event sourcing not implemented)
+ * Events are published to Kafka and persisted via Outbox Pattern only
  */
 @Component("companyDomainEventPublisher")
 @RequiredArgsConstructor
@@ -19,10 +21,9 @@ import java.util.List;
 public class CompanyDomainEventPublisher {
     
     private final CompanyEventPublisher companyEventPublisher;
-    private final CompanyEventStore companyEventStore;
     
     /**
-     * Publishes domain events after transaction commit
+     * Publishes domain events to Kafka after transaction commit
      */
     public void publishEvents(Company company) {
         List<Object> events = company.getAndClearDomainEvents();
@@ -34,10 +35,7 @@ public class CompanyDomainEventPublisher {
         log.debug("Publishing {} domain events for company: {}", events.size(), company.getId());
         
         for (Object event : events) {
-            // Store event in event store
-            companyEventStore.storeEvent(company.getId(), event);
-            
-            // Publish event to Kafka
+            // Publish event to Kafka (via Outbox Pattern)
             companyEventPublisher.publishEvent(event);
         }
     }

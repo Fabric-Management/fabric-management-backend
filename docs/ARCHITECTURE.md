@@ -1,9 +1,24 @@
 # 🏗️ Fabric Management - Mikroservis Mimarisi
 
-**Versiyon:** 2.1  
-**Tarih:** 9 Ekim 2025 (Spring Security Native Migration)  
+**Versiyon:** 3.0  
+**Tarih:** 10 Ekim 2025 ⚡ **MAJOR REFACTORING**  
 **Prensip:** Clean Architecture + SOLID + DRY + KISS + YAGNI  
 **Hedef:** Enterprise-grade, bakanlıkların imrendiği profesyonel mimari
+
+---
+
+## 🚨 IMPORTANT: Architecture Updated (Oct 10, 2025)
+
+**Majör mimari refactoring tamamlandı. Detaylı bilgi için:**  
+👉 **[ARCHITECTURE_REFACTORING_OCT_10_2025.md](./reports/2025-Q4/october/ARCHITECTURE_REFACTORING_OCT_10_2025.md)**
+
+### Key Changes:
+
+1. ✅ **Loose Coupling**: Facade controller'lar kaldırıldı (CompanyContactController, CompanyUserController)
+2. ✅ **Database Cleanup**: 6 gereksiz tablo kaldırıldı (43% azalma)
+3. ✅ **Event Sourcing Removed**: CompanyEventStore kaldırıldı, sadece Outbox Pattern
+4. ✅ **Centralized Constants**: Tüm hardcoded değerler SecurityConstants/ServiceConstants'a taşındı
+5. ✅ **Feign + Resilience4j**: Circuit breaker + fallback mechanism ekl endi
 
 ---
 
@@ -616,71 +631,7 @@ throw new ResourceNotFoundException("User", userId.toString());
 - ✅ Consistency %100
 - ✅ Test stable (key bazlı)
 
----
-
-## 🚀 Refactoring Guide
-
-### 2 Haftalık Plan
-
-#### Hafta 1: Mapper & Context
-
-```bash
-# 1. Mapper sınıfları
-services/{service}/application/mapper/
-  ├─ {Entity}Mapper.java
-
-# 2. SecurityContext injection
-shared/shared-application/
-  └─ context/SecurityContext.java  # Simple POJO
-
-shared/shared-security/
-  └─ filter/JwtAuthenticationFilter.java  # Sets SecurityContext as principal
-
-# 3. Controller'ları güncelle
-@AuthenticationPrincipal SecurityContext ctx  # Spring Security native!
-```
-
-#### Hafta 2: Repository & Exception
-
-```bash
-# 1. Repository custom methods
-Optional<User> findActiveByIdAndTenantId(UUID id, UUID tenantId);
-
-# 2. Exception standardization
-throw new ResourceNotFoundException("User", userId);
-
-# 3. Message keys
-ErrorMessageKeys.java + errors_en.properties
-```
-
-### 4 Haftalık Detaylı Plan
-
-**Sprint 1 (Hafta 1-2): Temel Refactoring**
-
-- [ ] Mapper sınıfları (UserMapper, CompanyMapper, ContactMapper)
-- [ ] SecurityContext injection
-- [ ] BaseController pattern (opsiyonel)
-- **Etki:** DRY %40 iyileşme
-
-**Sprint 2 (Hafta 3-4): Service Refactoring**
-
-- [ ] Service'leri böl (UserService + UserSearchService)
-- [ ] Repository custom methodlar
-- [ ] Exception standardization
-- **Etki:** SRP uygulandı, Service 150 satıra indi
-
-**Sprint 3 (Hafta 5-6): Performance**
-
-- [ ] Batch API endpoints
-- [ ] N+1 query fix
-- [ ] Redis cache layer
-- **Etki:** Response time %50 ↓
-
-**Sprint 4 (Hafta 7-8): CQRS Simplification**
-
-- [ ] Company Service handler'ları kaldır
-- [ ] Basit CRUD pattern
-- **Etki:** Kod karmaşıklığı %70 ↓
+**📖 Refactoring strategies:** [development/CODE_MIGRATION_GUIDE.md](./development/CODE_MIGRATION_GUIDE.md)
 
 ---
 
@@ -805,6 +756,7 @@ Principles:
   ✅ KISS (Keep It Simple)
   ✅ YAGNI (You Aren't Gonna Need It)
   ✅ SOLID (All principles)
+  ✅ Loose Coupling (Minimize dependencies)
   ✅ Clean Architecture
   ✅ Domain-Driven Design
 ```

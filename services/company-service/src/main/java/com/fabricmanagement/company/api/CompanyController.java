@@ -35,6 +35,7 @@ import java.util.UUID;
 public class CompanyController {
     
     private final CompanyService companyService;
+    private final com.fabricmanagement.company.infrastructure.config.DuplicateDetectionConfig duplicateConfig;
     
     /**
      * Creates a new company
@@ -216,5 +217,123 @@ public class CompanyController {
         companyService.updateSubscription(companyId, request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.ok(ApiResponse.success(null, "Company subscription updated successfully"));
+    }
+    
+    // =========================================================================
+    // DUPLICATE PREVENTION ENDPOINTS
+    // =========================================================================
+    
+    /**
+     * Check for duplicate companies before creating
+     * 
+     * This endpoint helps prevent duplicate company creation by:
+     * 1. Checking exact match on Tax ID and Registration Number
+     * 2. Fuzzy matching on company names (detects typos and similar names)
+     * 3. Returns confidence score and matched company details
+     * 
+     * Usage: Call this endpoint before creating a company (frontend validation)
+     * 
+     * @param request Company details to check
+     * @param ctx Security context
+     * @return Duplicate check result with matched company (if any)
+     */
+    @PostMapping("/check-duplicate")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<CheckDuplicateResponse>> checkDuplicate(
+            @Valid @RequestBody CheckDuplicateRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.info("Checking for duplicate company: {}", request.getName());
+        
+        CheckDuplicateResponse result = companyService.checkDuplicate(request, ctx.getTenantId());
+        
+        if (result.isDuplicate()) {
+            log.warn("Potential duplicate found: {} (confidence: {}%)", 
+                result.getMatchedCompanyName(), (int)(result.getConfidence() * 100));
+        }
+        
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+    
+    /**
+     * Search companies for autocomplete (search-as-you-type)
+     * 
+     * This endpoint provides fast search results for frontend autocomplete:
+     * - Returns top 10 matches
+     * - Uses full-text search for performance
+     * - Helps users find existing companies before creating duplicates
+     * 
+     * Usage: Call this endpoint as user types in company name field
+     * 
+     * @param query Search term (partial company name)
+     * @param ctx Security context
+     * @return List of matching companies
+     */
+    @GetMapping("/autocomplete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<CompanyAutocompleteResponse>> autocomplete(
+            @RequestParam("q") String query,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Autocomplete search: {}", query);
+        
+        // Configuration-driven validation (NO MAGIC NUMBERS!)
+        int minLength = duplicateConfig.getAutocompleteMinLength();
+        if (query == null || query.trim().length() < minLength) {
+            return ResponseEntity.ok(ApiResponse.success(
+                CompanyAutocompleteResponse.builder()
+                    .suggestions(List.of())
+                    .totalCount(0)
+                    .build(),
+                String.format("Query too short (minimum %d characters)", minLength)
+            ));
+        }
+        
+        CompanyAutocompleteResponse result = companyService.autocomplete(query.trim(), ctx.getTenantId());
+        
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+    
+    /**
+     * Find similar companies by name
+     * 
+     * This endpoint finds companies with similar names using fuzzy matching:
+     * - Detects typos (ABC vs ABD)
+     * - Handles abbreviations (Ltd vs Limited)
+     * - Returns similarity scores
+     * 
+     * Usage: Advanced duplicate detection, data quality checks
+     * 
+     * @param name Company name to search for
+     * @param threshold Minimum similarity (0.0-1.0), default 0.3
+     * @param ctx Security context
+     * @return List of similar companies with similarity scores
+     */
+    @GetMapping("/similar")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<CompanyResponse>>> findSimilar(
+            @RequestParam("name") String name,
+            @RequestParam(value = "threshold", defaultValue = "0.3") double threshold,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Finding similar companies to: {}", name);
+        
+        // Configuration-driven validation (NO MAGIC NUMBERS!)
+        int minLength = duplicateConfig.getFuzzySearchMinLength();
+        if (name == null || name.trim().length() < minLength) {
+            return ResponseEntity.ok(ApiResponse.success(
+                List.of(),
+                String.format("Query too short (minimum %d characters)", minLength)
+            ));
+        }
+        
+        // Validate threshold range
+        if (threshold < 0.0 || threshold > 1.0) {
+            threshold = duplicateConfig.getDatabaseSearchThreshold(); // Use configured default
+        }
+        
+        List<CompanyResponse> similar = companyService.findSimilar(name.trim(), threshold, ctx.getTenantId());
+        
+        return ResponseEntity.ok(ApiResponse.success(similar));
     }
 }

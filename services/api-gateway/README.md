@@ -1,173 +1,93 @@
 # 🚪 API Gateway
 
-Central entry point for Fabric Management System microservices.
-
-## 📋 Overview
-
-The API Gateway provides:
-
-- ✅ **Centralized Routing** - Single entry point for all services
-- 🔒 **JWT Authentication** - Centralized token validation
-- 🚦 **Rate Limiting** - Redis-based request throttling
-- ⚡ **Circuit Breaker** - Resilience4j fault tolerance
-- 🌍 **CORS Support** - Cross-origin resource sharing
-- 📊 **Request Logging** - Comprehensive request/response logging
-- 🔄 **Retry Logic** - Automatic retry for failed requests
-
-## 🏗️ Architecture
-
-```
-Client → API Gateway (8080) → Microservices
-                ↓
-            [Filters]
-        - JWT Authentication
-        - Request Logging
-        - Rate Limiting
-        - Circuit Breaker
-                ↓
-            [Routing]
-        - User Service (8081)
-        - Company Service (8083)
-        - Contact Service (8082)
-```
+Central entry point for all Fabric Management System microservices.
 
 ## 🚀 Quick Start
 
-### Local Development
-
 ```bash
-# Run with Maven
+# Run locally
 cd services/api-gateway
 mvn spring-boot:run
 
+# With Docker
+docker-compose up api-gateway
+
 # Access
-curl http://localhost:8080/gateway/health
-```
-
-### Docker
-
-```bash
-# Build and run with Docker Compose
-docker-compose -f docker-compose-complete.yml up -d api-gateway
-
-# Check logs
-docker logs -f fabric-api-gateway
-```
-
-## 📡 Endpoints
-
-### Public Endpoints (No Auth Required)
-
-| Endpoint                     | Description              |
-| ---------------------------- | ------------------------ |
-| `GET /gateway/health`        | Gateway health check     |
-| `GET /gateway/info`          | Gateway information      |
-| `GET /actuator/health`       | Spring Actuator health   |
-| `POST /api/v1/users/auth/**` | Authentication endpoints |
-
-### Protected Endpoints (Auth Required)
-
-All other endpoints require `Authorization: Bearer <token>` header.
-
-## 🔒 Authentication
-
-Gateway extracts JWT token and adds headers to downstream requests:
-
-```
-Authorization: Bearer <token>
-    ↓
-Gateway validates JWT
-    ↓
-X-Tenant-Id: <tenant-uuid>
-X-User-Id: <user-uuid>
-    ↓
-Downstream Service
-```
-
-## 🚦 Rate Limiting
-
-Redis-based rate limiting per route:
-
-- **Replenish Rate**: 50 requests/second
-- **Burst Capacity**: 100 requests
-
-## ⚡ Circuit Breaker
-
-Resilience4j configuration:
-
-- **Failure Threshold**: 50%
-- **Wait Duration**: 30s
-- **Sliding Window**: 100 calls
-
-## 📊 Monitoring
-
-### Health Checks
-
-```bash
-# Gateway health
-curl http://localhost:8080/gateway/health
-
-# Actuator health
 curl http://localhost:8080/actuator/health
-
-# Circuit breaker status
-curl http://localhost:8080/actuator/circuitbreakers
 ```
 
-### Metrics
+## ⚡ Key Features
+
+- ✅ **Centralized Routing** - Single entry point for all services
+- ✅ **JWT Authentication** - Token validation at gateway level
+- ✅ **Rate Limiting** - Redis-based request throttling
+- ✅ **Circuit Breaker** - Resilience4j fault tolerance
+- ✅ **Policy Authorization** - PEP (Policy Enforcement Point)
+- ✅ **CORS Support** - Cross-origin resource sharing
+- ✅ **Request Logging** - Comprehensive audit trail
+
+## 🎯 Routes
+
+| Path Pattern           | Target Service  | Port |
+| ---------------------- | --------------- | ---- |
+| `/api/v1/users/**`     | user-service    | 8081 |
+| `/api/v1/contacts/**`  | contact-service | 8082 |
+| `/api/v1/companies/**` | company-service | 8083 |
+
+**Service-Aware Pattern:** Gateway does NOT strip prefix.  
+**📖 Complete routing guide:** [docs/development/MICROSERVICES_API_STANDARDS.md](../../docs/development/MICROSERVICES_API_STANDARDS.md)
+
+## 🔐 Security
+
+- **JWT Validation**: Every request except public endpoints
+- **Policy Enforcement**: PDP (Policy Decision Point) integration
+- **Rate Limiting**: 100 req/min general, 5 req/min authentication
+
+**📖 Security architecture:** [docs/SECURITY.md](../../docs/SECURITY.md)
+
+## ⚙️ Configuration
+
+```yaml
+# application.yml key settings
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/users/**
+```
+
+## 🧪 Testing
 
 ```bash
-# Prometheus metrics
-curl http://localhost:8080/actuator/prometheus
+# Unit tests
+mvn test
 
-# Gateway routes
-curl http://localhost:8080/actuator/gateway/routes
+# Test routes
+curl http://localhost:8080/api/v1/users/health
 ```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable              | Description         | Default               |
-| --------------------- | ------------------- | --------------------- |
-| `JWT_SECRET`          | JWT signing secret  | Required              |
-| `REDIS_HOST`          | Redis host          | localhost             |
-| `REDIS_PORT`          | Redis port          | 6379                  |
-| `USER_SERVICE_URL`    | User service URL    | http://localhost:8081 |
-| `COMPANY_SERVICE_URL` | Company service URL | http://localhost:8083 |
-| `CONTACT_SERVICE_URL` | Contact service URL | http://localhost:8082 |
 
 ## 🐛 Troubleshooting
 
-### Issue: 401 Unauthorized
+| Issue                    | Solution                          |
+| ------------------------ | --------------------------------- |
+| Port 8080 already in use | `lsof -i :8080` and kill process  |
+| Service routing fails    | Check target service is running   |
+| JWT validation fails     | Check JWT secret matches services |
 
-**Solution**: Check JWT token is valid and not expired.
+## 📚 Documentation
 
-```bash
-# Test with valid token
-curl -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/users
-```
+- **API Standards**: [docs/development/MICROSERVICES_API_STANDARDS.md](../../docs/development/MICROSERVICES_API_STANDARDS.md)
+- **Architecture**: [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)
+- **Security**: [docs/SECURITY.md](../../docs/SECURITY.md)
 
-### Issue: 503 Service Unavailable
+---
 
-**Solution**: Check if downstream service is running and healthy.
-
-```bash
-# Check service health
-curl http://localhost:8081/actuator/health
-```
-
-### Issue: 429 Too Many Requests
-
-**Solution**: Rate limit exceeded. Wait and retry.
-
-## 📚 Related Documentation
-
-- [API Gateway Setup Guide](../../docs/deployment/API_GATEWAY_SETUP.md)
-- [Security Configuration](../../docs/security/SECURITY.md)
-- [Deployment Guide](../../docs/deployment/DEPLOYMENT.md)
-
-## 🏷️ Version
-
-**Version**: 1.0.0
-**Last Updated**: 2025-10-03
+**Port:** 8080  
+**Technology:** Spring Cloud Gateway  
+**Status:** ✅ Production

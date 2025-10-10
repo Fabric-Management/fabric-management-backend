@@ -51,15 +51,36 @@ CREATE INDEX IF NOT EXISTS idx_contacts_is_primary ON contacts(is_primary);
 CREATE INDEX IF NOT EXISTS idx_contacts_owner_id_type ON contacts(owner_id, owner_type);
 CREATE INDEX IF NOT EXISTS idx_contacts_deleted ON contacts(deleted);
 
--- Add unique constraint for contact value
-ALTER TABLE contacts ADD CONSTRAINT uk_contact_value UNIQUE (contact_value);
+-- Add unique constraint for contact value (idempotent)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uk_contact_value'
+    ) THEN
+        ALTER TABLE contacts ADD CONSTRAINT uk_contact_value UNIQUE (contact_value);
+    END IF;
+END $$;
 
--- Add check constraints
-ALTER TABLE contacts ADD CONSTRAINT chk_owner_type
-    CHECK (owner_type IN ('USER', 'COMPANY'));
+-- Add check constraints (idempotent)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'chk_owner_type'
+    ) THEN
+        ALTER TABLE contacts ADD CONSTRAINT chk_owner_type
+            CHECK (owner_type IN ('USER', 'COMPANY'));
+    END IF;
+END $$;
 
-ALTER TABLE contacts ADD CONSTRAINT chk_contact_type
-    CHECK (contact_type IN ('EMAIL', 'PHONE', 'ADDRESS', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'));
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'chk_contact_type'
+    ) THEN
+        ALTER TABLE contacts ADD CONSTRAINT chk_contact_type
+            CHECK (contact_type IN ('EMAIL', 'PHONE', 'ADDRESS', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'));
+    END IF;
+END $$;
 
 -- =============================================================================
 -- TRIGGERS (Auto-update timestamps)

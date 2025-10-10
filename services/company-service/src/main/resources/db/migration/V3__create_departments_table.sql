@@ -39,20 +39,30 @@ COMMENT ON TABLE departments IS 'Departments table - Organizational units (V3)';
 COMMENT ON COLUMN departments.code IS 'Department code. Example: WEAVING, FINANCE, QC';
 COMMENT ON COLUMN departments.type IS 'Department type: PRODUCTION, QUALITY, WAREHOUSE, FINANCE, etc.';
 
--- Foreign keys
-ALTER TABLE departments
-    ADD CONSTRAINT fk_departments_company
-        FOREIGN KEY (company_id) REFERENCES companies(id)
-        ON DELETE CASCADE;
+-- Foreign keys (IF NOT EXISTS)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_departments_company') THEN
+        ALTER TABLE departments
+            ADD CONSTRAINT fk_departments_company
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+                ON DELETE CASCADE;
+    END IF;
+END $$;
 
--- Indexes
-CREATE INDEX idx_departments_company ON departments(company_id) WHERE deleted = FALSE;
-CREATE INDEX idx_departments_type ON departments(type) WHERE deleted = FALSE;
-CREATE INDEX idx_departments_company_type ON departments(company_id, type) WHERE deleted = FALSE AND active = TRUE;
+-- Indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_departments_company ON departments(company_id) WHERE deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_departments_type ON departments(type) WHERE deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_departments_company_type ON departments(company_id, type) WHERE deleted = FALSE AND active = TRUE;
 
--- Trigger
-CREATE TRIGGER update_departments_updated_at
-    BEFORE UPDATE ON departments
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Trigger (IF NOT EXISTS)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_departments_updated_at') THEN
+        CREATE TRIGGER update_departments_updated_at
+            BEFORE UPDATE ON departments
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 

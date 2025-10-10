@@ -80,5 +80,68 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
      */
     @Query("SELECT c FROM Company c WHERE c.taxId = :taxId AND c.tenantId = :tenantId AND c.deleted = false")
     Optional<Company> findByTaxIdAndTenantId(@Param("taxId") String taxId, @Param("tenantId") UUID tenantId);
+    
+    /**
+     * Finds company by registration number and tenant ID
+     */
+    @Query("SELECT c FROM Company c WHERE c.registrationNumber = :registrationNumber AND c.tenantId = :tenantId AND c.deleted = false")
+    Optional<Company> findByRegistrationNumberAndTenantId(@Param("registrationNumber") String registrationNumber, @Param("tenantId") UUID tenantId);
+    
+    /**
+     * Fuzzy search companies by name using PostgreSQL similarity
+     * Uses pg_trgm extension for fuzzy matching
+     * 
+     * @param searchTerm The name to search for
+     * @param tenantId Tenant context
+     * @param similarityThreshold Minimum similarity (0.0 to 1.0), default 0.3
+     * @return List of similar companies ordered by similarity score
+     */
+    @Query(value = 
+        "SELECT c.* FROM companies c " +
+        "WHERE c.tenant_id = :tenantId " +
+        "AND c.deleted = false " +
+        "AND (similarity(c.name, :searchTerm) > :threshold " +
+        "     OR similarity(COALESCE(c.legal_name, ''), :searchTerm) > :threshold) " +
+        "ORDER BY GREATEST(similarity(c.name, :searchTerm), similarity(COALESCE(c.legal_name, ''), :searchTerm)) DESC " +
+        "LIMIT 10",
+        nativeQuery = true)
+    List<Company> findSimilarCompanies(
+        @Param("tenantId") UUID tenantId,
+        @Param("searchTerm") String searchTerm,
+        @Param("threshold") double similarityThreshold);
+    
+    /**
+     * Search companies for autocomplete (search-as-you-type)
+     * Uses full-text search for fast results
+     * 
+     * @param searchTerm The partial name to search for
+     * @param tenantId Tenant context
+     * @param limit Maximum results to return
+     * @return List of matching companies
+     */
+    @Query(value = 
+        "SELECT c.* FROM companies c " +
+        "WHERE c.tenant_id = :tenantId " +
+        "AND c.deleted = false " +
+        "AND c.name_search_vector @@ plainto_tsquery('simple', :searchTerm) " +
+        "ORDER BY ts_rank(c.name_search_vector, plainto_tsquery('simple', :searchTerm)) DESC " +
+        "LIMIT :limit",
+        nativeQuery = true)
+    List<Company> searchCompaniesForAutocomplete(
+        @Param("tenantId") UUID tenantId,
+        @Param("searchTerm") String searchTerm,
+        @Param("limit") int limit);
+    
+    /**
+     * Find companies that may be duplicates based on tax ID or registration number
+     * Used before creating a new company
+     */
+    @Query("SELECT c FROM Company c WHERE c.tenantId = :tenantId " +
+           "AND c.deleted = false " +
+           "AND (c.taxId = :taxId OR c.registrationNumber = :registrationNumber)")
+    List<Company> findPotentialDuplicates(
+        @Param("tenantId") UUID tenantId,
+        @Param("taxId") String taxId,
+        @Param("registrationNumber") String registrationNumber);
 }
 

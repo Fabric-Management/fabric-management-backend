@@ -1,102 +1,133 @@
-# 📚 Deployment Documentation
+# 🚀 Deployment Documentation
 
-## Overview
-
-This directory contains all deployment-related documentation for the Fabric Management System.
-
----
-
-## 📁 Documentation Structure
-
-### Core References
-
-| Document                                                                               | Purpose                                 | Status     |
-| -------------------------------------------------------------------------------------- | --------------------------------------- | ---------- |
-| [CURRENT_DEPLOYMENT_REFERENCE.md](./CURRENT_DEPLOYMENT_REFERENCE.md)                   | **Complete deployment reference guide** | ✅ CURRENT |
-| [ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md](./ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md) | Environment variables best practices    | ✅ UPDATED |
-| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)                                           | Step-by-step deployment instructions    | ✅ ACTIVE  |
-| [NEW_SERVICE_INTEGRATION_GUIDE.md](./NEW_SERVICE_INTEGRATION_GUIDE.md)                 | **New microservice integration guide**  | ✅ NEW     |
-
-### Configuration Guides
-
-| Document                                                   | Purpose                   | Status       |
-| ---------------------------------------------------------- | ------------------------- | ------------ |
-| [API_GATEWAY_SETUP.md](./API_GATEWAY_SETUP.md)             | API Gateway configuration | ✅ ACTIVE    |
-| [SERVICE_DISCOVERY_SETUP.md](./SERVICE_DISCOVERY_SETUP.md) | Service discovery setup   | 🔄 FUTURE    |
-| [DEPLOYMENT_IMPROVEMENTS.md](./DEPLOYMENT_IMPROVEMENTS.md) | Improvement roadmap       | 📋 REFERENCE |
+**Last Updated:** October 10, 2025  
+**Purpose:** Complete deployment guides and best practices  
+**Status:** ✅ Active & Production-Ready
 
 ---
 
-## 🚀 Quick Start
+## 📚 Essential Guides
 
-### 1. Environment Setup
+| Document                                                                               | Description                                                          | Priority    | When to Use      |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------- | ---------------- |
+| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)                                           | ⭐ **Main deployment guide** - Quick start, options, troubleshooting | 🔴 CRITICAL | Every deployment |
+| [DATABASE_MIGRATION_STRATEGY.md](./DATABASE_MIGRATION_STRATEGY.md)                     | Database migration & Flyway strategy                                 | 🔴 HIGH     | DB changes       |
+| [ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md](./ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md) | Environment variables, secrets management                            | 🟡 MEDIUM   | Setup & security |
+
+---
+
+## 🔧 Integration & Setup Guides
+
+| Document                                                               | Description                                            | When to Use        |
+| ---------------------------------------------------------------------- | ------------------------------------------------------ | ------------------ |
+| [NEW_SERVICE_INTEGRATION_GUIDE.md](./NEW_SERVICE_INTEGRATION_GUIDE.md) | ⭐ **Adding new microservice** - Complete step-by-step | Adding new service |
+| [API_GATEWAY_SETUP.md](./API_GATEWAY_SETUP.md)                         | API Gateway configuration & routing                    | Gateway changes    |
+
+---
+
+## 🎯 Quick Navigation
+
+### Deployment Scenarios
+
+| Scenario               | Guide                                    | Section              |
+| ---------------------- | ---------------------------------------- | -------------------- |
+| **First time deploy**  | DEPLOYMENT_GUIDE.md                      | Quick Start          |
+| **Add new service**    | NEW_SERVICE_INTEGRATION_GUIDE.md         | Complete guide       |
+| **Database migration** | DATABASE_MIGRATION_STRATEGY.md           | Flyway migrations    |
+| **Environment setup**  | ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md | .env configuration   |
+| **Gateway routing**    | API_GATEWAY_SETUP.md                     | Routes configuration |
+
+### By Problem
+
+| Problem               | Check                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| Deployment fails      | [DEPLOYMENT_GUIDE.md - Troubleshooting](./DEPLOYMENT_GUIDE.md#-troubleshooting)                        |
+| Service won't start   | [../troubleshooting/COMMON_ISSUES_AND_SOLUTIONS.md](../troubleshooting/COMMON_ISSUES_AND_SOLUTIONS.md) |
+| Database issues       | [DATABASE_MIGRATION_STRATEGY.md](./DATABASE_MIGRATION_STRATEGY.md)                                     |
+| Environment variables | [ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md](./ENVIRONMENT_MANAGEMENT_BEST_PRACTICES.md)                 |
+
+---
+
+## 🚀 Quick Start Commands
+
+### Full Stack Deployment
 
 ```bash
-# Copy and configure environment
+# 1. Setup environment
 cp .env.example .env
-vim .env  # Update with your values
+nano .env  # Update values
+
+# 2. Deploy everything
+make deploy
+
+# 3. Check health
+make health
 ```
 
-### 2. Local Development
+### Infrastructure Only
 
 ```bash
-# Start infrastructure only
-docker-compose up -d
-
-# Check status
-docker-compose ps
+# Deploy PostgreSQL, Redis, Kafka only
+make deploy-infra
 ```
 
-### 3. Full Stack Deployment
+### Single Service
 
 ```bash
-# Deploy everything
-docker-compose -f docker-compose-complete.yml up -d
-
-# Verify health
-curl http://localhost:8081/actuator/health
-curl http://localhost:8082/actuator/health
-curl http://localhost:8083/actuator/health
+# Deploy or restart specific service
+make deploy-service SERVICE=user-service
 ```
+
+**📖 Complete commands:** [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 
 ---
 
-## 📋 Current Architecture (October 2025)
+## 🔐 Security Checklist
 
-### System Components
+Before production deployment:
 
-- **3 Microservices**: User, Contact, Company
-- **Database**: PostgreSQL 15
-- **Cache**: Redis 7
-- **Message Broker**: Apache Kafka
-- **Build**: Maven + Docker
-- **Java**: JDK 21
+- [ ] Changed all default passwords
+- [ ] Generated strong JWT secret (512-bit)
+- [ ] Updated .env with production values
+- [ ] Secured actuator endpoints
+- [ ] Enabled SSL/TLS
+- [ ] Configured firewall rules
+- [ ] Set up backup procedures
 
-### Key Features
-
-- ✅ Parametric Dockerfile (DRY principle)
-- ✅ Environment-based configuration
-- ✅ No hardcoded values
-- ✅ Health checks configured
-- ✅ Security hardened
-- ✅ Production ready
-
-### Applied Principles
-
-- **KISS**: Simple configuration
-- **DRY**: No code duplication
-- **YAGNI**: No unnecessary complexity
-- **12-Factor**: Environment-based config
-- **Fail-Fast**: No default values
+**📖 Complete checklist:** [DEPLOYMENT_GUIDE.md - Production Checklist](./DEPLOYMENT_GUIDE.md#-production-checklist)
 
 ---
 
-## 🔧 Configuration Files
+## 📊 Current Deployment Architecture
+
+### Services
+
+| Service             | Port | Database   | Status        |
+| ------------------- | ---- | ---------- | ------------- |
+| **User Service**    | 8081 | user_db    | ✅ Production |
+| **Contact Service** | 8082 | contact_db | ✅ Production |
+| **Company Service** | 8083 | company_db | ✅ Production |
+| **API Gateway**     | 8080 | -          | ✅ Production |
+
+### Infrastructure
+
+| Component  | Port | Purpose                 |
+| ---------- | ---- | ----------------------- |
+| PostgreSQL | 5433 | Primary database        |
+| Redis      | 6379 | Caching & rate limiting |
+| Kafka      | 9092 | Event streaming         |
+| Zookeeper  | 2181 | Kafka coordination      |
+
+**📖 Complete architecture:** [../ARCHITECTURE.md](../ARCHITECTURE.md)
+
+---
+
+## 📁 Configuration Files
 
 ### Environment Files
 
 ```
-.env                 # Active configuration (not in Git)
+.env                 # Active configuration (gitignored)
 .env.example         # Template with all variables
 ```
 
@@ -104,147 +135,69 @@ curl http://localhost:8083/actuator/health
 
 ```
 Dockerfile.service           # Universal parametric Dockerfile
-docker-compose.yml          # Infrastructure services
+docker-compose.yml          # Infrastructure services only
 docker-compose-complete.yml # Full stack deployment
 ```
 
 ### Scripts
 
 ```
-scripts/docker-entrypoint.sh  # Optimized entrypoint
-scripts/init-db.sql           # Database initialization
-scripts/deploy.sh             # Deployment automation
+scripts/deploy.sh            # Main deployment script
+scripts/docker-entrypoint.sh # Container entrypoint
+scripts/run-migrations.sh    # Database migrations
 ```
 
 ---
 
-## 📊 Environment Variables
+## 🔗 Related Documentation
 
-### Required Variables
+### Internal Links
 
-```bash
-# Database
-POSTGRES_HOST
-POSTGRES_PORT
-POSTGRES_DB
-POSTGRES_USER
-POSTGRES_PASSWORD
-
-# Cache
-REDIS_HOST
-REDIS_PORT
-REDIS_PASSWORD
-
-# Message Broker
-KAFKA_HOST
-KAFKA_PORT
-KAFKA_ADVERTISED_HOST
-KAFKA_BOOTSTRAP_SERVERS
-
-# Security
-JWT_SECRET
-JWT_EXPIRATION
-JWT_REFRESH_EXPIRATION
-
-# Services
-USER_SERVICE_PORT
-CONTACT_SERVICE_PORT
-COMPANY_SERVICE_PORT
-```
-
-See [CURRENT_DEPLOYMENT_REFERENCE.md](./CURRENT_DEPLOYMENT_REFERENCE.md) for complete list.
-
----
-
-## 🔍 Health & Monitoring
-
-### Health Endpoints
-
-- User Service: `http://localhost:8081/actuator/health`
-- Contact Service: `http://localhost:8082/actuator/health`
-- Company Service: `http://localhost:8083/actuator/health`
-
-### Metrics
-
-- Prometheus: `/actuator/prometheus`
-- Metrics: `/actuator/metrics`
-
----
-
-## 🛠️ Maintenance
-
-### Common Tasks
-
-```bash
-# View logs
-docker-compose logs -f
-
-# Restart services
-docker-compose restart
-
-# Clear cache
-docker exec fabric-redis redis-cli FLUSHALL
-
-# Run migrations
-mvn flyway:migrate
-
-# Backup database
-docker exec fabric-postgres pg_dump -U ${POSTGRES_USER} ${POSTGRES_DB} > backup.sql
-```
-
----
-
-## ⚠️ Important Notes
-
-### Security
-
-- Never commit `.env` to Git
-- Change all default passwords
-- Use strong JWT secrets
-- Enable HTTPS in production
-
-### Performance
-
-- JVM: 50% RAM allocation
-- Connection pools: 10 max
-- Log level: INFO in production
-
-### Troubleshooting
-
-- Check health endpoints first
-- Review docker-compose logs
-- Verify environment variables
-- Check network connectivity
-
----
-
-## 📚 Additional Resources
-
-### Internal Documentation
-
-- [Development Principles](../development/PRINCIPLES.md)
-- [Project Structure](../PROJECT_STRUCTURE.md)
-- [Developer Handbook](../DEVELOPER_HANDBOOK.md)
+- [Architecture](../architecture/README.md) - System design
+- [Development](../development/README.md) - Development standards
+- [Troubleshooting](../troubleshooting/README.md) - Common issues
+- [Security](../SECURITY.md) - Security practices
 
 ### External Resources
 
-- [Spring Boot Documentation](https://spring.io/projects/spring-boot)
 - [Docker Documentation](https://docs.docker.com/)
+- [Docker Compose Best Practices](https://docs.docker.com/compose/production/)
 - [12-Factor App](https://12factor.net/)
+- [Spring Boot Deployment](https://docs.spring.io/spring-boot/docs/current/reference/html/deployment.html)
 
 ---
 
-## 🔄 Version History
+## 🔮 Future Enhancements
 
-| Date       | Version | Changes                            |
-| ---------- | ------- | ---------------------------------- |
-| 02.10.2025 | 2.0     | Complete refactoring, cleaned up   |
-| 02.10.2025 | 1.5     | Environment variables standardized |
-| 01.10.2025 | 1.0     | Initial deployment setup           |
+Planned features (not yet implemented):
+
+| Feature                   | Document                                                                     | Status     |
+| ------------------------- | ---------------------------------------------------------------------------- | ---------- |
+| **Service Discovery**     | [../future/SERVICE_DISCOVERY_SETUP.md](../future/SERVICE_DISCOVERY_SETUP.md) | 📋 Planned |
+| **Kubernetes Deployment** | -                                                                            | 📋 Planned |
+| **CI/CD Pipeline**        | -                                                                            | 📋 Planned |
 
 ---
 
-**Last Updated:** 2025-10-09 20:15 UTC+1  
+## 📞 Support
+
+### Getting Help
+
+- **Deployment Issues**: #fabric-devops on Slack
+- **Emergency**: Tag @devops-team
+- **Office Hours**: Monday & Friday, 10 AM - 12 PM
+
+### Contributing
+
+1. Read relevant deployment guide
+2. Make changes following existing patterns
+3. Test in local environment
+4. Update documentation
+5. Submit PR with clear description
+
+---
+
+**Maintained By:** DevOps Team  
+**Last Updated:** 2025-10-10 (Reorganized & cleaned)  
 **Version:** 2.0  
-**Status:** ✅ Current & Maintained  
-**Contact:** Development Team
+**Status:** ✅ Active - All guides current and accurate
