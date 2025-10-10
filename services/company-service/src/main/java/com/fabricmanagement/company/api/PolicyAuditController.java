@@ -1,7 +1,7 @@
 package com.fabricmanagement.company.api;
 
-import com.fabricmanagement.company.application.dto.PolicyAuditResponse;
-import com.fabricmanagement.company.application.dto.PolicyAuditStatsResponse;
+import com.fabricmanagement.company.api.dto.response.PolicyAuditResponse;
+import com.fabricmanagement.company.api.dto.response.PolicyAuditStatsResponse;
 import com.fabricmanagement.company.application.service.PolicyAuditQueryService;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import lombok.RequiredArgsConstructor;

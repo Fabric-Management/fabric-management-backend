@@ -1,6 +1,6 @@
 package com.fabricmanagement.company.application.mapper;
 
-import com.fabricmanagement.company.application.dto.PolicyAuditResponse;
+import com.fabricmanagement.company.api.dto.response.PolicyAuditResponse;
 import com.fabricmanagement.shared.domain.policy.PolicyDecisionAudit;
 import org.springframework.stereotype.Component;
 

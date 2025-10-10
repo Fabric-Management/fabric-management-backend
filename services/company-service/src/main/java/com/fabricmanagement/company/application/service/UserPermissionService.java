@@ -1,7 +1,7 @@
 package com.fabricmanagement.company.application.service;
 
-import com.fabricmanagement.company.application.dto.CreateUserPermissionRequest;
-import com.fabricmanagement.company.application.dto.UserPermissionResponse;
+import com.fabricmanagement.company.api.dto.request.CreateUserPermissionRequest;
+import com.fabricmanagement.company.api.dto.response.UserPermissionResponse;
 import com.fabricmanagement.company.application.mapper.UserPermissionMapper;
 import com.fabricmanagement.shared.domain.policy.UserPermission;
 import com.fabricmanagement.shared.infrastructure.policy.repository.UserPermissionRepository;

@@ -1,9 +1,12 @@
 package com.fabricmanagement.contact.application.service;
 
-import com.fabricmanagement.contact.application.dto.*;
+import com.fabricmanagement.contact.api.dto.request.*;
+import com.fabricmanagement.contact.api.dto.response.*;
+import com.fabricmanagement.contact.application.mapper.ContactMapper;
+import com.fabricmanagement.contact.application.mapper.ContactEventMapper;
 import com.fabricmanagement.contact.domain.aggregate.Contact;
-import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import com.fabricmanagement.contact.infrastructure.repository.ContactRepository;
+import com.fabricmanagement.contact.infrastructure.messaging.NotificationService;
 import com.fabricmanagement.shared.domain.event.DomainEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,11 +18,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Contact Application Service
- * 
- * Handles business logic for contact management
- */
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -29,63 +27,44 @@ public class ContactService {
     private final ContactRepository contactRepository;
     private final DomainEventPublisher eventPublisher;
     private final NotificationService notificationService;
+    private final ContactMapper contactMapper;
+    private final ContactEventMapper contactEventMapper;
     
-    /**
-     * Creates a new contact
-     */
+    @Transactional
     public ContactResponse createContact(CreateContactRequest request) {
         log.info("Creating contact for owner: {} with value: {}", request.getOwnerId(), request.getContactValue());
 
-        // Validate contact value based on contact type
         validateContactValue(request.getContactValue(), request.getContactType());
 
-        // Check if contact already exists
         if (contactRepository.existsByContactValue(request.getContactValue())) {
             throw new IllegalArgumentException("Contact value already exists: " + request.getContactValue());
         }
         
-        // Parse owner ID from String to UUID
         UUID ownerId = UUID.fromString(request.getOwnerId());
         
-        // If this should be primary, remove primary status from other contacts
         if (request.isPrimary()) {
             contactRepository.removePrimaryStatusForOwner(ownerId);
         }
         
-        // Create new contact
-        Contact contact = Contact.create(
-            ownerId,
-            Contact.OwnerType.valueOf(request.getOwnerType()),
-            request.getContactValue(),
-            ContactType.valueOf(request.getContactType()),
-            request.isPrimary()
-        );
+        Contact contact = contactMapper.fromCreateRequest(request);
         
-        // Generate verification code if not auto-verified
         if (!request.isAutoVerified()) {
             String code = contact.generateVerificationCode();
-            // Send verification code
             notificationService.sendVerificationCode(contact.getContactValue(), code, contact.getContactType());
         } else {
-            // Auto-verify for internal creation
             contact.setVerified(true);
             contact.setVerifiedAt(java.time.LocalDateTime.now());
         }
         
-        // Save contact
         contact = contactRepository.save(contact);
         
-        // Publish domain events
-        contact.getAndClearDomainEvents().forEach(eventPublisher::publish);
+        eventPublisher.publish(contactEventMapper.toCreatedEvent(contact));
         
         log.info("Contact created successfully with ID: {}", contact.getId());
         
-        return toContactResponse(contact);
+        return contactMapper.toResponse(contact);
     }
     
-    /**
-     * Gets contacts by owner ID
-     */
     @Transactional(readOnly = true)
     public List<ContactResponse> getContactsByOwner(UUID ownerId) {
         log.debug("Getting contacts for owner: {}", ownerId);
@@ -93,125 +72,95 @@ public class ContactService {
         List<Contact> contacts = contactRepository.findByOwnerId(ownerId);
         
         return contacts.stream()
-            .map(this::toContactResponse)
-            .collect(Collectors.toList());
+                .map(contactMapper::toResponse)
+                .collect(Collectors.toList());
     }
     
-    /**
-     * Gets a specific contact
-     */
     @Transactional(readOnly = true)
     public ContactResponse getContact(UUID contactId) {
         log.debug("Getting contact: {}", contactId);
         
         Contact contact = contactRepository.findById(contactId)
-            .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
+                .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
         
-        return toContactResponse(contact);
+        return contactMapper.toResponse(contact);
     }
     
-    /**
-     * Verifies a contact
-     */
+    @Transactional
     public ContactResponse verifyContact(UUID contactId, String code) {
         log.info("Verifying contact: {}", contactId);
         
         Contact contact = contactRepository.findById(contactId)
-            .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
+                .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
         
         contact.verify(code);
         contact = contactRepository.save(contact);
         
-        // Publish domain events
-        contact.getAndClearDomainEvents().forEach(eventPublisher::publish);
+        eventPublisher.publish(contactEventMapper.toUpdatedEvent(contact, "VERIFIED"));
         
         log.info("Contact verified successfully: {}", contactId);
         
-        return toContactResponse(contact);
+        return contactMapper.toResponse(contact);
     }
     
-    /**
-     * Sets a contact as primary (alias for makePrimary)
-     */
     public void setPrimaryContact(UUID contactId) {
         makePrimary(contactId);
     }
     
-    /**
-     * Makes a contact primary
-     */
+    @Transactional
     public ContactResponse makePrimary(UUID contactId) {
         log.info("Making contact primary: {}", contactId);
         
         Contact contact = contactRepository.findById(contactId)
-            .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
+                .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
         
-        // Remove primary status from other contacts
         contactRepository.removePrimaryStatusForOwner(contact.getOwnerId());
         
-        // Make this contact primary
         contact.makePrimary();
         contact = contactRepository.save(contact);
         
-        // Publish domain events
-        contact.getAndClearDomainEvents().forEach(eventPublisher::publish);
+        eventPublisher.publish(contactEventMapper.toUpdatedEvent(contact, "PRIMARY_CHANGED"));
         
         log.info("Contact made primary successfully: {}", contactId);
         
-        return toContactResponse(contact);
+        return contactMapper.toResponse(contact);
     }
     
-    /**
-     * Updates a contact
-     */
-    public void updateContact(UUID contactId, com.fabricmanagement.contact.application.dto.UpdateContactRequest request) {
+    @Transactional
+    public void updateContact(UUID contactId, UpdateContactRequest request) {
         log.info("Updating contact: {}", contactId);
 
         Contact contact = contactRepository.findById(contactId)
-            .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
+                .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
 
-        // Validate if contactValue is being updated
         if (request.getContactValue() != null) {
-            String contactType = request.getContactType() != null ? request.getContactType() : contact.getContactType().name();
+            String contactType = request.getContactType() != null ? 
+                    request.getContactType() : contact.getContactType().name();
             validateContactValue(request.getContactValue(), contactType);
-            contact.setContactValue(request.getContactValue());
         }
-        if (request.getContactType() != null) {
-            contact.setContactType(ContactType.valueOf(request.getContactType()));
-        }
-        if (request.getIsPrimary() != null) {
-            contact.setPrimary(request.getIsPrimary());
-        }
-        if (request.getIsVerified() != null) {
-            contact.setVerified(request.getIsVerified());
-        }
+        
+        contactMapper.updateFromRequest(contact, request);
         
         contactRepository.save(contact);
         
         log.info("Contact updated successfully: {}", contactId);
     }
     
-    /**
-     * Deletes a contact
-     */
+    @Transactional
     public void deleteContact(UUID contactId) {
         log.info("Deleting contact: {}", contactId);
         
         Contact contact = contactRepository.findById(contactId)
-            .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
+                .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
         
         contact.markAsDeleted();
         contactRepository.save(contact);
         
-        // Publish domain events
-        contact.getAndClearDomainEvents().forEach(eventPublisher::publish);
+        eventPublisher.publish(contactEventMapper.toDeletedEvent(contact));
         
         log.info("Contact deleted successfully: {}", contactId);
     }
     
-    /**
-     * Searches contacts by owner and type
-     */
     @Transactional(readOnly = true)
     public List<ContactResponse> searchContacts(UUID ownerId, String contactType) {
         log.debug("Searching contacts for owner: {} with type: {}", ownerId, contactType);
@@ -225,26 +174,21 @@ public class ContactService {
         
         return contacts.stream()
                 .filter(Contact::isNotDeleted)
-                .map(this::toContactResponse)
+                .map(contactMapper::toResponse)
                 .toList();
     }
     
-    /**
-     * Checks if a contact value is available
-     */
     @Transactional(readOnly = true)
     public boolean checkAvailability(String contactValue) {
         return !contactRepository.existsByContactValue(contactValue);
     }
     
-    /**
-     * Sends verification code to a contact
-     */
+    @Transactional
     public void sendVerificationCode(UUID contactId) {
         log.info("Sending verification code for contact: {}", contactId);
         
         Contact contact = contactRepository.findById(contactId)
-            .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
+                .orElseThrow(() -> new RuntimeException("Contact not found: " + contactId));
         
         if (contact.isVerified()) {
             throw new IllegalStateException("Contact is already verified");
@@ -253,15 +197,11 @@ public class ContactService {
         String code = contact.generateVerificationCode();
         contactRepository.save(contact);
         
-        // Send verification code
         notificationService.sendVerificationCode(contact.getContactValue(), code, contact.getContactType());
         
         log.info("Verification code sent successfully for contact: {}", contactId);
     }
     
-    /**
-     * Gets verified contacts for an owner
-     */
     @Transactional(readOnly = true)
     public List<ContactResponse> getVerifiedContacts(UUID ownerId) {
         log.debug("Getting verified contacts for owner: {}", ownerId);
@@ -269,39 +209,29 @@ public class ContactService {
         List<Contact> contacts = contactRepository.findVerifiedContactsByOwner(ownerId);
         
         return contacts.stream()
-            .map(this::toContactResponse)
-            .collect(Collectors.toList());
+                .map(contactMapper::toResponse)
+                .collect(Collectors.toList());
     }
     
-    /**
-     * Gets primary contact for an owner
-     */
     @Transactional(readOnly = true)
     public ContactResponse getPrimaryContact(UUID ownerId) {
         log.debug("Getting primary contact for owner: {}", ownerId);
 
         Contact contact = contactRepository.findPrimaryContactByOwner(ownerId)
-            .orElseThrow(() -> new RuntimeException("No primary contact found for owner: " + ownerId));
+                .orElseThrow(() -> new RuntimeException("No primary contact found for owner: " + ownerId));
 
-        return toContactResponse(contact);
+        return contactMapper.toResponse(contact);
     }
 
-    /**
-     * Finds contact by contact value (email or phone)
-     * Returns Optional since contact_value is UNIQUE in database
-     */
     @Transactional(readOnly = true)
     public Optional<ContactResponse> findByContactValue(String contactValue) {
         log.debug("Finding contact by value: {}", contactValue);
 
         return contactRepository.findByContactValue(contactValue)
                 .filter(Contact::isNotDeleted)
-                .map(this::toContactResponse);
+                .map(contactMapper::toResponse);
     }
     
-    /**
-     * Validates contact value based on contact type
-     */
     private void validateContactValue(String contactValue, String contactType) {
         if (contactValue == null || contactValue.trim().isEmpty()) {
             throw new IllegalArgumentException("Contact value cannot be empty");
@@ -317,7 +247,6 @@ public class ContactService {
                 break;
 
             case "PHONE":
-                // Remove common formatting characters
                 String cleanedPhone = trimmedValue.replaceAll("[\\s\\-\\(\\)]", "");
                 if (!cleanedPhone.matches("^\\+?[1-9]\\d{1,14}$")) {
                     throw new IllegalArgumentException("Invalid phone number format. Use E.164 format (e.g., +905551234567)");
@@ -328,7 +257,6 @@ public class ContactService {
             case "FAX":
             case "WEBSITE":
             case "SOCIAL_MEDIA":
-                // Basic validation for other types
                 if (trimmedValue.length() > 500) {
                     throw new IllegalArgumentException("Contact value is too long (max 500 characters)");
                 }
@@ -339,12 +267,6 @@ public class ContactService {
         }
     }
 
-    /**
-     * Lists all contacts (ADMIN only)
-     * 
-     * WARNING: This can return a large dataset. Use with caution.
-     * Consider using paginated version in the future.
-     */
     @Transactional(readOnly = true)
     public List<ContactResponse> listAllContacts() {
         log.debug("Listing all contacts (ADMIN operation)");
@@ -352,19 +274,11 @@ public class ContactService {
         List<Contact> contacts = contactRepository.findAll();
         
         return contacts.stream()
-            .filter(Contact::isNotDeleted)
-            .map(this::toContactResponse)
-            .collect(Collectors.toList());
+                .filter(Contact::isNotDeleted)
+                .map(contactMapper::toResponse)
+                .collect(Collectors.toList());
     }
     
-    /**
-     * Gets contacts by multiple owner IDs (batch operation)
-     * 
-     * NEW: Added to prevent N+1 query problem in User Service
-     * Returns Map<ownerId, List<ContactResponse>> for easy lookup
-     * 
-     * Example: 100 users = 1 database query instead of 100
-     */
     @Transactional(readOnly = true)
     public java.util.Map<UUID, List<ContactResponse>> getContactsByOwnersBatch(List<UUID> ownerIds) {
         log.debug("Getting contacts for {} owners in batch", ownerIds.size());
@@ -373,35 +287,15 @@ public class ContactService {
             return java.util.Collections.emptyMap();
         }
         
-        // Single database query for all owners!
         List<Contact> allContacts = contactRepository.findByOwnerIdIn(ownerIds);
         
-        // Group by ownerId
         return allContacts.stream()
-            .collect(java.util.stream.Collectors.groupingBy(
-                Contact::getOwnerId,
-                java.util.stream.Collectors.mapping(
-                    this::toContactResponse,
-                    java.util.stream.Collectors.toList()
-                )
-            ));
-    }
-    
-    /**
-     * Converts Contact entity to ContactResponse DTO
-     */
-    private ContactResponse toContactResponse(Contact contact) {
-        return ContactResponse.builder()
-            .id(contact.getId())
-            .ownerId(contact.getOwnerId().toString())  // DTO uses String for API compatibility
-            .ownerType(contact.getOwnerType().name())
-            .contactValue(contact.getContactValue())
-            .contactType(contact.getContactType().name())
-            .isVerified(contact.isVerified())
-            .isPrimary(contact.isPrimary())
-            .verifiedAt(contact.getVerifiedAt())
-            .createdAt(contact.getCreatedAt())
-            .updatedAt(contact.getUpdatedAt())
-            .build();
+                .collect(java.util.stream.Collectors.groupingBy(
+                        Contact::getOwnerId,
+                        java.util.stream.Collectors.mapping(
+                                contactMapper::toResponse,
+                                java.util.stream.Collectors.toList()
+                        )
+                ));
     }
 }

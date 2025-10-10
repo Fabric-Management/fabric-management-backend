@@ -1,6 +1,6 @@
 package com.fabricmanagement.company.api;
 
-import com.fabricmanagement.company.application.dto.CreateCompanyRequest;
+import com.fabricmanagement.company.api.dto.request.CreateCompanyRequest;
 import com.fabricmanagement.company.application.service.CompanyService;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,14 +25,8 @@ import static org.mockito.Mockito.when;
 /**
  * Company Controller Test - Pure Mockito
  * 
- * Tests company creation endpoint with controller logic:
- * - Successful company creation (CUSTOMER type)
- * - Controller delegates to service properly
- * - Response structure validation
- * 
+ * Tests company creation endpoint with controller logic.
  * Test Coverage: Controller layer (pure unit test, no Spring context)
- * 
- * Note: Validation testing done separately in integration tests
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Company Controller Tests - Pure Mockito")
@@ -61,7 +56,6 @@ class CompanyControllerTest {
     @Test
     @DisplayName("Should create CUSTOMER company successfully")
     void shouldCreateCustomerCompanySuccessfully() {
-        // Given: Valid customer company request
         CreateCompanyRequest request = CreateCompanyRequest.builder()
             .name("ABC Tekstil San. ve Tic. A.Ş.")
             .legalName("ABC Tekstil Sanayi ve Ticaret Anonim Şirketi")
@@ -80,22 +74,20 @@ class CompanyControllerTest {
         when(companyService.createCompany(any(), any(), anyString()))
             .thenReturn(TEST_COMPANY_ID);
 
-        // When
         ResponseEntity<ApiResponse<UUID>> response = companyController.createCompany(request, mockSecurityContext);
 
-        // Then
         assertThat(response).isNotNull();
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getSuccess()).isTrue();
-        assertThat(response.getBody().getData()).isEqualTo(TEST_COMPANY_ID);
-        assertThat(response.getBody().getMessage()).isEqualTo("Company created successfully");
+        
+        ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
+        assertThat(body.getSuccess()).isTrue();
+        assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
+        assertThat(body.getMessage()).isEqualTo("Company created successfully");
     }
 
     @Test
     @DisplayName("Should create INTERNAL company (default businessType)")
     void shouldCreateInternalCompany() {
-        // Given: Request without businessType (defaults to INTERNAL in handler)
         CreateCompanyRequest request = CreateCompanyRequest.builder()
             .name("Bizim Firma A.Ş.")
             .legalName("Bizim Firma Anonim Şirketi")
@@ -107,21 +99,19 @@ class CompanyControllerTest {
         when(companyService.createCompany(any(), any(), anyString()))
             .thenReturn(TEST_COMPANY_ID);
 
-        // When
         ResponseEntity<ApiResponse<UUID>> response = companyController.createCompany(request, mockSecurityContext);
 
-        // Then
         assertThat(response).isNotNull();
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getSuccess()).isTrue();
-        assertThat(response.getBody().getData()).isEqualTo(TEST_COMPANY_ID);
+        
+        ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
+        assertThat(body.getSuccess()).isTrue();
+        assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
     }
 
     @Test
     @DisplayName("Should create company with minimal required fields")
     void shouldCreateCompanyWithMinimalFields() {
-        // Given: Minimal valid request
         CreateCompanyRequest request = CreateCompanyRequest.builder()
             .name("Minimal Company")
             .type("LLC")
@@ -131,21 +121,19 @@ class CompanyControllerTest {
         when(companyService.createCompany(any(), any(), anyString()))
             .thenReturn(TEST_COMPANY_ID);
 
-        // When
         ResponseEntity<ApiResponse<UUID>> response = companyController.createCompany(request, mockSecurityContext);
 
-        // Then
         assertThat(response).isNotNull();
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getSuccess()).isTrue();
-        assertThat(response.getBody().getData()).isEqualTo(TEST_COMPANY_ID);
+        
+        ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
+        assertThat(body.getSuccess()).isTrue();
+        assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
     }
 
     @Test
     @DisplayName("Should create SUPPLIER company with parent relationship")
     void shouldCreateSupplierCompany() {
-        // Given: SUPPLIER company with parent relationship
         UUID parentCompanyId = UUID.fromString("660e8400-e29b-41d4-a716-446655440001");
         
         CreateCompanyRequest request = CreateCompanyRequest.builder()
@@ -161,21 +149,19 @@ class CompanyControllerTest {
         when(companyService.createCompany(any(), any(), anyString()))
             .thenReturn(TEST_COMPANY_ID);
 
-        // When
         ResponseEntity<ApiResponse<UUID>> response = companyController.createCompany(request, mockSecurityContext);
 
-        // Then
         assertThat(response).isNotNull();
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getSuccess()).isTrue();
-        assertThat(response.getBody().getData()).isEqualTo(TEST_COMPANY_ID);
+        
+        ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
+        assertThat(body.getSuccess()).isTrue();
+        assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
     }
 
     @Test
     @DisplayName("Should create company with all optional fields")
     void shouldCreateCompanyWithAllFields() {
-        // Given: Request with all fields populated
         CreateCompanyRequest request = CreateCompanyRequest.builder()
             .name("Full Details Company")
             .legalName("Full Details Company Inc.")
@@ -193,22 +179,20 @@ class CompanyControllerTest {
         when(companyService.createCompany(any(), any(), anyString()))
             .thenReturn(TEST_COMPANY_ID);
 
-        // When
         ResponseEntity<ApiResponse<UUID>> response = companyController.createCompany(request, mockSecurityContext);
 
-        // Then
         assertThat(response).isNotNull();
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getSuccess()).isTrue();
-        assertThat(response.getBody().getData()).isEqualTo(TEST_COMPANY_ID);
-        assertThat(response.getBody().getMessage()).isEqualTo("Company created successfully");
+        
+        ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
+        assertThat(body.getSuccess()).isTrue();
+        assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
+        assertThat(body.getMessage()).isEqualTo("Company created successfully");
     }
 
     @Test
     @DisplayName("Should delegate to service with correct parameters")
     void shouldDelegateToServiceWithCorrectParameters() {
-        // Given: Valid request
         CreateCompanyRequest request = CreateCompanyRequest.builder()
             .name("Test Company")
             .type("LLC")
@@ -218,19 +202,17 @@ class CompanyControllerTest {
         when(companyService.createCompany(request, TEST_TENANT_ID, TEST_USER_ID))
             .thenReturn(TEST_COMPANY_ID);
 
-        // When
         ResponseEntity<ApiResponse<UUID>> response = companyController.createCompany(request, mockSecurityContext);
 
-        // Then: Verify service was called with correct params
         assertThat(response).isNotNull();
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getData()).isEqualTo(TEST_COMPANY_ID);
+        
+        ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
+        assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
     }
 
     @Test
     @DisplayName("Should return 201 CREATED status for successful creation")
     void shouldReturn201CreatedStatus() {
-        // Given
         CreateCompanyRequest request = CreateCompanyRequest.builder()
             .name("Status Test Company")
             .type("CORPORATION")
@@ -240,10 +222,8 @@ class CompanyControllerTest {
         when(companyService.createCompany(any(), any(), anyString()))
             .thenReturn(TEST_COMPANY_ID);
 
-        // When
         ResponseEntity<ApiResponse<UUID>> response = companyController.createCompany(request, mockSecurityContext);
 
-        // Then: Verify 201 status
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 }

@@ -1,7 +1,7 @@
 package com.fabricmanagement.company.application.service;
 
-import com.fabricmanagement.company.application.dto.PolicyAuditResponse;
-import com.fabricmanagement.company.application.dto.PolicyAuditStatsResponse;
+import com.fabricmanagement.company.api.dto.response.PolicyAuditResponse;
+import com.fabricmanagement.company.api.dto.response.PolicyAuditStatsResponse;
 import com.fabricmanagement.company.application.mapper.PolicyAuditMapper;
 import com.fabricmanagement.shared.domain.policy.PolicyDecisionAudit;
 import com.fabricmanagement.shared.infrastructure.policy.repository.PolicyDecisionAuditRepository;

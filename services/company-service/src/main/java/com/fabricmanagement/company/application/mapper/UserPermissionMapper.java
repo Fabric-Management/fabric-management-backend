@@ -1,7 +1,7 @@
 package com.fabricmanagement.company.application.mapper;
 
-import com.fabricmanagement.company.application.dto.CreateUserPermissionRequest;
-import com.fabricmanagement.company.application.dto.UserPermissionResponse;
+import com.fabricmanagement.company.api.dto.request.CreateUserPermissionRequest;
+import com.fabricmanagement.company.api.dto.response.UserPermissionResponse;
 import com.fabricmanagement.shared.domain.policy.UserPermission;
 import org.springframework.stereotype.Component;
 
