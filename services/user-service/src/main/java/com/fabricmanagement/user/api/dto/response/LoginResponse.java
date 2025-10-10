@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.user.api.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,3 +25,4 @@ public class LoginResponse {
     private String email;
     private String role;
 }
+

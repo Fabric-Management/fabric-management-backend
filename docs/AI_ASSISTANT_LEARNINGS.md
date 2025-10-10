@@ -1496,9 +1496,236 @@ Explicit rules for:
 
 ---
 
+### 2025-10-10: 10 Golden Rules - Clean Code Principles in Action
+
+**Lesson:** When refactoring, ALWAYS ask "Is this really needed?" and apply SOLID/DRY/KISS/YAGNI ruthlessly.
+
+**Context:** User-Service reorganization - removed 700+ lines of over-engineering, achieved -76% entity size reduction.
+
+**User Message:** "gereksiz commentleride kaldiralim... prensiplere gore: no hardcoded, yes SOLID KISS DRY YAGNI"
+
+---
+
+## 🏆 THE 10 GOLDEN RULES
+
+### Applied in Every Code Action:
+
+1. **"Gerçekten Gerekli Mi?"** - Question EVERY new class/method before creating
+2. **SRP** - Each class ONE responsibility only
+3. **DRY** - Code duplication forbidden (2x = extract!)
+4. **KISS** - Simple > Complex (private method > new class)
+5. **YAGNI** - Need now? Write. Need later? Don't.
+6. **Self-Documenting** - Code explains itself (comment = code smell)
+7. **Anemic Domain** - Entity = Data holder ONLY (no business methods)
+8. **Right Layer** - Everything in correct place (Clean Architecture)
+9. **Mapping ≠ Logic** - DTO/Event mapping = Mapper's job, NOT Service
+10. **Leverage Framework** - Spring/Lombok exist? USE THEM (don't reinvent)
+
+---
+
+## 🎯 CODING ACTION WORKFLOW
+
+### Thought Process (Before Writing Code):
+
+```
+1. Need? → Check existing (Spring, Lombok, Shared modules)
+2. Exists? → Use it! Don't create
+3. Missing? → Ask: "Really needed NOW?"
+4. Needed? → Find simplest solution
+5. Implement → Apply SOLID/DRY/KISS
+6. Done? → Clean comments
+7. Verify? → Check affected code
+8. Test? → Run lints/tests
+```
+
+### Coding Ethics:
+
+- ✅ **Pragmatic** - Not idealistic (real-world solutions)
+- ✅ **Clean** - Minimal code, maximum clarity
+- ✅ **Maintainable** - Easy to change/extend
+- ✅ **Professional** - Industry standards applied
+
+---
+
+## 🔍 KEY REFACTORING INSIGHTS
+
+### 1. **Entity = Pure Data Holder**
+
+```java
+// ❌ WRONG: Business methods in entity
+public class User {
+    public void updateProfile(...) { /* logic */ }
+    public void activate() { /* logic */ }
+    public String getFullName() { /* computed */ }
+}
+
+// ✅ RIGHT: Only @Getter/@Setter
+@Entity
+@Getter
+@Setter
+public class User {
+    private String firstName;
+    private String lastName;
+    // NO METHODS! Lombok handles getters/setters
+}
+```
+
+**Rule:** Entity methods = Code smell. Use Lombok + Service layer.
+
+---
+
+### 2. **Mapping Logic → Mapper (NOT Service)**
+
+```java
+// ❌ WRONG: Mapping in service
+@Service
+public class UserService {
+    public UUID createUser(CreateUserRequest request) {
+        User user = User.builder()
+            .firstName(request.getFirstName())
+            .lastName(request.getLastName())
+            // ... 20+ lines of mapping
+            .build();
+    }
+}
+
+// ✅ RIGHT: Delegate to mapper
+@Service
+public class UserService {
+    public UUID createUser(CreateUserRequest request) {
+        User user = userMapper.fromCreateRequest(request, tenantId, createdBy);
+        // Only business logic here!
+    }
+}
+```
+
+**Rule:** Any `.builder()` or DTO→Entity = Mapper's job!
+
+---
+
+### 3. **Comment Cleanup = Code Quality**
+
+```java
+// ❌ WRONG: Obvious comments
+/**
+ * Gets a user by ID
+ */
+public UserResponse getUser(UUID userId) { }
+
+// ✅ RIGHT: Self-documenting
+public UserResponse getUser(UUID userId) { }  // Name explains it!
+```
+
+**Rule:** Method name obvious? No comment. WHY not obvious? Add comment.
+
+---
+
+### 4. **Separate Concerns with Multiple Mappers**
+
+```java
+// ✅ GOOD: Focused mappers (SRP)
+UserMapper       → DTO ↔ Entity (API layer)
+UserEventMapper  → Entity → Event (Domain events)
+AuthMapper       → Auth DTOs + JWT claims
+
+// ❌ BAD: One giant mapper
+UserMapper → Does everything (SRP violation!)
+```
+
+**Rule:** Different concerns = Different mappers
+
+---
+
+## 🛠️ MANDATORY POST-CHANGE ACTIONS
+
+### After ANY Code Change:
+
+```
+1. ✅ Find affected files (grep imports/usages)
+2. ✅ Update ALL affected code
+3. ✅ Remove orphaned code
+4. ✅ Clean empty directories
+5. ✅ Fix broken imports
+6. ✅ Run linter (read_lints tool)
+7. ✅ Verify compilation
+8. ✅ Check tests pass
+```
+
+**User Insight:** "bir kodu guncellediginde bu guncellmeden etkilenebilecek sinflari ve kodlari da guncelleme"
+
+**Rule:** Change is not done until ALL ripple effects cleaned!
+
+---
+
+## 🚫 ANTI-PATTERNS TO AVOID
+
+### Over-Engineering Detection:
+
+```
+❌ New validator class → Spring @Valid exists
+❌ New builder class → Lombok @Builder exists
+❌ New helper class → Private method sufficient
+❌ New utility class → Spring has it
+❌ Separate service for 2 methods → Merge into main service
+
+Question: "Does this add value OR just abstraction?"
+```
+
+### Misleading Names:
+
+```java
+// ❌ WRONG: Name lies
+public List<User> getUsersByCompany(UUID companyId) {
+    return repository.findByTenantId(tenantId);  // Doesn't use companyId!
+}
+
+// ✅ RIGHT: Honest name
+public List<User> getUsersByTenant(UUID tenantId) {
+    return repository.findByTenantId(tenantId);
+}
+```
+
+**Rule:** Method name must match implementation!
+
+---
+
+## 📊 REFACTORING SUCCESS METRICS
+
+### Good Refactoring:
+
+- ✅ **Reduced LOC:** -30% to -70% typical
+- ✅ **Fewer classes:** Consolidated, not fragmented
+- ✅ **Clear SRP:** Each class one job
+- ✅ **Zero duplication:** DRY applied
+- ✅ **Self-documenting:** Minimal comments
+
+### Bad Refactoring:
+
+- ❌ More classes created than removed
+- ❌ More abstraction layers
+- ❌ Same LOC or increased
+- ❌ More comments needed
+- ❌ Harder to understand
+
+---
+
+## 🎓 FRAMEWORK LEVERAGE CHECKLIST
+
+### Before Creating Helper/Util Class:
+
+- [ ] Can Spring do this? (@Transactional, @Valid, @Autowired)
+- [ ] Can Lombok do this? (@Getter, @Setter, @Builder, @Data)
+- [ ] Does Shared have this? (Check shared modules)
+- [ ] Is private method enough? (Don't create class for 1 method)
+- [ ] Really needed NOW? (Not "might need later")
+
+**If ANY answer is YES → Don't create new class!**
+
+---
+
 **Document Owner:** AI Assistant  
 **Reviewed By:** User (Project Owner)  
 **Status:** ✅ ACTIVE - Read Every Session  
-**Last Updated:** 2025-10-10 (Documentation Organization Complete)  
-**Version:** 1.6  
+**Last Updated:** 2025-10-10 (User-Service Refactoring Principles Added)  
+**Version:** 1.7  
 **Next Update:** When new lessons learned

@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.user.api.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -18,3 +18,4 @@ public class CheckContactRequest {
     @NotBlank(message = "Contact value is required")
     private String contactValue;  // email or phone
 }
+

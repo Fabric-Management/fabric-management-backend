@@ -976,6 +976,136 @@ public UserDTO getUser(@PathVariable UUID id) {
 
 ---
 
+## ⭐ Updated Principles (2025-10-10 Refactoring)
+
+### 🎯 Anemic Domain Model Pattern
+
+**Adopted:** Pure data holder entities (Lombok-powered)
+
+```java
+// ✅ CORRECT: Entity = Data only
+@Entity
+@Getter
+@Setter
+@SuperBuilder
+public class User extends BaseEntity {
+    private UUID tenantId;
+    private String firstName;
+    private String lastName;
+    private UserStatus status;
+
+    // NO BUSINESS METHODS!
+    // Lombok provides getters/setters
+}
+
+// ❌ WRONG: Business logic in entity
+public class User {
+    public void activate() { this.status = ACTIVE; }
+    public void updateProfile(...) { /* logic */ }
+    public String getFullName() { return firstName + " " + lastName; }
+}
+```
+
+**Why Anemic Domain:**
+
+- ✅ Lombok eliminates boilerplate (@Getter/@Setter)
+- ✅ Business logic → Service layer (testable)
+- ✅ Computed properties → Mapper layer (SRP)
+- ✅ Simpler, cleaner, more maintainable
+
+**Result:** User.java: 408 lines → 99 lines (-76%)
+
+---
+
+### 🗺️ Mapper Separation Pattern
+
+**Adopted:** Multiple focused mappers (SRP)
+
+```java
+// ✅ CORRECT: Separate mappers by concern
+UserMapper       → DTO ↔ Entity mapping
+UserEventMapper  → Entity → Event mapping
+AuthMapper       → Auth DTOs + JWT claims
+
+// ❌ WRONG: One giant mapper
+UserMapper → All mappings (SRP violation)
+```
+
+**Mapper Responsibilities:**
+
+| Mapper          | Input             | Output           | Purpose              |
+| --------------- | ----------------- | ---------------- | -------------------- |
+| UserMapper      | CreateUserRequest | User             | DTO → Entity         |
+| UserMapper      | User              | UserResponse     | Entity → DTO         |
+| UserEventMapper | User              | UserCreatedEvent | Entity → Event       |
+| AuthMapper      | User + Contact    | LoginResponse    | Complex DTO building |
+
+**Service Layer (NO Mapping):**
+
+```java
+@Service
+public class UserService {
+
+    @Transactional
+    public UUID createUser(CreateUserRequest request, UUID tenantId, String createdBy) {
+        // NO MAPPING HERE!
+        User user = userMapper.fromCreateRequest(request, tenantId, createdBy);
+        user = userRepository.save(user);
+
+        // NO EVENT BUILDING HERE!
+        eventPublisher.publishUserCreated(
+            eventMapper.toCreatedEvent(user, request.getEmail())
+        );
+
+        return user.getId();
+    }
+}
+```
+
+**Rule:** Service sees `.builder()` = Move to Mapper!
+
+---
+
+### 🚫 NO Over-Engineering
+
+**Eliminated Unnecessary Abstractions:**
+
+```java
+// ❌ REMOVED: Unnecessary classes
+- PasswordValidator    → Spring @Valid + @Pattern sufficient
+- ContactValidator     → ValidationConstants already exist
+- UserValidator        → Spring @Valid handles it
+- PageableBuilder      → PageRequest.of() is simple
+- EventBuilder         → Lombok @Builder sufficient
+- UserEnricher         → UserMapper already does this
+
+// ✅ KEPT: Only necessary
+- UserMapper           → DTO transformation needed
+- UserEventMapper      → Event transformation needed
+- LoginAttemptTracker  → Redis infrastructure needed
+```
+
+**YAGNI Applied:** 6 classes removed (-800 LOC)
+
+---
+
+### 📂 Infrastructure Layer Clarity
+
+**Redis/External Concerns → infrastructure/ Layer:**
+
+```java
+// ✅ CORRECT:
+infrastructure/security/LoginAttemptTracker.java  // Redis operations
+infrastructure/client/ContactServiceClient.java   // HTTP client
+
+// ❌ WRONG:
+application/service/LoginAttemptService.java  // Redis = infrastructure!
+```
+
+**Rule:** Infrastructure concerns (Redis, HTTP, Kafka) → infrastructure/ layer
+
+---
+
 ## 📚 Learning Resources
 
 - [Spring Boot Documentation](https://spring.io/projects/spring-boot)
@@ -983,3 +1113,8 @@ public UserDTO getUser(@PathVariable UUID id) {
 - [Clean Code by Robert C. Martin](https://www.amazon.com/Clean-Code-Handbook-Software-Craftsmanship/dp/0132350882)
 - [Domain-Driven Design](https://www.amazon.com/Domain-Driven-Design-Tackling-Complexity-Software/dp/0321125215)
 - [Building Microservices](https://www.amazon.com/Building-Microservices-Designing-Fine-Grained-Systems/dp/1491950358)
+
+---
+
+**Last Updated:** 2025-10-10 (Anemic Domain + Mapper Separation Principles)  
+**Version:** 2.0

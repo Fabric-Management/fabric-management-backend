@@ -1,4 +1,4 @@
-package com.fabricmanagement.user.api.dto;
+package com.fabricmanagement.user.api.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,3 +19,4 @@ public class CheckContactResponse {
     private String userId;            // User ID (if exists)
     private String message;           // User-friendly message
 }
+
