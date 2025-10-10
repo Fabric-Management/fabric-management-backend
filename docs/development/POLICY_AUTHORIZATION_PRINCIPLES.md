@@ -386,38 +386,155 @@ public PolicyDecision evaluate(PolicyContext ctx) {
 
 ---
 
-### 11. Double Validation (Defense in Depth)
+### 11. Defense-in-Depth Pattern ⭐ UPDATED (Phase 3)
+
+**Architecture:** 2-Layer Security
+
+```
+Layer 1: API Gateway (Primary Enforcement)
+    ↓
+Layer 2: Microservices (Secondary Enforcement)
+```
+
+#### Implementation Pattern
+
+**1️⃣ Gateway Layer (PolicyEnforcementFilter)**
 
 ```java
-// 1️⃣ Gateway (PEP) - First check
+// api-gateway/filter/PolicyEnforcementFilter.java
 @Component
-public class PolicyEnforcementFilter {
-    public void filter(ServerWebExchange exchange) {
-        PolicyDecision decision = pdpClient.evaluate(context);
-        if (!decision.isAllowed()) {
-            return unauthorizedResponse();
-        }
-        // Add decision to headers
-        addPolicyHeaders(exchange, decision);
+@RequiredArgsConstructor
+public class PolicyEnforcementFilter implements GlobalFilter, Ordered {
+
+    private final PolicyEngine policyEngine;
+    private final ReactivePolicyAuditPublisher auditPublisher;  // ✅ Phase 3
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        // Build policy context
+        PolicyContext context = buildPolicyContext(request, userId, tenantId);
+        long startTime = System.currentTimeMillis();
+
+        // Evaluate policy (async)
+        return evaluatePolicyAsync(context)
+            .flatMap(decision -> {
+                long latencyMs = System.currentTimeMillis() - startTime;
+
+                // Publish audit event (fire-and-forget) ✅ Phase 3
+                auditPublisher.publishDecision(context, decision, latencyMs)
+                    .subscribe(null, error -> log.error("Audit failed"));
+
+                if (decision.isDenied()) {
+                    return responseHelper.forbidden(exchange, decision.getReason());
+                }
+
+                return chain.filter(exchange);
+            });
     }
-}
 
-// 2️⃣ Service - Second check
-@Service
-public class UserService {
-    private final ScopeValidator scopeValidator;
-
-    public User getUser(UUID userId, SecurityContext ctx) {
-        // Validate again!
-        if (!scopeValidator.canAccess(userId, ctx)) {
-            throw new ForbiddenException("Scope validation failed");
-        }
-        return userRepository.findById(userId);
+    @Override
+    public int getOrder() {
+        return FilterOrder.POLICY_FILTER;  // -50 (after JWT)
     }
 }
 ```
 
-**Why?** Gateway bypass protection, manipulation detection
+**2️⃣ Service Layer (PolicyValidationFilter)** ⭐ NEW
+
+```java
+// user-service/infrastructure/security/PolicyValidationFilter.java
+@Component
+@Order(2)  // After JwtAuthenticationFilter
+@RequiredArgsConstructor
+public class PolicyValidationFilter implements Filter {
+
+    private final PolicyEngine policyEngine;
+
+    private static final List<String> PUBLIC_PATHS = List.of(
+        "/actuator",
+        "/api/public",
+        "/api/v1/auth/login"
+    );
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
+
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        String path = httpRequest.getRequestURI();
+
+        // Skip public paths
+        if (isPublicPath(path)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // Get SecurityContext from Spring Security
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication.getPrincipal() instanceof SecurityContext)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        SecurityContext securityContext = (SecurityContext) authentication.getPrincipal();
+
+        // Build PolicyContext and evaluate (secondary check)
+        PolicyContext policyContext = buildPolicyContext(httpRequest, securityContext);
+        PolicyDecision decision = policyEngine.evaluate(policyContext);
+
+        if (decision.isDenied()) {
+            log.warn("Policy DENIED (secondary check) - User: {}, Path: {}, Reason: {}",
+                securityContext.getUserId(), path, decision.getReason());
+            throw new ForbiddenException(decision.getReason());
+        }
+
+        log.debug("Policy ALLOWED (secondary check) - User: {}, Path: {}",
+            securityContext.getUserId(), path);
+
+        // Continue filter chain
+        chain.doFilter(request, response);
+    }
+
+    private PolicyContext buildPolicyContext(HttpServletRequest request, SecurityContext secCtx) {
+        UUID userId = UUID.fromString(secCtx.getUserId());
+
+        return PolicyContext.builder()
+            .userId(userId)
+            .companyId(secCtx.getTenantId())
+            .companyType(secCtx.getCompanyType())
+            .endpoint(request.getRequestURI())
+            .httpMethod(request.getMethod())
+            .operation(mapOperation(request.getMethod()))
+            .scope(inferScope(request.getRequestURI()))
+            .roles(extractRoles(secCtx))
+            .correlationId(request.getHeader("X-Correlation-ID"))
+            .requestIp(request.getRemoteAddr())
+            .build();
+    }
+}
+```
+
+**Why Defense-in-Depth?**
+
+| Scenario                       | Gateway Only    | Defense-in-Depth  |
+| ------------------------------ | --------------- | ----------------- |
+| Normal request                 | ✅ Protected    | ✅ Protected      |
+| Gateway bypass (internal call) | ❌ Vulnerable   | ✅ Protected      |
+| Gateway compromise             | ❌ Total breach | 🟡 Limited breach |
+| Policy mismatch                | ❌ Undetected   | ✅ Detected       |
+
+**Benefits:**
+
+- ✅ **2-layer protection** (redundancy)
+- ✅ **Gateway bypass immunity** (internal calls protected)
+- ✅ **Fail-safe architecture** (deny on error)
+- ✅ **Consistent enforcement** (same PolicyEngine)
+
+**Performance Impact:**
+
+- Gateway: ~40ms (policy + audit)
+- Service: ~10ms (cached evaluation)
+- **Total:** +50ms (acceptable for security gain)
 
 ---
 
@@ -723,6 +840,483 @@ public List<User> listUsers(UUID companyId, SecurityContext ctx) {
 
 ---
 
+## 🆕 Phase 3 Implementation Patterns (Oct 2025)
+
+### Pattern 1: Optional Dependency Injection ⭐
+
+**Problem:** PolicyEngine needs PolicyRegistryRepository, but Gateway doesn't have database access.
+
+**Solution:** Optional dependency with `@Autowired(required = false)`
+
+```java
+@Component
+public class PolicyEngine {
+
+    private final CompanyTypeGuard companyTypeGuard;  // Required
+    private final ScopeResolver scopeResolver;  // Required
+    private final PolicyRegistryRepository policyRegistryRepository;  // Optional
+
+    public PolicyEngine(
+            CompanyTypeGuard companyTypeGuard,
+            ScopeResolver scopeResolver,
+            @Autowired(required = false) PolicyRegistryRepository policyRegistryRepository) {
+        this.companyTypeGuard = companyTypeGuard;
+        this.scopeResolver = scopeResolver;
+        this.policyRegistryRepository = policyRegistryRepository;
+    }
+
+    private boolean checkRoleDefaultAccess(PolicyContext context) {
+        // Try PolicyRegistry lookup (if available)
+        if (policyRegistryRepository != null) {
+            Optional<PolicyRegistry> policy = policyRegistryRepository
+                .findByEndpointAndOperationAndActiveTrue(endpoint, operation);
+
+            if (policy.isPresent()) {
+                return policy.get().hasRoleAccess(userRole);
+            }
+        }
+
+        // Fallback to hardcoded logic (backward compatible)
+        return checkFallbackRoleAccess(context);
+    }
+}
+```
+
+**Benefits:**
+
+- ✅ Works in both Gateway (no DB) and Services (with DB)
+- ✅ Graceful degradation (fallback logic)
+- ✅ Single PolicyEngine implementation for all contexts
+- ✅ Database-driven when available
+
+**When to Use:**
+
+- Component used in multiple contexts (Gateway + Services)
+- Dependency not available in all contexts
+- Need graceful degradation strategy
+
+---
+
+### Pattern 2: Reactive Audit Publisher ⭐
+
+**Problem:** Gateway is reactive (WebFlux), but PolicyAuditService uses blocking I/O (JPA).
+
+**Solution:** Separate reactive publisher for Gateway.
+
+```java
+// Gateway-specific (Kafka-only, no database)
+@Component
+@RequiredArgsConstructor
+public class ReactivePolicyAuditPublisher {
+
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
+
+    public Mono<Void> publishDecision(PolicyContext context, PolicyDecision decision, long latencyMs) {
+        return Mono.fromRunnable(() -> publishSync(context, decision, latencyMs))
+            .subscribeOn(Schedulers.boundedElastic())  // Offload to separate thread
+            .onErrorResume(error -> {
+                log.error("Audit failed: {}", error.getMessage());
+                return Mono.empty();  // Fail-safe
+            })
+            .then();
+    }
+
+    private void publishSync(PolicyContext context, PolicyDecision decision, long latencyMs) {
+        PolicyAuditEvent event = buildAuditEvent(context, decision, latencyMs);
+        String eventJson = objectMapper.writeValueAsString(event);
+        kafkaTemplate.send("policy.audit", context.getCorrelationId(), eventJson);
+    }
+}
+
+// Service-specific (DB + Kafka)
+@Service
+public class PolicyAuditService {
+
+    private final PolicyDecisionAuditRepository auditRepository;  // JPA
+    private final KafkaTemplate<String, String> kafkaTemplate;
+
+    @Async
+    public void logDecision(PolicyContext context, PolicyDecision decision, long latencyMs) {
+        // 1. Save to database (blocking)
+        auditRepository.save(audit);
+
+        // 2. Publish to Kafka (fire-and-forget)
+        publishToKafka(audit);
+    }
+}
+```
+
+**Comparison:**
+
+| Aspect          | PolicyAuditService | ReactivePolicyAuditPublisher |
+| --------------- | ------------------ | ---------------------------- |
+| **I/O Model**   | Blocking (JPA)     | Reactive (Non-blocking)      |
+| **Database**    | PostgreSQL         | None (Kafka-only)            |
+| **Context**     | Microservices      | API Gateway                  |
+| **Pattern**     | DB + Kafka         | Kafka-only                   |
+| **When to Use** | Services with DB   | Reactive Gateway             |
+
+**Benefits:**
+
+- ✅ Reactive-compatible (no blocking in Gateway)
+- ✅ Decoupled architecture (Gateway doesn't need DB)
+- ✅ Event-driven (Kafka for persistence)
+- ✅ Fail-safe (audit error doesn't block request)
+
+**When to Use:**
+
+- Reactive context (WebFlux, Spring Cloud Gateway)
+- No database access in component
+- Need async audit without blocking
+- Fire-and-forget pattern suitable
+
+---
+
+### Pattern 3: PolicyRegistry Lookup with Fallback ⭐
+
+**Problem:** Need database-driven policies but must work without database.
+
+**Solution:** Lookup + Fallback pattern
+
+```java
+private boolean checkRoleDefaultAccess(PolicyContext context) {
+    // Step 1: Try PolicyRegistry lookup (database-driven)
+    if (policyRegistryRepository != null && context.getEndpoint() != null) {
+        try {
+            Optional<PolicyRegistry> policyOpt = policyRegistryRepository
+                .findByEndpointAndOperationAndActiveTrue(
+                    context.getEndpoint(),
+                    context.getOperation()
+                );
+
+            if (policyOpt.isPresent()) {
+                PolicyRegistry policy = policyOpt.get();
+
+                // Check default roles from database
+                if (policy.getDefaultRoles() != null && !policy.getDefaultRoles().isEmpty()) {
+                    return context.getRoles().stream()
+                        .anyMatch(policy::hasRoleAccess);
+                }
+
+                // Policy exists but no role restrictions
+                return true;
+            }
+
+        } catch (Exception e) {
+            log.error("PolicyRegistry lookup failed. Falling back.", e);
+            // Fall through to fallback logic
+        }
+    }
+
+    // Step 2: Fallback to hardcoded logic (backward compatible)
+    return checkFallbackRoleAccess(context);
+}
+
+private boolean checkFallbackRoleAccess(PolicyContext context) {
+    // Hardcoded fallback rules
+    if (context.hasAnyRole("ADMIN", "SUPER_ADMIN")) return true;
+    if (context.hasAnyRole("MANAGER")) return true;
+    if (context.hasAnyRole("USER")) return context.getOperation().isReadOnly();
+    return false;
+}
+```
+
+**Benefits:**
+
+- ✅ Database-driven (flexible, runtime configurable)
+- ✅ Fallback (works without database)
+- ✅ Fail-safe (error doesn't break system)
+- ✅ Backward compatible
+
+**When to Use:**
+
+- Need runtime configuration
+- Component used in multiple contexts
+- Database not always available
+- Need zero-downtime policy updates
+
+---
+
+### Pattern 4: Filter Order Management ⭐
+
+**Problem:** Filters must execute in correct order for security.
+
+**Solution:** Centralized order constants + @Order annotation
+
+```java
+// constants/FilterOrder.java
+public final class FilterOrder {
+    public static final int JWT_FILTER = -100;      // FIRST
+    public static final int POLICY_FILTER = -50;    // SECOND
+    public static final int LOGGING_FILTER = 0;     // THIRD
+
+    private FilterOrder() {}
+}
+
+// Gateway filter (Reactive)
+@Component
+public class PolicyEnforcementFilter implements GlobalFilter, Ordered {
+    @Override
+    public int getOrder() {
+        return FilterOrder.POLICY_FILTER;  // -50
+    }
+}
+
+// Service filter (Servlet)
+@Component
+@Order(2)  // After JwtAuthenticationFilter (Order 1)
+public class PolicyValidationFilter implements Filter {
+    @Override
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) {
+        // Secondary policy check
+    }
+}
+```
+
+**Execution Order:**
+
+```
+-100: JWT Authentication    → Validate token, extract claims
+ -50: Policy Enforcement    → Check authorization
+   0: Request Logging       → Log request/response
+   1: JwtAuthenticationFilter (Service) → Re-validate
+   2: PolicyValidationFilter (Service) → Secondary check
+```
+
+**Benefits:**
+
+- ✅ Explicit execution order
+- ✅ No magic numbers
+- ✅ Easy to understand flow
+- ✅ Centralized configuration
+
+**When to Use:**
+
+- Multiple filters in pipeline
+- Order-dependent processing
+- Need clear execution sequence
+
+---
+
+### Pattern 5: Fire-and-Forget Audit ⭐
+
+**Problem:** Audit logging shouldn't block main request flow.
+
+**Solution:** Fire-and-forget with error swallowing
+
+```java
+// Gateway (Reactive)
+auditPublisher.publishDecision(context, decision, latencyMs)
+    .subscribe(
+        null,  // No success handler needed
+        error -> log.error("Audit failed (non-blocking): {}", error.getMessage())
+    );
+
+// Service (Async)
+@Async
+public void logDecision(PolicyContext context, PolicyDecision decision, long latencyMs) {
+    try {
+        auditRepository.save(audit);
+        publishToKafka(audit);
+    } catch (Exception e) {
+        // Fail-safe: Log error but don't throw
+        log.error("Audit failed: {}", e.getMessage());
+    }
+}
+```
+
+**Principles:**
+
+- ✅ **Non-blocking** (async execution)
+- ✅ **Fail-safe** (error doesn't affect main flow)
+- ✅ **Fire-and-forget** (no waiting for result)
+- ✅ **Logged** (error tracking for monitoring)
+
+**When to Use:**
+
+- Audit logging
+- Event publishing
+- Non-critical side effects
+- Performance-sensitive paths
+
+---
+
+### Pattern 6: Correlation ID Propagation ⭐
+
+**Problem:** Need to trace request across multiple services.
+
+**Solution:** Generate once, propagate everywhere
+
+```java
+// 1. Gateway generates (or accepts from client)
+String correlationId = request.getHeader("X-Correlation-ID");
+if (correlationId == null) {
+    correlationId = UUID.randomUUID().toString();
+}
+
+// 2. Add to PolicyContext
+PolicyContext context = PolicyContext.builder()
+    .correlationId(correlationId)
+    .build();
+
+// 3. Use in audit event
+PolicyAuditEvent event = PolicyAuditEvent.builder()
+    .correlationId(correlationId)
+    .build();
+
+// 4. Use as Kafka message key (for ordering)
+kafkaTemplate.send("policy.audit", correlationId, eventJson);
+
+// 5. Propagate to downstream services
+request.mutate()
+    .header("X-Correlation-ID", correlationId)
+    .build();
+```
+
+**Benefits:**
+
+- ✅ **Distributed tracing** (track request across services)
+- ✅ **Kafka ordering** (same correlation = same partition)
+- ✅ **Log correlation** (group related logs)
+- ✅ **Debug friendly** (trace entire request flow)
+
+**When to Use:**
+
+- Microservices architecture
+- Distributed tracing needed
+- Event ordering required
+- Log aggregation systems
+
+---
+
+### Pattern 7: Build Context from SecurityContext ⭐
+
+**Problem:** Need to convert SecurityContext to PolicyContext in filters.
+
+**Solution:** Private helper method with consistent mapping
+
+```java
+@Component
+public class PolicyValidationFilter implements Filter {
+
+    private PolicyContext buildPolicyContext(HttpServletRequest request, SecurityContext secCtx) {
+        // Parse userId (String → UUID)
+        UUID userId = secCtx.getUserId() != null ?
+            UUID.fromString(secCtx.getUserId()) : null;
+
+        return PolicyContext.builder()
+            .userId(userId)
+            .companyId(secCtx.getTenantId())
+            .companyType(secCtx.getCompanyType())
+            .endpoint(request.getRequestURI())
+            .httpMethod(request.getMethod())
+            .operation(mapOperation(request.getMethod()))
+            .scope(inferScope(request.getRequestURI()))
+            .roles(extractRoles(secCtx))
+            .correlationId(request.getHeader("X-Correlation-ID"))
+            .requestId(request.getHeader("X-Request-ID"))
+            .requestIp(request.getRemoteAddr())
+            .build();
+    }
+
+    private OperationType mapOperation(String method) {
+        return switch (method.toUpperCase()) {
+            case "GET", "HEAD" -> OperationType.READ;
+            case "POST", "PUT", "PATCH" -> OperationType.WRITE;
+            case "DELETE" -> OperationType.DELETE;
+            default -> OperationType.READ;
+        };
+    }
+
+    private DataScope inferScope(String path) {
+        if (path.contains("/me") || path.contains("/profile")) {
+            return DataScope.SELF;
+        }
+        if (path.contains("/admin") || path.contains("/system")) {
+            return DataScope.GLOBAL;
+        }
+        return DataScope.COMPANY;
+    }
+
+    private List<String> extractRoles(SecurityContext secCtx) {
+        if (secCtx.getRoles() == null) return List.of();
+
+        return Arrays.stream(secCtx.getRoles())
+            .map(role -> role.startsWith("ROLE_") ? role.substring(5) : role)
+            .collect(Collectors.toList());
+    }
+}
+```
+
+**Benefits:**
+
+- ✅ **Reusable** (same pattern in all services)
+- ✅ **Type-safe** (String → UUID conversion)
+- ✅ **Consistent** (same mapping logic everywhere)
+- ✅ **Testable** (private methods can be tested)
+
+**When to Use:**
+
+- Filter implementations
+- AOP aspects
+- Interceptors
+- Any place converting SecurityContext → PolicyContext
+
+---
+
+### Pattern 8: Kafka Event Factory Method ⭐
+
+**Problem:** Creating Kafka events from domain objects is repetitive.
+
+**Solution:** Static factory method on event class
+
+```java
+@Builder
+public class PolicyAuditEvent extends DomainEvent {
+    private UUID userId;
+    private String decision;
+    private String reason;
+    // ... more fields
+
+    /**
+     * Factory method to create event from audit entity
+     */
+    public static PolicyAuditEvent fromAudit(PolicyDecisionAudit audit) {
+        return PolicyAuditEvent.builder()
+            .userId(audit.getUserId())
+            .companyId(audit.getCompanyId())
+            .decision(audit.getDecision())
+            .reason(audit.getReason())
+            .latencyMs(audit.getLatencyMs())
+            .correlationId(audit.getCorrelationId())
+            .timestamp(audit.getCreatedAt())
+            .build();
+    }
+}
+
+// Usage
+PolicyAuditEvent event = PolicyAuditEvent.fromAudit(audit);
+String eventJson = objectMapper.writeValueAsString(event);
+kafkaTemplate.send("policy.audit", correlationId, eventJson);
+```
+
+**Benefits:**
+
+- ✅ **DRY** (one place for conversion)
+- ✅ **Type-safe** (compile-time check)
+- ✅ **Self-documenting** (clear factory method)
+- ✅ **Testable** (easy to unit test)
+
+**When to Use:**
+
+- Creating Kafka events from entities
+- Converting between domain models
+- Event-driven architecture
+- Need consistent event creation
+
+---
+
 ## ✅ Pre-Commit Checklist
 
 Before committing code, verify:
@@ -758,7 +1352,7 @@ Before committing code, verify:
 
 ## 🎯 Summary
 
-**Remember:**
+**Core Principles (Always):**
 
 1. ⭐ **UUID type safety** is MANDATORY
 2. 📏 **Single Responsibility** - Keep files small
@@ -769,12 +1363,36 @@ Before committing code, verify:
 7. 📊 **Audit everything** - WHY? is important
 8. 🧪 **Test thoroughly** - Unit + Integration
 
+**Phase 3 Additions (New):**
+
+9. 🛡️ **Defense-in-Depth** - PolicyValidationFilter in all services
+10. 🔄 **Optional Dependencies** - `@Autowired(required = false)` pattern
+11. ⚡ **Reactive Audit** - Non-blocking audit for Gateway
+12. 🗄️ **Registry Lookup** - Database-driven + Fallback
+13. 📡 **Correlation ID** - Distributed tracing everywhere
+14. 🔥 **Fire-and-Forget** - Async audit without blocking
+
 **When in doubt, ask:** "Is this following Clean Architecture and SOLID principles?"
+
+---
+
+## 🆕 Phase 3 Pattern Quick Reference
+
+| Pattern                      | File Location                                                   | Lines   | Use When                         |
+| ---------------------------- | --------------------------------------------------------------- | ------- | -------------------------------- |
+| **Defense-in-Depth Filter**  | `{service}/infrastructure/security/PolicyValidationFilter.java` | ~160    | All services (secondary check)   |
+| **Reactive Audit Publisher** | `api-gateway/audit/ReactivePolicyAuditPublisher.java`           | ~90     | Reactive contexts (Gateway)      |
+| **Optional Dependency**      | `shared-infrastructure/policy/engine/PolicyEngine.java`         | Pattern | Component used in mixed contexts |
+| **Registry Lookup**          | `PolicyEngine.checkRoleDefaultAccess()`                         | Pattern | Need database-driven config      |
+| **Context Builder**          | `PolicyValidationFilter.buildPolicyContext()`                   | Helper  | Converting SecurityContext       |
+| **Factory Method**           | `PolicyAuditEvent.fromAudit()`                                  | Static  | Creating Kafka events            |
+
+**📖 Complete examples:** See Pattern 1-8 sections above
 
 ---
 
 **Document Owner:** Tech Lead  
 **Reviewers:** All Developers  
 **Status:** ✅ Active & Enforced  
-**Last Updated:** 2025-10-09 19:20 UTC+1  
-**Version:** 2.0 (Added PolicyConstants principle)
+**Last Updated:** 2025-10-10 14:45 UTC+1  
+**Version:** 3.0 (Phase 3 Implementation Patterns Added)

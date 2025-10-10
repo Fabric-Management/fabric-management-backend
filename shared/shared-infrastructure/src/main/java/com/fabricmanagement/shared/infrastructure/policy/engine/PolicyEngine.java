@@ -2,14 +2,18 @@ package com.fabricmanagement.shared.infrastructure.policy.engine;
 
 import com.fabricmanagement.shared.domain.policy.PolicyContext;
 import com.fabricmanagement.shared.domain.policy.PolicyDecision;
+import com.fabricmanagement.shared.domain.policy.PolicyRegistry;
 import com.fabricmanagement.shared.infrastructure.constants.SecurityRoles;
 import com.fabricmanagement.shared.infrastructure.policy.constants.PolicyConstants;
 import com.fabricmanagement.shared.infrastructure.policy.guard.CompanyTypeGuard;
 import com.fabricmanagement.shared.infrastructure.policy.guard.PlatformPolicyGuard;
+import com.fabricmanagement.shared.infrastructure.policy.repository.PolicyRegistryRepository;
 import com.fabricmanagement.shared.infrastructure.policy.resolver.ScopeResolver;
 import com.fabricmanagement.shared.infrastructure.policy.resolver.UserGrantResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
+import java.util.Optional;
 
 /**
  * Policy Engine (PDP - Policy Decision Point)
@@ -74,6 +78,7 @@ public class PolicyEngine {
     // Optional dependencies (may not be available in reactive contexts like Gateway)
     private final PlatformPolicyGuard platformPolicyGuard;
     private final UserGrantResolver userGrantResolver;
+    private final PolicyRegistryRepository policyRegistryRepository;
     
     /**
      * Constructor with optional dependencies
@@ -82,17 +87,21 @@ public class PolicyEngine {
      * @param scopeResolver required
      * @param platformPolicyGuard optional (null in Gateway)
      * @param userGrantResolver optional (null in Gateway)
+     * @param policyRegistryRepository optional (null in Gateway)
      */
     public PolicyEngine(CompanyTypeGuard companyTypeGuard,
                        ScopeResolver scopeResolver,
                        @org.springframework.beans.factory.annotation.Autowired(required = false) 
                        PlatformPolicyGuard platformPolicyGuard,
                        @org.springframework.beans.factory.annotation.Autowired(required = false) 
-                       UserGrantResolver userGrantResolver) {
+                       UserGrantResolver userGrantResolver,
+                       @org.springframework.beans.factory.annotation.Autowired(required = false)
+                       PolicyRegistryRepository policyRegistryRepository) {
         this.companyTypeGuard = companyTypeGuard;
         this.scopeResolver = scopeResolver;
         this.platformPolicyGuard = platformPolicyGuard;
         this.userGrantResolver = userGrantResolver;
+        this.policyRegistryRepository = policyRegistryRepository;
     }
     
     /**
@@ -178,8 +187,8 @@ public class PolicyEngine {
     /**
      * Check if user's role has default access
      * 
-     * This is a simplified implementation.
-     * TODO: Replace with PolicyRegistry lookup
+     * Checks PolicyRegistry for endpoint-specific role requirements.
+     * Falls back to simplified role-based access if registry unavailable.
      * 
      * @param context policy context
      * @return true if role has default access
@@ -189,7 +198,60 @@ public class PolicyEngine {
             return false;
         }
         
-        // Simplified role-based access
+        // Step 1: Try PolicyRegistry lookup (if available)
+        if (policyRegistryRepository != null && context.getEndpoint() != null && context.getOperation() != null) {
+            try {
+                Optional<PolicyRegistry> policyOpt = policyRegistryRepository
+                    .findByEndpointAndOperationAndActiveTrue(context.getEndpoint(), context.getOperation());
+                
+                if (policyOpt.isPresent()) {
+                    PolicyRegistry policy = policyOpt.get();
+                    
+                    // Check if user has any of the default roles defined in policy
+                    if (policy.getDefaultRoles() != null && !policy.getDefaultRoles().isEmpty()) {
+                        boolean hasDefaultRole = context.getRoles().stream()
+                            .anyMatch(policy::hasRoleAccess);
+                        
+                        if (hasDefaultRole) {
+                            log.debug("User has default role access from PolicyRegistry for endpoint: {}", 
+                                context.getEndpoint());
+                            return true;
+                        } else {
+                            log.debug("User lacks required roles from PolicyRegistry. Required: {}, User has: {}",
+                                policy.getDefaultRoles(), context.getRoles());
+                            return false;
+                        }
+                    }
+                    
+                    // Policy exists but no specific role requirements - allow
+                    log.debug("Policy exists with no role restrictions for endpoint: {}", context.getEndpoint());
+                    return true;
+                }
+                
+                // No specific policy found - fall through to default logic
+                log.debug("No PolicyRegistry entry found for endpoint: {}, operation: {}. Using default logic.",
+                    context.getEndpoint(), context.getOperation());
+                
+            } catch (Exception e) {
+                log.error("Error checking PolicyRegistry for endpoint: {}, operation: {}. Falling back to default logic.",
+                    context.getEndpoint(), context.getOperation(), e);
+                // Fall through to default logic on error
+            }
+        } else {
+            log.debug("PolicyRegistry not available. Using simplified role-based access.");
+        }
+        
+        // Step 2: Fallback - Simplified role-based access (original logic)
+        return checkFallbackRoleAccess(context);
+    }
+    
+    /**
+     * Fallback role-based access check (when PolicyRegistry unavailable)
+     * 
+     * @param context policy context
+     * @return true if role has default access
+     */
+    private boolean checkFallbackRoleAccess(PolicyContext context) {
         // ADMIN and SUPER_ADMIN have full access
         if (context.hasAnyRole(SecurityRoles.ADMIN, SecurityRoles.SUPER_ADMIN, SecurityRoles.SYSTEM_ADMIN)) {
             return true;
