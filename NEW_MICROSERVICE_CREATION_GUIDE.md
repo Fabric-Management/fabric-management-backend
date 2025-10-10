@@ -39,6 +39,7 @@
 ### Phase 1: Planning & Design (1-2 hours)
 
 - [ ] **Domain Analysis**
+
   - [ ] Bounded context belirlendi mi?
   - [ ] Entity'ler tanımlandı mı?
   - [ ] Value objects belirlendi mi?
@@ -46,6 +47,7 @@
   - [ ] External dependencies belirlendi mi?
 
 - [ ] **Architecture Decisions**
+
   - [ ] Domain model: Anemic vs Rich? (Default: Anemic)
   - [ ] Policy integration gerekli mi?
   - [ ] Cross-service communication var mı?
@@ -61,12 +63,14 @@
 ### Phase 2: Project Setup (30 minutes)
 
 - [ ] **Maven Module Creation**
+
   - [ ] `services/{service-name}/pom.xml` oluşturuldu mu?
   - [ ] Parent POM'a eklendi mi?
   - [ ] Dependencies doğru mu?
   - [ ] Shared modules import edildi mi?
 
 - [ ] **Application Configuration**
+
   - [ ] `application.yml` oluşturuldu mu?
   - [ ] `application-docker.yml` oluşturuldu mu?
   - [ ] Port numarası belirlendi mi? (unique!)
@@ -81,24 +85,28 @@
 ### Phase 3: Core Implementation (4-6 hours)
 
 - [ ] **Klasör Yapısı**
+
   - [ ] Clean Architecture structure oluşturuldu mu?
   - [ ] `api/`, `application/`, `domain/`, `infrastructure/` layerlar
   - [ ] DTO klasörleri: `api/dto/request/`, `api/dto/response/`
   - [ ] Mapper klasörü: `application/mapper/`
 
 - [ ] **Domain Layer**
+
   - [ ] Entity'ler oluşturuldu mu? (extends BaseEntity)
   - [ ] Value objects oluşturuldu mu?
   - [ ] Domain events tanımlandı mı?
   - [ ] Domain exceptions oluşturuldu mu?
 
 - [ ] **Application Layer**
+
   - [ ] Service sınıfları oluşturuldu mu?
   - [ ] Mapper'lar oluşturuldu mu?
   - [ ] Business logic implement edildi mi?
   - [ ] Transaction management eklendi mi?
 
 - [ ] **API Layer**
+
   - [ ] Controller'lar oluşturuldu mu?
   - [ ] Request DTO'lar oluşturuldu mu?
   - [ ] Response DTO'lar oluşturuldu mu?
@@ -113,6 +121,7 @@
 ### Phase 4: Security & Integration (2-3 hours)
 
 - [ ] **Security Integration**
+
   - [ ] `@EnableWebSecurity` yapılandırıldı mı?
   - [ ] JWT token validation eklendi mi?
   - [ ] `shared.security` package scan edildi mi?
@@ -120,6 +129,7 @@
   - [ ] SecurityContext kullanılıyor mu?
 
 - [ ] **API Gateway Integration**
+
   - [ ] Gateway routing yapılandırıldı mı?
   - [ ] Health endpoint expose edildi mi?
   - [ ] Rate limiting tanımlandı mı?
@@ -143,6 +153,7 @@
 ### Phase 6: Testing (2-3 hours)
 
 - [ ] **Unit Tests**
+
   - [ ] Service tests yazıldı mı?
   - [ ] Mapper tests yazıldı mı?
   - [ ] Coverage >80% mi?
@@ -155,6 +166,7 @@
 ### Phase 7: Documentation (1 hour)
 
 - [ ] **Service Documentation**
+
   - [ ] `services/{service-name}/README.md` oluşturuldu mu?
   - [ ] `docs/services/{service-name}.md` oluşturuldu mu?
   - [ ] API endpoints dokümante edildi mi?
@@ -168,6 +180,7 @@
 ### Phase 8: Final Checks (30 minutes)
 
 - [ ] **Code Quality**
+
   - [ ] Lint errors yok mu?
   - [ ] Hardcoded string yok mu?
   - [ ] Comment noise temizlendi mi?
@@ -271,7 +284,7 @@ import java.util.UUID;
 
 /**
  * {Entity} Entity
- * 
+ *
  * Domain model for {description}.
  * Pattern: Anemic Domain (Pure data holder)
  */
@@ -282,17 +295,17 @@ import java.util.UUID;
 @NoArgsConstructor
 @SuperBuilder
 public class {Entity} extends BaseEntity {
-    
+
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
-    
+
     @Column(name = "name", nullable = false)
     private String name;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private {Entity}Status status;
-    
+
     // NO BUSINESS METHODS!
     // Lombok provides @Getter/@Setter
     // Business logic → Service layer
@@ -323,7 +336,7 @@ import java.util.UUID;
 
 /**
  * {Entity} Service
- * 
+ *
  * Business logic for {entity} management.
  * Pattern: Orchestration only (no mapping, no event building)
  */
@@ -331,38 +344,38 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class {Entity}Service {
-    
+
     private final {Entity}Repository repository;
     private final {Entity}Mapper mapper;
     private final {Entity}EventMapper eventMapper;
     private final {Entity}EventPublisher eventPublisher;
-    
+
     @Transactional
     public UUID create{Entity}(Create{Entity}Request request, UUID tenantId, String createdBy) {
         log.info("Creating {entity} for tenant: {}", tenantId);
-        
+
         // Mapping → Mapper's job
         {Entity} entity = mapper.fromCreateRequest(request, tenantId, createdBy);
         entity = repository.save(entity);
-        
+
         log.info("{Entity} created successfully: {}", entity.getId());
-        
+
         // Event building → EventMapper's job
         eventPublisher.publish{Entity}Created(
             eventMapper.toCreatedEvent(entity)
         );
-        
+
         return entity.getId();
     }
-    
+
     @Transactional(readOnly = true)
     public {Entity}Response get{Entity}(UUID id, UUID tenantId) {
         {Entity} entity = repository.findByIdAndTenantId(id, tenantId)
             .orElseThrow(() -> new {Entity}NotFoundException(id));
-        
+
         return mapper.toResponse(entity);
     }
-    
+
     @Transactional(readOnly = true)
     public PagedResponse<{Entity}Response> list{Entities}(UUID tenantId, Pageable pageable) {
         Page<{Entity}> page = repository.findByTenantId(tenantId, pageable);
@@ -396,7 +409,7 @@ import java.util.UUID;
 
 /**
  * {Entity} Controller
- * 
+ *
  * HTTP endpoints for {entity} management.
  * Pattern: HTTP handling only (no business logic)
  */
@@ -405,36 +418,36 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class {Entity}Controller {
-    
+
     private final {Entity}Service service;
-    
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<UUID>> create{Entity}(
             @Valid @RequestBody Create{Entity}Request request,
             @AuthenticationPrincipal SecurityContext ctx) {
-        
+
         UUID id = service.create{Entity}(request, ctx.getTenantId(), ctx.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(id, "{Entity} created successfully"));
     }
-    
+
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<{Entity}Response>> get{Entity}(
             @PathVariable UUID id,
             @AuthenticationPrincipal SecurityContext ctx) {
-        
+
         {Entity}Response response = service.get{Entity}(id, ctx.getTenantId());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-    
+
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PagedResponse<{Entity}Response>> list{Entities}(
             Pageable pageable,
             @AuthenticationPrincipal SecurityContext ctx) {
-        
+
         PagedResponse<{Entity}Response> response = service.list{Entities}(
             ctx.getTenantId(), pageable
         );
@@ -457,13 +470,13 @@ import java.util.UUID;
 
 /**
  * {Entity} Mapper
- * 
+ *
  * DTO ↔ Entity mapping.
  * Pattern: Mapping only (no business logic)
  */
 @Component
 public class {Entity}Mapper {
-    
+
     public {Entity} fromCreateRequest(Create{Entity}Request request, UUID tenantId, String createdBy) {
         return {Entity}.builder()
                 .id(UUID.randomUUID())
@@ -473,7 +486,7 @@ public class {Entity}Mapper {
                 .createdBy(createdBy)
                 .build();
     }
-    
+
     public {Entity}Response toResponse({Entity} entity) {
         return {Entity}Response.builder()
                 .id(entity.getId())
@@ -501,11 +514,11 @@ import lombok.Data;
 @Data
 @Builder
 public class Create{Entity}Request {
-    
+
     @NotBlank(message = "Name is required")
     @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
     private String name;
-    
+
     // Add other fields with validation
 }
 ```
@@ -527,12 +540,12 @@ import java.util.UUID;
 @Data
 @Builder
 public class {Entity}Response {
-    
+
     private UUID id;
     private String name;
     private String status;
     private LocalDateTime createdAt;
-    
+
     // Add other fields as needed
 }
 ```
@@ -556,11 +569,11 @@ import java.util.UUID;
  */
 @Repository
 public interface {Entity}Repository extends JpaRepository<{Entity}, UUID> {
-    
+
     Optional<{Entity}> findByIdAndTenantId(UUID id, UUID tenantId);
-    
+
     Page<{Entity}> findByTenantId(UUID tenantId, Pageable pageable);
-    
+
     boolean existsByNameAndTenantId(String name, UUID tenantId);
 }
 ```
@@ -574,14 +587,14 @@ public interface {Entity}Repository extends JpaRepository<{Entity}, UUID> {
 CREATE TABLE {entities} (
     -- Primary Key
     id UUID PRIMARY KEY,
-    
+
     -- Tenant Isolation
     tenant_id UUID NOT NULL,
-    
+
     -- Business Fields
     name VARCHAR(100) NOT NULL,
     status VARCHAR(50) NOT NULL,
-    
+
     -- BaseEntity Audit Fields (MANDATORY!)
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -597,8 +610,8 @@ CREATE INDEX idx_{entities}_status ON {entities}(status);
 CREATE INDEX idx_{entities}_created_at ON {entities}(created_at);
 
 -- Unique Constraints
-CREATE UNIQUE INDEX idx_{entities}_name_tenant 
-    ON {entities}(name, tenant_id) 
+CREATE UNIQUE INDEX idx_{entities}_name_tenant
+    ON {entities}(name, tenant_id)
     WHERE deleted = FALSE;
 
 -- Comments
@@ -637,7 +650,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 @EnableFeignClients
 @EnableKafka
 public class {Service}Application {
-    
+
     public static void main(String[] args) {
         SpringApplication.run({Service}Application.class, args);
     }
@@ -659,26 +672,26 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Security Configuration
- * 
+ *
  * JWT validation handled by shared-security module.
  */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
-    
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> 
+            .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .anyRequest().authenticated()
             );
-        
+
         return http.build();
     }
 }
@@ -694,21 +707,21 @@ public class SecurityConfig {
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    
+
     <parent>
         <groupId>com.fabricmanagement</groupId>
         <artifactId>fabric-management-backend</artifactId>
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
-    
+
     <artifactId>{service}-service</artifactId>
     <name>{Service} Service</name>
     <description>{Service} microservice for Fabric Management System</description>
-    
+
     <dependencies>
         <!-- Shared Modules -->
         <dependency>
@@ -727,7 +740,7 @@ public class SecurityConfig {
             <groupId>com.fabricmanagement</groupId>
             <artifactId>shared-security</artifactId>
         </dependency>
-        
+
         <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -745,19 +758,19 @@ public class SecurityConfig {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-        
+
         <!-- Feign Client -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
-        
+
         <!-- Kafka -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
-        
+
         <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -768,14 +781,14 @@ public class SecurityConfig {
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
         </dependency>
-        
+
         <!-- Utilities -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
-        
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -783,7 +796,7 @@ public class SecurityConfig {
             <scope>test</scope>
         </dependency>
     </dependencies>
-    
+
     <build>
         <plugins>
             <plugin>
@@ -806,13 +819,13 @@ server:
 spring:
   application:
     name: {service}-service
-  
+
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/{service}_db
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
-  
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -821,12 +834,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-  
+
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-  
+
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -948,6 +961,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 ## 🎯 Başarı Kriterleri
 
 ### Kod Kalitesi
+
 - [ ] Zero lint errors
 - [ ] Zero hardcoded strings
 - [ ] Zero magic numbers
@@ -957,6 +971,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 - [ ] Test coverage >80%
 
 ### Architecture
+
 - [ ] Clean Architecture structure
 - [ ] SRP applied (each class one job)
 - [ ] DRY applied (no duplication)
@@ -964,6 +979,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 - [ ] YAGNI applied (no over-engineering)
 
 ### Security
+
 - [ ] JWT authentication integrated
 - [ ] SecurityContext kullanılıyor
 - [ ] @PreAuthorize annotations var
@@ -971,6 +987,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 - [ ] UUID type safety (all IDs)
 
 ### Database
+
 - [ ] Flyway migrations created
 - [ ] BaseEntity columns added
 - [ ] Indexes created
@@ -978,6 +995,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 - [ ] Unique constraints added
 
 ### Integration
+
 - [ ] API Gateway routing configured
 - [ ] Health endpoint working
 - [ ] Docker image builds
@@ -985,6 +1003,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 - [ ] Kafka events (if needed)
 
 ### Documentation
+
 - [ ] README.md created
 - [ ] Service docs created
 - [ ] API endpoints documented
@@ -995,15 +1014,15 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ## 📝 Port Allocation
 
-| Service           | Port | Status   |
-|-------------------|------|----------|
-| API Gateway       | 8080 | ✅ Used  |
-| User Service      | 8081 | ✅ Used  |
-| Contact Service   | 8082 | ✅ Used  |
-| Company Service   | 8083 | ✅ Used  |
-| **YOUR SERVICE**  | 8084 | 🆕 Next  |
-| **Future**        | 8085 | 🔜 Free  |
-| **Future**        | 8086 | 🔜 Free  |
+| Service          | Port | Status  |
+| ---------------- | ---- | ------- |
+| API Gateway      | 8080 | ✅ Used |
+| User Service     | 8081 | ✅ Used |
+| Contact Service  | 8082 | ✅ Used |
+| Company Service  | 8083 | ✅ Used |
+| **YOUR SERVICE** | 8084 | 🆕 Next |
+| **Future**       | 8085 | 🔜 Free |
+| **Future**       | 8086 | 🔜 Free |
 
 ---
 
@@ -1035,17 +1054,20 @@ mkdir -p infrastructure/{repository,client,messaging,config}
 ## 📚 Related Documentation
 
 ### Core Documents
+
 - [docs/AI_ASSISTANT_LEARNINGS.md](docs/AI_ASSISTANT_LEARNINGS.md)
 - [docs/development/PRINCIPLES.md](docs/development/PRINCIPLES.md)
 - [docs/development/CODE_STRUCTURE_GUIDE.md](docs/development/CODE_STRUCTURE_GUIDE.md)
 - [docs/development/DATA_TYPES_STANDARDS.md](docs/development/DATA_TYPES_STANDARDS.md)
 
 ### Service Examples
+
 - [docs/services/user-service.md](docs/services/user-service.md)
 - [docs/services/company-service.md](docs/services/company-service.md)
 - [docs/services/contact-service.md](docs/services/contact-service.md)
 
 ### Refactoring Guides
+
 - [COMPANY_SERVICE_REFACTORING_COMPLETE.md](COMPANY_SERVICE_REFACTORING_COMPLETE.md)
 - [API_GATEWAY_REFACTORING_PROMPT.md](API_GATEWAY_REFACTORING_PROMPT.md)
 
@@ -1054,27 +1076,35 @@ mkdir -p infrastructure/{repository,client,messaging,config}
 ## 💡 Pro Tips
 
 ### Tip 1: Start Simple
+
 Önce basit CRUD işlemleri ile başla. Complex business logic'i sonra ekle.
 
 ### Tip 2: Copy from Existing
+
 User-Service veya Company-Service'den copy-paste yap, sonra customize et.
 
 ### Tip 3: Test as You Go
+
 Her feature'ı implement ettikten sonra test et. Son ana bırakma!
 
 ### Tip 4: Document Immediately
+
 Kod yazarken dokümante et. Sonra unutursun!
 
 ### Tip 5: Follow Patterns
+
 Mevcut pattern'leri koru. Consistency çok önemli!
 
 ### Tip 6: Use Shared Modules
+
 shared-domain, shared-infrastructure'ı maksimum kullan. Don't reinvent!
 
 ### Tip 7: Security First
+
 Security integration'ı baştan ekle. Sonra eklemek zor!
 
 ### Tip 8: Policy Optional
+
 Policy her service'de gerekli değil! İhtiyaç varsa ekle, yoksa ekleme.
 
 ---
@@ -1082,6 +1112,7 @@ Policy her service'de gerekli değil! İhtiyaç varsa ekle, yoksa ekleme.
 ## 🎊 Final Checklist
 
 ### Before Committing
+
 - [ ] All files created
 - [ ] No lint errors
 - [ ] Tests passing
@@ -1130,14 +1161,13 @@ Status: Production Ready
 ## 🎯 Remember
 
 > "This is our baby. We must take care of it properly."
-> 
+>
 > - No temporary solutions
-> - No workarounds  
+> - No workarounds
 > - Production-grade from start
 > - Clean Architecture always
 > - Best practices mandatory
-> 
+>
 > **Quality is NOT optional. It's ESSENTIAL!**
 
 **Haydi şimdi harika bir microservice oluştur! 🚀✨**
-
