@@ -27,14 +27,14 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @SpringBootApplication(
     scanBasePackages = {
         "com.fabricmanagement.user",
-        "com.fabricmanagement.shared.domain",
-        "com.fabricmanagement.shared.application",
-        "com.fabricmanagement.shared.security"
-        // NOTE: shared.infrastructure.policy excluded (Policy management in Company Service)
+        "com.fabricmanagement.shared"
     },
     exclude = {RedisRepositoriesAutoConfiguration.class}
 )
-@EnableJpaRepositories(basePackages = "com.fabricmanagement.user.infrastructure.repository")
+@EnableJpaRepositories(basePackages = {
+    "com.fabricmanagement.user.infrastructure.repository",
+    "com.fabricmanagement.shared.infrastructure.policy.repository"
+})
 @EntityScan(basePackages = {
     "com.fabricmanagement.user.domain",
     "com.fabricmanagement.shared.domain"
