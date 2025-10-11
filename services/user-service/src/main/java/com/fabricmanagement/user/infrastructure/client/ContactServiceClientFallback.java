@@ -4,6 +4,7 @@ import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.infrastructure.constants.SecurityConstants;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
+import com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -105,6 +106,14 @@ public class ContactServiceClientFallback implements ContactServiceClient {
         log.warn("⚠️ Fallback: {} - returning empty batch for {} owners", 
             ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, ownerIds.size());
         return ApiResponse.success(Collections.emptyMap(), ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE);
+    }
+    
+    @Override
+    public ApiResponse<ContactDto> createContact(CreateContactDto request) {
+        log.error("⚠️ Fallback: {} - cannot create contact: {}", 
+            ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, request.getContactValue());
+        return ApiResponse.error(ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, 
+            SecurityConstants.ERROR_CODE_SERVICE_UNAVAILABLE);
     }
 }
 

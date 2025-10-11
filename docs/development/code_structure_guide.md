@@ -704,8 +704,10 @@ shared/
 ├── shared-infrastructure/            # Infrastructure Shared
 │   ├── constants/
 │   │   ├── ValidationConstants.java  # Email/phone patterns
-│   │   └── SecurityRoles.java        # ADMIN, SUPER_ADMIN, etc.
+│   │   ├── SecurityConstants.java
+│   │   └── ServiceConstants.java
 │   ├── security/SecurityContextHolder.java
+│   ├── policy/                       # Policy engine
 │   └── config/                       # Default configs
 │       └── JpaAuditingConfig.java
 │

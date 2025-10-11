@@ -1,7 +1,7 @@
 # 🏗️ Fabric Management - System Architecture
 
-**Version:** 2.1  
-**Last Updated:** 2025-10-10 (User-Service Refactoring Complete)  
+**Version:** 2.2  
+**Last Updated:** 2025-10-11 (Tenant Onboarding System)  
 **Status:** ✅ Production Ready
 
 ---
@@ -48,17 +48,22 @@
 
 ---
 
-## 🏆 Recent Updates (2025-10-10)
+## 🏆 Recent Updates (2025-10-11)
 
-### User-Service Refactoring
+### Tenant Onboarding System
+
+- ✅ **Self-Service Registration** - New tenant self-registration flow
+- ✅ **SystemRole Enum** - Type-safe roles (TENANT_ADMIN, USER, etc.)
+- ✅ **Platform Tenant** - Reserved for future SUPER_ADMIN
+- ✅ **Address Support** - Company address fields added
+- ✅ **No Default Users** - Clean start, all users via registration
+
+### Previous: User-Service Refactoring (2025-10-10)
 
 - ✅ **Entity:** 408 → 99 lines (-76%) - Pure data holder
-- ✅ **UserService:** 320 → 140 lines (-56%) - No mapping logic
-- ✅ **Total:** -700+ lines removed
-- ✅ **Mappers:** 3 focused mappers (SRP applied)
 - ✅ **Pattern:** Anemic Domain Model adopted
 
-**Details:** [AI_ASSISTANT_LEARNINGS.md](AI_ASSISTANT_LEARNINGS.md)
+**Details:** [TENANT_ONBOARDING_IMPLEMENTATION.md](../TENANT_ONBOARDING_IMPLEMENTATION.md)
 
 ---
 
@@ -168,6 +173,6 @@
 
 ---
 
-**Last Updated:** 2025-10-10 (Simplified to Navigation Index)  
-**Version:** 2.1  
+**Last Updated:** 2025-10-11 (Tenant Onboarding System Added)  
+**Version:** 2.2  
 **Status:** ✅ Production Ready

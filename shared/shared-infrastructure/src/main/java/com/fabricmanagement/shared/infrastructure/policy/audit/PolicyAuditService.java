@@ -200,6 +200,9 @@ public class PolicyAuditService {
             auditRepository.save(audit);
             log.debug("Sync audit saved: {}", decision.getAuditMessage());
             
+            // Publish to Kafka (same as async version)
+            publishToKafka(audit);
+            
         } catch (Exception e) {
             log.error("Failed to save sync audit", e);
         }

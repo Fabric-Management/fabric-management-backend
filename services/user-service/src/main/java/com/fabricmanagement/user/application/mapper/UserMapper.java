@@ -3,6 +3,7 @@ package com.fabricmanagement.user.application.mapper;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.application.response.PagedResponse;
 import com.fabricmanagement.shared.domain.policy.UserContext;
+import com.fabricmanagement.shared.domain.role.SystemRole;
 import com.fabricmanagement.user.api.dto.request.CreateUserRequest;
 import com.fabricmanagement.user.api.dto.request.UpdateUserRequest;
 import com.fabricmanagement.user.api.dto.response.UserResponse;
@@ -83,7 +84,7 @@ public class UserMapper {
                 .phone(phone)
                 .status(user.getStatus() != null ? user.getStatus().name() : null)
                 .registrationType(user.getRegistrationType() != null ? user.getRegistrationType().name() : null)
-                .role(user.getRole())
+                .role(user.getRole() != null ? user.getRole().name() : null)
                 .lastLoginAt(user.getLastLoginAt())
                 .lastLoginIp(user.getLastLoginIp())
                 .preferences(user.getPreferences())
@@ -182,6 +183,16 @@ public class UserMapper {
     }
     
     public User fromCreateRequest(CreateUserRequest request, UUID tenantId, String createdBy) {
+        SystemRole role = SystemRole.USER; // Default role
+        if (request.getRole() != null && !request.getRole().isEmpty()) {
+            try {
+                role = SystemRole.valueOf(request.getRole());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid role '{}' provided, using default USER role", request.getRole());
+                role = SystemRole.USER;
+            }
+        }
+        
         return User.builder()
                 .id(UUID.randomUUID())
                 .tenantId(tenantId)
@@ -190,7 +201,7 @@ public class UserMapper {
                 .displayName(request.getDisplayName())
                 .status(UserStatus.PENDING_VERIFICATION)
                 .registrationType(RegistrationType.DIRECT_REGISTRATION)
-                .role(request.getRole() != null ? request.getRole() : "USER")
+                .role(role)
                 .preferences(request.getPreferences())
                 .settings(request.getSettings())
                 .createdBy(createdBy)
@@ -209,7 +220,16 @@ public class UserMapper {
         if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
         if (request.getLastName() != null) user.setLastName(request.getLastName());
         if (request.getDisplayName() != null) user.setDisplayName(request.getDisplayName());
-        if (request.getRole() != null) user.setRole(request.getRole());
+        
+        if (request.getRole() != null && !request.getRole().isEmpty()) {
+            try {
+                SystemRole role = SystemRole.valueOf(request.getRole());
+                user.setRole(role);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid role '{}' provided for update, ignoring", request.getRole());
+            }
+        }
+        
         if (request.getPreferences() != null) user.setPreferences(request.getPreferences());
         if (request.getSettings() != null) user.setSettings(request.getSettings());
         

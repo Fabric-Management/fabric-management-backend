@@ -2,6 +2,7 @@ package com.fabricmanagement.user.domain.aggregate;
 
 import com.fabricmanagement.shared.domain.base.BaseEntity;
 import com.fabricmanagement.shared.domain.policy.UserContext;
+import com.fabricmanagement.shared.domain.role.SystemRole;
 import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
@@ -58,8 +59,10 @@ public class User extends BaseEntity {
     @Column(name = "password_hash")
     private String passwordHash;
     
-    @Column(name = "role")
-    private String role;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    @lombok.Builder.Default
+    private SystemRole role = SystemRole.USER;
     
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;

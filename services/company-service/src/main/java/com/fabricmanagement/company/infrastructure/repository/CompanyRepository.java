@@ -4,6 +4,8 @@ import com.fabricmanagement.company.domain.aggregate.Company;
 import com.fabricmanagement.company.domain.valueobject.CompanyStatus;
 import com.fabricmanagement.company.domain.valueobject.CompanyType;
 import com.fabricmanagement.company.domain.valueobject.Industry;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -143,5 +145,46 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
         @Param("tenantId") UUID tenantId,
         @Param("taxId") String taxId,
         @Param("registrationNumber") String registrationNumber);
+    
+    // ===== Paginated Query Methods =====
+    
+    /**
+     * Finds all non-deleted companies by tenant ID with pagination
+     * 
+     * @param tenantId Tenant context
+     * @param pageable Pagination parameters (page, size, sort)
+     * @return Page of companies
+     */
+    @Query("SELECT c FROM Company c WHERE c.tenantId = :tenantId AND c.deleted = false")
+    Page<Company> findByTenantIdAndDeletedFalse(@Param("tenantId") UUID tenantId, Pageable pageable);
+    
+    /**
+     * Finds companies by status and tenant ID with pagination
+     * 
+     * @param status Company status filter
+     * @param tenantId Tenant context
+     * @param pageable Pagination parameters
+     * @return Page of companies
+     */
+    @Query("SELECT c FROM Company c WHERE c.status = :status AND c.tenantId = :tenantId AND c.deleted = false")
+    Page<Company> findByStatusAndTenantId(
+        @Param("status") CompanyStatus status, 
+        @Param("tenantId") UUID tenantId, 
+        Pageable pageable);
+    
+    /**
+     * Search companies by name with pagination
+     * 
+     * @param searchTerm Search keyword
+     * @param tenantId Tenant context
+     * @param pageable Pagination parameters
+     * @return Page of matching companies
+     */
+    @Query("SELECT c FROM Company c WHERE LOWER(c.name.value) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "AND c.tenantId = :tenantId AND c.deleted = false")
+    Page<Company> searchByNameAndTenantIdPaginated(
+        @Param("searchTerm") String searchTerm, 
+        @Param("tenantId") UUID tenantId, 
+        Pageable pageable);
 }
 

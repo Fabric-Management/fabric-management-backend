@@ -1,0 +1,189 @@
+{
+  "info": {
+    "_postman_id": "tenant-onboarding-local",
+    "name": "Tenant Onboarding - Local",
+    "description": "Complete tenant onboarding flow: Register → Verify → Setup Password → Login",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "companyId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "admin@acmetekstil.com",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Register New Tenant",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('companyId', response.data.companyId);",
+              "    pm.collectionVariables.set('userId', response.data.userId);",
+              "    console.log('Company ID:', response.data.companyId);",
+              "    console.log('User ID:', response.data.userId);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"companyName\": \"Acme Tekstil A.Ş.\",\n  \"legalName\": \"Acme Tekstil Anonim Şirketi\",\n  \"taxId\": \"1234567890\",\n  \"registrationNumber\": \"REG-2025-001\",\n  \"companyType\": \"CORPORATION\",\n  \"industry\": \"MANUFACTURING\",\n  \"description\": \"Textile manufacturing company\",\n  \"website\": \"https://acmetekstil.com\",\n  \"addressLine1\": \"Organize Sanayi Bölgesi 5. Cadde No:42\",\n  \"addressLine2\": \"A Blok Kat:3\",\n  \"city\": \"İstanbul\",\n  \"district\": \"Esenyurt\",\n  \"postalCode\": \"34520\",\n  \"country\": \"Turkey\",\n  \"firstName\": \"Ahmet\",\n  \"lastName\": \"Yılmaz\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"+905551234567\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/public/onboarding/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "public", "onboarding", "register"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. Check Contact (After Email Click)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"{{email}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/check-contact",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "check-contact"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. Setup Password (First Login)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"{{email}}\",\n  \"password\": \"AcmeAdmin@123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/setup-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "setup-password"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+              "    console.log('Access Token:', response.data.accessToken);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"{{email}}\",\n  \"password\": \"AcmeAdmin@123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "login"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. Create New User (by TENANT_ADMIN)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Mehmet\",\n  \"lastName\": \"Demir\",\n  \"email\": \"mehmet@acmetekstil.com\",\n  \"phone\": \"+905559876543\",\n  \"role\": \"USER\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users"]
+        }
+      },
+      "response": []
+    }
+  ]
+}

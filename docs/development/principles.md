@@ -126,6 +126,9 @@ Before committing code, verify:
 - ✅ **Sabitler**: Magic number/string yerine constants kullanılmalı
 - ✅ **Tek Sorumluluk**: Her metod tek bir iş yapmalı
 - ✅ **Minimal Yorum**: Kod kendini açıklamalı, gereksiz yorum olmamalı
+  - Code tells HOW, comments tell WHY
+  - Self-documenting code > extensive JavaDoc
+  - Example: `SystemRole.TENANT_ADMIN` (isim zaten açıklıyor, yorum gereksiz)
 
 ### 2. Mimari Prensipler
 
@@ -149,7 +152,12 @@ Controller → Service → Repository → Database
 
 - **KISS**: Keep It Simple, Stupid
 - **DRY**: Don't Repeat Yourself
+  - Exception: Microservices DTO duplication OK (loose coupling > DRY)
+  - See: `microservices_api_standards.md` → DTO Strategy
 - **YAGNI**: You Aren't Gonna Need It
+  - Balance: Build foundation (data model) but not business logic yet
+  - Example: Add `is_platform` field ✅, Add `if (isPlatform)` logic ❌
+  - Rule: "Build the foundation, don't paint the house yet"
 - **Loose Coupling**: Minimize dependencies between components
 
 ### 3. Spring Boot Best Practices
@@ -926,10 +934,11 @@ public class UserService {
     // Multiple responsibilities
 }
 
-// Anemic domain models
+// Over-complicated validation
 public class User {
-    // Only getters/setters
-    // No business logic
+    public void setEmail(String email) {
+        // Don't validate here, use @Valid in controller
+    }
 }
 
 // Shared mutable state
@@ -952,14 +961,13 @@ public class UserAuthenticationService {
     // Only authentication logic
 }
 
-// Rich domain models
-public class User {
-    public void activate() {
-        if (this.status != UserStatus.PENDING) {
-            throw new IllegalStateException("User must be pending");
-        }
-        this.status = UserStatus.ACTIVE;
-    }
+// Anemic domain model (OUR PATTERN)
+@Entity
+@Getter
+@Setter
+public class User extends BaseEntity {
+    private String firstName;
+    // Pure data holder, business logic in Service
 }
 
 // Immutable shared state

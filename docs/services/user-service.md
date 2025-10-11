@@ -1,7 +1,7 @@
 # 👤 User Service Documentation
 
-**Version:** 2.0  
-**Last Updated:** 2025-10-10  
+**Version:** 2.1  
+**Last Updated:** 2025-10-11  
 **Port:** 8081  
 **Database:** fabric_management (user_schema)  
 **Status:** ✅ Production Ready
@@ -14,12 +14,14 @@ User Service manages user authentication, authorization, and profile management.
 
 ### Core Responsibilities
 
+- ✅ Tenant onboarding (self-service registration)
 - ✅ User authentication (login, password management)
 - ✅ User profile management (CRUD)
 - ✅ JWT token generation
 - ✅ Login attempt tracking (brute force protection)
 - ✅ Security audit logging
 - ✅ Integration with Contact Service (email/phone)
+- ✅ Integration with Company Service (tenant creation)
 - ✅ Policy-based authorization (UserContext)
 
 ---
@@ -122,8 +124,9 @@ public class User extends BaseEntity {
     @Column(name = "password_hash")
     private String passwordHash;
 
-    @Column(name = "role")
-    private String role;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private SystemRole role;
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -227,7 +230,47 @@ public class UserService {
 
 ## 🔒 Security Features
 
-### 1. Authentication Flow
+### 1. Tenant Onboarding Flow (NEW)
+
+**Step 1: Register Tenant**
+
+```
+POST /api/v1/public/onboarding/register
+→ NO AUTH (public endpoint)
+→ Creates: Company + TENANT_ADMIN user + Email contact
+→ User: passwordHash NULL, status PENDING_VERIFICATION
+→ Sends email verification link
+→ Rate limit: 2 req/min
+```
+
+**Step 2: Verify Email**
+
+```
+User clicks email link
+→ Contact service marks email as verified
+```
+
+**Step 3: Setup Password**
+
+```
+POST /api/v1/users/auth/setup-password
+→ Validates: Email must be verified
+→ Sets password hash
+→ User status: ACTIVE
+→ Rate limit: 3 req/min
+```
+
+**Step 4: Login**
+
+```
+POST /api/v1/users/auth/login
+→ Brute force protection (5 attempts → 15 min lockout)
+→ Returns: JWT access + refresh token
+→ Role: TENANT_ADMIN
+→ Rate limit: 5 req/min
+```
+
+### 2. Authentication Flow (Existing Users)
 
 **Step 1: Check Contact**
 
@@ -238,26 +281,14 @@ POST /api/v1/users/auth/check-contact
 → Rate limit: 10 req/min
 ```
 
-**Step 2: Setup Password (First Time)**
-
-```
-POST /api/v1/users/auth/setup-password
-→ Validation: Contact must be verified
-→ Password requirements enforced
-→ Rate limit: 3 req/min
-```
-
-**Step 3: Login**
+**Step 2: Login**
 
 ```
 POST /api/v1/users/auth/login
-→ Brute force protection (5 attempts → 15 min lockout)
-→ Security audit logging
-→ Rate limit: 5 req/min
-→ Returns: JWT access + refresh token
+→ Same as tenant onboarding Step 4
 ```
 
-### 2. Brute Force Protection
+### 3. Brute Force Protection
 
 ```java
 // Redis-based (LoginAttemptTracker)
@@ -267,7 +298,7 @@ POST /api/v1/users/auth/login
 - Distributed tracking
 ```
 
-### 3. Security Audit Logging
+### 4. Security Audit Logging
 
 ```
 [SECURITY_AUDIT] event=LOGIN_SUCCESS contactValue=use*** userId=uuid
@@ -289,6 +320,12 @@ POST /api/v1/users/auth/login
 | PUT    | `/api/v1/users/{id}`   | Owner/ADMIN   | Update user  |
 | DELETE | `/api/v1/users/{id}`   | ADMIN         | Delete user  |
 | GET    | `/api/v1/users/search` | Authenticated | Search users |
+
+### Onboarding (Public)
+
+| Method | Endpoint                             | Rate Limit | Description         |
+| ------ | ------------------------------------ | ---------- | ------------------- |
+| POST   | `/api/v1/public/onboarding/register` | 2/min      | Register new tenant |
 
 ### Authentication (Public)
 

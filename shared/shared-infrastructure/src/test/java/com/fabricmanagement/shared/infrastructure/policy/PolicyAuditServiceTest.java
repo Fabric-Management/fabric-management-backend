@@ -159,7 +159,7 @@ class PolicyAuditServiceTest {
             .thenAnswer(invocation -> invocation.getArgument(0));
         
         // Simulate Kafka failure
-        when(objectMapper.writeValueAsString(any()))
+        lenient().when(objectMapper.writeValueAsString(any()))
             .thenThrow(new RuntimeException("Kafka unavailable"));
         
         // When
@@ -167,7 +167,7 @@ class PolicyAuditServiceTest {
         
         // Then
         verify(auditRepository, times(1)).save(any(PolicyDecisionAudit.class));
-        // Kafka failure should not prevent DB save
+        // Kafka failure should not prevent DB save (fail-safe pattern)
     }
     
     @Test

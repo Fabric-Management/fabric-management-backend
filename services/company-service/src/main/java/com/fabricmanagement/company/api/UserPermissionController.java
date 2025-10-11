@@ -53,7 +53,7 @@ public class UserPermissionController {
     }
     
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionResponse>>> getUserPermissions(
             @PathVariable UUID userId) {
         
@@ -63,7 +63,7 @@ public class UserPermissionController {
     }
     
     @GetMapping("/user/{userId}/active")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionResponse>>> getActivePermissions(
             @PathVariable UUID userId) {
         
@@ -86,7 +86,7 @@ public class UserPermissionController {
     }
     
     @GetMapping("/{permissionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UserPermissionResponse>> getPermission(
             @PathVariable UUID permissionId) {
         
@@ -96,7 +96,7 @@ public class UserPermissionController {
     }
     
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionResponse>>> getAllPermissions(
             @AuthenticationPrincipal SecurityContext ctx) {
         

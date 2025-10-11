@@ -44,6 +44,13 @@ public class CompanyResponse implements Serializable {
     private boolean isActive;
     private int maxUsers;
     private int currentUsers;
+    private boolean isPlatform;
+    private String addressLine1;
+    private String addressLine2;
+    private String city;
+    private String district;
+    private String postalCode;
+    private String country;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String createdBy;
@@ -74,6 +81,13 @@ public class CompanyResponse implements Serializable {
             .isActive(company.isActive())
             .maxUsers(company.getMaxUsers())
             .currentUsers(company.getCurrentUsers())
+            .isPlatform(company.isPlatform())
+            .addressLine1(company.getAddressLine1())
+            .addressLine2(company.getAddressLine2())
+            .city(company.getCity())
+            .district(company.getDistrict())
+            .postalCode(company.getPostalCode())
+            .country(company.getCountry())
             .createdAt(company.getCreatedAt())
             .updatedAt(company.getUpdatedAt())
             .createdBy(company.getCreatedBy())

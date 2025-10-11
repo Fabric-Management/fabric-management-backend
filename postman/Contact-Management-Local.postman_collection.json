@@ -1,0 +1,135 @@
+{
+  "info": {
+    "_postman_id": "contact-management-local",
+    "name": "Contact Management - Local",
+    "description": "Contact Service API - Authenticated endpoints (requires tenant registration first)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "contactId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+              "    pm.collectionVariables.set('userId', response.data.userId);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"admin@acmetekstil.com\",\n  \"password\": \"AcmeAdmin@123\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. Get My Contacts",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/contacts/owner/{{userId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "contacts", "owner", "{{userId}}"]
+        }
+      }
+    },
+    {
+      "name": "3. Add Phone Contact",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('contactId', response.data.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ownerId\": \"{{userId}}\",\n  \"ownerType\": \"USER\",\n  \"contactType\": \"PHONE\",\n  \"contactValue\": \"+905551234567\",\n  \"isPrimary\": false,\n  \"autoVerified\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/contacts",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "contacts"]
+        }
+      }
+    }
+  ]
+}

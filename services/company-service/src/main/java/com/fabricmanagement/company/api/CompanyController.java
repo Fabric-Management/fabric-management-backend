@@ -2,14 +2,21 @@ package com.fabricmanagement.company.api;
 
 import com.fabricmanagement.company.api.dto.request.*;
 import com.fabricmanagement.company.api.dto.response.*;
+import com.fabricmanagement.company.api.dto.response.CompanySimilarResponse;
 import com.fabricmanagement.company.application.service.CompanyService;
 import com.fabricmanagement.company.domain.valueobject.CompanyStatus;
 import com.fabricmanagement.company.infrastructure.config.DuplicateDetectionConfig;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.application.response.PagedResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,7 +36,7 @@ public class CompanyController {
     private final DuplicateDetectionConfig duplicateConfig;
     
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<UUID>> createCompany(
             @Valid @RequestBody CreateCompanyRequest request,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -51,13 +58,50 @@ public class CompanyController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> listCompanies(
-            @AuthenticationPrincipal SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx,
+            @RequestParam(required = false) Boolean paginated,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+        
+        // If pagination requested, use paginated endpoint
+        if (Boolean.TRUE.equals(paginated)) {
+            Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection) 
+                ? Sort.Direction.DESC : Sort.Direction.ASC;
+            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+            
+            PagedResponse<CompanyResponse> pagedResult = companyService.listCompaniesPaginated(ctx.getTenantId(), pageable);
+            
+            // Return paged response directly (it extends API response structure)
+            return ResponseEntity.ok()
+                    .body(ApiResponse.success(pagedResult.getContent()));
+        }
+        
+        // Default: return all companies (backward compatible)
         List<CompanyResponse> companies = companyService.listCompanies(ctx.getTenantId());
         return ResponseEntity.ok(ApiResponse.success(companies));
     }
     
+    @GetMapping("/paginated")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PagedResponse<CompanyResponse>> listCompaniesPaginated(
+            @AuthenticationPrincipal SecurityContext ctx,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+        
+        Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection) 
+            ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        
+        PagedResponse<CompanyResponse> result = companyService.listCompaniesPaginated(ctx.getTenantId(), pageable);
+        return ResponseEntity.ok(result);
+    }
+    
     @PutMapping("/{companyId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> updateCompany(
             @PathVariable UUID companyId,
             @Valid @RequestBody UpdateCompanyRequest request,
@@ -68,7 +112,7 @@ public class CompanyController {
     }
     
     @DeleteMapping("/{companyId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteCompany(
             @PathVariable UUID companyId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -78,7 +122,7 @@ public class CompanyController {
     }
     
     @PostMapping("/{companyId}/activate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> activateCompany(
             @PathVariable UUID companyId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -88,7 +132,7 @@ public class CompanyController {
     }
     
     @PostMapping("/{companyId}/deactivate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivateCompany(
             @PathVariable UUID companyId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -101,9 +145,44 @@ public class CompanyController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompaniesByStatus(
             @PathVariable CompanyStatus status,
-            @AuthenticationPrincipal SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx,
+            @RequestParam(required = false) Boolean paginated,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+        
+        // If pagination requested
+        if (Boolean.TRUE.equals(paginated)) {
+            Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection) 
+                ? Sort.Direction.DESC : Sort.Direction.ASC;
+            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+            
+            PagedResponse<CompanyResponse> pagedResult = companyService.getCompaniesByStatusPaginated(status, ctx.getTenantId(), pageable);
+            return ResponseEntity.ok(ApiResponse.success(pagedResult.getContent()));
+        }
+        
+        // Default: return all
         List<CompanyResponse> companies = companyService.getCompaniesByStatus(status, ctx.getTenantId());
         return ResponseEntity.ok(ApiResponse.success(companies));
+    }
+    
+    @GetMapping("/status/{status}/paginated")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PagedResponse<CompanyResponse>> getCompaniesByStatusPaginated(
+            @PathVariable CompanyStatus status,
+            @AuthenticationPrincipal SecurityContext ctx,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+        
+        Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection) 
+            ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        
+        PagedResponse<CompanyResponse> result = companyService.getCompaniesByStatusPaginated(status, ctx.getTenantId(), pageable);
+        return ResponseEntity.ok(result);
     }
     
     @GetMapping("/search")
@@ -112,13 +191,48 @@ public class CompanyController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String industry,
             @RequestParam(required = false) String companyType,
-            @AuthenticationPrincipal SecurityContext ctx) {
+            @AuthenticationPrincipal SecurityContext ctx,
+            @RequestParam(required = false) Boolean paginated,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+        
+        // If pagination requested
+        if (Boolean.TRUE.equals(paginated)) {
+            Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection) 
+                ? Sort.Direction.DESC : Sort.Direction.ASC;
+            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+            
+            PagedResponse<CompanyResponse> pagedResult = companyService.searchCompaniesPaginated(ctx.getTenantId(), name, pageable);
+            return ResponseEntity.ok(ApiResponse.success(pagedResult.getContent()));
+        }
+        
+        // Default: return all
         List<CompanyResponse> companies = companyService.searchCompanies(ctx.getTenantId(), name);
         return ResponseEntity.ok(ApiResponse.success(companies));
     }
     
+    @GetMapping("/search/paginated")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PagedResponse<CompanyResponse>> searchCompaniesPaginated(
+            @RequestParam(required = false) String name,
+            @AuthenticationPrincipal SecurityContext ctx,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+        
+        Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection) 
+            ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        
+        PagedResponse<CompanyResponse> result = companyService.searchCompaniesPaginated(ctx.getTenantId(), name, pageable);
+        return ResponseEntity.ok(result);
+    }
+    
     @PutMapping("/{companyId}/settings")
-    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY_MANAGER')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> updateCompanySettings(
             @PathVariable UUID companyId,
             @Valid @RequestBody UpdateCompanySettingsRequest request,
@@ -129,7 +243,7 @@ public class CompanyController {
     }
     
     @PutMapping("/{companyId}/subscription")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> updateSubscription(
             @PathVariable UUID companyId,
             @Valid @RequestBody UpdateSubscriptionRequest request,
@@ -171,6 +285,31 @@ public class CompanyController {
         }
         
         CompanyAutocompleteResponse result = companyService.autocomplete(query.trim(), ctx.getTenantId());
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+    
+    @GetMapping("/similar")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<CompanySimilarResponse>> findSimilar(
+            @RequestParam("name") String name,
+            @RequestParam(value = "threshold", required = false, defaultValue = "0.3") Double threshold,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Finding similar companies for: {} with threshold: {}", name, threshold);
+        
+        int minLength = duplicateConfig.getFuzzySearchMinLength();
+        if (name == null || name.trim().length() < minLength) {
+            return ResponseEntity.ok(ApiResponse.success(
+                CompanySimilarResponse.builder()
+                    .matches(List.of())
+                    .totalCount(0)
+                    .threshold(threshold)
+                    .build(),
+                String.format("Query too short (minimum %d characters)", minLength)
+            ));
+        }
+        
+        CompanySimilarResponse result = companyService.findSimilar(name.trim(), threshold, ctx.getTenantId());
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

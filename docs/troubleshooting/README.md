@@ -18,6 +18,7 @@
 
 | Issue               | Document                                                     | Status      | Date Resolved |
 | ------------------- | ------------------------------------------------------------ | ----------- | ------------- |
+| **Kafka Topics**    | [KAFKA_TOPIC_ISSUES.md](./KAFKA_TOPIC_ISSUES.md)             | ✅ Resolved | Oct 11, 2025  |
 | **Bean Conflicts**  | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md) | ✅ Resolved | Oct 7, 2025   |
 | **Flyway Checksum** | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md) | ✅ Resolved | Oct 6, 2025   |
 
@@ -31,19 +32,19 @@
 | ----------------------- | ---------------------------------------------------------------------------------- |
 | **🚀 Startup Issues**   | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)  |
 | **🗄️ Database Issues**  | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
-| **📨 Kafka Issues**     | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#kafka-issues)    |
+| **📨 Kafka Issues**     | [KAFKA_TOPIC_ISSUES.md](./KAFKA_TOPIC_ISSUES.md) ⭐                                |
 | **🔗 Bean Conflicts**   | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md)                       |
 | **📋 Migration Issues** | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md)                       |
 
 ### By Symptom
 
-| Symptom                              | Likely Issue       | Guide                                                                        |
-| ------------------------------------ | ------------------ | ---------------------------------------------------------------------------- |
-| Service won't start                  | Check logs         | [Common Issues - Startup](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)   |
-| `ConflictingBeanDefinitionException` | Bean name conflict | [Bean Conflict Resolution](./BEAN_CONFLICT_RESOLUTION.md)                    |
-| `FlywayValidateException`            | Migration checksum | [Flyway Checksum](./FLYWAY_CHECKSUM_MISMATCH.md)                             |
-| Connection refused                   | Database not ready | [Common Issues - Database](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
-| `LEADER_NOT_AVAILABLE`               | Kafka not ready    | [Common Issues - Kafka](./COMMON_ISSUES_AND_SOLUTIONS.md#kafka-issues)       |
+| Symptom                              | Likely Issue         | Guide                                                                        |
+| ------------------------------------ | -------------------- | ---------------------------------------------------------------------------- |
+| Service won't start                  | Check logs           | [Common Issues - Startup](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)   |
+| `ConflictingBeanDefinitionException` | Bean name conflict   | [Bean Conflict Resolution](./BEAN_CONFLICT_RESOLUTION.md)                    |
+| `FlywayValidateException`            | Migration checksum   | [Flyway Checksum](./FLYWAY_CHECKSUM_MISMATCH.md)                             |
+| Connection refused                   | Database not ready   | [Common Issues - Database](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
+| `LEADER_NOT_AVAILABLE`               | Kafka topics missing | [Kafka Topic Issues](./KAFKA_TOPIC_ISSUES.md) ⭐                             |
 
 ---
 

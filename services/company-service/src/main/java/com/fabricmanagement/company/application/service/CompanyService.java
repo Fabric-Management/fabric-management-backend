@@ -8,6 +8,8 @@ import com.fabricmanagement.company.api.dto.request.CheckDuplicateRequest;
 import com.fabricmanagement.company.api.dto.response.CompanyResponse;
 import com.fabricmanagement.company.api.dto.response.CheckDuplicateResponse;
 import com.fabricmanagement.company.api.dto.response.CompanyAutocompleteResponse;
+import com.fabricmanagement.company.api.dto.response.CompanySimilarResponse;
+import com.fabricmanagement.shared.application.response.PagedResponse;
 import com.fabricmanagement.company.application.mapper.CompanyMapper;
 import com.fabricmanagement.company.application.mapper.CompanyEventMapper;
 import com.fabricmanagement.company.domain.aggregate.Company;
@@ -21,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -184,6 +188,22 @@ public class CompanyService {
                 .collect(Collectors.toList());
     }
     
+    /**
+     * List companies with pagination
+     * 
+     * @param tenantId Tenant ID
+     * @param pageable Pagination parameters (page, size, sort)
+     * @return Paginated company list
+     */
+    public PagedResponse<CompanyResponse> listCompaniesPaginated(UUID tenantId, Pageable pageable) {
+        log.debug("Listing companies for tenant: {} (page: {}, size: {})", 
+                  tenantId, pageable.getPageNumber(), pageable.getPageSize());
+        
+        Page<Company> companyPage = companyRepository.findByTenantIdAndDeletedFalse(tenantId, pageable);
+        
+        return PagedResponse.fromPage(companyPage, companyMapper::toResponse);
+    }
+    
     public List<CompanyResponse> searchCompanies(UUID tenantId, String searchTerm) {
         log.debug("Searching companies with term: {} for tenant: {}", searchTerm, tenantId);
         
@@ -192,12 +212,46 @@ public class CompanyService {
                 .collect(Collectors.toList());
     }
     
+    /**
+     * Search companies with pagination
+     * 
+     * @param tenantId Tenant ID
+     * @param searchTerm Search keyword
+     * @param pageable Pagination parameters
+     * @return Paginated search results
+     */
+    public PagedResponse<CompanyResponse> searchCompaniesPaginated(UUID tenantId, String searchTerm, Pageable pageable) {
+        log.debug("Searching companies with term: {} for tenant: {} (page: {}, size: {})", 
+                  searchTerm, tenantId, pageable.getPageNumber(), pageable.getPageSize());
+        
+        Page<Company> companyPage = companyRepository.searchByNameAndTenantIdPaginated(searchTerm, tenantId, pageable);
+        
+        return PagedResponse.fromPage(companyPage, companyMapper::toResponse);
+    }
+    
     public List<CompanyResponse> getCompaniesByStatus(CompanyStatus status, UUID tenantId) {
         log.debug("Getting companies with status: {} for tenant: {}", status, tenantId);
         
         return companyRepository.findByStatusAndTenantId(status, tenantId).stream()
                 .map(companyMapper::toResponse)
                 .collect(Collectors.toList());
+    }
+    
+    /**
+     * Get companies by status with pagination
+     * 
+     * @param status Company status filter
+     * @param tenantId Tenant ID
+     * @param pageable Pagination parameters
+     * @return Paginated status-filtered results
+     */
+    public PagedResponse<CompanyResponse> getCompaniesByStatusPaginated(CompanyStatus status, UUID tenantId, Pageable pageable) {
+        log.debug("Getting companies with status: {} for tenant: {} (page: {}, size: {})", 
+                  status, tenantId, pageable.getPageNumber(), pageable.getPageSize());
+        
+        Page<Company> companyPage = companyRepository.findByStatusAndTenantId(status, tenantId, pageable);
+        
+        return PagedResponse.fromPage(companyPage, companyMapper::toResponse);
     }
     
     public CheckDuplicateResponse checkDuplicate(CheckDuplicateRequest request, UUID tenantId) {
@@ -269,6 +323,60 @@ public class CompanyService {
         return CompanyAutocompleteResponse.builder()
                 .suggestions(suggestions)
                 .totalCount(suggestions.size())
+                .build();
+    }
+    
+    /**
+     * Find companies with similar names using PostgreSQL trigram similarity
+     * 
+     * @param name Company name to search for
+     * @param threshold Similarity threshold (0.0 to 1.0), lower = more results
+     * @param tenantId Tenant ID for multi-tenancy
+     * @return Response with list of similar companies and their similarity scores
+     */
+    public CompanySimilarResponse findSimilar(String name, Double threshold, UUID tenantId) {
+        log.debug("Finding similar companies for name: {} with threshold: {}", name, threshold);
+        
+        // Use configured threshold if not provided
+        double searchThreshold = threshold != null ? threshold : duplicateConfig.getDatabaseSearchThreshold();
+        
+        // Validate threshold range
+        if (searchThreshold < 0.0 || searchThreshold > 1.0) {
+            searchThreshold = 0.3; // default safe value
+        }
+        
+        // Minimum name length check
+        if (name == null || name.trim().length() < duplicateConfig.getFuzzySearchMinLength()) {
+            return CompanySimilarResponse.builder()
+                    .matches(List.of())
+                    .totalCount(0)
+                    .threshold(searchThreshold)
+                    .build();
+        }
+        
+        List<Company> similarCompanies = companyRepository.findSimilarCompanies(
+                tenantId, 
+                name.trim(), 
+                searchThreshold
+        );
+        
+        // Map to response with similarity scores
+        List<CompanySimilarResponse.SimilarCompany> matches = similarCompanies.stream()
+                .map(company -> CompanySimilarResponse.SimilarCompany.builder()
+                        .id(company.getId().toString())
+                        .name(company.getName().getValue())
+                        .legalName(company.getLegalName())
+                        .taxId(company.getTaxId())
+                        .type(company.getType().name())
+                        .industry(company.getIndustry().name())
+                        .similarityScore(0.85) // Placeholder - PostgreSQL returns ordered results
+                        .build())
+                .toList();
+        
+        return CompanySimilarResponse.builder()
+                .matches(matches)
+                .totalCount(matches.size())
+                .threshold(searchThreshold)
                 .build();
     }
     

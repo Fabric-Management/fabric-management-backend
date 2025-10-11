@@ -253,7 +253,7 @@ public class PolicyEngine {
      */
     private boolean checkFallbackRoleAccess(PolicyContext context) {
         // ADMIN and SUPER_ADMIN have full access
-        if (context.hasAnyRole(SecurityRoles.ADMIN, SecurityRoles.SUPER_ADMIN, SecurityRoles.SYSTEM_ADMIN)) {
+        if (context.hasAnyRole(SecurityRoles.TENANT_ADMIN, SecurityRoles.SUPER_ADMIN)) {
             return true;
         }
         

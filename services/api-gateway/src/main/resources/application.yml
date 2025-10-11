@@ -103,6 +103,33 @@ spring:
                   factor: 2
                   basedOnPreviousValue: true
 
+        # Tenant Onboarding - Public Registration (Very Strict Rate Limiting)
+        # Pattern: /api/v1/public/onboarding/register
+        - id: tenant-onboarding-register
+          uri: ${USER_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/public/onboarding/register
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user-service
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@smartKeyResolver}"
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.requestedTokens: 1
+            - name: Retry
+              args:
+                retries: 1
+                methods: POST
+                backoff:
+                  firstBackoff: 200ms
+                  maxBackoff: 1000ms
+                  factor: 2
+                  basedOnPreviousValue: true
+
         # User Service - Other Public Auth Routes (Moderate Rate Limiting)
         # Pattern: /api/v1/users/auth/** (catch-all for other auth endpoints)
         - id: user-service-public

@@ -2,6 +2,7 @@ package com.fabricmanagement.user.infrastructure.client;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
+import com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -95,4 +96,7 @@ public interface ContactServiceClient {
      */
     @PostMapping("/batch/by-owners")
     ApiResponse<java.util.Map<String, List<ContactDto>>> getContactsByOwnersBatch(@RequestBody List<UUID> ownerIds);
+    
+    @PostMapping
+    ApiResponse<ContactDto> createContact(@RequestBody CreateContactDto request);
 }

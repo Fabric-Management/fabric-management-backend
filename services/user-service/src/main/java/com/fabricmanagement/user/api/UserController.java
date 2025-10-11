@@ -75,7 +75,7 @@ public class UserController {
     }
     
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UUID>> createUser(
             @Valid @RequestBody CreateUserRequest request,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -101,7 +101,7 @@ public class UserController {
     }
     
     @DeleteMapping("/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
             @PathVariable UUID userId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -113,7 +113,7 @@ public class UserController {
     }
     
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers(
             @AuthenticationPrincipal SecurityContext ctx) {
         
@@ -123,7 +123,7 @@ public class UserController {
     }
     
     @GetMapping("/paged")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<PagedResponse<UserResponse>> listUsersPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -139,7 +139,7 @@ public class UserController {
     }
     
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> searchUsers(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
@@ -153,7 +153,7 @@ public class UserController {
     }
     
     @GetMapping("/search/paged")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<PagedResponse<UserResponse>> searchUsersPaginated(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
