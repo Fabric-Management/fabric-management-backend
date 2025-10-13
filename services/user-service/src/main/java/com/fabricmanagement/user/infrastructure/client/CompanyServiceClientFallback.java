@@ -7,11 +7,20 @@ import com.fabricmanagement.user.infrastructure.client.dto.CheckCompanyDuplicate
 import com.fabricmanagement.user.infrastructure.client.dto.CompanyDuplicateCheckResult;
 import com.fabricmanagement.user.infrastructure.client.dto.CreateCompanyDto;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
+/**
+ * Company Service Client Fallback
+ * 
+ * Provides graceful degradation when Company Service is unavailable.
+ * 
+ * Pattern: @Lazy to prevent eager initialization during FeignClient setup
+ */
 @Component
+@Lazy  // ✅ Lazy initialization to prevent circular dependency
 @Slf4j
 public class CompanyServiceClientFallback implements CompanyServiceClient {
 

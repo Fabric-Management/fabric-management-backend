@@ -356,10 +356,9 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      user-service:
-        condition: service_healthy
-      contact-service:
-        condition: service_healthy
+      # ✅ GOOGLE/AMAZON LEVEL: No service dependencies!
+      # Services start in parallel - Feign fallback handles initial unavailability
+      # Resilient architecture: One service down doesn't block others
     environment:
       SPRING_PROFILES_ACTIVE: docker
       POSTGRES_HOST: postgres

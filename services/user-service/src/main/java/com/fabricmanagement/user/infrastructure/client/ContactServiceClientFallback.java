@@ -8,6 +8,7 @@ import com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto;
 import com.fabricmanagement.user.infrastructure.client.dto.AddressDto;
 import com.fabricmanagement.user.infrastructure.client.dto.CreateAddressDto;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -29,8 +30,11 @@ import java.util.UUID;
  * - Does NOT hide errors permanently
  * - Logs all fallback activations for monitoring
  * - Returns empty/null data instead of throwing exceptions
+ * 
+ * Pattern: @Lazy to prevent eager initialization during FeignClient setup
  */
 @Component
+@Lazy  // ✅ Lazy initialization to prevent circular dependency
 @Slf4j
 public class ContactServiceClientFallback implements ContactServiceClient {
 

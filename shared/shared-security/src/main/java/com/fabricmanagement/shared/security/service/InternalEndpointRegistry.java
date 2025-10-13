@@ -2,10 +2,12 @@ package com.fabricmanagement.shared.security.service;
 
 import com.fabricmanagement.shared.security.annotation.InternalEndpoint;
 import com.fabricmanagement.shared.security.config.InternalEndpointProperties;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,30 +33,51 @@ import java.util.regex.Pattern;
  * - Built once at startup
  * - Cached in memory
  * 
+ * Pattern: ApplicationListener to avoid circular dependency
+ * - Scans AFTER all beans are initialized
+ * - Prevents: Filter → Registry → Controller → SecurityConfig → Filter cycle
+ * 
  * @since 3.2.0 - Internal Endpoint Registry (Oct 13, 2025)
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class InternalEndpointRegistry {
+public class InternalEndpointRegistry implements ApplicationListener<ContextRefreshedEvent> {
     
     private final ApplicationContext applicationContext;
     private final InternalEndpointProperties endpointProperties;
     
     private final Map<String, Set<String>> exactPathRegistry = new HashMap<>();
     private final List<PathPattern> regexPatterns = new ArrayList<>();
+    private volatile boolean initialized = false;  // ✅ Thread-safe flag
     
-    @PostConstruct
-    public void init() {
-        log.info("🔍 Scanning for @InternalEndpoint annotations...");
+    /**
+     * Initialize registry AFTER all beans are loaded (prevents circular dependency)
+     */
+    @Override
+    public void onApplicationEvent(@NonNull ContextRefreshedEvent event) {
+        // Only initialize once (prevent duplicate scans in parent/child contexts)
+        if (initialized) {
+            return;
+        }
         
-        int annotationCount = scanAnnotatedEndpoints();
-        int configCount = loadConfiguredEndpoints();
-        
-        log.info("✅ Internal Endpoint Registry initialized:");
-        log.info("   - Annotation-based: {} endpoints", annotationCount);
-        log.info("   - Configuration-based: {} endpoints", configCount);
-        log.info("   - Total: {} endpoints", annotationCount + configCount);
+        synchronized (this) {
+            if (initialized) {
+                return;
+            }
+            
+            log.info("🔍 Scanning for @InternalEndpoint annotations...");
+            
+            int annotationCount = scanAnnotatedEndpoints();
+            int configCount = loadConfiguredEndpoints();
+            
+            log.info("✅ Internal Endpoint Registry initialized:");
+            log.info("   - Annotation-based: {} endpoints", annotationCount);
+            log.info("   - Configuration-based: {} endpoints", configCount);
+            log.info("   - Total: {} endpoints", annotationCount + configCount);
+            
+            initialized = true;
+        }
     }
     
     /**
@@ -123,8 +146,16 @@ public class InternalEndpointRegistry {
     
     /**
      * Check if path+method is an internal endpoint
+     * 
+     * Thread-safe: Returns false if registry not yet initialized (fail-safe)
      */
     public boolean isInternalEndpoint(String path, String method) {
+        // ✅ Fail-safe: If not initialized yet, deny access (secure default)
+        if (!initialized) {
+            log.debug("Registry not yet initialized, denying access to: {} {}", method, path);
+            return false;
+        }
+        
         // 1. Check exact match
         Set<String> methods = exactPathRegistry.get(path);
         if (methods != null && (methods.contains(method) || methods.contains("*"))) {

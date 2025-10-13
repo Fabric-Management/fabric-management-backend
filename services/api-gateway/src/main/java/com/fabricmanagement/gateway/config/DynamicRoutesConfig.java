@@ -1,7 +1,8 @@
 package com.fabricmanagement.gateway.config;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
@@ -32,11 +33,28 @@ import java.time.Duration;
  */
 @Slf4j
 @Configuration
-@RequiredArgsConstructor
 public class DynamicRoutesConfig {
     
     private final GatewayProperties gatewayProperties;
     private final SmartKeyResolver smartKeyResolver;
+    
+    // ✅ Environment variables - properly injected (Java Config requires @Value injection!)
+    @Value("${USER_SERVICE_URL:http://localhost:8081}")
+    private String userServiceUrl;
+    
+    @Value("${CONTACT_SERVICE_URL:http://localhost:8082}")
+    private String contactServiceUrl;
+    
+    @Value("${COMPANY_SERVICE_URL:http://localhost:8083}")
+    private String companyServiceUrl;
+    
+    // ✅ Manual constructor to use @Qualifier for bean disambiguation
+    public DynamicRoutesConfig(
+            @Qualifier("fabricGatewayProperties") GatewayProperties gatewayProperties,
+            SmartKeyResolver smartKeyResolver) {
+        this.gatewayProperties = gatewayProperties;
+        this.smartKeyResolver = smartKeyResolver;
+    }
     
     @Bean
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
@@ -63,7 +81,7 @@ public class DynamicRoutesConfig {
                                         .setRetries(1)
                                         .setMethods(HttpMethod.POST)
                                         .setBackoff(Duration.ofMillis(100), Duration.ofMillis(500), 2, true)))
-                        .uri("${USER_SERVICE_URL:http://localhost:8081}"))
+                        .uri(userServiceUrl))  // ✅ Use injected variable
                 
                 // User Login (Public - Very Strict)
                 .route("public-user-login", r -> r
@@ -84,7 +102,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getPublicRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${USER_SERVICE_URL:http://localhost:8081}"))
+                        .uri(userServiceUrl))  // ✅ Use injected variable
                 
                 // Check Contact (Public - Moderate)
                 .route("public-check-contact", r -> r
@@ -105,7 +123,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${USER_SERVICE_URL:http://localhost:8081}"))
+                        .uri(userServiceUrl))  // ✅ Use injected variable
                 
                 // Setup Password (Public - Very Strict)
                 .route("public-setup-password", r -> r
@@ -126,7 +144,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getPublicRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${USER_SERVICE_URL:http://localhost:8081}"))
+                        .uri(userServiceUrl))  // ✅ Use injected variable
                 
                 // Other Auth Routes (Public)
                 .route("public-auth-routes", r -> r
@@ -147,7 +165,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${USER_SERVICE_URL:http://localhost:8081}"))
+                        .uri(userServiceUrl))  // ✅ Use injected variable
                 
                 // =============================================================================
                 // PROTECTED ROUTES - Standard Rate Limiting
@@ -172,7 +190,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${USER_SERVICE_URL:http://localhost:8081}"))
+                        .uri(userServiceUrl))  // ✅ Use injected variable
                 
                 // Company Service (Protected)
                 .route("company-service-protected", r -> r
@@ -193,7 +211,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${COMPANY_SERVICE_URL:http://localhost:8083}"))
+                        .uri(companyServiceUrl))  // ✅ Use injected variable
                 
                 // Contact Service - Find by Value (Internal/Protected - Strict)
                 .route("contact-service-find-by-value", r -> r
@@ -214,7 +232,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${CONTACT_SERVICE_URL:http://localhost:8082}"))
+                        .uri(contactServiceUrl))  // ✅ Use injected variable
                 
                 // Contact Service (Protected)
                 .route("contact-service-protected", r -> r
@@ -235,7 +253,7 @@ public class DynamicRoutesConfig {
                                                 gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
                                                 gatewayProperties.getRetry().getMaxBackoff(), 
                                                 2, true)))
-                        .uri("${CONTACT_SERVICE_URL:http://localhost:8082}"))
+                        .uri(contactServiceUrl))  // ✅ Use injected variable
                 
                 .build();
     }

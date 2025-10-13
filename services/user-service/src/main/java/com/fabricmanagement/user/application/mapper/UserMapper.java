@@ -12,8 +12,8 @@ import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import com.fabricmanagement.user.infrastructure.client.ContactServiceClient;
 import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
@@ -22,12 +22,23 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * User Mapper
+ * 
+ * Maps User entities to DTOs with contact enrichment.
+ * 
+ * Pattern: @Lazy injection for ContactServiceClient to prevent circular dependency
+ */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class UserMapper {
     
     private final ContactServiceClient contactServiceClient;
+    
+    // ✅ Manual constructor with @Lazy for ContactServiceClient
+    public UserMapper(@Lazy ContactServiceClient contactServiceClient) {
+        this.contactServiceClient = contactServiceClient;
+    }
     
     public UserResponse toResponse(User user) {
         String email = null;

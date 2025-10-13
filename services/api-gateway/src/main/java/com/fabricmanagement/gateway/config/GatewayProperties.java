@@ -13,10 +13,12 @@ import java.util.Map;
  * 
  * Replaces hardcoded values in YAML with structured, validated configuration.
  * 
+ * Bean name explicitly set to avoid conflict with Spring Cloud Gateway's default bean.
+ * 
  * @since 3.1.0 - Gateway Refactor (Oct 13, 2025)
  */
 @Data
-@Component
+@Component("fabricGatewayProperties")  // ✅ Explicit bean name to avoid conflict
 @ConfigurationProperties(prefix = "gateway")
 public class GatewayProperties {
     
