@@ -17,6 +17,7 @@ public final class GatewayPaths {
      */
     public static final List<String> PUBLIC_PATHS = List.of(
         "/api/v1/users/auth/",           // All authentication endpoints
+        "/api/v1/public/",               // Public endpoints (onboarding, etc.)
         "/api/v1/contacts/find-by-value", // Internal contact lookup (for auth)
         "/actuator/health",              // Health check
         "/actuator/info",                // Info endpoint  

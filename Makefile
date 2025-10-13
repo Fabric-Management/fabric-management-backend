@@ -228,6 +228,104 @@ lint: ## Lint code
 	@echo "$(GREEN)✅ Linting completed$(NC)"
 
 # =============================================================================
+# FAST DEVELOPMENT COMMANDS (Hot Reload)
+# =============================================================================
+dev-restart-gateway: ## Fast restart: API Gateway only (~30s)
+	@echo "$(YELLOW)⚡ Fast restart: API Gateway...$(NC)"
+	docker compose restart api-gateway
+	@echo "$(GREEN)✅ Gateway restarted (config changes applied)$(NC)"
+
+dev-restart-user: ## Fast restart: User Service only (~30s)
+	@echo "$(YELLOW)⚡ Fast restart: User Service...$(NC)"
+	docker compose restart user-service
+	@echo "$(GREEN)✅ User Service restarted$(NC)"
+
+dev-restart-contact: ## Fast restart: Contact Service only (~30s)
+	@echo "$(YELLOW)⚡ Fast restart: Contact Service...$(NC)"
+	docker compose restart contact-service
+	@echo "$(GREEN)✅ Contact Service restarted$(NC)"
+
+dev-restart-company: ## Fast restart: Company Service only (~30s)
+	@echo "$(YELLOW)⚡ Fast restart: Company Service...$(NC)"
+	docker compose restart company-service
+	@echo "$(GREEN)✅ Company Service restarted$(NC)"
+
+dev-rebuild-user: ## Fast rebuild + restart: User Service (~2min)
+	@echo "$(YELLOW)⚡ Rebuilding User Service...$(NC)"
+	mvn clean package -pl services/user-service -am -DskipTests
+	docker compose up -d --build --no-deps user-service
+	@echo "$(GREEN)✅ User Service rebuilt and restarted$(NC)"
+
+dev-rebuild-user-docker: ## Docker-only rebuild: User Service (no mvn needed, ~3min)
+	@echo "$(YELLOW)⚡ Docker rebuilding User Service (includes Maven build)...$(NC)"
+	docker compose up -d --build --no-deps user-service
+	@echo "$(GREEN)✅ User Service rebuilt and restarted$(NC)"
+
+dev-rebuild-contact: ## Fast rebuild + restart: Contact Service (~2min)
+	@echo "$(YELLOW)⚡ Rebuilding Contact Service...$(NC)"
+	mvn clean package -pl services/contact-service -am -DskipTests
+	docker compose up -d --build --no-deps contact-service
+	@echo "$(GREEN)✅ Contact Service rebuilt and restarted$(NC)"
+
+dev-rebuild-company: ## Fast rebuild + restart: Company Service (~2min)
+	@echo "$(YELLOW)⚡ Rebuilding Company Service...$(NC)"
+	mvn clean package -pl services/company-service -am -DskipTests
+	docker compose up -d --build --no-deps company-service
+	@echo "$(GREEN)✅ Company Service rebuilt and restarted$(NC)"
+
+dev-rebuild-gateway: ## Fast rebuild + restart: API Gateway (~1min)
+	@echo "$(YELLOW)⚡ Rebuilding API Gateway...$(NC)"
+	mvn clean package -pl services/api-gateway -am -DskipTests
+	docker compose up -d --build --no-deps api-gateway
+	@echo "$(GREEN)✅ Gateway rebuilt and restarted$(NC)"
+
+dev-rebuild-gateway-docker: ## Docker-only rebuild: API Gateway (no mvn needed, ~2min)
+	@echo "$(YELLOW)⚡ Docker rebuilding API Gateway (includes Maven build)...$(NC)"
+	docker compose up -d --build --no-deps api-gateway
+	@echo "$(GREEN)✅ Gateway rebuilt and restarted$(NC)"
+
+dev-rebuild-all-services: ## Rebuild all services (User, Contact, Company) - ~5min
+	@echo "$(YELLOW)⚡ Rebuilding all microservices...$(NC)"
+	docker compose up -d --build --no-deps user-service contact-service company-service
+	@echo "$(GREEN)✅ All services rebuilt and restarted$(NC)"
+	@echo "$(BLUE)ℹ️  Wait 30s for health checks, then test!$(NC)"
+
+dev-logs-gateway: ## Tail logs: API Gateway
+	docker compose logs -f --tail=100 api-gateway
+
+dev-logs-gateway-last: ## Show last 30 lines: API Gateway (no follow)
+	@docker compose logs --tail=30 api-gateway
+
+dev-logs-user: ## Tail logs: User Service
+	docker compose logs -f --tail=100 user-service
+
+dev-logs-user-last: ## Show last 30 lines: User Service (no follow)
+	@docker compose logs --tail=30 user-service
+
+dev-logs-all: ## Tail logs: All services
+	docker compose logs -f --tail=50
+
+dev-logs-errors: ## Show ERROR logs from all services
+	@docker compose logs --tail=100 | grep -i "error\|exception\|failed" || echo "$(GREEN)✅ No errors found$(NC)"
+
+dev-logs-user-full: ## Show last 100 lines: User Service (full startup logs)
+	@docker compose logs --tail=100 user-service
+
+dev-logs-user-startup: ## Show User Service startup logs (look for "Started" message)
+	@docker compose logs user-service | grep -E "Started|Tomcat|JVM|Application" | head -30
+
+dev-logs-user-500: ## Show User Service logs related to 500 errors
+	@docker compose logs --tail=300 user-service | grep -v "Kafka" | tail -50
+
+dev-test-network: ## Test network connectivity between services
+	@echo "$(YELLOW)🔍 Testing network connectivity...$(NC)"
+	@docker exec fabric-api-gateway nc -zv user-service 8081 2>&1 || echo "$(RED)❌ Cannot reach user-service$(NC)"
+	@docker exec fabric-api-gateway curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://user-service:8081/actuator/health || echo "$(RED)❌ User Service health check failed$(NC)"
+
+dev-logs-gateway-error: ## Show Gateway ERROR/WARN logs
+	@docker compose logs --tail=200 api-gateway | grep -E "ERROR|WARN|Exception|Failed" | head -50
+
+# =============================================================================
 # QUICK COMMANDS
 # =============================================================================
 up: deploy ## Alias for deploy

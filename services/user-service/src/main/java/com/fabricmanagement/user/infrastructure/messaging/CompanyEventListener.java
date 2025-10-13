@@ -21,6 +21,9 @@ import java.util.UUID;
  * Company Event Listener
  * 
  * Listens to events from Company Service
+ * 
+ * NOTE: This listener is non-blocking and uses async processing.
+ * Kafka consumer errors won't affect the main application.
  */
 @Component
 @RequiredArgsConstructor

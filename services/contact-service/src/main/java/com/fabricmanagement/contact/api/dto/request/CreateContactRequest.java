@@ -26,7 +26,7 @@ public class CreateContactRequest {
     private String contactValue;
 
     @NotBlank(message = "Contact type is required")
-    private String contactType; // EMAIL, PHONE, ADDRESS
+    private String contactType; // EMAIL, PHONE, PHONE_EXTENSION, ADDRESS
 
     @NotNull(message = "Primary flag is required")
     @JsonProperty("isPrimary")
@@ -35,5 +35,8 @@ public class CreateContactRequest {
     @Builder.Default
     @JsonProperty("autoVerified")
     private boolean autoVerified = false;
+    
+    // For PHONE_EXTENSION: links to company's main phone
+    private String parentContactId;
 }
 

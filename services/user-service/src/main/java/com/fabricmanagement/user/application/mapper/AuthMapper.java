@@ -56,13 +56,13 @@ public class AuthMapper {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .email(contact.getContactValue())
-                .role(user.getRole())
+                .role(user.getRole() != null ? user.getRole().name() : null)
                 .build();
     }
     
     public Map<String, Object> buildJwtClaims(User user) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("role", user.getRole());
+        claims.put("role", user.getRole() != null ? user.getRole().name() : "USER");
         claims.put("firstName", user.getFirstName());
         claims.put("lastName", user.getLastName());
         claims.put("companyId", user.getCompanyId() != null ? user.getCompanyId().toString() : null);

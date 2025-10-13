@@ -80,7 +80,7 @@ class PolicyEngineTest {
             CompanyType.INTERNAL,
             OperationType.WRITE,
             DataScope.COMPANY,
-            List.of("ADMIN")
+            List.of("TENANT_ADMIN")
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null); // No guardrail violation
@@ -261,7 +261,7 @@ class PolicyEngineTest {
             CompanyType.INTERNAL,
             OperationType.READ,
             DataScope.COMPANY,
-            List.of("ADMIN")
+            List.of("TENANT_ADMIN")
         );
         
         when(companyTypeGuard.checkGuardrails(any()))
@@ -283,7 +283,7 @@ class PolicyEngineTest {
             CompanyType.INTERNAL,
             OperationType.READ,
             DataScope.COMPANY,
-            List.of("ADMIN")
+            List.of("TENANT_ADMIN")
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
@@ -329,15 +329,15 @@ class PolicyEngineTest {
             CompanyType.INTERNAL,
             OperationType.WRITE,
             DataScope.COMPANY,
-            List.of("ADMIN") // User has ADMIN role
+            List.of("TENANT_ADMIN") // User has TENANT_ADMIN role
         );
         
-        // Create policy that requires ADMIN role
+        // Create policy that requires TENANT_ADMIN role
         PolicyRegistry policy = PolicyRegistry.builder()
             .id(UUID.randomUUID())
             .endpoint("/api/test")
             .operation(OperationType.WRITE)
-            .defaultRoles(List.of("ADMIN", "SUPER_ADMIN"))
+            .defaultRoles(List.of("TENANT_ADMIN", "SUPER_ADMIN"))
             .active(true)
             .build();
         
@@ -370,12 +370,12 @@ class PolicyEngineTest {
             List.of("USER") // User only has USER role
         );
         
-        // Create policy that requires ADMIN role
+        // Create policy that requires TENANT_ADMIN role
         PolicyRegistry policy = PolicyRegistry.builder()
             .id(UUID.randomUUID())
             .endpoint("/api/test")
             .operation(OperationType.DELETE)
-            .defaultRoles(List.of("ADMIN", "SUPER_ADMIN")) // USER not in list
+            .defaultRoles(List.of("TENANT_ADMIN", "SUPER_ADMIN")) // USER not in list
             .active(true)
             .build();
         
@@ -442,7 +442,7 @@ class PolicyEngineTest {
             CompanyType.INTERNAL,
             OperationType.WRITE,
             DataScope.COMPANY,
-            List.of("ADMIN")
+            List.of("TENANT_ADMIN")
         );
         
         when(companyTypeGuard.checkGuardrails(any())).thenReturn(null);
@@ -454,7 +454,7 @@ class PolicyEngineTest {
         PolicyDecision decision = engineWithoutRegistry.evaluate(context);
         
         // Then
-        assertTrue(decision.isAllowed()); // Should use fallback logic (ADMIN allowed)
+        assertTrue(decision.isAllowed()); // Should use fallback logic (TENANT_ADMIN allowed)
         verify(policyRegistryRepository, never()).findByEndpointAndOperationAndActiveTrue(any(), any());
     }
     

@@ -25,7 +25,7 @@ import java.util.UUID;
     name = "contact-service",
     url = "${contact-service.url:http://localhost:8082}",
     path = "/api/v1/contacts",
-    configuration = com.fabricmanagement.company.infrastructure.config.FeignClientConfig.class,
+    configuration = com.fabricmanagement.shared.infrastructure.config.BaseFeignClientConfig.class,
     fallback = ContactServiceClientFallback.class  // ← RESILIENCE!
 )
 public interface ContactServiceClient {
@@ -57,6 +57,19 @@ public interface ContactServiceClient {
     @PostMapping("/batch/by-owners")
     ApiResponse<Map<String, List<ContactDto>>> getContactsByOwnersBatch(
         @RequestBody List<UUID> ownerIds,
+        @RequestParam("ownerType") String ownerType
+    );
+    
+    /**
+     * Gets addresses for owner (Company)
+     * 
+     * @param ownerId Company ID
+     * @param ownerType Owner type (COMPANY)
+     * @return List of addresses
+     */
+    @GetMapping("/addresses/owner/{ownerId}")
+    ApiResponse<List<com.fabricmanagement.company.infrastructure.client.dto.AddressDto>> getAddressesByOwner(
+        @PathVariable("ownerId") UUID ownerId,
         @RequestParam("ownerType") String ownerType
     );
 }

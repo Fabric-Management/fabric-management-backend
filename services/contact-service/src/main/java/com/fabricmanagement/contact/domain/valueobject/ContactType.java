@@ -12,12 +12,20 @@ public enum ContactType {
     EMAIL,
     
     /**
-     * Phone number
+     * Phone number (mobile, landline)
      */
     PHONE,
     
     /**
+     * Phone extension (internal)
+     * Links to company's main phone via parent_contact_id
+     * Example: ext 101, 102, etc.
+     */
+    PHONE_EXTENSION,
+    
+    /**
      * Physical address
+     * Actual data stored in addresses table
      */
     ADDRESS,
     

@@ -3,6 +3,7 @@ package com.fabricmanagement.company.api;
 import com.fabricmanagement.company.api.dto.request.CreateUserPermissionRequest;
 import com.fabricmanagement.company.api.dto.response.UserPermissionResponse;
 import com.fabricmanagement.company.application.service.UserPermissionService;
+import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -49,11 +50,11 @@ public class UserPermissionController {
             request, UUID.fromString(ctx.getUserId()));
         
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(permissionId, "Permission created successfully"));
+                .body(ApiResponse.success(permissionId, ServiceConstants.MSG_PERMISSION_CREATED));
     }
     
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionResponse>>> getUserPermissions(
             @PathVariable UUID userId) {
         
@@ -63,7 +64,7 @@ public class UserPermissionController {
     }
     
     @GetMapping("/user/{userId}/active")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionResponse>>> getActivePermissions(
             @PathVariable UUID userId) {
         
@@ -82,11 +83,11 @@ public class UserPermissionController {
         userPermissionService.deletePermission(
             permissionId, UUID.fromString(ctx.getUserId()));
         
-        return ResponseEntity.ok(ApiResponse.success(null, "Permission deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_PERMISSION_DELETED));
     }
     
     @GetMapping("/{permissionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UserPermissionResponse>> getPermission(
             @PathVariable UUID permissionId) {
         
@@ -96,7 +97,7 @@ public class UserPermissionController {
     }
     
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionResponse>>> getAllPermissions(
             @AuthenticationPrincipal SecurityContext ctx) {
         

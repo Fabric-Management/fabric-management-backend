@@ -4,6 +4,7 @@ import com.fabricmanagement.company.api.dto.request.CreateCompanyRequest;
 import com.fabricmanagement.company.application.service.CompanyService;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class CompanyControllerTest {
         mockSecurityContext = SecurityContext.builder()
             .userId(TEST_USER_ID)
             .tenantId(TEST_TENANT_ID)
-            .roles(new String[]{"ADMIN"})
+            .roles(new String[]{"TENANT_ADMIN"})  // Match SecurityRoles.TENANT_ADMIN
             .build();
     }
 
@@ -82,7 +83,7 @@ class CompanyControllerTest {
         ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
         assertThat(body.getSuccess()).isTrue();
         assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
-        assertThat(body.getMessage()).isEqualTo("Company created successfully");
+        assertThat(body.getMessage()).isEqualTo(ServiceConstants.MSG_COMPANY_CREATED);
     }
 
     @Test
@@ -187,7 +188,7 @@ class CompanyControllerTest {
         ApiResponse<UUID> body = Objects.requireNonNull(response.getBody());
         assertThat(body.getSuccess()).isTrue();
         assertThat(body.getData()).isEqualTo(TEST_COMPANY_ID);
-        assertThat(body.getMessage()).isEqualTo("Company created successfully");
+        assertThat(body.getMessage()).isEqualTo(ServiceConstants.MSG_COMPANY_CREATED);
     }
 
     @Test

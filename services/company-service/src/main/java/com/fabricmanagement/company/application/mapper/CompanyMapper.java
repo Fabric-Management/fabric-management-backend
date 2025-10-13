@@ -27,7 +27,6 @@ public class CompanyMapper {
      */
     public Company fromCreateRequest(CreateCompanyRequest request, UUID tenantId, String createdBy) {
         Company company = Company.builder()
-                .id(UUID.randomUUID())
                 .tenantId(tenantId)
                 .name(new CompanyName(request.getName()))
                 .legalName(request.getLegalName())
@@ -60,6 +59,15 @@ public class CompanyMapper {
         
         if (request.getRelationshipType() != null) {
             company.setRelationshipType(request.getRelationshipType());
+        }
+        
+        company.setAddressLine1(request.getAddressLine1());
+        company.setAddressLine2(request.getAddressLine2());
+        company.setCity(request.getCity());
+        company.setDistrict(request.getDistrict());
+        company.setPostalCode(request.getPostalCode());
+        if (request.getCountry() != null) {
+            company.setCountry(request.getCountry());
         }
 
         return company;
@@ -115,6 +123,13 @@ public class CompanyMapper {
                 .isActive(company.isActive())
                 .maxUsers(company.getMaxUsers())
                 .currentUsers(company.getCurrentUsers())
+                .isPlatform(company.isPlatform())
+                .addressLine1(company.getAddressLine1())
+                .addressLine2(company.getAddressLine2())
+                .city(company.getCity())
+                .district(company.getDistrict())
+                .postalCode(company.getPostalCode())
+                .country(company.getCountry())
                 .createdAt(company.getCreatedAt())
                 .updatedAt(company.getUpdatedAt())
                 .createdBy(company.getCreatedBy())

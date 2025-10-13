@@ -1,8 +1,8 @@
 # 🗄️ DATABASE MIGRATION STRATEGY
 
-## 📅 Last Updated: 02 October 2025
+## 📅 Last Updated: 11 October 2025
 
-## 🎯 Principles: DRY, Microservice Autonomy, Idempotency
+## 🎯 Principles: DRY, Microservice Autonomy, Idempotency, Check Existing First
 
 ---
 
@@ -151,7 +151,50 @@ $$ LANGUAGE plpgsql;
 
 ## 📝 BEST PRACTICES
 
-### 1. Idempotency
+### 1. Check Existing Migrations First
+
+**Rule:** Before creating new migration, check if you can add to existing one
+
+**Example (2025-10-11):**
+
+```
+Need to add: is_platform field to companies
+
+❌ Create V11__add_platform_flag.sql
+✅ Add to V2__add_policy_fields_to_companies.sql (already adding policy fields)
+```
+
+**Benefits:**
+
+- Fewer migration files
+- Logical grouping
+- Easier to understand
+
+**When to Create New:**
+
+- Different feature/scope
+- Breaking changes
+- Already deployed to production
+
+### 2. NEVER Use Conditional Logic
+
+**Rule:** Migrations must be deterministic
+
+```sql
+❌ BAD: Conditional migration
+DO $$
+BEGIN
+    IF EXISTS (table check) THEN
+        INSERT...
+    END IF;
+END $$;
+
+✅ GOOD: Put migration in correct service
+-- If table doesn't exist in service, service doesn't need migration
+INSERT INTO policy_registry (...);
+```
+
+### 3. Idempotency
 
 ```sql
 -- ✅ ALWAYS use IF NOT EXISTS for tables
@@ -164,7 +207,7 @@ CREATE OR REPLACE FUNCTION my_function() ...
 DROP TRIGGER IF EXISTS my_trigger ON my_table;
 ```
 
-### 2. Self-Contained Migrations
+### 4. Self-Contained Migrations
 
 Each migration should:
 
@@ -172,14 +215,14 @@ Each migration should:
 - Create all required types
 - Be runnable in isolation
 
-### 3. Clean Separation
+### 5. Clean Separation
 
 ```
 init.sql/           → PostgreSQL-level (extensions, users, tuning)
 db/migration/       → Service-level (tables, triggers, data)
 ```
 
-### 4. Naming Convention
+### 6. Naming Convention
 
 ```
 init.sql/
@@ -266,7 +309,7 @@ psql -U fabric_user -d fabric_management -f services/user-service/src/main/resou
 
 ---
 
-**Last Updated:** 2025-10-09 20:15 UTC+1  
-**Version:** 1.0  
+**Last Updated:** 2025-10-11 02:00 UTC+1  
+**Version:** 1.1  
 **Status:** ✅ Active & Working  
 **Maintained By:** Development Team

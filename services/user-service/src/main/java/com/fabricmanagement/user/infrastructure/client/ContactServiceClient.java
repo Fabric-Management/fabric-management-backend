@@ -2,6 +2,7 @@ package com.fabricmanagement.user.infrastructure.client;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
+import com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,9 +23,9 @@ import java.util.UUID;
  */
 @FeignClient(
     name = "contact-service",
-    url = "${contact-service.url:http://localhost:8082}",
+    url = "${CONTACT_SERVICE_URL:http://localhost:8082}",
     path = "/api/v1/contacts",
-    configuration = com.fabricmanagement.user.infrastructure.config.FeignClientConfig.class,
+    configuration = com.fabricmanagement.shared.infrastructure.config.BaseFeignClientConfig.class,
     fallback = ContactServiceClientFallback.class  // ← RESILIENCE!
 )
 public interface ContactServiceClient {
@@ -95,4 +96,41 @@ public interface ContactServiceClient {
      */
     @PostMapping("/batch/by-owners")
     ApiResponse<java.util.Map<String, List<ContactDto>>> getContactsByOwnersBatch(@RequestBody List<UUID> ownerIds);
+    
+    @PostMapping
+    ApiResponse<ContactDto> createContact(@RequestBody CreateContactDto request);
+    
+    /**
+     * Check if email domain is already registered
+     * 
+     * Used during tenant onboarding to detect if company email domain
+     * already exists in the system (possible duplicate company or colleague)
+     * 
+     * @param emailDomain Email domain (e.g., "acmetekstil.com")
+     * @return List of owner IDs that use this email domain
+     */
+    @GetMapping("/check-domain")
+    ApiResponse<List<UUID>> checkEmailDomain(@RequestParam("domain") String emailDomain);
+    
+    /**
+     * Creates address for owner (Company or User)
+     * 
+     * @param request Address creation request
+     * @return Address response with ID
+     */
+    @PostMapping("/addresses")
+    ApiResponse<com.fabricmanagement.user.infrastructure.client.dto.AddressDto> createAddress(
+        @RequestBody com.fabricmanagement.user.infrastructure.client.dto.CreateAddressDto request);
+    
+    /**
+     * Gets addresses for owner
+     * 
+     * @param ownerId Owner ID (Company or User)
+     * @param ownerType Owner type (COMPANY or USER)
+     * @return List of addresses
+     */
+    @GetMapping("/addresses/owner/{ownerId}")
+    ApiResponse<List<com.fabricmanagement.user.infrastructure.client.dto.AddressDto>> getAddressesByOwner(
+        @PathVariable("ownerId") UUID ownerId,
+        @RequestParam("ownerType") String ownerType);
 }

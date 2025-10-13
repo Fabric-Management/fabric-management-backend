@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.api;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.user.api.dto.request.CheckContactRequest;
 import com.fabricmanagement.user.api.dto.request.LoginRequest;
 import com.fabricmanagement.user.api.dto.request.SetupPasswordRequest;
@@ -36,7 +37,7 @@ public class AuthController {
 
         log.info("Setting up password for contact: {}", request.getContactValue());
         authService.setupPassword(request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Password created successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_PASSWORD_CREATED));
     }
 
     @PostMapping("/login")

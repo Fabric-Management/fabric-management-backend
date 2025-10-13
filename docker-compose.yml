@@ -150,6 +150,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:9093"
       KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://${KAFKA_ADVERTISED_HOST:-localhost}:${KAFKA_PORT:-9092},PLAINTEXT_INTERNAL://kafka:9093"
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT_INTERNAL"
@@ -203,9 +204,10 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       JWT_SECRET: ${JWT_SECRET}
-      USER_SERVICE_URL: http://user-service:8081
-      COMPANY_SERVICE_URL: http://company-service:8083
-      CONTACT_SERVICE_URL: http://contact-service:8082
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
+      COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:-http://company-service:8083}
+      CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       SERVER_PORT: 8080
     ports:
       - "${API_GATEWAY_PORT:-8080}:8080"
@@ -258,12 +260,15 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JMX_PORT: 9011
       SERVER_PORT: 8081
-      CONTACT_SERVICE_URL: http://contact-service:8082
+      CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
+      COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:-http://company-service:8083}
+    # Ports: Only JMX exposed for monitoring (HTTP via Gateway only)
     ports:
-      - "${USER_SERVICE_PORT:-8081}:8081"
-      - "${USER_SERVICE_JMX_PORT:-9011}:9011"
+      - "${USER_SERVICE_JMX_PORT:-9011}:9011" # JMX for monitoring
+      # HTTP port 8081 NOT exposed - access via API Gateway (8080)
     networks:
       - fabric-network
     healthcheck:
@@ -310,11 +315,13 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JMX_PORT: 9012
       SERVER_PORT: 8082
+    # Ports: Only JMX exposed for monitoring (HTTP via Gateway only)
     ports:
-      - "${CONTACT_SERVICE_PORT:-8082}:8082"
-      - "${CONTACT_SERVICE_JMX_PORT:-9012}:9012"
+      - "${CONTACT_SERVICE_JMX_PORT:-9012}:9012" # JMX for monitoring
+      # HTTP port 8082 NOT exposed - access via API Gateway (8080)
     networks:
       - fabric-network
     healthcheck:
@@ -365,15 +372,17 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JMX_PORT: 9013
-      USER_SERVICE_HOST: user-service
-      CONTACT_SERVICE_HOST: contact-service
-      USER_SERVICE_URL: http://user-service:8081
-      CONTACT_SERVICE_URL: http://contact-service:8082
+      USER_SERVICE_HOST: ${USER_SERVICE_HOST:-user-service}
+      CONTACT_SERVICE_HOST: ${CONTACT_SERVICE_HOST:-contact-service}
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
+      CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       SERVER_PORT: 8083
+    # Ports: Only JMX exposed for monitoring (HTTP via Gateway only)
     ports:
-      - "${COMPANY_SERVICE_PORT:-8083}:8083"
-      - "${COMPANY_SERVICE_JMX_PORT:-9013}:9013"
+      - "${COMPANY_SERVICE_JMX_PORT:-9013}:9013" # JMX for monitoring
+      # HTTP port 8083 NOT exposed - access via API Gateway (8080)
     networks:
       - fabric-network
     healthcheck:

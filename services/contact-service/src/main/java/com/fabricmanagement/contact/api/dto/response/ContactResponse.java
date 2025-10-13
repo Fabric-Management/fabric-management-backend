@@ -19,6 +19,7 @@ public class ContactResponse {
     private String ownerType;
     private String contactValue;
     private String contactType;
+    private String parentContactId;  // For PHONE_EXTENSION
     private boolean isVerified;
     private boolean isPrimary;
     private LocalDateTime verifiedAt;

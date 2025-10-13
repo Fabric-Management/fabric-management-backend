@@ -1,10 +1,10 @@
 # 📧 Contact Service Documentation
 
-**Version:** 2.0 ✨  
-**Last Updated:** 2025-10-10  
+**Version:** 3.0 ✨ CLEAN ARCHITECTURE  
+**Last Updated:** 2025-10-13  
 **Port:** 8082  
 **Database:** fabric_management (contact_schema)  
-**Status:** ✅ Production Ready (Refactored)
+**Status:** ✅ Production Ready - Clean Architecture
 
 ---
 
@@ -14,9 +14,11 @@ Contact Service manages contact information (email, phone, address) for users an
 
 ### Core Responsibilities
 
-- ✅ Contact CRUD operations (email, phone, address, fax, website)
+- ✅ Contact CRUD operations (EMAIL, PHONE, PHONE_EXTENSION)
+- ✅ Address management (separate table for complex data)
 - ✅ Contact verification (email/phone)
 - ✅ Primary contact management
+- ✅ Parent-child relationships (PHONE_EXTENSION → main phone)
 - ✅ Owner-based authorization (USER or COMPANY)
 - ✅ Integration with User and Company services
 
@@ -24,7 +26,19 @@ Contact Service manages contact information (email, phone, address) for users an
 
 ## 🎉 Refactoring Status
 
-### ✅ TAMAMLANDI (2025-10-10)
+### ✅ v3.0 - CLEAN ARCHITECTURE (2025-10-13)
+
+Contact Service completely refactored! **Address Separation** + **Extension Support** + **Shared Infrastructure**
+
+#### 🆕 v3.0 Changes (Oct 13, 2025)
+
+1. **Address Table Separation** - Complex address data now in separate table
+2. **PHONE_EXTENSION Type** - Support for office extensions with parent relationship
+3. **AddressService** - Dedicated service for address operations
+4. **Shared Infrastructure** - Zero boilerplate with shared configs
+5. **Tenant Onboarding Integration** - Company addresses created during onboarding
+
+### ✅ v2.0 - TAMAMLANDI (2025-10-10)
 
 Contact-Service başarıyla refactor edildi! **Rich Domain Model** + **Mapper Separation** + **Clean Architecture**
 
@@ -89,50 +103,69 @@ Contact-Service başarıyla refactor edildi! **Rich Domain Model** + **Mapper Se
 
 ## 🏗️ Architecture
 
-### Domain Model (Refactored ✨)
+### Domain Model (v3.0 - Clean Architecture ✨)
 
 ```
 contact-service/
 ├── api/
-│   ├── ContactController.java [276 lines] ✅
+│   ├── ContactController.java [~380 lines] ✅ (includes address endpoints)
 │   └── dto/
 │       ├── request/
-│       │   ├── CreateContactRequest.java
+│       │   ├── CreateContactRequest.java (with parentContactId)
+│       │   ├── CreateAddressRequest.java ✨ NEW
 │       │   ├── UpdateContactRequest.java
 │       │   ├── VerifyContactRequest.java
 │       │   └── CheckContactAvailabilityRequest.java
 │       └── response/
-│           ├── ContactResponse.java
+│           ├── ContactResponse.java (with parentContactId)
+│           ├── AddressResponse.java ✨ NEW
 │           └── ContactAvailabilityResponse.java
 │
 ├── application/
 │   ├── mapper/
-│   │   ├── ContactMapper.java [60 lines] ✨ NEW
-│   │   └── ContactEventMapper.java [35 lines] ✨ NEW
+│   │   ├── ContactMapper.java [~65 lines] (parent support)
+│   │   ├── AddressMapper.java [93 lines] ✨ NEW
+│   │   └── ContactEventMapper.java [35 lines]
 │   └── service/
-│       └── ContactService.java [326 lines] ✅
+│       ├── ContactService.java [~350 lines] (ADDRESS handling)
+│       └── AddressService.java [~170 lines] ✨ NEW
 │
 ├── domain/
 │   ├── aggregate/
-│   │   └── Contact.java [149 lines] ✅ Rich Domain!
+│   │   └── Contact.java [~154 lines] (Anemic - with parentContactId)
+│   ├── entity/
+│   │   └── Address.java [~100 lines] ✨ NEW (Anemic)
 │   ├── event/
 │   │   ├── ContactCreatedEvent.java
 │   │   ├── ContactUpdatedEvent.java
 │   │   └── ContactDeletedEvent.java
 │   └── valueobject/
-│       ├── ContactType.java (EMAIL, PHONE, ADDRESS, FAX, WEBSITE)
-│       ├── Address.java
-│       └── PhoneNumber.java
+│       ├── ContactType.java (EMAIL, PHONE, PHONE_EXTENSION ✨, ADDRESS, FAX, WEBSITE)
+│       ├── AddressType.java ✨ NEW (HOME, WORK, BILLING, SHIPPING)
+│       ├── Address.java (legacy VO - not used)
+│       └── PhoneNumber.java (legacy VO - not used)
 │
 └── infrastructure/
     ├── repository/
-    │   └── ContactRepository.java
+    │   ├── ContactRepository.java
+    │   └── AddressRepository.java ✨ NEW
+    ├── config/
+    │   ├── FeignClientConfig.java (~25 lines) → extends BaseFeignClientConfig
+    │   └── KafkaErrorHandlingConfig.java (~25 lines) ✨ NEW → extends BaseKafkaErrorConfig
     ├── security/
-    │   └── PolicyValidationFilter.java [156 satır] ✅ NEW (Phase 3)
+    │   └── (PolicyValidationFilter moved to shared-security) ✅
     └── messaging/
-        ├── NotificationService.java [91 lines] ✅
-        └── ContactEventPublisher.java
+        └── NotificationService.java [91 lines]
 ```
+
+**🎯 Key Changes:**
+
+- ✅ Address = separate table (not in contact_value)
+- ✅ PHONE_EXTENSION with parent_contact_id
+- ✅ Shared infrastructure configs (90% boilerplate reduction!)
+- ✅ AddressService for complex address operations
+
+````
 
 ---
 
@@ -207,7 +240,7 @@ public class Contact extends BaseEntity {
         return this.verificationCode;
     }
 }
-```
+````
 
 **⚠️ Important:** Contact uses **Rich Domain Model** (NOT anemic) - appropriate for this domain!
 
@@ -406,40 +439,108 @@ contact.makePrimary()
 
 ---
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema (v3.0)
+
+### contacts Table (Email, Phone, Phone Extensions)
 
 ```sql
 CREATE TABLE contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id UUID NOT NULL,                    -- ✅ UUID type!
-    owner_type VARCHAR(20) NOT NULL,           -- USER, COMPANY
-    contact_value VARCHAR(255) NOT NULL,
-    contact_type VARCHAR(20) NOT NULL,         -- EMAIL, PHONE, ADDRESS, FAX, WEBSITE
+    owner_id UUID NOT NULL,
+    owner_type VARCHAR(50) NOT NULL,           -- USER, COMPANY
+    contact_value VARCHAR(500),                -- ✨ NULLABLE for ADDRESS type
+    contact_type VARCHAR(50) NOT NULL,         -- EMAIL, PHONE, PHONE_EXTENSION ✨, ADDRESS, FAX, WEBSITE
+    parent_contact_id UUID,                    -- ✨ NEW: For PHONE_EXTENSION → company phone
+
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     verified_at TIMESTAMP,
     verification_code VARCHAR(10),
     verification_expires_at TIMESTAMP,
-    deleted_at TIMESTAMP,
 
     -- BaseEntity fields
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(100),
-    updated_by VARCHAR(100),
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
     deleted BOOLEAN DEFAULT FALSE,
-    version INTEGER DEFAULT 0,
+    deleted_at TIMESTAMP,
+    version BIGINT DEFAULT 0,
 
-    UNIQUE(contact_value),  -- Global uniqueness
+    CONSTRAINT fk_parent_contact FOREIGN KEY (parent_contact_id) REFERENCES contacts(id),
     CONSTRAINT chk_owner_type CHECK (owner_type IN ('USER', 'COMPANY')),
-    CONSTRAINT chk_contact_type CHECK (contact_type IN ('EMAIL', 'PHONE', 'ADDRESS', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'))
+    CONSTRAINT chk_contact_type CHECK (contact_type IN ('EMAIL', 'PHONE', 'PHONE_EXTENSION', 'ADDRESS', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'))
 );
 
-CREATE INDEX idx_contacts_owner ON contacts(owner_id, owner_type);
-CREATE INDEX idx_contacts_value ON contacts(contact_value);
-CREATE INDEX idx_contacts_verified ON contacts(is_verified) WHERE is_verified = TRUE;
-CREATE INDEX idx_contacts_primary ON contacts(owner_id, contact_type, is_primary);
+CREATE INDEX idx_contacts_owner_id ON contacts(owner_id);
+CREATE INDEX idx_contacts_owner_id_type ON contacts(owner_id, owner_type);
+CREATE INDEX idx_contacts_contact_value ON contacts(contact_value);
+CREATE INDEX idx_contacts_parent_id ON contacts(parent_contact_id);  -- ✨ NEW
+CREATE INDEX idx_contacts_deleted ON contacts(deleted);
 ```
+
+---
+
+### addresses Table (Complex Address Data) ✨ NEW
+
+```sql
+CREATE TABLE addresses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    contact_id UUID NOT NULL,                  -- FK to contacts
+    owner_id UUID NOT NULL,                    -- Denormalized for fast queries
+    owner_type VARCHAR(50) NOT NULL,
+
+    -- Address fields
+    address_line1 VARCHAR(255) NOT NULL,
+    address_line2 VARCHAR(255),
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(100),
+    district VARCHAR(100),
+    postal_code VARCHAR(20),
+    country VARCHAR(100) NOT NULL,
+
+    -- Google Places integration (optional)
+    google_place_id VARCHAR(255),
+    formatted_address TEXT,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+
+    -- Metadata
+    address_type VARCHAR(50) DEFAULT 'HOME',   -- HOME, WORK, BILLING, SHIPPING
+    is_primary BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verified_at TIMESTAMP,
+
+    -- BaseEntity fields
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
+    deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP,
+    version BIGINT DEFAULT 0,
+
+    CONSTRAINT fk_addresses_contact FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+    CONSTRAINT chk_address_type CHECK (address_type IN ('HOME', 'WORK', 'BILLING', 'SHIPPING'))
+);
+
+CREATE INDEX idx_addresses_contact_id ON addresses(contact_id);
+CREATE INDEX idx_addresses_owner_id ON addresses(owner_id);
+CREATE INDEX idx_addresses_owner_id_type ON addresses(owner_id, owner_type);
+CREATE INDEX idx_addresses_country ON addresses(country);  -- For duplicate checks
+CREATE INDEX idx_addresses_postal_code ON addresses(postal_code);
+CREATE INDEX idx_addresses_deleted ON addresses(deleted);
+```
+
+**🎯 Design Rationale:**
+
+- ✅ Address = complex data → separate table
+- ✅ contacts table = simple data (email, phone)
+- ✅ 1:1 relationship (contact_id)
+- ✅ Denormalized owner_id for fast queries
+- ✅ Google Places integration ready
+
+````
 
 **Performance Optimizations:**
 
@@ -470,7 +571,7 @@ CREATE INDEX idx_contacts_primary ON contacts(owner_id, contact_type, is_primary
   "contactType": "EMAIL",
   "timestamp": "2025-10-10T12:00:00Z"
 }
-```
+````
 
 ### Events Consumed
 

@@ -59,3 +59,50 @@ COMMENT ON TABLE users IS 'Users table - Extended with policy authorization fiel
 -- Note: Foreign key for company_id will be added after companies table has business_type field (V3)
 -- Note: Foreign key for department_id will be added after departments table created (V5)
 
+-- =============================================================================
+-- SYSTEM ROLE ENUM (Authorization Enhancement)
+-- =============================================================================
+-- Migrate role from VARCHAR to PostgreSQL enum for type safety
+-- Ensures data integrity and prevents invalid role values
+
+-- Create system_role enum type
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'system_role') THEN
+        CREATE TYPE system_role AS ENUM (
+            'SUPER_ADMIN',    -- Platform admin (reserved for future)
+            'TENANT_ADMIN',   -- Tenant admin (creates users)
+            'MANAGER',        -- Manager (reserved for future)
+            'USER',           -- Standard user (default)
+            'VIEWER'          -- Read-only user (reserved for future)
+        );
+    END IF;
+END $$;
+
+-- Add comment for enum type
+COMMENT ON TYPE system_role IS 'System role enum: SUPER_ADMIN (platform), TENANT_ADMIN (tenant admin), MANAGER, USER (default), VIEWER';
+
+-- Migrate existing role data from VARCHAR to enum
+-- Backward compatibility: Map 'ADMIN' -> 'TENANT_ADMIN'
+ALTER TABLE users
+    ALTER COLUMN role TYPE system_role
+        USING CASE 
+            WHEN role = 'SUPER_ADMIN' THEN 'SUPER_ADMIN'::system_role
+            WHEN role = 'ADMIN' THEN 'TENANT_ADMIN'::system_role
+            WHEN role = 'TENANT_ADMIN' THEN 'TENANT_ADMIN'::system_role
+            WHEN role = 'MANAGER' THEN 'MANAGER'::system_role
+            WHEN role = 'VIEWER' THEN 'VIEWER'::system_role
+            ELSE 'USER'::system_role
+        END;
+
+-- Set NOT NULL constraint and default value
+ALTER TABLE users
+    ALTER COLUMN role SET NOT NULL,
+    ALTER COLUMN role SET DEFAULT 'USER'::system_role;
+
+-- Add comment
+COMMENT ON COLUMN users.role IS 'User system role (enum): SUPER_ADMIN, TENANT_ADMIN, MANAGER, USER, VIEWER. Default: USER';
+
+-- Create index on role for performance
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role) WHERE deleted = FALSE;
+

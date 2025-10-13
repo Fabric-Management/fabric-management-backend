@@ -20,6 +20,12 @@ public class CheckDuplicateRequest {
     @Size(min = 2, max = 100, message = "Company name must be between 2 and 100 characters")
     private String name;
     
+    @Size(max = 200, message = "Legal name must not exceed 200 characters")
+    private String legalName;
+    
+    @Size(max = 100, message = "Country must not exceed 100 characters")
+    private String country;
+    
     @Size(max = 50, message = "Tax ID must not exceed 50 characters")
     private String taxId;
     

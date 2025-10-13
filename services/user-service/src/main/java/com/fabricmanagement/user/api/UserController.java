@@ -3,6 +3,7 @@ package com.fabricmanagement.user.api;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.application.response.PagedResponse;
+import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.user.api.dto.request.CreateUserRequest;
 import com.fabricmanagement.user.api.dto.request.UpdateUserRequest;
 import com.fabricmanagement.user.api.dto.response.UserResponse;
@@ -75,7 +76,7 @@ public class UserController {
     }
     
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UUID>> createUser(
             @Valid @RequestBody CreateUserRequest request,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -84,7 +85,7 @@ public class UserController {
         UUID userId = userService.createUser(request, ctx.getTenantId(), ctx.getUserId());
         
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(userId, "User created successfully"));
+                .body(ApiResponse.success(userId, ServiceConstants.MSG_USER_CREATED));
     }
     
     @PutMapping("/{userId}")
@@ -97,11 +98,11 @@ public class UserController {
         log.info("Updating user: {} for tenant: {}", userId, ctx.getTenantId());
         userService.updateUser(userId, request, ctx.getTenantId(), ctx.getUserId());
         
-        return ResponseEntity.ok(ApiResponse.success(null, "User updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_USER_UPDATED));
     }
     
     @DeleteMapping("/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
             @PathVariable UUID userId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -109,11 +110,11 @@ public class UserController {
         log.info("Deleting user: {} for tenant: {}", userId, ctx.getTenantId());
         userService.deleteUser(userId, ctx.getTenantId(), ctx.getUserId());
         
-        return ResponseEntity.ok(ApiResponse.success(null, "User deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_USER_DELETED));
     }
     
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers(
             @AuthenticationPrincipal SecurityContext ctx) {
         
@@ -123,7 +124,7 @@ public class UserController {
     }
     
     @GetMapping("/paged")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<PagedResponse<UserResponse>> listUsersPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -139,7 +140,7 @@ public class UserController {
     }
     
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> searchUsers(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,
@@ -153,7 +154,7 @@ public class UserController {
     }
     
     @GetMapping("/search/paged")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<PagedResponse<UserResponse>> searchUsersPaginated(
             @RequestParam(required = false) String firstName,
             @RequestParam(required = false) String lastName,

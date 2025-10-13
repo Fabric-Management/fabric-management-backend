@@ -67,35 +67,61 @@ spring:
       time-to-live: ${CACHE_TTL:300000} # 5 minutes
 
   # ===========================================================================
+  # FEIGN CLIENT CONFIGURATION (TIMEOUTS)
+  # ===========================================================================
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            # Connection timeout: how long to wait for connection establishment
+            connectTimeout: ${FEIGN_CONNECT_TIMEOUT:5000}
+            # Read timeout: how long to wait for response
+            readTimeout: ${FEIGN_READ_TIMEOUT:10000}
+            # Log level for debugging
+            loggerLevel: ${FEIGN_LOG_LEVEL:full}
+
+  # ===========================================================================
   # KAFKA CONFIGURATION
   # ===========================================================================
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9093}
+    listener:
+      # Async mode: Kafka listener errors won't block the main application
+      type: ${KAFKA_LISTENER_TYPE:batch}
+      # Auto-startup: false means Kafka listeners won't start automatically
+      # Set to true when Kafka issues are resolved
+      auto-startup: ${KAFKA_AUTO_STARTUP:true}
     producer:
       client-id: ${spring.application.name}-producer-${HOSTNAME:${random.uuid}}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
-      retries: 3
-      enable-idempotence: true
-      max-in-flight-requests-per-connection: 1
-      batch-size: 16384
-      linger-ms: 5
-      buffer-memory: 33554432
+      acks: ${KAFKA_PRODUCER_ACKS:all}
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
+      enable-idempotence: ${KAFKA_PRODUCER_IDEMPOTENCE:true}
+      max-in-flight-requests-per-connection: ${KAFKA_PRODUCER_MAX_IN_FLIGHT:1}
+      batch-size: ${KAFKA_PRODUCER_BATCH_SIZE:16384}
+      linger-ms: ${KAFKA_PRODUCER_LINGER_MS:5}
+      buffer-memory: ${KAFKA_PRODUCER_BUFFER_MEMORY:33554432}
     consumer:
       client-id: ${spring.application.name}-consumer-${HOSTNAME:${random.uuid}}
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      group-id: user-service-group
-      auto-offset-reset: earliest
-      enable-auto-commit: false
-      heartbeat-interval: 3000
+      # ErrorHandlingDeserializer wrapper for graceful error handling
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:user-service-group}
+      auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      enable-auto-commit: ${KAFKA_CONSUMER_ENABLE_AUTO_COMMIT:false}
+      heartbeat-interval: ${KAFKA_CONSUMER_HEARTBEAT_INTERVAL:3000}
       properties:
-        spring.json.trusted.packages: "com.fabricmanagement.user.domain.event"
-        allow.auto.create.topics: true
+        # Trust all com.fabricmanagement.* packages (including sub-packages)
+        spring.json.trusted.packages: ${KAFKA_TRUSTED_PACKAGES:com.fabricmanagement.*,java.util,java.lang}
+        # Delegate deserializers (actual deserializers wrapped by ErrorHandlingDeserializer)
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        allow.auto.create.topics: ${KAFKA_AUTO_CREATE_TOPICS:true}
         jmx.prefix: user-service
-        session.timeout.ms: 30000
-        connections.max.idle.ms: 540000
+        session.timeout.ms: ${KAFKA_CONSUMER_SESSION_TIMEOUT:30000}
+        connections.max.idle.ms: ${KAFKA_CONSUMER_MAX_IDLE:540000}
 
 # =============================================================================
 # SERVER CONFIGURATION
@@ -147,13 +173,14 @@ contact-service:
   url: ${CONTACT_SERVICE_URL:http://contact-service:8082}
 
 # =============================================================================
-# LOGGING CONFIGURATION
+# LOGGING CONFIGURATION (DEBUG for troubleshooting)
 # =============================================================================
 logging:
   level:
-    com.fabricmanagement.user: INFO
-    org.springframework.security: WARN
-    org.springframework.web: WARN
+    root: INFO
+    com.fabricmanagement.user: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
     org.hibernate.SQL: WARN
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
   pattern:

@@ -34,7 +34,7 @@ public class PolicyAuditController {
     private final PolicyAuditQueryService policyAuditQueryService;
     
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<PolicyAuditResponse>>> getUserAuditLogs(
             @PathVariable UUID userId,
             @RequestParam(defaultValue = "50") int limit) {
@@ -45,7 +45,7 @@ public class PolicyAuditController {
     }
     
     @GetMapping("/denials")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<PolicyAuditResponse>>> getDenyDecisions(
             @RequestParam(required = false) 
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) 
@@ -59,7 +59,7 @@ public class PolicyAuditController {
     }
     
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PolicyAuditStatsResponse>> getStatistics(
             @RequestParam(required = false) 
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) 
@@ -72,7 +72,7 @@ public class PolicyAuditController {
     }
     
     @GetMapping("/trace/{correlationId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<PolicyAuditResponse>>> getByCorrelationId(
             @PathVariable String correlationId) {
         

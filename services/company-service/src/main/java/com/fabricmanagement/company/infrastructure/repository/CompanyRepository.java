@@ -4,6 +4,8 @@ import com.fabricmanagement.company.domain.aggregate.Company;
 import com.fabricmanagement.company.domain.valueobject.CompanyStatus;
 import com.fabricmanagement.company.domain.valueobject.CompanyType;
 import com.fabricmanagement.company.domain.valueobject.Industry;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -143,5 +145,100 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
         @Param("tenantId") UUID tenantId,
         @Param("taxId") String taxId,
         @Param("registrationNumber") String registrationNumber);
+    
+    /**
+     * Find companies globally (across ALL tenants) that may be duplicates
+     * Used during tenant onboarding to prevent cross-tenant duplicates
+     * 
+     * IMPORTANT: Tax ID and Registration Number are GLOBALLY UNIQUE identifiers
+     * A company cannot be registered in multiple tenants with same legal identifiers
+     */
+    @Query("SELECT c FROM Company c WHERE c.deleted = false " +
+           "AND (c.taxId = :taxId OR c.registrationNumber = :registrationNumber)")
+    List<Company> findPotentialDuplicatesGlobal(
+        @Param("taxId") String taxId,
+        @Param("registrationNumber") String registrationNumber);
+    
+    /**
+     * Find company by tax ID globally (across all tenants)
+     * Used during tenant onboarding
+     */
+    @Query("SELECT c FROM Company c WHERE c.taxId = :taxId AND c.deleted = false")
+    Optional<Company> findByTaxIdGlobal(@Param("taxId") String taxId);
+    
+    /**
+     * Find company by registration number globally (across all tenants)
+     * Used during tenant onboarding
+     */
+    @Query("SELECT c FROM Company c WHERE c.registrationNumber = :registrationNumber AND c.deleted = false")
+    Optional<Company> findByRegistrationNumberGlobal(@Param("registrationNumber") String registrationNumber);
+    
+    /**
+     * Find company by legal name and country
+     * 
+     * IMPORTANT: Legal name is country-scoped (not globally unique)
+     * Same legal name can exist in different countries (franchise, branch)
+     * But CANNOT exist in the same country (legal requirement!)
+     * 
+     * Examples:
+     * - "ABC Textile Limited Şirketi" (Turkey) + "ABC Textile Limited" (UK) → ALLOWED ✅
+     * - "ABC Textile Limited Şirketi" (Turkey) + "ABC Textile Limited Şirketi" (Turkey) → BLOCKED ❌
+     * 
+     * @param legalName Legal company name
+     * @param country Country code or name
+     * @return Company if found in same country
+     */
+    @Query("SELECT c FROM Company c WHERE LOWER(c.legalName) = LOWER(:legalName) AND LOWER(c.country) = LOWER(:country) AND c.deleted = false")
+    Optional<Company> findByLegalNameAndCountry(@Param("legalName") String legalName, @Param("country") String country);
+    
+    /**
+     * Find companies by legal name (all countries) for similarity checking
+     * 
+     * @param legalName Legal company name
+     * @return List of companies with matching legal name across all countries
+     */
+    @Query("SELECT c FROM Company c WHERE LOWER(c.legalName) = LOWER(:legalName) AND c.deleted = false")
+    List<Company> findByLegalNameGlobal(@Param("legalName") String legalName);
+    
+    // ===== Paginated Query Methods =====
+    
+    /**
+     * Finds all non-deleted companies by tenant ID with pagination
+     * 
+     * @param tenantId Tenant context
+     * @param pageable Pagination parameters (page, size, sort)
+     * @return Page of companies
+     */
+    @Query("SELECT c FROM Company c WHERE c.tenantId = :tenantId AND c.deleted = false")
+    Page<Company> findByTenantIdAndDeletedFalse(@Param("tenantId") UUID tenantId, Pageable pageable);
+    
+    /**
+     * Finds companies by status and tenant ID with pagination
+     * 
+     * @param status Company status filter
+     * @param tenantId Tenant context
+     * @param pageable Pagination parameters
+     * @return Page of companies
+     */
+    @Query("SELECT c FROM Company c WHERE c.status = :status AND c.tenantId = :tenantId AND c.deleted = false")
+    Page<Company> findByStatusAndTenantId(
+        @Param("status") CompanyStatus status, 
+        @Param("tenantId") UUID tenantId, 
+        Pageable pageable);
+    
+    /**
+     * Search companies by name with pagination
+     * 
+     * @param searchTerm Search keyword
+     * @param tenantId Tenant context
+     * @param pageable Pagination parameters
+     * @return Page of matching companies
+     */
+    @Query("SELECT c FROM Company c WHERE LOWER(c.name.value) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "AND c.tenantId = :tenantId AND c.deleted = false")
+    Page<Company> searchByNameAndTenantIdPaginated(
+        @Param("searchTerm") String searchTerm, 
+        @Param("tenantId") UUID tenantId, 
+        Pageable pageable);
 }
 

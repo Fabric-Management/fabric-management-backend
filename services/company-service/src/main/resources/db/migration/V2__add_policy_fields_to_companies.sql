@@ -60,5 +60,56 @@ CREATE INDEX IF NOT EXISTS idx_companies_business_parent ON companies(business_t
 -- Update existing companies to INTERNAL (our main company)
 UPDATE companies SET business_type = 'INTERNAL' WHERE business_type IS NULL;
 
-COMMENT ON TABLE companies IS 'Companies table - Extended with policy fields (V2)';
+-- =============================================================================
+-- PLATFORM TENANT (Reserved for SUPER_ADMIN)
+-- =============================================================================
+-- Add is_platform flag to identify platform tenant vs normal tenants
+-- Only ONE platform tenant allowed in entire system
+
+-- Add is_platform column
+ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS is_platform BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Unique constraint: Only ONE platform company allowed
+CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_platform_unique 
+    ON companies (is_platform) WHERE is_platform = TRUE;
+
+-- Add comment
+COMMENT ON COLUMN companies.is_platform IS 'Platform tenant flag. TRUE only for system platform (reserved for SUPER_ADMIN). Default: FALSE for normal tenants.';
+
+-- Insert PLATFORM tenant (reserved for future SUPER_ADMIN functionality)
+-- This tenant is referenced by user-service SUPER_ADMIN seed data
+INSERT INTO companies (
+    id,
+    tenant_id,
+    name,
+    legal_name,
+    type,
+    industry,
+    status,
+    business_type,
+    is_platform,
+    is_active,
+    max_users,
+    current_users,
+    created_by,
+    updated_by
+) VALUES (
+    '00000000-0000-0000-0000-000000000000'::UUID,
+    '00000000-0000-0000-0000-000000000000'::UUID,
+    'Fabricode Platform',
+    'Fabricode Platform Inc.',
+    'OTHER',
+    'TECHNOLOGY',
+    'ACTIVE',
+    'INTERNAL',
+    TRUE,
+    TRUE,
+    999999,
+    0,
+    'SYSTEM',
+    'SYSTEM'
+) ON CONFLICT (id) DO NOTHING;
+
+COMMENT ON TABLE companies IS 'Companies table - Extended with policy fields + platform tenant (V2)';
 

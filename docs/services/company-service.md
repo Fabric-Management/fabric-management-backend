@@ -1,7 +1,7 @@
 # 🏢 Company Service Documentation
 
-**Version:** 2.0  
-**Last Updated:** 2025-10-10  
+**Version:** 2.1  
+**Last Updated:** 2025-10-11  
 **Port:** 8083  
 **Database:** fabric_management (company_schema)  
 **Status:** ✅ Production Ready
@@ -16,6 +16,8 @@ Company Service manages company profiles, multi-tenancy, and policy data. Implem
 
 - ✅ Company CRUD operations
 - ✅ Multi-tenancy management (tenant isolation)
+- ✅ Platform tenant support (reserved for SUPER_ADMIN)
+- ✅ Company address management
 - ✅ Company type hierarchy (INTERNAL, CUSTOMER, SUPPLIER)
 - ✅ Subscription plan management
 - ✅ Department management
@@ -98,7 +100,7 @@ company-service/
 
 ## 📦 Domain Model
 
-### Company Aggregate (109 lines - Anemic Domain)
+### Company Aggregate (132 lines - Anemic Domain)
 
 ```java
 @Entity

@@ -106,4 +106,27 @@ public class Company extends BaseEntity {
     
     @Column(name = "relationship_type", length = 50)
     private String relationshipType;
+    
+    @Column(name = "is_platform", nullable = false)
+    @lombok.Builder.Default
+    private boolean isPlatform = false;
+    
+    @Column(name = "address_line1", length = 255)
+    private String addressLine1;
+    
+    @Column(name = "address_line2", length = 255)
+    private String addressLine2;
+    
+    @Column(name = "city", length = 100)
+    private String city;
+    
+    @Column(name = "district", length = 100)
+    private String district;
+    
+    @Column(name = "postal_code", length = 20)
+    private String postalCode;
+    
+    @Column(name = "country", length = 100, nullable = false)
+    @lombok.Builder.Default
+    private String country = "Turkey";
 }

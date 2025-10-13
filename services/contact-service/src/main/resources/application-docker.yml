@@ -75,27 +75,32 @@ spring:
       client-id: ${spring.application.name}-producer-${HOSTNAME:${random.uuid}}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
-      retries: 3
-      enable-idempotence: true
-      max-in-flight-requests-per-connection: 1
-      batch-size: 16384
-      linger-ms: 5
-      buffer-memory: 33554432
+      acks: ${KAFKA_PRODUCER_ACKS:all}
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
+      enable-idempotence: ${KAFKA_PRODUCER_IDEMPOTENCE:true}
+      max-in-flight-requests-per-connection: ${KAFKA_PRODUCER_MAX_IN_FLIGHT:1}
+      batch-size: ${KAFKA_PRODUCER_BATCH_SIZE:16384}
+      linger-ms: ${KAFKA_PRODUCER_LINGER_MS:5}
+      buffer-memory: ${KAFKA_PRODUCER_BUFFER_MEMORY:33554432}
     consumer:
       client-id: ${spring.application.name}-consumer-${HOSTNAME:${random.uuid}}
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      group-id: contact-service-group
-      auto-offset-reset: earliest
-      enable-auto-commit: false
-      heartbeat-interval: 3000
+      # ErrorHandlingDeserializer wrapper for graceful error handling
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:contact-service-group}
+      auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      enable-auto-commit: ${KAFKA_CONSUMER_ENABLE_AUTO_COMMIT:false}
+      heartbeat-interval: ${KAFKA_CONSUMER_HEARTBEAT_INTERVAL:3000}
       properties:
-        spring.json.trusted.packages: "com.fabricmanagement.contact.domain.event"
-        allow.auto.create.topics: true
+        # Trust all com.fabricmanagement.* packages (including sub-packages)
+        spring.json.trusted.packages: ${KAFKA_TRUSTED_PACKAGES:com.fabricmanagement.*,java.util,java.lang}
+        # Delegate deserializers (actual deserializers wrapped by ErrorHandlingDeserializer)
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        allow.auto.create.topics: ${KAFKA_AUTO_CREATE_TOPICS:true}
         jmx.prefix: contact-service
-        session.timeout.ms: 30000
-        connections.max.idle.ms: 540000
+        session.timeout.ms: ${KAFKA_CONSUMER_SESSION_TIMEOUT:30000}
+        connections.max.idle.ms: ${KAFKA_CONSUMER_MAX_IDLE:540000}
 
 # =============================================================================
 # SERVER CONFIGURATION

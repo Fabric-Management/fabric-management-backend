@@ -4,6 +4,9 @@ import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.infrastructure.constants.SecurityConstants;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
+import com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto;
+import com.fabricmanagement.user.infrastructure.client.dto.AddressDto;
+import com.fabricmanagement.user.infrastructure.client.dto.CreateAddressDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -105,6 +108,37 @@ public class ContactServiceClientFallback implements ContactServiceClient {
         log.warn("⚠️ Fallback: {} - returning empty batch for {} owners", 
             ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, ownerIds.size());
         return ApiResponse.success(Collections.emptyMap(), ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE);
+    }
+    
+    @Override
+    public ApiResponse<ContactDto> createContact(CreateContactDto request) {
+        log.error("⚠️ Fallback: {} - cannot create contact: {}", 
+            ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, request.getContactValue());
+        return ApiResponse.error(ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, 
+            SecurityConstants.ERROR_CODE_SERVICE_UNAVAILABLE);
+    }
+    
+    @Override
+    public ApiResponse<List<UUID>> checkEmailDomain(String emailDomain) {
+        log.warn("⚠️ Fallback: {} - cannot check email domain: @{}", 
+            ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, emailDomain);
+        // Optimistic: assume domain not registered (allow registration to proceed)
+        return ApiResponse.success(Collections.emptyList(), ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE);
+    }
+    
+    @Override
+    public ApiResponse<AddressDto> createAddress(CreateAddressDto request) {
+        log.error("⚠️ Fallback: {} - cannot create address for owner: {}", 
+            ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, request.getOwnerId());
+        return ApiResponse.error(ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, 
+            SecurityConstants.ERROR_CODE_SERVICE_UNAVAILABLE);
+    }
+    
+    @Override
+    public ApiResponse<List<AddressDto>> getAddressesByOwner(UUID ownerId, String ownerType) {
+        log.warn("⚠️ Fallback: {} - returning empty addresses for owner: {}", 
+            ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, ownerId);
+        return ApiResponse.success(Collections.emptyList(), ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE);
     }
 }
 

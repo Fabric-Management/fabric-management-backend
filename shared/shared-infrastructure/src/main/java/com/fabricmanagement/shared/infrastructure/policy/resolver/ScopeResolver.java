@@ -172,7 +172,7 @@ public class ScopeResolver {
      */
     private String validateGlobalScope(PolicyContext context) {
         // Only Super Admin can have GLOBAL scope
-        if (!context.hasAnyRole(SecurityRoles.SUPER_ADMIN, SecurityRoles.SYSTEM_ADMIN)) {
+        if (!context.hasAnyRole(SecurityRoles.SUPER_ADMIN)) {
             log.warn("User {} attempted GLOBAL scope access without SUPER_ADMIN role. Denied.",
                 context.getUserId());
             

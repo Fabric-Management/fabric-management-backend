@@ -3,6 +3,7 @@ package com.fabricmanagement.contact.api;
 import com.fabricmanagement.contact.api.dto.request.*;
 import com.fabricmanagement.contact.api.dto.response.*;
 import com.fabricmanagement.contact.application.service.ContactService;
+import com.fabricmanagement.contact.application.service.AddressService;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.infrastructure.constants.SecurityConstants;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class ContactController {
     
     private final ContactService contactService;
+    private final AddressService addressService;
     
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
@@ -191,12 +193,21 @@ public class ContactController {
     }
     
     @PostMapping("/check-availability")
-    @PreAuthorize("isAuthenticated()")
+    // No @PreAuthorize - Internal endpoint protected by InternalAuthenticationFilter (X-Internal-API-Key)
     public ResponseEntity<ApiResponse<Boolean>> checkAvailability(@RequestParam String contactValue) {
         log.debug("Checking availability for contact value: {}", contactValue);
 
         boolean available = contactService.checkAvailability(contactValue);
         return ResponseEntity.ok(ApiResponse.success(available));
+    }
+    
+    @GetMapping("/check-domain")
+    // No @PreAuthorize - Internal endpoint protected by InternalAuthenticationFilter (X-Internal-API-Key)
+    public ResponseEntity<ApiResponse<List<UUID>>> checkEmailDomain(@RequestParam String domain) {
+        log.debug("Checking email domain: @{}", domain);
+
+        List<UUID> ownerIds = contactService.checkEmailDomain(domain);
+        return ResponseEntity.ok(ApiResponse.success(ownerIds));
     }
 
     @GetMapping("/search")
@@ -226,7 +237,9 @@ public class ContactController {
         return contact
                 .map(c -> ResponseEntity.ok(ApiResponse.success(c)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("Contact not found", "CONTACT_NOT_FOUND")));
+                        .body(ApiResponse.error(
+                            ServiceConstants.MSG_CONTACT_NOT_FOUND, 
+                            ServiceConstants.ERROR_CODE_CONTACT_NOT_FOUND)));
     }
     
     @PostMapping("/batch/by-owners")
@@ -252,9 +265,128 @@ public class ContactController {
                 ServiceConstants.MSG_BATCH_CONTACTS_RETRIEVED + " for " + ownerIds.size() + " owners"));
     }
 
+    // =============================================================================
+    // ADDRESS ENDPOINTS
+    // =============================================================================
+    
+    @PostMapping("/addresses")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<AddressResponse>> createAddress(
+            @Valid @RequestBody CreateAddressRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.info("Creating address for owner: {} ({})", request.getOwnerId(), request.getOwnerType());
+        
+        if (!hasAccess(ctx, request.getOwnerId())) {
+            return forbiddenResponse();
+        }
+        
+        AddressResponse response = addressService.createAddress(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Address created successfully"));
+    }
+    
+    @GetMapping("/addresses/owner/{ownerId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<AddressResponse>>> getAddressesByOwner(
+            @PathVariable UUID ownerId,
+            @RequestParam String ownerType,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Getting addresses for owner: {} ({})", ownerId, ownerType);
+        
+        if (!hasAccess(ctx, ownerId.toString())) {
+            return forbiddenResponse();
+        }
+        
+        List<AddressResponse> addresses = addressService.getAddressesByOwner(ownerId, ownerType);
+        return ResponseEntity.ok(ApiResponse.success(addresses));
+    }
+    
+    @GetMapping("/addresses/{addressId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<AddressResponse>> getAddress(
+            @PathVariable UUID addressId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Getting address: {}", addressId);
+        
+        AddressResponse address = addressService.getAddress(addressId);
+        
+        if (!hasAccess(ctx, address.getOwnerId())) {
+            return forbiddenResponse();
+        }
+        
+        return ResponseEntity.ok(ApiResponse.success(address));
+    }
+    
+    @PutMapping("/addresses/{addressId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<AddressResponse>> updateAddress(
+            @PathVariable UUID addressId,
+            @Valid @RequestBody CreateAddressRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.info("Updating address: {}", addressId);
+        
+        // Check access to existing address
+        AddressResponse existing = addressService.getAddress(addressId);
+        if (!hasAccess(ctx, existing.getOwnerId())) {
+            return forbiddenResponse();
+        }
+        
+        AddressResponse response = addressService.updateAddress(addressId, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Address updated successfully"));
+    }
+    
+    @DeleteMapping("/addresses/{addressId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> deleteAddress(
+            @PathVariable UUID addressId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.info("Deleting address: {}", addressId);
+        
+        // Check access
+        AddressResponse existing = addressService.getAddress(addressId);
+        if (!hasAccess(ctx, existing.getOwnerId())) {
+            return forbiddenResponse();
+        }
+        
+        addressService.deleteAddress(addressId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Address deleted successfully"));
+    }
+    
+    @PutMapping("/addresses/{addressId}/set-primary")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> setAddressAsPrimary(
+            @PathVariable UUID addressId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.info("Setting address as primary: {}", addressId);
+        
+        // Check access
+        AddressResponse existing = addressService.getAddress(addressId);
+        if (!hasAccess(ctx, existing.getOwnerId())) {
+            return forbiddenResponse();
+        }
+        
+        addressService.setAsPrimary(addressId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Address set as primary"));
+    }
+
+    // =============================================================================
+    // HELPER METHODS
+    // =============================================================================
+    
     private boolean hasAccess(SecurityContext ctx, String ownerId) {
-        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) || 
-                         ctx.hasRole(SecurityConstants.ROLE_ADMIN) || 
+        // Allow internal service calls (service-to-service communication)
+        if (SecurityConstants.INTERNAL_SERVICE_PRINCIPAL.equals(ctx.getUserId())) {
+            return true;
+        }
+
+        boolean isAdmin = ctx.hasRole(SecurityConstants.ROLE_SUPER_ADMIN) ||
+                         ctx.hasRole(SecurityConstants.ROLE_ADMIN) ||
                          ctx.hasRole(SecurityConstants.ROLE_COMPANY_MANAGER);
         boolean isOwner = ctx.getUserId().equals(ownerId);
         return isAdmin || isOwner;

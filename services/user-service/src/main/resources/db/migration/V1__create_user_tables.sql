@@ -94,35 +94,6 @@ CREATE INDEX IF NOT EXISTS idx_user_outbox_processed ON user_outbox_events (proc
 CREATE INDEX IF NOT EXISTS idx_user_outbox_aggregate ON user_outbox_events (aggregate_type, aggregate_id);
 
 -- =============================================================================
--- SEED DATA - DEFAULT SUPER ADMIN
+-- SEED DATA
 -- =============================================================================
--- Default Super Admin for initial system access
--- Email: admin@system.local
--- Password: Admin@123
--- Note: Change password immediately after first login in production!
-
-INSERT INTO users (
-    id,
-    tenant_id,
-    first_name,
-    last_name,
-    display_name,
-    status,
-    role,
-    password_hash,
-    registration_type,
-    created_by,
-    updated_by
-) VALUES (
-    '00000000-0000-0000-0000-000000000001'::UUID,
-    '00000000-0000-0000-0000-000000000000'::UUID,  -- Default tenant ID
-    'Super',
-    'Admin',
-    'Super Administrator',
-    'ACTIVE',
-    'SUPER_ADMIN',
-    '$2b$12$9fPRsXGTeGgJ0kgRwEBG1OmVXKwpdniaEcBRg0vgdBGAynJFRkIaS',  -- bcrypt hash of 'Admin@123'
-    'SYSTEM_CREATED',
-    'SYSTEM',
-    'SYSTEM'
-) ON CONFLICT (id) DO NOTHING;
+-- No default users - all users created via tenant onboarding or manual setup

@@ -4,7 +4,7 @@
 
 Bu doküman, Fabric Management System'deki tüm microservisler ve API Gateway için geçerli olan **zorunlu** standartları tanımlar. Her yeni microservice bu standartlara uygun olarak geliştirilmelidir.
 
-**Son Güncelleme:** 2025-10-08  
+**Son Güncelleme:** 2025-10-11  
 **Durum:** ✅ Aktif ve Zorunlu  
 **Kapsam:** Tüm Microservices + API Gateway
 
@@ -389,7 +389,7 @@ public class UserController {
 
     // ✅ CORRECT: Role-based access
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<UUID>> createUser(@Valid @RequestBody CreateUserRequest request) {
         UUID tenantId = SecurityContextHolder.getCurrentTenantId();
         String createdBy = SecurityContextHolder.getCurrentUserId();
@@ -540,7 +540,7 @@ public class UserController {
 
 ## ✅ RULE 9: Service-to-Service Communication
 
-### Feign Client Pattern
+### Feign Client Pattern & DTO Strategy
 
 ```java
 /**
@@ -563,6 +563,57 @@ public interface UserServiceClient {
     List<UserDTO> listUsers();
 }
 ```
+
+### DTO Duplication Strategy (IMPORTANT!)
+
+**Rule:** Each service owns its Feign client DTOs - duplication is OK!
+
+**Why?**
+
+```
+contact-service/
+└── CreateContactRequest.java  ← API contract (controller uses)
+
+user-service/
+└── client/dto/CreateContactDto.java  ← Feign client (communication)
+```
+
+**Benefits:**
+
+- ✅ Loose coupling (services evolve independently)
+- ✅ API versioning easier
+- ✅ No deploy dependencies
+- ✅ Service autonomy
+
+**When Duplication is OK:**
+
+- Feign client DTOs (each service owns)
+- Simple POJOs (<50 lines)
+- Different validation rules per service
+
+**When Duplication is NOT OK:**
+
+- Business logic
+- Database schema
+- Constants (use shared-infrastructure)
+
+**Example (2025-10-11):**
+
+```java
+// contact-service (API)
+public class CreateContactRequest {
+    private String ownerId;
+    private boolean autoVerified;  // API-specific field
+}
+
+// user-service (Feign client)
+public class CreateContactDto {
+    private String ownerId;
+    private boolean isVerified;  // Different naming, simpler
+}
+```
+
+**Trade-off:** Loose coupling > DRY in microservices
 
 ### Internal vs External Endpoints
 
@@ -877,7 +928,7 @@ public class ResourceController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('TENANT_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         UUID tenantId = SecurityContextHolder.getCurrentTenantId();
         String deletedBy = SecurityContextHolder.getCurrentUserId();

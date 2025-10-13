@@ -3,6 +3,7 @@ package com.fabricmanagement.company.infrastructure.client;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.company.infrastructure.client.dto.ContactDto;
+import com.fabricmanagement.company.infrastructure.client.dto.AddressDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -48,6 +49,13 @@ public class ContactServiceClientFallback implements ContactServiceClient {
         log.warn("⚠️ Fallback: {} - returning empty batch for {} {} owners", 
             ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, ownerIds.size(), ownerType);
         return ApiResponse.success(Collections.emptyMap(), ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE);
+    }
+    
+    @Override
+    public ApiResponse<List<AddressDto>> getAddressesByOwner(UUID ownerId, String ownerType) {
+        log.warn("⚠️ Fallback: {} - returning empty addresses for company: {}", 
+            ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE, ownerId);
+        return ApiResponse.success(Collections.emptyList(), ServiceConstants.MSG_CONTACT_SERVICE_UNAVAILABLE);
     }
 }
 

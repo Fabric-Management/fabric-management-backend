@@ -1,6 +1,7 @@
 package com.fabricmanagement.shared.security.config;
 
 import com.fabricmanagement.shared.security.exception.JwtAuthenticationEntryPoint;
+import com.fabricmanagement.shared.security.filter.InternalAuthenticationFilter;
 import com.fabricmanagement.shared.security.filter.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class DefaultSecurityConfig {
 
+    private final InternalAuthenticationFilter internalAuthenticationFilter;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -57,29 +59,13 @@ public class DefaultSecurityConfig {
 
                 // Public: Authentication endpoints
                 .requestMatchers("/api/v1/users/auth/**").permitAll()
+                
+                // Public: Public endpoints (onboarding, etc.)
+                .requestMatchers("/api/v1/public/**").permitAll()
 
-                // Public: Internal service-to-service endpoints
-                // 
-                // Service-Aware Pattern: Each service knows its full base path
-                // All paths use the format: /api/v1/{service}/{endpoint}
-                // 
-                // This pattern ensures:
-                // - Single source of truth for paths
-                // - Services are self-contained and testable independently
-                // - No path transformation needed in API Gateway
-                // - Clear and maintainable security configuration
-                .requestMatchers(
-                    // Contact Service - Internal endpoints
-                    "/api/v1/contacts/find-by-value",      // Used by User Service for auth
-                    "/api/v1/contacts/owner/**",           // Owner-based queries
-                    "/api/v1/contacts/check-availability", // Availability checks
-                    "/api/v1/contacts/batch/by-owners",    // Batch fetching (NEW - for N+1 optimization)
-                    
-                    // User Service - Internal endpoints (called by Company Service)
-                    "/api/v1/users/{userId}",              // Get user by ID
-                    "/api/v1/users/{userId}/exists",       // Check user exists
-                    "/api/v1/users/company/**"             // Company-related queries
-                ).permitAll()
+                // ✅ SECURITY NOTE: Internal service-to-service endpoints are protected by
+                // InternalAuthenticationFilter (X-Internal-API-Key validation)
+                // No permitAll() needed here - filter handles it BEFORE this security chain
 
                 // Public: Swagger/OpenAPI (development only - disable in production via config)
                 .requestMatchers(
@@ -94,8 +80,16 @@ public class DefaultSecurityConfig {
             // Exception handling for authentication failures
             .exceptionHandling(exception ->
                 exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
-            // Add JWT authentication filter
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+            // FILTER CHAIN ORDER (PRODUCTION-READY):
+            // 1. InternalAuthenticationFilter (validates X-Internal-API-Key for service-to-service calls)
+            // 2. JwtAuthenticationFilter (validates JWT tokens for external client requests)
+            // 3. UsernamePasswordAuthenticationFilter (Spring Security default)
+            //
+            // Order matters! InternalAuthenticationFilter MUST run before JwtAuthenticationFilter
+            // to allow internal service calls without JWT tokens.
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(internalAuthenticationFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

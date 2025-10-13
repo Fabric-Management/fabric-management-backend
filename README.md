@@ -65,6 +65,10 @@ Fabric Management System is a comprehensive platform for fabric manufacturing, i
 git clone https://github.com/your-org/fabric-management-backend.git
 cd fabric-management-backend
 
+# Initial setup
+make setup           # Create .env file
+# Edit .env with your values
+
 # Start with Docker
 make deploy
 
@@ -73,6 +77,25 @@ docker-compose up -d
 mvn clean install
 mvn spring-boot:run
 ```
+
+### ⚡ Fast Development
+
+**Problem:** Full rebuild takes 25-30 minutes → Kills productivity
+
+**Solution:** Use fast commands for quick iterations:
+
+```bash
+# Config changed? Restart only (30s)
+make dev-restart-gateway
+
+# Code changed? Rebuild one service (2min)
+make dev-rebuild-user
+
+# View logs
+make dev-logs-gateway
+```
+
+**📖 Complete guide:** [FAST_DEVELOPMENT.md](FAST_DEVELOPMENT.md) - Save 7+ hours per day!
 
 ## 📁 Project Structure
 
@@ -222,15 +245,22 @@ make prune          # Docker system prune
 
 ## 🏗️ Services
 
-| Service         | Port | Description                        | Status        |
-| --------------- | ---- | ---------------------------------- | ------------- |
-| API Gateway     | 8080 | Central entry point with JWT auth  | ✅ Production |
-| User Service    | 8081 | User management and authentication | ✅ Production |
-| Contact Service | 8082 | Contact information management     | ✅ Production |
-| Company Service | 8083 | Company and tenant management      | ✅ Production |
-| PostgreSQL      | 5433 | Primary database                   | ✅ Ready      |
-| Redis           | 6379 | Caching + Rate limiting            | ✅ Ready      |
-| Kafka           | 9092 | Event streaming                    | ✅ Ready      |
+**🎯 Single Entry Point Architecture:**
+
+- All HTTP requests → API Gateway (8080)
+- Microservices → Internal network only (not exposed)
+
+| Service         | External Port | Internal Port | Description                        | Status        |
+| --------------- | ------------- | ------------- | ---------------------------------- | ------------- |
+| API Gateway     | 8080          | 8080          | Central entry point with JWT auth  | ✅ Production |
+| User Service    | -             | 8081          | User management and authentication | ✅ Production |
+| Contact Service | -             | 8082          | Contact information management     | ✅ Production |
+| Company Service | -             | 8083          | Company and tenant management      | ✅ Production |
+| PostgreSQL      | 5433          | 5432          | Primary database                   | ✅ Ready      |
+| Redis           | 6379          | 6379          | Caching + Rate limiting            | ✅ Ready      |
+| Kafka           | 9092          | 9092          | Event streaming                    | ✅ Ready      |
+
+**💡 Note:** Microservices are NOT exposed externally - access via API Gateway only. JMX ports (9011-9013) exposed for monitoring.
 
 ## 🔐 Security Features
 
