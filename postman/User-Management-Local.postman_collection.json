@@ -1,9 +1,10 @@
 {
   "info": {
-    "_postman_id": "user-management-local",
-    "name": "User Management - Local",
-    "description": "User Service API - Authenticated endpoints (requires tenant registration first)",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "_postman_id": "user-management-local-v3",
+    "name": "User Management - Local (v3.1)",
+    "description": "User Service API - CRUD operations for users\n\n✅ Updated for API Gateway v3.1.0:\n- Correlation ID tracking\n- Security headers validation\n- Simplified test scripts",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "3.1.0"
   },
   "variable": [
     {
@@ -24,157 +25,247 @@
   ],
   "item": [
     {
-      "name": "1. Login (Use Tenant-Onboarding collection first)",
-      "event": [
+      "name": "Auth",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "if (pm.response.code === 200) {",
-              "    const response = pm.response.json();",
-              "    pm.collectionVariables.set('accessToken', response.data.accessToken);",
-              "    console.log('Logged in successfully');",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"contactValue\": \"admin@acmetekstil.com\",\n  \"password\": \"AcmeAdmin@123\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/users/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "users", "auth", "login"]
-        }
-      }
-    },
-    {
-      "name": "2. List Users",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
+          "name": "Login",
+          "event": [
             {
-              "key": "token",
-              "value": "{{accessToken}}",
-              "type": "string"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const res = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "    pm.collectionVariables.set('userId', res.data.userId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
-        },
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/users",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "users"]
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactValue\": \"admin@acmetekstil.com\",\n  \"password\": \"AcmeAdmin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "auth", "login"]
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "3. Create User",
-      "event": [
+      "name": "User Operations",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "if (pm.response.code === 201) {",
-              "    const response = pm.response.json();",
-              "    pm.collectionVariables.set('userId', response.data);",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
+          "name": "Get My Profile",
+          "event": [
             {
-              "key": "token",
-              "value": "{{accessToken}}",
-              "type": "string"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
-        },
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"firstName\": \"Mehmet\",\n  \"lastName\": \"Demir\",\n  \"email\": \"mehmet@acmetekstil.com\",\n  \"phone\": \"+905559876543\",\n  \"role\": \"USER\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "me"]
             }
           }
         },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/users",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "users"]
-        }
-      }
-    },
-    {
-      "name": "4. Get User",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
+        {
+          "name": "List Users",
+          "event": [
             {
-              "key": "token",
-              "value": "{{accessToken}}",
-              "type": "string"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
         },
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "users", "{{userId}}"]
-        }
-      }
-    },
-    {
-      "name": "5. Search Users",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
+        {
+          "name": "Get User by ID",
+          "event": [
             {
-              "key": "token",
-              "value": "{{accessToken}}",
-              "type": "string"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            }
+          }
         },
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/users/search?firstName=Mehmet",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "users", "search"],
-          "query": [
+        {
+          "name": "Create User",
+          "event": [
             {
-              "key": "firstName",
-              "value": "Mehmet"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const res = pm.response.json();",
+                  "    console.log('User created:', res.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ayşe\",\n  \"lastName\": \"Kaya\",\n  \"email\": \"ayse@acmetekstil.com\",\n  \"phone\": \"+905559998877\",\n  \"role\": \"USER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ayşe\",\n  \"lastName\": \"Kaya Yılmaz\",\n  \"displayName\": \"Ayşe K.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 or 200', () => {",
+                  "    pm.expect([200, 204]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            }
+          }
         }
-      }
+      ]
     }
   ]
 }

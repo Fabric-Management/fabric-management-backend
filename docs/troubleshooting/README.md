@@ -1,6 +1,6 @@
 # 🔧 Troubleshooting Documentation
 
-**Last Updated:** October 10, 2025  
+**Last Updated:** October 13, 2025  
 **Purpose:** Troubleshooting guides and common solutions  
 **Status:** ✅ Active
 
@@ -16,11 +16,12 @@
 
 ### 🐛 Resolved Issues (Detailed Guides)
 
-| Issue               | Document                                                     | Status      | Date Resolved |
-| ------------------- | ------------------------------------------------------------ | ----------- | ------------- |
-| **Kafka Topics**    | [KAFKA_TOPIC_ISSUES.md](./KAFKA_TOPIC_ISSUES.md)             | ✅ Resolved | Oct 11, 2025  |
-| **Bean Conflicts**  | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md) | ✅ Resolved | Oct 7, 2025   |
-| **Flyway Checksum** | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md) | ✅ Resolved | Oct 6, 2025   |
+| Issue                      | Document                                                                                      | Status      | Date Resolved |
+| -------------------------- | --------------------------------------------------------------------------------------------- | ----------- | ------------- |
+| **503 Timeout Onboarding** | [TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md](./TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md) ⭐ **NEW** | ✅ Resolved | Oct 13, 2025  |
+| **Kafka Topics**           | [KAFKA_TOPIC_ISSUES.md](./KAFKA_TOPIC_ISSUES.md)                                              | ✅ Resolved | Oct 11, 2025  |
+| **Bean Conflicts**         | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md)                                  | ✅ Resolved | Oct 7, 2025   |
+| **Flyway Checksum**        | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md)                                  | ✅ Resolved | Oct 6, 2025   |
 
 ---
 
@@ -28,23 +29,27 @@
 
 ### By Problem Type
 
-| Problem Type            | What to Check                                                                      |
-| ----------------------- | ---------------------------------------------------------------------------------- |
-| **🚀 Startup Issues**   | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)  |
-| **🗄️ Database Issues**  | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
-| **📨 Kafka Issues**     | [KAFKA_TOPIC_ISSUES.md](./KAFKA_TOPIC_ISSUES.md) ⭐                                |
-| **🔗 Bean Conflicts**   | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md)                       |
-| **📋 Migration Issues** | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md)                       |
+| Problem Type                | What to Check                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------------- |
+| **⚡ Timeout/503 Errors**   | [TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md](./TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md) ⭐ **NEW** |
+| **🚀 Startup Issues**       | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)             |
+| **🗄️ Database Issues**      | [COMMON_ISSUES_AND_SOLUTIONS.md](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues)            |
+| **📨 Kafka Issues**         | [KAFKA_TOPIC_ISSUES.md](./KAFKA_TOPIC_ISSUES.md) ⭐                                           |
+| **🔗 Bean Conflicts**       | [BEAN_CONFLICT_RESOLUTION.md](./BEAN_CONFLICT_RESOLUTION.md)                                  |
+| **📋 Migration Issues**     | [FLYWAY_CHECKSUM_MISMATCH.md](./FLYWAY_CHECKSUM_MISMATCH.md)                                  |
+| **🔒 Internal Auth Issues** | [TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md](./TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md) ⭐ **NEW** |
 
 ### By Symptom
 
-| Symptom                              | Likely Issue         | Guide                                                                        |
-| ------------------------------------ | -------------------- | ---------------------------------------------------------------------------- |
-| Service won't start                  | Check logs           | [Common Issues - Startup](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)   |
-| `ConflictingBeanDefinitionException` | Bean name conflict   | [Bean Conflict Resolution](./BEAN_CONFLICT_RESOLUTION.md)                    |
-| `FlywayValidateException`            | Migration checksum   | [Flyway Checksum](./FLYWAY_CHECKSUM_MISMATCH.md)                             |
-| Connection refused                   | Database not ready   | [Common Issues - Database](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
-| `LEADER_NOT_AVAILABLE`               | Kafka topics missing | [Kafka Topic Issues](./KAFKA_TOPIC_ISSUES.md) ⭐                             |
+| Symptom                              | Likely Issue                | Guide                                                                        |
+| ------------------------------------ | --------------------------- | ---------------------------------------------------------------------------- |
+| 503 Service Unavailable              | Timeout or Circuit Breaker  | [Tenant Onboarding 503](./TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md) ⭐ **NEW** |
+| Service won't start                  | Check logs                  | [Common Issues - Startup](./COMMON_ISSUES_AND_SOLUTIONS.md#startup-issues)   |
+| `ConflictingBeanDefinitionException` | Bean name conflict          | [Bean Conflict Resolution](./BEAN_CONFLICT_RESOLUTION.md)                    |
+| `FlywayValidateException`            | Migration checksum          | [Flyway Checksum](./FLYWAY_CHECKSUM_MISMATCH.md)                             |
+| Connection refused                   | Database not ready          | [Common Issues - Database](./COMMON_ISSUES_AND_SOLUTIONS.md#database-issues) |
+| `LEADER_NOT_AVAILABLE`               | Kafka topics missing        | [Kafka Topic Issues](./KAFKA_TOPIC_ISSUES.md) ⭐                             |
+| 401 Unauthorized (internal calls)    | Missing internal auth setup | [Tenant Onboarding 503](./TENANT_ONBOARDING_503_TIMEOUT_ISSUE.md) ⭐ **NEW** |
 
 ---
 
@@ -176,6 +181,6 @@ Found a new issue? Solved a tricky problem?
 ---
 
 **Maintained By:** Development Team  
-**Last Updated:** 2025-10-10  
-**Version:** 2.0 (Reorganized & Enhanced)  
+**Last Updated:** 2025-10-13  
+**Version:** 2.1 (Added Tenant Onboarding 503 Timeout Issue)  
 **Status:** ✅ Active - Updated with new issues as they occur

@@ -986,16 +986,35 @@ public UserDTO getUser(@PathVariable UUID id) {
 
 ## ⭐ Updated Principles (2025-10-10 Refactoring)
 
-### 🎯 Anemic Domain Model Pattern
+### 🎯 Domain Model Strategy: Hybrid Approach
 
-**Adopted:** Pure data holder entities (Lombok-powered)
+**Philosophy:** Choose domain model based on complexity, not dogma!
+
+---
+
+#### 📊 Decision Matrix: Anemic vs Rich Domain Model
+
+| Domain Complexity                                         | Model Choice | Reasoning                                   |
+| --------------------------------------------------------- | ------------ | ------------------------------------------- |
+| **Simple CRUD** (User, Contact, Company)                  | Anemic       | Minimal business logic, Lombok sufficient   |
+| **Complex Business Rules** (Order, Invoice, Subscription) | Rich         | State machines, invariants, domain events   |
+| **Mix** (has both simple + complex behavior)              | Hybrid       | Simple fields anemic, complex behavior rich |
+
+**Rule:** "Complexity drives choice, not ideology"
+
+---
+
+#### ✅ Pattern 1: Anemic Domain Model (Simple CRUD)
+
+**Use When:** CRUD-heavy, minimal business logic, simple validations
 
 ```java
-// ✅ CORRECT: Entity = Data only
+// ✅ CORRECT: Entity = Pure data holder (Lombok-powered)
 @Entity
 @Getter
 @Setter
 @SuperBuilder
+@NoArgsConstructor
 public class User extends BaseEntity {
     private UUID tenantId;
     private String firstName;
@@ -1004,24 +1023,237 @@ public class User extends BaseEntity {
 
     // NO BUSINESS METHODS!
     // Lombok provides getters/setters
-}
-
-// ❌ WRONG: Business logic in entity
-public class User {
-    public void activate() { this.status = ACTIVE; }
-    public void updateProfile(...) { /* logic */ }
-    public String getFullName() { return firstName + " " + lastName; }
+    // Business logic → Service layer
+    // Computed properties → Mapper layer
 }
 ```
 
-**Why Anemic Domain:**
+**Benefits:**
 
 - ✅ Lombok eliminates boilerplate (@Getter/@Setter)
-- ✅ Business logic → Service layer (testable)
+- ✅ Business logic → Service layer (testable, mockable)
 - ✅ Computed properties → Mapper layer (SRP)
-- ✅ Simpler, cleaner, more maintainable
+- ✅ Simpler, cleaner, faster development
 
-**Result:** User.java: 408 lines → 99 lines (-76%)
+**Real Result:** User.java: 408 lines → 99 lines (-76%)
+
+---
+
+#### ✅ Pattern 2: Rich Domain Model (Complex Business Logic)
+
+**Use When:** Complex state transitions, business invariants, domain events
+
+```java
+// ✅ CORRECT: Entity = Data + Business behavior
+@Entity
+@Getter  // Only getter, NO @Setter!
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
+public class Order extends BaseEntity {
+    private UUID tenantId;
+    private OrderStatus status;
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
+
+    // ✅ Business methods encapsulate domain logic
+    public void submit() {
+        validateCanSubmit();
+        this.status = OrderStatus.SUBMITTED;
+        addDomainEvent(new OrderSubmittedEvent(this));
+    }
+
+    public void cancel(String reason) {
+        validateCanCancel();
+        this.status = OrderStatus.CANCELLED;
+        addDomainEvent(new OrderCancelledEvent(this, reason));
+    }
+
+    public Money calculateTotal() {
+        return items.stream()
+            .map(OrderItem::getSubtotal)
+            .reduce(Money.ZERO, Money::add);
+    }
+
+    public void addItem(Product product, int quantity) {
+        validateProduct(product);
+        OrderItem item = OrderItem.create(product, quantity);
+        items.add(item);
+    }
+
+    // ✅ Private validation methods (encapsulation)
+    private void validateCanSubmit() {
+        if (items.isEmpty())
+            throw new EmptyOrderException("Cannot submit empty order");
+        if (status != OrderStatus.DRAFT)
+            throw new InvalidStatusTransitionException("Can only submit DRAFT orders");
+    }
+
+    private void validateCanCancel() {
+        if (status == OrderStatus.DELIVERED)
+            throw new InvalidStatusTransitionException("Cannot cancel delivered order");
+    }
+}
+```
+
+**Benefits:**
+
+- ✅ Business rules encapsulated in domain
+- ✅ Invariants protected (no public setters)
+- ✅ State transitions controlled
+- ✅ Domain events for side effects
+- ✅ Self-documenting business logic
+
+---
+
+#### ✅ Pattern 3: Hybrid Model (Mix of Both)
+
+**Use When:** Entity has both simple fields + complex behavior
+
+```java
+@Entity
+@Getter
+@NoArgsConstructor
+@SuperBuilder
+public class Subscription extends BaseEntity {
+    // Simple fields - anemic style
+    private UUID tenantId;
+    private UUID customerId;
+    private String planName;
+
+    @Setter  // OK for simple field
+    private Money monthlyPrice;
+
+    // Complex fields - rich style (no setter)
+    private SubscriptionStatus status;
+    private LocalDateTime trialEndsAt;
+    private LocalDateTime nextBillingDate;
+
+    // ✅ Rich behavior for complex logic
+    public void activate() {
+        if (status != SubscriptionStatus.PENDING) {
+            throw new InvalidStatusException("Can only activate PENDING subscription");
+        }
+        this.status = SubscriptionStatus.ACTIVE;
+        this.nextBillingDate = calculateNextBillingDate();
+        addDomainEvent(new SubscriptionActivatedEvent(this));
+    }
+
+    public boolean isInTrialPeriod() {
+        return trialEndsAt != null && LocalDateTime.now().isBefore(trialEndsAt);
+    }
+
+    // ✅ Anemic style for simple updates
+    // (called from Service after validation)
+    protected void updatePlan(String newPlan, Money newPrice) {
+        this.planName = newPlan;
+        this.monthlyPrice = newPrice;
+    }
+}
+```
+
+---
+
+#### 🎯 When to Use Which Pattern
+
+| Scenario                        | Pattern    | Example                                          |
+| ------------------------------- | ---------- | ------------------------------------------------ |
+| Simple CRUD, minimal validation | **Anemic** | User, Contact, Company profiles                  |
+| Complex state machine           | **Rich**   | Order (Draft → Submitted → Shipped → Delivered)  |
+| Business invariants             | **Rich**   | Invoice (total must equal sum of line items)     |
+| Complex calculations            | **Rich**   | Subscription (billing cycles, prorations)        |
+| Financial transactions          | **Rich**   | Payment (capture, refund, dispute)               |
+| Simple lookups/filters          | **Anemic** | Category, Tag, Label                             |
+| Has both simple + complex       | **Hybrid** | Subscription (simple fields + complex lifecycle) |
+
+---
+
+#### ⚠️ Rich Domain Model Rules
+
+When using Rich Domain Model, follow these rules:
+
+1. **NO Public Setters** → Use Builder + business methods
+
+```java
+// ❌ WRONG
+order.setStatus(SUBMITTED);
+
+// ✅ CORRECT
+order.submit();
+```
+
+2. **Validation Inside Entity** → Protect invariants
+
+```java
+public void addItem(OrderItem item) {
+    if (status != DRAFT) throw new InvalidStateException();
+    items.add(item);
+}
+```
+
+3. **Domain Events** → Publish on state changes
+
+```java
+public void complete() {
+    this.status = COMPLETED;
+    addDomainEvent(new OrderCompletedEvent(this));
+}
+```
+
+4. **Service Layer is Thin** → Orchestration only
+
+```java
+// ✅ Service orchestrates, Entity enforces rules
+@Service
+public class OrderService {
+    public void submitOrder(UUID orderId) {
+        Order order = orderRepository.findById(orderId);
+        order.submit();  // Entity handles logic
+        orderRepository.save(order);
+    }
+}
+```
+
+---
+
+#### 🚫 What NOT to Do
+
+```java
+// ❌ WRONG: Business logic in service for rich domain
+@Service
+public class OrderService {
+    public void submitOrder(UUID orderId) {
+        Order order = orderRepository.findById(orderId);
+
+        // ❌ Validation in service (should be in entity)
+        if (order.getItems().isEmpty()) throw new EmptyOrderException();
+        if (order.getStatus() != DRAFT) throw new InvalidStatusException();
+
+        // ❌ Direct setter (bypasses encapsulation)
+        order.setStatus(SUBMITTED);
+
+        orderRepository.save(order);
+    }
+}
+
+// ✅ CORRECT: Entity encapsulates logic
+order.submit();  // All validation inside
+```
+
+---
+
+#### 📋 Current Codebase Status
+
+| Service             | Entities                     | Current Pattern | Future Direction          |
+| ------------------- | ---------------------------- | --------------- | ------------------------- |
+| **user-service**    | User, UserSession            | Anemic ✅       | Keep anemic (simple CRUD) |
+| **contact-service** | Contact, ContactVerification | Anemic ✅       | Keep anemic (simple CRUD) |
+| **company-service** | Company, CompanySettings     | Anemic ✅       | Keep anemic (simple CRUD) |
+| **order-service**   | Order, OrderItem             | Not yet built   | Use Rich Model 🎯         |
+| **billing-service** | Invoice, Subscription        | Not yet built   | Use Rich Model 🎯         |
+
+**Philosophy:** Don't refactor existing anemic domains unless they become complex. Choose pattern for NEW domains based on complexity.
 
 ---
 
@@ -1124,5 +1356,5 @@ application/service/LoginAttemptService.java  // Redis = infrastructure!
 
 ---
 
-**Last Updated:** 2025-10-10 (Anemic Domain + Mapper Separation Principles)  
-**Version:** 2.0
+**Last Updated:** 2025-10-12 (Hybrid Domain Model Strategy - Anemic + Rich patterns)  
+**Version:** 2.1

@@ -354,6 +354,251 @@ logging:
 
 ---
 
+### 3. Infrastructure Configuration (v2.0 - SHARED PATTERNS) ✨
+
+**🎯 YENİ (Oct 2025):** Shared infrastructure modules ile ZERO boilerplate!
+
+#### a) FeignClientConfig (AUTO-CONFIGURED!) ✨
+
+**🎯 v3.0 FINAL:** Service-specific config dosyası **ARTIK GEREKSIZ!**
+
+**Kullanım (@FeignClient annotation):**
+
+```java
+import com.fabricmanagement.shared.infrastructure.config.BaseFeignClientConfig;
+
+@FeignClient(
+    name = "contact-service",
+    url = "${contact-service.url:http://localhost:8082}",
+    path = "/api/v1/contacts",
+    configuration = BaseFeignClientConfig.class,  // ✅ Direkt base config!
+    fallback = ContactServiceClientFallback.class
+)
+public interface ContactServiceClient {
+    // ...
+}
+```
+
+**Özellikler:**
+
+- ✅ Internal API Key otomatik
+- ✅ JWT propagation otomatik
+- ✅ Correlation ID tracking otomatik
+- ✅ **0 satır kod!** (eskiden 50-75 satırdı!)
+
+**⚠️ ARTIK OLUŞTURMAYIN:**
+
+```
+❌ services/{service}/infrastructure/config/FeignClientConfig.java
+   → Direkt BaseFeignClientConfig kullanılır!
+```
+
+---
+
+#### b) KafkaErrorHandlingConfig (AUTO-CONFIGURED!) ✨
+
+**🎯 v3.0 FINAL:** Hiçbir config dosyası **GEREKSIZ!**
+
+**BaseKafkaErrorConfig otomatik aktif:**
+
+- ✅ `@ConditionalOnClass(KafkaTemplate.class)` → Kafka dependency varsa otomatik
+- ✅ `spring-kafka` dependency yeterli
+- ✅ DLQ pattern otomatik
+- ✅ Retry logic otomatik
+
+**Özellikler:**
+
+- ✅ DLQ pattern (failed messages → {topic}.DLT)
+- ✅ 3 retry with exponential backoff (1s, 2s, 4s, max 10s)
+- ✅ Business exceptions not retried
+- ✅ **0 satır kod!** (eskiden 48 satırdı!)
+
+**⚠️ ARTIK OLUŞTURMAYIN:**
+
+```
+❌ services/{service}/infrastructure/config/KafkaErrorHandlingConfig.java
+   → BaseKafkaErrorConfig otomatik çalışır!
+```
+
+**Service-specific DLT handling gerekirse:**
+
+```java
+// Özel recovery logic için
+@Component
+public class OrderFailureHandler {
+    @KafkaListener(topics = "order.created.DLT")
+    public void handleFailedOrders(OrderCreatedEvent event) {
+        // Custom recovery
+    }
+}
+```
+
+---
+
+#### c) Event Publisher (ASYNC Pattern - Best Practice)
+
+**Template:**
+
+```java
+package com.fabricmanagement.{service}.infrastructure.messaging;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
+import org.springframework.stereotype.Component;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * {Entity} Event Publisher
+ *
+ * Publishes domain events to Kafka (ASYNC).
+ * Pattern: Non-blocking async publishing with error logging.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class {Entity}EventPublisher {
+
+    private static final String TOPIC = "{entity}-events";
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    public void publish{Entity}Created({Entity}CreatedEvent event) {
+        log.info("Publishing {Entity}CreatedEvent: {}", event.getId());
+
+        // ASYNC with CompletableFuture
+        CompletableFuture<SendResult<String, Object>> future =
+            kafkaTemplate.send(TOPIC, event.getId().toString(), event);
+
+        future.whenComplete((result, ex) -> {
+            if (ex == null) {
+                log.info("✅ Event published: {}", event.getId());
+            } else {
+                log.error("❌ Failed to publish: {}", event.getId(), ex);
+            }
+        });
+    }
+}
+```
+
+**Özellikler:**
+
+- ✅ Non-blocking (CompletableFuture)
+- ✅ Error logging
+- ✅ DLQ otomatik (BaseKafkaErrorConfig'den)
+
+---
+
+#### d) Internal Endpoints - @InternalEndpoint Annotation (v3.2.0) 🆕
+
+**🎯 MODERN PATTERN:** Service-to-service endpoints için annotation kullan!
+
+**Service'te internal endpoint oluştururken:**
+
+```java
+import com.fabricmanagement.shared.security.annotation.InternalEndpoint;
+
+@RestController
+@RequestMapping("/api/v1/orders")
+public class OrderController {
+
+    /**
+     * Create order - called by User Service during checkout
+     */
+    @InternalEndpoint(
+        description = "Create order during checkout process",
+        calledBy = {"user-service"},
+        critical = true  // Monitoring alert if fails
+    )
+    @PostMapping
+    public ResponseEntity<UUID> createOrder(@RequestBody CreateOrderDto dto) {
+        // Requires X-Internal-API-Key header
+        // No JWT needed for internal calls!
+    }
+}
+```
+
+**Benefits:**
+
+- ✅ **Self-documenting** - See annotation → Know it's internal
+- ✅ **Auto-discovery** - InternalEndpointRegistry scans at startup
+- ✅ **Zero hardcoded paths** - No filter logic needed!
+- ✅ **99% code reduction** - 156 lines → 1 annotation!
+
+**Reference:** See `docs/development/INTERNAL_ENDPOINT_PATTERN.md`
+
+---
+
+#### e) ❌ ARTIK OLUŞTURMAYIN! (v3.0 FINAL)
+
+```
+❌ infrastructure/config/FeignClientConfig.java
+   → BaseFeignClientConfig direkt @FeignClient'ta kullanılır
+   → Service-specific dosya gereksiz!
+
+❌ infrastructure/config/KafkaErrorHandlingConfig.java
+   → BaseKafkaErrorConfig otomatik aktif
+   → Service-specific dosya gereksiz!
+
+❌ infrastructure/security/PolicyValidationFilter.java
+   → shared-security/filter/PolicyValidationFilter.java otomatik
+   → @ConditionalOnProperty ile enable/disable
+
+❌ Hardcoded internal endpoint paths
+   → @InternalEndpoint annotation kullan! (v3.2.0) ✨
+
+❌ Custom RequestInterceptor
+   → BaseFeignClientConfig zaten tüm ihtiyaçları karşılıyor
+
+❌ Sync Kafka Publishing
+   → Her zaman CompletableFuture kullan (async)
+```
+
+**📊 Code Reduction:**
+
+```
+BEFORE v3.0:
+  - FeignClientConfig: ~50 satır
+  - KafkaErrorHandlingConfig: ~25 satır
+  - PolicyValidationFilter: ~160 satır
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TOTAL per service: ~235 satır
+
+AFTER v3.0:
+  - ZERO config files needed!
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TOTAL per service: 0 satır! 🎉
+
+  100% boilerplate elimination!
+
+v3.2.0 UPDATE (Oct 13, 2025):
+  + @InternalEndpoint annotation pattern
+  + InternalAuthenticationFilter: 156 lines → 80 lines
+  + Zero hardcoded path matching!
+  + Auto-discovery at startup
+```
+
+---
+
+#### e) Service-Specific Config (Optional)
+
+Sadece **service-specific** konfigürasyon gerekiyorsa:
+
+```java
+// Example: Order-specific duplicate detection config
+@Configuration
+@ConfigurationProperties(prefix = "order.detection")
+@Data
+public class OrderDetectionConfig {
+    private double similarityThreshold = 0.85;
+    private int maxSuggestions = 5;
+}
+```
+
+**Lokasyon:** `infrastructure/config/{ServiceSpecific}Config.java`
+
+---
+
 ## 🐳 Dockerfile Yapılandırması
 
 ### Önemli: Universal Dockerfile Kullanımı
@@ -553,30 +798,91 @@ ORDER_SERVICE_JMX_PORT=9014
 
 ## 🌐 API Gateway Rotası Ekleme
 
-### 1. Gateway application.yml Güncelleme
+**🆕 v3.1.0:** API Gateway artık **Java Config** (type-safe routing!)
+
+### 1. DynamicRoutesConfig.java Güncelleme (Modern Pattern!)
+
+```java
+// services/api-gateway/src/main/java/com/fabricmanagement/gateway/config/DynamicRoutesConfig.java
+
+@Configuration
+public class DynamicRoutesConfig {
+
+    @Bean
+    public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
+        return builder.routes()
+                // ... existing routes ...
+
+                // ✅ YENİ: Order Service Route
+                .route("order-service-protected", r -> r
+                        .path("/api/v1/orders/**")
+                        .filters(f -> f
+                                .circuitBreaker(c -> c
+                                        .setName("orderServiceCircuitBreaker")
+                                        .setFallbackUri("forward:/fallback/order-service"))
+                                .requestRateLimiter(rl -> rl
+                                        .setRateLimiter(redisRateLimiter(
+                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardReplenishRate(),
+                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardBurstCapacity()))
+                                        .setKeyResolver(smartKeyResolver))
+                                .retry(retryConfig -> retryConfig
+                                        .setRetries(3)
+                                        .setMethods(HttpMethod.GET)
+                                        .setBackoff(
+                                                gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(),
+                                                gatewayProperties.getRetry().getMaxBackoff(),
+                                                2, true)))
+                        .uri("${ORDER_SERVICE_URL:http://localhost:8084}"))
+
+                .build();
+    }
+}
+```
+
+**Benefits:**
+
+- ✅ Type-safe (compile-time errors)
+- ✅ IDE autocomplete
+- ✅ Easy refactoring
+- ✅ Configuration-driven (GatewayProperties)
+
+### 2. Resilience4j Timeout Configuration (P95-Based!)
 
 ```yaml
 # services/api-gateway/src/main/resources/application.yml
+
+resilience4j:
+  timelimiter:
+    instances:
+      # ✅ YENİ: Order Service timeout
+      orderServiceCircuitBreaker:
+        base-config: default
+        # P95=4s → Timeout 6s (%50 buffer) - MEASURE in production!
+        timeout-duration: ${ORDER_SERVICE_TIMEOUT:6s}
+```
+
+**Environment Override:**
+
+```bash
+# Measure P95 in production, then override
+export ORDER_SERVICE_TIMEOUT=8s  # Measured P95=5s → 8s (%60 buffer)
+```
+
+**Reference:** See `docs/deployment/PERFORMANCE_TUNING_GUIDE.md`
+
+### 3. ~~Gateway application.yml Güncelleme~~ (DEPRECATED - Use Java Config Above!)
+
+~~**Old YAML-based routing (DO NOT USE!):**~~
+
+```yaml
+# ❌ DEPRECATED (v3.0) - Use DynamicRoutesConfig.java instead!
+# This is kept for reference only
 spring:
   cloud:
     gateway:
       routes:
-        # ... existing routes ...
-
-        # ✅ YENİ: Order Service Routes
         - id: order-service
           uri: ${ORDER_SERVICE_URL:http://localhost:8084}
-          predicates:
-            - Path=/api/v1/orders/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: orderServiceCircuitBreaker
-                fallbackUri: forward:/fallback/order-service
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
 ```
 
 ### 2. Gateway application-docker.yml Güncelleme
@@ -725,9 +1031,10 @@ docker exec fabric-kafka kafka-consumer-groups \
 - [ ] Root `pom.xml`'e modül eklendi
 - [ ] Servis ana sınıfı oluşturuldu (`OrderServiceApplication.java`)
 - [ ] Clean Architecture katmanları oluşturuldu (api, application, domain, infrastructure)
-- [ ] `application.yml` oluşturuldu
+- [ ] `application.yml` oluşturuldu (with ${ENV_VAR:default} pattern!)
 - [ ] `application-docker.yml` oluşturuldu
 - [ ] Flyway migration scripts eklendi (gerekirse)
+- [ ] **@InternalEndpoint** annotation eklendi (service-to-service endpoints için) 🆕
 - [ ] Unit testler yazıldı
 
 ### Docker Yapılandırması
@@ -749,14 +1056,15 @@ docker exec fabric-kafka kafka-consumer-groups \
 - [ ] Naming convention'a uyuldu (`{SERVICE}_PORT`, `{SERVICE}_URL`)
 - [ ] Default değerler ayarlandı (`:` ile fallback)
 
-### API Gateway
+### API Gateway (v3.1.0 - Java Config!)
 
-- [ ] Gateway `application.yml`'e route eklendi
-- [ ] Gateway `application-docker.yml`'e route eklendi
+- [ ] **DynamicRoutesConfig.java**'ya route eklendi (type-safe!) 🆕
+- [ ] Resilience4j timeout konfigürasyonu eklendi (P95-based)
+- [ ] Environment variables eklendi (`{SERVICE}_TIMEOUT`, etc.)
 - [ ] Circuit breaker konfigürasyonu eklendi
-- [ ] Rate limiter ayarları yapıldı
+- [ ] Rate limiter ayarları yapıldı (GatewayProperties)
 - [ ] Fallback endpoint oluşturuldu (opsiyonel)
-- [ ] Gateway environment variables güncellendi
+- [ ] ~~YAML routing~~ (DEPRECATED - Use Java Config)
 
 ### Dokümantasyon
 

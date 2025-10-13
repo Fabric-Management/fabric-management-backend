@@ -4,11 +4,15 @@ import com.fabricmanagement.company.api.dto.request.*;
 import com.fabricmanagement.company.api.dto.response.*;
 import com.fabricmanagement.company.api.dto.response.CompanySimilarResponse;
 import com.fabricmanagement.company.application.service.CompanyService;
+import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
+import com.fabricmanagement.shared.infrastructure.constants.SecurityConstants;
+import com.fabricmanagement.shared.infrastructure.constants.SecurityRoles;
 import com.fabricmanagement.company.domain.valueobject.CompanyStatus;
 import com.fabricmanagement.company.infrastructure.config.DuplicateDetectionConfig;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.application.response.PagedResponse;
+import com.fabricmanagement.shared.security.annotation.InternalEndpoint;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -35,15 +39,56 @@ public class CompanyController {
     private final CompanyService companyService;
     private final DuplicateDetectionConfig duplicateConfig;
     
+    /**
+     * Create new company
+     * 
+     * Dual mode endpoint:
+     * 1. Internal call (onboarding flow) - No JWT, tenantId in request body
+     * 2. Authenticated call (normal flow) - JWT required, tenantId from SecurityContext
+     * 
+     * Security: @InternalEndpoint allows internal calls with X-Internal-API-Key
+     */
+    @InternalEndpoint(
+        description = "Create company during tenant onboarding or by authenticated admin",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PostMapping
-    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'COMPANY_MANAGER')")
     public ResponseEntity<ApiResponse<UUID>> createCompany(
             @Valid @RequestBody CreateCompanyRequest request,
             @AuthenticationPrincipal SecurityContext ctx) {
         log.info("Creating company: {}", request.getName());
-        UUID companyId = companyService.createCompany(request, ctx.getTenantId(), ctx.getUserId());
+        
+        // Support both authenticated calls (with JWT) and internal service calls (onboarding)
+        UUID tenantId;
+        String createdBy;
+        
+        if (request.getTenantId() != null) {
+            // Internal service-to-service call (onboarding flow)
+            tenantId = request.getTenantId();  // Already UUID type
+            createdBy = request.getCreatedBy() != null 
+                ? request.getCreatedBy() 
+                : ServiceConstants.AUDIT_SYSTEM_USER;
+            log.debug("Creating company via internal call. Tenant: {}, CreatedBy: {}", tenantId, createdBy);
+        } else if (ctx != null) {
+            // Authenticated call (with JWT) - require proper role
+            if (!ctx.hasAnyRole(SecurityRoles.TENANT_ADMIN, SecurityRoles.COMPANY_MANAGER)) {
+                log.warn("User {} attempted to create company without proper role", ctx.getUserId());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(ApiResponse.error(SecurityConstants.MSG_INSUFFICIENT_PERMISSIONS));
+            }
+            tenantId = ctx.getTenantId();
+            createdBy = ctx.getUserId().toString();
+            log.debug("Creating company via authenticated call. Tenant: {}, User: {}", tenantId, createdBy);
+        } else {
+            log.error("Cannot create company: No authentication context and no tenantId in request");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error(SecurityConstants.MSG_UNAUTHORIZED_ACCESS));
+        }
+        
+        UUID companyId = companyService.createCompany(request, tenantId, createdBy);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(companyId, "Company created successfully"));
+                .body(ApiResponse.success(companyId, ServiceConstants.MSG_COMPANY_CREATED));
     }
     
     @GetMapping("/{companyId}")
@@ -108,7 +153,7 @@ public class CompanyController {
             @AuthenticationPrincipal SecurityContext ctx) {
         log.info("Updating company: {}", companyId);
         companyService.updateCompany(companyId, request, ctx.getTenantId(), ctx.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(null, "Company updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_COMPANY_UPDATED));
     }
     
     @DeleteMapping("/{companyId}")
@@ -118,7 +163,7 @@ public class CompanyController {
             @AuthenticationPrincipal SecurityContext ctx) {
         log.info("Deleting company: {}", companyId);
         companyService.deleteCompany(companyId, ctx.getTenantId(), ctx.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(null, "Company deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_COMPANY_DELETED));
     }
     
     @PostMapping("/{companyId}/activate")
@@ -128,7 +173,7 @@ public class CompanyController {
             @AuthenticationPrincipal SecurityContext ctx) {
         log.info("Activating company: {}", companyId);
         companyService.activateCompany(companyId, ctx.getTenantId(), ctx.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(null, "Company activated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_COMPANY_ACTIVATED));
     }
     
     @PostMapping("/{companyId}/deactivate")
@@ -138,7 +183,7 @@ public class CompanyController {
             @AuthenticationPrincipal SecurityContext ctx) {
         log.info("Deactivating company: {}", companyId);
         companyService.deactivateCompany(companyId, ctx.getTenantId(), ctx.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(null, "Company deactivated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_COMPANY_DEACTIVATED));
     }
     
     @GetMapping("/status/{status}")
@@ -239,7 +284,7 @@ public class CompanyController {
             @AuthenticationPrincipal SecurityContext ctx) {
         log.info("Updating company settings: {}", companyId);
         companyService.updateSettings(companyId, request, ctx.getTenantId(), ctx.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(null, "Company settings updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_COMPANY_SETTINGS_UPDATED));
     }
     
     @PutMapping("/{companyId}/subscription")
@@ -250,14 +295,34 @@ public class CompanyController {
             @AuthenticationPrincipal SecurityContext ctx) {
         log.info("Updating company subscription: {}", companyId);
         companyService.updateSubscription(companyId, request, ctx.getTenantId(), ctx.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(null, "Company subscription updated successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_COMPANY_SUBSCRIPTION_UPDATED));
     }
     
+    @InternalEndpoint(
+        description = "Check company duplicate during tenant onboarding validation",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PostMapping("/check-duplicate")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<CheckDuplicateResponse>> checkDuplicate(
             @Valid @RequestBody CheckDuplicateRequest request,
             @AuthenticationPrincipal SecurityContext ctx) {
+        
+        // If internal service call, check globally (for tenant onboarding)
+        if (SecurityConstants.INTERNAL_SERVICE_PRINCIPAL.equals(ctx.getUserId())) {
+            log.info("Internal call - checking duplicate globally");
+            CheckDuplicateResponse result = companyService.checkDuplicateGlobal(request);
+            
+            if (result.isDuplicate()) {
+                log.warn("GLOBAL duplicate found: {} (type: {}, confidence: {}%)", 
+                    result.getMatchedCompanyName(), result.getMatchType(), (int)(result.getConfidence() * 100));
+            }
+            
+            return ResponseEntity.ok(ApiResponse.success(result));
+        }
+        
+        // Otherwise, tenant-scoped check
         CheckDuplicateResponse result = companyService.checkDuplicate(request, ctx.getTenantId());
         
         if (result.isDuplicate()) {

@@ -60,6 +60,7 @@ public class User extends BaseEntity {
     private String passwordHash;
     
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "role", nullable = false)
     @lombok.Builder.Default
     private SystemRole role = SystemRole.USER;

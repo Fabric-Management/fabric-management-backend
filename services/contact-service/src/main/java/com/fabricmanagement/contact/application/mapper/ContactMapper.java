@@ -19,6 +19,9 @@ public class ContactMapper {
                 .ownerType(contact.getOwnerType().name())
                 .contactValue(contact.getContactValue())
                 .contactType(contact.getContactType().name())
+                .parentContactId(contact.getParentContactId() != null 
+                    ? contact.getParentContactId().toString() 
+                    : null)
                 .isVerified(contact.isVerified())
                 .isPrimary(contact.isPrimary())
                 .verifiedAt(contact.getVerifiedAt())
@@ -29,14 +32,20 @@ public class ContactMapper {
 
     public Contact fromCreateRequest(CreateContactRequest request) {
         UUID ownerId = UUID.fromString(request.getOwnerId());
+        UUID parentContactId = request.getParentContactId() != null 
+            ? UUID.fromString(request.getParentContactId()) 
+            : null;
         
-        return Contact.create(
+        Contact contact = Contact.create(
                 ownerId,
                 Contact.OwnerType.valueOf(request.getOwnerType()),
                 request.getContactValue(),
                 ContactType.valueOf(request.getContactType()),
                 request.isPrimary()
         );
+        
+        contact.setParentContactId(parentContactId);
+        return contact;
     }
 
     public void updateFromRequest(Contact contact, UpdateContactRequest request) {

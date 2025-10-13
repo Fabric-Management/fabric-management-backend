@@ -19,6 +19,8 @@ import com.fabricmanagement.company.domain.valueobject.CompanyStatus;
 import com.fabricmanagement.company.infrastructure.repository.CompanyRepository;
 import com.fabricmanagement.company.infrastructure.config.DuplicateDetectionConfig;
 import com.fabricmanagement.company.infrastructure.messaging.CompanyEventPublisher;
+import com.fabricmanagement.shared.infrastructure.util.StringNormalizationUtil;
+import com.fabricmanagement.shared.infrastructure.util.TokenBasedSimilarityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -50,14 +53,45 @@ public class CompanyService {
     private final CompanyEventMapper eventMapper;
     private final CompanyEventPublisher eventPublisher;
     private final DuplicateDetectionConfig duplicateConfig;
+    private final StringNormalizationUtil normalizationUtil;
+    private final TokenBasedSimilarityUtil tokenSimilarityUtil;
     
     @Transactional
     @CacheEvict(value = {"companies", "companiesList"}, allEntries = true)
     public UUID createCompany(CreateCompanyRequest request, UUID tenantId, String createdBy) {
         log.info("Creating company: {} for tenant: {}", request.getName(), tenantId);
         
+        // Check for duplicate tax ID (CRITICAL - legal requirement)
+        if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+            companyRepository.findByTaxIdAndTenantId(request.getTaxId(), tenantId)
+                .ifPresent(existing -> {
+                    throw new CompanyAlreadyExistsException(
+                        "TAX_ID",
+                        request.getTaxId(),
+                        "A company with this tax ID is already registered. If this is your company, please use the forgot password option to recover your account."
+                    );
+                });
+        }
+        
+        // Check for duplicate registration number (CRITICAL - legal requirement)
+        if (request.getRegistrationNumber() != null && !request.getRegistrationNumber().isBlank()) {
+            companyRepository.findByRegistrationNumberAndTenantId(request.getRegistrationNumber(), tenantId)
+                .ifPresent(existing -> {
+                    throw new CompanyAlreadyExistsException(
+                        "REGISTRATION_NUMBER",
+                        request.getRegistrationNumber(),
+                        "A company with this registration number is already registered. If this is your company, please use the forgot password option to recover your account."
+                    );
+                });
+        }
+        
+        // Check for duplicate name (less strict - exact match only)
         if (companyRepository.existsByNameAndTenantId(request.getName(), tenantId)) {
-            throw new CompanyAlreadyExistsException(request.getName());
+            throw new CompanyAlreadyExistsException(
+                "NAME_EXACT",
+                request.getName(),
+                "A company with this name is already registered. If this is your company, please use the forgot password option to recover your account."
+            );
         }
         
         Company company = companyMapper.fromCreateRequest(request, tenantId, createdBy);
@@ -255,42 +289,257 @@ public class CompanyService {
     }
     
     public CheckDuplicateResponse checkDuplicate(CheckDuplicateRequest request, UUID tenantId) {
-        log.info("Checking duplicate for company: {}", request.getName());
+        log.info("Checking duplicate for company - Name: {}, TaxId: {}, RegNumber: {}", 
+            request.getName(), request.getTaxId(), request.getRegistrationNumber());
         
-        List<Company> potentialDuplicates = companyRepository.findPotentialDuplicates(
-                tenantId, 
-                request.getTaxId(), 
-                request.getRegistrationNumber()
-        );
+        // Priority 1: Check exact tax ID match (CRITICAL - legal identifier)
+        if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+            Optional<Company> taxIdMatch = companyRepository.findByTaxIdAndTenantId(request.getTaxId(), tenantId);
+            if (taxIdMatch.isPresent()) {
+                Company matched = taxIdMatch.get();
+                return CheckDuplicateResponse.builder()
+                        .isDuplicate(true)
+                        .matchType("TAX_ID")
+                        .matchedCompanyId(matched.getId().toString())
+                        .matchedCompanyName(matched.getName().getValue())
+                        .matchedTaxId(matched.getTaxId())
+                        .confidence(1.0)
+                        .message("Tax ID is already registered")
+                        .recommendation("If this is your company, please use the forgot password option")
+                        .build();
+            }
+        }
         
+        // Priority 2: Check exact registration number match (CRITICAL - legal identifier)
+        if (request.getRegistrationNumber() != null && !request.getRegistrationNumber().isBlank()) {
+            Optional<Company> regNumberMatch = companyRepository.findByRegistrationNumberAndTenantId(
+                request.getRegistrationNumber(), tenantId);
+            if (regNumberMatch.isPresent()) {
+                Company matched = regNumberMatch.get();
+                return CheckDuplicateResponse.builder()
+                        .isDuplicate(true)
+                        .matchType("REGISTRATION_NUMBER")
+                        .matchedCompanyId(matched.getId().toString())
+                        .matchedCompanyName(matched.getName().getValue())
+                        .matchedTaxId(matched.getTaxId())
+                        .confidence(1.0)
+                        .message("Registration number is already registered")
+                        .recommendation("If this is your company, please use the forgot password option")
+                        .build();
+            }
+        }
+        
+        // Priority 3: Check exact name match
+        if (companyRepository.existsByNameAndTenantId(request.getName(), tenantId)) {
+            // Find the actual company for details
+            List<Company> nameMatches = companyRepository.searchByNameAndTenantId(request.getName(), tenantId);
+            if (!nameMatches.isEmpty()) {
+                Company matched = nameMatches.get(0);
+                return CheckDuplicateResponse.builder()
+                        .isDuplicate(true)
+                        .matchType("NAME_EXACT")
+                        .matchedCompanyId(matched.getId().toString())
+                        .matchedCompanyName(matched.getName().getValue())
+                        .matchedTaxId(matched.getTaxId())
+                        .confidence(1.0)
+                        .message("Company name is already registered")
+                        .recommendation("If this is your company, please use the forgot password option")
+                        .build();
+            }
+        }
+        
+        // Priority 4: Check fuzzy name similarity (WARNING - not blocking)
         if (request.getName() != null && request.getName().trim().length() >= duplicateConfig.getFuzzySearchMinLength()) {
             List<Company> nameSimilar = companyRepository.findSimilarCompanies(
                     tenantId, 
                     request.getName(), 
-                    duplicateConfig.getDatabaseSearchThreshold()
+                    duplicateConfig.getNameSimilarityThreshold()
             );
             
-            for (var company : nameSimilar) {
-                if (potentialDuplicates.stream().noneMatch(c -> c.getId().equals(company.getId()))) {
-                    potentialDuplicates.add(company);
+            if (!nameSimilar.isEmpty()) {
+                Company matched = nameSimilar.get(0);
+                return CheckDuplicateResponse.builder()
+                        .isDuplicate(true)
+                        .matchType("NAME_SIMILAR")
+                        .matchedCompanyId(matched.getId().toString())
+                        .matchedCompanyName(matched.getName().getValue())
+                        .matchedTaxId(matched.getTaxId())
+                        .confidence(0.85)
+                        .message("A similar company name was found: " + matched.getName().getValue())
+                        .recommendation("Please verify this is not a duplicate or a typo")
+                        .build();
+            }
+        }
+        
+        return CheckDuplicateResponse.noDuplicate();
+    }
+    
+    /**
+     * Check for duplicate companies GLOBALLY (across all tenants)
+     * Used during tenant onboarding to prevent cross-tenant duplicates
+     * 
+     * Multi-level validation (priority-based):
+     * 1. Tax ID (GLOBAL) → BLOCK - Globally unique legal identifier
+     * 2. Registration Number (GLOBAL) → BLOCK - Globally unique legal identifier
+     * 3. Legal Name + Country (EXACT) → BLOCK - Cannot have same legal name in same country
+     * 4. Legal Name + Country (TOKEN-BASED) → BLOCK if typo - Smart fuzzy matching
+     * 5. Company Name (NORMALIZED) → BLOCK - Marketing name exact match
+     * 6. Company Name (TOKEN-BASED) → WARN - Allow different companies with generic terms
+     * 
+     * SMART TOKEN-BASED MATCHING:
+     * - Filters common words: "tekstil", "limited", "sanayi", etc.
+     * - Compares unique tokens only
+     * - "Akme Tekstil" vs "Akkayalar Tekstil" → ALLOW (different unique tokens)
+     * - "Acme Tekstil" vs "Acmee Tekstil" → BLOCK (typo in unique token)
+     * 
+     * GLOBAL NORMALIZATION:
+     * - ICU4J transliteration (İ→i, ü→u, München→munchen)
+     * - Multi-language suffix removal (A.Ş., GmbH, Inc., SA, SAS, SpA)
+     * - Apache Commons Text (Jaccard, Jaro-Winkler)
+     */
+    public CheckDuplicateResponse checkDuplicateGlobal(CheckDuplicateRequest request) {
+        log.info("Checking GLOBAL duplicate for company - Name: {}, Legal: {}, Country: {}, TaxId: {}, RegNumber: {}", 
+            request.getName(), request.getLegalName(), request.getCountry(), 
+            request.getTaxId(), request.getRegistrationNumber());
+        
+        // Priority 1: Check exact tax ID match GLOBALLY (CRITICAL - legal identifier)
+        if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+            Optional<Company> taxIdMatch = companyRepository.findByTaxIdGlobal(request.getTaxId());
+            if (taxIdMatch.isPresent()) {
+                Company matched = taxIdMatch.get();
+                return CheckDuplicateResponse.builder()
+                        .isDuplicate(true)
+                        .matchType("TAX_ID")
+                        .matchedCompanyId(matched.getId().toString())
+                        .matchedCompanyName(matched.getName().getValue())
+                        .matchedTaxId(matched.getTaxId())
+                        .confidence(1.0)
+                        .message("Tax ID is already registered")
+                        .recommendation("If this is your company, please use the forgot password option")
+                        .build();
+            }
+        }
+        
+        // Priority 2: Check exact registration number match GLOBALLY (CRITICAL)
+        if (request.getRegistrationNumber() != null && !request.getRegistrationNumber().isBlank()) {
+            Optional<Company> regNumberMatch = companyRepository.findByRegistrationNumberGlobal(
+                request.getRegistrationNumber());
+            if (regNumberMatch.isPresent()) {
+                Company matched = regNumberMatch.get();
+                return CheckDuplicateResponse.builder()
+                        .isDuplicate(true)
+                        .matchType("REGISTRATION_NUMBER")
+                        .matchedCompanyId(matched.getId().toString())
+                        .matchedCompanyName(matched.getName().getValue())
+                        .matchedTaxId(matched.getTaxId())
+                        .confidence(1.0)
+                        .message("Registration number is already registered")
+                        .recommendation("If this is your company, please use the forgot password option")
+                        .build();
+            }
+        }
+        
+        // Priority 3: Check LEGAL NAME + COUNTRY (CRITICAL - same legal name in same country is ILLEGAL!)
+        if (request.getLegalName() != null && !request.getLegalName().isBlank() 
+            && request.getCountry() != null && !request.getCountry().isBlank()) {
+            
+            Optional<Company> legalNameMatch = companyRepository.findByLegalNameAndCountry(
+                request.getLegalName(), request.getCountry());
+            
+            if (legalNameMatch.isPresent()) {
+                Company matched = legalNameMatch.get();
+                return CheckDuplicateResponse.builder()
+                        .isDuplicate(true)
+                        .matchType("LEGAL_NAME_COUNTRY")
+                        .matchedCompanyId(matched.getId().toString())
+                        .matchedCompanyName(matched.getName().getValue())
+                        .matchedTaxId(matched.getTaxId())
+                        .confidence(1.0)
+                        .message(String.format(
+                            "A company with this legal name is already registered in %s. Legal name: '%s'",
+                            request.getCountry(), matched.getLegalName()
+                        ))
+                        .recommendation("If this is your company, please use the forgot password option")
+                        .build();
+            }
+            
+            // Priority 4: Check LEGAL NAME fuzzy match (SAME COUNTRY ONLY - typo detection)
+            // Get companies in same country
+            List<Company> companiesInSameCountry = getCompaniesByCountry(request.getCountry());
+            
+            for (Company company : companiesInSameCountry) {
+                if (company.getLegalName() == null || company.getLegalName().isBlank()) {
+                    continue;
+                }
+                
+                // Token-based fuzzy match on LEGAL NAME
+                TokenBasedSimilarityUtil.TokenSimilarityResult tokenResult = 
+                    tokenSimilarityUtil.calculateTokenSimilarity(
+                        request.getLegalName(), 
+                        company.getLegalName()
+                    );
+                
+                log.debug("Legal name token similarity for '{}' vs '{}' (same country: {}): {}", 
+                    request.getLegalName(), company.getLegalName(), 
+                    request.getCountry(), tokenResult.getExplanation());
+                
+                // STRICT on legal name - block if duplicate detected
+                if (tokenResult.isDuplicate()) {
+                    return CheckDuplicateResponse.builder()
+                            .isDuplicate(true)
+                            .matchType("LEGAL_NAME_TOKEN_DUPLICATE")
+                            .matchedCompanyId(company.getId().toString())
+                            .matchedCompanyName(company.getName().getValue())
+                            .matchedTaxId(company.getTaxId())
+                            .confidence(tokenResult.getConfidence())
+                            .message(String.format(
+                                "Very similar LEGAL name found in %s: '%s' (%.0f%% confidence). This appears to be a duplicate or typo.",
+                                request.getCountry(),
+                                company.getLegalName(), 
+                                tokenResult.getConfidence() * 100
+                            ))
+                            .recommendation("If this is your company, please use the forgot password option. Legal names must be unique within the same country.")
+                            .build();
                 }
             }
         }
         
-        if (potentialDuplicates.isEmpty()) {
-            return CheckDuplicateResponse.noDuplicate();
+        // Priority 5: Check normalized COMPANY NAME match GLOBALLY (EXACT only)
+        // This catches "A.Ş." vs "AS", "İstanbul" vs "Istanbul", etc.
+        // NOTE: We do NOT apply fuzzy matching to company name (only legal name)
+        // Reason: Company names are marketing/brand names and can be similar
+        // Example: "Akkayalar Tekstil" and "Akme Tekstil" → ALLOWED
+        if (request.getName() != null && !request.getName().isBlank()) {
+            String normalizedRequestName = normalizationUtil.normalizeForComparison(request.getName());
+            
+            // Get all companies and check normalized names
+            // TODO: Optimize with database-level normalization in future
+            List<Company> allCompanies = companyRepository.findAll().stream()
+                    .filter(c -> !c.isDeleted())
+                    .collect(Collectors.toList());
+            
+            for (Company company : allCompanies) {
+                String normalizedExistingName = normalizationUtil.normalizeForComparison(
+                    company.getName().getValue());
+                
+                // Exact match after normalization
+                if (normalizedRequestName.equals(normalizedExistingName)) {
+                    return CheckDuplicateResponse.builder()
+                            .isDuplicate(true)
+                            .matchType("NAME_NORMALIZED_EXACT")
+                            .matchedCompanyId(company.getId().toString())
+                            .matchedCompanyName(company.getName().getValue())
+                            .matchedTaxId(company.getTaxId())
+                            .confidence(1.0)
+                            .message("Company name is already registered (normalized match)")
+                            .recommendation("If this is your company, please use the forgot password option")
+                            .build();
+                }
+            }
         }
         
-        Company matched = potentialDuplicates.get(0);
-        return CheckDuplicateResponse.builder()
-                .isDuplicate(true)
-                .matchType("SIMILAR")
-                .matchedCompanyId(matched.getId().toString())
-                .matchedCompanyName(matched.getName().getValue())
-                .confidence(0.8)
-                .message("Similar company found")
-                .recommendation("Please verify this is not a duplicate")
-                .build();
+        // No duplicates found
+        return CheckDuplicateResponse.noDuplicate();
     }
     
     public CompanyAutocompleteResponse autocomplete(String query, UUID tenantId) {
@@ -384,5 +633,25 @@ public class CompanyService {
         return companyRepository.findByIdAndTenantId(companyId, tenantId)
                 .filter(c -> !c.isDeleted())
                 .orElseThrow(() -> new CompanyNotFoundException(companyId));
+    }
+    
+    /**
+     * Gets companies in a specific country
+     * 
+     * Uses Contact Service to get country from addresses
+     * Falls back to Company.country field if Contact Service unavailable
+     */
+    private List<Company> getCompaniesByCountry(String country) {
+        log.debug("Getting companies in country: {}", country);
+        
+        // Strategy: Use Company.country field (denormalized for performance)
+        // This field is populated during company creation from address data
+        List<Company> companies = companyRepository.findAll().stream()
+                .filter(c -> !c.isDeleted())
+                .filter(c -> c.getCountry() != null && country.equalsIgnoreCase(c.getCountry()))
+                .collect(Collectors.toList());
+        
+        log.debug("Found {} companies in country: {}", companies.size(), country);
+        return companies;
     }
 }

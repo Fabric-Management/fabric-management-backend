@@ -34,6 +34,32 @@ spring:
   cloud:
     gateway:
       routes:
+        # Public Endpoints - Tenant Onboarding & Other Public APIs
+        # Pattern: /api/v1/public/** (catch-all for public endpoints)
+        - id: public-endpoints
+          uri: ${USER_SERVICE_URL:http://user-service:8081}
+          predicates:
+            - Path=/api/v1/public/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCircuitBreaker
+                fallbackUri: forward:/fallback/user-service
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@smartKeyResolver}"
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+            - name: Retry
+              args:
+                retries: 1
+                methods: POST,GET
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: true
+
         # User Service - Public Auth Routes (No Rate Limiting)
         # Pattern: /api/v1/users/auth/** - Authentication endpoints
         - id: user-service-public

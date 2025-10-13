@@ -4,6 +4,7 @@ import com.fabricmanagement.company.domain.exception.CompanyAlreadyExistsExcepti
 import com.fabricmanagement.company.domain.exception.CompanyNotFoundException;
 import com.fabricmanagement.company.domain.exception.MaxUsersLimitException;
 import com.fabricmanagement.company.domain.exception.UnauthorizedCompanyAccessException;
+import com.fabricmanagement.shared.application.response.ApiResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -49,17 +50,15 @@ public class CompanyExceptionHandler {
     }
     
     @ExceptionHandler(CompanyAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponse> handleCompanyAlreadyExists(CompanyAlreadyExistsException ex) {
-        log.error("Company already exists: {}", ex.getMessage());
+    public ResponseEntity<ApiResponse<Void>> handleCompanyAlreadyExists(CompanyAlreadyExistsException ex) {
+        log.warn("Company already exists - Type: {}, Value: {}, Message: {}", 
+            ex.getMatchType(), ex.getMatchedValue(), ex.getMessage());
         
-        ErrorResponse error = ErrorResponse.builder()
-            .timestamp(LocalDateTime.now())
-            .status(HttpStatus.CONFLICT.value())
-            .error("Conflict")
-            .message(ex.getMessage())
-            .build();
-        
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "COMPANY_ALREADY_EXISTS"
+                ));
     }
     
     @ExceptionHandler(UnauthorizedCompanyAccessException.class)

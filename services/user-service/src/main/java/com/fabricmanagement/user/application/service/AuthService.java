@@ -2,6 +2,7 @@ package com.fabricmanagement.user.application.service;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.domain.exception.*;
+import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.shared.security.jwt.JwtTokenProvider;
 import com.fabricmanagement.user.api.dto.request.CheckContactRequest;
 import com.fabricmanagement.user.api.dto.request.LoginRequest;
@@ -145,8 +146,8 @@ public class AuthService {
             ApiResponse<ContactDto> response = contactServiceClient.findByContactValue(contactValue);
             if (response == null || response.getData() == null) {
                 loginAttemptTracker.recordFailedAttempt(contactValue);
-                auditLogger.logFailedLogin(contactValue, "Contact not found");
-                throw new InvalidPasswordException("Invalid credentials");
+                auditLogger.logFailedLogin(contactValue, ServiceConstants.MSG_CONTACT_NOT_FOUND);
+                throw new InvalidPasswordException(ServiceConstants.MSG_INVALID_CREDENTIALS);
             }
 
             ContactDto contact = response.getData();
@@ -156,19 +157,19 @@ public class AuthService {
                     .filter(u -> !u.isDeleted())
                     .orElseThrow(() -> {
                         loginAttemptTracker.recordFailedAttempt(contactValue);
-                        auditLogger.logFailedLogin(contactValue, "User not found or deleted");
-                        return new InvalidPasswordException("Invalid credentials");
+                        auditLogger.logFailedLogin(contactValue, ServiceConstants.MSG_USER_NOT_FOUND);
+                        return new InvalidPasswordException(ServiceConstants.MSG_INVALID_CREDENTIALS);
                     });
 
             if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                throw new PasswordAlreadySetException("Password not set. Please setup your password first.");
+                throw new PasswordAlreadySetException(ServiceConstants.MSG_PASSWORD_NOT_SET);
             }
 
             if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
                 log.warn("Failed login attempt for contact: {}", contactValue);
                 loginAttemptTracker.recordFailedAttempt(contactValue);
-                auditLogger.logFailedLogin(contactValue, "Invalid password");
-                throw new InvalidPasswordException("Invalid credentials");
+                auditLogger.logFailedLogin(contactValue, ServiceConstants.MSG_INVALID_CREDENTIALS);
+                throw new InvalidPasswordException(ServiceConstants.MSG_INVALID_CREDENTIALS);
             }
 
             if (user.getStatus() != UserStatus.ACTIVE) {
@@ -205,7 +206,7 @@ public class AuthService {
             log.error("Unexpected error during login for contact: {}", contactValue, e);
             loginAttemptTracker.recordFailedAttempt(contactValue);
             auditLogger.logFailedLogin(contactValue, "Unexpected error: " + e.getMessage());
-            throw new InvalidPasswordException("Invalid credentials");
+            throw new InvalidPasswordException(ServiceConstants.MSG_INVALID_CREDENTIALS);
         }
     }
 }

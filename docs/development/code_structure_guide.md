@@ -436,27 +436,40 @@ public UserDTO getUser(@PathVariable UUID id) {
 
 ## ⭐ Yeni Prensipler (2025-10-10 Refactoring)
 
-### 1. **Entity = Pure Data Holder (Anemic Domain)**
+### 1. **Domain Model: Choose Based on Complexity**
+
+**Anemic Model (Simple CRUD):**
 
 ```java
-// ✅ DOĞRU: Sadece fields
+// ✅ DOĞRU: Pure data holder (User, Contact, Company)
 @Entity
 @Getter
 @Setter
 public class User extends BaseEntity {
     private String firstName;
     private String lastName;
-    // NO METHODS!
-}
-
-// ❌ YANLIŞ: Business methods
-public class User {
-    public void updateProfile() { ... }
-    public String getFullName() { ... }
+    // NO METHODS! Lombok powered
 }
 ```
 
-**Neden:** Lombok zaten getter/setter sağlıyor, computed properties → Mapper'da!
+**Rich Model (Complex Business Logic):**
+
+```java
+// ✅ DOĞRU: Data + behavior (Order, Invoice, Subscription)
+@Entity
+@Getter  // NO @Setter!
+public class Order extends BaseEntity {
+    private OrderStatus status;
+
+    // Business methods
+    public void submit() {
+        validateCanSubmit();
+        this.status = OrderStatus.SUBMITTED;
+    }
+}
+```
+
+**Karar:** Complexity'ye göre seç → Simple = Anemic, Complex = Rich
 
 ---
 
@@ -705,24 +718,40 @@ shared/
 │   ├── constants/
 │   │   ├── ValidationConstants.java  # Email/phone patterns
 │   │   ├── SecurityConstants.java
-│   │   └── ServiceConstants.java
+│   │   ├── ServiceConstants.java
+│   │   └── InternalApiConstants.java
 │   ├── security/SecurityContextHolder.java
 │   ├── policy/                       # Policy engine
-│   └── config/                       # Default configs
-│       └── JpaAuditingConfig.java
+│   ├── util/                         # Utility classes
+│   │   ├── StringNormalizationUtil.java  # Global normalization (ICU4J)
+│   │   ├── TextSimilarityUtil.java       # Jaro-Winkler
+│   │   ├── TokenBasedSimilarityUtil.java # Jaccard
+│   │   ├── EmailValidationUtil.java      # Corporate email validation
+│   │   └── MaskingUtil.java              # Data masking
+│   └── config/                       # ✨ Base Configs (v3.0)
+│       ├── JpaAuditingConfig.java
+│       ├── BaseFeignClientConfig.java     ✨ NEW - Internal API Key + JWT
+│       ├── BaseKafkaErrorConfig.java      ✨ NEW - DLQ + Retry
+│       ├── TextProcessingConfig.java      # Similarity thresholds
+│       └── DuplicateDetectionConfig.java  # Duplicate detection settings
 │
 └── shared-security/                  # Security Shared
     ├── config/DefaultSecurityConfig.java
     ├── jwt/JwtTokenProvider.java
-    └── filter/JwtAuthenticationFilter.java
+    └── filter/
+        ├── JwtAuthenticationFilter.java
+        ├── InternalAuthenticationFilter.java
+        └── PolicyValidationFilter.java    ✨ NEW - Shared across all services
 ```
 
 **Usage:**
 
 - ✅ Import from shared (don't duplicate)
 - ✅ Extend base classes (BaseEntity)
+- ✅ Extend base configs (BaseFeignClientConfig, BaseKafkaErrorConfig) ✨
 - ✅ Use shared exceptions
 - ✅ Use PagedResponse factory methods
+- ✅ PolicyValidationFilter auto-included ✨
 
 ---
 
@@ -734,7 +763,7 @@ shared/
 
 ---
 
-**Last Updated:** 2025-10-10 (Phase 3 Integration - Defense-in-Depth + Reactive Patterns)  
-**Version:** 3.0.0  
+**Last Updated:** 2025-10-13 (Clean Architecture - Shared Infrastructure)  
+**Version:** 3.2.0  
 **Status:** ✅ Production Ready  
-**New Patterns:** Defense-in-Depth Filter, Reactive Audit, Optional Dependencies
+**New Patterns:** Shared Base Configs, Address Separation, Extension Support, Zero Boilerplate Infrastructure

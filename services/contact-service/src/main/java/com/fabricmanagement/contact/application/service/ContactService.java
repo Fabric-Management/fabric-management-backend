@@ -32,12 +32,22 @@ public class ContactService {
     
     @Transactional
     public ContactResponse createContact(CreateContactRequest request) {
-        log.info("Creating contact for owner: {} with value: {}", request.getOwnerId(), request.getContactValue());
+        String contactType = request.getContactType();
+        log.info("Creating contact for owner: {} type: {}", request.getOwnerId(), contactType);
 
-        validateContactValue(request.getContactValue(), request.getContactType());
+        // ADDRESS type handled by AddressService (separate flow)
+        if ("ADDRESS".equals(contactType)) {
+            throw new IllegalArgumentException("ADDRESS type must be created via AddressService");
+        }
 
-        if (contactRepository.existsByContactValue(request.getContactValue())) {
-            throw new IllegalArgumentException("Contact value already exists: " + request.getContactValue());
+        // Validate contact value (not needed for ADDRESS)
+        validateContactValue(request.getContactValue(), contactType);
+
+        // Check duplicate (except PHONE_EXTENSION - can have multiple)
+        if (!"PHONE_EXTENSION".equals(contactType)) {
+            if (contactRepository.existsByContactValue(request.getContactValue())) {
+                throw new IllegalArgumentException("Contact value already exists: " + request.getContactValue());
+            }
         }
         
         UUID ownerId = UUID.fromString(request.getOwnerId());
@@ -48,10 +58,17 @@ public class ContactService {
         
         Contact contact = contactMapper.fromCreateRequest(request);
         
-        if (!request.isAutoVerified()) {
-            String code = contact.generateVerificationCode();
-            notificationService.sendVerificationCode(contact.getContactValue(), code, contact.getContactType());
+        // PHONE_EXTENSION doesn't need verification
+        if (!"PHONE_EXTENSION".equals(contactType)) {
+            if (!request.isAutoVerified()) {
+                String code = contact.generateVerificationCode();
+                notificationService.sendVerificationCode(contact.getContactValue(), code, contact.getContactType());
+            } else {
+                contact.setVerified(true);
+                contact.setVerifiedAt(java.time.LocalDateTime.now());
+            }
         } else {
+            // Extensions are auto-verified
             contact.setVerified(true);
             contact.setVerifiedAt(java.time.LocalDateTime.now());
         }
@@ -60,7 +77,7 @@ public class ContactService {
         
         eventPublisher.publish(contactEventMapper.toCreatedEvent(contact));
         
-        log.info("Contact created successfully with ID: {}", contact.getId());
+        log.info("Contact created successfully: {} (type: {})", contact.getId(), contactType);
         
         return contactMapper.toResponse(contact);
     }
@@ -183,6 +200,37 @@ public class ContactService {
         return !contactRepository.existsByContactValue(contactValue);
     }
     
+    /**
+     * Check if email domain is already registered
+     * 
+     * Returns list of owner IDs that use this email domain.
+     * Used during tenant onboarding to detect potential duplicates.
+     * 
+     * @param emailDomain Email domain (e.g., "acmetekstil.com")
+     * @return List of owner IDs (USER or COMPANY) using this domain
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> checkEmailDomain(String emailDomain) {
+        log.info("Checking if email domain is registered: @{}", emailDomain);
+        
+        if (emailDomain == null || emailDomain.isBlank()) {
+            return List.of();
+        }
+        
+        // Pattern: %@domain.com
+        String domainPattern = "%@" + emailDomain.toLowerCase().trim();
+        
+        List<Contact> contacts = contactRepository.findByEmailDomain(domainPattern);
+        
+        log.info("Found {} contacts with domain @{}", contacts.size(), emailDomain);
+        
+        // Return unique owner IDs
+        return contacts.stream()
+                .map(Contact::getOwnerId)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+    
     @Transactional
     public void sendVerificationCode(UUID contactId) {
         log.info("Sending verification code for contact: {}", contactId);
@@ -253,7 +301,17 @@ public class ContactService {
                 }
                 break;
 
+            case "PHONE_EXTENSION":
+                // Extensions are simple numbers (e.g., 101, 1234, ext:101)
+                if (!trimmedValue.matches("^(ext:)?\\d{1,10}$")) {
+                    throw new IllegalArgumentException("Invalid extension format. Use numbers only (e.g., 101 or ext:101)");
+                }
+                break;
+
             case "ADDRESS":
+                // ADDRESS handled by AddressService
+                throw new IllegalArgumentException("ADDRESS type not supported here. Use /addresses endpoint");
+
             case "FAX":
             case "WEBSITE":
             case "SOCIAL_MEDIA":

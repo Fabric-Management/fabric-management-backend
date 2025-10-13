@@ -1,6 +1,7 @@
 package com.fabricmanagement.shared.infrastructure.exception;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.domain.exception.TenantRegistrationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.http.HttpStatus;
@@ -131,6 +132,29 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(
                     ex.getMessage(),
                     "DUPLICATE_ENTITY"
+                ));
+    }
+
+    /**
+     * Handle tenant registration errors
+     * 
+     * Returns 400 Bad Request with user-friendly message.
+     * Common scenarios:
+     * - Email already registered
+     * - Tax ID already exists
+     * - Company name duplicate
+     * - Invalid registration data
+     */
+    @ExceptionHandler(TenantRegistrationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTenantRegistrationError(
+            TenantRegistrationException ex, WebRequest request) {
+        
+        log.warn("Tenant registration error: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "TENANT_REGISTRATION_ERROR"
                 ));
     }
 

@@ -56,10 +56,10 @@ jwt:
 # EXTERNAL SERVICES CONFIGURATION
 # =============================================================================
 contact-service:
-  url: http://localhost:8082
+  url: ${CONTACT_SERVICE_URL:http://localhost:8082}
 
 user-service:
-  url: http://localhost:8081
+  url: ${USER_SERVICE_URL:http://localhost:8081}
 
 # =============================================================================
 # RESILIENCE4J CONFIGURATION (Circuit Breaker)

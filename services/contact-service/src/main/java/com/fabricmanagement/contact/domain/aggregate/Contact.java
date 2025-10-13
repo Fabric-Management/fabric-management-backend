@@ -26,12 +26,15 @@ public class Contact extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private OwnerType ownerType;
     
-    @Column(name = "contact_value", nullable = false)
+    @Column(name = "contact_value")  // Nullable for ADDRESS type
     private String contactValue;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "contact_type", nullable = false)
     private ContactType contactType;
+    
+    @Column(name = "parent_contact_id")
+    private UUID parentContactId;  // For PHONE_EXTENSION → links to company's main phone
     
     @Column(name = "is_verified", nullable = false)
     private boolean isVerified;

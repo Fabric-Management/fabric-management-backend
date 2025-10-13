@@ -97,5 +97,33 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
      */
     @Query("SELECT c FROM Contact c WHERE c.ownerId IN :ownerIds AND c.deleted = false")
     List<Contact> findByOwnerIdIn(@Param("ownerIds") List<UUID> ownerIds);
+    
+    /**
+     * Find contacts by email domain pattern (for duplicate detection)
+     * 
+     * Used to check if email domain already exists in system.
+     * Example: "@acmetekstil.com" → finds all emails ending with this domain
+     * 
+     * @param domainPattern Email domain pattern (e.g., "%@acmetekstil.com")
+     * @return List of contacts with matching domain
+     */
+    @Query("SELECT c FROM Contact c WHERE c.contactType = 'EMAIL' AND c.contactValue LIKE :domainPattern AND c.deleted = false")
+    List<Contact> findByEmailDomain(@Param("domainPattern") String domainPattern);
+    
+    /**
+     * Find primary email contacts by domain (for company identification)
+     * 
+     * Used to find which company owns a specific email domain.
+     * Returns only primary, verified contacts for reliability.
+     * 
+     * @param domainPattern Email domain pattern (e.g., "%@acmetekstil.com")
+     * @return List of primary, verified email contacts with matching domain
+     */
+    @Query("SELECT c FROM Contact c WHERE c.contactType = 'EMAIL' " +
+           "AND c.contactValue LIKE :domainPattern " +
+           "AND c.isPrimary = true " +
+           "AND c.isVerified = true " +
+           "AND c.deleted = false")
+    List<Contact> findPrimaryEmailsByDomain(@Param("domainPattern") String domainPattern);
 }
 

@@ -9,6 +9,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 /**
  * Request DTO for creating a new company
  */
@@ -69,5 +71,10 @@ public class CreateCompanyRequest {
     
     @Size(max = 100, message = "Country must not exceed 100 characters")
     private String country;
+    
+    // Optional: For internal service-to-service calls (onboarding flow)
+    // If provided, overrides SecurityContext (allows calls without JWT)
+    private UUID tenantId;      // UUID type (internal call only)
+    private String createdBy;   // Audit trail
 }
 

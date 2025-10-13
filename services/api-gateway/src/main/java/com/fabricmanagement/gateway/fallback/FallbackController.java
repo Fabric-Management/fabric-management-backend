@@ -4,7 +4,6 @@ import com.fabricmanagement.shared.application.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -13,13 +12,16 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * Provides fallback responses when downstream services are unavailable.
  * Triggered by Circuit Breaker when a service fails.
+ * 
+ * NOTE: Uses @RequestMapping (not @GetMapping) to support ALL HTTP methods
+ * because fallback can be triggered by any request type (GET, POST, PUT, DELETE, etc.)
  */
 @RestController
 @RequestMapping("/fallback")
 @Slf4j
 public class FallbackController {
 
-    @GetMapping("/user-service")
+    @RequestMapping("/user-service")
     public ResponseEntity<ApiResponse<Void>> userServiceFallback() {
         log.error("User Service is unavailable - Circuit breaker triggered");
         return ResponseEntity
@@ -30,7 +32,7 @@ public class FallbackController {
             ));
     }
 
-    @GetMapping("/company-service")
+    @RequestMapping("/company-service")
     public ResponseEntity<ApiResponse<Void>> companyServiceFallback() {
         log.error("Company Service is unavailable - Circuit breaker triggered");
         return ResponseEntity
@@ -41,7 +43,7 @@ public class FallbackController {
             ));
     }
 
-    @GetMapping("/contact-service")
+    @RequestMapping("/contact-service")
     public ResponseEntity<ApiResponse<Void>> contactServiceFallback() {
         log.error("Contact Service is unavailable - Circuit breaker triggered");
         return ResponseEntity

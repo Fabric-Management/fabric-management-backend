@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.api.dto.request;
 
 import com.fabricmanagement.shared.infrastructure.constants.ValidationConstants;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -26,6 +27,7 @@ public class TenantRegistrationRequest {
     
     @NotBlank(message = ValidationConstants.MSG_REQUIRED)
     @Size(max = 50, message = "Tax ID must not exceed 50 characters")
+    @JsonAlias("taxNumber") // Accept both taxId and taxNumber for backward compatibility
     private String taxId;
     
     @Size(max = 100, message = "Registration number must not exceed 100 characters")

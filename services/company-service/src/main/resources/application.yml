@@ -74,24 +74,29 @@ spring:
       client-id: ${spring.application.name}-producer-${HOSTNAME:localhost}
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
-      retries: 3
-      enable-idempotence: true
-      max-in-flight-requests-per-connection: 1
-      batch-size: 16384
-      linger-ms: 5
-      buffer-memory: 33554432
+      acks: ${KAFKA_PRODUCER_ACKS:all}
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
+      enable-idempotence: ${KAFKA_PRODUCER_IDEMPOTENCE:true}
+      max-in-flight-requests-per-connection: ${KAFKA_PRODUCER_MAX_IN_FLIGHT:1}
+      batch-size: ${KAFKA_PRODUCER_BATCH_SIZE:16384}
+      linger-ms: ${KAFKA_PRODUCER_LINGER_MS:5}
+      buffer-memory: ${KAFKA_PRODUCER_BUFFER_MEMORY:33554432}
     consumer:
       client-id: ${spring.application.name}-consumer-${HOSTNAME:localhost}
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      group-id: company-service-group
-      auto-offset-reset: earliest
-      enable-auto-commit: false
-      max-poll-records: 100
+      # ErrorHandlingDeserializer wrapper for graceful error handling
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:company-service-group}
+      auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      enable-auto-commit: ${KAFKA_CONSUMER_ENABLE_AUTO_COMMIT:false}
+      max-poll-records: ${KAFKA_CONSUMER_MAX_POLL_RECORDS:100}
       properties:
-        spring.json.trusted.packages: "com.fabricmanagement.company.domain.event"
-        allow.auto.create.topics: true
+        # Trust all com.fabricmanagement.* packages (including sub-packages)
+        spring.json.trusted.packages: ${KAFKA_TRUSTED_PACKAGES:com.fabricmanagement.*,java.util,java.lang}
+        # Delegate deserializers (actual deserializers wrapped by ErrorHandlingDeserializer)
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        allow.auto.create.topics: ${KAFKA_AUTO_CREATE_TOPICS:true}
         jmx.prefix: company-service
 
 # =============================================================================
@@ -182,6 +187,36 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/company-service.log
+
+# =============================================================================
+# TEXT PROCESSING CONFIGURATION (GLOBAL - Multi-Language Support)
+# =============================================================================
+# International text processing for company name normalization and similarity
+# Supports Turkish, German, French, Spanish, Italian and more
+text-processing:
+  normalization:
+    enabled: ${TEXT_NORMALIZATION_ENABLED:true}
+    locale: ${TEXT_NORMALIZATION_LOCALE:en-US}
+    remove-diacritics: ${TEXT_REMOVE_DIACRITICS:true}
+    lowercase: ${TEXT_LOWERCASE:true}
+    trim-whitespace: ${TEXT_TRIM_WHITESPACE:true}
+    remove-company-suffixes: ${TEXT_REMOVE_SUFFIXES:true}
+
+  similarity:
+    algorithm: ${TEXT_SIMILARITY_ALGORITHM:JARO_WINKLER}
+    threshold-block: ${TEXT_SIMILARITY_BLOCK:0.90} # >90% → BLOCK creation
+    threshold-warn: ${TEXT_SIMILARITY_WARN:0.70} # 70-90% → WARN user
+    threshold-suggest: ${TEXT_SIMILARITY_SUGGEST:0.50} # 50-70% → SUGGEST
+    block-on-exact-match: ${TEXT_BLOCK_EXACT:true}
+    block-on-high-similarity: ${TEXT_BLOCK_HIGH:true}
+    enable-email-domain-check: ${EMAIL_DOMAIN_CHECK:true}
+    email-domain-warning-only: ${EMAIL_DOMAIN_WARN_ONLY:true}
+
+  masking:
+    email-visible-chars: ${MASKING_EMAIL_CHARS:2}
+    phone-visible-digits: ${MASKING_PHONE_DIGITS:4}
+    masking-char: ${MASKING_CHAR:*}
+    minimum-masked-chars: ${MASKING_MIN_CHARS:3}
 
 # =============================================================================
 # DUPLICATE DETECTION CONFIGURATION

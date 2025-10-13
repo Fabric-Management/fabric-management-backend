@@ -27,7 +27,6 @@ public class CompanyMapper {
      */
     public Company fromCreateRequest(CreateCompanyRequest request, UUID tenantId, String createdBy) {
         Company company = Company.builder()
-                .id(UUID.randomUUID())
                 .tenantId(tenantId)
                 .name(new CompanyName(request.getName()))
                 .legalName(request.getLegalName())

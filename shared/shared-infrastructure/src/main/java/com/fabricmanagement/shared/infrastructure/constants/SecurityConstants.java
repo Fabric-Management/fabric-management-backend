@@ -28,6 +28,12 @@ public final class SecurityConstants {
     public static final String ROLE_PURCHASER = "PURCHASER";
     public static final String ROLE_SALES = "SALES";
     public static final String ROLE_PRODUCTION = "PRODUCTION";
+    public static final String ROLE_INTERNAL_SERVICE = "ROLE_INTERNAL_SERVICE"; // For service-to-service calls
+
+    // Internal Service Authentication (NO HARDCODED STRINGS!)
+    public static final String INTERNAL_SERVICE_PRINCIPAL = "internal-service";
+    public static final String INTERNAL_SERVICE_DISPLAY_NAME = "Internal Service";
+    public static final String INTERNAL_SERVICE_DESCRIPTION = "Authenticated internal service-to-service call";
     
     // Password Constants
     public static final int PASSWORD_MIN_LENGTH = 8;

@@ -16,6 +16,65 @@ spring:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
       - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
 
+# =============================================================================
+# GATEWAY PROPERTIES (Type-safe configuration)
+# =============================================================================
+gateway:
+  services:
+    user-service:
+      name: user-service
+      url: ${USER_SERVICE_URL:http://localhost:8081}
+      path: /api/v1/users
+      enabled: true
+      timeout: ${USER_SERVICE_TIMEOUT:15s}
+    company-service:
+      name: company-service
+      url: ${COMPANY_SERVICE_URL:http://localhost:8083}
+      path: /api/v1/companies
+      enabled: true
+      timeout: ${COMPANY_SERVICE_TIMEOUT:15s}
+    contact-service:
+      name: contact-service
+      url: ${CONTACT_SERVICE_URL:http://localhost:8082}
+      path: /api/v1/contacts
+      enabled: true
+      timeout: ${CONTACT_SERVICE_TIMEOUT:15s}
+
+  rate-limit:
+    public-endpoints:
+      login-replenish-rate: ${GATEWAY_RATE_LOGIN_REPLENISH:5}
+      login-burst-capacity: ${GATEWAY_RATE_LOGIN_BURST:10}
+      onboarding-replenish-rate: ${GATEWAY_RATE_ONBOARDING_REPLENISH:5}
+      onboarding-burst-capacity: ${GATEWAY_RATE_ONBOARDING_BURST:10}
+      check-contact-replenish-rate: ${GATEWAY_RATE_CHECK_CONTACT_REPLENISH:10}
+      check-contact-burst-capacity: ${GATEWAY_RATE_CHECK_CONTACT_BURST:15}
+      setup-password-replenish-rate: ${GATEWAY_RATE_SETUP_PASSWORD_REPLENISH:3}
+      setup-password-burst-capacity: ${GATEWAY_RATE_SETUP_PASSWORD_BURST:5}
+      other-auth-replenish-rate: ${GATEWAY_RATE_OTHER_AUTH_REPLENISH:20}
+      other-auth-burst-capacity: ${GATEWAY_RATE_OTHER_AUTH_BURST:30}
+    protected-endpoints:
+      standard-replenish-rate: ${GATEWAY_RATE_PROTECTED_REPLENISH:50}
+      standard-burst-capacity: ${GATEWAY_RATE_PROTECTED_BURST:100}
+      internal-endpoint-replenish-rate: ${GATEWAY_RATE_INTERNAL_REPLENISH:5}
+      internal-endpoint-burst-capacity: ${GATEWAY_RATE_INTERNAL_BURST:10}
+
+  circuit-breaker:
+    sliding-window-size: ${GATEWAY_CB_SLIDING_WINDOW:100}
+    minimum-number-of-calls: ${GATEWAY_CB_MIN_CALLS:10}
+    permitted-calls-in-half-open: ${GATEWAY_CB_HALF_OPEN_CALLS:5}
+    wait-duration-in-open-state: ${GATEWAY_CB_WAIT_DURATION:30s}
+    failure-rate-threshold: ${GATEWAY_CB_FAILURE_THRESHOLD:50}
+    slow-call-rate-threshold: ${GATEWAY_CB_SLOW_CALL_THRESHOLD:50}
+    slow-call-duration-threshold: ${GATEWAY_CB_SLOW_CALL_DURATION:8s}
+
+  retry:
+    max-attempts: ${GATEWAY_RETRY_MAX_ATTEMPTS:3}
+    initial-backoff: ${GATEWAY_RETRY_INITIAL_BACKOFF:50ms}
+    max-backoff: ${GATEWAY_RETRY_MAX_BACKOFF:500ms}
+    multiplier: ${GATEWAY_RETRY_MULTIPLIER:2.0}
+    public-routes-initial-backoff: ${GATEWAY_RETRY_PUBLIC_INITIAL:100ms}
+    protected-routes-initial-backoff: ${GATEWAY_RETRY_PROTECTED_INITIAL:50ms}
+
   # ===========================================================================
   # GATEWAY ROUTES CONFIGURATION
   # ===========================================================================
@@ -103,12 +162,12 @@ spring:
                   factor: 2
                   basedOnPreviousValue: true
 
-        # Tenant Onboarding - Public Registration (Very Strict Rate Limiting)
-        # Pattern: /api/v1/public/onboarding/register
-        - id: tenant-onboarding-register
+        # Public Endpoints - Tenant Onboarding & Other Public APIs (Strict Rate Limiting)
+        # Pattern: /api/v1/public/** (catch-all for public endpoints)
+        - id: public-endpoints
           uri: ${USER_SERVICE_URL:http://localhost:8081}
           predicates:
-            - Path=/api/v1/public/onboarding/register
+            - Path=/api/v1/public/**
           filters:
             - name: CircuitBreaker
               args:
@@ -117,16 +176,16 @@ spring:
             - name: RequestRateLimiter
               args:
                 key-resolver: "#{@smartKeyResolver}"
-                redis-rate-limiter.replenishRate: 2
-                redis-rate-limiter.burstCapacity: 5
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
                 redis-rate-limiter.requestedTokens: 1
             - name: Retry
               args:
                 retries: 1
-                methods: POST
+                methods: POST,GET
                 backoff:
-                  firstBackoff: 200ms
-                  maxBackoff: 1000ms
+                  firstBackoff: 100ms
+                  maxBackoff: 500ms
                   factor: 2
                   basedOnPreviousValue: true
 
@@ -265,9 +324,10 @@ spring:
           globalcors:
             cors-configurations:
               "[/**]":
-                allowedOrigins:
-                  - "http://localhost:3000"
-                  - "http://localhost:4200"
+                # Frontend URLs - Override with CORS_ALLOWED_ORIGINS env var
+                # Format: comma-separated URLs
+                # Example: http://localhost:3000,http://localhost:4200,https://app.example.com
+                allowedOrigins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
                 allowedMethods:
                   - GET
                   - POST
@@ -335,14 +395,14 @@ resilience4j:
   circuitbreaker:
     configs:
       default:
-        sliding-window-size: 100
-        minimum-number-of-calls: 10
-        permitted-number-of-calls-in-half-open-state: 5
+        sliding-window-size: ${GATEWAY_CB_SLIDING_WINDOW:100}
+        minimum-number-of-calls: ${GATEWAY_CB_MIN_CALLS:10}
+        permitted-number-of-calls-in-half-open-state: ${GATEWAY_CB_HALF_OPEN_CALLS:5}
         automatic-transition-from-open-to-half-open-enabled: true
-        wait-duration-in-open-state: 30s
-        failure-rate-threshold: 50
-        slow-call-rate-threshold: 50
-        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: ${GATEWAY_CB_WAIT_DURATION:30s}
+        failure-rate-threshold: ${GATEWAY_CB_FAILURE_THRESHOLD:50}
+        slow-call-rate-threshold: ${GATEWAY_CB_SLOW_CALL_THRESHOLD:50}
+        slow-call-duration-threshold: ${GATEWAY_CB_SLOW_CALL_DURATION:8s}
         record-exceptions:
           - java.io.IOException
           - java.util.concurrent.TimeoutException
@@ -359,14 +419,20 @@ resilience4j:
   timelimiter:
     configs:
       default:
-        timeout-duration: 5s
+        timeout-duration: ${GATEWAY_DEFAULT_TIMEOUT:15s}
     instances:
       userServiceCircuitBreaker:
         base-config: default
+        # Tenant onboarding: P95=7s → Timeout 10.5s (%50 buffer) → Round to 15s (safe)
+        timeout-duration: ${USER_SERVICE_TIMEOUT:15s}
       companyServiceCircuitBreaker:
         base-config: default
+        # Company operations: P95=5s → Timeout 7.5s (%50 buffer) → Round to 10s
+        timeout-duration: ${COMPANY_SERVICE_TIMEOUT:10s}
       contactServiceCircuitBreaker:
         base-config: default
+        # Contact operations: P95=3s → Timeout 4.5s (%50 buffer) → Round to 7s
+        timeout-duration: ${CONTACT_SERVICE_TIMEOUT:7s}
 
   retry:
     configs:

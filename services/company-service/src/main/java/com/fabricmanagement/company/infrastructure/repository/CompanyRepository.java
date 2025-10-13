@@ -146,6 +146,60 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
         @Param("taxId") String taxId,
         @Param("registrationNumber") String registrationNumber);
     
+    /**
+     * Find companies globally (across ALL tenants) that may be duplicates
+     * Used during tenant onboarding to prevent cross-tenant duplicates
+     * 
+     * IMPORTANT: Tax ID and Registration Number are GLOBALLY UNIQUE identifiers
+     * A company cannot be registered in multiple tenants with same legal identifiers
+     */
+    @Query("SELECT c FROM Company c WHERE c.deleted = false " +
+           "AND (c.taxId = :taxId OR c.registrationNumber = :registrationNumber)")
+    List<Company> findPotentialDuplicatesGlobal(
+        @Param("taxId") String taxId,
+        @Param("registrationNumber") String registrationNumber);
+    
+    /**
+     * Find company by tax ID globally (across all tenants)
+     * Used during tenant onboarding
+     */
+    @Query("SELECT c FROM Company c WHERE c.taxId = :taxId AND c.deleted = false")
+    Optional<Company> findByTaxIdGlobal(@Param("taxId") String taxId);
+    
+    /**
+     * Find company by registration number globally (across all tenants)
+     * Used during tenant onboarding
+     */
+    @Query("SELECT c FROM Company c WHERE c.registrationNumber = :registrationNumber AND c.deleted = false")
+    Optional<Company> findByRegistrationNumberGlobal(@Param("registrationNumber") String registrationNumber);
+    
+    /**
+     * Find company by legal name and country
+     * 
+     * IMPORTANT: Legal name is country-scoped (not globally unique)
+     * Same legal name can exist in different countries (franchise, branch)
+     * But CANNOT exist in the same country (legal requirement!)
+     * 
+     * Examples:
+     * - "ABC Textile Limited Şirketi" (Turkey) + "ABC Textile Limited" (UK) → ALLOWED ✅
+     * - "ABC Textile Limited Şirketi" (Turkey) + "ABC Textile Limited Şirketi" (Turkey) → BLOCKED ❌
+     * 
+     * @param legalName Legal company name
+     * @param country Country code or name
+     * @return Company if found in same country
+     */
+    @Query("SELECT c FROM Company c WHERE LOWER(c.legalName) = LOWER(:legalName) AND LOWER(c.country) = LOWER(:country) AND c.deleted = false")
+    Optional<Company> findByLegalNameAndCountry(@Param("legalName") String legalName, @Param("country") String country);
+    
+    /**
+     * Find companies by legal name (all countries) for similarity checking
+     * 
+     * @param legalName Legal company name
+     * @return List of companies with matching legal name across all countries
+     */
+    @Query("SELECT c FROM Company c WHERE LOWER(c.legalName) = LOWER(:legalName) AND c.deleted = false")
+    List<Company> findByLegalNameGlobal(@Param("legalName") String legalName);
+    
     // ===== Paginated Query Methods =====
     
     /**

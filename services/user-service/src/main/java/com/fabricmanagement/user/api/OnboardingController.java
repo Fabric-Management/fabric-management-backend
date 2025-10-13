@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.api;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
+import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.user.api.dto.request.TenantRegistrationRequest;
 import com.fabricmanagement.user.api.dto.response.TenantOnboardingResponse;
 import com.fabricmanagement.user.application.service.TenantOnboardingService;
@@ -28,7 +29,7 @@ public class OnboardingController {
         TenantOnboardingResponse response = onboardingService.registerTenant(request);
         
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Tenant registered successfully"));
+                .body(ApiResponse.success(response, ServiceConstants.MSG_TENANT_REGISTERED));
     }
 }
 

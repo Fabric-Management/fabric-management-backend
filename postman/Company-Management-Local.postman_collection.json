@@ -1,9 +1,10 @@
 {
   "info": {
-    "_postman_id": "company-management-local",
-    "name": "Company Management - Local",
-    "description": "Company Service API - Authenticated endpoints (requires tenant registration first)",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "_postman_id": "company-management-local-v3",
+    "name": "Company Management - Local (v3.1)",
+    "description": "Company Service API - CRUD operations for companies\n\n✅ Updated for API Gateway v3.1.0:\n- Correlation ID tracking\n- Security headers validation\n- Simplified test scripts",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "3.1.0"
   },
   "variable": [
     {
@@ -24,128 +25,206 @@
   ],
   "item": [
     {
-      "name": "1. Login",
-      "event": [
+      "name": "Auth",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "if (pm.response.code === 200) {",
-              "    const response = pm.response.json();",
-              "    pm.collectionVariables.set('accessToken', response.data.accessToken);",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"contactValue\": \"admin@acmetekstil.com\",\n  \"password\": \"AcmeAdmin@123\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/users/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "users", "auth", "login"]
-        }
-      }
-    },
-    {
-      "name": "2. List Companies",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
+          "name": "Login",
+          "event": [
             {
-              "key": "token",
-              "value": "{{accessToken}}",
-              "type": "string"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const res = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "    pm.collectionVariables.set('companyId', res.data.companyId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
-        },
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/companies",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "companies"]
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactValue\": \"admin@acmetekstil.com\",\n  \"password\": \"AcmeAdmin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "auth", "login"]
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "3. Create Company",
-      "event": [
+      "name": "Company Operations",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "if (pm.response.code === 201) {",
-              "    const response = pm.response.json();",
-              "    pm.collectionVariables.set('companyId', response.data);",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
+          "name": "Get My Company",
+          "event": [
             {
-              "key": "token",
-              "value": "{{accessToken}}",
-              "type": "string"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
-        },
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"name\": \"XYZ Konfeksiyon Ltd.\",\n  \"legalName\": \"XYZ Konfeksiyon Limited Şirketi\",\n  \"taxId\": \"9876543210\",\n  \"type\": \"LLC\",\n  \"industry\": \"MANUFACTURING\",\n  \"addressLine1\": \"Sanayi Sitesi 12. Sokak No:8\",\n  \"city\": \"Bursa\",\n  \"postalCode\": \"16200\",\n  \"country\": \"Turkey\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/companies/{{companyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "companies", "{{companyId}}"]
             }
           }
         },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/companies",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "companies"]
-        }
-      }
-    },
-    {
-      "name": "4. Get Company",
-      "request": {
-        "auth": {
-          "type": "bearer",
-          "bearer": [
+        {
+          "name": "List Companies",
+          "event": [
             {
-              "key": "token",
-              "value": "{{accessToken}}",
-              "type": "string"
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
             }
-          ]
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/companies?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "companies"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
         },
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/companies/{{companyId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "companies", "{{companyId}}"]
+        {
+          "name": "Update Company",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description - Leading textile manufacturer in Turkey\",\n  \"website\": \"https://acmetekstil.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/companies/{{companyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "companies", "{{companyId}}"]
+            }
+          }
+        },
+        {
+          "name": "Search Companies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{accessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/companies/search?query=Acme",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "companies", "search"],
+              "query": [{ "key": "query", "value": "Acme" }]
+            }
+          }
+        },
+        {
+          "name": "Check Duplicate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has correlation ID', () => pm.response.to.have.header('X-Correlation-ID'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Tekstil A.Ş.\",\n  \"legalName\": \"Test Tekstil Anonim Şirketi\",\n  \"country\": \"Turkey\",\n  \"taxId\": \"9999999999\",\n  \"registrationNumber\": \"TEST-2025-999\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/companies/check-duplicate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "companies", "check-duplicate"]
+            },
+            "description": "Test duplicate detection (tax ID, legal name, fuzzy matching)"
+          }
         }
-      }
+      ]
     }
   ]
 }

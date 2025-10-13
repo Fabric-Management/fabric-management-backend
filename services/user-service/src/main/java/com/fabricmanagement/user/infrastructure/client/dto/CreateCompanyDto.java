@@ -30,5 +30,9 @@ public class CreateCompanyDto {
     private String district;
     private String postalCode;
     private String country;
+    
+    // Internal service-to-service call fields
+    private UUID tenantId;      // For onboarding flow
+    private String createdBy;   // For audit trail
 }
 
