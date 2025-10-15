@@ -5,10 +5,6 @@ import com.fabricmanagement.shared.domain.exception.*;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.shared.infrastructure.util.MaskingUtil;
 import com.fabricmanagement.shared.security.jwt.JwtTokenProvider;
-import com.fabricmanagement.shared.domain.event.UserCreatedEvent;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
-import java.util.concurrent.CompletableFuture;
 import com.fabricmanagement.user.api.dto.request.CheckContactRequest;
 import com.fabricmanagement.user.api.dto.request.LoginRequest;
 import com.fabricmanagement.user.api.dto.request.SetupPasswordRequest;
@@ -58,7 +54,6 @@ public class AuthService {
     private final LoginAttemptTracker loginAttemptTracker;
     private final SecurityAuditLogger auditLogger;
     private final MaskingUtil maskingUtil;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
     
     // ✅ Manual constructor with @Lazy for ContactServiceClient
     public AuthService(
@@ -69,8 +64,7 @@ public class AuthService {
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptTracker loginAttemptTracker,
             SecurityAuditLogger auditLogger,
-            MaskingUtil maskingUtil,
-            KafkaTemplate<String, Object> kafkaTemplate) {
+            MaskingUtil maskingUtil) {
         this.userRepository = userRepository;
         this.contactServiceClient = contactServiceClient;
         this.authMapper = authMapper;
@@ -79,7 +73,6 @@ public class AuthService {
         this.loginAttemptTracker = loginAttemptTracker;
         this.auditLogger = auditLogger;
         this.maskingUtil = maskingUtil;
-        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Value("${security.response-time-masking.min-response-time-ms:200}")
@@ -108,22 +101,22 @@ public class AuthService {
                 return applyTimingMask(startTime, authMapper.toUserNotFoundResponse());
             }
 
-            CheckContactResponse response = authMapper.toCheckResponse(user);
+            CheckContactResponse checkResponse = authMapper.toCheckResponse(user);
             
             // Add verified status and next step
-            response.setVerified(contact.isVerified());
-            response.setMaskedContact(maskingUtil.maskEmail(request.getContactValue()));
+            checkResponse.setVerified(contact.isVerified());
+            checkResponse.setMaskedContact(maskingUtil.maskEmail(request.getContactValue()));
             
             // Determine next step for UI
             if (!contact.isVerified()) {
-                response.setNextStep("send-verification");
+                checkResponse.setNextStep("send-verification");
             } else if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                response.setNextStep("setup-password");
+                checkResponse.setNextStep("setup-password");
             } else {
-                response.setNextStep("login");
+                checkResponse.setNextStep("login");
             }
             
-            return applyTimingMask(startTime, response);
+            return applyTimingMask(startTime, checkResponse);
 
         } catch (Exception e) {
             log.error("Error checking contact: {}", e.getMessage(), e);
@@ -287,11 +280,6 @@ public class AuthService {
             log.warn("Contact already verified: {}", request.getContactValue());
             return; // No-op, already verified
         }
-        
-        // Get user for UserCreatedEvent
-        User user = userRepository.findById(contact.getOwnerId())
-            .filter(u -> !u.isDeleted())
-            .orElseThrow(() -> new UserNotFoundException(contact.getOwnerId().toString()));
         
         // Send verification code via Contact Service
         try {
