@@ -22,6 +22,7 @@ public class ContactResponse {
     private String parentContactId;  // For PHONE_EXTENSION
     private boolean isVerified;
     private boolean isPrimary;
+    private String verificationCode;  // Only returned during creation
     private LocalDateTime verifiedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

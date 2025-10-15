@@ -24,6 +24,7 @@ public class ContactMapper {
                     : null)
                 .isVerified(contact.isVerified())
                 .isPrimary(contact.isPrimary())
+                .verificationCode(contact.getVerificationCode()) // ✅ For UserCreatedEvent
                 .verifiedAt(contact.getVerifiedAt())
                 .createdAt(contact.getCreatedAt())
                 .updatedAt(contact.getUpdatedAt())
