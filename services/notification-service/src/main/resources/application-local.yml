@@ -1,0 +1,38 @@
+server:
+  port: 8084
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notification_db
+    username: postgres
+    password: postgres
+
+  jpa:
+    show-sql: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  redis:
+    host: localhost
+    port: 6379
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: info@storeandsale.shop
+    password: ${PLATFORM_SMTP_PASSWORD:}
+
+notification:
+  platform:
+    email:
+      from: info@storeandsale.shop
+      fromName: Store and Sale
+    whatsapp:
+      enabled: true
+      fromNumber: +447553838399
+
+logging:
+  level:
+    com.fabricmanagement.notification: DEBUG
+    org.springframework.mail: DEBUG
