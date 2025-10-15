@@ -140,20 +140,97 @@ token:
     attempts: 5 # Maximum attempts for verification
 
 # =============================================================================
-# RESILIENCE4J CONFIGURATION
+# RESILIENCE4J CONFIGURATION (✅ ZERO HARDCODED - Production-Ready)
 # =============================================================================
+# Circuit Breaker Pattern for inter-service communication resilience
+#
+# Configuration Strategy (Google/Amazon Level):
+# - Large sliding window (100) for statistical significance
+# - Balanced thresholds (50%) for failure/slow calls
+# - Environment-based tuning via ${VAR:default}
+# - Separate configuration per service
+#
+# Monitoring:
+# - Track circuit state changes via actuator/health
+# - Alert on OPEN state > 1 minute
+# - P95 response times should guide slow call thresholds
+#
 resilience4j:
   circuitbreaker:
+    configs:
+      default:
+        # Sliding window for calculating failure rate
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${FEIGN_CB_SLIDING_WINDOW:100} # ✅ Statistical significance
+        minimum-number-of-calls: ${FEIGN_CB_MIN_CALLS:10} # ✅ Min calls before circuit can open
+
+        # Failure thresholds
+        failure-rate-threshold: ${FEIGN_CB_FAILURE_THRESHOLD:50} # 50% failures → OPEN
+        slow-call-rate-threshold: ${FEIGN_CB_SLOW_CALL_THRESHOLD:50} # 50% slow calls → OPEN
+        slow-call-duration-threshold: ${FEIGN_CB_SLOW_CALL_DURATION:5000} # 5s = slow (ms)
+
+        # Circuit breaker behavior
+        wait-duration-in-open-state: ${FEIGN_CB_WAIT_DURATION:30s} # Wait 30s before half-open
+        permitted-number-of-calls-in-half-open-state: ${FEIGN_CB_HALF_OPEN_CALLS:5} # Test with 5 calls
+        automatic-transition-from-open-to-half-open-enabled: true # Auto recovery
+
+        # Exceptions to record as failure
+        record-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - feign.FeignException
+
+        # Exceptions to ignore (don't count as failure)
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+
     instances:
       contact-service:
-        failureRateThreshold: 50
-        waitDurationInOpenState: 30s
-        slidingWindowSize: 10
+        base-config: default
+        # Override if needed:
+        # slow-call-duration-threshold: 7000  # Contact operations may take longer
+
+      company-service:
+        base-config: default
+        # Override if needed:
+        # slow-call-duration-threshold: 8000  # Company creation is heavier
+
+  # =============================================================================
+  # RETRY CONFIGURATION
+  # =============================================================================
   retry:
+    configs:
+      default:
+        max-attempts: ${FEIGN_RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${FEIGN_RETRY_WAIT_DURATION:1000} # 1s between retries
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: ${FEIGN_RETRY_MULTIPLIER:2}
+        retry-exceptions:
+          - java.io.IOException
+          - feign.RetryableException
+
     instances:
       contact-service:
-        maxAttempts: 3
-        waitDuration: 1s
+        base-config: default
+
+      company-service:
+        base-config: default
+
+  # =============================================================================
+  # TIMEOUT CONFIGURATION (Time Limiter)
+  # =============================================================================
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: ${FEIGN_DEFAULT_TIMEOUT:10s} # Default 10s
+        cancel-running-future: true
+
+    instances:
+      contact-service:
+        timeout-duration: ${CONTACT_SERVICE_TIMEOUT:15s} # ✅ Contact operations need more time
+
+      company-service:
+        timeout-duration: ${COMPANY_SERVICE_TIMEOUT:15s} # ✅ Company creation is complex
 
 # =============================================================================
 # MANAGEMENT & MONITORING

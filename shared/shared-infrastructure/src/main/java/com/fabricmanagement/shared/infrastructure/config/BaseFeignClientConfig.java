@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -61,8 +62,11 @@ public class BaseFeignClientConfig {
      * - Secure service-to-service communication
      * - User context preservation across services
      * - Request tracing across microservices
+     * 
+     * Pattern: @Lazy to prevent circular dependencies during FeignClient initialization
      */
     @Bean
+    @Lazy  // ✅ Lazy bean to break circular dependency cycles
     public RequestInterceptor internalAuthenticationInterceptor() {
         return new RequestInterceptor() {
             @Override

@@ -45,42 +45,34 @@ server:
 # SECURITY CONFIGURATION
 # =============================================================================
 jwt:
+  # ⚠️ LOCAL DEV ONLY - Do NOT use in production!
+  # Production: Use strong secret from ${JWT_SECRET} environment variable
   secret: "EgUbMz7OOW7+57Ehxr2jUc7mFlEQPrs/XZirqOjhI4OF42Z+sW6hF7Rj9OMEjeCBBZHuzaBICuAlMtNMMZT+6A=="
-  expiration: 3600000 # 1 hour
-  refresh-expiration: 86400000 # 24 hours
-  algorithm: HS256
-  issuer: fabric-management-system
-  audience: fabric-api
+  expiration: ${JWT_EXPIRATION:3600000} # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours
+  algorithm: ${JWT_ALGORITHM:HS256}
+  issuer: ${JWT_ISSUER:fabric-management-system}
+  audience: ${JWT_AUDIENCE:fabric-api}
+
+# =============================================================================
+# INTERNAL API CONFIGURATION (Required for Feign Client inter-service calls)
+# =============================================================================
+# ⚠️ LOCAL DEV ONLY - Use same key as Docker for consistency
+# Set as environment variable: export INTERNAL_API_KEY="local-dev-internal-key-2024"
+# Or Spring Boot will use this default
+INTERNAL_API_KEY: ${INTERNAL_API_KEY:local-dev-internal-key-2024}
 
 # =============================================================================
 # EXTERNAL SERVICES CONFIGURATION
 # =============================================================================
-contact-service:
-  url: ${CONTACT_SERVICE_URL:http://localhost:8082}
-
-user-service:
-  url: ${USER_SERVICE_URL:http://localhost:8081}
+# ✅ Feign Clients use ${CONTACT_SERVICE_URL} and ${USER_SERVICE_URL} directly
+# No need for kebab-case properties (deprecated pattern)
 
 # =============================================================================
-# RESILIENCE4J CONFIGURATION (Circuit Breaker)
+# RESILIENCE4J CONFIGURATION
 # =============================================================================
-resilience4j:
-  circuitbreaker:
-    instances:
-      contact-service:
-        failure-rate-threshold: 50
-        minimum-number-of-calls: 5
-        wait-duration-in-open-state: 10s
-        permitted-number-of-calls-in-half-open-state: 3
-        sliding-window-size: 10
-        record-exceptions:
-          - feign.FeignException
-          - java.net.ConnectException
-
-  timelimiter:
-    instances:
-      contact-service:
-        timeout-duration: 3s
+# ✅ Inherited from application.yml (ZERO HARDCODED)
+# Local dev uses same config as production for consistency
 
 # Enable Feign with circuit breaker
 feign:
@@ -89,8 +81,8 @@ feign:
   client:
     config:
       default:
-        connect-timeout: 5000
-        read-timeout: 5000
+        connect-timeout: ${FEIGN_CONNECT_TIMEOUT:5000}
+        read-timeout: ${FEIGN_READ_TIMEOUT:5000}
 
 # =============================================================================
 # DUPLICATE DETECTION CONFIGURATION

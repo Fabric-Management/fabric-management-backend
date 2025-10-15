@@ -17,9 +17,9 @@ import com.fabricmanagement.user.infrastructure.client.ContactServiceClient;
 import com.fabricmanagement.user.infrastructure.client.dto.ContactDto;
 import com.fabricmanagement.user.infrastructure.repository.UserRepository;
 import com.fabricmanagement.user.infrastructure.security.LoginAttemptTracker;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,8 +28,18 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Authentication Service
+ * 
+ * Handles user authentication, password setup, and contact validation.
+ * 
+ * Pattern: @Lazy injection for ContactServiceClient to prevent circular dependency
+ * - AuthController → AuthService → ContactServiceClient (Feign)
+ * - FeignClient initialization triggers SecurityConfig
+ * - SecurityConfig creates filters that scan Controllers
+ * - Lazy loading breaks the cycle
+ */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AuthService {
 
@@ -40,6 +50,24 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final LoginAttemptTracker loginAttemptTracker;
     private final SecurityAuditLogger auditLogger;
+    
+    // ✅ Manual constructor with @Lazy for ContactServiceClient
+    public AuthService(
+            UserRepository userRepository,
+            @Lazy ContactServiceClient contactServiceClient,  // ✅ Lazy to break circular dependency
+            AuthMapper authMapper,
+            PasswordEncoder passwordEncoder,
+            JwtTokenProvider jwtTokenProvider,
+            LoginAttemptTracker loginAttemptTracker,
+            SecurityAuditLogger auditLogger) {
+        this.userRepository = userRepository;
+        this.contactServiceClient = contactServiceClient;
+        this.authMapper = authMapper;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.loginAttemptTracker = loginAttemptTracker;
+        this.auditLogger = auditLogger;
+    }
 
     @Value("${security.response-time-masking.min-response-time-ms:200}")
     private long minResponseTimeMs;

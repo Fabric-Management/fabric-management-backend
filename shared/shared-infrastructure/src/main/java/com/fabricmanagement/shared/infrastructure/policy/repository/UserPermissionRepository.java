@@ -168,5 +168,14 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
         @Param("userId") UUID userId, 
         @Param("permissionType") PermissionType permissionType
     );
+    
+    /**
+     * Find all non-deleted permissions
+     * Used for admin operations
+     * 
+     * @return list of all active permissions
+     */
+    @Query("SELECT p FROM UserPermission p WHERE p.deleted = false")
+    List<UserPermission> findAllNonDeleted();
 }
 

@@ -200,6 +200,25 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
     @Query("SELECT c FROM Company c WHERE LOWER(c.legalName) = LOWER(:legalName) AND c.deleted = false")
     List<Company> findByLegalNameGlobal(@Param("legalName") String legalName);
     
+    /**
+     * Find all non-deleted companies globally (across all tenants)
+     * Used for duplicate detection during tenant onboarding
+     * 
+     * @return List of all active companies
+     */
+    @Query("SELECT c FROM Company c WHERE c.deleted = false")
+    List<Company> findAllNonDeleted();
+    
+    /**
+     * Find all non-deleted companies by country
+     * Used for similarity detection within same country
+     * 
+     * @param country Country code or name
+     * @return List of companies in specified country
+     */
+    @Query("SELECT c FROM Company c WHERE c.deleted = false AND LOWER(c.country) = LOWER(:country)")
+    List<Company> findAllNonDeletedByCountry(@Param("country") String country);
+    
     // ===== Paginated Query Methods =====
     
     /**

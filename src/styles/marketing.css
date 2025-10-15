@@ -1,0 +1,34 @@
+/* src/styles/marketing.css */
+
+:root {
+  --marketing-bg: #f8f9fb;
+}
+
+.marketing-shell {
+  background: var(--marketing-bg);
+  min-height: 100vh;
+  color: #0f172a;
+  font-family: "Inter", "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+[data-animate="fade-up"] {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: fadeUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation-delay: 0.1s;
+}
+
+@keyframes fadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-animate="fade-up"] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -282,9 +282,9 @@
             "method": "PUT",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/contacts/{{contactId}}/set-primary",
+              "raw": "{{baseUrl}}/api/v1/contacts/{{contactId}}/primary",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "contacts", "{{contactId}}", "set-primary"]
+              "path": ["api", "v1", "contacts", "{{contactId}}", "primary"]
             }
           }
         },
@@ -469,7 +469,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"addressLine1\": \"Bağdat Caddesi No:125\",\n  \"addressLine2\": \"Daire:7\",\n  \"city\": \"İstanbul\",\n  \"district\": \"Kadıköy\",\n  \"postalCode\": \"34710\",\n  \"country\": \"Turkey\",\n  \"addressType\": \"HOME\",\n  \"isPrimary\": true\n}"
+              "raw": "{\n  \"ownerId\": \"{{userId}}\",\n  \"ownerType\": \"USER\",\n  \"addressLine1\": \"Bağdat Caddesi No:125\",\n  \"addressLine2\": \"Daire:7\",\n  \"city\": \"İstanbul\",\n  \"district\": \"Kadıköy\",\n  \"postalCode\": \"34710\",\n  \"country\": \"Turkey\",\n  \"addressType\": \"HOME\",\n  \"isPrimary\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/contacts/addresses/{{addressId}}",

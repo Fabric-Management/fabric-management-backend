@@ -27,6 +27,14 @@ public final class GatewayPaths {
     );
     
     /**
+     * Public contact verification patterns (regex matching)
+     */
+    public static final List<String> PUBLIC_CONTACT_PATTERNS = List.of(
+        "/api/v1/contacts/[a-f0-9\\-]+/verify",  // Contact verification with code
+        "/api/v1/contacts/public/.*"             // Public contact operations (resend-verification)
+    );
+    
+    /**
      * Check if path is public endpoint
      * 
      * @param path Request path
@@ -36,7 +44,14 @@ public final class GatewayPaths {
         if (path == null || path.isEmpty()) {
             return false;
         }
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+        
+        // Check prefix-based public paths
+        if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
+            return true;
+        }
+        
+        // Check regex-based public patterns (e.g., /contacts/{id}/verify)
+        return PUBLIC_CONTACT_PATTERNS.stream().anyMatch(path::matches);
     }
     
     private GatewayPaths() {

@@ -21,8 +21,8 @@ import com.fabricmanagement.user.infrastructure.repository.UserRepository;
 import com.fabricmanagement.shared.infrastructure.util.EmailValidationUtil;
 import com.fabricmanagement.shared.infrastructure.util.MaskingUtil;
 import com.fabricmanagement.shared.domain.event.tenant.TenantRegisteredEvent;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
@@ -32,8 +32,17 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Tenant Onboarding Service
+ * 
+ * Handles new tenant registration with company, user, and contact creation.
+ * 
+ * Pattern: @Lazy injection for Feign Clients to prevent circular dependency
+ * - OnboardingController → TenantOnboardingService → CompanyServiceClient/ContactServiceClient
+ * - FeignClient initialization triggers SecurityConfig which scans Controllers
+ * - Lazy loading breaks the cycle
+ */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class TenantOnboardingService {
     
@@ -43,6 +52,22 @@ public class TenantOnboardingService {
     private final EmailValidationUtil emailValidationUtil;
     private final MaskingUtil maskingUtil;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    
+    // ✅ Manual constructor with @Lazy for Feign Clients
+    public TenantOnboardingService(
+            @Lazy CompanyServiceClient companyServiceClient,  // ✅ Lazy to break circular dependency
+            @Lazy ContactServiceClient contactServiceClient,  // ✅ Lazy to break circular dependency
+            UserRepository userRepository,
+            EmailValidationUtil emailValidationUtil,
+            MaskingUtil maskingUtil,
+            KafkaTemplate<String, Object> kafkaTemplate) {
+        this.companyServiceClient = companyServiceClient;
+        this.contactServiceClient = contactServiceClient;
+        this.userRepository = userRepository;
+        this.emailValidationUtil = emailValidationUtil;
+        this.maskingUtil = maskingUtil;
+        this.kafkaTemplate = kafkaTemplate;
+    }
     
     @Transactional
     public TenantOnboardingResponse registerTenant(TenantRegistrationRequest request) {

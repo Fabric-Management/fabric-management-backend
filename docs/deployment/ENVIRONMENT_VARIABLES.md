@@ -209,18 +209,19 @@ JWT_SECRET=EgUbMz7OOW7+57Ehxr2jUc7mFlEQPrs/XZirqOjhI4O...
 ## 🎯 Default Values in Docker Compose
 
 ```yaml
-# All service URLs have Docker-friendly defaults
+# ✅ Microservice URLs (Docker-friendly defaults)
+# Pattern: {SERVICE_NAME}_URL for consistency
 USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
 COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:-http://company-service:8083}
 CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
-
-# Hosts
-USER_SERVICE_HOST: ${USER_SERVICE_HOST:-user-service}
-COMPANY_SERVICE_HOST: ${COMPANY_SERVICE_HOST:-company-service}
-CONTACT_SERVICE_HOST: ${CONTACT_SERVICE_HOST:-contact-service}
 ```
 
-**Benefit:** Works out-of-box with Docker, customizable for local dev
+**Benefits:**
+
+- ✅ Works out-of-box with Docker (service discovery via Docker DNS)
+- ✅ Customizable for local dev (override with localhost)
+- ✅ Consistent naming (SCREAMING_SNAKE_CASE)
+- ✅ Full URL format (includes protocol + port)
 
 ---
 

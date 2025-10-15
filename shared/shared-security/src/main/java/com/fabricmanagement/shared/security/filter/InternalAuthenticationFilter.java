@@ -60,6 +60,12 @@ public class InternalAuthenticationFilter implements Filter {
         "/api/v1/users/auth/setup-password"
     );
     
+    // Public contact operations (verification during onboarding)
+    private static final List<String> PUBLIC_CONTACT_PATTERNS = List.of(
+        "/api/v1/contacts/.*/verify",           // Contact verification with code
+        "/api/v1/contacts/public/.*"            // Public contact endpoints (resend-verification, etc.)
+    );
+    
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
@@ -72,7 +78,7 @@ public class InternalAuthenticationFilter implements Filter {
         log.trace("🔍 [InternalAuth] Processing: {} {}", method, path);
 
         // Skip public paths
-        if (isPublicPath(path)) {
+        if (isPublicPath(path) || isPublicContactPattern(path)) {
             log.trace("✅ [InternalAuth] Public path, skipping: {}", path);
             chain.doFilter(request, response);
             return;
@@ -123,6 +129,11 @@ public class InternalAuthenticationFilter implements Filter {
     
     private boolean isPublicPath(String path) {
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+    }
+    
+    private boolean isPublicContactPattern(String path) {
+        return PUBLIC_CONTACT_PATTERNS.stream()
+            .anyMatch(pattern -> path.matches(pattern));
     }
     
     private void sendUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {

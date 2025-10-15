@@ -209,6 +209,19 @@ services:
       COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:-http://company-service:8083}
       CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       SERVER_PORT: 8080
+      # ✅ API Gateway - Resilience4j Circuit Breaker (ZERO HARDCODED)
+      GATEWAY_CB_SLIDING_WINDOW: ${GATEWAY_CB_SLIDING_WINDOW:-100}
+      GATEWAY_CB_MIN_CALLS: ${GATEWAY_CB_MIN_CALLS:-10}
+      GATEWAY_CB_HALF_OPEN_CALLS: ${GATEWAY_CB_HALF_OPEN_CALLS:-5}
+      GATEWAY_CB_WAIT_DURATION: ${GATEWAY_CB_WAIT_DURATION:-30s}
+      GATEWAY_CB_FAILURE_THRESHOLD: ${GATEWAY_CB_FAILURE_THRESHOLD:-50}
+      GATEWAY_CB_SLOW_CALL_THRESHOLD: ${GATEWAY_CB_SLOW_CALL_THRESHOLD:-50}
+      GATEWAY_CB_SLOW_CALL_DURATION: ${GATEWAY_CB_SLOW_CALL_DURATION:-8s}
+      # ✅ API Gateway - Service Timeouts (Match with microservices!)
+      GATEWAY_DEFAULT_TIMEOUT: ${GATEWAY_DEFAULT_TIMEOUT:-15s}
+      USER_SERVICE_TIMEOUT: ${USER_SERVICE_TIMEOUT:-15s}
+      COMPANY_SERVICE_TIMEOUT: ${COMPANY_SERVICE_TIMEOUT:-15s}
+      CONTACT_SERVICE_TIMEOUT: ${CONTACT_SERVICE_TIMEOUT:-15s}
     ports:
       - "${API_GATEWAY_PORT:-8080}:8080"
     networks:
@@ -265,6 +278,22 @@ services:
       SERVER_PORT: 8081
       CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:-http://company-service:8083}
+      # ✅ Resilience4j - Circuit Breaker (ZERO HARDCODED)
+      FEIGN_CB_SLIDING_WINDOW: ${FEIGN_CB_SLIDING_WINDOW:-100}
+      FEIGN_CB_MIN_CALLS: ${FEIGN_CB_MIN_CALLS:-10}
+      FEIGN_CB_FAILURE_THRESHOLD: ${FEIGN_CB_FAILURE_THRESHOLD:-50}
+      FEIGN_CB_SLOW_CALL_THRESHOLD: ${FEIGN_CB_SLOW_CALL_THRESHOLD:-50}
+      FEIGN_CB_SLOW_CALL_DURATION: ${FEIGN_CB_SLOW_CALL_DURATION:-5000}
+      FEIGN_CB_WAIT_DURATION: ${FEIGN_CB_WAIT_DURATION:-30s}
+      FEIGN_CB_HALF_OPEN_CALLS: ${FEIGN_CB_HALF_OPEN_CALLS:-5}
+      # ✅ Resilience4j - Retry
+      FEIGN_RETRY_MAX_ATTEMPTS: ${FEIGN_RETRY_MAX_ATTEMPTS:-3}
+      FEIGN_RETRY_WAIT_DURATION: ${FEIGN_RETRY_WAIT_DURATION:-1000}
+      FEIGN_RETRY_MULTIPLIER: ${FEIGN_RETRY_MULTIPLIER:-2}
+      # ✅ Resilience4j - Timeout
+      FEIGN_DEFAULT_TIMEOUT: ${FEIGN_DEFAULT_TIMEOUT:-10s}
+      CONTACT_SERVICE_TIMEOUT: ${CONTACT_SERVICE_TIMEOUT:-15s}
+      COMPANY_SERVICE_TIMEOUT: ${COMPANY_SERVICE_TIMEOUT:-15s}
     # Ports: Only JMX exposed for monitoring (HTTP via Gateway only)
     ports:
       - "${USER_SERVICE_JMX_PORT:-9011}:9011" # JMX for monitoring
@@ -356,10 +385,9 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      user-service:
-        condition: service_healthy
-      contact-service:
-        condition: service_healthy
+      # ✅ GOOGLE/AMAZON LEVEL: No service dependencies!
+      # Services start in parallel - Feign fallback handles initial unavailability
+      # Resilient architecture: One service down doesn't block others
     environment:
       SPRING_PROFILES_ACTIVE: docker
       POSTGRES_HOST: postgres
@@ -374,11 +402,25 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JMX_PORT: 9013
-      USER_SERVICE_HOST: ${USER_SERVICE_HOST:-user-service}
-      CONTACT_SERVICE_HOST: ${CONTACT_SERVICE_HOST:-contact-service}
       USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
       CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       SERVER_PORT: 8083
+      # ✅ Resilience4j - Circuit Breaker (ZERO HARDCODED)
+      FEIGN_CB_SLIDING_WINDOW: ${FEIGN_CB_SLIDING_WINDOW:-100}
+      FEIGN_CB_MIN_CALLS: ${FEIGN_CB_MIN_CALLS:-10}
+      FEIGN_CB_FAILURE_THRESHOLD: ${FEIGN_CB_FAILURE_THRESHOLD:-50}
+      FEIGN_CB_SLOW_CALL_THRESHOLD: ${FEIGN_CB_SLOW_CALL_THRESHOLD:-50}
+      FEIGN_CB_SLOW_CALL_DURATION: ${FEIGN_CB_SLOW_CALL_DURATION:-5000}
+      FEIGN_CB_WAIT_DURATION: ${FEIGN_CB_WAIT_DURATION:-30s}
+      FEIGN_CB_HALF_OPEN_CALLS: ${FEIGN_CB_HALF_OPEN_CALLS:-5}
+      # ✅ Resilience4j - Retry
+      FEIGN_RETRY_MAX_ATTEMPTS: ${FEIGN_RETRY_MAX_ATTEMPTS:-3}
+      FEIGN_RETRY_WAIT_DURATION: ${FEIGN_RETRY_WAIT_DURATION:-1000}
+      FEIGN_RETRY_MULTIPLIER: ${FEIGN_RETRY_MULTIPLIER:-2}
+      # ✅ Resilience4j - Timeout
+      FEIGN_DEFAULT_TIMEOUT: ${FEIGN_DEFAULT_TIMEOUT:-10s}
+      USER_SERVICE_TIMEOUT: ${USER_SERVICE_TIMEOUT:-15s}
+      CONTACT_SERVICE_TIMEOUT: ${CONTACT_SERVICE_TIMEOUT:-15s}
     # Ports: Only JMX exposed for monitoring (HTTP via Gateway only)
     ports:
       - "${COMPANY_SERVICE_JMX_PORT:-9013}:9013" # JMX for monitoring
