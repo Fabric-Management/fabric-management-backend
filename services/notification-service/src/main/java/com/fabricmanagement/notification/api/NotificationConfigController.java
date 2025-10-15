@@ -130,7 +130,7 @@ public class NotificationConfigController {
         
         configService.deleteConfig(id, ctx.getTenantId(), ctx.getUserId().toString());
         
-        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_DELETED_SUCCESSFULLY));
+        return ResponseEntity.ok(ApiResponse.success(null, "Notification config deleted successfully"));
     }
 }
 
