@@ -1,0 +1,39 @@
+server:
+  port: 8084
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notification_db
+    username: postgres
+    password: postgres
+
+  jpa:
+    show-sql: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  redis:
+    host: localhost
+    port: 6379
+
+  mail:
+    host: ${PLATFORM_SMTP_HOST:-smtp.hostinger.com}
+    port: ${PLATFORM_SMTP_PORT:-465}
+    username: ${PLATFORM_SMTP_USERNAME:-info@storeandsale.shop}
+    password: ${PLATFORM_SMTP_PASSWORD:}
+
+notification:
+  platform:
+    email:
+      from: ${PLATFORM_EMAIL_FROM:-info@storeandsale.shop}
+      fromName: ${PLATFORM_EMAIL_FROM_NAME:-Fabricode}
+    whatsapp:
+      enabled: ${PLATFORM_WHATSAPP_ENABLED:-true}
+      provider: ${PLATFORM_WHATSAPP_PROVIDER:-META}
+      fromNumber: ${PLATFORM_WHATSAPP_FROM_NUMBER:-+447553838399}
+
+logging:
+  level:
+    com.fabricmanagement.notification: DEBUG
+    org.springframework.mail: DEBUG

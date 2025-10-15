@@ -208,6 +208,7 @@ services:
       USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
       COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:-http://company-service:8083}
       CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8084}
       SERVER_PORT: 8080
       # ✅ API Gateway - Resilience4j Circuit Breaker (ZERO HARDCODED)
       GATEWAY_CB_SLIDING_WINDOW: ${GATEWAY_CB_SLIDING_WINDOW:-100}
@@ -243,6 +244,84 @@ services:
   # ==============================================
   # MICROSERVICES
   # ==============================================
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: notification-service
+        SERVICE_PORT: 8084
+    image: fabric-notification-service:latest
+    container_name: fabric-notification-service
+    hostname: notification-service-instance
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-86400000}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      JMX_PORT: 9014
+      SERVER_PORT: 8084
+      # ✅ Platform Email Configuration (SMTP - Hostinger)
+      PLATFORM_SMTP_HOST: ${PLATFORM_SMTP_HOST:-smtp.hostinger.com}
+      PLATFORM_SMTP_PORT: ${PLATFORM_SMTP_PORT:-465}
+      PLATFORM_SMTP_USERNAME: ${PLATFORM_SMTP_USERNAME:-info@storeandsale.shop}
+      PLATFORM_SMTP_PASSWORD: ${PLATFORM_SMTP_PASSWORD}
+      PLATFORM_EMAIL_FROM: ${PLATFORM_EMAIL_FROM:-info@storeandsale.shop}
+      PLATFORM_EMAIL_FROM_NAME: ${PLATFORM_EMAIL_FROM_NAME:-Fabricode}
+      # ✅ Platform WhatsApp Configuration (Meta Cloud API)
+      PLATFORM_WHATSAPP_ENABLED: ${PLATFORM_WHATSAPP_ENABLED:-true}
+      PLATFORM_WHATSAPP_PROVIDER: ${PLATFORM_WHATSAPP_PROVIDER:-META}
+      PLATFORM_WHATSAPP_ACCESS_TOKEN: ${PLATFORM_WHATSAPP_ACCESS_TOKEN}
+      PLATFORM_WHATSAPP_PHONE_NUMBER_ID: ${PLATFORM_WHATSAPP_PHONE_NUMBER_ID}
+      PLATFORM_WHATSAPP_WABA_ID: ${PLATFORM_WHATSAPP_WABA_ID}
+      PLATFORM_WHATSAPP_FROM_NUMBER: ${PLATFORM_WHATSAPP_FROM_NUMBER:-+447553838399}
+      PLATFORM_WHATSAPP_TEST_NUMBER: ${PLATFORM_WHATSAPP_TEST_NUMBER}
+      # ✅ Platform SMS Configuration (Disabled)
+      PLATFORM_SMS_ENABLED: ${PLATFORM_SMS_ENABLED:-false}
+      PLATFORM_SMS_FROM_NUMBER: ${PLATFORM_SMS_FROM_NUMBER:-+447553838399}
+      # ✅ Notification Configuration
+      NOTIFICATION_RETRY_MAX_ATTEMPTS: ${NOTIFICATION_RETRY_MAX_ATTEMPTS:-3}
+      NOTIFICATION_RETRY_BACKOFF_MS: ${NOTIFICATION_RETRY_BACKOFF_MS:-1000}
+      VERIFICATION_CODE_LENGTH: ${VERIFICATION_CODE_LENGTH:-6}
+      VERIFICATION_CODE_EXPIRATION_MINUTES: ${VERIFICATION_CODE_EXPIRATION_MINUTES:-15}
+    ports:
+      - "${NOTIFICATION_SERVICE_JMX_PORT:-9014}:9014" # JMX for monitoring
+      # HTTP port 8084 NOT exposed - access via API Gateway (8080)
+    networks:
+      - fabric-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      <<: *healthcheck-defaults
+      start_period: 75s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "0.75"
+        reservations:
+          memory: 384M
+          cpus: "0.5"
+
   user-service:
     build:
       context: .

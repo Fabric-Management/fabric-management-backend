@@ -82,5 +82,13 @@ public class TenantRegistrationRequest {
     @Pattern(regexp = ValidationConstants.PHONE_PATTERN, message = ValidationConstants.MSG_INVALID_PHONE)
     @Size(max = ValidationConstants.MAX_PHONE_LENGTH, message = ValidationConstants.MSG_TOO_LONG)
     private String phone;
+    
+    /**
+     * Preferred notification channel for verification code
+     * Options: "WHATSAPP" (mobile default), "EMAIL" (web default), "SMS" (optional)
+     * If not provided, defaults to WHATSAPP
+     */
+    @Pattern(regexp = "^(WHATSAPP|EMAIL|SMS)$", message = "Preferred channel must be WHATSAPP, EMAIL, or SMS")
+    private String preferredChannel;
 }
 
