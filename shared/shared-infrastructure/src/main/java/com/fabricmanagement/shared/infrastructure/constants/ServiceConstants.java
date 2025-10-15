@@ -77,6 +77,10 @@ public final class ServiceConstants {
     public static final String MSG_INVALID_CREDENTIALS = "Invalid credentials";
     public static final String MSG_PASSWORD_NOT_SET = "Password not set. Please setup your password first.";
     public static final String MSG_POLICY_VALIDATION_FAILED = "Policy validation failed";
+    public static final String MSG_INVALID_VERIFICATION_CODE = "Invalid verification code. Please try again.";
+    public static final String MSG_FAILED_TO_SEND_VERIFICATION_CODE = "Failed to send verification code. Please try again.";
+    public static final String MSG_CONTACT_ALREADY_VERIFIED = "Contact is already verified";
+    public static final String MSG_USER_ACCOUNT_NOT_ACTIVE = "User account is not active";
     
     // Error Messages - Company Duplicates
     public static final String MSG_COMPANY_TAX_ID_ALREADY_REGISTERED = "A company with this tax ID is already registered";
@@ -110,5 +114,14 @@ public final class ServiceConstants {
     public static final String AUDIT_ANONYMOUS_USER = "ANONYMOUS";     // Public actions before authentication
     public static final String AUDIT_SCHEDULER_USER = "SCHEDULER";     // Scheduled job actions
     public static final String AUDIT_MIGRATION_USER = "MIGRATION";     // Database migration actions
+    
+    // UI Next Step Actions (Frontend Routing)
+    public static final String NEXT_STEP_SEND_VERIFICATION = "send-verification";
+    public static final String NEXT_STEP_SETUP_PASSWORD = "setup-password";
+    public static final String NEXT_STEP_LOGIN = "login";
+    public static final String NEXT_STEP_DASHBOARD = "dashboard";
+    
+    // User Status Messages (for exceptions)
+    public static final String USER_STATUS_PENDING_OR_ACTIVE = "PENDING_VERIFICATION or ACTIVE";
 }
 

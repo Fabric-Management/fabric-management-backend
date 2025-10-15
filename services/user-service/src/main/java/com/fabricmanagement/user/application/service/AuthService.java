@@ -109,11 +109,11 @@ public class AuthService {
             
             // Determine next step for UI
             if (!contact.isVerified()) {
-                checkResponse.setNextStep("send-verification");
+                checkResponse.setNextStep(ServiceConstants.NEXT_STEP_SEND_VERIFICATION);
             } else if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                checkResponse.setNextStep("setup-password");
+                checkResponse.setNextStep(ServiceConstants.NEXT_STEP_SETUP_PASSWORD);
             } else {
-                checkResponse.setNextStep("login");
+                checkResponse.setNextStep(ServiceConstants.NEXT_STEP_LOGIN);
             }
             
             return applyTimingMask(startTime, checkResponse);
@@ -164,7 +164,7 @@ public class AuthService {
             user.getStatus() != UserStatus.ACTIVE) {
             throw new InvalidUserStatusException(
                 user.getStatus().name(), 
-                "PENDING_VERIFICATION or ACTIVE"
+                ServiceConstants.USER_STATUS_PENDING_OR_ACTIVE
             );
         }
 
@@ -222,7 +222,7 @@ public class AuthService {
             }
 
             if (user.getStatus() != UserStatus.ACTIVE) {
-                throw new InvalidUserStatusException("User account is not active: " + user.getStatus());
+                throw new InvalidUserStatusException(ServiceConstants.MSG_USER_ACCOUNT_NOT_ACTIVE + ": " + user.getStatus());
             }
 
             loginAttemptTracker.clearFailedAttempts(contactValue);
@@ -287,7 +287,7 @@ public class AuthService {
             log.info("✅ Verification code sent to: {}", request.getContactValue());
         } catch (Exception e) {
             log.error("Failed to send verification code: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to send verification code. Please try again.");
+            throw new RuntimeException(ServiceConstants.MSG_FAILED_TO_SEND_VERIFICATION_CODE);
         }
     }
     
@@ -319,7 +319,7 @@ public class AuthService {
             log.info("✅ Contact verified: {}", request.getContactValue());
         } catch (Exception e) {
             log.error("Verification failed: {}", e.getMessage());
-            throw new RuntimeException("Invalid verification code. Please try again.");
+            throw new RuntimeException(ServiceConstants.MSG_INVALID_VERIFICATION_CODE);
         }
         
         // Step 3: Get user
