@@ -20,14 +20,14 @@ spring:
   mail:
     host: smtp.hostinger.com
     port: 465
-    username: noreply@storeandsale.shop
+    username: info@storeandsale.shop
     password: ${PLATFORM_SMTP_PASSWORD:}
 
 notification:
   platform:
     email:
-      from: noreply@storeandsale.shop
-      fromName: Store and Sale
+      from: info@storeandsale.shop
+      fromName: Fabricode
     whatsapp:
       enabled: true
       provider: META

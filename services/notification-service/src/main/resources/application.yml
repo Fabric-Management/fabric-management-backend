@@ -110,8 +110,8 @@ notification:
   platform:
     # Platform fallback credentials (used if tenant has no config)
     email:
-      from: ${PLATFORM_EMAIL_FROM:noreply@storeandsale.shop}
-      fromName: ${PLATFORM_EMAIL_FROM_NAME:Store and Sale}
+      from: ${PLATFORM_EMAIL_FROM:info@storeandsale.shop}
+      fromName: ${PLATFORM_EMAIL_FROM_NAME:Fabricode}
     sms:
       enabled: ${PLATFORM_SMS_ENABLED:false}
       provider: ${PLATFORM_SMS_PROVIDER:}

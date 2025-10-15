@@ -283,10 +283,10 @@ services:
       # ✅ Platform Email Configuration (SMTP - Hostinger)
       PLATFORM_SMTP_HOST: ${PLATFORM_SMTP_HOST:-smtp.hostinger.com}
       PLATFORM_SMTP_PORT: ${PLATFORM_SMTP_PORT:-465}
-      PLATFORM_SMTP_USERNAME: ${PLATFORM_SMTP_USERNAME:-noreply@storeandsale.shop}
+      PLATFORM_SMTP_USERNAME: ${PLATFORM_SMTP_USERNAME:-info@storeandsale.shop}
       PLATFORM_SMTP_PASSWORD: ${PLATFORM_SMTP_PASSWORD}
-      PLATFORM_EMAIL_FROM: ${PLATFORM_EMAIL_FROM:-noreply@storeandsale.shop}
-      PLATFORM_EMAIL_FROM_NAME: ${PLATFORM_EMAIL_FROM_NAME:-Store and Sale}
+      PLATFORM_EMAIL_FROM: ${PLATFORM_EMAIL_FROM:-info@storeandsale.shop}
+      PLATFORM_EMAIL_FROM_NAME: ${PLATFORM_EMAIL_FROM_NAME:-Fabricode}
       # ✅ Platform WhatsApp Configuration (Meta Cloud API)
       PLATFORM_WHATSAPP_ENABLED: ${PLATFORM_WHATSAPP_ENABLED:-true}
       PLATFORM_WHATSAPP_PROVIDER: ${PLATFORM_WHATSAPP_PROVIDER:-META}
