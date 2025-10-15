@@ -70,14 +70,23 @@ public class PlatformFallbackConfig {
     @Value("${notification.platform.whatsapp.enabled:true}")
     private Boolean platformWhatsappEnabled;
     
-    @Value("${notification.platform.whatsapp.provider:}")
+    @Value("${notification.platform.whatsapp.provider:META}")
     private String platformWhatsappProvider;
     
-    @Value("${notification.platform.whatsapp.apiKey:}")
-    private String platformWhatsappApiKey;
+    @Value("${notification.platform.whatsapp.accessToken:}")
+    private String platformWhatsappAccessToken;
+    
+    @Value("${notification.platform.whatsapp.phoneNumberId:}")
+    private String platformWhatsappPhoneNumberId;
+    
+    @Value("${notification.platform.whatsapp.wabaId:}")
+    private String platformWhatsappWabaId;
     
     @Value("${notification.platform.whatsapp.fromNumber:+447553838399}")
     private String platformWhatsappFromNumber;
+    
+    @Value("${notification.platform.whatsapp.testNumber:}")
+    private String platformWhatsappTestNumber;
     
     // ========== Retry Configuration ==========
     
@@ -130,8 +139,10 @@ public class PlatformFallbackConfig {
      */
     public boolean isWhatsAppConfigured() {
         return platformWhatsappEnabled && 
-               platformWhatsappApiKey != null && 
-               !platformWhatsappApiKey.isEmpty();
+               platformWhatsappAccessToken != null && 
+               !platformWhatsappAccessToken.isEmpty() &&
+               platformWhatsappPhoneNumberId != null &&
+               !platformWhatsappPhoneNumberId.isEmpty();
     }
     
     /**
