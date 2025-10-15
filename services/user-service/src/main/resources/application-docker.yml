@@ -169,8 +169,8 @@ springdoc:
 # =============================================================================
 # FEIGN CLIENT CONFIGURATION
 # =============================================================================
-contact-service:
-  url: ${CONTACT_SERVICE_URL:http://contact-service:8082}
+# ✅ Feign Clients use ${CONTACT_SERVICE_URL} and ${COMPANY_SERVICE_URL} directly
+# No kebab-case properties needed (deprecated pattern)
 
 # =============================================================================
 # LOGGING CONFIGURATION (DEBUG for troubleshooting)

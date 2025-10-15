@@ -512,11 +512,8 @@ public class CompanyService {
         if (request.getName() != null && !request.getName().isBlank()) {
             String normalizedRequestName = normalizationUtil.normalizeForComparison(request.getName());
             
-            // Get all companies and check normalized names
-            // TODO: Optimize with database-level normalization in future
-            List<Company> allCompanies = companyRepository.findAll().stream()
-                    .filter(c -> !c.isDeleted())
-                    .collect(Collectors.toList());
+            // DB-level query (no stream filter)
+            List<Company> allCompanies = companyRepository.findAllNonDeleted();
             
             for (Company company : allCompanies) {
                 String normalizedExistingName = normalizationUtil.normalizeForComparison(
@@ -644,12 +641,8 @@ public class CompanyService {
     private List<Company> getCompaniesByCountry(String country) {
         log.debug("Getting companies in country: {}", country);
         
-        // Strategy: Use Company.country field (denormalized for performance)
-        // This field is populated during company creation from address data
-        List<Company> companies = companyRepository.findAll().stream()
-                .filter(c -> !c.isDeleted())
-                .filter(c -> c.getCountry() != null && country.equalsIgnoreCase(c.getCountry()))
-                .collect(Collectors.toList());
+        // DB-level query with country filter
+        List<Company> companies = companyRepository.findAllNonDeletedByCountry(country);
         
         log.debug("Found {} companies in country: {}", companies.size(), country);
         return companies;

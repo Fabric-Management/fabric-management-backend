@@ -87,7 +87,7 @@ public class UserPermissionService {
     @Transactional(readOnly = true)
     public List<UserPermissionResponse> getAllPermissions() {
         log.debug("Getting all permissions");
-        List<UserPermission> permissions = userPermissionRepository.findAll();
+        List<UserPermission> permissions = userPermissionRepository.findAllNonDeleted();
         return userPermissionMapper.toResponseList(permissions);
     }
 }

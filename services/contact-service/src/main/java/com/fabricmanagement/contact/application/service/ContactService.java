@@ -329,10 +329,9 @@ public class ContactService {
     public List<ContactResponse> listAllContacts() {
         log.debug("Listing all contacts (ADMIN operation)");
         
-        List<Contact> contacts = contactRepository.findAll();
+        List<Contact> contacts = contactRepository.findAllNonDeleted();
         
         return contacts.stream()
-                .filter(Contact::isNotDeleted)
                 .map(contactMapper::toResponse)
                 .collect(Collectors.toList());
     }

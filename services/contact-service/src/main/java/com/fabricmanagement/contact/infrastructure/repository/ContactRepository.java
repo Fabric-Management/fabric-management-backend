@@ -125,5 +125,14 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
            "AND c.isVerified = true " +
            "AND c.deleted = false")
     List<Contact> findPrimaryEmailsByDomain(@Param("domainPattern") String domainPattern);
+    
+    /**
+     * Find all non-deleted contacts
+     * Used for admin operations (list all contacts across system)
+     * 
+     * @return List of all active contacts
+     */
+    @Query("SELECT c FROM Contact c WHERE c.deleted = false")
+    List<Contact> findAllNonDeleted();
 }
 

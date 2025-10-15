@@ -101,11 +101,9 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
-        <!-- OpenFeign for inter-service communication -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-openfeign</artifactId>
-        </dependency>
+        <!-- ❌ OpenFeign NOT needed - Contact Service doesn't call other services -->
+        <!-- This is a PURE DOMAIN SERVICE - only provides endpoints -->
+        <!-- User/Company Services call Contact Service, not vice versa -->
 
         <!-- Lombok -->
         <dependency>

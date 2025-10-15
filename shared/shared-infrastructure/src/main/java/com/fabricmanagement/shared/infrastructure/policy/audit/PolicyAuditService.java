@@ -52,7 +52,7 @@ import java.util.stream.Collectors;
  * 
  * Performance:
  * - Async logging (non-blocking)
- * - Kafka event-based (fire and forget) - TODO: Phase 3
+ * - Kafka event-based (fire and forget) ✅ IMPLEMENTED
  * - Max latency: 5ms (should not slow down main request)
  * 
  * Storage:

@@ -23,7 +23,7 @@ import java.util.UUID;
  */
 @FeignClient(
     name = "contact-service",
-    url = "${contact-service.url:http://localhost:8082}",
+    url = "${CONTACT_SERVICE_URL:http://localhost:8082}",
     path = "/api/v1/contacts",
     configuration = com.fabricmanagement.shared.infrastructure.config.BaseFeignClientConfig.class,
     fallback = ContactServiceClientFallback.class  // ← RESILIENCE!

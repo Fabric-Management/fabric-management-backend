@@ -1,6 +1,8 @@
 package com.fabricmanagement.gateway.config;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
@@ -15,21 +17,8 @@ import java.time.Duration;
 /**
  * Dynamic Routes Configuration for API Gateway
  * 
- * Modern, type-safe routing configuration replacing YAML-based routes.
- * 
- * Benefits over YAML:
- * ✅ Type-safe (compile-time errors)
- * ✅ Better IDE support (autocomplete, refactoring)
- * ✅ Conditional routing (environment-based)
- * ✅ Dynamic configuration from properties
- * ✅ Better readability and maintainability
- * 
- * Architecture:
- * - Public routes: Aggressive rate limiting (protect from abuse)
- * - Protected routes: Standard rate limiting
- * - All routes: Circuit breaker + retry + correlation ID + security headers
- * 
- * @since 3.1.0 - Gateway Refactor (Oct 13, 2025)
+ * Production-ready routing with optional rate limiting.
+ * Rate limiting: Set GATEWAY_RATE_LIMIT_ENABLED=true in production
  */
 @Slf4j
 @Configuration
@@ -38,7 +27,9 @@ public class DynamicRoutesConfig {
     private final GatewayProperties gatewayProperties;
     private final SmartKeyResolver smartKeyResolver;
     
-    // ✅ Environment variables - properly injected (Java Config requires @Value injection!)
+    @Autowired(required = false)
+    private RedisRateLimiter redisRateLimiter;
+    
     @Value("${USER_SERVICE_URL:http://localhost:8081}")
     private String userServiceUrl;
     
@@ -48,7 +39,9 @@ public class DynamicRoutesConfig {
     @Value("${COMPANY_SERVICE_URL:http://localhost:8083}")
     private String companyServiceUrl;
     
-    // ✅ Manual constructor to use @Qualifier for bean disambiguation
+    @Value("${GATEWAY_RATE_LIMIT_ENABLED:false}")
+    private boolean rateLimitEnabled;
+    
     public DynamicRoutesConfig(
             @Qualifier("fabricGatewayProperties") GatewayProperties gatewayProperties,
             SmartKeyResolver smartKeyResolver) {
@@ -56,217 +49,197 @@ public class DynamicRoutesConfig {
         this.smartKeyResolver = smartKeyResolver;
     }
     
+    @PostConstruct
+    public void init() {
+        log.info("🔍 DynamicRoutesConfig initialized:");
+        log.info("   USER_SERVICE_URL = {}", userServiceUrl);
+        log.info("   COMPANY_SERVICE_URL = {}", companyServiceUrl);
+        log.info("   CONTACT_SERVICE_URL = {}", contactServiceUrl);
+        log.info("   Rate Limiting: {}", rateLimitEnabled ? "✅ ENABLED" : "⚠️ DISABLED (dev mode)");
+    }
+    
     @Bean
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
-        log.info("🚀 Configuring dynamic routes for API Gateway v3.1.0");
+        log.info("🚀 Configuring dynamic routes (Rate limiting: {})", 
+            rateLimitEnabled ? "ON" : "OFF");
         
         return builder.routes()
-                // =============================================================================
-                // PUBLIC ROUTES - Aggressive Rate Limiting (Anti-abuse)
-                // =============================================================================
-                
-                // Tenant Onboarding (Public)
+                // Tenant Onboarding
                 .route("public-tenant-onboarding", r -> r
                         .path("/api/v1/public/onboarding/**")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("userServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/user-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getOnboardingReplenishRate(),
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getOnboardingBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("userServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/user-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(1)
-                                        .setMethods(HttpMethod.POST)
-                                        .setBackoff(Duration.ofMillis(100), Duration.ofMillis(500), 2, true)))
-                        .uri(userServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(1)
+                                    .setMethods(HttpMethod.POST)
+                                    .setBackoff(Duration.ofMillis(100), Duration.ofMillis(500), 2, true));
+                            
+                            // Apply rate limiting only if enabled
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(userServiceUrl))
                 
-                // User Login (Public - Very Strict)
+                // Login
                 .route("public-user-login", r -> r
                         .path("/api/v1/users/auth/login")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("userServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/user-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getLoginReplenishRate(),
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getLoginBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("userServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/user-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(1)
-                                        .setMethods(HttpMethod.POST)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getPublicRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(userServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(1)
+                                    .setMethods(HttpMethod.POST)
+                                    .setBackoff(gatewayProperties.getRetry().getPublicRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(userServiceUrl))
                 
-                // Check Contact (Public - Moderate)
+                // Check Contact
                 .route("public-check-contact", r -> r
                         .path("/api/v1/users/auth/check-contact")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("userServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/user-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getCheckContactReplenishRate(),
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getCheckContactBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("userServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/user-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(2)
-                                        .setMethods(HttpMethod.POST)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(userServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(2)
+                                    .setMethods(HttpMethod.POST)
+                                    .setBackoff(gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(userServiceUrl))
                 
-                // Setup Password (Public - Very Strict)
+                // Setup Password
                 .route("public-setup-password", r -> r
                         .path("/api/v1/users/auth/setup-password")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("userServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/user-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getSetupPasswordReplenishRate(),
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getSetupPasswordBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("userServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/user-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(1)
-                                        .setMethods(HttpMethod.POST)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getPublicRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(userServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(1)
+                                    .setMethods(HttpMethod.POST)
+                                    .setBackoff(gatewayProperties.getRetry().getPublicRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(userServiceUrl))
                 
-                // Other Auth Routes (Public)
+                // Other Auth
                 .route("public-auth-routes", r -> r
                         .path("/api/v1/users/auth/**")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("userServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/user-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getOtherAuthReplenishRate(),
-                                                gatewayProperties.getRateLimit().getPublicEndpoints().getOtherAuthBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("userServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/user-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(3)
-                                        .setMethods(HttpMethod.GET, HttpMethod.POST)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(userServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(3)
+                                    .setMethods(HttpMethod.GET, HttpMethod.POST)
+                                    .setBackoff(gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(userServiceUrl))
                 
-                // =============================================================================
-                // PROTECTED ROUTES - Standard Rate Limiting
-                // =============================================================================
-                
-                // User Service (Protected)
+                // User Service
                 .route("user-service-protected", r -> r
                         .path("/api/v1/users/**")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("userServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/user-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardReplenishRate(),
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("userServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/user-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(3)
-                                        .setMethods(HttpMethod.GET)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(userServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(3)
+                                    .setMethods(HttpMethod.GET)
+                                    .setBackoff(gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(userServiceUrl))
                 
-                // Company Service (Protected)
+                // Company Service
                 .route("company-service-protected", r -> r
                         .path("/api/v1/companies/**")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("companyServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/company-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardReplenishRate(),
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("companyServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/company-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(3)
-                                        .setMethods(HttpMethod.GET)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(companyServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(3)
+                                    .setMethods(HttpMethod.GET)
+                                    .setBackoff(gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(companyServiceUrl))
                 
-                // Contact Service - Find by Value (Internal/Protected - Strict)
-                .route("contact-service-find-by-value", r -> r
-                        .path("/api/v1/contacts/find-by-value")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("contactServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/contact-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getInternalEndpointReplenishRate(),
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getInternalEndpointBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
-                                .retry(retryConfig -> retryConfig
-                                        .setRetries(2)
-                                        .setMethods(HttpMethod.GET)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(contactServiceUrl))  // ✅ Use injected variable
-                
-                // Contact Service (Protected)
+                // Contact Service
                 .route("contact-service-protected", r -> r
                         .path("/api/v1/contacts/**")
-                        .filters(f -> f
-                                .circuitBreaker(c -> c
-                                        .setName("contactServiceCircuitBreaker")
-                                        .setFallbackUri("forward:/fallback/contact-service"))
-                                .requestRateLimiter(rl -> rl
-                                        .setRateLimiter(redisRateLimiter(
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardReplenishRate(),
-                                                gatewayProperties.getRateLimit().getProtectedEndpoints().getStandardBurstCapacity()))
-                                        .setKeyResolver(smartKeyResolver))
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("contactServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/contact-service"))
                                 .retry(retryConfig -> retryConfig
-                                        .setRetries(3)
-                                        .setMethods(HttpMethod.GET)
-                                        .setBackoff(
-                                                gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
-                                                gatewayProperties.getRetry().getMaxBackoff(), 
-                                                2, true)))
-                        .uri(contactServiceUrl))  // ✅ Use injected variable
+                                    .setRetries(3)
+                                    .setMethods(HttpMethod.GET)
+                                    .setBackoff(gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(contactServiceUrl))
                 
                 .build();
     }
-    
-    /**
-     * Creates a Redis-based rate limiter with specified rates.
-     * 
-     * @param replenishRate Number of requests per second to allow
-     * @param burstCapacity Maximum burst size (bucket capacity)
-     * @return Configured RedisRateLimiter
-     */
-    private RedisRateLimiter redisRateLimiter(int replenishRate, int burstCapacity) {
-        return new RedisRateLimiter(replenishRate, burstCapacity, 1);
-    }
 }
-

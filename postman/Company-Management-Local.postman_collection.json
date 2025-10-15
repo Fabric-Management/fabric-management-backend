@@ -120,13 +120,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/companies?page=0&size=10",
+              "raw": "{{baseUrl}}/api/v1/companies",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "companies"],
-              "query": [
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "10" }
-              ]
+              "path": ["api", "v1", "companies"]
             }
           }
         },

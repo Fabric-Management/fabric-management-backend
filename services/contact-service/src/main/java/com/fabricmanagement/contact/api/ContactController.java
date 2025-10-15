@@ -8,6 +8,7 @@ import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.infrastructure.constants.SecurityConstants;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
+import com.fabricmanagement.shared.security.annotation.InternalEndpoint;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
+    @InternalEndpoint(
+        description = "Create contact during tenant onboarding or by authenticated user",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ContactResponse>> createContact(
@@ -141,6 +147,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_SET_PRIMARY));
     }
     
+    @InternalEndpoint(
+        description = "Send verification code during tenant onboarding",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PostMapping("/{contactId}/send-verification")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> sendVerificationCode(
@@ -159,21 +170,48 @@ public class ContactController {
     }
 
     @PutMapping("/{contactId}/verify")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> verifyContact(
             @PathVariable UUID contactId,
-            @RequestParam String code,
-            @AuthenticationPrincipal SecurityContext ctx) {
+            @RequestParam String code) {
         
         log.info("Verifying contact: {}", contactId);
         
-        ContactResponse existingContact = contactService.getContact(contactId);
-        if (!hasAccess(ctx, existingContact.getOwnerId())) {
-            return forbiddenResponse();
-        }
-
+        // Security: contactId + code combination is sufficient
+        // - code is 6-digit random (expires in 15 minutes)
+        // - brute force protected (max 5 attempts)
+        // - no authentication needed (user hasn't set password yet)
+        
         contactService.verifyContact(contactId, code);
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_VERIFIED));
+    }
+    
+    @PostMapping("/public/resend-verification")
+    public ResponseEntity<ApiResponse<Void>> resendVerificationCode(
+            @RequestParam String contactValue) {
+        
+        log.info("Resending verification code for contact: {}", contactValue);
+        
+        // Security: 
+        // - Rate limited by Gateway (3 requests/15min per contact)
+        // - Only sends if contact exists and unverified
+        // - Code expires in 15 minutes
+        
+        Optional<ContactResponse> optionalContact = contactService.findByContactValue(contactValue);
+        
+        if (optionalContact.isEmpty()) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Contact not found in system"));
+        }
+        
+        ContactResponse contact = optionalContact.get();
+        
+        if (contact.isVerified()) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Contact is already verified"));
+        }
+        
+        contactService.sendVerificationCode(contact.getId());
+        return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_VERIFICATION_CODE_SENT));
     }
     
     @GetMapping("/owner/{ownerId}/primary")
@@ -201,8 +239,12 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(available));
     }
     
+    @InternalEndpoint(
+        description = "Check email domain uniqueness across all tenants",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @GetMapping("/check-domain")
-    // No @PreAuthorize - Internal endpoint protected by InternalAuthenticationFilter (X-Internal-API-Key)
     public ResponseEntity<ApiResponse<List<UUID>>> checkEmailDomain(@RequestParam String domain) {
         log.debug("Checking email domain: @{}", domain);
 

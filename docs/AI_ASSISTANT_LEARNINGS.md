@@ -72,6 +72,174 @@ GOOGLE/AMAZON LEVEL CODE!
 
 ---
 
+Zero Hardcoded Values · Clean Architecture · Production-Ready Discipline
+💎 I. ZERO HARDCODED VALUES — GOOGLE/AMAZON LEVEL — PRODUCTION-READY CLEAN CODE
+
+Every configuration, threshold, and dependency must be externalized.
+No magic numbers. No inline constants. No hidden logic.
+Code should be environment-driven, observable, fault-tolerant, and fully scalable.
+
+Each component must follow SOLID, DRY, and Separation of Concerns principles.
+Services must recover gracefully from failure, log meaningfully, and operate with zero manual intervention.
+
+Maintain clarity, testability, and resilience — these are the foundations of enterprise-grade software.
+
+🧭 If a configuration cannot be changed without redeploying, it’s a design failure.
+
+⚡ II. CODE IS NOT JUST WHAT YOU WRITE — IT’S HOW YOU THINK
+
+Write code as if the next person maintaining it is a future version of yourself, with less time and more responsibility.
+
+Each line must earn its place — every method must have purpose.
+Complexity is not mastery — clarity is.
+
+Code should speak, not scream.
+Every design choice must serve scalability, reliability, and human readability.
+
+Delete what doesn’t add value.
+Automate what humans forget.
+Document what isn’t obvious.
+Question what feels “good enough.”
+
+Because in production, “good enough” never is.
+
+🧩 True engineering is not about writing more code — it’s about writing the right code.
+
+🧠 III. ENGINEERING BEHAVIORAL PRINCIPLES
+Principle	Description
+Fail Fast, Recover Gracefully	Detect issues early, isolate failure, and recover without downtime.
+Immutable Infrastructure	Nothing changes manually in production — everything is versioned, reproducible, and declarative.
+Explicit Over Implicit	Clarity always wins over brevity. Be predictable. Be readable.
+Automate, Don’t Depend	Every repetitive step must be automated — trust code, not memory.
+Measure Everything	If you can’t measure it, you can’t improve it. Integrate observability from day one.
+Ownership Over Blame	When something breaks, own the fix, not the fault.
+Refactor Ruthlessly	Legacy code deserves respect — and refactoring. Never accept “it works, don’t touch it.”
+🧩 IV. CODE REVIEW PHILOSOPHY
+
+Review for design intent, not just syntax.
+
+Ask “does this change make the system more maintainable six months from now?”
+
+Prefer small, atomic PRs over large, unfocused ones.
+
+Approve only what’s testable, observable, and reversible.
+
+Consistency > Cleverness.
+
+Every comment should educate, not humiliate.
+
+🚀 V. CONTINUOUS IMPROVEMENT MINDSET
+
+Good engineers ship features.
+Great engineers ship systems that keep shipping — reliably, repeatedly, and predictably.
+
+Build today what you’ll thank yourself for tomorrow.
+
+🏁 Excellence isn’t an act — it’s a habit embedded in every commit.
+
+Naming & Consistency Guidelines
+Consistency is clarity. Clarity is scalability.
+
+A system’s readability defines its maintainability.
+Inconsistent naming breaks understanding faster than bad logic ever will.
+Every identifier, from containers to constants, must communicate intent, scope, and ownership — instantly.
+
+1️⃣ Service & Container Naming
+
+Use lowercase, hyphen-separated names (kebab-case) for all Docker containers and services.
+
+✅ fabric-user-service  
+✅ fabric-company-service  
+✅ fabric-api-gateway
+
+
+Keep the service name identical across Docker, Spring application name, and log identifiers.
+
+spring.application.name = user-service  
+container_name = fabric-user-service
+
+
+Avoid version or environment suffixes inside names (e.g., -dev, -v1); handle environment via profiles, not naming.
+
+2️⃣ Port-to-Service Convention
+Service	Port	Example
+API Gateway	8080	fabric-api-gateway
+User Service	8081	fabric-user-service
+Contact Service	8082	fabric-contact-service
+Company Service	8083	fabric-company-service
+
+The port itself defines the service identity — this must never conflict across the environment.
+
+3️⃣ Database Schema & Migration Naming
+
+Each microservice maintains its own Flyway history table.
+
+user_flyway_schema_history  
+company_flyway_schema_history  
+contact_flyway_schema_history  
+
+
+Schema table names must follow {service}_flyway_schema_history to prevent cross-service migration collisions.
+
+Migrations should be versioned consistently:
+
+V1__create_user_tables.sql  
+V2__add_user_roles.sql
+
+4️⃣ Internal & Public Endpoint Naming
+Endpoint Type	Base Path	Example
+Internal API	/internal/{entity}	/internal/companies/{id}
+Public API	/api/v1/{entity}	/api/v1/users/{id}
+
+Never mix internal and public endpoint prefixes.
+
+@InternalEndpoint-annotated controllers must always use /internal/ base paths.
+
+Public APIs must versioned explicitly (/api/v1/...) to ensure backward compatibility.
+
+5️⃣ Environment Variable Naming
+
+Use UPPERCASE_WITH_UNDERSCORES.
+
+Variables should express their full meaning — never abbreviate context.
+
+✅ POSTGRES_HOST, POSTGRES_DB, POSTGRES_USER
+✅ REDIS_PASSWORD, KAFKA_BOOTSTRAP_SERVERS
+✅ USER_SERVICE_URL, COMPANY_SERVICE_URL
+⚠️ Avoid mixed usage: HOST vs URL must be distinct in purpose.
+
+
+HOST → network location (e.g., user-service)
+
+URL → protocol + host + port (e.g., http://user-service:8081)
+
+Environment variables are contract points — changing them without documentation breaks the contract.
+
+6️⃣ Logging & Monitoring Identity
+
+Each log entry must identify service, instance, and correlationId.
+
+Log prefixes should follow:
+
+[service-name][instance-id][trace-id] LEVEL message
+
+
+Never log raw credentials, JWTs, or internal API keys.
+
+Each log must be parsable by centralized monitoring tools (ELK / Grafana).
+
+7️⃣ Naming Philosophy
+
+Name things for what they do, not how they do it.
+
+Favor explicit over clever — code is read more often than written.
+
+If you need a comment to explain a name, rename it instead.
+
+Consistency builds trust; trust builds velocity.
+
+---
+
 ## 📊 QUICK SUMMARY (Top 12 Principles)
 
 1. **🔴 PRODUCTION-READY CODE - NO SHORTCUTS** - Enterprise-level quality, zero technical debt

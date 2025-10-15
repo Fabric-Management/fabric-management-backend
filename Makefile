@@ -328,6 +328,12 @@ dev-logs-gateway-error: ## Show Gateway ERROR/WARN logs
 # =============================================================================
 # QUICK COMMANDS
 # =============================================================================
+rebuild-all: ## Full rebuild: mvn clean install + docker build + docker up (~10min)
+	@echo "$(YELLOW)🔨 Full rebuild: Maven + Docker...$(NC)"
+	mvn clean install -DskipTests
+	docker compose build --no-cache && docker compose up -d
+	@echo "$(GREEN)✅ Full rebuild completed$(NC)"
+
 up: deploy ## Alias for deploy
 stop: down ## Alias for down
 start: deploy ## Alias for deploy

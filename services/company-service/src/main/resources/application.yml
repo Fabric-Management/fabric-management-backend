@@ -119,32 +119,78 @@ jwt:
   audience: ${JWT_AUDIENCE:fabric-api}
 
 # =============================================================================
-# EXTERNAL SERVICES CONFIGURATION
+# EXTERNAL SERVICES CONFIGURATION (Deprecated - Using direct env vars)
 # =============================================================================
-contact-service:
-  url: ${CONTACT_SERVICE_URL:http://localhost:8082}
-
-user-service:
-  url: ${USER_SERVICE_URL:http://localhost:8081}
+# ✅ Feign Clients now use ${CONTACT_SERVICE_URL} directly
+# This section kept for backward compatibility but not actively used
 
 # =============================================================================
-# RESILIENCE4J CONFIGURATION
+# RESILIENCE4J CONFIGURATION (✅ ZERO HARDCODED - Production-Ready)
 # =============================================================================
+# Circuit Breaker Pattern for inter-service communication resilience
+# Same strategy as User Service for consistency
+#
 resilience4j:
   circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${FEIGN_CB_SLIDING_WINDOW:100}
+        minimum-number-of-calls: ${FEIGN_CB_MIN_CALLS:10}
+
+        failure-rate-threshold: ${FEIGN_CB_FAILURE_THRESHOLD:50}
+        slow-call-rate-threshold: ${FEIGN_CB_SLOW_CALL_THRESHOLD:50}
+        slow-call-duration-threshold: ${FEIGN_CB_SLOW_CALL_DURATION:5000}
+
+        wait-duration-in-open-state: ${FEIGN_CB_WAIT_DURATION:30s}
+        permitted-number-of-calls-in-half-open-state: ${FEIGN_CB_HALF_OPEN_CALLS:5}
+        automatic-transition-from-open-to-half-open-enabled: true
+
+        record-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - feign.FeignException
+
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+
     instances:
       user-service:
-        failureRateThreshold: 50
-        waitDurationInOpenState: 30s
+        base-config: default
+
       contact-service:
-        failureRateThreshold: 50
-        waitDurationInOpenState: 30s
+        base-config: default
+
   retry:
+    configs:
+      default:
+        max-attempts: ${FEIGN_RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${FEIGN_RETRY_WAIT_DURATION:1000}
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: ${FEIGN_RETRY_MULTIPLIER:2}
+        retry-exceptions:
+          - java.io.IOException
+          - feign.RetryableException
+
     instances:
       user-service:
-        maxAttempts: 3
+        base-config: default
+
       contact-service:
-        maxAttempts: 3
+        base-config: default
+
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: ${FEIGN_DEFAULT_TIMEOUT:10s}
+        cancel-running-future: true
+
+    instances:
+      user-service:
+        timeout-duration: ${USER_SERVICE_TIMEOUT:15s}
+
+      contact-service:
+        timeout-duration: ${CONTACT_SERVICE_TIMEOUT:15s}
 
 # =============================================================================
 # MANAGEMENT & MONITORING

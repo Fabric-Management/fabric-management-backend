@@ -31,95 +31,12 @@ spring:
   # ===========================================================================
   # GATEWAY ROUTES CONFIGURATION
   # ===========================================================================
+  # ✅ Routes are managed via DynamicRoutesConfig.java (Type-safe, ZERO hardcoded!)
+  # 📍 Location: api-gateway/config/DynamicRoutesConfig.java
+  # ✅ Service URLs injected via @Value("${USER_SERVICE_URL}") in DynamicRoutesConfig
   cloud:
     gateway:
-      routes:
-        # Public Endpoints - Tenant Onboarding & Other Public APIs
-        # Pattern: /api/v1/public/** (catch-all for public endpoints)
-        - id: public-endpoints
-          uri: ${USER_SERVICE_URL:http://user-service:8081}
-          predicates:
-            - Path=/api/v1/public/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: userServiceCircuitBreaker
-                fallbackUri: forward:/fallback/user-service
-            - name: RequestRateLimiter
-              args:
-                key-resolver: "#{@smartKeyResolver}"
-                redis-rate-limiter.replenishRate: 5
-                redis-rate-limiter.burstCapacity: 10
-            - name: Retry
-              args:
-                retries: 1
-                methods: POST,GET
-                backoff:
-                  firstBackoff: 100ms
-                  maxBackoff: 500ms
-                  factor: 2
-                  basedOnPreviousValue: true
-
-        # User Service - Public Auth Routes (No Rate Limiting)
-        # Pattern: /api/v1/users/auth/** - Authentication endpoints
-        - id: user-service-public
-          uri: ${USER_SERVICE_URL:http://user-service:8081}
-          predicates:
-            - Path=/api/v1/users/auth/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: userServiceCircuitBreaker
-                fallbackUri: forward:/fallback/user-service
-
-        # User Service - Protected Routes (With Rate Limiting)
-        # Pattern: /api/v1/users/** (excluding auth)
-        - id: user-service-protected
-          uri: ${USER_SERVICE_URL:http://user-service:8081}
-          predicates:
-            - Path=/api/v1/users/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: userServiceCircuitBreaker
-                fallbackUri: forward:/fallback/user-service
-            - name: RequestRateLimiter
-              args:
-                key-resolver: "#{@smartKeyResolver}"
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
-
-        # Company Service Routes (Protected - With Rate Limiting)
-        - id: company-service
-          uri: ${COMPANY_SERVICE_URL:http://company-service:8083}
-          predicates:
-            - Path=/api/v1/companies/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: companyServiceCircuitBreaker
-                fallbackUri: forward:/fallback/company-service
-            - name: RequestRateLimiter
-              args:
-                key-resolver: "#{@smartKeyResolver}"
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
-
-        # Contact Service Routes (Protected - With Rate Limiting)
-        - id: contact-service
-          uri: ${CONTACT_SERVICE_URL:http://contact-service:8082}
-          predicates:
-            - Path=/api/v1/contacts/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: contactServiceCircuitBreaker
-                fallbackUri: forward:/fallback/contact-service
-            - name: RequestRateLimiter
-              args:
-                key-resolver: "#{@smartKeyResolver}"
-                redis-rate-limiter.replenishRate: 50
-                redis-rate-limiter.burstCapacity: 100
+      # Routes configured programmatically for better type-safety and flexibility
 
 # =============================================================================
 # SERVER CONFIGURATION
@@ -188,8 +105,11 @@ management:
 # =============================================================================
 logging:
   level:
-    com.fabricmanagement.gateway: INFO
-    org.springframework.cloud.gateway: INFO
+    com.fabricmanagement.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.cloud.gateway.handler.RoutePredicateHandlerMapping: TRACE
+    org.springframework.web.reactive.function.client: DEBUG
+    io.github.resilience4j.circuitbreaker: DEBUG
     org.springframework.security: WARN
     org.springframework.web: WARN
   pattern:

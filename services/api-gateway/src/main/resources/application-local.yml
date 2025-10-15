@@ -1,0 +1,59 @@
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - API GATEWAY LOCAL DEVELOPMENT CONFIGURATION
+# =============================================================================
+# This profile is used for local development when running API Gateway
+# with Maven (mvn spring-boot:run) while microservices can run in Docker or Maven
+# =============================================================================
+
+spring:
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: local_redis_pass
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  # ⚠️ LOCAL DEV ONLY - Do NOT use in production!
+  # Production: Use strong secret from ${JWT_SECRET} environment variable
+  secret: "EgUbMz7OOW7+57Ehxr2jUc7mFlEQPrs/XZirqOjhI4OF42Z+sW6hF7Rj9OMEjeCBBZHuzaBICuAlMtNMMZT+6A=="
+  expiration: ${JWT_EXPIRATION:3600000} # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours
+  algorithm: ${JWT_ALGORITHM:HS256}
+  issuer: ${JWT_ISSUER:fabric-management-system}
+  audience: ${JWT_AUDIENCE:fabric-api}
+
+# =============================================================================
+# INTERNAL API CONFIGURATION (Required for @InternalEndpoint validation)
+# =============================================================================
+# ⚠️ LOCAL DEV ONLY - Use same key as Docker for consistency
+# This allows API Gateway to validate internal service-to-service calls
+INTERNAL_API_KEY: ${INTERNAL_API_KEY:local-dev-internal-key-2024}
+
+# =============================================================================
+# MICROSERVICE URLs
+# =============================================================================
+# ✅ Default to localhost (Maven-based microservices)
+# Override if running specific services in Docker:
+#   export USER_SERVICE_URL="http://localhost:8081"    (if Maven)
+#   export USER_SERVICE_URL="http://user-service:8081" (if Docker - won't work from host!)
+#
+# Best Practice: Run all microservices via Maven for local dev
+USER_SERVICE_URL: ${USER_SERVICE_URL:http://localhost:8081}
+COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:http://localhost:8083}
+CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:http://localhost:8082}
+
+# =============================================================================
+# LOGGING CONFIGURATION (More verbose for local development)
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: INFO
+    reactor.netty: INFO

@@ -211,8 +211,8 @@ public class UserService {
 
     @Transactional
     public UUID createUser(CreateUserRequest request, UUID tenantId, String createdBy) {
-        // TODO: Policy check ekle
-        // Sadece INTERNAL company user create edebilir
+        // Policy check: PolicyValidationFilter (shared-security) handles authorization
+        // INTERNAL company users can create via Controller @PreAuthorize check
 
         User user = userMapper.fromCreateRequest(request, tenantId, createdBy);
         user = userRepository.save(user);

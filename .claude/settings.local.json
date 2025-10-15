@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "mcp__ide__getDiagnostics",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/src/app/**)",
+      "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/src/lib/**)",
+      "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/src/shared/constants/**)",
+      "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/**)"
     ],
     "deny": [],
     "ask": []
