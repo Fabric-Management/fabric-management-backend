@@ -57,17 +57,19 @@ kafka:
 
   mail:
     # Platform fallback SMTP (tenant-specific configs override this)
-    host: ${PLATFORM_SMTP_HOST:smtp.gmail.com}
-    port: ${PLATFORM_SMTP_PORT:587}
-    username: ${PLATFORM_SMTP_USERNAME:info@storeandsale.shop}
+    host: ${PLATFORM_SMTP_HOST:smtp.hostinger.com}
+    port: ${PLATFORM_SMTP_PORT:465}
+    username: ${PLATFORM_SMTP_USERNAME:noreply@storeandsale.shop}
     password: ${PLATFORM_SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
           auth: true
-          starttls:
+          ssl:
             enable: true
-            required: true
+          socketFactory:
+            port: 465
+            class: javax.net.ssl.SSLSocketFactory
 
   redis:
     host: ${REDIS_HOST:localhost}
@@ -106,7 +108,7 @@ notification:
   platform:
     # Platform fallback credentials (used if tenant has no config)
     email:
-      from: ${PLATFORM_EMAIL_FROM:info@storeandsale.shop}
+      from: ${PLATFORM_EMAIL_FROM:noreply@storeandsale.shop}
       fromName: ${PLATFORM_EMAIL_FROM_NAME:Store and Sale}
     sms:
       enabled: ${PLATFORM_SMS_ENABLED:false}
@@ -115,9 +117,12 @@ notification:
       fromNumber: ${PLATFORM_SMS_FROM_NUMBER:+447553838399}
     whatsapp:
       enabled: ${PLATFORM_WHATSAPP_ENABLED:true}
-      provider: ${PLATFORM_WHATSAPP_PROVIDER:}
-      apiKey: ${PLATFORM_WHATSAPP_API_KEY:}
+      provider: ${PLATFORM_WHATSAPP_PROVIDER:META}
+      accessToken: ${PLATFORM_WHATSAPP_ACCESS_TOKEN:}
+      phoneNumberId: ${PLATFORM_WHATSAPP_PHONE_NUMBER_ID:}
+      wabaId: ${PLATFORM_WHATSAPP_WABA_ID:}
       fromNumber: ${PLATFORM_WHATSAPP_FROM_NUMBER:+447553838399}
+      testNumber: ${PLATFORM_WHATSAPP_TEST_NUMBER:}
 
   retry:
     maxAttempts: ${NOTIFICATION_RETRY_MAX_ATTEMPTS:3}

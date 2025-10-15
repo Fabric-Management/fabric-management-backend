@@ -12,30 +12,21 @@ export function GetStartedSection() {
         <div
           style={{
             borderRadius: layoutTokens.radius.xl,
-            background: `linear-gradient(135deg, rgba(30, 58, 138, 0.95), rgba(15, 23, 42, 0.92))`,
+            background: colorTokens.accent.subtle,
             padding: "clamp(2rem, 6vw, 3.75rem)",
-            position: "relative",
-            overflow: "hidden",
-            color: colorTokens.text.inverse,
+            color: colorTokens.text.primary,
+            display: "grid",
+            gap: "1.5rem",
           }}
         >
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "radial-gradient(circle at top left, rgba(255,255,255,0.12) 0%, transparent 55%), radial-gradient(circle at bottom right, rgba(59,130,246,0.22) 0%, transparent 50%)",
-            }}
-          />
-
-          <div style={{ position: "relative", zIndex: 1 }} className="space-y-6">
+          <div className="space-y-6">
             <span
               style={{
                 textTransform: "uppercase",
                 letterSpacing: "0.2em",
                 fontSize: "0.75rem",
-                color: "rgba(248, 250, 255, 0.7)",
+                color: colorTokens.accent.primary,
+                fontWeight: typographyTokens.weight.medium,
               }}
             >
               Get Started
@@ -51,7 +42,7 @@ export function GetStartedSection() {
             </h2>
             <p
               style={{
-                color: "rgba(248, 250, 255, 0.78)",
+                color: colorTokens.text.tertiary,
                 lineHeight: 1.7,
               }}
             >
@@ -63,8 +54,8 @@ export function GetStartedSection() {
                 display: "inline-flex",
                 padding: "1rem 1.75rem",
                 borderRadius: "999px",
-                background: colorTokens.background.surface,
-                color: colorTokens.accent.primary,
+                background: colorTokens.accent.primary,
+                color: colorTokens.text.inverse,
                 fontWeight: typographyTokens.weight.medium,
                 letterSpacing: "0.01em",
               }}

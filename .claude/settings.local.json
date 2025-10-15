@@ -6,7 +6,9 @@
       "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/src/app/**)",
       "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/src/lib/**)",
       "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/src/shared/constants/**)",
-      "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/**)"
+      "Read(//Users/user/Coding/fabric-management/fabric-management-frontend/**)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

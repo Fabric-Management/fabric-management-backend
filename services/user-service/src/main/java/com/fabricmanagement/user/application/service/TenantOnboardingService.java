@@ -401,7 +401,7 @@ public class TenantOnboardingService {
         });
     }
     
-    private UUID createEmailContact(String email, UUID userId) {
+    private ContactDto createEmailContact(String email, UUID userId) {
         CreateContactDto contactDto = CreateContactDto.builder()
                 .ownerId(userId.toString())
                 .ownerType("USER")
@@ -417,7 +417,7 @@ public class TenantOnboardingService {
             throw new TenantRegistrationException(ServiceConstants.MSG_FAILED_TO_CREATE_CONTACT);
         }
         
-        return response.getData().getId();
+        return response.getData();
     }
     
     /**

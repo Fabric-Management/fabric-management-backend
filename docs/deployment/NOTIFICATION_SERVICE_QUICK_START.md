@@ -53,6 +53,7 @@ docker logs -f fabric-notification-service
 ```
 
 **Expected Log:**
+
 ```
 ✅ Platform Fallback Configuration loaded:
    Email: Store and Sale <info@storeandsale.shop>
@@ -65,6 +66,7 @@ docker logs -f fabric-notification-service
 ### Step 4: Test Registration (3 min)
 
 **Postman Request:**
+
 ```http
 POST http://localhost:8080/api/v1/public/onboarding/register
 Content-Type: application/json
@@ -88,6 +90,7 @@ Content-Type: application/json
 ```
 
 **Expected Response:**
+
 ```json
 {
   "success": true,
@@ -106,15 +109,16 @@ Content-Type: application/json
 ### Step 5: Check Email (1 min)
 
 **Check your inbox for:**
+
 ```
 From: Store and Sale <info@storeandsale.shop>
 Subject: Verify your account - Test Firma A.Ş.
-Body: 
+Body:
   Welcome to Test Firma A.Ş.!
-  
+
   Please verify your email address using the code below:
   123456
-  
+
   This code will expire in 15 minutes.
 ```
 
@@ -125,12 +129,14 @@ Body:
 ### Issue 1: No email received
 
 **Check 1: SMTP Password**
+
 ```bash
 # Verify password is set
 docker exec fabric-notification-service env | grep PLATFORM_SMTP_PASSWORD
 ```
 
 **Check 2: Service Logs**
+
 ```bash
 docker logs fabric-notification-service | grep "Email"
 
@@ -139,6 +145,7 @@ docker logs fabric-notification-service | grep "Email"
 ```
 
 **Check 3: Kafka Event**
+
 ```bash
 docker logs fabric-notification-service | grep "UserCreatedEvent"
 
@@ -153,6 +160,7 @@ docker logs fabric-notification-service | grep "UserCreatedEvent"
 **Cause:** Wrong SMTP password or 2FA not enabled
 
 **Fix:**
+
 1. Enable 2FA: https://myaccount.google.com/security
 2. Create new App Password: https://myaccount.google.com/apppasswords
 3. Update .env with new password
@@ -165,6 +173,7 @@ docker logs fabric-notification-service | grep "UserCreatedEvent"
 **Cause:** Gmail marks unfamiliar senders as spam
 
 **Fix:**
+
 1. Check spam folder
 2. Mark as "Not Spam"
 3. Add `info@storeandsale.shop` to contacts
@@ -174,20 +183,22 @@ docker logs fabric-notification-service | grep "UserCreatedEvent"
 ## 📊 Verify Everything Works
 
 ### Database Check
+
 ```sql
 -- Connect to notification_db
 docker exec -it fabric-postgres psql -U postgres -d notification_db
 
 -- Check notification logs
-SELECT id, channel, recipient, status, sent_at 
-FROM notification_logs 
-ORDER BY created_at DESC 
+SELECT id, channel, recipient, status, sent_at
+FROM notification_logs
+ORDER BY created_at DESC
 LIMIT 10;
 
 -- Expected: 1 row with status='SENT', channel='EMAIL'
 ```
 
 ### Kafka Check
+
 ```bash
 # Check if topic exists
 docker exec -it fabric-kafka kafka-topics --bootstrap-server localhost:9092 --list | grep user.created
@@ -208,7 +219,7 @@ docker exec -it fabric-kafka kafka-console-consumer \
 ✅ Email received in inbox (or spam)  
 ✅ Verification code visible (6 digits)  
 ✅ notification_logs table has 1 SENT record  
-✅ No errors in logs  
+✅ No errors in logs
 
 ---
 
@@ -224,12 +235,14 @@ docker exec -it fabric-kafka kafka-console-consumer \
 ## 📝 Summary
 
 **What Works Today:**
+
 - ✅ Email notifications via Gmail SMTP
 - ✅ Verification code delivery
 - ✅ Multi-channel fallback (WhatsApp/SMS → Email)
 - ✅ Delivery tracking
 
 **What's Coming:**
+
 - ⏳ WhatsApp notifications (placeholder ready)
 - ⏳ SMS notifications (placeholder ready)
 - ⏳ HTML email templates
@@ -239,4 +252,3 @@ docker exec -it fabric-kafka kafka-console-consumer \
 
 **Maintainer:** Fabric Management Team  
 **Documentation Date:** 2025-10-15
-

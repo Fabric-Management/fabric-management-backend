@@ -61,12 +61,10 @@ export function SupportSection() {
               style={{
                 padding: "26px",
                 borderRadius: layoutTokens.radius.lg,
-                border: `1px solid ${colorTokens.border.default}`,
-                background: colorTokens.background.surface,
+                background: colorTokens.accent.subtle,
                 display: "flex",
                 flexDirection: "column",
                 gap: "18px",
-                boxShadow: "0 16px 34px rgba(15, 23, 42, 0.05)",
               }}
             >
               <div>
@@ -82,7 +80,7 @@ export function SupportSection() {
                 <p
                   style={{
                     marginTop: "10px",
-                    color: colorTokens.text.secondary,
+                    color: colorTokens.text.tertiary,
                     lineHeight: 1.6,
                   }}
                 >

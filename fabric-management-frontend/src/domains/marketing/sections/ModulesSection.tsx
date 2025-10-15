@@ -1,15 +1,22 @@
 // fabric-management-frontend/src/domains/marketing/sections/ModulesSection.tsx
 
-import Link from "next/link";
 import { FullWidthSection } from "@/ui/components/sections/FullWidthSection";
 import { Container } from "@/ui/components/layout/Container";
 import { colorTokens, typographyTokens, layoutTokens } from "@/ui/theme/tokens";
 import { fabricodeModules } from "@/domains/marketing/content/modules";
 
 export function ModulesSection() {
+  const pastelPalette = [
+    "#EEF3FF",
+    "#F9FAFB",
+    "#E9F6FF",
+    "#F4F5FF",
+    "#F7FBFF",
+  ];
+
   return (
     <FullWidthSection id="modules">
-      <Container className="space-y-12">
+      <Container className="space-y-16">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-end">
           <div>
             <p
@@ -17,7 +24,7 @@ export function ModulesSection() {
                 textTransform: "uppercase",
                 letterSpacing: "0.18em",
                 fontSize: "0.75rem",
-                color: colorTokens.text.secondary,
+                color: colorTokens.text.tertiary,
                 marginBottom: "12px",
               }}
             >
@@ -27,7 +34,6 @@ export function ModulesSection() {
               style={{
                 fontSize: typographyTokens.sizes.sectionTitle,
                 fontWeight: typographyTokens.weight.semibold,
-                color: colorTokens.text.primary,
                 lineHeight: 1.1,
               }}
             >
@@ -36,7 +42,7 @@ export function ModulesSection() {
           </div>
           <p
             style={{
-              color: colorTokens.text.secondary,
+              color: colorTokens.text.tertiary,
               lineHeight: 1.7,
             }}
           >
@@ -45,68 +51,96 @@ export function ModulesSection() {
         </div>
 
         <div
-          className="grid gap-6"
+          className="grid gap-10"
           style={{
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           }}
         >
-          {fabricodeModules.map((module) => (
-            <Link
+          {fabricodeModules.map((module, index) => (
+            <article
               key={module.id}
-              href={module.href}
-              className="group"
               style={{
+                background:
+                  pastelPalette[index % pastelPalette.length],
                 display: "flex",
                 flexDirection: "column",
-                gap: "18px",
-                padding: "24px",
+                gap: "1.5rem",
+                padding: "2.25rem",
                 borderRadius: layoutTokens.radius.lg,
-                background: colorTokens.background.surface,
-                border: `1px solid ${colorTokens.border.default}`,
-                boxShadow: "0 16px 34px rgba(15, 23, 42, 0.06)",
-                transition: "transform 0.25s ease, box-shadow 0.25s ease",
               }}
             >
-              <span
-                aria-hidden
+              <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div style={{ fontSize: "2rem" }} aria-hidden>
+                  {module.icon}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <p
+                    style={{
+                      fontSize: "0.9rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.2em",
+                      fontWeight: typographyTokens.weight.medium,
+                      color: colorTokens.text.tertiary,
+                    }}
+                  >
+                    {module.name}
+                  </p>
+                  <h3
+                    style={{
+                      fontSize: "1.3rem",
+                      fontWeight: typographyTokens.weight.semibold,
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {module.title}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "1rem",
+                      color: colorTokens.accent.primary,
+                      fontWeight: typographyTokens.weight.medium,
+                    }}
+                  >
+                    “{module.headline}”
+                  </p>
+                </div>
+              </header>
+              <p
                 style={{
-                  fontSize: "2rem",
+                  color: colorTokens.text.secondary,
+                  lineHeight: 1.65,
                 }}
               >
-                {module.icon}
-              </span>
-              <div>
+                {module.description}
+              </p>
+
+              <section style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                 <p
                   style={{
-                    fontWeight: typographyTokens.weight.semibold,
-                    fontSize: "1.1rem",
-                    color: colorTokens.text.primary,
+                    fontSize: "0.85rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.18em",
+                    color: colorTokens.text.tertiary,
+                    fontWeight: typographyTokens.weight.medium,
                   }}
                 >
-                  {module.name}
+                  Key capabilities
                 </p>
-                <p
-                  style={{
-                    marginTop: "8px",
-                    color: colorTokens.text.secondary,
-                    lineHeight: 1.5,
-                    fontSize: "0.95rem",
-                  }}
-                >
-                  {module.headline}
-                </p>
-              </div>
-              <span
-                style={{
-                  marginTop: "auto",
-                  fontSize: "0.95rem",
-                  color: colorTokens.accent.primary,
-                  fontWeight: typographyTokens.weight.medium,
-                }}
-              >
-                Learn More →
-              </span>
-            </Link>
+                <ul style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingLeft: "1.25rem", margin: 0 }}>
+                  {module.capabilities.map((item) => (
+                    <li
+                      key={item}
+                      style={{
+                        color: colorTokens.text.secondary,
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </article>
           ))}
         </div>
       </Container>

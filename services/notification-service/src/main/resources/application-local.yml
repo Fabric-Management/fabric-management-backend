@@ -18,18 +18,19 @@ spring:
     port: 6379
 
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: info@storeandsale.shop
+    host: smtp.hostinger.com
+    port: 465
+    username: noreply@storeandsale.shop
     password: ${PLATFORM_SMTP_PASSWORD:}
 
 notification:
   platform:
     email:
-      from: info@storeandsale.shop
+      from: noreply@storeandsale.shop
       fromName: Store and Sale
     whatsapp:
       enabled: true
+      provider: META
       fromNumber: +447553838399
 
 logging:

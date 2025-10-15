@@ -52,9 +52,7 @@ export function PricingSection() {
             maxWidth: "560px",
             padding: "40px",
             borderRadius: layoutTokens.radius.xl,
-            background: colorTokens.background.surface,
-            border: `1px solid ${colorTokens.border.strong}`,
-            boxShadow: "0 30px 60px rgba(15, 23, 42, 0.12)",
+            background: colorTokens.accent.subtle,
           }}
         >
           <div className="flex flex-col gap-6">

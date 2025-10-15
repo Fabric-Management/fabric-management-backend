@@ -23,7 +23,7 @@ export function FullWidthSection({
       style={{
         paddingTop: `clamp(${layoutTokens.sectionPadding.mobile}, 10vw, ${layoutTokens.sectionPadding.desktop})`,
         paddingBottom: `clamp(${layoutTokens.sectionPadding.mobile}, 10vw, ${layoutTokens.sectionPadding.desktop})`,
-        background: subdued ? colorTokens.background.base : colorTokens.background.surface,
+        background: subdued ? colorTokens.background.surface : colorTokens.background.base,
       }}
     >
       {children}

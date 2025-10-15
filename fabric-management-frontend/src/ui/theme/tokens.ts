@@ -2,30 +2,21 @@
 
 export const colorTokens = {
   background: {
-    base: "#F8F9FB",
-    surface: "#FFFFFF",
-    contrast: "#111827",
-    muted: "#E5E7EB",
-    footer: "#151823",
+    base: "#FFFFFF",
+    surface: "#F5F7FB",
+    contrast: "#0F172A",
+    muted: "#E2E8F0",
+    footer: "#111827",
   },
   text: {
     primary: "#0F172A",
-    secondary: "#475569",
-    accent: "#1E3A8A",
-    inverse: "#F8FAFF",
+    secondary: "#1F2937",
+    tertiary: "#4B5563",
+    inverse: "#F9FAFB",
   },
   accent: {
-    primary: "#1E3A8A",
-    subtle: "#E0E7FF",
-    gradientFrom: "#0F172A",
-    gradientTo: "#1E40AF",
-  },
-  border: {
-    default: "#E2E8F0",
-    strong: "#CBD5F5",
-  },
-  shadow: {
-    soft: "0 20px 45px rgba(15, 23, 42, 0.12)",
+    primary: "#2563EB",
+    subtle: "#E3ECFF",
   },
 } as const;
 
@@ -52,7 +43,7 @@ export const typographyTokens = {
 } as const;
 
 export const layoutTokens = {
-  maxWidth: "1200px",
+  maxWidth: "1400px",
   sectionPadding: {
     mobile: "64px",
     desktop: "120px",
@@ -70,22 +61,10 @@ export const layoutTokens = {
   },
 } as const;
 
-export const motionTokens = {
-  duration: {
-    short: 0.2,
-    medium: 0.4,
-    long: 0.6,
-  },
-  easing: {
-    standard: [0.2, 0.8, 0.2, 1],
-  },
-} as const;
-
 export const fabricodeThemeTokens = {
   color: colorTokens,
   typography: typographyTokens,
   layout: layoutTokens,
-  motion: motionTokens,
 };
 
 export type FabricodeThemeTokens = typeof fabricodeThemeTokens;
