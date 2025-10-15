@@ -241,6 +241,31 @@ public class ApiResponse<T> {
 
 ## 🚀 Microservice Development Principles
 
+### ⚡ ORCHESTRATION PATTERN - GOLDEN RULE (NEW - Oct 15, 2025)
+
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║                                                                   ║
+║  ⚡ CRITICAL: ATOMIC OPERATIONS FOR MULTI-STEP FLOWS             ║
+║                                                                   ║
+║  ❌ NEVER: verify() → setupPassword() → login() (3 HTTP)         ║
+║  ✅ ALWAYS: setupPasswordWithVerification() (1 HTTP)             ║
+║                                                                   ║
+║  Impact: 66% faster, 66% cheaper, 100% better UX                 ║
+║                                                                   ║
+║  📖 See: docs/development/ORCHESTRATION_PATTERN.md               ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+**Examples in Our Codebase:**
+- `TenantOnboardingService.registerTenant()` → Company + User + Contact (1 HTTP)
+- `AuthService.setupPasswordWithVerification()` → Verify + Password + Login (1 HTTP)
+
+**Rule:** If frontend needs 2+ related API calls → Create orchestration endpoint!
+
+---
+
 ### 1. Service Design
 
 #### Bounded Context

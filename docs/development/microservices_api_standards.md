@@ -36,6 +36,67 @@ Bu doküman, Fabric Management System'deki tüm microservisler ve API Gateway i�
 
 ---
 
+## ⚡ ORCHESTRATION PATTERN - GOLDEN RULE (CRITICAL!)
+
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║                                                                   ║
+║  ⚡ MANDATORY: ATOMIC OPERATIONS FOR MULTI-STEP API FLOWS        ║
+║                                                                   ║
+║  ❌ FORBIDDEN: Multiple sequential HTTP calls                    ║
+║  ❌ BAD API Design:                                               ║
+║     POST /verify-contact                                          ║
+║     POST /setup-password                                          ║
+║     POST /login                                                   ║
+║     = 3 HTTP, 900ms, bad UX                                       ║
+║                                                                   ║
+║  ✅ REQUIRED: Single atomic endpoint                             ║
+║  ✅ GOOD API Design:                                              ║
+║     POST /setup-password-with-verification                        ║
+║     = 1 HTTP, 350ms, instant UX                                   ║
+║                                                                   ║
+║  Benefits:                                                        ║
+║  • 66% latency reduction                                          ║
+║  • 66% cost reduction (DB + network)                              ║
+║  • ACID compliance (@Transactional rollback)                      ║
+║  • Simplified error handling                                      ║
+║  • Enterprise-grade UX                                            ║
+║                                                                   ║
+║  📖 Full Guide: docs/development/ORCHESTRATION_PATTERN.md        ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+**Implementation Examples:**
+```java
+// ✅ GOOD: Atomic orchestration
+@Transactional
+public LoginResponse setupPasswordWithVerification(request) {
+    verifyContact();     // Step 1
+    setupPassword();     // Step 2
+    generateJWT();       // Step 3
+    return loginResponse;
+}
+
+// ❌ BAD: Separate endpoints forcing frontend to orchestrate
+@PostMapping("/verify")     // Frontend calls this
+@PostMapping("/password")   // Then this
+@PostMapping("/login")      // Then this
+// = Bad API design, bad UX, bad performance
+```
+
+**When to Apply:**
+- Authentication flows (verify + password + login)
+- Registration (company + user + contact)
+- Checkout (validate + payment + order)
+- Multi-step wizards (any business process requiring 2+ steps)
+
+**When NOT to Apply:**
+- Single operations (getUser, deleteItem)
+- Independent operations (listUsers, searchCompanies)
+
+---
+
 ## ✅ RULE 1: Controller Base Path Standards
 
 ### 🔴 ZORUNLU KURAL: Service-Aware Pattern (Full Paths)
