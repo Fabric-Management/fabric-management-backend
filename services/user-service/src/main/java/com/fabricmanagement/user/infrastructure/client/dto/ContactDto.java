@@ -28,6 +28,7 @@ public class ContactDto {
     private String contactType;
     private boolean isPrimary;
     private boolean isVerified;
+    private String verificationCode; // For UserCreatedEvent
     private LocalDateTime verifiedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

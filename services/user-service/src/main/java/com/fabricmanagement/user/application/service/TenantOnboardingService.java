@@ -21,6 +21,7 @@ import com.fabricmanagement.user.infrastructure.repository.UserRepository;
 import com.fabricmanagement.shared.infrastructure.util.EmailValidationUtil;
 import com.fabricmanagement.shared.infrastructure.util.MaskingUtil;
 import com.fabricmanagement.shared.domain.event.tenant.TenantRegisteredEvent;
+import com.fabricmanagement.shared.domain.event.UserCreatedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -103,10 +104,10 @@ public class TenantOnboardingService {
             userId = createTenantAdminUser(request, tenantId);
             
             // Step 3: Create primary email contact (synchronous - needed for verification)
-            UUID contactId = createEmailContact(request.getEmail(), userId);
+            ContactDto contactDto = createEmailContact(request.getEmail(), userId);
             
-            // Step 4: Send verification email (best-effort, non-blocking)
-            sendVerificationEmail(contactId);
+            // Step 4: Publish UserCreatedEvent for notification service (verification code)
+            publishUserCreatedEvent(request, tenantId, userId, contactDto);
             
             // 🎯 Step 5: Publish TenantRegisteredEvent (ASYNC - other services will handle)
             // Contact Service will create company address + admin contacts
@@ -419,18 +420,46 @@ public class TenantOnboardingService {
         return response.getData().getId();
     }
     
-    private void sendVerificationEmail(UUID contactId) {
-        if (contactId == null) {
-            log.warn("Cannot send verification email, contactId is null");
-            return;
-        }
+    /**
+     * Publish UserCreatedEvent for Notification Service
+     * 
+     * Notification Service will send verification code via preferred channel:
+     * - Mobile → WhatsApp (default) or SMS (user-selectable)
+     * - Web → Email (default) or WhatsApp/SMS (user-selectable)
+     */
+    private void publishUserCreatedEvent(
+            TenantRegistrationRequest request,
+            UUID tenantId,
+            UUID userId,
+            ContactDto contact) {
         
-        try {
-            contactServiceClient.sendVerificationCode(contactId);
-            log.info("Verification email sent to contact: {}", contactId);
-        } catch (Exception e) {
-            log.error("Failed to send verification email, but registration continues", e);
-        }
+        String eventId = UUID.randomUUID().toString();
+        
+        UserCreatedEvent event = UserCreatedEvent.builder()
+            .eventId(eventId)
+            .tenantId(tenantId)
+            .userId(userId)
+            .email(request.getEmail())
+            .phone(request.getPhone())
+            .firstName(request.getFirstName())
+            .lastName(request.getLastName())
+            .companyName(request.getCompanyName())
+            .verificationCode(contact.getVerificationCode())
+            .preferredChannel(request.getPreferredChannel()) // ✅ WhatsApp/Email/SMS
+            .build();
+        
+        // Async publish (non-blocking)
+        CompletableFuture<SendResult<String, Object>> future = 
+            kafkaTemplate.send("user.created", userId.toString(), event);
+        
+        future.whenComplete((result, ex) -> {
+            if (ex == null) {
+                log.info("✅ UserCreatedEvent published successfully: {} (channel: {})", 
+                    userId, request.getPreferredChannel());
+            } else {
+                log.error("❌ Failed to publish UserCreatedEvent: {}", userId, ex);
+            }
+        });
     }
     
     private void performRollback(UUID companyId, UUID userId) {

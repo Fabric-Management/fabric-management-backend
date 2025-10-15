@@ -23,7 +23,7 @@ const [notificationChannel, setNotificationChannel] = useState('WHATSAPP');
 <Switch
   label="SMS ile doğrulama kodu al"
   value={notificationChannel === 'SMS'}
-  onValueChange={(enabled) => 
+  onValueChange={(enabled) =>
     setNotificationChannel(enabled ? 'SMS' : 'WHATSAPP')
   }
 />
@@ -75,6 +75,7 @@ POST /api/v1/public/onboarding/register
 ## 🔄 Backend Flow
 
 ### 1. User Service (Onboarding)
+
 ```java
 // ✅ Request DTO'da preferredChannel var
 public class TenantRegistrationRequest {
@@ -95,20 +96,22 @@ kafkaTemplate.send("user.created", event);
 ```
 
 ### 2. Notification Service (Listener)
+
 ```java
 @KafkaListener(topics = "user.created")
 public void onUserCreated(UserCreatedEvent event) {
     NotificationChannel channel = determineChannel(event);
-    
+
     // WhatsApp/SMS → phone, Email → email
     String recipient = (channel == EMAIL) ? event.getEmail() : event.getPhone();
-    
+
     // Notification gönder
     dispatchService.dispatch(notificationEvent);
 }
 ```
 
 ### 3. Fallback Pattern
+
 ```
 1. Preferred channel (WhatsApp/SMS/Email) → Try first
 2. If fails → Fallback to Email (always available)
@@ -119,11 +122,11 @@ public void onUserCreated(UserCreatedEvent event) {
 
 ## 📊 Channel Comparison
 
-| Channel | Cost | Speed | Reliability | Mobile Default | Web Default |
-|---------|------|-------|-------------|----------------|-------------|
-| **WhatsApp** | 💰 Lowest | ⚡ Fast | ✅ High | ✅ Yes | ❌ No |
-| **Email** | 💰💰 Low | ⚡⚡ Medium | ✅ High | ❌ No | ✅ Yes |
-| **SMS** | 💰💰💰 High | ⚡ Fast | ✅ High | ❌ No | ❌ No |
+| Channel      | Cost        | Speed       | Reliability | Mobile Default | Web Default |
+| ------------ | ----------- | ----------- | ----------- | -------------- | ----------- |
+| **WhatsApp** | 💰 Lowest   | ⚡ Fast     | ✅ High     | ✅ Yes         | ❌ No       |
+| **Email**    | 💰💰 Low    | ⚡⚡ Medium | ✅ High     | ❌ No          | ✅ Yes      |
+| **SMS**      | 💰💰💰 High | ⚡ Fast     | ✅ High     | ❌ No          | ❌ No       |
 
 ---
 
@@ -134,25 +137,25 @@ public void onUserCreated(UserCreatedEvent event) {
 ```jsx
 <View style={styles.notificationSelector}>
   <Text style={styles.label}>Doğrulama kodunu nasıl almak istersiniz?</Text>
-  
+
   <View style={styles.switchContainer}>
     <Text style={styles.channelText}>
-      {notificationChannel === 'WHATSAPP' ? '📱 WhatsApp' : '📟 SMS'}
+      {notificationChannel === "WHATSAPP" ? "📱 WhatsApp" : "📟 SMS"}
     </Text>
-    
+
     <Switch
-      value={notificationChannel === 'SMS'}
-      onValueChange={(enabled) => 
-        setNotificationChannel(enabled ? 'SMS' : 'WHATSAPP')
+      value={notificationChannel === "SMS"}
+      onValueChange={enabled =>
+        setNotificationChannel(enabled ? "SMS" : "WHATSAPP")
       }
-      trackColor={{ false: '#25D366', true: '#007AFF' }}
+      trackColor={{ false: "#25D366", true: "#007AFF" }}
     />
   </View>
-  
+
   <Text style={styles.hint}>
-    {notificationChannel === 'WHATSAPP' 
-      ? 'WhatsApp ile daha hızlı ve ücretsiz'
-      : 'SMS ile tüm telefonlara ulaşılabilir'}
+    {notificationChannel === "WHATSAPP"
+      ? "WhatsApp ile daha hızlı ve ücretsiz"
+      : "SMS ile tüm telefonlara ulaşılabilir"}
   </Text>
 </View>
 ```
@@ -162,38 +165,38 @@ public void onUserCreated(UserCreatedEvent event) {
 ```jsx
 <div className="notification-channel-selector">
   <label className="label">Doğrulama kodu gönderim tercihi</label>
-  
+
   <div className="radio-group">
     <label className="radio-option">
       <input
         type="radio"
         value="EMAIL"
-        checked={channel === 'EMAIL'}
-        onChange={(e) => setChannel(e.target.value)}
+        checked={channel === "EMAIL"}
+        onChange={e => setChannel(e.target.value)}
       />
       <span className="icon">📧</span>
       <span>Email</span>
       <span className="badge">Önerilen</span>
     </label>
-    
+
     <label className="radio-option">
       <input
         type="radio"
         value="WHATSAPP"
-        checked={channel === 'WHATSAPP'}
-        onChange={(e) => setChannel(e.target.value)}
+        checked={channel === "WHATSAPP"}
+        onChange={e => setChannel(e.target.value)}
       />
       <span className="icon">📱</span>
       <span>WhatsApp</span>
       <span className="badge">Hızlı</span>
     </label>
-    
+
     <label className="radio-option">
       <input
         type="radio"
         value="SMS"
-        checked={channel === 'SMS'}
-        onChange={(e) => setChannel(e.target.value)}
+        checked={channel === "SMS"}
+        onChange={e => setChannel(e.target.value)}
       />
       <span className="icon">📟</span>
       <span>SMS</span>
@@ -219,19 +222,19 @@ public void onUserCreated(UserCreatedEvent event) {
 
 ```javascript
 // Phone number required for WhatsApp/SMS
-if ((channel === 'WHATSAPP' || channel === 'SMS') && !phone) {
-  throw new Error('Telefon numarası gerekli');
+if ((channel === "WHATSAPP" || channel === "SMS") && !phone) {
+  throw new Error("Telefon numarası gerekli");
 }
 
 // Email required for Email channel
-if (channel === 'EMAIL' && !email) {
-  throw new Error('Email adresi gerekli');
+if (channel === "EMAIL" && !email) {
+  throw new Error("Email adresi gerekli");
 }
 
 // Phone format validation (E.164)
 const phoneRegex = /^\+[1-9]\d{1,14}$/;
 if (phone && !phoneRegex.test(phone)) {
-  throw new Error('Geçersiz telefon formatı (örn: +905551234567)');
+  throw new Error("Geçersiz telefon formatı (örn: +905551234567)");
 }
 ```
 
@@ -270,4 +273,3 @@ if (phone && !phoneRegex.test(phone)) {
 
 **Maintainer:** Fabric Management Team  
 **Documentation Date:** 2025-10-15
-
