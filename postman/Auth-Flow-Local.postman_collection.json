@@ -1,0 +1,201 @@
+{
+  "info": {
+    "_postman_id": "auth-flow-local-v4",
+    "name": "Auth Flow - Complete (v4.0)",
+    "description": "Complete authentication flow with notification-service integration\n\n✅ New Features:\n- Verification code via Email/WhatsApp\n- Atomic password setup + verification + login\n- Check contact with nextStep guidance\n- Optimized flow (3 requests → 1 request)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "4.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "contactValue",
+      "value": "fatih@akkayalartekstil.com.tr",
+      "type": "string"
+    },
+    {
+      "key": "phone",
+      "value": "+447553838399",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "verificationCode",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Check Contact (DB Validation)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "",
+              "if (pm.response.code === 200) {",
+              "    const res = pm.response.json();",
+              "    console.log('✅ Contact exists:', res.data.exists);",
+              "    console.log('✅ Verified:', res.data.verified);",
+              "    console.log('✅ Has password:', res.data.hasPassword);",
+              "    console.log('✅ Next step:', res.data.nextStep);",
+              "    ",
+              "    if (res.data.userId) {",
+              "        pm.collectionVariables.set('userId', res.data.userId);",
+              "    }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"{{contactValue}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/check-contact",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "check-contact"]
+        }
+      }
+    },
+    {
+      "name": "2. Send Verification Code (If Unverified)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "console.log('✅ Verification code sent!');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"{{contactValue}}\",\n  \"preferredChannel\": \"WHATSAPP\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/send-verification",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "send-verification"]
+        }
+      }
+    },
+    {
+      "name": "3. Setup Password + Verify + Login (ATOMIC)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "",
+              "if (pm.response.code === 200) {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('accessToken', res.data.accessToken);",
+              "    pm.collectionVariables.set('userId', res.data.userId);",
+              "    console.log('✅ Password created!');",
+              "    console.log('✅ Contact verified!');",
+              "    console.log('✅ Logged in!');",
+              "    console.log('✅ Access Token:', res.data.accessToken.substring(0, 20) + '...');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"{{contactValue}}\",\n  \"verificationCode\": \"123456\",\n  \"password\": \"Pass123!@#\",\n  \"preferredChannel\": \"WHATSAPP\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/setup-password-with-verification",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "setup-password-with-verification"]
+        }
+      }
+    },
+    {
+      "name": "4. Login (Normal Flow)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "",
+              "if (pm.response.code === 200) {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('accessToken', res.data.accessToken);",
+              "    console.log('✅ Logged in!');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contactValue\": \"{{contactValue}}\",\n  \"password\": \"Pass123!@#\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "auth", "login"]
+        }
+      }
+    }
+  ]
+}
+
