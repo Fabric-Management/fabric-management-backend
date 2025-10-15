@@ -86,6 +86,8 @@ kafka:
 security:
   jwt:
     secret: ${JWT_SECRET:your-secret-key-change-in-production}
+    expiration: ${JWT_EXPIRATION:3600000}
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}
   internal:
     api-key: ${INTERNAL_API_KEY:default-internal-key}
 
