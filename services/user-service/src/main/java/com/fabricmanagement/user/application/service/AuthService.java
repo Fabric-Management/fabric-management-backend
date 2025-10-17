@@ -87,6 +87,7 @@ public class AuthService {
             ApiResponse<ContactDto> response = contactServiceClient.findByContactValue(request.getContactValue());
             
             if (response == null || response.getData() == null) {
+                log.debug("Contact not found: {}", request.getContactValue());
                 return applyTimingMask(startTime, authMapper.toNotFoundResponse());
             }
 
@@ -98,6 +99,7 @@ public class AuthService {
                     .orElse(null);
 
             if (user == null) {
+                log.debug("User not found for contact: {}", request.getContactValue());
                 return applyTimingMask(startTime, authMapper.toUserNotFoundResponse());
             }
 
@@ -118,9 +120,12 @@ public class AuthService {
             
             return applyTimingMask(startTime, checkResponse);
 
+        } catch (feign.FeignException.NotFound e) {
+            log.debug("Contact not found in Contact Service: {}", request.getContactValue());
+            return applyTimingMask(startTime, authMapper.toNotFoundResponse());
         } catch (Exception e) {
-            log.error("Error checking contact: {}", e.getMessage(), e);
-            return applyTimingMask(startTime, authMapper.toErrorResponse());
+            log.error("Unexpected error checking contact: {}", e.getMessage(), e);
+            return applyTimingMask(startTime, authMapper.toNotFoundResponse());
         }
     }
 

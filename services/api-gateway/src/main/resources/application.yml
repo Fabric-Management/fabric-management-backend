@@ -190,8 +190,10 @@ resilience4j:
     instances:
       userServiceCircuitBreaker:
         base-config: default
-        # Tenant onboarding: P95=7s → Timeout 10.5s (%50 buffer) → Round to 15s (safe)
-        timeout-duration: ${USER_SERVICE_TIMEOUT:15s}
+        # Tenant onboarding with validations: P95=15s (5 sequential Feign)
+        # After parallel optimization: P95=3s → Timeout 6s
+        # Current (before optimization): 30s buffer for safety
+        timeout-duration: ${USER_SERVICE_TIMEOUT:30s}
       companyServiceCircuitBreaker:
         base-config: default
         # Company operations: P95=5s → Timeout 7.5s (%50 buffer) → Round to 10s

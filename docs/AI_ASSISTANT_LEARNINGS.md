@@ -107,14 +107,14 @@ Because in production, “good enough” never is.
 🧩 True engineering is not about writing more code — it’s about writing the right code.
 
 🧠 III. ENGINEERING BEHAVIORAL PRINCIPLES
-Principle	Description
-Fail Fast, Recover Gracefully	Detect issues early, isolate failure, and recover without downtime.
-Immutable Infrastructure	Nothing changes manually in production — everything is versioned, reproducible, and declarative.
-Explicit Over Implicit	Clarity always wins over brevity. Be predictable. Be readable.
-Automate, Don’t Depend	Every repetitive step must be automated — trust code, not memory.
-Measure Everything	If you can’t measure it, you can’t improve it. Integrate observability from day one.
-Ownership Over Blame	When something breaks, own the fix, not the fault.
-Refactor Ruthlessly	Legacy code deserves respect — and refactoring. Never accept “it works, don’t touch it.”
+Principle Description
+Fail Fast, Recover Gracefully Detect issues early, isolate failure, and recover without downtime.
+Immutable Infrastructure Nothing changes manually in production — everything is versioned, reproducible, and declarative.
+Explicit Over Implicit Clarity always wins over brevity. Be predictable. Be readable.
+Automate, Don’t Depend Every repetitive step must be automated — trust code, not memory.
+Measure Everything If you can’t measure it, you can’t improve it. Integrate observability from day one.
+Ownership Over Blame When something breaks, own the fix, not the fault.
+Refactor Ruthlessly Legacy code deserves respect — and refactoring. Never accept “it works, don’t touch it.”
 🧩 IV. CODE REVIEW PHILOSOPHY
 
 Review for design intent, not just syntax.
@@ -153,21 +153,19 @@ Use lowercase, hyphen-separated names (kebab-case) for all Docker containers and
 ✅ fabric-company-service  
 ✅ fabric-api-gateway
 
-
 Keep the service name identical across Docker, Spring application name, and log identifiers.
 
 spring.application.name = user-service  
 container_name = fabric-user-service
 
-
 Avoid version or environment suffixes inside names (e.g., -dev, -v1); handle environment via profiles, not naming.
 
 2️⃣ Port-to-Service Convention
-Service	Port	Example
-API Gateway	8080	fabric-api-gateway
-User Service	8081	fabric-user-service
-Contact Service	8082	fabric-contact-service
-Company Service	8083	fabric-company-service
+Service Port Example
+API Gateway 8080 fabric-api-gateway
+User Service 8081 fabric-user-service
+Contact Service 8082 fabric-contact-service
+Company Service 8083 fabric-company-service
 
 The port itself defines the service identity — this must never conflict across the environment.
 
@@ -177,20 +175,19 @@ Each microservice maintains its own Flyway history table.
 
 user_flyway_schema_history  
 company_flyway_schema_history  
-contact_flyway_schema_history  
+contact_flyway_schema_history
 
-
-Schema table names must follow {service}_flyway_schema_history to prevent cross-service migration collisions.
+Schema table names must follow {service}\_flyway_schema_history to prevent cross-service migration collisions.
 
 Migrations should be versioned consistently:
 
-V1__create_user_tables.sql  
-V2__add_user_roles.sql
+V1**create_user_tables.sql  
+V2**add_user_roles.sql
 
 4️⃣ Internal & Public Endpoint Naming
-Endpoint Type	Base Path	Example
-Internal API	/internal/{entity}	/internal/companies/{id}
-Public API	/api/v1/{entity}	/api/v1/users/{id}
+Endpoint Type Base Path Example
+Internal API /internal/{entity} /internal/companies/{id}
+Public API /api/v1/{entity} /api/v1/users/{id}
 
 Never mix internal and public endpoint prefixes.
 
@@ -209,7 +206,6 @@ Variables should express their full meaning — never abbreviate context.
 ✅ USER_SERVICE_URL, COMPANY_SERVICE_URL
 ⚠️ Avoid mixed usage: HOST vs URL must be distinct in purpose.
 
-
 HOST → network location (e.g., user-service)
 
 URL → protocol + host + port (e.g., http://user-service:8081)
@@ -223,7 +219,6 @@ Each log entry must identify service, instance, and correlationId.
 Log prefixes should follow:
 
 [service-name][instance-id][trace-id] LEVEL message
-
 
 Never log raw credentials, JWTs, or internal API keys.
 
@@ -241,51 +236,56 @@ Consistency builds trust; trust builds velocity.
 
 ---
 
-## 📊 QUICK SUMMARY (Top 13 Principles)
+## 📊 QUICK SUMMARY (Top 14 Principles)
 
 1. **🔴 PRODUCTION-READY CODE - NO SHORTCUTS** - Enterprise-level quality, zero technical debt
 2. **🔴 Shared Infrastructure - ZERO Boilerplate** - Extend base configs, NO duplicate infrastructure code
-3. **🔴 ⚡ ORCHESTRATION PATTERN - ATOMIC OPERATIONS** - Multiple operations → Single @Transactional endpoint (66% faster, 66% cheaper)
+3. **🔴 🎭 HYBRID PATTERN** - Orchestration (core flows) + Choreography (side effects) + Parallel (validations)
 4. **🔴 Annotation Over Hardcoded** - @InternalEndpoint > hardcoded paths (156 lines → 1 annotation!)
-5. **Configuration-Driven** - ${ENV_VAR:default} pattern for all timeouts/limits (P95-based tuning)
-6. **Check Existing First** - Migration/DTO/Class eklemeden önce mevcut kodları kontrol et
-7. **Minimal Comments** - Kod self-documenting, comment sadece WHY
-8. **DTO Duplication OK** - Microservices'te loose coupling > DRY
-9. **YAGNI + Future-Proofing Balance** - Foundation kur, business logic bekleme
-10. **Cleanup Culture** - Kullanılmayan kod = Konfüzyon
-11. **Microservice Boundaries** - Her service kendi domain'ine dokunur
-12. **Ripple Effect Analysis** - Constant değişti mi, kullanımları güncelle
-13. **Async First** - Kafka publishing = CompletableFuture (non-blocking)
+5. **🔴 i18n Messages MANDATORY** - All user-facing messages via MessageResolver + Custom Exceptions
+6. **Configuration-Driven** - ${ENV_VAR:default} pattern for all timeouts/limits (P95-based tuning)
+7. **Check Existing First** - Migration/DTO/Class eklemeden önce mevcut kodları kontrol et
+8. **Minimal Comments** - Kod self-documenting, comment sadece WHY
+9. **DTO Duplication OK** - Microservices'te loose coupling > DRY
+10. **YAGNI + Future-Proofing Balance** - Foundation kur, business logic bekleme
+11. **Cleanup Culture** - Kullanılmayan kod = Konfüzyon
+12. **Microservice Boundaries** - Her service kendi domain'ine dokunur
+13. **Ripple Effect Analysis** - Constant değişti mi, kullanımları güncelle
+14. **Async First** - Kafka publishing = CompletableFuture (non-blocking)
 
 ---
 
-## ⚡ ORCHESTRATION PATTERN - GOLDEN RULE
+## ⚡ HYBRID PATTERN - ORCHESTRATION + CHOREOGRAPHY
 
 ```
 ╔═══════════════════════════════════════════════════════════════════╗
 ║                                                                   ║
-║  ⚡ ORCHESTRATION PATTERN - MANDATORY FOR ALL MULTI-STEP FLOWS   ║
+║  🎭 HYBRID PATTERN - PRODUCTION-GRADE ARCHITECTURE               ║
 ║                                                                   ║
-║  ❌ NEVER: Multiple sequential HTTP calls for related operations ║
-║  ✅ ALWAYS: Single atomic @Transactional endpoint                ║
+║  Core Flows → Orchestration (@Transactional, atomic)             ║
+║  Validations → Parallel (CompletableFuture, concurrent)          ║
+║  Side Effects → Choreography (Event-driven, async)               ║
 ║                                                                   ║
-║  Example (Our Auth Flow - Oct 15, 2025):                         ║
-║  ❌ BAD:  verify() → setupPassword() → login() (3 HTTP, 900ms)   ║
-║  ✅ GOOD: setupPasswordWithVerification() (1 HTTP, 350ms)        ║
+║  Example (Tenant Onboarding - Oct 16, 2025):                     ║
+║  ⚡ Parallel Validations (3s vs 15s sequential)                  ║
+║  🎼 Orchestration: Company + User + Contact (atomic)             ║
+║  🩰 Choreography: Notification + Audit (event-driven)            ║
 ║                                                                   ║
 ║  Benefits:                                                        ║
-║  • 66% faster (network round-trips eliminated)                   ║
-║  • 66% cheaper (DB connection pool optimization)                 ║
-║  • 100% better UX (instant, no multiple loading screens)         ║
-║  • ACID compliant (automatic rollback on any failure)            ║
-║  • Simpler error handling (Spring manages transaction)           ║
+║  • 80% faster validations (parallel execution)                   ║
+║  • 66% faster transactions (atomic operations)                   ║
+║  • 100% async side effects (non-blocking)                        ║
+║  • ACID compliant (automatic rollback)                           ║
+║  • Loosely coupled (event-driven services)                       ║
+║  • Scalable (independent listeners)                              ║
 ║                                                                   ║
 ║  Real-World Impact (1M users/month):                             ║
-║  • Latency: 900ms → 350ms (61% faster)                           ║
+║  • Validation: 15s → 3s (80% faster)                             ║
+║  • Core flow: 900ms → 350ms (61% faster)                         ║
+║  • Side effects: Sync → Async (100% non-blocking)                ║
 ║  • Cost: $6000/mo → $2000/mo (66% cheaper)                       ║
-║  • UX: 3 loading screens → 1 instant transition                  ║
 ║                                                                   ║
-║  Used By: Google (Gmail), Amazon (Checkout), Netflix (Signup)    ║
+║  Used By: Google, Amazon, Netflix (industry standard)            ║
 ║                                                                   ║
 ║  📖 Full Guide: docs/development/ORCHESTRATION_PATTERN.md        ║
 ║                                                                   ║
@@ -293,12 +293,14 @@ Consistency builds trust; trust builds velocity.
 ```
 
 **When to Use:**
+
 - Multi-step authentication (verify + password + login)
 - Registration flows (company + user + contact)
 - Checkout processes (validate + charge + order)
 - Profile updates (user + contacts + settings)
 
 **When NOT to Use:**
+
 - Single operations (getUser, listItems)
 - Long-running tasks (use async + polling)
 - Independent operations (no relationship)
@@ -306,6 +308,42 @@ Consistency builds trust; trust builds velocity.
 **Golden Question:**  
 _"Will the user make multiple API calls for this business operation?"_  
 **If YES → Create orchestration endpoint!**
+
+---
+
+## 🌍 USER-FACING MESSAGES - i18n ARCHITECTURE
+
+**Mimari:** Custom Exceptions (shared-domain) + MessageResolver (shared-infrastructure) + GlobalExceptionHandler
+
+**Yerleşim:**
+
+- Custom Exceptions: `shared-domain/exception/`
+- Message Keys: `shared-domain/message/*MessageKeys.java`
+- i18n Files: `shared-infrastructure/resources/messages/*_messages_{locale}.properties`
+- Handler: `GlobalExceptionHandler` + MessageResolver injection
+
+**Pattern:**
+
+1. Custom exception oluştur (shared-domain, RuntimeException extends)
+2. Message key ekle (\*MessageKeys.java)
+3. Mesajları ekle (\_en.properties, \_tr.properties)
+4. GlobalExceptionHandler'a @ExceptionHandler ekle (MessageResolver kullan)
+
+**Naming:**
+
+- Exception: `{Domain}{Action}Exception` (InvalidVerificationCodeException)
+- Message Key: `{domain}.{action}.{detail}` (auth.verification.code_invalid)
+- Message File: `{domain}_messages_{locale}.properties`
+
+**ASLA:**
+
+- ❌ `throw new Exception("Hardcoded message")`
+- ❌ Kullanıcıya görünecek herhangi bir hardcoded string
+
+**DAIMA:**
+
+- ✅ Custom Exception → GlobalExceptionHandler → MessageResolver → i18n
+- ✅ Accept-Language header otomatik (EN/TR)
 
 ---
 

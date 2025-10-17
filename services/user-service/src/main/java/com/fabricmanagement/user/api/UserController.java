@@ -88,6 +88,20 @@ public class UserController {
                 .body(ApiResponse.success(userId, ServiceConstants.MSG_USER_CREATED));
     }
     
+    @PostMapping("/invite")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<com.fabricmanagement.user.api.dto.response.UserInvitationResponse>> inviteUser(
+            @Valid @RequestBody com.fabricmanagement.user.api.dto.request.InviteUserRequest request,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.info("Inviting user: {} for tenant: {}", request.getEmail(), ctx.getTenantId());
+        com.fabricmanagement.user.api.dto.response.UserInvitationResponse response = 
+            userService.inviteUser(request, ctx.getTenantId(), ctx.getUserId());
+        
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "User invited successfully"));
+    }
+    
     @PutMapping("/{userId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> updateUser(

@@ -62,6 +62,11 @@ public class ContactController {
                 .body(ApiResponse.success(response, ServiceConstants.MSG_CONTACT_CREATED));
     }
     
+    @InternalEndpoint(
+        description = "Get contacts by owner - used in profile composites",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @GetMapping("/owner/{ownerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<ContactResponse>>> getContactsByOwner(
@@ -75,6 +80,27 @@ public class ContactController {
         }
         
         List<ContactResponse> contacts = contactService.getContactsByOwner(ownerId);
+        return ResponseEntity.ok(ApiResponse.success(contacts));
+    }
+    
+    @InternalEndpoint(
+        description = "Get verified contacts only - used for notification targeting",
+        calledBy = {"user-service", "notification-service"},
+        critical = false
+    )
+    @GetMapping("/owner/{ownerId}/verified")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<ContactResponse>>> getVerifiedContacts(
+            @PathVariable UUID ownerId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Getting verified contacts for owner: {}", ownerId);
+        
+        if (!hasAccess(ctx, ownerId.toString())) {
+            return forbiddenResponse();
+        }
+        
+        List<ContactResponse> contacts = contactService.getVerifiedContacts(ownerId);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
@@ -113,6 +139,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_UPDATED));
     }
     
+    @InternalEndpoint(
+        description = "Delete contact - used when deleting user with cleanup",
+        calledBy = {"user-service"},
+        critical = false
+    )
     @DeleteMapping("/{contactId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteContact(
@@ -169,6 +200,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_VERIFICATION_CODE_SENT));
     }
 
+    @InternalEndpoint(
+        description = "Verify contact with code - used by orchestration flows",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PutMapping("/{contactId}/verify")
     public ResponseEntity<ApiResponse<Void>> verifyContact(
             @PathVariable UUID contactId,
@@ -214,6 +250,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_VERIFICATION_CODE_SENT));
     }
     
+    @InternalEndpoint(
+        description = "Get primary contact - used by other services",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @GetMapping("/owner/{ownerId}/primary")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ContactResponse>> getPrimaryContact(
@@ -230,8 +271,12 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contact));
     }
     
+    @InternalEndpoint(
+        description = "Check if email/phone is available - used by auth validation",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PostMapping("/check-availability")
-    // No @PreAuthorize - Internal endpoint protected by InternalAuthenticationFilter (X-Internal-API-Key)
     public ResponseEntity<ApiResponse<Boolean>> checkAvailability(@RequestParam String contactValue) {
         log.debug("Checking availability for contact value: {}", contactValue);
 
@@ -269,6 +314,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
 
+    @InternalEndpoint(
+        description = "Find contact by email/phone - used by auth flows",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @GetMapping("/find-by-value")
     public ResponseEntity<ApiResponse<ContactResponse>> findByContactValue(
             @RequestParam String contactValue) {
@@ -284,6 +334,11 @@ public class ContactController {
                             ServiceConstants.ERROR_CODE_CONTACT_NOT_FOUND)));
     }
     
+    @InternalEndpoint(
+        description = "Batch fetch contacts for multiple owners - N+1 query optimization",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @PostMapping("/batch/by-owners")
     public ResponseEntity<ApiResponse<java.util.Map<String, List<ContactResponse>>>> getContactsByOwnersBatch(
             @RequestBody List<UUID> ownerIds) {
@@ -311,6 +366,11 @@ public class ContactController {
     // ADDRESS ENDPOINTS
     // =============================================================================
     
+    @InternalEndpoint(
+        description = "Create address - used during company/user creation flows",
+        calledBy = {"user-service", "company-service"},
+        critical = true
+    )
     @PostMapping("/addresses")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<AddressResponse>> createAddress(
@@ -328,6 +388,11 @@ public class ContactController {
                 .body(ApiResponse.success(response, "Address created successfully"));
     }
     
+    @InternalEndpoint(
+        description = "Get addresses by owner - used in profile/dashboard composites",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @GetMapping("/addresses/owner/{ownerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<AddressResponse>>> getAddressesByOwner(
@@ -381,6 +446,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(response, "Address updated successfully"));
     }
     
+    @InternalEndpoint(
+        description = "Delete address - used when deleting user/company with cleanup",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @DeleteMapping("/addresses/{addressId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteAddress(

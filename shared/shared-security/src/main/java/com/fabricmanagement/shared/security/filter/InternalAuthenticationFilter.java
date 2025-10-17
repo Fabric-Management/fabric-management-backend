@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -36,6 +37,9 @@ import java.util.List;
  * - Endpoints in configuration → Require X-Internal-API-Key
  * - Other endpoints → Continue to JWT authentication
  * 
+ * NOTE: Only applies to servlet-based services (user, company, contact).
+ * Reactive services (api-gateway) use WebFlux security filters.
+ * 
  * @author Fabric Management Team
  * @since 1.0 (Refactored to annotation-based v3.2.0 - Oct 13, 2025)
  */
@@ -43,28 +47,13 @@ import java.util.List;
 @Component
 @Order(0) // Before JwtAuthenticationFilter (Order 1)
 @RequiredArgsConstructor
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class InternalAuthenticationFilter implements Filter {
     
     private final InternalEndpointRegistry endpointRegistry;
     
     @Value("${INTERNAL_API_KEY:}")
     private String internalApiKey;
-    
-    // Public paths that don't need authentication at all
-    private static final List<String> PUBLIC_PATHS = List.of(
-        "/actuator",
-        "/api/public",
-        "/api/v1/public",
-        "/api/v1/users/auth/login",
-        "/api/v1/users/auth/check-contact",
-        "/api/v1/users/auth/setup-password"
-    );
-    
-    // Public contact operations (verification during onboarding)
-    private static final List<String> PUBLIC_CONTACT_PATTERNS = List.of(
-        "/api/v1/contacts/.*/verify",           // Contact verification with code
-        "/api/v1/contacts/public/.*"            // Public contact endpoints (resend-verification, etc.)
-    );
     
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -76,13 +65,6 @@ public class InternalAuthenticationFilter implements Filter {
         String method = httpRequest.getMethod();
 
         log.trace("🔍 [InternalAuth] Processing: {} {}", method, path);
-
-        // Skip public paths
-        if (isPublicPath(path) || isPublicContactPattern(path)) {
-            log.trace("✅ [InternalAuth] Public path, skipping: {}", path);
-            chain.doFilter(request, response);
-            return;
-        }
 
         // Check if this is an internal endpoint (annotation or config)
         if (endpointRegistry.isInternalEndpoint(path, method)) {
@@ -125,15 +107,6 @@ public class InternalAuthenticationFilter implements Filter {
         }
 
         chain.doFilter(request, response);
-    }
-    
-    private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
-    }
-    
-    private boolean isPublicContactPattern(String path) {
-        return PUBLIC_CONTACT_PATTERNS.stream()
-            .anyMatch(pattern -> path.matches(pattern));
     }
     
     private void sendUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {

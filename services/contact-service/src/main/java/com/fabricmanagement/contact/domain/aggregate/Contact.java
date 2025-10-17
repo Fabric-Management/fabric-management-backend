@@ -1,6 +1,8 @@
 package com.fabricmanagement.contact.domain.aggregate;
 
 import com.fabricmanagement.shared.domain.base.BaseEntity;
+import com.fabricmanagement.shared.domain.exception.InvalidVerificationCodeException;
+import com.fabricmanagement.shared.domain.exception.VerificationCodeExpiredException;
 import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -82,11 +84,11 @@ public class Contact extends BaseEntity {
         }
         
         if (!code.equals(this.verificationCode)) {
-            throw new IllegalArgumentException("Invalid verification code");
+            throw new InvalidVerificationCodeException();
         }
         
         if (LocalDateTime.now().isAfter(this.verificationExpiresAt)) {
-            throw new IllegalArgumentException("Verification code has expired");
+            throw new VerificationCodeExpiredException();
         }
         
         this.isVerified = true;
@@ -95,9 +97,9 @@ public class Contact extends BaseEntity {
         this.verificationExpiresAt = null;
     }
     
-    public String generateVerificationCode() {
+    public String generateVerificationCode(int expiryMinutes) {
         this.verificationCode = generateRandomCode();
-        this.verificationExpiresAt = LocalDateTime.now().plusMinutes(15);
+        this.verificationExpiresAt = LocalDateTime.now().plusMinutes(expiryMinutes);
         return this.verificationCode;
     }
     
