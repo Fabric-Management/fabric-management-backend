@@ -3,13 +3,14 @@ package com.fabricmanagement.notification;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
  * Notification Service Application
@@ -34,22 +35,25 @@ import org.springframework.scheduling.annotation.EnableAsync;
  * @since 1.0 (Oct 15, 2025)
  */
 @Slf4j
-@SpringBootApplication
+@SpringBootApplication(
+    scanBasePackages = {
+        "com.fabricmanagement.notification",
+        "com.fabricmanagement.shared"
+    },
+    exclude = {RedisRepositoriesAutoConfiguration.class}
+)
 @EnableCaching
 @EnableAsync
 @EnableKafka
 @EnableJpaAuditing
-@ComponentScan(basePackages = {
-    "com.fabricmanagement.notification",
-    "com.fabricmanagement.shared"
-})
+@EnableTransactionManagement
 @EnableJpaRepositories(basePackages = {
     "com.fabricmanagement.notification.infrastructure.repository",
     "com.fabricmanagement.shared.infrastructure.policy.repository"
 })
 @EntityScan(basePackages = {
     "com.fabricmanagement.notification.domain",
-    "com.fabricmanagement.shared.infrastructure.policy.entity"
+    "com.fabricmanagement.shared.domain.policy"
 })
 public class NotificationServiceApplication {
 

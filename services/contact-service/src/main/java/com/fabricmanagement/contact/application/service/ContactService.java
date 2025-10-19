@@ -10,6 +10,7 @@ import com.fabricmanagement.contact.infrastructure.messaging.NotificationService
 import com.fabricmanagement.shared.domain.event.DomainEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,9 @@ public class ContactService {
     private final NotificationService notificationService;
     private final ContactMapper contactMapper;
     private final ContactEventMapper contactEventMapper;
+    
+    @Value("${contact.verification.code-expiry-minutes:15}")
+    private int verificationCodeExpiryMinutes;
     
     @Transactional
     public ContactResponse createContact(CreateContactRequest request) {
@@ -61,7 +65,7 @@ public class ContactService {
         // PHONE_EXTENSION doesn't need verification
         if (!"PHONE_EXTENSION".equals(contactType)) {
             if (!request.isAutoVerified()) {
-                String code = contact.generateVerificationCode();
+                String code = contact.generateVerificationCode(verificationCodeExpiryMinutes);
                 notificationService.sendVerificationCode(contact.getContactValue(), code, contact.getContactType());
             } else {
                 contact.setVerified(true);
@@ -242,7 +246,7 @@ public class ContactService {
             throw new IllegalStateException("Contact is already verified");
         }
         
-        String code = contact.generateVerificationCode();
+        String code = contact.generateVerificationCode(verificationCodeExpiryMinutes);
         contactRepository.save(contact);
         
         notificationService.sendVerificationCode(contact.getContactValue(), code, contact.getContactType());

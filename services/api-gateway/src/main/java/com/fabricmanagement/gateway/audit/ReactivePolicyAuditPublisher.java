@@ -7,12 +7,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 
 /**
@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
  * - Kafka-only (no database - Gateway has no DB)
  * - Fire-and-forget pattern
  * - Fail-safe (audit failure doesn't block request)
+ * - Config-driven enable/disable
  * 
  * Why not use PolicyAuditService?
  * - PolicyAuditService uses JPA (blocking I/O)
@@ -41,13 +42,27 @@ import java.time.LocalDateTime;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "policy.audit.enabled", havingValue = "true", matchIfMissing = true)
 public class ReactivePolicyAuditPublisher {
-    
-    private static final String KAFKA_TOPIC = "policy.audit";
     
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    
+    // ✅ Config-driven: Enable/disable audit publishing
+    @org.springframework.beans.factory.annotation.Value("${policy.audit.enabled:false}")
+    private boolean auditEnabled;
+    
+    // ✅ Config-driven topic name (ZERO HARDCODED!)
+    @org.springframework.beans.factory.annotation.Value("${kafka.topics.policy-audit:policy.audit}")
+    private String kafkaTopic;
+    
+    @PostConstruct
+    public void init() {
+        if (auditEnabled) {
+            log.info("✅ Policy audit publisher initialized and ENABLED - Topic: {}", kafkaTopic);
+        } else {
+            log.warn("⚠️ Policy audit publisher initialized but DISABLED by configuration.");
+        }
+    }
     
     /**
      * Publish policy decision audit event (reactive, non-blocking)
@@ -58,6 +73,12 @@ public class ReactivePolicyAuditPublisher {
      * @return Mono<Void> for reactive composition
      */
     public Mono<Void> publishDecision(PolicyContext context, PolicyDecision decision, long latencyMs) {
+        // ✅ Config-driven: Skip if audit disabled
+        if (!auditEnabled) {
+            log.debug("Policy audit disabled - skipping event: {}", context.getEndpoint());
+            return Mono.empty();
+        }
+        
         return Mono.fromRunnable(() -> publishSync(context, decision, latencyMs))
             .subscribeOn(Schedulers.boundedElastic()) // Offload to separate thread
             .onErrorResume(error -> {
@@ -69,7 +90,7 @@ public class ReactivePolicyAuditPublisher {
     }
     
     /**
-     * Synchronous publish (called on separate thread)
+     * Async publish (fire-and-forget, non-blocking)
      */
     private void publishSync(PolicyContext context, PolicyDecision decision, long latencyMs) {
         try {
@@ -80,15 +101,22 @@ public class ReactivePolicyAuditPublisher {
                         (context.getRequestId() != null ? context.getRequestId() : 
                          context.getUserId().toString());
             
-            kafkaTemplate.send(KAFKA_TOPIC, key, eventJson);
-            
-            log.debug("Published policy audit event. Topic: {}, Decision: {}, Endpoint: {}, Latency: {}ms",
-                KAFKA_TOPIC, decision.isAllowed() ? "ALLOW" : "DENY", context.getEndpoint(), latencyMs);
+            // ✅ ASYNC: Fire-and-forget (CompletableFuture)
+            kafkaTemplate.send(kafkaTopic, key, eventJson)
+                .whenComplete((result, ex) -> {
+                    if (ex == null) {
+                        log.debug("✅ Policy audit published: {}, Decision: {}", 
+                            context.getEndpoint(), decision.isAllowed() ? "ALLOW" : "DENY");
+                    } else {
+                        log.warn("⚠️ Policy audit failed (non-blocking): {} - {}", 
+                            context.getEndpoint(), ex.getMessage());
+                    }
+                });
             
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize policy audit event", e);
         } catch (Exception e) {
-            log.error("Failed to send audit event to Kafka", e);
+            log.warn("Failed to send audit event (non-blocking): {}", e.getMessage());
         }
     }
     

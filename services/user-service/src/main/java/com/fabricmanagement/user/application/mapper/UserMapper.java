@@ -194,6 +194,7 @@ public class UserMapper {
     }
     
     public User fromCreateRequest(CreateUserRequest request, UUID tenantId, String createdBy) {
+        // ✅ Parse role with fallback
         SystemRole role = SystemRole.USER; // Default role
         if (request.getRole() != null && !request.getRole().isEmpty()) {
             try {
@@ -204,8 +205,52 @@ public class UserMapper {
             }
         }
         
+        // ✅ Parse UserContext with fallback (NOT NULL in DB!)
+        UserContext userContext = UserContext.INTERNAL; // Default: INTERNAL
+        if (request.getUserContext() != null && !request.getUserContext().isEmpty()) {
+            try {
+                userContext = UserContext.valueOf(request.getUserContext());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid userContext '{}' provided, using default INTERNAL", request.getUserContext());
+                userContext = UserContext.INTERNAL;
+            }
+        }
+        
+        // ✅ Safe UUID parsing with validation
+        UUID companyId = null;
+        if (request.getCompanyId() != null && !request.getCompanyId().trim().isEmpty()) {
+            try {
+                companyId = UUID.fromString(request.getCompanyId().trim());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid UUID for companyId: '{}', setting to null", request.getCompanyId());
+            }
+        }
+        
+        UUID departmentId = null;
+        if (request.getDepartmentId() != null && !request.getDepartmentId().trim().isEmpty()) {
+            try {
+                departmentId = UUID.fromString(request.getDepartmentId().trim());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid UUID for departmentId: '{}', setting to null", request.getDepartmentId());
+            }
+        }
+        
+        UUID stationId = null;
+        if (request.getStationId() != null && !request.getStationId().trim().isEmpty()) {
+            try {
+                stationId = UUID.fromString(request.getStationId().trim());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid UUID for stationId: '{}', setting to null", request.getStationId());
+            }
+        }
+        
         return User.builder()
-                .id(UUID.randomUUID())
+                // ✅ DON'T set ID manually - BaseEntity has @GeneratedValue(UUID)!
+                // ✅ DON'T set version manually - BaseEntity has @Version!
+                // Hibernate will:
+                //   1. Generate UUID on persist
+                //   2. Set version=0 on first persist
+                //   3. Auto-increment version on each update
                 .tenantId(tenantId)
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -218,12 +263,11 @@ public class UserMapper {
                 .createdBy(createdBy)
                 .updatedBy(createdBy)
                 .deleted(false)
-                .version(0L)
-                .companyId(request.getCompanyId() != null ? UUID.fromString(request.getCompanyId()) : null)
-                .departmentId(request.getDepartmentId() != null ? UUID.fromString(request.getDepartmentId()) : null)
-                .stationId(request.getStationId() != null ? UUID.fromString(request.getStationId()) : null)
+                .companyId(companyId)
+                .departmentId(departmentId)
+                .stationId(stationId)
                 .jobTitle(request.getJobTitle())
-                .userContext(request.getUserContext() != null ? UserContext.valueOf(request.getUserContext()) : null)
+                .userContext(userContext)  // ✅ NEVER null - database constraint!
                 .build();
     }
     
@@ -245,7 +289,7 @@ public class UserMapper {
         if (request.getSettings() != null) user.setSettings(request.getSettings());
         
         user.setUpdatedBy(updatedBy);
-        user.setVersion(user.getVersion() + 1);
+        // ✅ DON'T increment version manually - Hibernate @Version auto-increments on save!
     }
 }
 

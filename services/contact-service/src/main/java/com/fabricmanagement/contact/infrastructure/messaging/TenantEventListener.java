@@ -8,8 +8,6 @@ import com.fabricmanagement.contact.domain.aggregate.Contact;
 import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import com.fabricmanagement.contact.domain.valueobject.AddressType;
 import com.fabricmanagement.shared.domain.event.tenant.TenantRegisteredEvent;
-import static com.fabricmanagement.shared.infrastructure.constants.ServiceConstants.TOPIC_TENANT_EVENTS;
-import static com.fabricmanagement.shared.infrastructure.constants.ServiceConstants.GROUP_CONTACT_SERVICE_TENANT;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -54,10 +52,12 @@ public class TenantEventListener {
      * 
      * NOTE: This is idempotent - duplicate events won't create duplicate records
      * (Address/Contact services handle uniqueness)
+     * 
+     * ✅ Config-driven topics (ZERO HARDCODED!)
      */
     @KafkaListener(
-        topics = TOPIC_TENANT_EVENTS,
-        groupId = GROUP_CONTACT_SERVICE_TENANT,
+        topics = "${kafka.topics.tenant-events:tenant-events}",
+        groupId = "contact-service-tenant-group",
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void handleTenantRegistered(

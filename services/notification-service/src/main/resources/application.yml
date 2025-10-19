@@ -48,13 +48,9 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-# Kafka Topics
-kafka:
-  topics:
-    user-created: ${KAFKA_TOPIC_USER_CREATED:user.created}
-    user-password-reset: ${KAFKA_TOPIC_USER_PASSWORD_RESET:user.password.reset}
-    contact-verification: ${KAFKA_TOPIC_CONTACT_VERIFICATION:contact.verification}
-
+  # ===========================================================================
+  # MAIL CONFIGURATION
+  # ===========================================================================
   mail:
     # Platform fallback SMTP (tenant-specific configs override this)
     host: ${PLATFORM_SMTP_HOST:smtp.hostinger.com}
@@ -62,25 +58,42 @@ kafka:
     username: ${PLATFORM_SMTP_USERNAME:noreply@storeandsale.shop}
     password: ${PLATFORM_SMTP_PASSWORD:}
     properties:
-      mail:
-        smtp:
-          auth: true
-          ssl:
-            enable: true
-          socketFactory:
-            port: 465
-            class: javax.net.ssl.SSLSocketFactory
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
+      mail.smtp.socketFactory.port: 465
+      mail.smtp.socketFactory.class: javax.net.ssl.SSLSocketFactory
 
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-    timeout: ${REDIS_TIMEOUT:2000}
+  # ===========================================================================
+  # REDIS & CACHE CONFIGURATION
+  # ===========================================================================
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:2000}
 
   cache:
     type: redis
     redis:
       time-to-live: ${CACHE_TTL:3600000}
+
+# ===========================================================================
+# KAFKA TOPICS
+# ===========================================================================
+kafka:
+  topics:
+    user-created: ${KAFKA_TOPIC_USER_CREATED:user.created}
+    user-password-reset: ${KAFKA_TOPIC_USER_PASSWORD_RESET:user.password.reset}
+    contact-verification: ${KAFKA_TOPIC_CONTACT_VERIFICATION:contact.verification}
+
+# ===========================================================================
+# PLATFORM BRANDING (for system emails)
+# ===========================================================================
+platform:
+  branding:
+    name: ${PLATFORM_NAME:FabriCode}
+    company: ${PLATFORM_COMPANY:Akkayalar Group}
 
 # Security Configuration
 security:

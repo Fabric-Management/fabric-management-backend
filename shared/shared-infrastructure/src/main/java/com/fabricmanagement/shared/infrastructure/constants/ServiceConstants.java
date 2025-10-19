@@ -49,16 +49,28 @@ public final class ServiceConstants {
     public static final String MSG_COMPANY_SUBSCRIPTION_UPDATED = "Company subscription updated successfully";
     public static final String MSG_COMPANY_ACTIVATED = "Company activated successfully";
     
-    // Kafka Topics - Event-Driven Architecture
+    // Kafka Topics - DEPRECATED!
+    // ❌ DO NOT USE! Use ${kafka.topics.xxx} in @KafkaListener instead
+    // These constants are kept temporarily for backward compatibility
+    // Will be removed in future versions (after full migration)
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String TOPIC_TENANT_EVENTS = "tenant-events";
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String TOPIC_COMPANY_EVENTS = "company-events";
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String TOPIC_USER_EVENTS = "user-events";
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String TOPIC_CONTACT_EVENTS = "contact-events";
     
-    // Kafka Consumer Groups
+    // Kafka Consumer Groups - DEPRECATED!
+    // ❌ DO NOT USE! Use ${spring.kafka.consumer.group-id} or explicit groupId
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String GROUP_CONTACT_SERVICE_TENANT = "contact-service-tenant-group";
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String GROUP_COMPANY_SERVICE_TENANT = "company-service-tenant-group";
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String GROUP_USER_SERVICE_COMPANY = "user-service-company-group";
+    
     public static final String MSG_COMPANY_DEACTIVATED = "Company deactivated successfully";
     
     // Success Messages - Permissions
@@ -77,6 +89,10 @@ public final class ServiceConstants {
     public static final String MSG_INVALID_CREDENTIALS = "Invalid credentials";
     public static final String MSG_PASSWORD_NOT_SET = "Password not set. Please setup your password first.";
     public static final String MSG_POLICY_VALIDATION_FAILED = "Policy validation failed";
+    public static final String MSG_INVALID_VERIFICATION_CODE = "Invalid verification code. Please try again.";
+    public static final String MSG_FAILED_TO_SEND_VERIFICATION_CODE = "Failed to send verification code. Please try again.";
+    public static final String MSG_CONTACT_ALREADY_VERIFIED = "Contact is already verified";
+    public static final String MSG_USER_ACCOUNT_NOT_ACTIVE = "User account is not active";
     
     // Error Messages - Company Duplicates
     public static final String MSG_COMPANY_TAX_ID_ALREADY_REGISTERED = "A company with this tax ID is already registered";
@@ -110,5 +126,14 @@ public final class ServiceConstants {
     public static final String AUDIT_ANONYMOUS_USER = "ANONYMOUS";     // Public actions before authentication
     public static final String AUDIT_SCHEDULER_USER = "SCHEDULER";     // Scheduled job actions
     public static final String AUDIT_MIGRATION_USER = "MIGRATION";     // Database migration actions
+    
+    // UI Next Step Actions (Frontend Routing)
+    public static final String NEXT_STEP_SEND_VERIFICATION = "send-verification";
+    public static final String NEXT_STEP_SETUP_PASSWORD = "setup-password";
+    public static final String NEXT_STEP_LOGIN = "login";
+    public static final String NEXT_STEP_DASHBOARD = "dashboard";
+    
+    // User Status Messages (for exceptions)
+    public static final String USER_STATUS_PENDING_OR_ACTIVE = "PENDING_VERIFICATION or ACTIVE";
 }
 

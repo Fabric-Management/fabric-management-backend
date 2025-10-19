@@ -7,6 +7,7 @@ import com.fabricmanagement.notification.domain.valueobject.NotificationTemplate
 import com.fabricmanagement.shared.domain.event.UserCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +32,12 @@ import java.util.Map;
 public class UserEventListener {
     
     private final NotificationDispatchService dispatchService;
+    
+    @Value("${platform.branding.name:FabriCode}")
+    private String platformName;
+    
+    @Value("${platform.branding.company:Akkayalar Group}")
+    private String platformCompany;
     
     /**
      * Handle user created event - send verification email
@@ -113,13 +120,13 @@ public class UserEventListener {
      * Build verification SMS/WhatsApp body (short format)
      */
     private String buildVerificationSmsBody(UserCreatedEvent event) {
-        String companyName = event.getCompanyName() != null ? event.getCompanyName() : "Store and Sale";
         String code = event.getVerificationCode() != null ? event.getVerificationCode() : "N/A";
         
         return String.format(
-            "%s verification code: %s\n\nThis code will expire in 15 minutes.\n\nIf you didn't request this, please ignore.",
-            companyName,
-            code
+            "%s verification code: %s\n\nExpires in 15 min.\n\nPowered by %s",
+            platformName,
+            code,
+            platformCompany
         );
     }
     
@@ -127,20 +134,26 @@ public class UserEventListener {
      * Build verification email body
      */
     private String buildVerificationEmailBody(UserCreatedEvent event) {
+        String firstName = event.getFirstName() != null ? event.getFirstName() : "there";
+        String code = event.getVerificationCode() != null ? event.getVerificationCode() : "N/A";
+        
         return """
             <h2>Welcome to %s!</h2>
             <p>Hi %s,</p>
             <p>Thank you for registering. Please verify your email address using the code below:</p>
-            <p class="code">%s</p>
+            <p class="code" style="font-size: 24px; font-weight: bold; color: #2563eb; padding: 20px; background: #f3f4f6; border-radius: 8px; text-align: center; letter-spacing: 4px;">%s</p>
             <p>This code will expire in 15 minutes.</p>
-            <p>If you didn't create this account, please ignore this email.</p>
+            <p style="color: #6b7280; font-size: 14px;">If you didn't create this account, please ignore this email.</p>
             <br>
-            <p>Best regards,<br>%s Team</p>
+            <p>Best regards,<br><strong>%s Team</strong></p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+            <p style="color: #9ca3af; font-size: 12px; text-align: center;">Powered by %s</p>
             """.formatted(
-                event.getCompanyName() != null ? event.getCompanyName() : "Store and Sale",
-                event.getFirstName() != null ? event.getFirstName() : "there",
-                event.getVerificationCode() != null ? event.getVerificationCode() : "N/A",
-                event.getCompanyName() != null ? event.getCompanyName() : "Store and Sale"
+                platformName,
+                firstName,
+                code,
+                platformName,
+                platformCompany
             );
     }
 }

@@ -11,7 +11,6 @@ import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import com.fabricmanagement.user.infrastructure.messaging.UserEventPublisher;
 import com.fabricmanagement.user.infrastructure.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,7 +21,6 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class UserService {
     
@@ -30,6 +28,20 @@ public class UserService {
     private final UserMapper userMapper;
     private final UserEventMapper eventMapper;
     private final UserEventPublisher eventPublisher;
+    private final com.fabricmanagement.user.infrastructure.client.ContactServiceClient contactServiceClient;
+    
+    public UserService(
+            UserRepository userRepository,
+            UserMapper userMapper,
+            UserEventMapper eventMapper,
+            UserEventPublisher eventPublisher,
+            @org.springframework.context.annotation.Lazy com.fabricmanagement.user.infrastructure.client.ContactServiceClient contactServiceClient) {
+        this.userRepository = userRepository;
+        this.userMapper = userMapper;
+        this.eventMapper = eventMapper;
+        this.eventPublisher = eventPublisher;
+        this.contactServiceClient = contactServiceClient;
+    }
     
     @Transactional(readOnly = true)
     public UserResponse getUser(UUID userId, UUID tenantId) {
@@ -71,6 +83,72 @@ public class UserService {
         eventPublisher.publishUserCreated(eventMapper.toCreatedEvent(user, request.getEmail()));
         
         return user.getId();
+    }
+    
+    @Transactional
+    public com.fabricmanagement.user.api.dto.response.UserInvitationResponse inviteUser(
+            com.fabricmanagement.user.api.dto.request.InviteUserRequest request,
+            UUID tenantId,
+            String createdBy) {
+        
+        log.info("Inviting user: {} for tenant: {}", request.getEmail(), tenantId);
+        
+        // Step 1: Create user
+        CreateUserRequest createRequest = CreateUserRequest.builder()
+            .firstName(request.getFirstName())
+            .lastName(request.getLastName())
+            .email(request.getEmail())
+            .phone(request.getPhone())
+            .role(request.getRole())
+            .build();
+        
+        UUID userId = createUser(createRequest, tenantId, createdBy);
+        
+        // Step 2: Create email contact (Feign call)
+        com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto emailContactRequest = 
+            com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto.builder()
+                .ownerId(userId.toString())
+                .ownerType("USER")
+                .contactType("EMAIL")
+                .contactValue(request.getEmail())
+                .isPrimary(true)
+                .build();
+        
+        com.fabricmanagement.user.infrastructure.client.dto.ContactDto emailContact = 
+            contactServiceClient.createContact(emailContactRequest).getData();
+        
+        // Step 3: Create phone contact (if provided)
+        UUID phoneContactId = null;
+        if (request.getPhone() != null && !request.getPhone().isEmpty()) {
+            com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto phoneContactRequest = 
+                com.fabricmanagement.user.infrastructure.client.dto.CreateContactDto.builder()
+                    .ownerId(userId.toString())
+                    .ownerType("USER")
+                    .contactType("PHONE")
+                    .contactValue(request.getPhone())
+                    .isPrimary(false)
+                    .build();
+            
+            com.fabricmanagement.user.infrastructure.client.dto.ContactDto phoneContact = 
+                contactServiceClient.createContact(phoneContactRequest).getData();
+            phoneContactId = phoneContact.getId();
+        }
+        
+        // Step 4: Send verification code (if requested)
+        if (request.isSendVerification()) {
+            contactServiceClient.sendVerificationCode(emailContact.getId());
+        }
+        
+        log.info("User invited successfully: userId={}, emailContactId={}", userId, emailContact.getId());
+        
+        // Step 5: Build response
+        return com.fabricmanagement.user.api.dto.response.UserInvitationResponse.builder()
+            .userId(userId)
+            .emailContactId(emailContact.getId())
+            .phoneContactId(phoneContactId)
+            .verificationSent(request.isSendVerification())
+            .message("User invited successfully")
+            .build();
     }
     
     @Transactional

@@ -8,6 +8,7 @@ import com.fabricmanagement.company.domain.valueobject.CompanyName;
 import com.fabricmanagement.company.domain.valueobject.CompanyStatus;
 import com.fabricmanagement.company.domain.valueobject.CompanyType;
 import com.fabricmanagement.company.domain.valueobject.Industry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -18,7 +19,9 @@ import java.util.UUID;
  * 
  * Handles DTO ↔ Entity transformations
  * Follows SRP: Only mapping logic, no business logic
+ * Safe UUID/Enum parsing with fallbacks
  */
+@Slf4j
 @Component
 public class CompanyMapper {
 
@@ -47,18 +50,29 @@ public class CompanyMapper {
                 .createdBy(createdBy)
                 .build();
 
-        if (request.getBusinessType() != null) {
-            company.setBusinessType(
-                com.fabricmanagement.shared.domain.policy.CompanyType.valueOf(request.getBusinessType())
-            );
+        if (request.getBusinessType() != null && !request.getBusinessType().trim().isEmpty()) {
+            try {
+                company.setBusinessType(
+                    com.fabricmanagement.shared.domain.policy.CompanyType.valueOf(request.getBusinessType())
+                );
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid businessType: '{}', using default INTERNAL", request.getBusinessType());
+                company.setBusinessType(com.fabricmanagement.shared.domain.policy.CompanyType.INTERNAL);
+            }
         }
         
-        if (request.getParentCompanyId() != null) {
-            company.setParentCompanyId(UUID.fromString(request.getParentCompanyId()));
+        // ✅ Safe UUID parsing for parentCompanyId
+        if (request.getParentCompanyId() != null && !request.getParentCompanyId().trim().isEmpty()) {
+            try {
+                company.setParentCompanyId(UUID.fromString(request.getParentCompanyId().trim()));
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid UUID for parentCompanyId: '{}', setting to null", request.getParentCompanyId());
+                // Leave as null - optional field
+            }
         }
         
-        if (request.getRelationshipType() != null) {
-            company.setRelationshipType(request.getRelationshipType());
+        if (request.getRelationshipType() != null && !request.getRelationshipType().trim().isEmpty()) {
+            company.setRelationshipType(request.getRelationshipType().trim());
         }
         
         company.setAddressLine1(request.getAddressLine1());

@@ -1,11 +1,10 @@
 # =============================================================================
 # FABRIC MANAGEMENT SYSTEM - MAKEFILE
 # =============================================================================
-# Professional deployment and development commands
+# Production-ready development & deployment commands
 
-.PHONY: help build test clean deploy down restart logs status health
+.PHONY: help setup validate-env build test clean deploy down restart logs status health db-shell rebuild-service restart-service logs-service kafka-topics kafka-describe kafka-delete kafka-consumer
 
-# Default target
 .DEFAULT_GOAL := help
 
 # Colors
@@ -13,60 +12,107 @@ BLUE := \033[0;34m
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
 RED := \033[0;31m
-NC := \033[0m # No Color
+NC := \033[0m
 
 # =============================================================================
 # HELP
 # =============================================================================
-help: ## Show this help message
+help: ## Show available commands
 	@echo "$(GREEN)========================================$(NC)"
 	@echo "$(GREEN)  Fabric Management - Make Commands$(NC)"
 	@echo "$(GREEN)========================================$(NC)"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(BLUE)%-20s$(NC) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(BLUE)%-25s$(NC) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(YELLOW)Examples:$(NC)"
+	@echo "  make rebuild-service SERVICE=user-service"
+	@echo "  make logs-service SERVICE=contact-service"
 	@echo ""
 
 # =============================================================================
-# DEVELOPMENT
+# SETUP
 # =============================================================================
-setup: ## Initial setup - Copy .env.example to .env
+setup: ## Initial setup - create .env from template
 	@echo "$(YELLOW)🔧 Setting up environment...$(NC)"
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
-		echo "$(GREEN)✅ .env file created. Please update it with your values.$(NC)"; \
+		echo "$(GREEN)✅ .env created. Update with your values.$(NC)"; \
 	else \
-		echo "$(YELLOW)⚠️  .env file already exists.$(NC)"; \
+		echo "$(YELLOW)⚠️  .env already exists.$(NC)"; \
 	fi
 
-validate-env: ## Validate environment variables
-	@echo "$(YELLOW)🔍 Validating environment variables...$(NC)"
+validate-env: ## Validate .env file exists
+	@echo "$(YELLOW)🔍 Validating environment...$(NC)"
 	@if [ ! -f .env ]; then \
-		echo "$(RED)❌ .env file not found!$(NC)"; \
+		echo "$(RED)❌ .env not found! Run: make setup$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(GREEN)✅ Environment file exists$(NC)"
+	@echo "$(GREEN)✅ Environment valid$(NC)"
 
 # =============================================================================
 # BUILD
 # =============================================================================
-build: ## Build all services
+build: ## Build all services (Maven + Docker)
 	@echo "$(YELLOW)🏗️  Building all services...$(NC)"
-	mvn clean install -DskipTests
-	@echo "$(GREEN)✅ Build completed$(NC)"
+	@mvn clean install -DskipTests
+	@docker compose up -d
+	@docker compose build --no-cache
+	@echo "$(GREEN)✅ Build completed & services started$(NC)"
+	@sleep 200
+	@make status
 
-build-services: ## Build Docker images for all services
-	@echo "$(YELLOW)🐳 Building Docker images...$(NC)"
-	docker-compose -f docker-compose-complete.yml build
-	@echo "$(GREEN)✅ Docker images built$(NC)"
+build-shared: ## Build all shared modules (domain, infrastructure, security)
+	@echo "$(YELLOW)🏗️  Building shared modules...$(NC)"
+	@cd shared/shared-domain && mvn clean install -DskipTests
+	@cd shared/shared-application && mvn clean install -DskipTests
+	@cd shared/shared-infrastructure && mvn clean install -DskipTests
+	@cd shared/shared-security && mvn clean install -DskipTests
+	@echo "$(GREEN)✅ Shared modules built$(NC)"
 
-build-service: ## Build specific service (use: make build-service SERVICE=user-service)
-	@echo "$(YELLOW)🐳 Building $(SERVICE)...$(NC)"
+build-service: ## Build specific service (make build-service SERVICE=user-service)
+	@echo "$(YELLOW)🏗️  Building $(SERVICE)...$(NC)"
 	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Please specify SERVICE=service-name$(NC)"; \
+		echo "$(RED)❌ Specify: make build-service SERVICE=service-name$(NC)"; \
 		exit 1; \
 	fi
-	docker-compose -f docker-compose-complete.yml build $(SERVICE)
+	@mvn clean package -pl services/$(SERVICE) -am -DskipTests
 	@echo "$(GREEN)✅ $(SERVICE) built$(NC)"
+
+rebuild-service: ## Rebuild + restart service (make rebuild-service SERVICE=user-service)
+	@echo "$(YELLOW)⚡ Rebuilding $(SERVICE)...$(NC)"
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "$(RED)❌ Specify: make rebuild-service SERVICE=service-name$(NC)"; \
+		exit 1; \
+	fi
+	@mvn clean package -pl services/$(SERVICE) -am -DskipTests
+	@docker compose up -d --build --no-deps fabric-$(SERVICE)
+	@echo "$(GREEN)✅ $(SERVICE) rebuilt & restarted$(NC)"
+
+rebuild-with-shared: ## Rebuild shared + service + restart (make rebuild-with-shared SERVICE=user-service)
+	@echo "$(YELLOW)⚡ Rebuilding shared + $(SERVICE)...$(NC)"
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "$(RED)❌ Specify: make rebuild-with-shared SERVICE=service-name$(NC)"; \
+		exit 1; \
+	fi
+	@make build-shared
+	@mvn clean package -pl services/$(SERVICE) -DskipTests
+	@docker compose up -d --build --no-deps fabric-$(SERVICE)
+	@echo "$(GREEN)✅ Shared + $(SERVICE) rebuilt & restarted$(NC)"
+
+rebuild: ## 🔄 Full clean rebuild (remove everything & rebuild all)
+	@echo "$(YELLOW)🧹  Cleaning up all Docker resources...$(NC)"
+	@docker compose down --rmi all --volumes --remove-orphans || true
+	@docker builder prune -a -f || true
+	@docker system prune -a --volumes -f || true
+	@echo "$(YELLOW)🏗️  Building all services (Maven + Docker)...$(NC)"
+	@mvn clean install -DskipTests
+	@echo "$(YELLOW)🚧  Building Docker images without cache...$(NC)"
+	@docker compose build --no-cache
+	@echo "$(YELLOW)🚀  Starting Docker containers...$(NC)"
+	@docker compose up -d
+	@echo "$(GREEN)✅  Rebuild completed & services started$(NC)"
+	@sleep 240
+	@make status
 
 # =============================================================================
 # TEST
@@ -76,10 +122,10 @@ test: ## Run all tests
 	mvn test
 	@echo "$(GREEN)✅ Tests completed$(NC)"
 
-test-service: ## Test specific service (use: make test-service SERVICE=user-service)
+test-service: ## Test specific service (make test-service SERVICE=user-service)
 	@echo "$(YELLOW)🧪 Testing $(SERVICE)...$(NC)"
 	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Please specify SERVICE=service-name$(NC)"; \
+		echo "$(RED)❌ Specify: make test-service SERVICE=service-name$(NC)"; \
 		exit 1; \
 	fi
 	mvn test -pl services/$(SERVICE)
@@ -88,253 +134,222 @@ test-service: ## Test specific service (use: make test-service SERVICE=user-serv
 # =============================================================================
 # DEPLOYMENT
 # =============================================================================
-deploy-infra: validate-env ## Deploy infrastructure services (PostgreSQL, Redis, Kafka)
+deploy-infra: validate-env ## Deploy infrastructure (PostgreSQL, Redis, Kafka)
 	@echo "$(YELLOW)🚀 Deploying infrastructure...$(NC)"
-	docker-compose up -d
+	docker compose up -d postgres redis kafka
 	@echo "$(GREEN)✅ Infrastructure deployed$(NC)"
-	@echo "$(BLUE)ℹ️  Waiting for services to be healthy...$(NC)"
-	@sleep 10
+	@sleep 5
 	@make status
 
-deploy: validate-env build-services ## Deploy all services (infrastructure + microservices)
+deploy: validate-env ## Deploy all services
 	@echo "$(YELLOW)🚀 Deploying complete system...$(NC)"
-	docker-compose -f docker-compose-complete.yml up -d
+	docker compose up -d
 	@echo "$(GREEN)✅ System deployed$(NC)"
-	@echo "$(BLUE)ℹ️  Waiting for services to be healthy...$(NC)"
-	@sleep 15
+	@sleep 10
 	@make health
-
-deploy-service: ## Deploy specific service (use: make deploy-service SERVICE=user-service)
-	@echo "$(YELLOW)🚀 Deploying $(SERVICE)...$(NC)"
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Please specify SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	docker-compose -f docker-compose-complete.yml up -d $(SERVICE)
-	@echo "$(GREEN)✅ $(SERVICE) deployed$(NC)"
 
 # =============================================================================
 # MANAGEMENT
 # =============================================================================
 down: ## Stop all services
-	@echo "$(YELLOW)🛑 Stopping all services...$(NC)"
-	docker-compose -f docker-compose-complete.yml down
+	@echo "$(YELLOW)🛑 Stopping services...$(NC)"
+	docker compose down
 	@echo "$(GREEN)✅ Services stopped$(NC)"
 
-down-clean: ## Stop all services and remove volumes
-	@echo "$(RED)⚠️  Stopping services and removing volumes...$(NC)"
-	docker-compose -f docker-compose-complete.yml down -v
-	@echo "$(GREEN)✅ Services stopped and volumes removed$(NC)"
+down-clean: ## Stop services + remove volumes (DESTRUCTIVE!)
+	@echo "$(RED)⚠️  Stopping services & removing volumes...$(NC)"
+	docker compose down -v
+	@echo "$(GREEN)✅ Services stopped, volumes removed$(NC)"
 
 restart: ## Restart all services
 	@echo "$(YELLOW)🔄 Restarting services...$(NC)"
-	docker-compose -f docker-compose-complete.yml restart
+	docker compose restart
 	@echo "$(GREEN)✅ Services restarted$(NC)"
 
-restart-service: ## Restart specific service (use: make restart-service SERVICE=user-service)
+restart-service: ## Restart specific service (make restart-service SERVICE=user-service)
 	@echo "$(YELLOW)🔄 Restarting $(SERVICE)...$(NC)"
 	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Please specify SERVICE=service-name$(NC)"; \
+		echo "$(RED)❌ Specify: make restart-service SERVICE=service-name$(NC)"; \
 		exit 1; \
 	fi
-	docker-compose -f docker-compose-complete.yml restart $(SERVICE)
+	docker compose restart fabric-$(SERVICE)
 	@echo "$(GREEN)✅ $(SERVICE) restarted$(NC)"
 
 # =============================================================================
 # MONITORING
 # =============================================================================
-logs: ## Show logs from all services
-	docker-compose -f docker-compose-complete.yml logs -f
+status: ## Show service status
+	@echo "$(YELLOW)📊 Service Status:$(NC)"
+	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 
-logs-service: ## Show logs from specific service (use: make logs-service SERVICE=user-service)
+logs: ## Show logs from all services
+	docker compose logs -f --tail=100
+
+logs-service: ## Show logs from service (make logs-service SERVICE=user-service)
 	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Please specify SERVICE=service-name$(NC)"; \
+		echo "$(RED)❌ Specify: make logs-service SERVICE=service-name$(NC)"; \
 		exit 1; \
 	fi
-	docker-compose -f docker-compose-complete.yml logs -f $(SERVICE)
+	docker compose logs -f --tail=100 fabric-$(SERVICE)
 
-status: ## Show status of all containers
-	@echo "$(BLUE)📊 Container Status:$(NC)"
-	@docker-compose -f docker-compose-complete.yml ps
+logs-errors: ## Show ERROR/EXCEPTION logs
+	@docker compose logs --tail=200 | grep -iE "error|exception|failed" || echo "$(GREEN)✅ No errors$(NC)"
 
-health: ## Check health of all services
+health: ## Check service health
 	@echo "$(BLUE)🏥 Health Check:$(NC)"
-	@echo ""
-	@echo "$(YELLOW)User Service:$(NC)"
-	@curl -s http://localhost:8081/actuator/health | jq . || echo "$(RED)❌ User Service not responding$(NC)"
-	@echo ""
-	@echo "$(YELLOW)Contact Service:$(NC)"
-	@curl -s http://localhost:8082/actuator/health | jq . || echo "$(RED)❌ Contact Service not responding$(NC)"
-	@echo ""
-	@echo "$(YELLOW)Company Service:$(NC)"
-	@curl -s http://localhost:8083/actuator/health | jq . || echo "$(RED)❌ Company Service not responding$(NC)"
+	@echo "\n$(YELLOW)User Service:$(NC)"
+	@curl -s http://localhost:8081/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Not responding$(NC)"
+	@echo "\n$(YELLOW)Contact Service:$(NC)"
+	@curl -s http://localhost:8082/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Not responding$(NC)"
+	@echo "\n$(YELLOW)Company Service:$(NC)"
+	@curl -s http://localhost:8083/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Not responding$(NC)"
 
 ps: ## Show running containers
-	docker ps --filter "name=fabric-*" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@docker ps --filter "name=fabric-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 # =============================================================================
 # DATABASE
 # =============================================================================
-db-migrate: ## Run database migrations
-	@echo "$(YELLOW)🗄️  Running migrations...$(NC)"
-	@echo "$(BLUE)ℹ️  Migrations run automatically on service startup$(NC)"
+db-shell: ## Open PostgreSQL shell
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb
+
+db-tables: ## List all tables with row counts
+	@echo "$(YELLOW)📊 Database Tables:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
+		SELECT \
+			schemaname AS schema, \
+			tablename AS table, \
+			pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size, \
+			(SELECT count(*) FROM information_schema.columns WHERE table_name = tablename) AS columns, \
+			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS rows \
+		FROM pg_tables \
+		WHERE schemaname NOT IN ('pg_catalog', 'information_schema') \
+		ORDER BY schemaname, tablename;"
+
+db-data: ## Show tables with data (non-empty)
+	@echo "$(YELLOW)📊 Tables with Data:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
+		SELECT \
+			schemaname AS schema, \
+			tablename AS table, \
+			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS rows \
+		FROM pg_tables \
+		WHERE schemaname NOT IN ('pg_catalog', 'information_schema') \
+		AND (xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int > 0 \
+		ORDER BY rows DESC;"
+
+db-show: ## Show table data (make db-show TABLE=users LIMIT=10)
+	@if [ -z "$(TABLE)" ]; then \
+		echo "$(RED)❌ Specify: make db-show TABLE=table-name LIMIT=10$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)📊 Data from $(TABLE):$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "SELECT * FROM $(TABLE) LIMIT $${LIMIT:-10};"
+
+db-count: ## Count rows in all tables
+	@echo "$(YELLOW)📊 Row Counts:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
+		SELECT \
+			tablename, \
+			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS row_count \
+		FROM pg_tables \
+		WHERE schemaname = 'public' \
+		ORDER BY row_count DESC NULLS LAST;"
 
 db-backup: ## Backup database
 	@echo "$(YELLOW)💾 Backing up database...$(NC)"
-	docker exec -t fabric-postgres pg_dump -U fabric_user fabric_management > backup-$$(date +%Y%m%d-%H%M%S).sql
+	@docker exec -t fabric-postgres pg_dump -U fabricuser fabricdb > backup-$$(date +%Y%m%d-%H%M%S).sql
 	@echo "$(GREEN)✅ Database backed up$(NC)"
 
-db-restore: ## Restore database (use: make db-restore FILE=backup.sql)
+db-restore: ## Restore database (make db-restore FILE=backup.sql)
 	@echo "$(YELLOW)📥 Restoring database...$(NC)"
 	@if [ -z "$(FILE)" ]; then \
-		echo "$(RED)❌ Please specify FILE=backup.sql$(NC)"; \
+		echo "$(RED)❌ Specify: make db-restore FILE=backup.sql$(NC)"; \
 		exit 1; \
 	fi
-	docker exec -i fabric-postgres psql -U fabric_user fabric_management < $(FILE)
+	@docker exec -i fabric-postgres psql -U fabricuser fabricdb < $(FILE)
 	@echo "$(GREEN)✅ Database restored$(NC)"
-
-db-shell: ## Open PostgreSQL shell
-	docker exec -it fabric-postgres psql -U fabric_user -d fabric_management
 
 # =============================================================================
 # CLEANUP
 # =============================================================================
-clean: ## Clean build artifacts
+clean: ## Clean Maven build artifacts
 	@echo "$(YELLOW)🧹 Cleaning build artifacts...$(NC)"
 	mvn clean
 	@echo "$(GREEN)✅ Clean completed$(NC)"
 
-clean-docker: ## Remove all Docker images
+clean-docker: ## Remove Docker images (DESTRUCTIVE!)
 	@echo "$(RED)⚠️  Removing Docker images...$(NC)"
-	docker-compose -f docker-compose-complete.yml down --rmi all
+	docker compose down --rmi all
 	@echo "$(GREEN)✅ Docker images removed$(NC)"
 
-prune: ## Clean Docker system (dangling images, networks, etc.)
+prune: ## Clean Docker system (dangling resources)
 	@echo "$(YELLOW)🧹 Pruning Docker system...$(NC)"
 	docker system prune -f
 	@echo "$(GREEN)✅ Docker system pruned$(NC)"
 
 # =============================================================================
-# DEVELOPMENT TOOLS
+# CODE QUALITY
 # =============================================================================
-format: ## Format code
+format: ## Format code (Spotless)
 	@echo "$(YELLOW)💅 Formatting code...$(NC)"
 	mvn spotless:apply
 	@echo "$(GREEN)✅ Code formatted$(NC)"
 
-lint: ## Lint code
+lint: ## Lint code (Spotless check)
 	@echo "$(YELLOW)🔍 Linting code...$(NC)"
 	mvn spotless:check
 	@echo "$(GREEN)✅ Linting completed$(NC)"
 
 # =============================================================================
-# FAST DEVELOPMENT COMMANDS (Hot Reload)
+# KAFKA MANAGEMENT (Debug & Inspection)
 # =============================================================================
-dev-restart-gateway: ## Fast restart: API Gateway only (~30s)
-	@echo "$(YELLOW)⚡ Fast restart: API Gateway...$(NC)"
-	docker compose restart api-gateway
-	@echo "$(GREEN)✅ Gateway restarted (config changes applied)$(NC)"
+# NOTE: Topics auto-initialize via docker-compose.yml kafka-init container
+#       These commands are for debugging and inspection only
 
-dev-restart-user: ## Fast restart: User Service only (~30s)
-	@echo "$(YELLOW)⚡ Fast restart: User Service...$(NC)"
-	docker compose restart user-service
-	@echo "$(GREEN)✅ User Service restarted$(NC)"
+kafka-topics: ## List all Kafka topics
+	@echo "$(YELLOW)📋 Listing Kafka topics...$(NC)"
+	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --list
 
-dev-restart-contact: ## Fast restart: Contact Service only (~30s)
-	@echo "$(YELLOW)⚡ Fast restart: Contact Service...$(NC)"
-	docker compose restart contact-service
-	@echo "$(GREEN)✅ Contact Service restarted$(NC)"
+kafka-describe: ## Describe a Kafka topic (make kafka-describe TOPIC=user.created)
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "$(RED)❌ Specify: make kafka-describe TOPIC=topic-name$(NC)"; \
+		exit 1; \
+	fi
+	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --describe --topic $(TOPIC)
 
-dev-restart-company: ## Fast restart: Company Service only (~30s)
-	@echo "$(YELLOW)⚡ Fast restart: Company Service...$(NC)"
-	docker compose restart company-service
-	@echo "$(GREEN)✅ Company Service restarted$(NC)"
+kafka-delete: ## Delete a Kafka topic (make kafka-delete TOPIC=user.created)
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "$(RED)❌ Specify: make kafka-delete TOPIC=topic-name$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(RED)⚠️  Deleting topic: $(TOPIC)$(NC)"
+	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --delete --topic $(TOPIC)
+	@echo "$(GREEN)✅ Topic deleted: $(TOPIC)$(NC)"
 
-dev-rebuild-user: ## Fast rebuild + restart: User Service (~2min)
-	@echo "$(YELLOW)⚡ Rebuilding User Service...$(NC)"
-	mvn clean package -pl services/user-service -am -DskipTests
-	docker compose up -d --build --no-deps user-service
-	@echo "$(GREEN)✅ User Service rebuilt and restarted$(NC)"
-
-dev-rebuild-user-docker: ## Docker-only rebuild: User Service (no mvn needed, ~3min)
-	@echo "$(YELLOW)⚡ Docker rebuilding User Service (includes Maven build)...$(NC)"
-	docker compose up -d --build --no-deps user-service
-	@echo "$(GREEN)✅ User Service rebuilt and restarted$(NC)"
-
-dev-rebuild-contact: ## Fast rebuild + restart: Contact Service (~2min)
-	@echo "$(YELLOW)⚡ Rebuilding Contact Service...$(NC)"
-	mvn clean package -pl services/contact-service -am -DskipTests
-	docker compose up -d --build --no-deps contact-service
-	@echo "$(GREEN)✅ Contact Service rebuilt and restarted$(NC)"
-
-dev-rebuild-company: ## Fast rebuild + restart: Company Service (~2min)
-	@echo "$(YELLOW)⚡ Rebuilding Company Service...$(NC)"
-	mvn clean package -pl services/company-service -am -DskipTests
-	docker compose up -d --build --no-deps company-service
-	@echo "$(GREEN)✅ Company Service rebuilt and restarted$(NC)"
-
-dev-rebuild-gateway: ## Fast rebuild + restart: API Gateway (~1min)
-	@echo "$(YELLOW)⚡ Rebuilding API Gateway...$(NC)"
-	mvn clean package -pl services/api-gateway -am -DskipTests
-	docker compose up -d --build --no-deps api-gateway
-	@echo "$(GREEN)✅ Gateway rebuilt and restarted$(NC)"
-
-dev-rebuild-gateway-docker: ## Docker-only rebuild: API Gateway (no mvn needed, ~2min)
-	@echo "$(YELLOW)⚡ Docker rebuilding API Gateway (includes Maven build)...$(NC)"
-	docker compose up -d --build --no-deps api-gateway
-	@echo "$(GREEN)✅ Gateway rebuilt and restarted$(NC)"
-
-dev-rebuild-all-services: ## Rebuild all services (User, Contact, Company) - ~5min
-	@echo "$(YELLOW)⚡ Rebuilding all microservices...$(NC)"
-	docker compose up -d --build --no-deps user-service contact-service company-service
-	@echo "$(GREEN)✅ All services rebuilt and restarted$(NC)"
-	@echo "$(BLUE)ℹ️  Wait 30s for health checks, then test!$(NC)"
-
-dev-logs-gateway: ## Tail logs: API Gateway
-	docker compose logs -f --tail=100 api-gateway
-
-dev-logs-gateway-last: ## Show last 30 lines: API Gateway (no follow)
-	@docker compose logs --tail=30 api-gateway
-
-dev-logs-user: ## Tail logs: User Service
-	docker compose logs -f --tail=100 user-service
-
-dev-logs-user-last: ## Show last 30 lines: User Service (no follow)
-	@docker compose logs --tail=30 user-service
-
-dev-logs-all: ## Tail logs: All services
-	docker compose logs -f --tail=50
-
-dev-logs-errors: ## Show ERROR logs from all services
-	@docker compose logs --tail=100 | grep -i "error\|exception\|failed" || echo "$(GREEN)✅ No errors found$(NC)"
-
-dev-logs-user-full: ## Show last 100 lines: User Service (full startup logs)
-	@docker compose logs --tail=100 user-service
-
-dev-logs-user-startup: ## Show User Service startup logs (look for "Started" message)
-	@docker compose logs user-service | grep -E "Started|Tomcat|JVM|Application" | head -30
-
-dev-logs-user-500: ## Show User Service logs related to 500 errors
-	@docker compose logs --tail=300 user-service | grep -v "Kafka" | tail -50
-
-dev-test-network: ## Test network connectivity between services
-	@echo "$(YELLOW)🔍 Testing network connectivity...$(NC)"
-	@docker exec fabric-api-gateway nc -zv user-service 8081 2>&1 || echo "$(RED)❌ Cannot reach user-service$(NC)"
-	@docker exec fabric-api-gateway curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://user-service:8081/actuator/health || echo "$(RED)❌ User Service health check failed$(NC)"
-
-dev-logs-gateway-error: ## Show Gateway ERROR/WARN logs
-	@docker compose logs --tail=200 api-gateway | grep -E "ERROR|WARN|Exception|Failed" | head -50
+kafka-consumer: ## Consume messages from a topic (make kafka-consumer TOPIC=user.created)
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "$(RED)❌ Specify: make kafka-consumer TOPIC=topic-name$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)📨 Consuming from topic: $(TOPIC)$(NC)"
+	@docker exec -it fabric-kafka kafka-console-consumer \
+		--bootstrap-server localhost:9092 \
+		--topic $(TOPIC) \
+		--from-beginning
 
 # =============================================================================
-# QUICK COMMANDS
+# DEVELOPMENT SHORTCUTS
 # =============================================================================
-rebuild-all: ## Full rebuild: mvn clean install + docker build + docker up (~10min)
-	@echo "$(YELLOW)🔨 Full rebuild: Maven + Docker...$(NC)"
-	mvn clean install -DskipTests
-	docker compose build --no-cache && docker compose up -d
-	@echo "$(GREEN)✅ Full rebuild completed$(NC)"
+dev: deploy-infra ## Start infrastructure only (fast dev mode)
 
-up: deploy ## Alias for deploy
-stop: down ## Alias for down
-start: deploy ## Alias for deploy
+dev-all: deploy ## Start everything
 
+dev-test: ## Quick test cycle (build + restart service)
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "$(RED)❌ Specify: make dev-test SERVICE=service-name$(NC)"; \
+		exit 1; \
+	fi
+	@make rebuild-service SERVICE=$(SERVICE)
+	@sleep 5
+	@make logs-service SERVICE=$(SERVICE)

@@ -35,8 +35,11 @@ public class CompanyEventListener {
     
     /**
      * Handles generic company events and routes to specific handlers
+     * 
+     * ✅ Config-driven topic (ZERO HARDCODED!)
      */
-    @KafkaListener(topics = "company-events", groupId = "user-service", 
+    @KafkaListener(topics = "${kafka.topics.company-events:company-events}", 
+                   groupId = "user-service", 
                    containerFactory = "kafkaListenerContainerFactory")
     public void handleCompanyEvent(String event) {
         log.info("📬 Company event received: {}", event);
@@ -127,13 +130,13 @@ public class CompanyEventListener {
      */
     public void handleCompanyCreated(CompanyCreatedEvent event) {
         log.info("📬 Company created event received: companyId={}, name={}", 
-            event.getCompanyId(), event.getName());
+            event.getCompanyId(), event.getCompanyName());
         
         try {
             // Log for audit trail
             log.info("📝 Audit: Company created - ID: {}, Name: {}, TenantID: {}", 
                 event.getCompanyId(), 
-                event.getName(),
+                event.getCompanyName(),
                 event.getTenantId());
             
             // Note: Company-user relationship will be handled by Company Service

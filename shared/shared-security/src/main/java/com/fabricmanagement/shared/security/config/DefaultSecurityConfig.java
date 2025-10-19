@@ -6,6 +6,7 @@ import com.fabricmanagement.shared.security.filter.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -21,7 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 /**
  * Default Security Configuration for Microservices
  *
- * Provides sensible defaults for all services:
+ * Provides sensible defaults for all SERVLET-based services:
  * - Stateless session management
  * - CSRF disabled (for REST APIs)
  * - JWT authentication for protected endpoints
@@ -31,10 +32,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  *
  * Services can override this by providing their own SecurityFilterChain bean.
  * This configuration is only applied if no other SecurityFilterChain bean is defined.
+ * 
+ * NOTE: Only applies to servlet-based services (user, company, contact).
+ * Reactive services (api-gateway) have their own WebFlux security config.
  */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class DefaultSecurityConfig {
 
     private final InternalAuthenticationFilter internalAuthenticationFilter;
@@ -54,6 +59,9 @@ public class DefaultSecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Public: Error handling
+                .requestMatchers("/error").permitAll()
+                
                 // Public: Health checks and monitoring
                 .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
 

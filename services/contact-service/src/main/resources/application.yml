@@ -12,6 +12,14 @@ spring:
   profiles:
     active: local
 
+# =============================================================================
+# CONTACT SERVICE SPECIFIC CONFIGURATION
+# =============================================================================
+contact:
+  verification:
+    # Verification code expiry in minutes (default: 15 minutes)
+    code-expiry-minutes: ${VERIFICATION_CODE_EXPIRY_MINUTES:15}
+
   # ===========================================================================
   # DATABASE CONFIGURATION
   # ===========================================================================

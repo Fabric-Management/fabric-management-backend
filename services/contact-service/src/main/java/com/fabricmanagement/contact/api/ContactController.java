@@ -40,8 +40,14 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
+    /**
+     * Create contact
+     * 
+     * DUAL MODE: Internal call (onboarding) OR authenticated user (JWT)
+     * InternalAuthenticationFilter validates internal key first, falls through to JWT if key missing
+     */
     @InternalEndpoint(
-        description = "Create contact during tenant onboarding or by authenticated user",
+        description = "Create contact during tenant onboarding (internal key) or by user (JWT)",
         calledBy = {"user-service"},
         critical = true
     )
@@ -62,6 +68,16 @@ public class ContactController {
                 .body(ApiResponse.success(response, ServiceConstants.MSG_CONTACT_CREATED));
     }
     
+    /**
+     * Get contacts by owner
+     * 
+     * DUAL MODE: Internal call OR authenticated user (JWT)
+     */
+    @InternalEndpoint(
+        description = "Get contacts by owner - used in profile composites (internal) or by UI (JWT)",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @GetMapping("/owner/{ownerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<ContactResponse>>> getContactsByOwner(
@@ -75,6 +91,32 @@ public class ContactController {
         }
         
         List<ContactResponse> contacts = contactService.getContactsByOwner(ownerId);
+        return ResponseEntity.ok(ApiResponse.success(contacts));
+    }
+    
+    /**
+     * Get verified contacts only
+     * 
+     * DUAL MODE: Internal call OR authenticated user (JWT)
+     */
+    @InternalEndpoint(
+        description = "Get verified contacts - notification service (internal) or UI (JWT)",
+        calledBy = {"user-service", "notification-service"},
+        critical = false
+    )
+    @GetMapping("/owner/{ownerId}/verified")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<ContactResponse>>> getVerifiedContacts(
+            @PathVariable UUID ownerId,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Getting verified contacts for owner: {}", ownerId);
+        
+        if (!hasAccess(ctx, ownerId.toString())) {
+            return forbiddenResponse();
+        }
+        
+        List<ContactResponse> contacts = contactService.getVerifiedContacts(ownerId);
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
     
@@ -113,6 +155,16 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_UPDATED));
     }
     
+    /**
+     * Delete contact
+     * 
+     * DUAL MODE: Internal call OR authenticated user (JWT)
+     */
+    @InternalEndpoint(
+        description = "Delete contact - cascade delete (internal) or manual delete (JWT)",
+        calledBy = {"user-service"},
+        critical = false
+    )
     @DeleteMapping("/{contactId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteContact(
@@ -147,8 +199,13 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_CONTACT_SET_PRIMARY));
     }
     
+    /**
+     * Send verification code
+     * 
+     * DUAL MODE: Internal call OR authenticated user (JWT)
+     */
     @InternalEndpoint(
-        description = "Send verification code during tenant onboarding",
+        description = "Send verification - onboarding (internal) or resend (JWT)",
         calledBy = {"user-service"},
         critical = true
     )
@@ -169,6 +226,17 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_VERIFICATION_CODE_SENT));
     }
 
+    /**
+     * Verify contact with code
+     * 
+     * INTERNAL ONLY: Called by user-service during password setup orchestration
+     * No JWT - requires X-Internal-API-Key
+     */
+    @InternalEndpoint(
+        description = "Verify contact with code - used by orchestration flows",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PutMapping("/{contactId}/verify")
     public ResponseEntity<ApiResponse<Void>> verifyContact(
             @PathVariable UUID contactId,
@@ -214,6 +282,16 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_VERIFICATION_CODE_SENT));
     }
     
+    /**
+     * Get primary contact
+     * 
+     * DUAL MODE: Internal call OR authenticated user (JWT)
+     */
+    @InternalEndpoint(
+        description = "Get primary contact - service calls (internal) or UI (JWT)",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @GetMapping("/owner/{ownerId}/primary")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ContactResponse>> getPrimaryContact(
@@ -230,8 +308,18 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contact));
     }
     
+    /**
+     * Check if email/phone is available
+     * 
+     * INTERNAL ONLY: Called by user-service during tenant onboarding validation
+     * No JWT - requires X-Internal-API-Key
+     */
+    @InternalEndpoint(
+        description = "Check if email/phone is available - used by auth validation",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @PostMapping("/check-availability")
-    // No @PreAuthorize - Internal endpoint protected by InternalAuthenticationFilter (X-Internal-API-Key)
     public ResponseEntity<ApiResponse<Boolean>> checkAvailability(@RequestParam String contactValue) {
         log.debug("Checking availability for contact value: {}", contactValue);
 
@@ -239,6 +327,12 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(available));
     }
     
+    /**
+     * Check email domain uniqueness
+     * 
+     * INTERNAL ONLY: Called by user-service during tenant onboarding validation
+     * No JWT - requires X-Internal-API-Key
+     */
     @InternalEndpoint(
         description = "Check email domain uniqueness across all tenants",
         calledBy = {"user-service"},
@@ -269,6 +363,17 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(contacts));
     }
 
+    /**
+     * Find contact by email/phone
+     * 
+     * INTERNAL ONLY: Called by user-service during login/auth flows
+     * No JWT - requires X-Internal-API-Key
+     */
+    @InternalEndpoint(
+        description = "Find contact by email/phone - used by auth flows",
+        calledBy = {"user-service"},
+        critical = true
+    )
     @GetMapping("/find-by-value")
     public ResponseEntity<ApiResponse<ContactResponse>> findByContactValue(
             @RequestParam String contactValue) {
@@ -284,6 +389,16 @@ public class ContactController {
                             ServiceConstants.ERROR_CODE_CONTACT_NOT_FOUND)));
     }
     
+    /**
+     * Batch fetch contacts for multiple owners
+     * 
+     * DUAL MODE: N+1 query optimization - Internal call OR authenticated user (JWT)
+     */
+    @InternalEndpoint(
+        description = "Batch fetch contacts - N+1 optimization (internal) or bulk fetch (JWT)",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @PostMapping("/batch/by-owners")
     public ResponseEntity<ApiResponse<java.util.Map<String, List<ContactResponse>>>> getContactsByOwnersBatch(
             @RequestBody List<UUID> ownerIds) {
@@ -311,6 +426,16 @@ public class ContactController {
     // ADDRESS ENDPOINTS
     // =============================================================================
     
+    /**
+     * Create address
+     * 
+     * DUAL MODE: Internal call OR authenticated user (JWT)
+     */
+    @InternalEndpoint(
+        description = "Create address - onboarding/user creation (internal) or manual add (JWT)",
+        calledBy = {"user-service", "company-service"},
+        critical = true
+    )
     @PostMapping("/addresses")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<AddressResponse>> createAddress(
@@ -328,6 +453,16 @@ public class ContactController {
                 .body(ApiResponse.success(response, "Address created successfully"));
     }
     
+    /**
+     * Get addresses by owner
+     * 
+     * DUAL MODE: Internal call OR authenticated user (JWT)
+     */
+    @InternalEndpoint(
+        description = "Get addresses by owner - profile aggregation (internal) or UI (JWT)",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @GetMapping("/addresses/owner/{ownerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<AddressResponse>>> getAddressesByOwner(
@@ -381,6 +516,11 @@ public class ContactController {
         return ResponseEntity.ok(ApiResponse.success(response, "Address updated successfully"));
     }
     
+    @InternalEndpoint(
+        description = "Delete address - used when deleting user/company with cleanup",
+        calledBy = {"user-service", "company-service"},
+        critical = false
+    )
     @DeleteMapping("/addresses/{addressId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteAddress(

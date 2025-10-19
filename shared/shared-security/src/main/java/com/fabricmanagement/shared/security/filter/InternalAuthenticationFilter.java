@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -17,7 +18,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
 
 /**
  * Internal Authentication Filter
@@ -36,6 +36,9 @@ import java.util.List;
  * - Endpoints in configuration → Require X-Internal-API-Key
  * - Other endpoints → Continue to JWT authentication
  * 
+ * NOTE: Only applies to servlet-based services (user, company, contact).
+ * Reactive services (api-gateway) use WebFlux security filters.
+ * 
  * @author Fabric Management Team
  * @since 1.0 (Refactored to annotation-based v3.2.0 - Oct 13, 2025)
  */
@@ -43,28 +46,13 @@ import java.util.List;
 @Component
 @Order(0) // Before JwtAuthenticationFilter (Order 1)
 @RequiredArgsConstructor
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class InternalAuthenticationFilter implements Filter {
     
     private final InternalEndpointRegistry endpointRegistry;
     
     @Value("${INTERNAL_API_KEY:}")
     private String internalApiKey;
-    
-    // Public paths that don't need authentication at all
-    private static final List<String> PUBLIC_PATHS = List.of(
-        "/actuator",
-        "/api/public",
-        "/api/v1/public",
-        "/api/v1/users/auth/login",
-        "/api/v1/users/auth/check-contact",
-        "/api/v1/users/auth/setup-password"
-    );
-    
-    // Public contact operations (verification during onboarding)
-    private static final List<String> PUBLIC_CONTACT_PATTERNS = List.of(
-        "/api/v1/contacts/.*/verify",           // Contact verification with code
-        "/api/v1/contacts/public/.*"            // Public contact endpoints (resend-verification, etc.)
-    );
     
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -77,63 +65,49 @@ public class InternalAuthenticationFilter implements Filter {
 
         log.trace("🔍 [InternalAuth] Processing: {} {}", method, path);
 
-        // Skip public paths
-        if (isPublicPath(path) || isPublicContactPattern(path)) {
-            log.trace("✅ [InternalAuth] Public path, skipping: {}", path);
-            chain.doFilter(request, response);
-            return;
-        }
-
         // Check if this is an internal endpoint (annotation or config)
         if (endpointRegistry.isInternalEndpoint(path, method)) {
             log.debug("🔒 [InternalAuth] Internal endpoint detected: {} {}", method, path);
 
             String providedKey = httpRequest.getHeader(InternalApiConstants.INTERNAL_API_KEY_HEADER);
 
-            if (providedKey == null || providedKey.isEmpty()) {
-                log.warn("⚠️ [InternalAuth] Missing API key: {} {}", method, path);
-                sendUnauthorizedResponse(httpResponse, InternalApiConstants.MSG_MISSING_INTERNAL_KEY);
-                return;
+            // ✅ DUAL MODE support: If internal key is provided, validate it
+            if (providedKey != null && !providedKey.isEmpty()) {
+                // Key provided - MUST be valid
+                if (!providedKey.equals(internalApiKey)) {
+                    log.error("🚨 [InternalAuth] Invalid API key: {} {}", method, path);
+                    sendUnauthorizedResponse(httpResponse, InternalApiConstants.MSG_INVALID_INTERNAL_KEY);
+                    return;
+                }
+
+                log.info("✅ [InternalAuth] API key validated: {} {}", method, path);
+
+                // Create internal service security context
+                com.fabricmanagement.shared.application.context.SecurityContext customSecurityContext =
+                    com.fabricmanagement.shared.application.context.SecurityContext.builder()
+                        .userId(SecurityConstants.INTERNAL_SERVICE_PRINCIPAL)
+                        .tenantId(null)
+                        .roles(new String[]{SecurityConstants.ROLE_INTERNAL_SERVICE})
+                        .build();
+
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    customSecurityContext,
+                    null,
+                    Collections.singletonList(new SimpleGrantedAuthority(SecurityConstants.ROLE_INTERNAL_SERVICE))
+                );
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                log.debug("🔓 [InternalAuth] Internal service authentication set");
+            } else {
+                // ✅ DUAL MODE: No internal key → Fall through to JWT authentication
+                // This allows endpoints to be called with either internal key OR JWT
+                log.debug("➡️ [InternalAuth] No internal key provided, falling through to JWT auth: {} {}", method, path);
             }
-
-            if (!providedKey.equals(internalApiKey)) {
-                log.error("🚨 [InternalAuth] Invalid API key: {} {}", method, path);
-                sendUnauthorizedResponse(httpResponse, InternalApiConstants.MSG_INVALID_INTERNAL_KEY);
-                return;
-            }
-
-            log.info("✅ [InternalAuth] API key validated: {} {}", method, path);
-
-            // Create internal service security context
-            com.fabricmanagement.shared.application.context.SecurityContext customSecurityContext =
-                com.fabricmanagement.shared.application.context.SecurityContext.builder()
-                    .userId(SecurityConstants.INTERNAL_SERVICE_PRINCIPAL)
-                    .tenantId(null)
-                    .roles(new String[]{SecurityConstants.ROLE_INTERNAL_SERVICE})
-                    .build();
-
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                customSecurityContext,
-                null,
-                Collections.singletonList(new SimpleGrantedAuthority(SecurityConstants.ROLE_INTERNAL_SERVICE))
-            );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            log.debug("🔓 [InternalAuth] Internal service authentication set");
         } else {
             log.trace("➡️ [InternalAuth] Not internal, continue to JWT auth: {} {}", method, path);
         }
 
         chain.doFilter(request, response);
-    }
-    
-    private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
-    }
-    
-    private boolean isPublicContactPattern(String path) {
-        return PUBLIC_CONTACT_PATTERNS.stream()
-            .anyMatch(pattern -> path.matches(pattern));
     }
     
     private void sendUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {

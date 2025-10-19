@@ -6,7 +6,6 @@ import com.fabricmanagement.notification.api.dto.response.NotificationConfigResp
 import com.fabricmanagement.notification.application.service.NotificationConfigService;
 import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
-import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

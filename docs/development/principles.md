@@ -92,7 +92,7 @@ String userId = jwtTokenProvider.extractUserId(token); // ✅ YES!
 {
   "sub": "550e8400-e29b-41d4-a716-446655440000",  // ✅ userId (UUID)
   "tenantId": "7c9e6679-7425-40de-963d-42a6ee08cd6c",
-  "role": "ADMIN"
+  "role": "TENANT_ADMIN"  // ✅ SystemRole enum value
   // NO username field!
 }
 ```
@@ -240,6 +240,32 @@ public class ApiResponse<T> {
 ---
 
 ## 🚀 Microservice Development Principles
+
+### ⚡ ORCHESTRATION PATTERN - GOLDEN RULE (NEW - Oct 15, 2025)
+
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║                                                                   ║
+║  ⚡ CRITICAL: ATOMIC OPERATIONS FOR MULTI-STEP FLOWS             ║
+║                                                                   ║
+║  ❌ NEVER: verify() → setupPassword() → login() (3 HTTP)         ║
+║  ✅ ALWAYS: setupPasswordWithVerification() (1 HTTP)             ║
+║                                                                   ║
+║  Impact: 66% faster, 66% cheaper, 100% better UX                 ║
+║                                                                   ║
+║  📖 See: docs/development/ORCHESTRATION_PATTERN.md               ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+**Examples in Our Codebase:**
+
+- `TenantOnboardingService.registerTenant()` → Company + User + Contact (1 HTTP)
+- `AuthService.setupPasswordWithVerification()` → Verify + Password + Login (1 HTTP)
+
+**Rule:** If frontend needs 2+ related API calls → Create orchestration endpoint!
+
+---
 
 ### 1. Service Design
 

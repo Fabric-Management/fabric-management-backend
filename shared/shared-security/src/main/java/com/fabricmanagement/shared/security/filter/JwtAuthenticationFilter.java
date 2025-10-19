@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -36,11 +37,15 @@ import java.util.UUID;
  *
  * This filter is automatically applied to all requests through SecurityFilterChain.
  * 
+ * NOTE: Only applies to servlet-based services (user, company, contact).
+ * Reactive services (api-gateway) use WebFlux JWT authentication.
+ * 
  * Version: 2.0 (Spring Security Native Pattern)
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";

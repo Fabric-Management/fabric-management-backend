@@ -4,6 +4,7 @@ import com.fabricmanagement.shared.security.annotation.InternalEndpoint;
 import com.fabricmanagement.shared.security.config.InternalEndpointProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -37,11 +38,15 @@ import java.util.regex.Pattern;
  * - Scans AFTER all beans are initialized
  * - Prevents: Filter → Registry → Controller → SecurityConfig → Filter cycle
  * 
+ * NOTE: Only applies to servlet-based services (user, company, contact).
+ * Reactive services (api-gateway) don't use servlet filters.
+ * 
  * @since 3.2.0 - Internal Endpoint Registry (Oct 13, 2025)
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class InternalEndpointRegistry implements ApplicationListener<ContextRefreshedEvent> {
     
     private final ApplicationContext applicationContext;
@@ -184,9 +189,19 @@ public class InternalEndpointRegistry implements ApplicationListener<ContextRefr
     
     /**
      * Register an endpoint in the registry
+     * Converts path variables to regex patterns
      */
     private void registerEndpoint(String path, String httpMethod) {
-        exactPathRegistry.computeIfAbsent(path, k -> new HashSet<>()).add(httpMethod);
+        // If path contains variables like {id}, convert to regex
+        if (path.contains("{") && path.contains("}")) {
+            // Convert {variable} to regex pattern [^/]+
+            String regexPath = path.replaceAll("\\{[^}]+\\}", "[^/]+");
+            regexPatterns.add(new PathPattern(path, httpMethod, Pattern.compile(regexPath)));
+            log.debug("   🔧 Converted path variable to regex: {} -> {}", path, regexPath);
+        } else {
+            // Exact path
+            exactPathRegistry.computeIfAbsent(path, k -> new HashSet<>()).add(httpMethod);
+        }
     }
     
     /**

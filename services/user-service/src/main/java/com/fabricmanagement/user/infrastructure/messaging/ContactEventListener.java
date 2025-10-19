@@ -30,7 +30,8 @@ public class ContactEventListener {
      * Handles contact verified event
      * Automatically activates users who are pending verification
      */
-    @KafkaListener(topics = "contact.verified", groupId = "user-service")
+    // ✅ Config-driven topic (ZERO HARDCODED!)
+    @KafkaListener(topics = "${kafka.topics.contact-verified:contact.verified}", groupId = "user-service")
     @Transactional
     public void handleContactVerified(ContactVerifiedEvent event) {
         log.info("📬 Contact verified event received: ownerId={}, contactValue={}", 
@@ -78,7 +79,8 @@ public class ContactEventListener {
      * Handles contact created event
      * Logs contact creation for audit trail
      */
-    @KafkaListener(topics = "contact.created", groupId = "user-service")
+    // ✅ Config-driven topic (ZERO HARDCODED!)
+    @KafkaListener(topics = "${kafka.topics.contact-created:contact.created}", groupId = "user-service")
     public void handleContactCreated(ContactCreatedEvent event) {
         log.info("📬 Contact created event received: ownerId={}, contactType={}", 
             event.getOwnerId(), event.getContactType());
@@ -100,7 +102,8 @@ public class ContactEventListener {
      * Handles contact deleted event
      * Logs contact deletion for audit trail
      */
-    @KafkaListener(topics = "contact.deleted", groupId = "user-service")
+    // ✅ Config-driven topic (ZERO HARDCODED!)
+    @KafkaListener(topics = "${kafka.topics.contact-deleted:contact.deleted}", groupId = "user-service")
     public void handleContactDeleted(ContactDeletedEvent event) {
         log.info("📬 Contact deleted event received: ownerId={}", event.getOwnerId());
         

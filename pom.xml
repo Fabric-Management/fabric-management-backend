@@ -94,7 +94,13 @@
         <module>services/company-service</module>
         <module>services/notification-service</module>
 
+        <!-- Production Textile Services (NEW!) -->
+        <module>services/fiber-service</module>
+
         <!-- Service modules (Coming Soon - Uncomment when created) -->
+        <!--<module>services/yarn-service</module>-->
+        <!--<module>services/weaving-service</module>-->
+        <!--<module>services/finishing-service</module>-->
         <!--<module>services/hr-service</module>-->
         <!--<module>services/inventory-service</module>-->
         <!--<module>services/procurement-service</module>-->

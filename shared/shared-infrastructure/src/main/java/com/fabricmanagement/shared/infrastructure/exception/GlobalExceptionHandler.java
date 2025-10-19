@@ -1,7 +1,10 @@
 package com.fabricmanagement.shared.infrastructure.exception;
 
 import com.fabricmanagement.shared.application.response.ApiResponse;
-import com.fabricmanagement.shared.domain.exception.TenantRegistrationException;
+import com.fabricmanagement.shared.domain.exception.*;
+import com.fabricmanagement.shared.domain.message.AuthMessageKeys;
+import com.fabricmanagement.shared.infrastructure.service.MessageResolver;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.http.HttpStatus;
@@ -28,8 +31,65 @@ import java.util.List;
  */
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 @ConditionalOnMissingBean(name = "serviceExceptionHandler")
 public class GlobalExceptionHandler {
+    
+    private final MessageResolver messageResolver;
+
+    /**
+     * Handle verification code errors
+     */
+    @ExceptionHandler(InvalidVerificationCodeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidVerificationCode(
+            InvalidVerificationCodeException ex, WebRequest request) {
+        
+        String message = messageResolver.getMessage(AuthMessageKeys.VERIFICATION_CODE_INVALID);
+        log.warn("Invalid verification code attempt");
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(message, "INVALID_VERIFICATION_CODE"));
+    }
+    
+    /**
+     * Handle expired verification code
+     */
+    @ExceptionHandler(VerificationCodeExpiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationCodeExpired(
+            VerificationCodeExpiredException ex, WebRequest request) {
+        
+        String message = messageResolver.getMessage(AuthMessageKeys.VERIFICATION_CODE_EXPIRED);
+        log.warn("Verification code expired");
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(message, "VERIFICATION_CODE_EXPIRED"));
+    }
+
+    /**
+     * Handle password not set (user tries to login before setting password)
+     */
+    @ExceptionHandler(PasswordNotSetException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePasswordNotSet(
+            PasswordNotSetException ex, WebRequest request) {
+        
+        log.warn("Login attempt without password: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getMessage(), "PASSWORD_NOT_SET"));
+    }
+
+    /**
+     * Handle password already set (user tries to setup password again)
+     */
+    @ExceptionHandler(PasswordAlreadySetException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePasswordAlreadySet(
+            PasswordAlreadySetException ex, WebRequest request) {
+        
+        log.warn("Password setup attempted for user who already has password: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getMessage(), "PASSWORD_ALREADY_SET"));
+    }
 
     /**
      * Handle validation errors
@@ -56,6 +116,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle invalid composition errors
+     */
+    @ExceptionHandler(InvalidCompositionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidComposition(
+            InvalidCompositionException ex, WebRequest request) {
+        
+        log.warn("Invalid composition error: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "VALIDATION_ERROR"
+                ));
+    }
+
+    /**
      * Handle business rule violations
      */
     @ExceptionHandler(BusinessRuleViolationException.class)
@@ -68,6 +144,38 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(
                     ex.getMessage(),
                     ex.getErrorCode()
+                ));
+    }
+
+    /**
+     * Handle fiber not found
+     */
+    @ExceptionHandler(FiberNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFiberNotFound(
+            FiberNotFoundException ex, WebRequest request) {
+        
+        log.warn("Fiber not found: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "NOT_FOUND"
+                ));
+    }
+
+    /**
+     * Handle inactive fiber
+     */
+    @ExceptionHandler(InactiveFiberException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInactiveFiber(
+            InactiveFiberException ex, WebRequest request) {
+        
+        log.warn("Inactive fiber error: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "VALIDATION_ERROR"
                 ));
     }
 

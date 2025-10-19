@@ -5,10 +5,6 @@ import com.fabricmanagement.shared.domain.exception.*;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
 import com.fabricmanagement.shared.infrastructure.util.MaskingUtil;
 import com.fabricmanagement.shared.security.jwt.JwtTokenProvider;
-import com.fabricmanagement.shared.domain.event.UserCreatedEvent;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
-import java.util.concurrent.CompletableFuture;
 import com.fabricmanagement.user.api.dto.request.CheckContactRequest;
 import com.fabricmanagement.user.api.dto.request.LoginRequest;
 import com.fabricmanagement.user.api.dto.request.SetupPasswordRequest;
@@ -58,7 +54,6 @@ public class AuthService {
     private final LoginAttemptTracker loginAttemptTracker;
     private final SecurityAuditLogger auditLogger;
     private final MaskingUtil maskingUtil;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
     
     // ✅ Manual constructor with @Lazy for ContactServiceClient
     public AuthService(
@@ -69,8 +64,7 @@ public class AuthService {
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptTracker loginAttemptTracker,
             SecurityAuditLogger auditLogger,
-            MaskingUtil maskingUtil,
-            KafkaTemplate<String, Object> kafkaTemplate) {
+            MaskingUtil maskingUtil) {
         this.userRepository = userRepository;
         this.contactServiceClient = contactServiceClient;
         this.authMapper = authMapper;
@@ -79,7 +73,6 @@ public class AuthService {
         this.loginAttemptTracker = loginAttemptTracker;
         this.auditLogger = auditLogger;
         this.maskingUtil = maskingUtil;
-        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Value("${security.response-time-masking.min-response-time-ms:200}")
@@ -94,6 +87,7 @@ public class AuthService {
             ApiResponse<ContactDto> response = contactServiceClient.findByContactValue(request.getContactValue());
             
             if (response == null || response.getData() == null) {
+                log.debug("Contact not found: {}", request.getContactValue());
                 return applyTimingMask(startTime, authMapper.toNotFoundResponse());
             }
 
@@ -105,29 +99,33 @@ public class AuthService {
                     .orElse(null);
 
             if (user == null) {
+                log.debug("User not found for contact: {}", request.getContactValue());
                 return applyTimingMask(startTime, authMapper.toUserNotFoundResponse());
             }
 
-            CheckContactResponse response = authMapper.toCheckResponse(user);
+            CheckContactResponse checkResponse = authMapper.toCheckResponse(user);
             
             // Add verified status and next step
-            response.setVerified(contact.isVerified());
-            response.setMaskedContact(maskingUtil.maskEmail(request.getContactValue()));
+            checkResponse.setVerified(contact.isVerified());
+            checkResponse.setMaskedContact(maskingUtil.maskEmail(request.getContactValue()));
             
             // Determine next step for UI
             if (!contact.isVerified()) {
-                response.setNextStep("send-verification");
+                checkResponse.setNextStep(ServiceConstants.NEXT_STEP_SEND_VERIFICATION);
             } else if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                response.setNextStep("setup-password");
+                checkResponse.setNextStep(ServiceConstants.NEXT_STEP_SETUP_PASSWORD);
             } else {
-                response.setNextStep("login");
+                checkResponse.setNextStep(ServiceConstants.NEXT_STEP_LOGIN);
             }
             
-            return applyTimingMask(startTime, response);
+            return applyTimingMask(startTime, checkResponse);
 
+        } catch (feign.FeignException.NotFound e) {
+            log.debug("Contact not found in Contact Service: {}", request.getContactValue());
+            return applyTimingMask(startTime, authMapper.toNotFoundResponse());
         } catch (Exception e) {
-            log.error("Error checking contact: {}", e.getMessage(), e);
-            return applyTimingMask(startTime, authMapper.toErrorResponse());
+            log.error("Unexpected error checking contact: {}", e.getMessage(), e);
+            return applyTimingMask(startTime, authMapper.toNotFoundResponse());
         }
     }
 
@@ -171,7 +169,7 @@ public class AuthService {
             user.getStatus() != UserStatus.ACTIVE) {
             throw new InvalidUserStatusException(
                 user.getStatus().name(), 
-                "PENDING_VERIFICATION or ACTIVE"
+                ServiceConstants.USER_STATUS_PENDING_OR_ACTIVE
             );
         }
 
@@ -218,7 +216,7 @@ public class AuthService {
                     });
 
             if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                throw new PasswordAlreadySetException(ServiceConstants.MSG_PASSWORD_NOT_SET);
+                throw new PasswordNotSetException(contactValue);
             }
 
             if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -229,7 +227,7 @@ public class AuthService {
             }
 
             if (user.getStatus() != UserStatus.ACTIVE) {
-                throw new InvalidUserStatusException("User account is not active: " + user.getStatus());
+                throw new InvalidUserStatusException(ServiceConstants.MSG_USER_ACCOUNT_NOT_ACTIVE + ": " + user.getStatus());
             }
 
             loginAttemptTracker.clearFailedAttempts(contactValue);
@@ -288,18 +286,13 @@ public class AuthService {
             return; // No-op, already verified
         }
         
-        // Get user for UserCreatedEvent
-        User user = userRepository.findById(contact.getOwnerId())
-            .filter(u -> !u.isDeleted())
-            .orElseThrow(() -> new UserNotFoundException(contact.getOwnerId().toString()));
-        
         // Send verification code via Contact Service
         try {
             contactServiceClient.sendVerificationCode(contact.getId());
             log.info("✅ Verification code sent to: {}", request.getContactValue());
         } catch (Exception e) {
             log.error("Failed to send verification code: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to send verification code. Please try again.");
+            throw new RuntimeException(ServiceConstants.MSG_FAILED_TO_SEND_VERIFICATION_CODE);
         }
     }
     
@@ -331,7 +324,7 @@ public class AuthService {
             log.info("✅ Contact verified: {}", request.getContactValue());
         } catch (Exception e) {
             log.error("Verification failed: {}", e.getMessage());
-            throw new RuntimeException("Invalid verification code. Please try again.");
+            throw new RuntimeException(ServiceConstants.MSG_INVALID_VERIFICATION_CODE);
         }
         
         // Step 3: Get user
