@@ -3,7 +3,7 @@
 # =============================================================================
 # Production-ready development & deployment commands
 
-.PHONY: help setup validate-env build test clean deploy down restart logs status health db-shell rebuild-service restart-service logs-service
+.PHONY: help setup validate-env build test clean deploy down restart logs status health db-shell rebuild-service restart-service logs-service kafka-topics kafka-describe kafka-delete kafka-consumer
 
 .DEFAULT_GOAL := help
 
@@ -52,10 +52,22 @@ validate-env: ## Validate .env file exists
 # =============================================================================
 # BUILD
 # =============================================================================
-build: ## Build all services (Maven)
+build: ## Build all services (Maven + Docker)
 	@echo "$(YELLOW)🏗️  Building all services...$(NC)"
-	mvn clean install -DskipTests
-	@echo "$(GREEN)✅ Build completed$(NC)"
+	@mvn clean install -DskipTests
+	@docker compose up -d
+	@docker compose build --no-cache
+	@echo "$(GREEN)✅ Build completed & services started$(NC)"
+	@sleep 200
+	@make status
+
+build-shared: ## Build all shared modules (domain, infrastructure, security)
+	@echo "$(YELLOW)🏗️  Building shared modules...$(NC)"
+	@cd shared/shared-domain && mvn clean install -DskipTests
+	@cd shared/shared-application && mvn clean install -DskipTests
+	@cd shared/shared-infrastructure && mvn clean install -DskipTests
+	@cd shared/shared-security && mvn clean install -DskipTests
+	@echo "$(GREEN)✅ Shared modules built$(NC)"
 
 build-service: ## Build specific service (make build-service SERVICE=user-service)
 	@echo "$(YELLOW)🏗️  Building $(SERVICE)...$(NC)"
@@ -63,7 +75,7 @@ build-service: ## Build specific service (make build-service SERVICE=user-servic
 		echo "$(RED)❌ Specify: make build-service SERVICE=service-name$(NC)"; \
 		exit 1; \
 	fi
-	mvn clean package -pl services/$(SERVICE) -am -DskipTests
+	@mvn clean package -pl services/$(SERVICE) -am -DskipTests
 	@echo "$(GREEN)✅ $(SERVICE) built$(NC)"
 
 rebuild-service: ## Rebuild + restart service (make rebuild-service SERVICE=user-service)
@@ -72,15 +84,35 @@ rebuild-service: ## Rebuild + restart service (make rebuild-service SERVICE=user
 		echo "$(RED)❌ Specify: make rebuild-service SERVICE=service-name$(NC)"; \
 		exit 1; \
 	fi
-	mvn clean package -pl services/$(SERVICE) -am -DskipTests
-	docker compose up -d --build --no-deps fabric-$(SERVICE)
+	@mvn clean package -pl services/$(SERVICE) -am -DskipTests
+	@docker compose up -d --build --no-deps fabric-$(SERVICE)
 	@echo "$(GREEN)✅ $(SERVICE) rebuilt & restarted$(NC)"
 
-rebuild-all: ## Rebuild all services (Maven + Docker)
-	@echo "$(YELLOW)⚡ Rebuilding all services...$(NC)"
-	mvn clean install -DskipTests
-	docker compose up -d --build user-service contact-service company-service api-gateway
-	@echo "$(GREEN)✅ All services rebuilt$(NC)"
+rebuild-with-shared: ## Rebuild shared + service + restart (make rebuild-with-shared SERVICE=user-service)
+	@echo "$(YELLOW)⚡ Rebuilding shared + $(SERVICE)...$(NC)"
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "$(RED)❌ Specify: make rebuild-with-shared SERVICE=service-name$(NC)"; \
+		exit 1; \
+	fi
+	@make build-shared
+	@mvn clean package -pl services/$(SERVICE) -DskipTests
+	@docker compose up -d --build --no-deps fabric-$(SERVICE)
+	@echo "$(GREEN)✅ Shared + $(SERVICE) rebuilt & restarted$(NC)"
+
+rebuild: ## 🔄 Full clean rebuild (remove everything & rebuild all)
+	@echo "$(YELLOW)🧹  Cleaning up all Docker resources...$(NC)"
+	@docker compose down --rmi all --volumes --remove-orphans || true
+	@docker builder prune -a -f || true
+	@docker system prune -a --volumes -f || true
+	@echo "$(YELLOW)🏗️  Building all services (Maven + Docker)...$(NC)"
+	@mvn clean install -DskipTests
+	@echo "$(YELLOW)🚧  Building Docker images without cache...$(NC)"
+	@docker compose build --no-cache
+	@echo "$(YELLOW)🚀  Starting Docker containers...$(NC)"
+	@docker compose up -d
+	@echo "$(GREEN)✅  Rebuild completed & services started$(NC)"
+	@sleep 240
+	@make status
 
 # =============================================================================
 # TEST
@@ -179,11 +211,54 @@ ps: ## Show running containers
 # DATABASE
 # =============================================================================
 db-shell: ## Open PostgreSQL shell
-	docker exec -it fabric-postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb
+
+db-tables: ## List all tables with row counts
+	@echo "$(YELLOW)📊 Database Tables:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
+		SELECT \
+			schemaname AS schema, \
+			tablename AS table, \
+			pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size, \
+			(SELECT count(*) FROM information_schema.columns WHERE table_name = tablename) AS columns, \
+			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS rows \
+		FROM pg_tables \
+		WHERE schemaname NOT IN ('pg_catalog', 'information_schema') \
+		ORDER BY schemaname, tablename;"
+
+db-data: ## Show tables with data (non-empty)
+	@echo "$(YELLOW)📊 Tables with Data:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
+		SELECT \
+			schemaname AS schema, \
+			tablename AS table, \
+			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS rows \
+		FROM pg_tables \
+		WHERE schemaname NOT IN ('pg_catalog', 'information_schema') \
+		AND (xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int > 0 \
+		ORDER BY rows DESC;"
+
+db-show: ## Show table data (make db-show TABLE=users LIMIT=10)
+	@if [ -z "$(TABLE)" ]; then \
+		echo "$(RED)❌ Specify: make db-show TABLE=table-name LIMIT=10$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)📊 Data from $(TABLE):$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "SELECT * FROM $(TABLE) LIMIT $${LIMIT:-10};"
+
+db-count: ## Count rows in all tables
+	@echo "$(YELLOW)📊 Row Counts:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
+		SELECT \
+			tablename, \
+			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS row_count \
+		FROM pg_tables \
+		WHERE schemaname = 'public' \
+		ORDER BY row_count DESC NULLS LAST;"
 
 db-backup: ## Backup database
 	@echo "$(YELLOW)💾 Backing up database...$(NC)"
-	docker exec -t fabric-postgres pg_dump -U ${POSTGRES_USER} ${POSTGRES_DB} > backup-$$(date +%Y%m%d-%H%M%S).sql
+	@docker exec -t fabric-postgres pg_dump -U fabricuser fabricdb > backup-$$(date +%Y%m%d-%H%M%S).sql
 	@echo "$(GREEN)✅ Database backed up$(NC)"
 
 db-restore: ## Restore database (make db-restore FILE=backup.sql)
@@ -192,7 +267,7 @@ db-restore: ## Restore database (make db-restore FILE=backup.sql)
 		echo "$(RED)❌ Specify: make db-restore FILE=backup.sql$(NC)"; \
 		exit 1; \
 	fi
-	docker exec -i fabric-postgres psql -U ${POSTGRES_USER} ${POSTGRES_DB} < $(FILE)
+	@docker exec -i fabric-postgres psql -U fabricuser fabricdb < $(FILE)
 	@echo "$(GREEN)✅ Database restored$(NC)"
 
 # =============================================================================
@@ -225,6 +300,43 @@ lint: ## Lint code (Spotless check)
 	@echo "$(YELLOW)🔍 Linting code...$(NC)"
 	mvn spotless:check
 	@echo "$(GREEN)✅ Linting completed$(NC)"
+
+# =============================================================================
+# KAFKA MANAGEMENT (Debug & Inspection)
+# =============================================================================
+# NOTE: Topics auto-initialize via docker-compose.yml kafka-init container
+#       These commands are for debugging and inspection only
+
+kafka-topics: ## List all Kafka topics
+	@echo "$(YELLOW)📋 Listing Kafka topics...$(NC)"
+	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --list
+
+kafka-describe: ## Describe a Kafka topic (make kafka-describe TOPIC=user.created)
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "$(RED)❌ Specify: make kafka-describe TOPIC=topic-name$(NC)"; \
+		exit 1; \
+	fi
+	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --describe --topic $(TOPIC)
+
+kafka-delete: ## Delete a Kafka topic (make kafka-delete TOPIC=user.created)
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "$(RED)❌ Specify: make kafka-delete TOPIC=topic-name$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(RED)⚠️  Deleting topic: $(TOPIC)$(NC)"
+	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --delete --topic $(TOPIC)
+	@echo "$(GREEN)✅ Topic deleted: $(TOPIC)$(NC)"
+
+kafka-consumer: ## Consume messages from a topic (make kafka-consumer TOPIC=user.created)
+	@if [ -z "$(TOPIC)" ]; then \
+		echo "$(RED)❌ Specify: make kafka-consumer TOPIC=topic-name$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)📨 Consuming from topic: $(TOPIC)$(NC)"
+	@docker exec -it fabric-kafka kafka-console-consumer \
+		--bootstrap-server localhost:9092 \
+		--topic $(TOPIC) \
+		--from-beginning
 
 # =============================================================================
 # DEVELOPMENT SHORTCUTS

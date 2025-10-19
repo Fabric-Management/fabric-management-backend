@@ -216,7 +216,7 @@ public class AuthService {
                     });
 
             if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                throw new PasswordAlreadySetException(ServiceConstants.MSG_PASSWORD_NOT_SET);
+                throw new PasswordNotSetException(contactValue);
             }
 
             if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {

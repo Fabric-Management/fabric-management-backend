@@ -138,6 +138,31 @@ gateway:
     redis:
       time-to-live: ${CACHE_TTL:300000} # 5 minutes
 
+  # ===========================================================================
+  # KAFKA CONFIGURATION (Audit Events - Non-blocking)
+  # ===========================================================================
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: ${KAFKA_PRODUCER_ACKS:1}
+      retries: ${KAFKA_PRODUCER_RETRIES:0}
+      properties:
+        # ✅ Fast fail if topic missing (5s vs 60s default)
+        request.timeout.ms: ${KAFKA_PRODUCER_TIMEOUT:5000}
+        max.block.ms: ${KAFKA_MAX_BLOCK_MS:5000}
+        delivery.timeout.ms: ${KAFKA_DELIVERY_TIMEOUT:10000}
+
+# =============================================================================
+# POLICY CONFIGURATION
+# =============================================================================
+policy:
+  audit:
+    # ✅ Config-driven: Enable/disable policy audit events
+    # Set to false if policy.audit Kafka topic not available
+    enabled: ${POLICY_AUDIT_ENABLED:false}
+
 # =============================================================================
 # SERVER CONFIGURATION
 # =============================================================================

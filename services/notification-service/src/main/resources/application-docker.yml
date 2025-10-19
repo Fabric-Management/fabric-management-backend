@@ -8,13 +8,25 @@ spring:
     password: ${POSTGRES_PASSWORD}
 
   kafka:
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
 
   mail:
     host: ${PLATFORM_SMTP_HOST:smtp.hostinger.com}
     port: ${PLATFORM_SMTP_PORT:465}
-    username: ${PLATFORM_SMTP_USERNAME:noreply@storeandsale.shop}
+    username: ${PLATFORM_SMTP_USERNAME:info@storeandsale.shop}
     password: ${PLATFORM_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
+          connectiontimeout: ${SMTP_CONNECTION_TIMEOUT:5000}
+          timeout: ${SMTP_TIMEOUT:5000}
+          writetimeout: ${SMTP_WRITE_TIMEOUT:5000}
 
   data:
     redis:

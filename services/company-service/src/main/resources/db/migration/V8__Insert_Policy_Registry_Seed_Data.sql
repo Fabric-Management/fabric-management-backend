@@ -26,7 +26,7 @@
 -- USER MANAGEMENT POLICIES
 -- =====================================================================================
 
--- Create User (Admin/Super Admin only, INTERNAL companies preferred)
+-- Create User (Tenant Admin/Super Admin only, INTERNAL companies preferred)
 INSERT INTO policy_registry (
     id, endpoint, operation, scope, default_roles, allowed_company_types,
     requires_grant, active, policy_version, description, platform_policy,
@@ -36,12 +36,12 @@ INSERT INTO policy_registry (
     '/api/v1/users',
     'WRITE',
     'COMPANY',
-    ARRAY['ADMIN']::TEXT[],
+    ARRAY['TENANT_ADMIN']::TEXT[],
     ARRAY['INTERNAL', 'CUSTOMER']::TEXT[],
     false,
     true,
     'v1',
-    'Only admins can create users',
+    'Only tenant admins can create users',
     '{"risk_level": "high"}'::jsonb,
     NOW(),
     NOW(),
@@ -80,7 +80,7 @@ INSERT INTO policy_registry (
 -- COMPANY MANAGEMENT POLICIES
 -- =====================================================================================
 
--- Create Company (Admin only, INTERNAL companies)
+-- Create Company (Tenant Admin only, INTERNAL companies)
 INSERT INTO policy_registry (
     id, endpoint, operation, scope, default_roles, allowed_company_types,
     requires_grant, active, policy_version, description, platform_policy,
@@ -90,7 +90,7 @@ INSERT INTO policy_registry (
     '/api/v1/companies',
     'WRITE',
     'GLOBAL',
-    ARRAY['ADMIN']::TEXT[],
+    ARRAY['TENANT_ADMIN']::TEXT[],
     ARRAY['INTERNAL']::TEXT[],
     false,
     true,
@@ -169,7 +169,7 @@ INSERT INTO policy_registry (
     '/api/v1/contacts/{contactId}',
     'DELETE',
     'COMPANY',
-    ARRAY['MANAGER', 'ADMIN']::TEXT[],
+    ARRAY['MANAGER', 'TENANT_ADMIN']::TEXT[],
     NULL,
     false,
     true,
@@ -188,7 +188,7 @@ INSERT INTO policy_registry (
 -- SYSTEM-WIDE POLICIES
 -- =====================================================================================
 
--- Bulk Operations (Admin only, grant required)
+-- Bulk Operations (Tenant Admin only, grant required)
 INSERT INTO policy_registry (
     id, endpoint, operation, scope, default_roles, allowed_company_types,
     requires_grant, active, policy_version, description, platform_policy,
@@ -198,12 +198,12 @@ INSERT INTO policy_registry (
     '/api/v1/%/bulk/%',
     'WRITE',
     'GLOBAL',
-    ARRAY['ADMIN']::TEXT[],
+    ARRAY['TENANT_ADMIN']::TEXT[],
     ARRAY['INTERNAL']::TEXT[],
     true,
     true,
     'v1',
-    'Bulk operations require admin + grant (pattern match)',
+    'Bulk operations require tenant admin + grant (pattern match)',
     '{"risk_level": "high"}'::jsonb,
     NOW(),
     NOW(),
@@ -223,7 +223,7 @@ INSERT INTO policy_registry (
     '/api/v1/%/export',
     'READ',
     'COMPANY',
-    ARRAY['MANAGER', 'ADMIN']::TEXT[],
+    ARRAY['MANAGER', 'TENANT_ADMIN']::TEXT[],
     NULL,
     false,
     true,

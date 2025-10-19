@@ -31,6 +31,10 @@ volumes:
     driver: local
   redis_data:
     driver: local
+  kafka_data:
+    driver: local
+  zookeeper_data:
+    driver: local
 
 services:
   # ==============================================
@@ -119,8 +123,12 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT:-2181}
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_DATA_DIR: /var/lib/zookeeper/data
+      ZOOKEEPER_DATA_LOG_DIR: /var/lib/zookeeper/log
     ports:
       - "${ZOOKEEPER_PORT:-2181}:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
     networks:
       - fabric-network
     healthcheck:
@@ -143,7 +151,8 @@ services:
     container_name: fabric-kafka
     restart: unless-stopped
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "${KAFKA_PORT:-9092}:9092"
     environment:
@@ -156,7 +165,11 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      # ✅ Keep auto-create for backward compatibility, but init script is preferred
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     networks:
       - fabric-network
     healthcheck:
@@ -179,6 +192,69 @@ services:
         reservations:
           memory: 512M
           cpus: "0.5"
+
+  # ==============================================
+  # KAFKA TOPIC INIT (Idempotent)
+  # ==============================================
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: fabric-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - fabric-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "🔍 Waiting for Kafka to be ready..."
+        sleep 5
+
+        echo "📨 Creating Kafka topics (idempotent)..."
+
+        # User Service Topics
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic user.created --partitions 3 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic user.updated --partitions 3 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic user.deleted --partitions 3 --replication-factor 1 --config retention.ms=604800000
+
+        # Company Service Topics
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic company-events --partitions 3 --replication-factor 1 --config retention.ms=604800000
+
+        # Contact Service Topics
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic contact.created --partitions 3 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic contact.verified --partitions 3 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic contact.deleted --partitions 3 --replication-factor 1 --config retention.ms=604800000
+
+        # Tenant Onboarding Topics
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic tenant-events --partitions 3 --replication-factor 1 --config retention.ms=604800000
+
+        # Policy & Audit Topics
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic policy.audit --partitions 3 --replication-factor 1 --config retention.ms=2592000000
+
+        # Notification Service Topics
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic email-notifications --partitions 3 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic sms-notifications --partitions 3 --replication-factor 1 --config retention.ms=604800000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic domain-events --partitions 3 --replication-factor 1 --config retention.ms=604800000
+
+        # DLT Topics (Dead Letter Topics)
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic user.created.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic user.updated.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic user.deleted.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic company-events.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic contact.created.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic contact.verified.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic contact.deleted.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic tenant-events.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic policy.audit.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic email-notifications.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic sms-notifications.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+        kafka-topics --bootstrap-server kafka:9093 --create --if-not-exists --topic domain-events.DLT --partitions 1 --replication-factor 1 --config retention.ms=7776000000
+
+        echo "✅ Kafka topics created successfully!"
+
+        echo "📋 Current topics:"
+        kafka-topics --bootstrap-server kafka:9093 --list
+    restart: "no"
 
   # ==============================================
   # API GATEWAY - Central Entry Point
@@ -285,7 +361,10 @@ services:
       PLATFORM_SMTP_USERNAME: ${PLATFORM_SMTP_USERNAME:-info@storeandsale.shop}
       PLATFORM_SMTP_PASSWORD: ${PLATFORM_SMTP_PASSWORD}
       PLATFORM_EMAIL_FROM: ${PLATFORM_EMAIL_FROM:-info@storeandsale.shop}
-      PLATFORM_EMAIL_FROM_NAME: ${PLATFORM_EMAIL_FROM_NAME:-Fabricode}
+      PLATFORM_EMAIL_FROM_NAME: ${PLATFORM_EMAIL_FROM_NAME:-FabriCode}
+      # ✅ Platform Branding (for system emails)
+      PLATFORM_NAME: ${PLATFORM_NAME:-FabriCode}
+      PLATFORM_COMPANY: ${PLATFORM_COMPANY:-Akkayalar Group}
       # ✅ Platform WhatsApp Configuration (Meta Cloud API)
       PLATFORM_WHATSAPP_ENABLED: ${PLATFORM_WHATSAPP_ENABLED:-true}
       PLATFORM_WHATSAPP_PROVIDER: ${PLATFORM_WHATSAPP_PROVIDER:-META}

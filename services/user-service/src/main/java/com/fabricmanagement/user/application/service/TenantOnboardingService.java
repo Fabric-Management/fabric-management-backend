@@ -3,10 +3,11 @@ package com.fabricmanagement.user.application.service;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.domain.exception.TenantRegistrationException;
 import com.fabricmanagement.shared.domain.role.SystemRole;
+import com.fabricmanagement.shared.infrastructure.constants.KafkaTopics;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
-import static com.fabricmanagement.shared.infrastructure.constants.ServiceConstants.TOPIC_TENANT_EVENTS;
 import com.fabricmanagement.user.api.dto.request.TenantRegistrationRequest;
 import com.fabricmanagement.user.api.dto.response.TenantOnboardingResponse;
+import com.fabricmanagement.shared.domain.policy.UserContext;
 import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.valueobject.RegistrationType;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
@@ -332,7 +333,12 @@ public class TenantOnboardingService {
     
     private UUID createTenantAdminUser(TenantRegistrationRequest request, UUID tenantId) {
         User user = User.builder()
-                // ✅ DON'T set ID manually - @GeneratedValue manages it!
+                // ✅ DON'T set ID manually - BaseEntity has @GeneratedValue(UUID)!
+                // ✅ DON'T set version manually - BaseEntity has @Version!
+                // Hibernate will:
+                //   1. Generate UUID on persist
+                //   2. Set version=0 on first persist
+                //   3. Auto-increment version on each update
                 .tenantId(tenantId)
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -344,7 +350,7 @@ public class TenantOnboardingService {
                 .createdBy(ServiceConstants.AUDIT_SYSTEM_USER)
                 .updatedBy(ServiceConstants.AUDIT_SYSTEM_USER)
                 .deleted(false)
-                // ✅ DON'T set version manually - Hibernate @Version manages it!
+                .userContext(UserContext.INTERNAL)  // ✅ Default context for tenant admin
                 .build();
         
         user = userRepository.save(user);
@@ -395,7 +401,7 @@ public class TenantOnboardingService {
         
         // Async publish (non-blocking)
         CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send(TOPIC_TENANT_EVENTS, tenantId.toString(), event);
+            kafkaTemplate.send(KafkaTopics.TENANT_EVENTS, tenantId.toString(), event);
         
         future.whenComplete((result, ex) -> {
             if (ex == null) {
@@ -456,7 +462,7 @@ public class TenantOnboardingService {
         
         // Async publish (non-blocking)
         CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send("user.created", userId.toString(), event);
+            kafkaTemplate.send(KafkaTopics.USER_CREATED, userId.toString(), event);
         
         future.whenComplete((result, ex) -> {
             if (ex == null) {

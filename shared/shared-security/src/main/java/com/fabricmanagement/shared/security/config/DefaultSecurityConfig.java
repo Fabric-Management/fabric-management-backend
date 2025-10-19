@@ -59,6 +59,9 @@ public class DefaultSecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Public: Error handling
+                .requestMatchers("/error").permitAll()
+                
                 // Public: Health checks and monitoring
                 .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
 

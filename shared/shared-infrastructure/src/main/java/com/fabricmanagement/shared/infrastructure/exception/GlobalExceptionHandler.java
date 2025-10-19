@@ -66,6 +66,32 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle password not set (user tries to login before setting password)
+     */
+    @ExceptionHandler(PasswordNotSetException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePasswordNotSet(
+            PasswordNotSetException ex, WebRequest request) {
+        
+        log.warn("Login attempt without password: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getMessage(), "PASSWORD_NOT_SET"));
+    }
+
+    /**
+     * Handle password already set (user tries to setup password again)
+     */
+    @ExceptionHandler(PasswordAlreadySetException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePasswordAlreadySet(
+            PasswordAlreadySetException ex, WebRequest request) {
+        
+        log.warn("Password setup attempted for user who already has password: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getMessage(), "PASSWORD_ALREADY_SET"));
+    }
+
+    /**
      * Handle validation errors
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)

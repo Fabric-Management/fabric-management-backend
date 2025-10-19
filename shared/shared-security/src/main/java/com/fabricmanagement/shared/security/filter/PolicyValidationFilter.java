@@ -157,10 +157,16 @@ public class PolicyValidationFilter implements Filter {
         UUID userId = securityContext.getUserId() != null ? 
             UUID.fromString(securityContext.getUserId()) : null;
         
+        // ✅ Production fix: CompanyType fallback
+        // If companyType is NULL in JWT (legacy tokens), default to INTERNAL
+        // This allows TENANT_ADMIN to perform operations during migration
+        CompanyType companyType = securityContext.getCompanyType() != null ?
+            securityContext.getCompanyType() : CompanyType.INTERNAL;
+        
         return PolicyContext.builder()
             .userId(userId)
             .companyId(securityContext.getTenantId())
-            .companyType(securityContext.getCompanyType())
+            .companyType(companyType)
             .endpoint(path)
             .httpMethod(method)
             .operation(mapOperation(method))

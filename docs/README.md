@@ -8,11 +8,13 @@
 
 ## 🎯 Quick Start
 
-| Role             | Document                                                 | Description                         |
-| ---------------- | -------------------------------------------------------- | ----------------------------------- |
-| **🤖 AI**        | [AI_ASSISTANT_LEARNINGS.md](./AI_ASSISTANT_LEARNINGS.md) | AI behavior & project philosophy    |
-| **💎 Developer** | [DEVELOPER_PROTOCOL.md](./DEVELOPER_PROTOCOL.md)         | Developer DNA manifesto (mandatory) |
-| **🏗️ Architect** | [ARCHITECTURE.md](./ARCHITECTURE.md)                     | System architecture                 |
+| Role             | Document                                                                         | Description                         |
+| ---------------- | -------------------------------------------------------------------------------- | ----------------------------------- |
+| **📋 TODO**      | [TODO/README.md](./TODO/README.md)                                               | Production migration & roadmap      |
+| **🤖 AI**        | [AI_ASSISTANT_LEARNINGS.md](./AI_ASSISTANT_LEARNINGS.md)                         | AI behavior & project philosophy    |
+| **💎 Developer** | [DEVELOPER_PROTOCOL.md](./DEVELOPER_PROTOCOL.md)                                 | Developer DNA manifesto (mandatory) |
+| **🏗️ Architect** | [ARCHITECTURE.md](./ARCHITECTURE.md)                                             | System architecture                 |
+| **👥 Roles**     | [architecture/ROLES_QUICK_REFERENCE.md](./architecture/ROLES_QUICK_REFERENCE.md) | System roles & permissions          |
 
 ---
 
@@ -26,6 +28,10 @@ docs/
 ├── 🔐 SECURITY.md                        # Security architecture
 ├── 📖 DOCUMENTATION_PRINCIPLES.md        # Doc standards
 │
+├── 📋 TODO/                              # Production migration & roadmap
+│   ├── README.md                         # Overview & review schedule
+│   └── PRODUCTION_SECURITY_MIGRATION.md  # JWT + mTLS migration plan
+│
 ├── 📐 development/                       # Development standards
 │   ├── principles.md                     # SOLID, DRY, NO USERNAME
 │   ├── code_structure_guide.md           # Code organization
@@ -35,7 +41,8 @@ docs/
 │   └── microservices_api_standards.md    # API standards
 │
 ├── 🏛️ architecture/                      # Architecture patterns
-│   └── TENANT_MODEL_AND_ROLES_GUIDE.md   # Multi-tenancy model
+│   ├── TENANT_MODEL_AND_ROLES_GUIDE.md   # Multi-tenancy model (detailed)
+│   └── ROLES_QUICK_REFERENCE.md          # System roles (quick reference)
 │
 └── 🚀 deployment/                        # Deployment patterns
     ├── ENVIRONMENT_VARIABLES.md          # Config pattern

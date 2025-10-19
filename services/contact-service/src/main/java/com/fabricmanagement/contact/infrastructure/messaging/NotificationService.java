@@ -19,16 +19,17 @@ public class NotificationService {
     
     private final KafkaTemplate<String, Object> kafkaTemplate;
     
-    @Value("${kafka.topics.email-notifications:" + NotificationConstants.TOPIC_EMAIL_NOTIFICATIONS + "}")
+    // ✅ Config-driven topic names (ZERO HARDCODED!)
+    @Value("${kafka.topics.email-notifications:email-notifications}")
     private String emailNotificationTopic;
     
-    @Value("${kafka.topics.sms-notifications:" + NotificationConstants.TOPIC_SMS_NOTIFICATIONS + "}")
+    @Value("${kafka.topics.sms-notifications:sms-notifications}")
     private String smsNotificationTopic;
     
     @Value("${notification.enabled:true}")
     private boolean notificationEnabled;
     
-    @Value("${notification.code-expiry-minutes:" + NotificationConstants.DEFAULT_CODE_EXPIRY_MINUTES + "}")
+    @Value("${notification.code-expiry-minutes:15}")
     private int codeExpiryMinutes;
     
     public void sendVerificationCode(String contactValue, String code, ContactType type) {

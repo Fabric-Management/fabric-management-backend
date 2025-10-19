@@ -33,11 +33,26 @@
     },
     {
       "key": "contactValue",
-      "value": "test@example.com",
+      "value": "fatih@akkayalartekstil.com.tr",
       "type": "string"
     },
     {
       "key": "verificationCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerCompanyId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "supplierCompanyId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subcontractorCompanyId",
       "value": "",
       "type": "string"
     }
@@ -81,6 +96,9 @@
                 }
               ],
               "request": {
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
                 "header": [
                   {
@@ -90,7 +108,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"companyName\": \"Test Company Ltd\",\n  \"legalName\": \"Test Company Limited Şirketi\",\n  \"taxId\": \"1234567890\",\n  \"registrationNumber\": \"REG-2025-TEST\",\n  \"companyType\": \"CORPORATION\",\n  \"industry\": \"MANUFACTURING\",\n  \"description\": \"Test company for Postman testing\",\n  \"website\": \"https://testcompany.com\",\n  \"addressLine1\": \"123 Test Street\",\n  \"addressLine2\": \"Suite 100\",\n  \"city\": \"Istanbul\",\n  \"district\": \"Kadıköy\",\n  \"postalCode\": \"34710\",\n  \"country\": \"Turkey\",\n  \"firstName\": \"Admin\",\n  \"lastName\": \"User\",\n  \"email\": \"admin@testcompany.com\",\n  \"phone\": \"+905551234567\",\n  \"preferredChannel\": \"EMAIL\"\n}"
+                  "raw": "{\n  \"companyName\": \"Akkayalar Tekstil\",\n  \"legalName\": \"Akkayalar Tekstil Dokuma San Tic Ltd Şti\",\n  \"taxId\": \"1234567891\",\n  \"registrationNumber\": \"REG-2025-AKKAYA\",\n  \"companyType\": \"CORPORATION\",\n  \"industry\": \"MANUFACTURING\",\n  \"description\": \"Test company for Postman testing\",\n  \"website\": \"https://akkayalartekstil.com.tr\",\n  \"addressLine1\": \"123 Test Street\",\n  \"addressLine2\": \"Suite 100\",\n  \"city\": \"Istanbul\",\n  \"district\": \"Kadıköy\",\n  \"postalCode\": \"34710\",\n  \"country\": \"Turkey\",\n  \"firstName\": \"Admin\",\n  \"lastName\": \"User\",\n  \"email\": \"fatih@akkayalartekstil.com.tr\",\n  \"phone\": \"+447553838399\",\n  \"preferredChannel\": \"EMAIL\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/public/onboarding/register",
@@ -113,6 +131,7 @@
                       "console.log(\"   Run this SQL to get code:\");",
                       "console.log(\"   SELECT verification_code FROM contacts WHERE contact_value = '\" + pm.collectionVariables.get(\"contactValue\") + \"' ORDER BY created_at DESC LIMIT 1;\");",
                       "console.log(\"\");",
+                      "console.log(\"   Or check email inbox: \" + pm.collectionVariables.get(\"contactValue\"));",
                       "console.log(\"   Then set verificationCode variable with the result.\");"
                     ],
                     "type": "text/javascript"
@@ -126,7 +145,7 @@
                   "raw": "{{baseUrl}}/",
                   "host": ["{{baseUrl}}"]
                 },
-                "description": "**MANUAL STEP:**\n\nGet verification code from database:\n\n```sql\nSELECT verification_code \nFROM contacts \nWHERE contact_value = 'admin@testcompany.com' \nORDER BY created_at DESC \nLIMIT 1;\n```\n\nOr check email inbox.\n\nThen update `verificationCode` variable."
+                "description": "**MANUAL STEP:**\n\nGet verification code from database:\n\n```sql\nSELECT verification_code \nFROM contacts \nWHERE contact_value = 'fatih@akkayalartekstil.com.tr' \nORDER BY created_at DESC \nLIMIT 1;\n```\n\nOr check email inbox.\n\nThen update `verificationCode` variable."
               },
               "response": []
             },
@@ -162,6 +181,9 @@
                 }
               ],
               "request": {
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
                 "header": [
                   {
@@ -222,6 +244,9 @@
                 }
               ],
               "request": {
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
                 "header": [
                   {
@@ -270,6 +295,9 @@
                 }
               ],
               "request": {
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
                 "header": [
                   {
@@ -354,7 +382,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@testcompany.com\",\n  \"phone\": \"+905559876543\",\n  \"role\": \"USER\",\n  \"sendVerification\": true,\n  \"preferredChannel\": \"EMAIL\"\n}"
+                  "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"phone\": \"+447553838400\",\n  \"role\": \"USER\",\n  \"sendVerification\": true,\n  \"preferredChannel\": \"EMAIL\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/users/invite",
@@ -389,6 +417,9 @@
                 }
               ],
               "request": {
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "POST",
                 "header": [
                   {
@@ -398,7 +429,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"contactValue\": \"john.doe@testcompany.com\",\n  \"verificationCode\": \"123456\",\n  \"password\": \"Secure@Pass123\",\n  \"preferredChannel\": \"EMAIL\"\n}"
+                  "raw": "{\n  \"contactValue\": \"john.doe@example.com\",\n  \"verificationCode\": \"123456\",\n  \"password\": \"Secure@Pass123\",\n  \"preferredChannel\": \"EMAIL\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/users/auth/setup-password-with-verification",
@@ -411,7 +442,7 @@
                     "setup-password-with-verification"
                   ]
                 },
-                "description": "⚡ **ORCHESTRATION ENDPOINT**\n\nInvited user sets password and auto-logs in.\n\n**NOTE:** Get real verification code from DB:\n```sql\nSELECT verification_code FROM contacts \nWHERE contact_value = 'john.doe@testcompany.com' \nORDER BY created_at DESC LIMIT 1;\n```"
+                "description": "⚡ **ORCHESTRATION ENDPOINT**\n\nInvited user sets password and auto-logs in.\n\n**NOTE:** Get real verification code from DB:\n```sql\nSELECT verification_code FROM contacts \nWHERE contact_value = 'john.doe@example.com' \nORDER BY created_at DESC LIMIT 1;\n```"
               },
               "response": []
             }
@@ -426,6 +457,9 @@
         {
           "name": "Check Contact",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -443,6 +477,9 @@
         {
           "name": "Send Verification Code",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -478,6 +515,9 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -511,7 +551,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"displayName\": \"Jane Smith\",\n  \"email\": \"jane.smith@testcompany.com\",\n  \"phone\": \"+905558765432\",\n  \"role\": \"USER\"\n}"
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"displayName\": \"Jane Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"phone\": \"+447553838399\",\n  \"role\": \"USER\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
@@ -534,7 +574,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Bob\",\n  \"lastName\": \"Johnson\",\n  \"email\": \"bob.johnson@testcompany.com\",\n  \"phone\": \"+905557654321\",\n  \"role\": \"USER\",\n  \"sendVerification\": true,\n  \"preferredChannel\": \"WHATSAPP\"\n}"
+              "raw": "{\n  \"firstName\": \"Bob\",\n  \"lastName\": \"Johnson\",\n  \"email\": \"bob.johnson@example.com\",\n  \"phone\": \"+447553838401\",\n  \"role\": \"USER\",\n  \"sendVerification\": true,\n  \"preferredChannel\": \"WHATSAPP\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/invite",
@@ -695,6 +735,606 @@
             "description": "Uses auto-saved userId from login"
           },
           "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏢 Company Management",
+      "description": "Complete company lifecycle management.\n\n**Hierarchy:**\n1. Create related companies (Customer/Supplier/Subcontractor)\n2. Retrieve & search companies\n3. Update company details\n4. Manage company status\n5. Utilities (duplicate check, autocomplete)\n\n**Auth:** TENANT_ADMIN required",
+      "item": [
+        {
+          "name": "1️⃣ Create Related Companies",
+          "description": "Create companies related to your tenant company.\n\n**Types:**\n- CUSTOMER: Müşteri firmalar\n- SUPPLIER: Tedarikçi firmalar\n- SUBCONTRACTOR: Alt yüklenici firmalar",
+          "item": [
+            {
+              "name": "Create Customer Company",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Customer company created\", function() {",
+                      "    pm.response.to.have.status(201);",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json.success).to.be.true;",
+                      "    pm.expect(json.data).to.exist;",
+                      "    ",
+                      "    // Save customer company ID",
+                      "    pm.collectionVariables.set(\"customerCompanyId\", json.data);",
+                      "    console.log(\"✅ Customer Company ID:\", json.data);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"ABC Retail Ltd\",\n  \"legalName\": \"ABC Retail Limited Şirketi\",\n  \"taxId\": \"9876543210\",\n  \"registrationNumber\": \"REG-2025-ABC\",\n  \"type\": \"LLC\",\n  \"industry\": \"RETAIL\",\n  \"description\": \"Müşteri firma - Perakende\",\n  \"businessType\": \"CUSTOMER\",\n  \"relationshipType\": \"CUSTOMER\",\n  \"website\": \"https://abcretail.com\",\n  \"addressLine1\": \"456 Customer Street\",\n  \"addressLine2\": \"Floor 3\",\n  \"city\": \"Istanbul\",\n  \"district\": \"Beşiktaş\",\n  \"postalCode\": \"34340\",\n  \"country\": \"Turkey\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies"]
+                },
+                "description": "**Create CUSTOMER company**\n\nRelated to tenant company as customer.\n\n**Required:**\n- businessType: CUSTOMER\n- parentCompanyId: Tenant company ID\n- relationshipType: CUSTOMER"
+              },
+              "response": []
+            },
+            {
+              "name": "Create Supplier Company",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Supplier company created\", function() {",
+                      "    pm.response.to.have.status(201);",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json.success).to.be.true;",
+                      "    pm.expect(json.data).to.exist;",
+                      "    ",
+                      "    pm.collectionVariables.set(\"supplierCompanyId\", json.data);",
+                      "    console.log(\"✅ Supplier Company ID:\", json.data);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"XYZ Tekstil A.Ş.\",\n  \"legalName\": \"XYZ Tekstil Anonim Şirketi\",\n  \"taxId\": \"1122334455\",\n  \"registrationNumber\": \"REG-2025-XYZ\",\n  \"type\": \"CORPORATION\",\n  \"industry\": \"MANUFACTURING\",\n  \"description\": \"Tedarikçi firma - Ham madde sağlayıcı\",\n  \"businessType\": \"SUPPLIER\",\n  \"relationshipType\": \"SUPPLIER\",\n  \"website\": \"https://xyztekstil.com.tr\",\n  \"addressLine1\": \"789 Supplier Avenue\",\n  \"city\": \"Bursa\",\n  \"district\": \"Osmangazi\",\n  \"postalCode\": \"16200\",\n  \"country\": \"Turkey\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies"]
+                },
+                "description": "**Create SUPPLIER company**\n\nRelated to tenant company as supplier.\n\n**Required:**\n- businessType: SUPPLIER\n- parentCompanyId: Tenant company ID\n- relationshipType: SUPPLIER"
+              },
+              "response": []
+            },
+            {
+              "name": "Create Subcontractor Company",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Subcontractor company created\", function() {",
+                      "    pm.response.to.have.status(201);",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json.success).to.be.true;",
+                      "    pm.expect(json.data).to.exist;",
+                      "    ",
+                      "    pm.collectionVariables.set(\"subcontractorCompanyId\", json.data);",
+                      "    console.log(\"✅ Subcontractor Company ID:\", json.data);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"DEF Manufacturing Ltd\",\n  \"legalName\": \"DEF Manufacturing Limited\",\n  \"taxId\": \"5544332211\",\n  \"registrationNumber\": \"REG-2025-DEF\",\n  \"type\": \"LLC\",\n  \"industry\": \"MANUFACTURING\",\n  \"description\": \"Alt yüklenici - Fason üretim\",\n  \"businessType\": \"SUBCONTRACTOR\",\n  \"relationshipType\": \"SUBCONTRACTOR\",\n  \"website\": \"https://defmanufacturing.com\",\n  \"addressLine1\": \"321 Manufacturing Blvd\",\n  \"city\": \"Denizli\",\n  \"district\": \"Pamukkale\",\n  \"postalCode\": \"20100\",\n  \"country\": \"Turkey\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies"]
+                },
+                "description": "**Create SUBCONTRACTOR company**\n\nRelated to tenant company as subcontractor.\n\n**Required:**\n- businessType: SUBCONTRACTOR\n- parentCompanyId: Tenant company ID\n- relationshipType: SUBCONTRACTOR"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "2️⃣ Retrieve Companies",
+          "description": "Get company information in various ways.",
+          "item": [
+            {
+              "name": "Get Company by ID",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/{{companyId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "{{companyId}}"]
+                },
+                "description": "Get company details by ID.\n\n**Auth:** Any authenticated user\n**Returns:** Full company details"
+              },
+              "response": []
+            },
+            {
+              "name": "List All Companies",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies"]
+                },
+                "description": "List all companies for tenant.\n\n**Auth:** Any authenticated user\n**Returns:** Array of companies"
+              },
+              "response": []
+            },
+            {
+              "name": "List Companies (Paginated)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/paginated?page=0&size=10&sort=createdAt,desc",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "paginated"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "createdAt,desc"
+                    }
+                  ]
+                },
+                "description": "List companies with pagination.\n\n**Params:**\n- page: Page number (0-based)\n- size: Items per page\n- sort: Sort field,direction"
+              },
+              "response": []
+            },
+            {
+              "name": "Search Companies",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/search?name=Tekstil",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "search"],
+                  "query": [
+                    {
+                      "key": "name",
+                      "value": "Tekstil"
+                    },
+                    {
+                      "key": "industry",
+                      "value": "MANUFACTURING",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "ACTIVE",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Search companies by criteria.\n\n**Params:**\n- name: Company name (partial match)\n- industry: Industry filter\n- status: Status filter"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Companies by Status",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/status/ACTIVE",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "status", "ACTIVE"]
+                },
+                "description": "Get companies by status.\n\n**Status values:**\n- ACTIVE\n- INACTIVE\n- PENDING\n- DELETED"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "3️⃣ Update Company",
+          "description": "Update company information and settings.",
+          "item": [
+            {
+              "name": "Update Company Details",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"legalName\": \"Updated Legal Name\",\n  \"description\": \"Updated company description\",\n  \"website\": \"https://updated-website.com\",\n  \"logoUrl\": \"https://updated-website.com/logo.png\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/{{companyId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "{{companyId}}"]
+                },
+                "description": "Update company details.\n\n**Auth:** TENANT_ADMIN or COMPANY_MANAGER\n**Fields:** Partial update supported"
+              },
+              "response": []
+            },
+            {
+              "name": "Update Company Settings",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"maxUsers\": 50,\n  \"settings\": {\n    \"feature_notifications\": true,\n    \"feature_analytics\": true\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/{{companyId}}/settings",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "companies",
+                    "{{companyId}}",
+                    "settings"
+                  ]
+                },
+                "description": "Update company settings.\n\n**Auth:** TENANT_ADMIN or COMPANY_MANAGER"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "4️⃣ Company Actions",
+          "description": "Activate, deactivate, or delete companies.",
+          "item": [
+            {
+              "name": "Activate Company",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/{{customerCompanyId}}/activate",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "companies",
+                    "{{customerCompanyId}}",
+                    "activate"
+                  ]
+                },
+                "description": "Activate inactive company.\n\n**Auth:** TENANT_ADMIN"
+              },
+              "response": []
+            },
+            {
+              "name": "Deactivate Company",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/{{customerCompanyId}}/deactivate",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "v1",
+                    "companies",
+                    "{{customerCompanyId}}",
+                    "deactivate"
+                  ]
+                },
+                "description": "Deactivate active company.\n\n**Auth:** TENANT_ADMIN"
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Company (Soft)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/{{customerCompanyId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "{{customerCompanyId}}"]
+                },
+                "description": "Soft delete company.\n\n**Auth:** TENANT_ADMIN\n**Note:** Company is marked deleted, not removed from DB"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "5️⃣ Company Utilities",
+          "description": "Helper endpoints for company management.",
+          "item": [
+            {
+              "name": "Check Duplicate Company",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Test Company\",\n  \"legalName\": \"Test Company Legal Name\",\n  \"country\": \"Turkey\",\n  \"taxId\": \"1234567890\",\n  \"registrationNumber\": \"REG-2025-TEST\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/check-duplicate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "check-duplicate"]
+                },
+                "description": "Check if company already exists.\n\n**Checks:**\n- Tax ID (exact)\n- Registration number (exact)\n- Legal name + country (exact)\n- Name similarity (fuzzy)\n\n**Use before:** Creating new company"
+              },
+              "response": []
+            },
+            {
+              "name": "Company Autocomplete",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/autocomplete?q=Tekstil&limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "autocomplete"],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "Tekstil"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Autocomplete company names.\n\n**Use case:** Dropdown search, quick select\n**Params:** q (min 2 chars), limit (optional)"
+              },
+              "response": []
+            },
+            {
+              "name": "Find Similar Companies",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/companies/similar?name=Akkayalar&threshold=0.7",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "companies", "similar"],
+                  "query": [
+                    {
+                      "key": "name",
+                      "value": "Akkayalar"
+                    },
+                    {
+                      "key": "threshold",
+                      "value": "0.7"
+                    }
+                  ]
+                },
+                "description": "Find similar companies (fuzzy match).\n\n**Use case:** Prevent typo duplicates"
+              },
+              "response": []
+            }
+          ]
         }
       ]
     }

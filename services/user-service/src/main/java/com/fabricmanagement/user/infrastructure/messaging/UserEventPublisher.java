@@ -15,17 +15,28 @@ import java.util.concurrent.CompletableFuture;
  * User Event Publisher
  * 
  * Publishes user domain events to Kafka
+ * 
+ * ✅ ZERO HARDCODED (Manifesto compliance)
+ * - Topic names from application.yml
+ * - Override via environment variables
+ * - Production-ready configuration
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class UserEventPublisher {
     
-    private static final String USER_CREATED_TOPIC = "user.created";
-    private static final String USER_UPDATED_TOPIC = "user.updated";
-    private static final String USER_DELETED_TOPIC = "user.deleted";
-    
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    
+    // ✅ Config-driven topic names (ZERO HARDCODED!)
+    @org.springframework.beans.factory.annotation.Value("${kafka.topics.user-created:user.created}")
+    private String userCreatedTopic;
+    
+    @org.springframework.beans.factory.annotation.Value("${kafka.topics.user-updated:user.updated}")
+    private String userUpdatedTopic;
+    
+    @org.springframework.beans.factory.annotation.Value("${kafka.topics.user-deleted:user.deleted}")
+    private String userDeletedTopic;
     
     /**
      * Publishes UserCreatedEvent
@@ -34,7 +45,7 @@ public class UserEventPublisher {
         log.info("Publishing UserCreatedEvent for user: {}", event.getUserId());
         
         CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send(USER_CREATED_TOPIC, event.getUserId().toString(), event);
+            kafkaTemplate.send(userCreatedTopic, event.getUserId().toString(), event);
         
         future.whenComplete((result, ex) -> {
             if (ex == null) {
@@ -52,7 +63,7 @@ public class UserEventPublisher {
         log.info("Publishing UserUpdatedEvent for user: {}", event.getUserId());
         
         CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send(USER_UPDATED_TOPIC, event.getUserId().toString(), event);
+            kafkaTemplate.send(userUpdatedTopic, event.getUserId().toString(), event);
         
         future.whenComplete((result, ex) -> {
             if (ex == null) {
@@ -70,7 +81,7 @@ public class UserEventPublisher {
         log.info("Publishing UserDeletedEvent for user: {}", event.getUserId());
         
         CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send(USER_DELETED_TOPIC, event.getUserId().toString(), event);
+            kafkaTemplate.send(userDeletedTopic, event.getUserId().toString(), event);
         
         future.whenComplete((result, ex) -> {
             if (ex == null) {

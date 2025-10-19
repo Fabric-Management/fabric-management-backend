@@ -87,6 +87,14 @@ kafka:
     user-password-reset: ${KAFKA_TOPIC_USER_PASSWORD_RESET:user.password.reset}
     contact-verification: ${KAFKA_TOPIC_CONTACT_VERIFICATION:contact.verification}
 
+# ===========================================================================
+# PLATFORM BRANDING (for system emails)
+# ===========================================================================
+platform:
+  branding:
+    name: ${PLATFORM_NAME:FabriCode}
+    company: ${PLATFORM_COMPANY:Akkayalar Group}
+
 # Security Configuration
 security:
   jwt:

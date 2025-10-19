@@ -606,13 +606,13 @@ public class CompanyService {
                 searchThreshold
         );
         
-        // Map to response with similarity scores
+        // Map to response with similarity scores and masked sensitive data
         List<CompanySimilarResponse.SimilarCompany> matches = similarCompanies.stream()
                 .map(company -> CompanySimilarResponse.SimilarCompany.builder()
                         .id(company.getId().toString())
                         .name(company.getName().getValue())
-                        .legalName(company.getLegalName())
-                        .taxId(company.getTaxId())
+                        .legalName(com.fabricmanagement.shared.infrastructure.util.DataMaskingUtil.maskLegalName(company.getLegalName()))
+                        .taxId(com.fabricmanagement.shared.infrastructure.util.DataMaskingUtil.maskTaxId(company.getTaxId()))
                         .type(company.getType().name())
                         .industry(company.getIndustry().name())
                         .similarityScore(0.85) // Placeholder - PostgreSQL returns ordered results

@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
 
 /**
  * Internal Authentication Filter
@@ -72,36 +71,38 @@ public class InternalAuthenticationFilter implements Filter {
 
             String providedKey = httpRequest.getHeader(InternalApiConstants.INTERNAL_API_KEY_HEADER);
 
-            if (providedKey == null || providedKey.isEmpty()) {
-                log.warn("⚠️ [InternalAuth] Missing API key: {} {}", method, path);
-                sendUnauthorizedResponse(httpResponse, InternalApiConstants.MSG_MISSING_INTERNAL_KEY);
-                return;
+            // ✅ DUAL MODE support: If internal key is provided, validate it
+            if (providedKey != null && !providedKey.isEmpty()) {
+                // Key provided - MUST be valid
+                if (!providedKey.equals(internalApiKey)) {
+                    log.error("🚨 [InternalAuth] Invalid API key: {} {}", method, path);
+                    sendUnauthorizedResponse(httpResponse, InternalApiConstants.MSG_INVALID_INTERNAL_KEY);
+                    return;
+                }
+
+                log.info("✅ [InternalAuth] API key validated: {} {}", method, path);
+
+                // Create internal service security context
+                com.fabricmanagement.shared.application.context.SecurityContext customSecurityContext =
+                    com.fabricmanagement.shared.application.context.SecurityContext.builder()
+                        .userId(SecurityConstants.INTERNAL_SERVICE_PRINCIPAL)
+                        .tenantId(null)
+                        .roles(new String[]{SecurityConstants.ROLE_INTERNAL_SERVICE})
+                        .build();
+
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    customSecurityContext,
+                    null,
+                    Collections.singletonList(new SimpleGrantedAuthority(SecurityConstants.ROLE_INTERNAL_SERVICE))
+                );
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                log.debug("🔓 [InternalAuth] Internal service authentication set");
+            } else {
+                // ✅ DUAL MODE: No internal key → Fall through to JWT authentication
+                // This allows endpoints to be called with either internal key OR JWT
+                log.debug("➡️ [InternalAuth] No internal key provided, falling through to JWT auth: {} {}", method, path);
             }
-
-            if (!providedKey.equals(internalApiKey)) {
-                log.error("🚨 [InternalAuth] Invalid API key: {} {}", method, path);
-                sendUnauthorizedResponse(httpResponse, InternalApiConstants.MSG_INVALID_INTERNAL_KEY);
-                return;
-            }
-
-            log.info("✅ [InternalAuth] API key validated: {} {}", method, path);
-
-            // Create internal service security context
-            com.fabricmanagement.shared.application.context.SecurityContext customSecurityContext =
-                com.fabricmanagement.shared.application.context.SecurityContext.builder()
-                    .userId(SecurityConstants.INTERNAL_SERVICE_PRINCIPAL)
-                    .tenantId(null)
-                    .roles(new String[]{SecurityConstants.ROLE_INTERNAL_SERVICE})
-                    .build();
-
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                customSecurityContext,
-                null,
-                Collections.singletonList(new SimpleGrantedAuthority(SecurityConstants.ROLE_INTERNAL_SERVICE))
-            );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            log.debug("🔓 [InternalAuth] Internal service authentication set");
         } else {
             log.trace("➡️ [InternalAuth] Not internal, continue to JWT auth: {} {}", method, path);
         }

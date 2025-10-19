@@ -34,8 +34,13 @@ public final class NotificationConstants {
     public static final int DEFAULT_CODE_EXPIRY_MINUTES = 15;
     public static final String DEFAULT_SENDER_NAME = "Fabric Management System";
     
-    // Kafka Topics (Default values)
+    // Kafka Topics - DEPRECATED!
+    // ❌ DO NOT USE! Use ${kafka.topics.xxx} in @Value instead
+    // These constants are kept temporarily for backward compatibility
+    // Will be removed in future versions (after full migration)
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String TOPIC_EMAIL_NOTIFICATIONS = "email-notifications";
+    @Deprecated(since = "3.3.0", forRemoval = true)
     public static final String TOPIC_SMS_NOTIFICATIONS = "sms-notifications";
 }
 

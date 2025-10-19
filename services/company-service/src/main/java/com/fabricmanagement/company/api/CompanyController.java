@@ -42,14 +42,16 @@ public class CompanyController {
     /**
      * Create new company
      * 
-     * Dual mode endpoint:
-     * 1. Internal call (onboarding flow) - No JWT, tenantId in request body
-     * 2. Authenticated call (normal flow) - JWT required, tenantId from SecurityContext
+     * DUAL MODE endpoint:
+     * 1. Internal call (onboarding flow) - X-Internal-API-Key validates FIRST (InternalAuthenticationFilter)
+     * 2. Authenticated call (normal flow) - JWT Bearer token (if no internal key, falls through to JwtFilter)
      * 
-     * Security: @InternalEndpoint allows internal calls with X-Internal-API-Key
+     * @InternalEndpoint allows InternalAuthenticationFilter to validate internal key first.
+     * If key is valid, JWT filter is skipped (SecurityContext already set).
+     * If key is missing/invalid, request falls through to JWT authentication.
      */
     @InternalEndpoint(
-        description = "Create company during tenant onboarding or by authenticated admin",
+        description = "Create company during tenant onboarding (internal key) or by admin (JWT)",
         calledBy = {"user-service"},
         critical = true
     )
@@ -298,13 +300,18 @@ public class CompanyController {
         return ResponseEntity.ok(ApiResponse.success(null, ServiceConstants.MSG_COMPANY_SUBSCRIPTION_UPDATED));
     }
     
+    /**
+     * Check company duplicate
+     * 
+     * INTERNAL ONLY: Called during tenant onboarding (no JWT yet)
+     * Requires X-Internal-API-Key
+     */
     @InternalEndpoint(
         description = "Check company duplicate during tenant onboarding validation",
         calledBy = {"user-service"},
         critical = true
     )
     @PostMapping("/check-duplicate")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<CheckDuplicateResponse>> checkDuplicate(
             @Valid @RequestBody CheckDuplicateRequest request,
             @AuthenticationPrincipal SecurityContext ctx) {
