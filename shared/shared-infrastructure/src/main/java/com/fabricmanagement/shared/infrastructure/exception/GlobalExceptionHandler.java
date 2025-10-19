@@ -116,6 +116,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle invalid composition errors
+     */
+    @ExceptionHandler(InvalidCompositionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidComposition(
+            InvalidCompositionException ex, WebRequest request) {
+        
+        log.warn("Invalid composition error: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "VALIDATION_ERROR"
+                ));
+    }
+
+    /**
      * Handle business rule violations
      */
     @ExceptionHandler(BusinessRuleViolationException.class)
@@ -128,6 +144,38 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(
                     ex.getMessage(),
                     ex.getErrorCode()
+                ));
+    }
+
+    /**
+     * Handle fiber not found
+     */
+    @ExceptionHandler(FiberNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFiberNotFound(
+            FiberNotFoundException ex, WebRequest request) {
+        
+        log.warn("Fiber not found: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "NOT_FOUND"
+                ));
+    }
+
+    /**
+     * Handle inactive fiber
+     */
+    @ExceptionHandler(InactiveFiberException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInactiveFiber(
+            InactiveFiberException ex, WebRequest request) {
+        
+        log.warn("Inactive fiber error: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(
+                    ex.getMessage(),
+                    "VALIDATION_ERROR"
                 ));
     }
 
