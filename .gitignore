@@ -70,11 +70,11 @@ tmp/
 
 # Environment & Configuration
 # ==========================================
-# .env
-# .env.local
-#env.*.local
-#env.backup.*
-#!.env.example
+.env
+.env.local
+env.*.local
+env.backup.*
+!.env.example
 
 # Docker
 # ==========================================
@@ -130,6 +130,13 @@ credentials/
 /uploads/
 /downloads/
 *.pid
+
+# Monitoring Data (Prometheus, Grafana, Alertmanager)
+# ==========================================
+# Keep configs, ignore runtime data
+monitoring/prometheus/data/
+monitoring/grafana/data/
+monitoring/alertmanager/data/
 
 # Reports (keep only in docs/analysis)
 # ==========================================

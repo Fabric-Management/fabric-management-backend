@@ -44,7 +44,8 @@ import static org.hamcrest.Matchers.*;
 class FiberControllerIT {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+    @SuppressWarnings("resource")
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("fiber_test")
             .withUsername("test")
             .withPassword("test");

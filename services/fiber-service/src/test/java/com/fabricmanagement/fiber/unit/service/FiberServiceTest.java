@@ -25,11 +25,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import static com.fabricmanagement.fiber.support.TestSupport.*;
 
 import static com.fabricmanagement.fiber.fixtures.FiberFixtures.*;
 import static org.assertj.core.api.Assertions.*;
@@ -82,14 +82,14 @@ class FiberServiceTest {
         @DisplayName("Should create pure fiber when valid request provided")
         void shouldCreatePureFiber_whenValidRequest() {
             // Given
-            CreateFiberRequest request = createPureFiberRequest("CO", "Cotton");
-            Fiber fiberToSave = createPureFiber("CO", "Cotton");
+            CreateFiberRequest request = createPureFiberRequest(CODE_COTTON, NAME_COTTON);
+            Fiber fiberToSave = createPureFiber(CODE_COTTON, NAME_COTTON);
             
             // Simulate Hibernate generating ID after save
-            Fiber savedFiber = createPureFiber("CO", "Cotton");
-            savedFiber.setId(UUID.randomUUID());
+            Fiber savedFiber = createPureFiber(CODE_COTTON, NAME_COTTON);
+            savedFiber.setId(newId());
 
-            when(fiberRepository.existsByCode("CO")).thenReturn(false);
+            when(fiberRepository.existsByCode(CODE_COTTON)).thenReturn(false);
             when(fiberMapper.fromCreateRequest(request)).thenReturn(fiberToSave);
             when(fiberRepository.save(any(Fiber.class))).thenReturn(savedFiber);
 
@@ -100,7 +100,7 @@ class FiberServiceTest {
             assertThat(fiberId).isNotNull();
             assertThat(fiberId).isEqualTo(savedFiber.getId());
 
-            verify(fiberRepository).existsByCode("CO");
+            verify(fiberRepository).existsByCode(CODE_COTTON);
             verify(fiberMapper).fromCreateRequest(request);
             verify(fiberRepository).save(fiberToSave);
             verify(eventPublisher).publishFiberDefined(savedFiber);
@@ -110,15 +110,15 @@ class FiberServiceTest {
         @DisplayName("Should throw DuplicateResourceException when fiber code already exists")
         void shouldThrowDuplicateException_whenCodeAlreadyExists() {
             // Given
-            CreateFiberRequest request = createPureFiberRequest("CO", "Cotton");
-            when(fiberRepository.existsByCode("CO")).thenReturn(true);
+            CreateFiberRequest request = createPureFiberRequest(CODE_COTTON, NAME_COTTON);
+            when(fiberRepository.existsByCode(CODE_COTTON)).thenReturn(true);
 
             // When & Then
             assertThatThrownBy(() -> fiberService.createFiber(request))
                     .isInstanceOf(DuplicateResourceException.class)
-                    .hasMessageContaining("Fiber code already exists: CO");
+                    .hasMessageContaining("Fiber code already exists: " + CODE_COTTON);
 
-            verify(fiberRepository).existsByCode("CO");
+            verify(fiberRepository).existsByCode(CODE_COTTON);
             verify(fiberRepository, never()).save(any());
             verify(eventPublisher, never()).publishFiberDefined(any());
         }
@@ -127,10 +127,10 @@ class FiberServiceTest {
         @DisplayName("Should set default properties when creating fiber")
         void shouldSetDefaultProperties_whenCreatingFiber() {
             // Given
-            CreateFiberRequest request = createPureFiberRequest("PES", "Polyester");
-            Fiber fiber = createSyntheticFiber("PES", "Polyester");
+            CreateFiberRequest request = createPureFiberRequest(CODE_POLYESTER, NAME_POLYESTER);
+            Fiber fiber = createSyntheticFiber(CODE_POLYESTER, NAME_POLYESTER);
 
-            when(fiberRepository.existsByCode("PES")).thenReturn(false);
+            when(fiberRepository.existsByCode(CODE_POLYESTER)).thenReturn(false);
             when(fiberMapper.fromCreateRequest(request)).thenReturn(fiber);
             when(fiberRepository.save(any())).thenReturn(fiber);
 
@@ -182,11 +182,11 @@ class FiberServiceTest {
             
             // Simulate Hibernate generating ID after save
             Fiber savedFiber = createCottonPolyesterBlend();
-            savedFiber.setId(UUID.randomUUID());
+            savedFiber.setId(newId());
 
             when(fiberRepository.existsByCode("BLD-001")).thenReturn(false);
-            when(fiberRepository.existsByCodeAndStatus("CO", FiberStatus.ACTIVE)).thenReturn(true);
-            when(fiberRepository.existsByCodeAndStatus("PES", FiberStatus.ACTIVE)).thenReturn(true);
+            when(fiberRepository.existsByCodeAndStatus(CODE_COTTON, FiberStatus.ACTIVE)).thenReturn(true);
+            when(fiberRepository.existsByCodeAndStatus(CODE_POLYESTER, FiberStatus.ACTIVE)).thenReturn(true);
             when(fiberMapper.fromCreateBlendRequest(request)).thenReturn(fiberToSave);
             when(fiberRepository.save(any())).thenReturn(savedFiber);
 
@@ -197,8 +197,8 @@ class FiberServiceTest {
             assertThat(fiberId).isNotNull();
             assertThat(fiberId).isEqualTo(savedFiber.getId());
 
-            verify(fiberRepository).existsByCodeAndStatus("CO", FiberStatus.ACTIVE);
-            verify(fiberRepository).existsByCodeAndStatus("PES", FiberStatus.ACTIVE);
+            verify(fiberRepository).existsByCodeAndStatus(CODE_COTTON, FiberStatus.ACTIVE);
+            verify(fiberRepository).existsByCodeAndStatus(CODE_POLYESTER, FiberStatus.ACTIVE);
             verify(fiberRepository).save(fiberToSave);
             verify(eventPublisher).publishFiberDefined(savedFiber);
         }
@@ -209,8 +209,8 @@ class FiberServiceTest {
             // Given
             CreateBlendFiberRequest request = createBlendFiberRequest("BLD-002", "Invalid");
             request.setComponents(Arrays.asList(
-                    createComponentDto("CO", 60.0),
-                    createComponentDto("PES", 30.0)  // Total = 90% ❌
+                    createComponentDto(CODE_COTTON, PCT_60.doubleValue()),
+                    createComponentDto(CODE_POLYESTER, 30.0)  // Total = 90% ❌
             ));
 
             when(fiberRepository.existsByCode("BLD-002")).thenReturn(false);
@@ -307,8 +307,8 @@ class FiberServiceTest {
         @DisplayName("Should update fiber property when valid request")
         void shouldUpdateFiberProperty_whenValidRequest() {
             // Given
-            UUID fiberId = UUID.randomUUID();
-            Fiber fiber = createPureFiber("CO", "Cotton");
+            UUID fiberId = newId();
+            Fiber fiber = createPureFiber(CODE_COTTON, NAME_COTTON);
             UpdateFiberPropertyRequest request = createUpdatePropertyRequest();
 
             when(fiberRepository.findById(fiberId)).thenReturn(Optional.of(fiber));
@@ -327,8 +327,8 @@ class FiberServiceTest {
         @DisplayName("Should throw ForbiddenException when updating default fiber")
         void shouldThrowException_whenUpdatingDefaultFiber() {
             // Given
-            UUID fiberId = UUID.randomUUID();
-            Fiber defaultFiber = createDefaultFiber("CO");
+            UUID fiberId = newId();
+            Fiber defaultFiber = createDefaultFiber(CODE_COTTON);
             UpdateFiberPropertyRequest request = createUpdatePropertyRequest();
 
             when(fiberRepository.findById(fiberId)).thenReturn(Optional.of(defaultFiber));
@@ -336,7 +336,7 @@ class FiberServiceTest {
             // When & Then
             assertThatThrownBy(() -> fiberService.updateFiberProperty(fiberId, request))
                     .isInstanceOf(ForbiddenException.class)
-                    .hasMessageContaining("Cannot update default fiber: CO");
+                    .hasMessageContaining("Cannot update default fiber: " + CODE_COTTON);
 
             verify(fiberRepository).findById(fiberId);
             verify(fiberRepository, never()).save(any());

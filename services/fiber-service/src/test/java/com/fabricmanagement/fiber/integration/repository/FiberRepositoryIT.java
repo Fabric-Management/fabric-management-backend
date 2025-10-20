@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.fabricmanagement.fiber.fixtures.FiberFixtures.*;
+import static com.fabricmanagement.fiber.support.TestSupport.*;
 import static org.assertj.core.api.Assertions.*;
 
 /**
@@ -43,7 +44,8 @@ import static org.assertj.core.api.Assertions.*;
 class FiberRepositoryIT {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+    @SuppressWarnings("resource")
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("fiber_test")
             .withUsername("test")
             .withPassword("test");
@@ -232,8 +234,8 @@ class FiberRepositoryIT {
         @DisplayName("Should find fibers by status")
         void shouldFindFibersByStatus() {
             // Given
-            Fiber active1 = fiberRepository.save(createPureFiber("CO", "Cotton"));
-            Fiber active2 = fiberRepository.save(createPureFiber("PE", "Polyester"));
+            fiberRepository.save(createPureFiber("CO", "Cotton"));
+            fiberRepository.save(createPureFiber("PE", "Polyester"));
 
             Fiber inactive = createPureFiber("WO", "Wool");
             inactive.setStatus(FiberStatus.INACTIVE);

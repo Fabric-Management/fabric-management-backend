@@ -146,9 +146,10 @@ gateway:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: ${KAFKA_PRODUCER_ACKS:1}
-      retries: ${KAFKA_PRODUCER_RETRIES:0}
+      acks: ${KAFKA_PRODUCER_ACKS:all}
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
       properties:
+        enable.idempotence: ${KAFKA_PRODUCER_IDEMPOTENCE:true}
         # ✅ Fast fail if topic missing (5s vs 60s default)
         request.timeout.ms: ${KAFKA_PRODUCER_TIMEOUT:5000}
         max.block.ms: ${KAFKA_MAX_BLOCK_MS:5000}
@@ -269,4 +270,4 @@ logging:
     reactor.netty: ${LOG_LEVEL:INFO}
     io.netty: ${LOG_LEVEL:INFO}
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [%X{X-Correlation-ID}] - %msg%n"

@@ -11,7 +11,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Import;
+
+import static org.mockito.Mockito.mock;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -53,25 +58,35 @@ import static org.hamcrest.Matchers.*;
 )
 @Testcontainers
 @DisplayName("Fiber Service E2E Tests - Complete User Journeys")
+@Import(FiberLifecycleE2ETest.TestConfig.class)
 class FiberLifecycleE2ETest {
 
-    @MockBean
-    private PolicyDecisionAuditRepository policyDecisionAuditRepository;
+    @TestConfiguration
+    static class TestConfig {
+        @Bean
+        @Primary
+        PolicyDecisionAuditRepository policyDecisionAuditRepository() {
+            return mock(PolicyDecisionAuditRepository.class);
+        }
+    }
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+    @SuppressWarnings("resource")
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("fiber_e2e_test")
             .withUsername("test")
             .withPassword("test");
 
     @Container
-    static KafkaContainer kafka = new KafkaContainer(
+    @SuppressWarnings("deprecation")
+    static final KafkaContainer kafka = new KafkaContainer(
             DockerImageName.parse("confluentinc/cp-kafka:7.5.0"));
 
     @DynamicPropertySource
+    @SuppressWarnings("deprecation")
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
