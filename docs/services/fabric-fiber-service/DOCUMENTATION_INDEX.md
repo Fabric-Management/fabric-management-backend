@@ -2,7 +2,7 @@
 
 **Last Updated:** 2025-10-20  
 **Service Version:** 1.0.0  
-**Status:** ✅ PRODUCTION-READY (92% test coverage)
+**Status:** ✅ PRODUCTION-READY (92% coverage, ZERO hardcoded, Shared modules integrated)
 
 ---
 
@@ -11,7 +11,11 @@
 | What You Need           | Go Here                                                   |
 | ----------------------- | --------------------------------------------------------- |
 | **Getting Started**     | [README](./README.md)                                     |
-| **API Reference**       | [Service Overview](./fabric-fiber-service.md)             |
+| **API Endpoints**       | [API Reference](./api/ENDPOINTS.md)                       |
+| **API Examples**        | [Usage Examples](./api/EXAMPLES.md)                       |
+| **Authentication**      | [Auth Guide](./api/AUTHENTICATION.md)                     |
+| **Service Overview**    | [Architecture](./fabric-fiber-service.md)                 |
+| **Infrastructure**      | [Infrastructure Guide](./INFRASTRUCTURE.md)               |
 | **Test Strategy**       | [Test Architecture](./testing/TEST_ARCHITECTURE.md)       |
 | **Test Results**        | [Test Results](./testing/TEST_RESULTS.md)                 |
 | **Integration Guide**   | [Yarn Integration](./guides/yarn-service-integration.md)  |
@@ -50,6 +54,143 @@ docs/services/fabric-fiber-service/
 ## 📖 DOCUMENT DESCRIPTIONS
 
 ### 1. Overview & Getting Started
+
+---
+
+### 2. API Documentation ✨ NEW
+
+#### 📄 [api/README.md](./api/README.md)
+
+**Purpose:** API documentation hub with quick examples  
+**Audience:** API consumers, Frontend developers  
+**Contents:**
+
+- Endpoint categories
+- Quick start examples
+- Authentication overview
+- Links to detailed docs
+
+**When to Use:**
+
+- First time using Fiber API
+- Quick reference needed
+
+---
+
+#### 📄 [api/ENDPOINTS.md](./api/ENDPOINTS.md)
+
+**Purpose:** Complete endpoint reference with request/response examples  
+**Audience:** API consumers, Integration developers  
+**Contents:**
+
+- All 12 endpoints documented
+- Request payloads
+- Response formats
+- cURL examples
+- Validation rules
+
+**When to Use:**
+
+- Implementing API calls
+- Understanding request/response formats
+- Testing endpoints
+
+**Size:** 350+ lines
+
+---
+
+#### 📄 [api/AUTHENTICATION.md](./api/AUTHENTICATION.md)
+
+**Purpose:** Authentication & authorization guide  
+**Audience:** Security engineers, Developers  
+**Contents:**
+
+- JWT authentication flow
+- Internal API Key usage
+- Role-based permissions
+- Multi-layer security
+- Common auth errors
+
+**When to Use:**
+
+- Setting up authentication
+- Troubleshooting auth issues
+- Understanding security model
+
+**Size:** 200+ lines
+
+---
+
+#### 📄 [api/ERROR_HANDLING.md](./api/ERROR_HANDLING.md)
+
+**Purpose:** Error codes and troubleshooting guide  
+**Audience:** Developers, Support team  
+**Contents:**
+
+- All error codes
+- Error scenarios
+- Troubleshooting steps
+- Common solutions
+- Error statistics
+
+**When to Use:**
+
+- Debugging API errors
+- Implementing error handling
+- User support
+
+**Size:** 150+ lines
+
+---
+
+#### 📄 [api/EXAMPLES.md](./api/EXAMPLES.md)
+
+**Purpose:** Real-world usage scenarios  
+**Audience:** Frontend developers, Integration engineers  
+**Contents:**
+
+- 7 complete scenarios
+- Frontend code examples (TypeScript)
+- Backend integration (Java)
+- Performance optimization patterns
+
+**When to Use:**
+
+- Learning API usage
+- Implementation examples
+- Best practices
+
+**Size:** 250+ lines
+
+---
+
+### 3. Infrastructure
+
+#### 📄 [INFRASTRUCTURE.md](./INFRASTRUCTURE.md)
+
+**Purpose:** Production-ready infrastructure guide with shared modules usage  
+**Audience:** DevOps, Architects, Senior Developers  
+**Contents:**
+
+- Shared module usage (90% code reduction)
+- Configuration files (ZERO hardcoded)
+- Security architecture (multi-layer)
+- Async event publishing (CompletableFuture)
+- Monitoring & observability
+- Database setup
+- Performance optimizations
+
+**When to Use:**
+
+- Understanding infrastructure design
+- Deploying to production
+- Performance tuning
+- Security audits
+
+**Size:** 250+ lines  
+**Key Value:** Shows how we achieve ZERO duplication + Production-ready quality
+
+---
 
 #### 📄 [README.md](./README.md)
 

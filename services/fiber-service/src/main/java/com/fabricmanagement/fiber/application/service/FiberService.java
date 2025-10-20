@@ -21,9 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -131,6 +129,7 @@ public class FiberService {
         log.info("Fiber deactivated: fiberId={}", fiberId);
     }
     
+    @Transactional(readOnly = true)
     public FiberResponse getFiber(UUID fiberId) {
         Fiber fiber = fiberRepository.findById(fiberId)
                 .orElseThrow(() -> new FiberNotFoundException("Fiber not found: " + fiberId));
@@ -138,11 +137,15 @@ public class FiberService {
         return fiberMapper.toResponse(fiber);
     }
     
+    @Transactional(readOnly = true)
     public Page<FiberSummaryResponse> listFibers(Pageable pageable) {
+        // Note: Using findAll without JOIN FETCH for pagination (components not needed for summary)
+        // If components are needed, use manual pagination with findAllWithComponents()
         Page<Fiber> fibers = fiberRepository.findAll(pageable);
         return fibers.map(fiberMapper::toSummaryResponse);
     }
     
+    @Transactional(readOnly = true)
     public List<FiberResponse> getDefaultFibers() {
         List<Fiber> defaultFibers = fiberRepository.findByIsDefaultTrue();
         return defaultFibers.stream()
@@ -150,6 +153,7 @@ public class FiberService {
                 .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<FiberSummaryResponse> searchFibers(String query) {
         List<Fiber> fibers = fiberRepository.findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(query, query);
         return fibers.stream()
@@ -157,6 +161,7 @@ public class FiberService {
                 .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<FiberSummaryResponse> getFibersByCategory(String category) {
         FiberCategory fiberCategory = FiberCategory.valueOf(category);
         List<Fiber> fibers = fiberRepository.findByCategory(fiberCategory);
@@ -165,6 +170,7 @@ public class FiberService {
                 .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public FiberValidationResponse validateComposition(List<String> fiberCodes) {
         List<String> activeFibers = new ArrayList<>();
         List<String> inactiveFibers = new ArrayList<>();
@@ -189,6 +195,18 @@ public class FiberService {
                 .notFoundFibers(notFoundFibers)
                 .message(valid ? "All fibers are valid" : "Some fibers are invalid")
                 .build();
+    }
+    
+    @Transactional(readOnly = true)
+    public Map<String, FiberResponse> getFibersBatch(List<String> fiberCodes) {
+        List<Fiber> fibers = fiberRepository.findByCodeIn(fiberCodes);
+        
+        Map<String, FiberResponse> result = new HashMap<>();
+        for (Fiber fiber : fibers) {
+            result.put(fiber.getCode(), fiberMapper.toResponse(fiber));
+        }
+        
+        return result;
     }
     
     private void validateBlendComposition(CreateBlendFiberRequest request) {

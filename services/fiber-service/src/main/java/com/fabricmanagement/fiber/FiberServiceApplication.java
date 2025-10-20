@@ -28,7 +28,7 @@ import org.springframework.kafka.annotation.EnableKafka;
         "com.fabricmanagement.fiber",
         "com.fabricmanagement.shared"
 })
-@EnableJpaAuditing
+@EnableJpaAuditing(auditorAwareRef = "auditorProvider")
 @EnableCaching
 @EnableKafka
 @EnableFeignClients

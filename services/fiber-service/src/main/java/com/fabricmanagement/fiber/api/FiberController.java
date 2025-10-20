@@ -53,7 +53,7 @@ public class FiberController {
     }
 
     @DeleteMapping("/{fiberId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivateFiber(@PathVariable UUID fiberId) {
         fiberService.deactivateFiber(fiberId);
         return ResponseEntity.ok(ApiResponse.success(null, "Fiber deactivated successfully"));
@@ -101,7 +101,8 @@ public class FiberController {
 
     @GetMapping("/internal/batch")
     public ResponseEntity<ApiResponse<Map<String, FiberResponse>>> getFibersBatch(@RequestParam List<String> fiberCodes) {
-        return ResponseEntity.ok(ApiResponse.success(Map.of()));
+        Map<String, FiberResponse> fibers = fiberService.getFibersBatch(fiberCodes);
+        return ResponseEntity.ok(ApiResponse.success(fibers));
     }
 
     @GetMapping("/internal/exists/{fiberCode}")
