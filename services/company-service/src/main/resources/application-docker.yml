@@ -148,7 +148,7 @@ logging:
     org.hibernate.SQL: WARN
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [%X{X-Correlation-ID}] - %msg%n"
   # File logging disabled in Docker - logs should go to stdout/stderr
   # Docker will handle log collection and rotation
   # file:

@@ -6,7 +6,6 @@ import com.fabricmanagement.fiber.api.dto.request.UpdateFiberPropertyRequest;
 import com.fabricmanagement.fiber.api.dto.response.FiberResponse;
 import com.fabricmanagement.fiber.api.dto.response.FiberSummaryResponse;
 import com.fabricmanagement.fiber.api.dto.response.FiberValidationResponse;
-import com.fabricmanagement.fiber.application.mapper.FiberEventMapper;
 import com.fabricmanagement.fiber.application.mapper.FiberMapper;
 import com.fabricmanagement.fiber.domain.aggregate.Fiber;
 import com.fabricmanagement.fiber.domain.valueobject.*;
@@ -34,7 +33,6 @@ public class FiberService {
     
     private final FiberRepository fiberRepository;
     private final FiberMapper fiberMapper;
-    private final FiberEventMapper eventMapper;
     private final FiberEventPublisher eventPublisher;
     
     @Transactional

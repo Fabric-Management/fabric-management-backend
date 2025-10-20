@@ -1,20 +1,38 @@
-server:
-  port: ${FIBER_SERVICE_PORT:8094}
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - FIBER SERVICE CONFIGURATION
+# =============================================================================
+# 🎉 PRODUCTION-READY from Day 1 - All best practices applied!
+# Last service benefits from all lessons learned
 
+# =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
 spring:
   application:
     name: fiber-service
+  profiles:
+    active: local
 
+  # ===========================================================================
+  # DATABASE CONFIGURATION
+  # ===========================================================================
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
     username: ${POSTGRES_USER:fabric_user}
-    password: ${POSTGRES_PASSWORD}
+    password: ${POSTGRES_PASSWORD:fabric_password}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
+    open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -26,37 +44,93 @@ spring:
     baseline-on-migrate: true
     locations: classpath:db/migration
     table: fiber_flyway_schema_history
+    validate-on-migrate: true
+    clean-disabled: true
+    repair-on-migrate: false
 
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    consumer:
-      group-id: fiber-service
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000ms}
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000ms}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
 
   cache:
     type: redis
     redis:
       time-to-live: ${FIBER_CACHE_TTL:3600000}
 
-logging:
-  level:
-    com.fabricmanagement.fiber: INFO
-    org.springframework.kafka: WARN
-    org.hibernate.SQL: DEBUG
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+  # ===========================================================================
+  # KAFKA CONFIGURATION
+  # ===========================================================================
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      client-id: ${spring.application.name}-producer-${HOSTNAME:localhost}
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: ${KAFKA_PRODUCER_ACKS:all}
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
+      enable-idempotence: ${KAFKA_PRODUCER_IDEMPOTENCE:true}
+      max-in-flight-requests-per-connection: ${KAFKA_PRODUCER_MAX_IN_FLIGHT:1}
+      batch-size: ${KAFKA_PRODUCER_BATCH_SIZE:16384}
+      linger-ms: ${KAFKA_PRODUCER_LINGER_MS:5}
+      buffer-memory: ${KAFKA_PRODUCER_BUFFER_MEMORY:33554432}
+    consumer:
+      client-id: ${spring.application.name}-consumer-${HOSTNAME:localhost}
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:fiber-service-group}
+      auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      enable-auto-commit: ${KAFKA_CONSUMER_ENABLE_AUTO_COMMIT:false}
+      max-poll-records: ${KAFKA_CONSUMER_MAX_POLL_RECORDS:100}
+      # ErrorHandlingDeserializer wrapper for graceful error handling
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        # Trust all com.fabricmanagement.* packages (including sub-packages)
+        spring.json.trusted.packages: ${KAFKA_TRUSTED_PACKAGES:com.fabricmanagement.*,java.util,java.lang}
+        # Delegate deserializers (actual deserializers wrapped by ErrorHandlingDeserializer)
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        allow.auto.create.topics: ${KAFKA_AUTO_CREATE_TOPICS:true}
+        jmx.prefix: fiber-service
 
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: ${FIBER_SERVICE_PORT:8094}
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000} # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000} # 24 hours
+  algorithm: ${JWT_ALGORITHM:HS256}
+  issuer: ${JWT_ISSUER:fabric-management-system}
+  audience: ${JWT_AUDIENCE:fabric-api}
+
+# =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
+app:
+  kafka:
+    topic:
+      fiber-events: ${KAFKA_TOPIC_FIBER_EVENTS:fiber-events}
+
+# =============================================================================
+# MANAGEMENT & MONITORING
+# =============================================================================
 management:
   endpoints:
     web:
@@ -65,9 +139,34 @@ management:
   endpoint:
     health:
       show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
 
-# Application Configuration
-app:
-  kafka:
-    topic:
-      fiber-events: ${KAFKA_TOPIC_FIBER_EVENTS:fiber-events}
+# =============================================================================
+# OPENAPI/SWAGGER CONFIGURATION
+# =============================================================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.fiber: ${LOG_LEVEL:DEBUG}
+    org.springframework.security: ${LOG_LEVEL:INFO}
+    org.springframework.web: ${LOG_LEVEL:INFO}
+    org.springframework.kafka: ${KAFKA_LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${LOG_LEVEL:DEBUG}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_LEVEL:TRACE}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [%X{X-Correlation-ID}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [%X{X-Correlation-ID}] - %msg%n"
+  file:
+    name: logs/fiber-service.log

@@ -1,0 +1,133 @@
+# =====================================================
+# Alertmanager Configuration
+# =====================================================
+# Routes alerts to appropriate channels (Slack, Email, etc.)
+
+global:
+  # SMTP configuration for email alerts (optional)
+  smtp_smarthost: "${ALERT_SMTP_HOST:-smtp.gmail.com}:${ALERT_SMTP_PORT:-587}"
+  smtp_from: "${ALERT_EMAIL_FROM:-alerts@fabricmanagement.com}"
+  smtp_auth_username: "${ALERT_SMTP_USERNAME:-}"
+  smtp_auth_password: "${ALERT_SMTP_PASSWORD:-}"
+  smtp_require_tls: true
+
+  # Slack webhook (optional)
+  slack_api_url: "${ALERT_SLACK_WEBHOOK:-}"
+
+# Alert routing
+route:
+  # Default receiver
+  receiver: "default-receiver"
+
+  # Group alerts by category
+  group_by: ["severity", "category", "service"]
+
+  # Wait time before sending grouped alerts
+  group_wait: ${ALERT_GROUP_WAIT:-30s}
+
+  # Wait time before sending additional alerts for same group
+  group_interval: ${ALERT_GROUP_INTERVAL:-5m}
+
+  # Wait time before resending alert if not resolved
+  repeat_interval: ${ALERT_REPEAT_INTERVAL:-4h}
+
+  # Sub-routes for different severity levels
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: "critical-receiver"
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+
+    # Warning alerts - batched notification
+    - match:
+        severity: warning
+      receiver: "warning-receiver"
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 2h
+
+    # Info alerts - daily digest
+    - match:
+        severity: info
+      receiver: "info-receiver"
+      group_wait: 5m
+      group_interval: 1h
+      repeat_interval: 24h
+
+    # Performance alerts - dedicated channel
+    - match:
+        category: performance
+      receiver: "performance-receiver"
+      group_by: ["service", "uri"]
+
+    # Security alerts - high priority
+    - match:
+        category: security
+      receiver: "security-receiver"
+      group_wait: 10s
+
+# Receivers (notification channels)
+receivers:
+  # Default receiver - logs only (for development)
+  - name: "default-receiver"
+    # Add email/slack config in production
+
+  # Critical alerts - multiple channels
+  - name: "critical-receiver"
+    # Email (production)
+    # email_configs:
+    #   - to: '${ALERT_EMAIL_CRITICAL:-devops@fabricmanagement.com}'
+    #     headers:
+    #       Subject: '[CRITICAL] {{ .GroupLabels.service }}: {{ .GroupLabels.alertname }}'
+
+    # Slack (production)
+    # slack_configs:
+    #   - channel: '#alerts-critical'
+    #     title: '[CRITICAL] {{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+    #     send_resolved: true
+
+  # Warning alerts
+  - name: "warning-receiver"
+    # Email (production)
+    # email_configs:
+    #   - to: '${ALERT_EMAIL_WARNING:-team@fabricmanagement.com}'
+
+  # Info alerts - daily digest
+  - name: "info-receiver"
+    # Email (production)
+    # email_configs:
+    #   - to: '${ALERT_EMAIL_INFO:-monitoring@fabricmanagement.com}'
+
+  # Performance alerts - dedicated channel
+  - name: "performance-receiver"
+    # Slack #performance channel
+    # slack_configs:
+    #   - channel: '#performance'
+    #     title: 'Performance Alert: {{ .GroupLabels.service }}'
+
+  # Security alerts - security team
+  - name: "security-receiver"
+    # Email security team
+    # email_configs:
+    #   - to: '${ALERT_EMAIL_SECURITY:-security@fabricmanagement.com}'
+
+# Inhibition rules - prevent alert spam
+inhibit_rules:
+  # If service is down, don't alert on high latency
+  - source_match:
+      severity: "critical"
+      alertname: "ServiceDown"
+    target_match:
+      severity: "warning"
+    equal: ["service"]
+
+  # If circuit breaker is open, don't alert on high error rate
+  - source_match:
+      alertname: "CircuitBreakerOpen"
+    target_match:
+      category: "performance"
+    equal: ["service"]

@@ -1,0 +1,249 @@
+# =====================================================
+# Prometheus Alert Rules
+# =====================================================
+# Production-ready alerts for performance monitoring
+# "Measure first, optimize second"
+
+groups:
+  # ===================================================
+  # SERVICE HEALTH ALERTS
+  # ===================================================
+  - name: service_health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~".*-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Service {{ $labels.service }} is down"
+          description: "{{ $labels.service }} has been down for more than 1 minute"
+
+      - alert: ServiceUnhealthy
+        expr: up{job=~".*-service"} == 1 and (http_server_requests_seconds_count{uri="/actuator/health"} < 1)
+        for: 2m
+        labels:
+          severity: warning
+          category: availability
+        annotations:
+          summary: "Service {{ $labels.service }} may be unhealthy"
+          description: "{{ $labels.service }} is up but health endpoint not responding"
+
+  # ===================================================
+  # PERFORMANCE ALERTS (Golden Rule: Measure First)
+  # ===================================================
+  - name: performance
+    interval: 15s
+    rules:
+      # API Latency (P95) - Critical threshold
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[5m])) by (service, uri, le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High latency P95 on {{ $labels.service }}{{ $labels.uri }}"
+          description: "P95 latency is {{ $value | humanizeDuration }} (threshold: 500ms)"
+          runbook: "Check Grafana dashboard for detailed metrics"
+
+      # API Latency (P99) - Severe threshold
+      - alert: VeryHighLatencyP99
+        expr: histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[5m])) by (service, uri, le)) > 1
+        for: 3m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "Very high latency P99 on {{ $labels.service }}{{ $labels.uri }}"
+          description: "P99 latency is {{ $value | humanizeDuration }} (threshold: 1s)"
+          action: "Immediate investigation required"
+
+      # Error Rate - 5xx errors
+      - alert: HighErrorRate
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (service) / sum(rate(http_server_requests_seconds_count[5m])) by (service) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          category: errors
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 1%)"
+
+      # Slow Requests (>1s)
+      - alert: SlowRequests
+        expr: sum(rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[1m])) by (service, uri) > 0 and histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[1m])) by (service, uri, le)) > 1
+        for: 3m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Slow requests detected on {{ $labels.service }}{{ $labels.uri }}"
+          description: "P50 latency > 1s - investigate database queries or external calls"
+
+  # ===================================================
+  # DATABASE PERFORMANCE ALERTS
+  # ===================================================
+  - name: database
+    interval: 30s
+    rules:
+      # HikariCP Connection Pool Saturation
+      - alert: DatabaseConnectionPoolHigh
+        expr: (hikaricp_connections_active / hikaricp_connections_max) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "High DB connection usage on {{ $labels.service }}"
+          description: "Connection pool at {{ $value | humanizePercentage }} capacity (threshold: 80%)"
+          action: "Consider increasing DB_POOL_MAX_SIZE or scaling service"
+
+      # Connection Pool Exhaustion
+      - alert: DatabaseConnectionPoolExhausted
+        expr: (hikaricp_connections_active / hikaricp_connections_max) >= 1
+        for: 1m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "DB connection pool exhausted on {{ $labels.service }}"
+          description: "All connections in use - requests will timeout"
+          action: "URGENT: Scale service or increase pool size immediately"
+
+      # Slow Database Queries
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, sum(rate(hikaricp_connections_usage_seconds_bucket[5m])) by (service, le)) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "Slow database queries on {{ $labels.service }}"
+          description: "P95 query time: {{ $value | humanizeDuration }} (threshold: 100ms)"
+
+  # ===================================================
+  # CACHE PERFORMANCE ALERTS
+  # ===================================================
+  - name: cache
+    interval: 30s
+    rules:
+      # Redis Cache Hit Rate
+      - alert: LowCacheHitRate
+        expr: sum(rate(cache_gets{result="hit"}[5m])) by (service) / sum(rate(cache_gets[5m])) by (service) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          category: cache
+        annotations:
+          summary: "Low cache hit rate on {{ $labels.service }}"
+          description: "Hit rate: {{ $value | humanizePercentage }} (threshold: 70%)"
+          action: "Review caching strategy or increase TTL"
+
+  # ===================================================
+  # MESSAGING ALERTS (Kafka)
+  # ===================================================
+  - name: messaging
+    interval: 30s
+    rules:
+      # Kafka Producer Errors
+      - alert: KafkaProducerErrors
+        expr: rate(kafka_producer_record_error_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          category: messaging
+        annotations:
+          summary: "Kafka producer errors on {{ $labels.service }}"
+          description: "Error rate: {{ $value }}/sec"
+          action: "Check Kafka broker health and network connectivity"
+
+  # ===================================================
+  # RESILIENCE ALERTS (Circuit Breakers)
+  # ===================================================
+  - name: resilience
+    interval: 30s
+    rules:
+      # Circuit Breaker Open
+      - alert: CircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          category: resilience
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.name }}"
+          description: "Circuit breaker {{ $labels.name }} has been OPEN for > 1 minute"
+          action: "Check downstream service health: {{ $labels.name }}"
+
+      # High Retry Rate
+      - alert: HighRetryRate
+        expr: rate(resilience4j_retry_calls_total{kind="successful_with_retry"}[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: resilience
+        annotations:
+          summary: "High retry rate on {{ $labels.service }}"
+          description: "Retry rate: {{ $value }}/sec - indicates unstable downstream service"
+
+  # ===================================================
+  # RESOURCE ALERTS (Memory, CPU)
+  # ===================================================
+  - name: resources
+    interval: 30s
+    rules:
+      # JVM Memory Usage
+      - alert: HighJVMMemoryUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High JVM memory usage on {{ $labels.service }}"
+          description: "Heap usage: {{ $value | humanizePercentage }} (threshold: 85%)"
+          action: "Consider increasing -Xmx or investigate memory leaks"
+
+      # JVM Memory Critical
+      - alert: CriticalJVMMemoryUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "CRITICAL: JVM memory almost full on {{ $labels.service }}"
+          description: "Heap usage: {{ $value | humanizePercentage }} - OOM imminent"
+          action: "URGENT: Restart service or increase heap size"
+
+  # ===================================================
+  # BUSINESS METRICS (Domain-Specific)
+  # ===================================================
+  - name: business
+    interval: 1m
+    rules:
+      # High Duplicate Detection Rate (Company Service)
+      - alert: HighDuplicateDetectionRate
+        expr: rate(company_duplicate_detected_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: info
+          category: business
+        annotations:
+          summary: "High duplicate detection rate"
+          description: "{{ $value }}/sec duplicates detected - possible data quality issue"
+
+      # Failed Login Attempts
+      - alert: HighFailedLoginRate
+        expr: rate(http_server_requests_seconds_count{uri="/api/v1/users/auth/login",status="401"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High failed login rate"
+          description: "{{ $value }}/sec failed logins - possible brute force attack"
+          action: "Review security logs and consider rate limiting"

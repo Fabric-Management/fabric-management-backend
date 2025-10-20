@@ -35,6 +35,12 @@ volumes:
     driver: local
   zookeeper_data:
     driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
 
 services:
   # ==============================================
@@ -285,6 +291,8 @@ services:
       CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8084}
       SERVER_PORT: 8080
+      # ✅ JVM Tuning (50% of container memory = 384M)
+      JAVA_OPTS: ${GATEWAY_JAVA_OPTS:--Xms384M -Xmx384M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
       # ✅ API Gateway - Resilience4j Circuit Breaker (ZERO HARDCODED)
       GATEWAY_CB_SLIDING_WINDOW: ${GATEWAY_CB_SLIDING_WINDOW:-100}
       GATEWAY_CB_MIN_CALLS: ${GATEWAY_CB_MIN_CALLS:-10}
@@ -355,6 +363,8 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JMX_PORT: 9014
       SERVER_PORT: 8084
+      # ✅ JVM Tuning (50% of container memory = 384M)
+      JAVA_OPTS: ${NOTIFICATION_JAVA_OPTS:--Xms384M -Xmx384M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
       # ✅ Platform Email Configuration (SMTP - Hostinger)
       PLATFORM_SMTP_HOST: ${PLATFORM_SMTP_HOST:-smtp.hostinger.com}
       PLATFORM_SMTP_PORT: ${PLATFORM_SMTP_PORT:-465}
@@ -433,6 +443,8 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JMX_PORT: 9011
       SERVER_PORT: 8081
+      # ✅ JVM Tuning (50% of container memory = 512M)
+      JAVA_OPTS: ${USER_SERVICE_JAVA_OPTS:--Xms512M -Xmx512M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
       CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL:-http://company-service:8083}
       # ✅ Resilience4j - Circuit Breaker (ZERO HARDCODED)
@@ -504,6 +516,8 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JMX_PORT: 9012
       SERVER_PORT: 8082
+      # ✅ JVM Tuning (50% of container memory = 512M)
+      JAVA_OPTS: ${CONTACT_JAVA_OPTS:--Xms512M -Xmx512M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
     # Ports: Only JMX exposed for monitoring (HTTP via Gateway only)
     ports:
       - "${CONTACT_SERVICE_JMX_PORT:-9012}:9012" # JMX for monitoring
@@ -562,6 +576,8 @@ services:
       USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
       CONTACT_SERVICE_URL: ${CONTACT_SERVICE_URL:-http://contact-service:8082}
       SERVER_PORT: 8083
+      # ✅ JVM Tuning (50% of container memory = 512M)
+      JAVA_OPTS: ${COMPANY_JAVA_OPTS:--Xms512M -Xmx512M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
       # ✅ Resilience4j - Circuit Breaker (ZERO HARDCODED)
       FEIGN_CB_SLIDING_WINDOW: ${FEIGN_CB_SLIDING_WINDOW:-100}
       FEIGN_CB_MIN_CALLS: ${FEIGN_CB_MIN_CALLS:-10}
@@ -597,3 +613,205 @@ services:
         reservations:
           memory: 512M
           cpus: "0.5"
+
+  fiber-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: fiber-service
+        SERVICE_PORT: 8094
+    image: fabric-fiber-service:latest
+    container_name: fabric-fiber-service
+    hostname: fiber-service-instance
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      JMX_PORT: 9094
+      SERVER_PORT: 8094
+      # ✅ JVM Tuning (50% of container memory = 384M)
+      JAVA_OPTS: ${FIBER_JAVA_OPTS:--Xms384M -Xmx384M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
+    # Ports: Only JMX exposed for monitoring (HTTP via Gateway only)
+    ports:
+      - "${FIBER_SERVICE_JMX_PORT:-9094}:9094" # JMX for monitoring
+      # HTTP port 8094 NOT exposed - access via API Gateway (8080)
+    networks:
+      - fabric-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8094/actuator/health"]
+      <<: *healthcheck-defaults
+      start_period: 90s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "0.75"
+        reservations:
+          memory: 384M
+          cpus: "0.5"
+
+  # ==============================================
+  # MONITORING STACK - Prometheus + Grafana + Alertmanager
+  # ==============================================
+
+  # Prometheus - Metrics Collection & Time-Series Database
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: fabric-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus_data:/prometheus
+    networks:
+      - fabric-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/-/healthy",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      company-service:
+        condition: service_healthy
+      contact-service:
+        condition: service_healthy
+      fiber-service:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+
+  # Grafana - Metrics Visualization & Dashboards
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: fabric-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_SERVER_SERVE_FROM_SUB_PATH: false
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_AUTH_ANONYMOUS_ENABLED: false
+      GF_DATABASE_WAL: true
+      GF_LOG_LEVEL: ${GRAFANA_LOG_LEVEL:-info}
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - fabric-network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+        reservations:
+          memory: 128M
+          cpus: "0.1"
+
+  # Alertmanager - Alert Routing & Notification Management
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: fabric-alertmanager
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=http://localhost:9093"
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    networks:
+      - fabric-network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9093/-/healthy",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.1"
+        reservations:
+          memory: 64M
+          cpus: "0.05"

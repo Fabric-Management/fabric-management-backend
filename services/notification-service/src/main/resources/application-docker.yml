@@ -36,3 +36,9 @@ spring:
 logging:
   level:
     com.fabricmanagement.notification: INFO
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{X-Correlation-ID}] - %msg%n"
+  # File logging disabled in Docker - logs should go to stdout/stderr
+  # Docker will handle log collection and rotation

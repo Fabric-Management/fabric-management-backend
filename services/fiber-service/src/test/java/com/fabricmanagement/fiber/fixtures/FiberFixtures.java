@@ -6,12 +6,11 @@ import com.fabricmanagement.fiber.api.dto.request.FiberComponentDto;
 import com.fabricmanagement.fiber.api.dto.request.UpdateFiberPropertyRequest;
 import com.fabricmanagement.fiber.domain.aggregate.Fiber;
 import com.fabricmanagement.fiber.domain.valueobject.*;
+import static com.fabricmanagement.fiber.support.TestSupport.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Test Data Builders for Fiber Domain
@@ -27,10 +26,6 @@ import java.util.UUID;
  *   CreateFiberRequest request = createPureFiberRequest("PES", "Polyester");
  */
 public class FiberFixtures {
-
-    public static final UUID GLOBAL_TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
-    public static final String TEST_USER = "TEST_USER";
-    public static final String SYSTEM_USER = "SYSTEM";
 
     // ═════════════════════════════════════════════════════
     // PURE FIBER BUILDERS (Domain Entity)
@@ -114,8 +109,8 @@ public class FiberFixtures {
                 "BLD-001",
                 "Cotton/Polyester 60/40",
                 Arrays.asList(
-                        component("CO", 60.0),
-                        component("PES", 40.0)
+                        component(CODE_COTTON, PCT_60.doubleValue()),
+                        component(CODE_POLYESTER, PCT_40.doubleValue())
                 )
         );
     }
@@ -146,15 +141,15 @@ public class FiberFixtures {
 
     public static List<FiberComponent> createValidBlendComponents() {
         return Arrays.asList(
-                component("CO", 60.0),
-                component("PE", 40.0)
+                component(CODE_COTTON, PCT_60.doubleValue()),
+                component(CODE_POLYESTER, PCT_40.doubleValue())
         );
     }
 
     public static List<FiberComponent> createInvalidBlendComponents() {
         return Arrays.asList(
-                component("CO", 60.0),
-                component("PES", 30.0)  // Total = 90% ❌
+                component(CODE_COTTON, PCT_60.doubleValue()),
+                component(CODE_POLYESTER, 30.0)  // Total = 90% ❌
         );
     }
 
@@ -208,8 +203,8 @@ public class FiberFixtures {
         request.setCode(code);
         request.setName(name);
         request.setComponents(Arrays.asList(
-                createComponentDto("CO", 60.0),
-                createComponentDto("PES", 40.0)
+                createComponentDto(CODE_COTTON, PCT_60.doubleValue()),
+                createComponentDto(CODE_POLYESTER, PCT_40.doubleValue())
         ));
         request.setOriginType("UNKNOWN");
         request.setReusable(true);
@@ -240,11 +235,11 @@ public class FiberFixtures {
     // ═════════════════════════════════════════════════════
 
     public static Fiber cotton() {
-        return createDefaultFiber("CO");
+        return createDefaultFiber(CODE_COTTON);
     }
 
     public static Fiber polyester() {
-        return createDefaultFiber("PES");
+        return createDefaultFiber(CODE_POLYESTER);
     }
 
     public static Fiber wool() {
