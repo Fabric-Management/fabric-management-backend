@@ -53,4 +53,26 @@ public class FallbackController {
                 "SERVICE_UNAVAILABLE"
             ));
     }
+
+    @RequestMapping("/fiber-service")
+    public ResponseEntity<ApiResponse<Void>> fiberServiceFallback() {
+        log.error("Fiber Service is unavailable - Circuit breaker triggered");
+        return ResponseEntity
+            .status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ApiResponse.error(
+                "Fiber Service is temporarily unavailable. Please try again later.",
+                "SERVICE_UNAVAILABLE"
+            ));
+    }
+
+    @RequestMapping("/notification-service")
+    public ResponseEntity<ApiResponse<Void>> notificationServiceFallback() {
+        log.error("Notification Service is unavailable - Circuit breaker triggered");
+        return ResponseEntity
+            .status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ApiResponse.error(
+                "Notification Service is temporarily unavailable. Please try again later.",
+                "SERVICE_UNAVAILABLE"
+            ));
+    }
 }

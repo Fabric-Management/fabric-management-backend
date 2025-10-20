@@ -4,6 +4,7 @@ import com.fabricmanagement.shared.application.context.SecurityContext;
 import com.fabricmanagement.shared.application.response.ApiResponse;
 import com.fabricmanagement.shared.application.response.PagedResponse;
 import com.fabricmanagement.shared.infrastructure.constants.ServiceConstants;
+import com.fabricmanagement.shared.security.annotation.InternalEndpoint;
 import com.fabricmanagement.user.api.dto.request.CreateUserRequest;
 import com.fabricmanagement.user.api.dto.request.UpdateUserRequest;
 import com.fabricmanagement.user.api.dto.response.UserResponse;
@@ -44,6 +45,7 @@ public class UserController {
     
     @GetMapping("/{userId}/exists")
     @PreAuthorize("isAuthenticated()")
+    @InternalEndpoint  // ✅ Internal only - for service-to-service calls
     public ResponseEntity<ApiResponse<Boolean>> userExists(
             @PathVariable UUID userId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -55,6 +57,7 @@ public class UserController {
     
     @GetMapping("/company/{companyId}")
     @PreAuthorize("isAuthenticated()")
+    @InternalEndpoint  // ✅ Internal only - for Company Service calls
     public ResponseEntity<ApiResponse<List<UserResponse>>> getUsersByCompany(
             @PathVariable UUID companyId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -66,6 +69,7 @@ public class UserController {
     
     @GetMapping("/company/{companyId}/count")
     @PreAuthorize("isAuthenticated()")
+    @InternalEndpoint  // ✅ Internal only - for Company Service calls
     public ResponseEntity<ApiResponse<Integer>> getUserCountForCompany(
             @PathVariable UUID companyId,
             @AuthenticationPrincipal SecurityContext ctx) {
@@ -196,5 +200,40 @@ public class UserController {
                 : Sort.Direction.ASC;
         
         return PageRequest.of(page, size, Sort.by(direction, sortField));
+    }
+    
+    // ========================================================================
+    // BATCH ENDPOINTS (Performance Optimization)
+    // ========================================================================
+    
+    /**
+     * Get multiple users by IDs (batch operation)
+     * 
+     * Prevents N+1 queries from clients
+     * 
+     * Example: GET /api/v1/users/batch?ids=uuid1,uuid2,uuid3
+     * 
+     * ✅ Performance: 1 DB query vs N queries
+     */
+    @GetMapping("/batch")
+    @PreAuthorize("isAuthenticated()")
+    @InternalEndpoint  // ✅ Internal only - for service-to-service batch calls
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getUsersBatch(
+            @RequestParam("ids") List<UUID> userIds,
+            @AuthenticationPrincipal SecurityContext ctx) {
+        
+        log.debug("Getting batch users: {} IDs for tenant: {}", userIds.size(), ctx.getTenantId());
+        
+        if (userIds.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.success(List.of()));
+        }
+        
+        if (userIds.size() > 100) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Maximum 100 users per batch request", "BATCH_SIZE_EXCEEDED"));
+        }
+        
+        List<UserResponse> users = userService.getUsersBatch(userIds, ctx.getTenantId());
+        return ResponseEntity.ok(ApiResponse.success(users));
     }
 }

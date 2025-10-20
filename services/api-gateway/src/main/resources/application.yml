@@ -39,6 +39,18 @@ gateway:
       path: /api/v1/contacts
       enabled: true
       timeout: ${CONTACT_SERVICE_TIMEOUT:15s}
+    fiber-service:
+      name: fiber-service
+      url: ${FIBER_SERVICE_URL:http://localhost:8094}
+      path: /api/v1/fibers
+      enabled: true
+      timeout: ${FIBER_SERVICE_TIMEOUT:10s}
+    notification-service:
+      name: notification-service
+      url: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
+      path: /api/v1/notifications
+      enabled: true
+      timeout: ${NOTIFICATION_SERVICE_TIMEOUT:5s}
 
   rate-limit:
     public-endpoints:
@@ -228,6 +240,14 @@ resilience4j:
         base-config: default
         # Contact operations: P95=3s → Timeout 4.5s (%50 buffer) → Round to 7s
         timeout-duration: ${CONTACT_SERVICE_TIMEOUT:7s}
+      fiberServiceCircuitBreaker:
+        base-config: default
+        # Fiber catalog operations: P95=2s (cached) → Timeout 3s (%50 buffer) → Round to 5s
+        timeout-duration: ${FIBER_SERVICE_TIMEOUT:10s}
+      notificationServiceCircuitBreaker:
+        base-config: default
+        # Notification operations: P95=1s → Timeout 1.5s (%50 buffer) → Round to 5s
+        timeout-duration: ${NOTIFICATION_SERVICE_TIMEOUT:5s}
 
   retry:
     configs:
@@ -242,6 +262,10 @@ resilience4j:
       companyServiceCircuitBreaker:
         base-config: default
       contactServiceCircuitBreaker:
+        base-config: default
+      fiberServiceCircuitBreaker:
+        base-config: default
+      notificationServiceCircuitBreaker:
         base-config: default
 
 # =============================================================================

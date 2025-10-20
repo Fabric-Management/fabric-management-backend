@@ -1,6 +1,7 @@
 package com.fabricmanagement.user.infrastructure.repository;
 
 import com.fabricmanagement.user.domain.aggregate.User;
+import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -91,5 +92,19 @@ public interface UserRepository extends JpaRepository<User, UUID> {
         @Param("lastName") String lastName,
         @Param("status") String status,
         Pageable pageable
+    );
+    
+    /**
+     * Batch get users by IDs
+     * 
+     * Prevents N+1 queries - uses IN (...) clause
+     * 
+     * ✅ Performance: 1 query vs N queries
+     */
+    @Query("SELECT u FROM User u WHERE u.id IN :userIds AND u.tenantId = :tenantId AND u.status = :status AND u.deleted = false")
+    List<User> findAllByIdInAndTenantIdAndStatus(
+        @Param("userIds") List<UUID> userIds,
+        @Param("tenantId") UUID tenantId,
+        @Param("status") UserStatus status
     );
 }

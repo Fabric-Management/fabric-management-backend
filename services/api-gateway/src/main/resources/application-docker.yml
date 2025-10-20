@@ -74,6 +74,10 @@ resilience4j:
         baseConfig: default
       contactServiceCircuitBreaker:
         baseConfig: default
+      fiberServiceCircuitBreaker:
+        baseConfig: default
+      notificationServiceCircuitBreaker:
+        baseConfig: default
 
   retry:
     configs:

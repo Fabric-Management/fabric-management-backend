@@ -39,6 +39,12 @@ public class DynamicRoutesConfig {
     @Value("${COMPANY_SERVICE_URL:http://localhost:8083}")
     private String companyServiceUrl;
     
+    @Value("${FIBER_SERVICE_URL:http://localhost:8094}")
+    private String fiberServiceUrl;
+    
+    @Value("${NOTIFICATION_SERVICE_URL:http://localhost:8084}")
+    private String notificationServiceUrl;
+    
     @Value("${GATEWAY_RATE_LIMIT_ENABLED:false}")
     private boolean rateLimitEnabled;
     
@@ -55,6 +61,8 @@ public class DynamicRoutesConfig {
         log.info("   USER_SERVICE_URL = {}", userServiceUrl);
         log.info("   COMPANY_SERVICE_URL = {}", companyServiceUrl);
         log.info("   CONTACT_SERVICE_URL = {}", contactServiceUrl);
+        log.info("   FIBER_SERVICE_URL = {}", fiberServiceUrl);
+        log.info("   NOTIFICATION_SERVICE_URL = {}", notificationServiceUrl);
         log.info("   Rate Limiting: {}", rateLimitEnabled ? "✅ ENABLED" : "⚠️ DISABLED (dev mode)");
     }
     
@@ -239,6 +247,50 @@ public class DynamicRoutesConfig {
                             return filter;
                         })
                         .uri(contactServiceUrl))
+                
+                // Fiber Service
+                .route("fiber-service-protected", r -> r
+                        .path("/api/v1/fibers/**")
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("fiberServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/fiber-service"))
+                                .retry(retryConfig -> retryConfig
+                                    .setRetries(3)
+                                    .setMethods(HttpMethod.GET)
+                                    .setBackoff(gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(fiberServiceUrl))
+                
+                // Notification Service
+                .route("notification-service-protected", r -> r
+                        .path("/api/v1/notifications/**")
+                        .filters(f -> {
+                            var filter = f.circuitBreaker(c -> c
+                                    .setName("notificationServiceCircuitBreaker")
+                                    .setFallbackUri("forward:/fallback/notification-service"))
+                                .retry(retryConfig -> retryConfig
+                                    .setRetries(3)
+                                    .setMethods(HttpMethod.GET)
+                                    .setBackoff(gatewayProperties.getRetry().getProtectedRoutesInitialBackoff(), 
+                                            gatewayProperties.getRetry().getMaxBackoff(), 2, true));
+                            
+                            if (rateLimitEnabled && redisRateLimiter != null) {
+                                filter = filter.requestRateLimiter(rl -> rl
+                                    .setRateLimiter(redisRateLimiter)
+                                    .setKeyResolver(smartKeyResolver));
+                            }
+                            return filter;
+                        })
+                        .uri(notificationServiceUrl))
                 
                 .build();
     }

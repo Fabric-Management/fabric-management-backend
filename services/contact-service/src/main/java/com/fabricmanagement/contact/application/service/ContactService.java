@@ -7,7 +7,7 @@ import com.fabricmanagement.contact.application.mapper.ContactEventMapper;
 import com.fabricmanagement.contact.domain.aggregate.Contact;
 import com.fabricmanagement.contact.infrastructure.repository.ContactRepository;
 import com.fabricmanagement.contact.infrastructure.messaging.NotificationService;
-import com.fabricmanagement.shared.domain.event.DomainEventPublisher;
+import com.fabricmanagement.contact.infrastructure.messaging.ContactEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 public class ContactService {
     
     private final ContactRepository contactRepository;
-    private final DomainEventPublisher eventPublisher;
+    private final ContactEventPublisher eventPublisher;
     private final NotificationService notificationService;
     private final ContactMapper contactMapper;
     private final ContactEventMapper contactEventMapper;

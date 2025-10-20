@@ -19,10 +19,12 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ContactVerifiedEvent {
     
+    private UUID eventId;       // For idempotency
     private UUID contactId;
     private String ownerId;
     private String ownerType;
     private String contactValue;
     private String contactType;
+    private UUID tenantId;      // For multi-tenancy
     private LocalDateTime verifiedAt;
 }

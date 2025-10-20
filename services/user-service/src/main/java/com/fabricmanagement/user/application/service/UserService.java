@@ -243,5 +243,27 @@ public class UserService {
         return userRepository.findActiveByIdAndTenantId(userId, tenantId)
                 .orElseThrow(() -> new UserNotFoundException(userId.toString()));
     }
+    
+    /**
+     * Get multiple users by IDs (batch operation)
+     * 
+     * Prevents N+1 queries - uses IN (...) clause
+     * 
+     * @param userIds List of user IDs to fetch
+     * @param tenantId Tenant ID for multi-tenancy
+     * @return List of users (only active users in same tenant)
+     */
+    @Transactional(readOnly = true)
+    public List<UserResponse> getUsersBatch(List<UUID> userIds, UUID tenantId) {
+        log.debug("Fetching batch users: {} IDs for tenant: {}", userIds.size(), tenantId);
+        
+        List<User> users = userRepository.findAllByIdInAndTenantIdAndStatus(
+            userIds, tenantId, UserStatus.ACTIVE
+        );
+        
+        log.debug("Found {} active users out of {} requested IDs", users.size(), userIds.size());
+        
+        return userMapper.toResponseList(users);
+    }
 }
 

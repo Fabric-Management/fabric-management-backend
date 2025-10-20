@@ -5,8 +5,10 @@ import com.fabricmanagement.contact.api.dto.request.CreateContactRequest;
 import com.fabricmanagement.contact.application.service.AddressService;
 import com.fabricmanagement.contact.application.service.ContactService;
 import com.fabricmanagement.contact.domain.aggregate.Contact;
+import com.fabricmanagement.contact.domain.aggregate.ProcessedEvent;
 import com.fabricmanagement.contact.domain.valueobject.ContactType;
 import com.fabricmanagement.contact.domain.valueobject.AddressType;
+import com.fabricmanagement.contact.infrastructure.repository.ProcessedEventRepository;
 import com.fabricmanagement.shared.domain.event.tenant.TenantRegisteredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,9 @@ import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 /**
  * Event Listener - Tenant Registration Events
@@ -42,6 +47,7 @@ public class TenantEventListener {
     
     private final AddressService addressService;
     private final ContactService contactService;
+    private final ProcessedEventRepository processedEventRepository;
     
     /**
      * Handle TenantRegisteredEvent
@@ -60,6 +66,7 @@ public class TenantEventListener {
         groupId = "contact-service-tenant-group",
         containerFactory = "kafkaListenerContainerFactory"
     )
+    @Transactional
     public void handleTenantRegistered(
             @Payload TenantRegisteredEvent event,
             @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
@@ -71,6 +78,28 @@ public class TenantEventListener {
                 event.getTenantId(), event.getCompanyId(), topic, partition, offset);
         
         try {
+            // ✅ IDEMPOTENCY CHECK
+            if (event.getEventId() != null && processedEventRepository.existsByEventId(event.getEventId())) {
+                log.warn("⚠️ Event already processed, skipping: {}", event.getEventId());
+                acknowledgment.acknowledge();
+                return;
+            }
+            
+            if (event.getEventId() != null) {
+                UUID tenantUUID = UUID.fromString(event.getTenantId());
+                ProcessedEvent processed = ProcessedEvent.builder()
+                    .eventId(event.getEventId())
+                    .eventType("TenantRegisteredEvent")
+                    .aggregateId(tenantUUID)
+                    .tenantId(tenantUUID)
+                    .sourceService("user-service")
+                    .kafkaTopic(topic)
+                    .kafkaPartition(partition)
+                    .kafkaOffset(offset)
+                    .build();
+                processedEventRepository.save(processed);
+                log.debug("✅ Event marked as processed: {}", event.getEventId());
+            }
             // Step 1: Create company address
             createCompanyAddress(event);
             

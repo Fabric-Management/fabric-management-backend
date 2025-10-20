@@ -1,32 +1,39 @@
 package com.fabricmanagement.user.infrastructure.messaging;
 
+import com.fabricmanagement.user.domain.aggregate.OutboxEvent;
 import com.fabricmanagement.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.user.domain.event.UserDeletedEvent;
 import com.fabricmanagement.user.domain.event.UserUpdatedEvent;
+import com.fabricmanagement.user.domain.valueobject.OutboxEventStatus;
+import com.fabricmanagement.user.infrastructure.repository.OutboxEventRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.UUID;
 
 /**
  * User Event Publisher
  * 
- * Publishes user domain events to Kafka
+ * Publishes user domain events using Transactional Outbox Pattern
  * 
  * ✅ ZERO HARDCODED (Manifesto compliance)
- * - Topic names from application.yml
- * - Override via environment variables
- * - Production-ready configuration
+ * ✅ OUTBOX PATTERN (Guaranteed delivery)
+ * 
+ * How it works:
+ * 1. Write event to outbox table in same transaction as business logic
+ * 2. Background publisher (OutboxEventPublisher) sends to Kafka
+ * 3. Ensures at-least-once delivery guarantee
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class UserEventPublisher {
     
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
     
     // ✅ Config-driven topic names (ZERO HARDCODED!)
     @org.springframework.beans.factory.annotation.Value("${kafka.topics.user-created:user.created}")
@@ -39,75 +46,58 @@ public class UserEventPublisher {
     private String userDeletedTopic;
     
     /**
-     * Publishes UserCreatedEvent
+     * Publishes UserCreatedEvent via Outbox Pattern
+     * 
+     * Event is saved to outbox table, background publisher sends to Kafka
      */
     public void publishUserCreated(UserCreatedEvent event) {
-        log.info("Publishing UserCreatedEvent for user: {}", event.getUserId());
-        
-        CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send(userCreatedTopic, event.getUserId().toString(), event);
-        
-        future.whenComplete((result, ex) -> {
-            if (ex == null) {
-                log.info("✅ UserCreatedEvent published successfully: {}", event.getUserId());
-            } else {
-                log.error("❌ Failed to publish UserCreatedEvent: {}", event.getUserId(), ex);
-            }
-        });
+        log.info("📝 Writing UserCreatedEvent to outbox: {}", event.getUserId());
+        writeToOutbox(event, userCreatedTopic, "USER", event.getUserId(), UUID.fromString(event.getTenantId()));
     }
     
     /**
-     * Publishes UserUpdatedEvent
+     * Publishes UserUpdatedEvent via Outbox Pattern
      */
     public void publishUserUpdated(UserUpdatedEvent event) {
-        log.info("Publishing UserUpdatedEvent for user: {}", event.getUserId());
-        
-        CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send(userUpdatedTopic, event.getUserId().toString(), event);
-        
-        future.whenComplete((result, ex) -> {
-            if (ex == null) {
-                log.info("✅ UserUpdatedEvent published successfully: {}", event.getUserId());
-            } else {
-                log.error("❌ Failed to publish UserUpdatedEvent: {}", event.getUserId(), ex);
-            }
-        });
+        log.info("📝 Writing UserUpdatedEvent to outbox: {}", event.getUserId());
+        writeToOutbox(event, userUpdatedTopic, "USER", event.getUserId(), UUID.fromString(event.getTenantId()));
     }
     
     /**
-     * Publishes UserDeletedEvent
+     * Publishes UserDeletedEvent via Outbox Pattern
      */
     public void publishUserDeleted(UserDeletedEvent event) {
-        log.info("Publishing UserDeletedEvent for user: {}", event.getUserId());
-        
-        CompletableFuture<SendResult<String, Object>> future = 
-            kafkaTemplate.send(userDeletedTopic, event.getUserId().toString(), event);
-        
-        future.whenComplete((result, ex) -> {
-            if (ex == null) {
-                log.info("✅ UserDeletedEvent published successfully: {}", event.getUserId());
-            } else {
-                log.error("❌ Failed to publish UserDeletedEvent: {}", event.getUserId(), ex);
-            }
-        });
+        log.info("📝 Writing UserDeletedEvent to outbox: {}", event.getUserId());
+        writeToOutbox(event, userDeletedTopic, "USER", event.getUserId(), UUID.fromString(event.getTenantId()));
     }
     
     /**
-     * Publishes any domain event
+     * Generic method to write event to outbox table
      * 
-     * This method is kept for future extensibility
+     * This is called in same transaction as business logic
+     * Guarantees: Either both succeed or both fail (atomicity)
      */
-    public void publishEvent(Object event) {
-        log.debug("Publishing event: {}", event.getClass().getSimpleName());
-        
-        if (event instanceof UserCreatedEvent) {
-            publishUserCreated((UserCreatedEvent) event);
-        } else if (event instanceof UserUpdatedEvent) {
-            publishUserUpdated((UserUpdatedEvent) event);
-        } else if (event instanceof UserDeletedEvent) {
-            publishUserDeleted((UserDeletedEvent) event);
-        } else {
-            log.warn("Unknown event type: {}", event.getClass().getName());
+    private void writeToOutbox(Object event, String topic, String aggregateType, 
+                               java.util.UUID aggregateId, java.util.UUID tenantId) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                .aggregateType(aggregateType)
+                .aggregateId(aggregateId)
+                .eventType(event.getClass().getSimpleName())
+                .payload(payload)
+                .status(OutboxEventStatus.PENDING)
+                .topic(topic)
+                .tenantId(tenantId)
+                .build();
+            
+            outboxEventRepository.save(outboxEvent);
+            log.info("✅ Event written to outbox: {} (ID: {})", event.getClass().getSimpleName(), outboxEvent.getId());
+            
+        } catch (JsonProcessingException e) {
+            log.error("❌ Failed to serialize event to JSON: {}", event.getClass().getSimpleName(), e);
+            throw new RuntimeException("Failed to write event to outbox", e);
         }
     }
 }
