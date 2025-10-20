@@ -1,10 +1,9 @@
 package com.fabricmanagement.user.infrastructure.messaging;
 
-import com.fabricmanagement.user.domain.aggregate.OutboxEvent;
+import com.fabricmanagement.shared.domain.outbox.OutboxEvent;
 import com.fabricmanagement.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.user.domain.event.UserDeletedEvent;
 import com.fabricmanagement.user.domain.event.UserUpdatedEvent;
-import com.fabricmanagement.user.domain.valueobject.OutboxEventStatus;
 import com.fabricmanagement.user.infrastructure.repository.OutboxEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -21,10 +21,11 @@ import java.util.UUID;
  * 
  * ✅ ZERO HARDCODED (Manifesto compliance)
  * ✅ OUTBOX PATTERN (Guaranteed delivery)
+ * ✅ ZERO DUPLICATION (Uses shared OutboxEvent)
  * 
  * How it works:
  * 1. Write event to outbox table in same transaction as business logic
- * 2. Background publisher (OutboxEventPublisher) sends to Kafka
+ * 2. Background publisher (from shared-infrastructure) sends to Kafka
  * 3. Ensures at-least-once delivery guarantee
  */
 @Component
@@ -76,20 +77,24 @@ public class UserEventPublisher {
      * 
      * This is called in same transaction as business logic
      * Guarantees: Either both succeed or both fail (atomicity)
+     * 
+     * ✅ Uses shared OutboxEvent (ZERO DUPLICATION)
      */
     private void writeToOutbox(Object event, String topic, String aggregateType, 
-                               java.util.UUID aggregateId, java.util.UUID tenantId) {
+                               UUID aggregateId, UUID tenantId) {
         try {
             String payload = objectMapper.writeValueAsString(event);
             
             OutboxEvent outboxEvent = OutboxEvent.builder()
                 .aggregateType(aggregateType)
-                .aggregateId(aggregateId)
+                .aggregateId(aggregateId.toString()) // Shared OutboxEvent uses String
                 .eventType(event.getClass().getSimpleName())
                 .payload(payload)
-                .status(OutboxEventStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .processed(false) // Shared OutboxEvent uses Boolean
+                .attempts(0)
                 .topic(topic)
-                .tenantId(tenantId)
+                .tenantId(tenantId.toString()) // Shared OutboxEvent uses String
                 .build();
             
             outboxEventRepository.save(outboxEvent);

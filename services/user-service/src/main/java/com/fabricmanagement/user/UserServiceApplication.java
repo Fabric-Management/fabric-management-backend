@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoCo
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     "com.fabricmanagement.user.domain",
     "com.fabricmanagement.shared.domain"
 })
+@EnableJpaAuditing(auditorAwareRef = "auditorProvider")
 @EnableCaching
 @EnableKafka
 @EnableAsync

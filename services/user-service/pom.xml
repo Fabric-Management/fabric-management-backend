@@ -265,6 +265,12 @@
                     </includes>
                 </configuration>
             </plugin>
+
+            <!-- JaCoCo plugin - inherits config from parent -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
         </plugins>
     </build>
 </project>

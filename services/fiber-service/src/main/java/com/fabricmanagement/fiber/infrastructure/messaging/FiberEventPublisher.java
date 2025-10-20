@@ -27,7 +27,7 @@ public class FiberEventPublisher {
     private final FiberEventMapper eventMapper;
     private final ObjectMapper objectMapper;
     
-    @Value("${app.kafka.topic.fiber-events:fiber-events}")
+    @Value("${app.kafka.topics.fiber-events:fiber-events}")
     private String fiberEventsTopic;
     
     public void publishFiberDefined(Fiber fiber) {

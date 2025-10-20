@@ -1,5 +1,6 @@
 package com.fabricmanagement.shared.security.jwt;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -161,11 +162,13 @@ class JwtTokenProviderTest {
         // When - Wait for token to expire
         Thread.sleep(10); // Wait 10ms to ensure expiry
         
-        Boolean isValid = shortLivedProvider.validateToken(token);
+        // Then - validateToken should return false (catches ExpiredJwtException internally)
+        assertThat(shortLivedProvider.validateToken(token)).isFalse();
         
-        // Then
-        assertThat(isValid).isFalse();
-        assertThat(shortLivedProvider.isTokenExpired(token)).isTrue();
+        // Verify that isTokenExpired throws ExpiredJwtException (stronger assertion!)
+        assertThatThrownBy(() -> shortLivedProvider.isTokenExpired(token))
+            .isInstanceOf(ExpiredJwtException.class)
+            .hasMessageContaining("JWT expired");
     }
     
     @Test

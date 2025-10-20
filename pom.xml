@@ -444,6 +444,40 @@
                                 <goal>report</goal>
                             </goals>
                         </execution>
+                <execution>
+                    <id>jacoco-check</id>
+                    <goals>
+                        <goal>check</goal>
+                    </goals>
+                    <configuration>
+                        <excludes>
+                            <!-- Exclude Lombok-generated DTO code -->
+                            <exclude>**/dto/**/*Dto.class</exclude>
+                            <exclude>**/dto/**/*Request.class</exclude>
+                            <exclude>**/dto/**/*Response.class</exclude>
+                            <exclude>**/*Dto$*Builder.class</exclude>
+                            <exclude>**/*Request$*Builder.class</exclude>
+                            <exclude>**/*Response$*Builder.class</exclude>
+                            <!-- Exclude external event DTOs (Kafka consumer contracts, Lombok generated) -->
+                            <exclude>**/infrastructure/messaging/event/**/*Event.class</exclude>
+                            <exclude>**/*Event$*Builder.class</exclude>
+                            <!-- Exclude Application main class -->
+                            <exclude>**/*Application.class</exclude>
+                        </excludes>
+                        <rules>
+                            <rule>
+                                <element>BUNDLE</element>
+                                <limits>
+                                    <limit>
+                                        <counter>LINE</counter>
+                                        <value>COVEREDRATIO</value>
+                                        <minimum>0.80</minimum>
+                                    </limit>
+                                </limits>
+                            </rule>
+                        </rules>
+                    </configuration>
+                </execution>
                     </executions>
                 </plugin>
                 <!-- Flyway Plugin -->
