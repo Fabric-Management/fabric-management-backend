@@ -339,3 +339,76 @@ docs/development/
 **Enforced By:** All team members  
 **Violations:** PR will be rejected  
 **Questions:** #fabric-docs on Slack
+
+---
+
+## 🧵 STANDARD SERVICE DOCUMENTATION PATTERN (Mandatory)
+
+To ensure consistent, scalable and discoverable docs across all services, use this exact structure under `docs/services/{service-name}/`.
+
+```
+docs/services/{service}/
+├── README.md                    # Main hub (index) for the service docs (fihrist)
+├── DOCUMENTATION_INDEX.md       # Complete navigation map for service docs
+├── {service}.md                 # Main architecture + API document
+│
+├── testing/                     # All test-related docs live here
+│   ├── TEST_ARCHITECTURE.md     # Strategy (pyramid, tools, standards, CI)
+│   ├── TEST_SUMMARY.md          # Coverage/what’s tested catalog
+│   ├── TEST_RESULTS.md          # Latest execution results & analysis
+│   └── TEST_ANTI_PATTERNS.md    # What NOT to do in tests
+│
+├── guides/                      # Integration guides for other services/clients
+│   └── {integration-name}.md
+│
+└── reference/                   # Reference materials (catalogs, standards)
+    └── {reference}.md
+```
+
+### Rules
+
+- All detailed content lives under `docs/services/{service}/...` (Single Source of Truth)
+- Service root `services/{service}/README.md` is a “Welcome/Quick Start” only:
+  - ASCII welcome (optional), quick status, quick start commands
+  - Direct links to the centralized docs above
+  - No duplicated long-form content
+- Never place long-form docs in `services/{service}/` (delete or move to docs/)
+
+### Examples
+
+- Canonical example: `docs/services/fabric-fiber-service/` (use as a template)
+- Convert existing services to this pattern incrementally during maintenance
+
+---
+
+## 🧪 TEST DOCUMENTATION CONVENTIONS (Project-wide)
+
+Use the same testing documentation taxonomy for EVERY service. The project root defines global testing principles (see `docs/TESTING_PRINCIPLES.md`). Each service may add specifics under its own `testing/` folder.
+
+- Global target coverage: ≥ 80% (JaCoCo enforced in CI)
+- Layer targets (guideline): Service ≥95%, Mapper ≥90%, Controller ≥85%, Repository ≥80%, Domain 100%
+- Test Pyramid: Unit ~75%, Integration ~20%, E2E ~5%
+- Use Testcontainers for real infra (DB, Kafka, etc.)
+- REST tests with REST Assured (for HTTP contracts)
+- AssertJ for fluent assertions
+- No flaky tests; avoid sleeps; deterministic tests only
+
+---
+
+## 🧭 MIGRATION CHECKLIST (Service → Standard Pattern)
+
+- [ ] Create `docs/services/{service}/README.md` as the hub (fihrist)
+- [ ] Move long-form docs from `services/{service}/` → `docs/services/{service}/`
+- [ ] Create `testing/` folder with 4 standard files
+- [ ] Add `DOCUMENTATION_INDEX.md` with navigation tables
+- [ ] Update `services/{service}/README.md` to be Welcome + Quick links only
+- [ ] Remove duplicated docs from service root
+- [ ] Verify all links resolve from repo root and from service root
+
+---
+
+## 🔗 CROSS-REFERENCING STANDARDS
+
+- Project-wide documentation rules: this file
+- Project-wide testing rules: `docs/TESTING_PRINCIPLES.md`
+- Service-specific: `docs/services/{service}/**/*`
