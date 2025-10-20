@@ -1,130 +1,73 @@
 package com.fabricmanagement.company.infrastructure.messaging;
 
+import com.fabricmanagement.company.domain.aggregate.OutboxEvent;
 import com.fabricmanagement.company.domain.event.CompanyCreatedEvent;
 import com.fabricmanagement.company.domain.event.CompanyDeletedEvent;
 import com.fabricmanagement.company.domain.event.CompanyUpdatedEvent;
+import com.fabricmanagement.company.domain.valueobject.OutboxEventStatus;
+import com.fabricmanagement.company.infrastructure.repository.OutboxEventRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.UUID;
 
 /**
  * Company Event Publisher
  * 
- * Publishes company domain events to Kafka (ASYNC).
+ * Publishes company domain events using Transactional Outbox Pattern
  * 
- * Pattern:
- * - Non-blocking async publishing
- * - Error logging via CompletableFuture
- * - DLQ handling via BaseKafkaErrorConfig
- * 
- * ✅ ZERO HARDCODED (Manifesto compliance)
- * - Topic name from application.yml
- * - Override via ${KAFKA_TOPIC_COMPANY_EVENTS}
- * - Production-ready configuration
+ * ✅ ZERO HARDCODED
+ * ✅ OUTBOX PATTERN (Guaranteed delivery)
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class CompanyEventPublisher {
     
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
     
-    // ✅ Config-driven topic name (ZERO HARDCODED!)
     @org.springframework.beans.factory.annotation.Value("${kafka.topics.company-events:company-events}")
     private String companyEventsTopic;
     
-    /**
-     * Publishes CompanyCreatedEvent (async)
-     */
     public void publishCompanyCreated(CompanyCreatedEvent event) {
-        log.info("Publishing CompanyCreatedEvent for company: {}", event.getCompanyId());
-        
-        try {
-            // ✅ Envelope pattern: wrap event with metadata
-            Map<String, Object> envelope = new HashMap<>();
-            envelope.put("eventType", "CompanyCreated");
-            envelope.put("data", event);
-            
-            String eventJson = objectMapper.writeValueAsString(envelope);
-            
-            CompletableFuture<SendResult<String, String>> future = 
-                kafkaTemplate.send(companyEventsTopic, event.getCompanyId().toString(), eventJson);
-            
-            future.whenComplete((result, ex) -> {
-                if (ex == null) {
-                    log.info("✅ CompanyCreatedEvent published successfully: {}", event.getCompanyId());
-                } else {
-                    log.error("❌ Failed to publish CompanyCreatedEvent: {}", event.getCompanyId(), ex);
-                }
-            });
-        } catch (Exception e) {
-            log.error("❌ Failed to serialize CompanyCreatedEvent: {}", event.getCompanyId(), e);
-        }
+        log.info("📝 Writing CompanyCreatedEvent to outbox: {}", event.getCompanyId());
+        writeToOutbox(event, companyEventsTopic, "COMPANY", event.getCompanyId(), UUID.fromString(event.getTenantId()));
     }
     
-    /**
-     * Publishes CompanyUpdatedEvent (async)
-     */
     public void publishCompanyUpdated(CompanyUpdatedEvent event) {
-        log.info("Publishing CompanyUpdatedEvent for company: {}", event.getCompanyId());
-        
-        try {
-            // ✅ Envelope pattern: wrap event with metadata
-            Map<String, Object> envelope = new HashMap<>();
-            envelope.put("eventType", "CompanyUpdated");
-            envelope.put("data", event);
-            
-            String eventJson = objectMapper.writeValueAsString(envelope);
-            
-            CompletableFuture<SendResult<String, String>> future = 
-                kafkaTemplate.send(companyEventsTopic, event.getCompanyId().toString(), eventJson);
-            
-            future.whenComplete((result, ex) -> {
-                if (ex == null) {
-                    log.info("✅ CompanyUpdatedEvent published successfully: {}", event.getCompanyId());
-                } else {
-                    log.error("❌ Failed to publish CompanyUpdatedEvent: {}", event.getCompanyId(), ex);
-                }
-            });
-        } catch (Exception e) {
-            log.error("❌ Failed to serialize CompanyUpdatedEvent: {}", event.getCompanyId(), e);
-        }
+        log.info("📝 Writing CompanyUpdatedEvent to outbox: {}", event.getCompanyId());
+        writeToOutbox(event, companyEventsTopic, "COMPANY", event.getCompanyId(), UUID.fromString(event.getTenantId()));
     }
     
-    /**
-     * Publishes CompanyDeletedEvent (async)
-     */
     public void publishCompanyDeleted(CompanyDeletedEvent event) {
-        log.info("Publishing CompanyDeletedEvent for company: {}", event.getCompanyId());
-        
+        log.info("📝 Writing CompanyDeletedEvent to outbox: {}", event.getCompanyId());
+        writeToOutbox(event, companyEventsTopic, "COMPANY", event.getCompanyId(), UUID.fromString(event.getTenantId()));
+    }
+    
+    private void writeToOutbox(Object event, String topic, String aggregateType, UUID aggregateId, UUID tenantId) {
         try {
-            // ✅ Envelope pattern: wrap event with metadata
-            Map<String, Object> envelope = new HashMap<>();
-            envelope.put("eventType", "CompanyDeleted");
-            envelope.put("data", event);
+            String payload = objectMapper.writeValueAsString(event);
             
-            String eventJson = objectMapper.writeValueAsString(envelope);
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                .aggregateType(aggregateType)
+                .aggregateId(aggregateId)
+                .eventType(event.getClass().getSimpleName())
+                .payload(payload)
+                .status(OutboxEventStatus.PENDING)
+                .topic(topic)
+                .tenantId(tenantId)
+                .build();
             
-            CompletableFuture<SendResult<String, String>> future = 
-                kafkaTemplate.send(companyEventsTopic, event.getCompanyId().toString(), eventJson);
+            outboxEventRepository.save(outboxEvent);
+            log.info("✅ Event written to outbox: {}", outboxEvent.getId());
             
-            future.whenComplete((result, ex) -> {
-                if (ex == null) {
-                    log.info("✅ CompanyDeletedEvent published successfully: {}", event.getCompanyId());
-                } else {
-                    log.error("❌ Failed to publish CompanyDeletedEvent: {}", event.getCompanyId(), ex);
-                }
-            });
-        } catch (Exception e) {
-            log.error("❌ Failed to serialize CompanyDeletedEvent: {}", event.getCompanyId(), e);
+        } catch (JsonProcessingException e) {
+            log.error("❌ Failed to serialize event to JSON", e);
+            throw new RuntimeException("Failed to write event to outbox", e);
         }
     }
 }

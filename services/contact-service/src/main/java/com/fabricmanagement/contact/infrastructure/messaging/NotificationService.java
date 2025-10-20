@@ -1,23 +1,29 @@
 package com.fabricmanagement.contact.infrastructure.messaging;
 
+import com.fabricmanagement.contact.domain.aggregate.OutboxEvent;
 import com.fabricmanagement.contact.domain.valueobject.ContactType;
+import com.fabricmanagement.contact.domain.valueobject.OutboxEventStatus;
+import com.fabricmanagement.contact.infrastructure.repository.OutboxEventRepository;
 import com.fabricmanagement.shared.infrastructure.constants.NotificationConstants;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationService {
     
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
     
     // ✅ Config-driven topic names (ZERO HARDCODED!)
     @Value("${kafka.topics.email-notifications:email-notifications}")
@@ -65,8 +71,8 @@ public class NotificationService {
         emailPayload.put("expiresInMinutes", codeExpiryMinutes);
         emailPayload.put("timestamp", LocalDateTime.now().toString());
         
-        kafkaTemplate.send(emailNotificationTopic, email, emailPayload);
-        log.info("📧 Email verification queued for {}", email);
+        writeToOutbox(emailPayload, emailNotificationTopic, "NOTIFICATION", UUID.randomUUID(), UUID.randomUUID());
+        log.info("📧 Email verification written to outbox for {}", email);
     }
     
     private void sendSmsVerification(String phone, String code) {
@@ -77,8 +83,8 @@ public class NotificationService {
         smsPayload.put("expiresInMinutes", codeExpiryMinutes);
         smsPayload.put("timestamp", LocalDateTime.now().toString());
         
-        kafkaTemplate.send(smsNotificationTopic, phone, smsPayload);
-        log.info("📱 SMS verification queued for {}", phone);
+        writeToOutbox(smsPayload, smsNotificationTopic, "NOTIFICATION", UUID.randomUUID(), UUID.randomUUID());
+        log.info("📱 SMS verification written to outbox for {}", phone);
     }
     
     public void sendContactVerifiedNotification(String contactValue, ContactType type) {
@@ -96,11 +102,34 @@ public class NotificationService {
                 emailPayload.put("template", NotificationConstants.TEMPLATE_CONTACT_VERIFIED);
                 emailPayload.put("timestamp", LocalDateTime.now().toString());
                 
-                kafkaTemplate.send(emailNotificationTopic, contactValue, emailPayload);
-                log.info("📧 Contact verified notification queued for {}", contactValue);
+                writeToOutbox(emailPayload, emailNotificationTopic, "NOTIFICATION", UUID.randomUUID(), UUID.randomUUID());
+                log.info("📧 Contact verified notification written to outbox for {}", contactValue);
             }
         } catch (Exception e) {
             log.error("Failed to send verified notification to {}: {}", contactValue, e.getMessage(), e);
+        }
+    }
+    
+    private void writeToOutbox(Object event, String topic, String aggregateType, UUID aggregateId, UUID tenantId) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                .aggregateType(aggregateType)
+                .aggregateId(aggregateId)
+                .eventType(event.getClass().getSimpleName())
+                .payload(payload)
+                .status(OutboxEventStatus.PENDING)
+                .topic(topic)
+                .tenantId(tenantId)
+                .build();
+            
+            outboxEventRepository.save(outboxEvent);
+            log.debug("✅ Event written to outbox: {}", outboxEvent.getId());
+            
+        } catch (JsonProcessingException e) {
+            log.error("❌ Failed to serialize event to JSON", e);
+            throw new RuntimeException("Failed to write event to outbox", e);
         }
     }
 }
