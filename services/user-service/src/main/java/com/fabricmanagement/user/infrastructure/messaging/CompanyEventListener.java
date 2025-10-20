@@ -1,15 +1,19 @@
 package com.fabricmanagement.user.infrastructure.messaging;
 
+import com.fabricmanagement.user.domain.aggregate.ProcessedEvent;
 import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import com.fabricmanagement.user.infrastructure.messaging.event.CompanyCreatedEvent;
 import com.fabricmanagement.user.infrastructure.messaging.event.CompanyDeletedEvent;
 import com.fabricmanagement.user.infrastructure.messaging.event.CompanyUpdatedEvent;
+import com.fabricmanagement.user.infrastructure.repository.ProcessedEventRepository;
 import com.fabricmanagement.user.infrastructure.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,17 +35,25 @@ import java.util.UUID;
 public class CompanyEventListener {
     
     private final UserRepository userRepository;
+    private final ProcessedEventRepository processedEventRepository;
     private final ObjectMapper objectMapper;
     
     /**
      * Handles generic company events and routes to specific handlers
      * 
      * ✅ Config-driven topic (ZERO HARDCODED!)
+     * ✅ Idempotency check (prevents duplicate processing)
      */
     @KafkaListener(topics = "${kafka.topics.company-events:company-events}", 
                    groupId = "user-service", 
                    containerFactory = "kafkaListenerContainerFactory")
-    public void handleCompanyEvent(String event) {
+    @Transactional
+    public void handleCompanyEvent(
+            String event,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(value = KafkaHeaders.RECEIVED_PARTITION, required = false) Integer partition,
+            @Header(value = KafkaHeaders.OFFSET, required = false) Long offset) {
+        
         log.info("📬 Company event received: {}", event);
         
         try {
@@ -49,10 +61,34 @@ public class CompanyEventListener {
             @SuppressWarnings("unchecked")
             Map<String, Object> eventData = objectMapper.readValue(event, Map.class);
             String eventType = (String) eventData.get("eventType");
+            String eventIdStr = (String) eventData.get("eventId");
             
             if (eventType == null) {
                 log.warn("⚠️ Event type is null, cannot route event");
                 return;
+            }
+            
+            // ✅ IDEMPOTENCY CHECK
+            if (eventIdStr != null) {
+                UUID eventId = UUID.fromString(eventIdStr);
+                if (processedEventRepository.existsByEventId(eventId)) {
+                    log.warn("⚠️ Event already processed, skipping: {}", eventId);
+                    return; // Skip duplicate
+                }
+                
+                // Mark as processed BEFORE processing (fail-safe)
+                ProcessedEvent processedEvent = ProcessedEvent.builder()
+                    .eventId(eventId)
+                    .eventType(eventType)
+                    .aggregateId(UUID.fromString((String) eventData.get("companyId")))
+                    .tenantId(UUID.fromString((String) eventData.get("tenantId")))
+                    .sourceService("company-service")
+                    .kafkaTopic(topic)
+                    .kafkaPartition(partition)
+                    .kafkaOffset(offset)
+                    .build();
+                processedEventRepository.save(processedEvent);
+                log.debug("✅ Event marked as processed: {}", eventId);
             }
             
             // Route to specific handler based on event type

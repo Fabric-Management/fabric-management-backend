@@ -1,14 +1,18 @@
 package com.fabricmanagement.user.infrastructure.messaging;
 
+import com.fabricmanagement.user.domain.aggregate.ProcessedEvent;
 import com.fabricmanagement.user.domain.aggregate.User;
 import com.fabricmanagement.user.domain.valueobject.UserStatus;
 import com.fabricmanagement.user.infrastructure.messaging.event.ContactVerifiedEvent;
 import com.fabricmanagement.user.infrastructure.messaging.event.ContactCreatedEvent;
 import com.fabricmanagement.user.infrastructure.messaging.event.ContactDeletedEvent;
+import com.fabricmanagement.user.infrastructure.repository.ProcessedEventRepository;
 import com.fabricmanagement.user.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,19 +29,45 @@ import java.util.UUID;
 public class ContactEventListener {
     
     private final UserRepository userRepository;
+    private final ProcessedEventRepository processedEventRepository;
     
     /**
      * Handles contact verified event
      * Automatically activates users who are pending verification
+     * ✅ Idempotency check added
      */
     // ✅ Config-driven topic (ZERO HARDCODED!)
     @KafkaListener(topics = "${kafka.topics.contact-verified:contact.verified}", groupId = "user-service")
     @Transactional
-    public void handleContactVerified(ContactVerifiedEvent event) {
+    public void handleContactVerified(
+            ContactVerifiedEvent event,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(value = KafkaHeaders.RECEIVED_PARTITION, required = false) Integer partition,
+            @Header(value = KafkaHeaders.OFFSET, required = false) Long offset) {
+        
         log.info("📬 Contact verified event received: ownerId={}, contactValue={}", 
             event.getOwnerId(), event.getContactValue());
         
         try {
+            // ✅ IDEMPOTENCY CHECK
+            if (event.getEventId() != null && processedEventRepository.existsByEventId(event.getEventId())) {
+                log.warn("⚠️ Event already processed, skipping: {}", event.getEventId());
+                return;
+            }
+            
+            if (event.getEventId() != null) {
+                ProcessedEvent processed = ProcessedEvent.builder()
+                    .eventId(event.getEventId())
+                    .eventType("ContactVerifiedEvent")
+                    .aggregateId(UUID.fromString(event.getOwnerId()))
+                    .tenantId(event.getTenantId())
+                    .sourceService("contact-service")
+                    .kafkaTopic(topic)
+                    .kafkaPartition(partition)
+                    .kafkaOffset(offset)
+                    .build();
+                processedEventRepository.save(processed);
+            }
             // Parse UUID safely
             UUID userId;
             try {
