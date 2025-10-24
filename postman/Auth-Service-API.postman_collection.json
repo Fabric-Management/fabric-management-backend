@@ -1,0 +1,359 @@
+{
+  "info": {
+    "_postman_id": "auth-service-api-v1",
+    "name": "Auth Service API",
+    "description": "**Auth Service Endpoints**\n\nAuthentication and Authorization endpoints for Fabric Management System.\n\n**Base URL:** http://localhost:8081\n**Port:** 8081 (Auth Service)\n\n**Endpoints:**\n- POST /api/v1/auth/register - User registration\n- POST /api/v1/auth/login - User login\n- POST /api/v1/auth/refresh - Refresh token\n- POST /api/v1/auth/logout - User logout\n- POST /api/v1/auth/users/{userId}/roles - Assign role (Internal)\n- DELETE /api/v1/auth/users/{userId}/roles/{roleName} - Remove role (Internal)\n- GET /api/v1/auth/users/{userId}/roles - Get user roles (Internal)\n- POST /api/v1/auth/users/{userId}/permissions - Assign permission (Internal)\n- GET /api/v1/auth/users/{userId}/permissions - Get user permissions (Internal)\n\n**Version:** 1.0\n**Date:** 2025-01-27\n**Manifesto:** Production-ready, ZERO HARDCODED VALUES, Event-driven",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantId",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "contactValue",
+      "value": "fatih@akkayalartekstil.com.tr",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "Test123456",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactValue\": \"{{contactValue}}\",\n  \"contactType\": \"EMAIL\",\n  \"password\": \"{{password}}\",\n  \"tenantId\": \"{{tenantId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data) {",
+                  "        pm.collectionVariables.set('accessToken', response.data.accessToken);",
+                  "        pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+                  "        pm.collectionVariables.set('userId', response.data.user.id);",
+                  "        pm.collectionVariables.set('tenantId', response.data.user.tenantId);",
+                  "        console.log('✅ Registration successful!');",
+                  "        console.log('User ID:', response.data.user.id);",
+                  "        console.log('Access Token saved');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactValue\": \"{{contactValue}}\",\n  \"password\": \"{{password}}\",\n  \"tenantId\": \"{{tenantId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data) {",
+                  "        pm.collectionVariables.set('accessToken', response.data.accessToken);",
+                  "        pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+                  "        pm.collectionVariables.set('userId', response.data.user.id);",
+                  "        pm.collectionVariables.set('tenantId', response.data.user.tenantId);",
+                  "        console.log('✅ Login successful!');",
+                  "        console.log('User ID:', response.data.user.id);",
+                  "        console.log('Access Token saved');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data) {",
+                  "        pm.collectionVariables.set('accessToken', response.data.accessToken);",
+                  "        console.log('✅ Token refreshed successfully!');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    console.log('✅ Logout successful!');",
+                  "    pm.collectionVariables.set('accessToken', '');",
+                  "    pm.collectionVariables.set('refreshToken', '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authorization (Internal)",
+      "item": [
+        {
+          "name": "Assign Role to User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-API-Key",
+                "value": "internal-api-key-123",
+                "description": "Internal API Key for service-to-service calls"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleName\": \"MANAGER\",\n  \"tenantId\": \"{{tenantId}}\",\n  \"grantedBy\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/users/{{userId}}/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "users", "{{userId}}", "roles"]
+            }
+          }
+        },
+        {
+          "name": "Remove Role from User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-API-Key",
+                "value": "internal-api-key-123",
+                "description": "Internal API Key for service-to-service calls"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/users/{{userId}}/roles/MANAGER?tenantId={{tenantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "users",
+                "{{userId}}",
+                "roles",
+                "MANAGER"
+              ],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-API-Key",
+                "value": "internal-api-key-123",
+                "description": "Internal API Key for service-to-service calls"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/users/{{userId}}/roles?tenantId={{tenantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "users", "{{userId}}", "roles"],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assign Permission to User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-API-Key",
+                "value": "internal-api-key-123",
+                "description": "Internal API Key for service-to-service calls"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissionName\": \"READ_FIBER\",\n  \"resourceType\": \"FIBER\",\n  \"resourceId\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"tenantId\": \"{{tenantId}}\",\n  \"grantedBy\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/users/{{userId}}/permissions",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "users",
+                "{{userId}}",
+                "permissions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-API-Key",
+                "value": "internal-api-key-123",
+                "description": "Internal API Key for service-to-service calls"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/users/{{userId}}/permissions?tenantId={{tenantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "users",
+                "{{userId}}",
+                "permissions"
+              ],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

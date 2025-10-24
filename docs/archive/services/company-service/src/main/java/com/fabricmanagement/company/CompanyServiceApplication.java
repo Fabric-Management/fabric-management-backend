@@ -1,0 +1,59 @@
+package com.fabricmanagement.company;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+/**
+ * Company Service Application
+ * 
+ * Provides comprehensive company management including:
+ * - Company profile and information management
+ * - Multi-tenancy support
+ * - Company settings and preferences
+ * - Policy Authorization Management (UserPermission, PolicyAudit)
+ * - Duplicate detection and prevention
+ * 
+ * Architecture: Clean Architecture + CQRS + Event Sourcing
+ * 
+ * Microservices Communication:
+ * - Feign clients with circuit breakers (resilient coupling)
+ * - Kafka for async events
+ * - Fallback mechanisms for graceful degradation
+ * 
+ * Port: 8083
+ */
+@SpringBootApplication(
+    scanBasePackages = {
+        "com.fabricmanagement.company",
+        "com.fabricmanagement.shared"
+    },
+    exclude = {RedisRepositoriesAutoConfiguration.class}
+)
+@EnableJpaRepositories(basePackages = {
+    "com.fabricmanagement.company.infrastructure.repository",
+    "com.fabricmanagement.company.infrastructure.outbox",
+    "com.fabricmanagement.shared.infrastructure.policy.repository"
+})
+@EntityScan(basePackages = {
+    "com.fabricmanagement.company.domain",
+    "com.fabricmanagement.shared.domain"
+})
+@EnableCaching
+@EnableKafka
+@EnableAsync
+@EnableTransactionManagement
+@EnableFeignClients
+public class CompanyServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CompanyServiceApplication.class, args);
+    }
+}

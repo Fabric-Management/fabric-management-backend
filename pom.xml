@@ -89,6 +89,7 @@
 
         <!-- Service modules (Active) -->
         <module>services/api-gateway</module>
+        <module>services/auth-service</module>
         <module>services/user-service</module>
         <module>services/contact-service</module>
         <module>services/company-service</module>

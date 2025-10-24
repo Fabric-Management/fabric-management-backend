@@ -1,219 +1,279 @@
-# 🏗️ Fabric Management - System Architecture
+# 🏗️ FABRIC MANAGEMENT - SYSTEM ARCHITECTURE
 
-**Version:** 2.2  
-**Last Updated:** 2025-10-11 (Tenant Onboarding System)  
-**Status:** ✅ Production Ready
-
----
-
-## 📋 Quick Navigation
-
-| What You Need         | Documentation                                                                            |
-| --------------------- | ---------------------------------------------------------------------------------------- |
-| 💎 **Developer DNA**  | [DEVELOPER_PROTOCOL.md](DEVELOPER_PROTOCOL.md)                                           |
-| 🤖 **AI Rules**       | [AI_ASSISTANT_LEARNINGS.md](AI_ASSISTANT_LEARNINGS.md)                                   |
-| 📖 **Principles**     | [development/principles.md](development/principles.md)                                   |
-| 🎭 **Hybrid Pattern** | [development/ORCHESTRATION_PATTERN.md](development/ORCHESTRATION_PATTERN.md)             |
-| 🔢 **UUID Standards** | [development/data_types_standards.md](development/data_types_standards.md)               |
-| 🌐 **API Standards**  | [development/microservices_api_standards.md](development/microservices_api_standards.md) |
-| 📁 **Code Structure** | [development/code_structure_guide.md](development/code_structure_guide.md)               |
-| 🔐 **Security**       | [SECURITY.md](SECURITY.md)                                                               |
-
----
-
-## 🎯 System Overview
-
-### Architecture Type
-
-- **Microservices** - Spring Boot based
-- **Event-Driven** - Kafka messaging
-- **API Gateway** - Routing + Auth + Rate limiting
-- **Multi-tenant** - Tenant isolation at all layers
-
-### Core Services
-
-1. **user-service** - User management & authentication
-2. **company-service** - Company & relationships
-3. **contact-service** - Contact information & verification
-4. **api-gateway** - Entry point for all requests
-
-### Shared Modules
-
-- **shared-domain** - Base entities, exceptions, events
-- **shared-application** - Responses, context
-- **shared-infrastructure** - Constants, security, config
-- **shared-security** - JWT, authentication filters
-
-**Details:** [code_structure_guide.md](development/code_structure_guide.md)
-
----
-
-## 🏆 Recent Updates
-
-### Hybrid Pattern Architecture (2025-10-17)
-
-- ✅ **Hybrid Pattern Implemented** - Orchestration + Choreography + Parallel validations
-- ✅ **Performance Verified** - Tenant onboarding: 15s → 5.5s (63% faster, production tested)
-- ✅ **Parallel Validation** - 3 independent checks run concurrently (CompletableFuture)
-- ✅ **Event-Driven Side Effects** - Notification, audit via Kafka (async, non-blocking)
-- ✅ **Config-Driven Timeouts** - Zero hardcoded values (${USER_SERVICE_TIMEOUT:30s})
-- ✅ **i18n Message System** - Custom Exceptions + MessageResolver (EN/TR automatic)
-- ✅ **Production-Ready** - Google/Amazon/Netflix level architecture
-
-### Orchestration Pattern + Notification Service (2025-10-15)
-
-- ✅ **Orchestration Pattern** - Atomic operations (3 HTTP → 1 HTTP, 66% faster)
-- ✅ **Notification Service** - Email/WhatsApp/SMS multi-tenant notifications
-- ✅ **Auth Flow Optimization** - setupPasswordWithVerification() atomic endpoint
-- ✅ **WhatsApp Integration** - Meta Cloud API production-ready
-- ✅ **Cost Reduction** - 66% DB query reduction, $4000/mo savings (estimated)
-
-### Tenant Onboarding System (2025-10-11)
-
-- ✅ **Self-Service Registration** - New tenant self-registration flow
-- ✅ **SystemRole Enum** - Type-safe roles (TENANT_ADMIN, USER, etc.)
-- ✅ **Platform Tenant** - Reserved for future SUPER_ADMIN
-- ✅ **Address Support** - Company address fields added
-- ✅ **No Default Users** - Clean start, all users via registration
-
-### Previous: User-Service Refactoring (2025-10-10)
-
-- ✅ **Entity:** 408 → 99 lines (-76%) - Pure data holder
-- ✅ **Pattern:** Anemic Domain Model adopted
-
----
-
-## 📊 Architecture Quality Score
-
-| Principle                 | Score         |
-| ------------------------- | ------------- |
-| **Single Responsibility** | 9.5/10        |
-| **DRY**                   | 9/10          |
-| **KISS**                  | 9/10          |
-| **YAGNI**                 | 9/10          |
-| **Clean Code**            | 9.5/10        |
-| **Overall**               | **9.2/10** 🏆 |
-
----
-
-## 🎯 Key Principles
-
-### ⚡ 0. HYBRID PATTERN ARCHITECTURE (Oct 16, 2025)
-
-```
-╔═══════════════════════════════════════════════════════════════════╗
-║  🎭 HYBRID PATTERN - ORCHESTRATION + CHOREOGRAPHY               ║
-║                                                                   ║
-║  Critical flows → Orchestration (@Transactional, atomic)         ║
-║  Side effects → Choreography (Event-driven, async)               ║
-║  Validations → Parallel (CompletableFuture)                      ║
-║                                                                   ║
-║  Architecture:                                                    ║
-║  ┌─────────────────────────────────────┐                        ║
-║  │ Orchestration (Core Flow)           │                        ║
-║  │ ├─ Parallel Validations (3s)        │                        ║
-║  │ ├─ Company + User + Contact (atomic)│                        ║
-║  │ └─ Publish Event                    │                        ║
-║  └──────────┬──────────────────────────┘                        ║
-║             │                                                     ║
-║             ▼                                                     ║
-║  ┌─────────────────────────────────────┐                        ║
-║  │ Choreography (Event-Driven)         │                        ║
-║  │ ├─ Notification → Email/SMS (async) │                        ║
-║  │ ├─ Audit → Logging (async)          │                        ║
-║  │ └─ Analytics → Metrics (async)      │                        ║
-║  └─────────────────────────────────────┘                        ║
-║                                                                   ║
-║  Impact: 80% faster validation, 100% async side effects          ║
-║  Used By: Google, Amazon, Netflix (industry standard)            ║
-║                                                                   ║
-║  📖 Full Guide: docs/development/ORCHESTRATION_PATTERN.md        ║
-╚═══════════════════════════════════════════════════════════════════╝
-```
-
-### 1. Anemic Domain Model
-
-- Entity = Data holder ONLY
-- No business methods in entities
-- Use @Getter/@Setter (Lombok)
-
-### 2. Mapper Separation
-
-- UserMapper → DTO ↔ Entity
-- EventMapper → Entity → Event
-- NO mapping in Service layer
-
-### 3. Layer Responsibilities
-
-- **Controller:** HTTP only
-- **Service:** Business logic + Orchestration
-- **Mapper:** Mapping only
-- **Entity:** Data only
-
-### 4. NO Over-Engineering
-
-- NO validator/ folder (Spring @Valid)
-- NO helper/ folder (private methods)
-- USE Spring/Lombok/Shared modules
-
-**Full details:** [principles.md](development/principles.md)
-
----
-
-## 📂 Standard Service Structure
-
-```
-{service}-service/
-├── api/              # HTTP Layer
-├── application/      # Business Layer
-│   ├── mapper/       # All mapping
-│   └── service/      # Business logic
-├── domain/           # Domain Layer
-│   ├── aggregate/    # Entities (data holders)
-│   ├── event/        # Domain events
-│   └── valueobject/  # Enums, VOs
-└── infrastructure/   # Infrastructure
-    ├── repository/
-    ├── client/
-    ├── messaging/
-    ├── security/
-    └── config/
-```
-
-**Detailed structure:** [code_structure_guide.md](development/code_structure_guide.md)
-
----
-
-## 🔗 Documentation Index
-
-### Core Documents
-
-- [DEVELOPER_PROTOCOL.md](DEVELOPER_PROTOCOL.md) - Developer DNA manifesto
-- [AI_ASSISTANT_LEARNINGS.md](AI_ASSISTANT_LEARNINGS.md) - AI coding principles
-- [SECURITY.md](SECURITY.md) - Security architecture
-- [DOCUMENTATION_PRINCIPLES.md](DOCUMENTATION_PRINCIPLES.md) - Doc standards
-
-### Development Standards
-
-- [principles.md](development/principles.md) - SOLID, DRY, NO USERNAME
-- [ORCHESTRATION_PATTERN.md](development/ORCHESTRATION_PATTERN.md) - Hybrid Pattern guide
-- [HYBRID_PATTERN_IMPLEMENTATION.md](development/HYBRID_PATTERN_IMPLEMENTATION.md) - Production case study (63% faster)
-- [code_structure_guide.md](development/code_structure_guide.md) - Code organization
-- [data_types_standards.md](development/data_types_standards.md) - UUID standards
-- [microservices_api_standards.md](development/microservices_api_standards.md) - API standards
-- [INTERNAL_ENDPOINT_PATTERN.md](development/INTERNAL_ENDPOINT_PATTERN.md) - @InternalEndpoint
-
-### Architecture
-
-- [TENANT_MODEL_AND_ROLES_GUIDE.md](architecture/TENANT_MODEL_AND_ROLES_GUIDE.md) - Multi-tenancy
-
-### Deployment Patterns
-
-- [DATABASE_MIGRATION_STRATEGY.md](deployment/DATABASE_MIGRATION_STRATEGY.md) - DB migrations
-- [ENVIRONMENT_VARIABLES.md](deployment/ENVIRONMENT_VARIABLES.md) - Config management
-
----
-
-**Last Updated:** 2025-10-16 (Hybrid Pattern Architecture)  
 **Version:** 3.0  
-**Status:** ✅ Production Ready - Orchestration + Choreography
+**Status:** ✅ Production-Ready  
+**Scope:** Modular Monolith Architecture with OS Subscription & Policy Engine  
+**Last Updated:** 2025-01-27
+
+---
+
+## 🎯 ARCHITECTURE OVERVIEW
+
+Fabric Management Platform uses a **Modular Monolith** architecture that combines the benefits of monolithic simplicity with modular design principles.
+
+### Core Philosophy
+
+- **Single Deploy** - One application, one database, one deployment
+- **Modular Design** - Clear domain boundaries within monolith
+- **In-Process Communication** - Zero network latency between modules
+- **Event-Driven** - Asynchronous processing with Outbox pattern
+- **Multi-Tenant** - Row-level security with tenant isolation
+
+---
+
+## 🏗️ MODULAR MONOLITH STRUCTURE
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   FABRIC MANAGEMENT                       │
+│                 (Modular Monolith Core)                  │
+├──────────────────────────────────────────────────────────┤
+│  common/         → Platform (Auth, User, Company, Policy, Audit, Config, Monitoring, Communication) + Infrastructure │
+│  production/     → MasterData, Planning, Execution, Quality                     │
+│  logistics/      → Inventory, Shipment, Customs                                 │
+│  finance/        → Accounting, Costing, Billing                                 │
+│  human/          → Employee, Payroll, Performance, Leave                        │
+│  procurement/    → Supplier, Purchase, GRN, RFQ                                 │
+│  integration/    → Adapters, Webhooks, Schedulers, Outbox                       │
+│  insight/         → Analytics, Intelligence (AI, Forecasts)                     │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🧱 MODULE DEPENDENCIES
+
+| Module        | Allowed Dependencies                   | Purpose                  |
+| ------------- | -------------------------------------- | ------------------------ |
+| `common`      | none                                   | Platform foundation      |
+| `production`  | common                                 | Manufacturing operations |
+| `logistics`   | common, production                     | Supply chain management  |
+| `finance`     | common, logistics, production          | Financial operations     |
+| `human`       | common                                 | Human resources          |
+| `procurement` | common, finance                        | Purchasing operations    |
+| `integration` | common, production, logistics, finance | External integrations    |
+| `insight`     | common, production, logistics, finance | Analytics & intelligence |
+
+---
+
+## 🔒 SECURITY ARCHITECTURE
+
+### Authentication & Authorization
+
+- **JWT-based Authentication** - Stateless token validation
+- **Role-Based Access Control (RBAC)** - User roles and permissions
+- **Policy-Based Authorization** - Fine-grained access control
+- **Multi-Tenant Isolation** - Row-level security (RLS)
+
+### Policy Engine (5-Layer Architecture)
+
+Fabric Management Platform, **enterprise-grade policy engine** ile korunur:
+
+**Policy Layers:**
+
+1. **OS Subscription** - Tenant hangi OS'lere abone?
+2. **Tenant** - Şirket seviyesi kurallar
+3. **Company** - Departman ve hiyerarşi
+4. **User** - Rol ve özel izinler
+5. **Conditions** - Zaman, veri, iş kuralları
+
+```java
+@PolicyCheck(
+    os = "YarnOS",
+    resource = "fabric.yarn.create",
+    action = "POST"
+)
+@PostMapping("/api/production/yarn")
+public ResponseEntity<?> createYarn(@RequestBody YarnDto dto) {
+    // Implementation
+}
+```
+
+**Detaylı bilgi için:** [modular_monolith/POLICY_ENGINE.md](./modular_monolith/POLICY_ENGINE.md)
+
+### OS Subscription Model
+
+Platform, **OS (Operating Subscription)** bazlı abonelik modeli kullanır:
+
+- **FabricOS** - Base platform (FREE) - Tüm tenantlar için
+- **YarnOS, LoomOS, KnitOS, DyeOS** - Production OS'lar (PROFESSIONAL)
+- **AccountOS, AnalyticsOS, IntelligenceOS** - Premium OS'lar (ENTERPRISE)
+
+**Detaylı bilgi için:** [modular_monolith/OS_SUBSCRIPTION_MODEL.md](./modular_monolith/OS_SUBSCRIPTION_MODEL.md)
+
+---
+
+## 🗃️ DATA ARCHITECTURE
+
+### Database Design
+
+- **Single PostgreSQL Database** - ACID transactions across modules
+- **Module-Prefixed Schemas** - Clear data boundaries
+- **Row-Level Security (RLS)** - Tenant isolation at database level
+- **Flyway Migrations** - Version-controlled schema evolution
+
+### Schema Structure
+
+```
+common_auth, common_user, common_company, common_policy, common_audit
+common_subscription, common_os_definition, common_os_dependency
+prod_fiber, prod_yarn, prod_manufacturing
+logi_inventory, logi_shipment
+fin_accounting, fin_billing
+hr_employee, hr_payroll
+proc_supplier, proc_purchase
+integ_outbox, integ_webhook
+ins_analytics, ins_intelligence
+```
+
+---
+
+## 🔄 COMMUNICATION PATTERNS
+
+### In-Process Communication
+
+- **Direct Method Calls** - Zero latency between modules
+- **Facade Pattern** - Clean module interfaces
+- **Event Publishing** - Asynchronous module communication
+- **Shared Context** - Common security and tenant context
+
+### Event-Driven Architecture
+
+- **Domain Events** - Module-specific business events
+- **Outbox Pattern** - Reliable event publishing
+- **Kafka Integration** - External system communication
+- **Event Sourcing** - Audit trail and state reconstruction
+
+---
+
+## 🚀 DEPLOYMENT ARCHITECTURE
+
+### Single Application Deployment
+
+- **One JAR File** - `fabric-management-backend.jar`
+- **Single Port** - 8080 (main application)
+- **Shared JVM** - All modules in same process
+- **Blue-Green Deployment** - Zero-downtime updates
+
+### Infrastructure Components
+
+- **PostgreSQL** - Main database
+- **Redis** - Caching and session storage
+- **Kafka** - Event streaming (optional)
+- **Prometheus/Grafana** - Monitoring and alerting
+
+---
+
+## 📊 MONITORING & OBSERVABILITY
+
+### Health Checks
+
+- **Spring Actuator** - `/actuator/health`
+- **Module Health** - Individual module status
+- **Database Health** - Connection and query performance
+- **Cache Health** - Redis connectivity
+
+### Metrics & Tracing
+
+- **Micrometer** - Application metrics
+- **OpenTelemetry** - Distributed tracing
+- **Prometheus** - Metrics collection
+- **Grafana** - Visualization and alerting
+
+---
+
+## 🔧 DEVELOPMENT ARCHITECTURE
+
+### Module Structure
+
+```
+src/main/java/com/fabric/
+├─ common/          # Shared utilities
+├─ core/            # Platform capabilities
+├─ production/      # Manufacturing
+├─ logistics/       # Supply chain
+├─ finance/         # Financial operations
+├─ human/           # Human resources
+├─ procurement/     # Purchasing
+├─ integration/     # External systems
+└─ insight/         # Analytics & AI
+```
+
+### Technology Stack
+
+- **Spring Boot 3.2** - Application framework
+- **Spring Modulith** - Module boundaries
+- **PostgreSQL 15** - Database
+- **Redis 7** - Caching
+- **Kafka 3** - Event streaming
+- **Docker** - Containerization
+- **Kubernetes** - Orchestration
+
+---
+
+## 🎯 SCALING STRATEGY
+
+### Horizontal Scaling
+
+- **Multi-Instance Deployment** - Multiple application instances
+- **Load Balancing** - Traffic distribution
+- **Database Scaling** - Read replicas for analytics
+- **Cache Clustering** - Redis cluster for high availability
+
+### Vertical Scaling
+
+- **JVM Tuning** - Memory and GC optimization
+- **Database Optimization** - Query performance tuning
+- **Connection Pooling** - Database connection management
+- **Caching Strategy** - Multi-level caching
+
+---
+
+## 🔄 EVOLUTION STRATEGY
+
+### Module Extraction
+
+- **Independent Modules** - Clear boundaries enable extraction
+- **API Facades** - Well-defined interfaces
+- **Event Contracts** - Stable communication protocols
+- **Database Separation** - Schema isolation
+
+### Future Microservices
+
+When needed, modules can be extracted to independent microservices:
+
+- **Insight Module** - Analytics and AI services
+- **Integration Module** - External system adapters
+- **Production Module** - Manufacturing operations
+- **Finance Module** - Financial operations
+
+---
+
+## ✅ ARCHITECTURE BENEFITS
+
+### Operational Benefits
+
+- **Simplified Deployment** - Single application deployment
+- **Reduced Complexity** - No service mesh or API gateway needed
+- **Lower Costs** - Minimal infrastructure overhead
+- **Easier Debugging** - Single process, single logs
+
+### Development Benefits
+
+- **Faster Development** - No service-to-service communication
+- **ACID Transactions** - Cross-module data consistency
+- **Shared Context** - Common security and tenant context
+- **Easier Testing** - Single application testing
+
+### Business Benefits
+
+- **Faster Time-to-Market** - Simplified development and deployment
+- **Lower Operational Costs** - Reduced infrastructure complexity
+- **Better Performance** - In-process communication
+- **Easier Maintenance** - Single codebase to maintain
+
+---
+
+**Architecture Version:** 2.0  
+**Last Updated:** 2025-01-27  
+**Maintained By:** Fabric Management Team
