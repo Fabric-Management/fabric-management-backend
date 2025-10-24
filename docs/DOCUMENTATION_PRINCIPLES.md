@@ -1,8 +1,11 @@
 # 📚 Documentation Principles
 
-**Last Updated:** October 10, 2025  
+**Version:** 2.0  
+**Last Updated:** 2025-01-27 (Modular Monolith Architecture Integration)  
 **Status:** ✅ MANDATORY - Apply to all documentation  
 **Purpose:** Clear rules for documentation structure and usage
+
+**🔗 Referans:** [FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md](FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md) - Modular Monolith architecture ve documentation standards
 
 ---
 

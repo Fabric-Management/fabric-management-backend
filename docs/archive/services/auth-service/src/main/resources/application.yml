@@ -1,0 +1,222 @@
+# =============================================================================
+# FABRIC MANAGEMENT SYSTEM - AUTH SERVICE CONFIGURATION
+# =============================================================================
+# Service-specific configuration for authentication and authorization
+
+# =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
+spring:
+  application:
+    name: auth-service
+  profiles:
+    active: local
+
+  # ===========================================================================
+  # DATABASE CONFIGURATION
+  # ===========================================================================
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:fabric_management}
+    username: ${POSTGRES_USER:fabric_user}
+    password: ${POSTGRES_PASSWORD:fabric_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: false
+    show-sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+
+  # ===========================================================================
+  # CACHE CONFIGURATION
+  # ===========================================================================
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_CONNECTION_TIMEOUT:2000ms}
+      connect-timeout: ${REDIS_COMMAND_TIMEOUT:3000ms}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: ${CACHE_TTL:300000}
+
+  # ===========================================================================
+  # KAFKA CONFIGURATION
+  # ===========================================================================
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${AUTH_SERVICE_KAFKA_GROUP_ID:auth-service-group}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# =============================================================================
+# KAFKA TOPICS CONFIGURATION
+# =============================================================================
+kafka:
+  topics:
+    security-events: ${KAFKA_TOPIC_SECURITY_EVENTS:security-events}
+    user-events: ${KAFKA_TOPIC_USER_EVENTS:user-events}
+    contact-events: ${KAFKA_TOPIC_CONTACT_EVENTS:contact-events}
+    company-events: ${KAFKA_TOPIC_COMPANY_EVENTS:company-events}
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: ${AUTH_SERVICE_PORT:8085}
+  servlet:
+    context-path: /api/v1/auth
+
+# =============================================================================
+# AUTH SERVICE SPECIFIC CONFIGURATION
+# =============================================================================
+auth:
+  jwt:
+    secret: ${JWT_SECRET:fabric-management-jwt-secret-key-2024}
+    expiration: ${JWT_EXPIRATION:86400000} # 24 hours
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
+
+  password:
+    min-length: ${AUTH_PASSWORD_MIN_LENGTH:8}
+    require-special-chars: ${AUTH_PASSWORD_REQUIRE_SPECIAL:true}
+    require-numbers: ${AUTH_PASSWORD_REQUIRE_NUMBERS:true}
+    require-uppercase: ${AUTH_PASSWORD_REQUIRE_UPPERCASE:true}
+    max-failed-attempts: ${AUTH_PASSWORD_MAX_FAILED_ATTEMPTS:5}
+
+  session:
+    timeout: ${AUTH_SESSION_TIMEOUT:1800} # 30 minutes
+    max-sessions: ${AUTH_MAX_SESSIONS:5}
+
+# =============================================================================
+# SERVICE COMMUNICATION CONFIGURATION
+# =============================================================================
+services:
+  user-service:
+    url: ${USER_SERVICE_URL:http://localhost:8082}
+  contact-service:
+    url: ${CONTACT_SERVICE_URL:http://localhost:8083}
+  company-service:
+    url: ${COMPANY_SERVICE_URL:http://localhost:8084}
+  api-gateway:
+    url: ${API_GATEWAY_URL:http://localhost:8080}
+
+# =============================================================================
+# FEIGN CLIENT CONFIGURATION
+# =============================================================================
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: ${FEIGN_CONNECT_TIMEOUT:5000}
+        read-timeout: ${FEIGN_READ_TIMEOUT:10000}
+        logger-level: basic
+      user-service:
+        connect-timeout: ${FEIGN_CONNECT_TIMEOUT:5000}
+        read-timeout: ${FEIGN_READ_TIMEOUT:10000}
+      contact-service:
+        connect-timeout: ${FEIGN_CONNECT_TIMEOUT:5000}
+        read-timeout: ${FEIGN_READ_TIMEOUT:10000}
+      company-service:
+        connect-timeout: ${FEIGN_CONNECT_TIMEOUT:5000}
+        read-timeout: ${FEIGN_READ_TIMEOUT:10000}
+
+# =============================================================================
+# RESILIENCE4J CONFIGURATION
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      user-service:
+        failure-rate-threshold: ${CB_FAILURE_RATE_THRESHOLD:50}
+        wait-duration-in-open-state: ${CB_WAIT_DURATION:30s}
+        sliding-window-size: ${CB_SLIDING_WINDOW_SIZE:100}
+      contact-service:
+        failure-rate-threshold: ${CB_FAILURE_RATE_THRESHOLD:50}
+        wait-duration-in-open-state: ${CB_WAIT_DURATION:30s}
+        sliding-window-size: ${CB_SLIDING_WINDOW_SIZE:100}
+      company-service:
+        failure-rate-threshold: ${CB_FAILURE_RATE_THRESHOLD:50}
+        wait-duration-in-open-state: ${CB_WAIT_DURATION:30s}
+        sliding-window-size: ${CB_SLIDING_WINDOW_SIZE:100}
+
+  retry:
+    instances:
+      user-service:
+        max-attempts: ${RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${RETRY_WAIT_DURATION:1s}
+        exponential-backoff-multiplier: ${RETRY_BACKOFF_MULTIPLIER:2}
+      contact-service:
+        max-attempts: ${RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${RETRY_WAIT_DURATION:1s}
+        exponential-backoff-multiplier: ${RETRY_BACKOFF_MULTIPLIER:2}
+      company-service:
+        max-attempts: ${RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${RETRY_WAIT_DURATION:1s}
+        exponential-backoff-multiplier: ${RETRY_BACKOFF_MULTIPLIER:2}
+
+  timelimiter:
+    instances:
+      user-service:
+        timeout-duration: ${TIMEOUT_DURATION:15s}
+      contact-service:
+        timeout-duration: ${TIMEOUT_DURATION:15s}
+      company-service:
+        timeout-duration: ${TIMEOUT_DURATION:15s}
+
+# =============================================================================
+# MANAGEMENT & MONITORING
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  level:
+    com.fabricmanagement.auth: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] - %msg%n"
+  file:
+    name: logs/auth-service.log

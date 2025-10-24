@@ -1,697 +1,485 @@
-# 🧪 TESTING PRINCIPLES (Global)
+# 🧪 TESTING PRINCIPLES - Fabric Management System
 
-Last Updated: 2025-10-20  
-Status: ✅ MANDATORY - Apply to all services  
-Purpose: Define global testing policy, targets, practices, and documentation standards.
+**Version:** 2.0  
+**Last Updated:** 2025-01-27 (Modular Monolith Architecture Integration)  
+**Status:** 🔴 MANDATORY - All testing must follow these principles
+
+**🔗 Referans:** [FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md](FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md) - Modular Monolith architecture ve testing standards
 
 ---
 
-## 📖 PHILOSOPHY
+## 🎯 Core Testing Philosophy
 
-```
+### "Güçlü Test = Güçlü Kod"
+
+Strong tests enable strong code. Every line of production code must be backed by meaningful tests that verify real behavior, not just implementation details.
+
+### Test Pyramid Strategy
+
+- **Unit Tests** - 70% - Business logic coverage
+- **Integration Tests** - 20% - Database and external calls
+- **End-to-End Tests** - 10% - Complete user journeys
+
+---
+
+## 🧭 TEST PRENSİPLERİ – GERÇEK BİR YAZILIMCI İÇİN REHBER
+
+1️⃣ Testin Amacı: Kodun Gerçek Davranışını Doğrulamak
+
+Test, kodun “çalışıyor görünmesi” için değil, doğru şekilde çalıştığını kanıtlamak için yazılır.
+Bir test “başarılı” ise, bu sadece true döndürdüğü için değil, uygulamanın beklenen iş mantığını sağladığı için anlamlıdır.
+
+🔹 “Bir test kodu korur, bir assert satırı değil.”
+
+2️⃣ Test, “Ne yaptığını” değil, “Nasıl davrandığını” ölçmelidir
+
+Testler kodun iç yapısına değil, dıştan görülen davranışına odaklanmalıdır.
+Bu sayede kodun içi değişse bile, davranış aynı kaldıkça test geçerli olur.
+
+🔹 İyi testler, kodun nasıl yazıldığını değil, ne yaptığını umursar.
+
+3️⃣ Testler “geçsin” diye değil, gerçeği ortaya çıkarsın diye yazılır
+
+Testin amacı “yeşil bar görmek” değildir.
+Amacı, “kırmızı barla gerçeği öğrenmek”tir.
+Bir test başarısız olduğunda, o bir hata değil, bilgilendirici bir sinyaldir.
+
+🔹 Testler geçsin diye kodu değiştirmek hiledir.
+🔹 Test geçmiyorsa, gerçeklik kodda bir yerde kırılmıştır — orayı bul.
+
+4️⃣ Test, doğru türü doğrulamalıdır
+
+Eğer bir kod Enum döndürüyorsa, testin de Enum beklemesi gerekir.
+Eğer bir kod boolean döndürüyorsa, testte true/false kontrol edilir.
+Testler veri tipine sadık kalmalıdır; aksi halde zayıf testler oluşur.
+
+🔹 “Tip güvenliği”, sadece kodda değil, testte de korunmalıdır.
+🔹 assertEquals(OutboxEventStatus.NEW, status) → güçlü
+🔸 assertEquals("NEW", status) → kırılgan
+
+5️⃣ Testler bakım yükü değil, güven unsuru olmalıdır
+
+İyi testler, geliştiriciye güven verir;
+kötü testler ise her küçük değişiklikte build’i kırar.
+Bu yüzden testin amacı, geliştiriciyi cezalandırmak değil, desteklemek olmalıdır.
+
+🔹 “Kırılgan test” → kodu geliştirmekten korkarsın.
+🔹 “Güvenilir test” → refactor yaparken bile rahat olursun.
+
+6️⃣ Testler, geleceğe yatırım gibidir
+
+Her test, bugünün doğruluğunu değil, yarının güvenliğini sağlar.
+Kod değişir, insanlar değişir, ama testler gerçeği korur.
+
+🔹 “Bugün yazdığın iyi bir test, yarın seni kurtarır.”
+
+7️⃣ Testlerin dili açık ve niyet odaklı olmalıdır
+
+Test isimleri kod kadar önemlidir.
+Bir testin adını okuyan kişi, neden yazıldığını hemen anlamalıdır.
+
+Örnek:
+
+// Zayıf
+testNewStatusIsSetCorrectly();
+
+// Güçlü
+should_SetOutboxEventStatusToNEW_WhenUserRegisters();
+
+🔹 Testin ismi, testin amacını anlatmalıdır.
+🔹 “Ne test ediliyor?” ve “hangi durumda?” sorularını yanıtlamalıdır.
+
+8️⃣ Gerçek test, gerçeği söyler
+
+Test geçsin diye “trim” eklemek, string manipülasyonu yapmak veya türü zorla dönüştürmek bir çözümmüş gibi görünür ama gerçeği gizler.
+Bu, tıpkı ateşi düşürmek için termometreyi buzdolabına koymak gibidir.
+
+🔹 Testi düzeltme, nedeni düzelt.
+
+9️⃣ Testler birbirinden bağımsız olmalıdır
+
+Bir testin sonucu, başka bir testin çalışmasına bağlı olmamalıdır.
+Her test, kendi senaryosunu başlatıp kendi izini temizlemelidir.
+
+🔹 “Bir testin sonucu diğerini etkilememeli.”
+
+🔟 Testler kodun kadar değerlidir
+
+Kimi zaman test yazmak, kod yazmaktan daha öğreticidir.
+Çünkü test yazarken, kodu nasıl kullanacağını düşünürsün.
+Bu da seni sadece yazılımcı değil, tasarımcı yapar.
+
+🔹 “Test, yazılımın vicdanıdır.”
+🔹 “İyi test, kötü kodu affetmez.”
+
+💬 Sonuç
+
+✅ Testin amacı: Gerçeği doğrulamak.
+❌ Testin amacı: Raporu yeşile boyamak değil.
+
+Eğer testin amacı buysa,
+hiçbir geliştirici “hileli” çözüm üretmeye gerek duymaz.
+Çünkü artık mesele “geçmek” değil, doğruluk, güven ve sürdürülebilirlik olur.
+
+🧪 TESTING PRINCIPLES (Global)
+
+Last Updated: 2025-10-22
+Status: ✅ MANDATORY — Applies to all microservices
+Purpose: Define global testing principles, strategy, tooling, performance validation, and enforcement rules for all services.
+
+📖 PHILOSOPHY
 ╔══════════════════════════════════════════════════════════════════╗
-║                                                                  ║
-║  "If you wouldn't stake your bank account on this code,          ║
-║   you haven't tested it enough."                                 ║
-║                                                                  ║
-║  - Google SRE Handbook                                           ║
-║                                                                  ║
+║ ║
+║ "If you wouldn’t stake your bank account on this code, ║
+║ you haven’t tested it enough." ║
+║ ║
+║ — Google SRE Handbook ║
+║ ║
 ╚══════════════════════════════════════════════════════════════════╝
-```
 
-**Core Principles:**
+Core Principles
 
-- ✅ Test FIRST (TDD - write tests before implementation)
-- ✅ Fast feedback (unit tests < 100ms each)
-- ✅ Real infrastructure (Testcontainers for integration)
-- ✅ Production parity (test like production)
-- ✅ Flaky test = Zero tolerance
-- ✅ Coverage ≥ 80% (enforced by JaCoCo in root pom.xml)
+✅ ARCHITECTURE FIRST — TDD FOR BUSINESS LOGIC — CONTRACTS DEFINE BOUNDARIES
 
----
+✅ Test FIRST (TDD – write tests before implementation)
 
-## 🎯 QUALITY BAR
+✅ Fast feedback (unit tests < 100ms each)
 
-- **Minimum coverage:** ≥ 80% (JaCoCo enforced at BUNDLE level in root pom.xml)
-- **Layer guidance:**
-  - Domain (Validation/Value Objects): 100%
-  - Service (Business Logic): ≥ 95%
-  - Mapper (DTO ↔ Entity): ≥ 90%
-  - Controller (API Contracts): ≥ 85%
-  - Repository (DB Integration): ≥ 80%
-- **Zero flaky tests:** Tests must be deterministic and isolated
-- **Performance targets:**
-  - Unit tests: < 100ms each, total suite < 10s
-  - Integration tests: < 30s total
-  - E2E tests: < 2 minutes total
+✅ Real infrastructure (Testcontainers for integration)
 
----
+✅ Production parity (test like production)
 
-## △ TEST PYRAMID (Target Mix)
+✅ Flaky test = Zero tolerance
 
-```
-        E2E Tests   (~5%)  → Full workflows, real infra
-       ───────────────────
-      Integration (~20%)  → Real DB/Kafka via Testcontainers
-     ─────────────────────
-    Unit Tests    (~75%)  → Pure logic, fast, isolated
-```
+✅ Coverage ≥ 80% (JaCoCo enforced globally)
 
----
+✅ Performance testing mandatory before production
 
-## ⚙️ TOOLING & FRAMEWORKS
+✅ Readability > Cleverness
 
-- **JUnit 5:** Test framework
-- **AssertJ:** Fluent assertions
-- **Mockito:** Unit test doubles
-- **Testcontainers:** Real infra (PostgreSQL, Kafka, Redis)
-- **REST Assured:** API tests (full HTTP stack)
-- **JaCoCo:** Coverage enforcement (configured in root pom.xml)
-- **@SpringBootTest:** Full context integration tests
-- **@DataJpaTest:** Repository layer tests
+✅ Consistency > Creativity
 
----
+🎯 QUALITY BAR
 
-## 🏗️ STANDARD TEST STRUCTURE
+Minimum coverage: ≥ 80% (enforced globally via JaCoCo)
 
-All services MUST follow this standardized structure:
+Layer guidance:
 
-```
-{service}/src/test/
-├── java/com/fabricmanagement/{service}/
-│   ├── unit/                          # Unit Tests (~75%)
-│   │   ├── api/
-│   │   │   └── {Service}ControllerTest.java
-│   │   ├── service/
-│   │   │   └── {Service}ServiceTest.java
-│   │   ├── mapper/
-│   │   │   ├── {Service}MapperTest.java
-│   │   │   └── {Service}EventMapperTest.java
-│   │   ├── domain/
-│   │   │   └── {Service}ValidationTest.java
-│   │   └── messaging/
-│   │       └── {Service}EventPublisherTest.java
-│   │
-│   ├── integration/                   # Integration Tests (~20%)
-│   │   ├── repository/
-│   │   │   └── {Service}RepositoryIT.java
-│   │   ├── api/
-│   │   │   └── {Service}ControllerIT.java
-│   │   ├── messaging/
-│   │   │   └── {Service}EventPublisherIT.java
-│   │   └── cache/
-│   │       └── {Service}CacheIT.java
-│   │
-│   ├── e2e/                           # E2E Tests (~5%)
-│   │   └── {Service}LifecycleE2ETest.java
-│   │
-│   ├── fixtures/                      # Test Data Builders
-│   │   └── {Service}Fixtures.java
-│   │
-│   └── support/                       # Test Utilities
-│       ├── TestSecurityHelper.java
-│       └── TestDataGenerator.java
-│
+Domain: 100%
+
+Service (Business logic): ≥ 95%
+
+Mapper: ≥ 90%
+
+Controller (API contracts): ≥ 85%
+
+Repository (DB integration): ≥ 80%
+
+Zero flaky tests: 100% deterministic, isolated
+
+Performance targets:
+
+Unit suite < 10 s total
+
+Integration suite < 30 s total
+
+E2E suite < 2 minutes total
+
+🟡 Performance Testing: Optional during development, mandatory pre-production.
+Validate latency (p95/p99), throughput, and error rate using Gatling or k6 in staging.
+
+🧭 TEST STRATEGY FOR MICROSERVICES
+Stage Focus Principle Test Type
+1️⃣ Define architecture & service boundaries Architecture First —
+2️⃣ Define API/Message contracts Contracts Define Boundaries Contract Tests
+3️⃣ Implement business logic TDD for Business Logic Unit Tests
+4️⃣ Validate inter-service communication Integration Tests
+5️⃣ Validate full workflows & orchestration E2E Tests
+
+Rule: Define → Test → Implement → Integrate → Validate.
+
+△ TEST PYRAMID (Target Mix)
+E2E Tests (~5%) → Full workflows, real infra
+────────────────────
+Integration (~20%) → Real DB/Kafka via Testcontainers
+──────────────────────
+Unit Tests (~75%) → Pure logic, fast, isolated
+
+⚙️ TOOLING & FRAMEWORKS
+
+JUnit 5 — Test framework
+
+AssertJ — Fluent assertions
+
+Mockito — Unit test doubles
+
+Testcontainers — Real infra (PostgreSQL, Kafka, Redis)
+
+REST Assured — Full HTTP API tests
+
+JaCoCo — Coverage enforcement (global root configuration)
+
+@SpringBootTest — Full context integration tests
+
+@DataJpaTest — Repository-layer tests
+
+🏗️ STANDARD TEST STRUCTURE
+src/test/
+├── java/.../
+│ ├── unit/ # (~75%) business logic, mapper, validator tests
+│ ├── integration/ # (~20%) repository, messaging, API tests
+│ ├── e2e/ # (~5%) full workflow tests
+│ ├── fixtures/ # Reusable test data builders
+│ └── support/ # Test utilities, helpers
 └── resources/
-    └── application-test.yml (optional, prefer dynamic properties)
-```
+└── application-test.yml
 
-**Naming Conventions:**
+Naming Conventions
 
-- Unit tests: `*Test.java` (e.g., `FiberServiceTest.java`)
-- Integration tests: `*IT.java` (e.g., `FiberRepositoryIT.java`)
-- E2E tests: `*E2ETest.java` (e.g., `FiberLifecycleE2ETest.java`)
-- Fixtures: `*Fixtures.java` (e.g., `FiberFixtures.java`)
+Unit: \*Test.java
 
-**Test Method Naming:**
+Integration: \*IT.java
 
-```
-Format: should{ExpectedBehavior}_when{Condition}
+E2E: \*E2ETest.java
 
-✅ Good Examples:
-- shouldCreatePureFiber_whenValidRequest()
-- shouldThrowException_whenCompositionTotalNot100()
-- shouldReturnCachedFiber_whenCalledSecondTime()
-- shouldPublishEvent_whenFiberCreated()
+Fixtures: \*Fixtures.java
 
-❌ Bad Examples:
-- test1()
-- testCreateFiber()
-- fiberCreationTest()
-```
+Method Naming
 
----
+should{ExpectedBehavior}\_when{Condition}
 
-## ✅ PRACTICES (Do's)
+✅ Example: shouldReturnCachedResult_whenCalledTwice()
+❌ Avoid: test1(), myTest()
 
-### Test-Driven Development (TDD)
+✅ PRACTICES (Do’s)
+TDD — Red → Green → Refactor
 
-1. **Write test FIRST** (before implementation)
-2. **Test fails initially** (red phase)
-3. **Write minimal code** to pass (green phase)
-4. **Refactor** (clean up while keeping tests green)
-5. **Repeat** for next feature
+Write failing test (red)
 
-### AAA Pattern (Arrange-Act-Assert)
+Write minimal code to pass (green)
 
-```java
+Refactor for clarity
+
+Keep tests fast and readable
+
+AAA Pattern (Arrange–Act–Assert)
 @Test
-@DisplayName("Should create pure fiber when valid request provided")
-void shouldCreatePureFiber_whenValidRequest() {
-    // Given (Arrange) - Set up test data
-    var request = createPureFiberRequest("CO", "Cotton");
-    when(repository.existsByCode("CO")).thenReturn(false);
+@DisplayName("Should calculate total cost when valid items provided")
+void shouldCalculateTotalCost_whenValidItems() {
+// Arrange
+var items = List.of(new Item("Cotton", 10, 3.0));
 
-    // When (Act) - Execute the behavior under test
-    UUID fiberId = service.createFiber(request);
+    // Act
+    double total = service.calculateTotal(items);
 
-    // Then (Assert) - Verify expected outcome
-    assertThat(fiberId).isNotNull();
-    verify(repository).save(any(Fiber.class));
-}
-```
+    // Assert
+    assertThat(total).isEqualTo(30.0);
 
-### Test Data Builders (Fixtures)
-
-Create reusable, readable test data with sensible defaults:
-
-```java
-// ✅ Good - Test Data Builder Pattern
-public class FiberFixtures {
-    public static Fiber createPureFiber(String code, String name) {
-        return Fiber.builder()
-                .tenantId(GLOBAL_TENANT_ID)
-                .code(code)
-                .name(name)
-                .category(FiberCategory.NATURAL)
-                .status(FiberStatus.ACTIVE)
-                // DON'T set .id() - Hibernate manages it!
-                .build();
-    }
 }
 
-// Usage in tests
-var fiber = createPureFiber("CO", "Cotton");
-```
-
-### Key Practices
-
-- ✅ **Keep unit tests fast:** < 100ms each; full suite < 10s
-- ✅ **Use fixtures/builders:** Readable, maintainable test data
-- ✅ **Test happy + edge cases:** Both success and failure scenarios
-- ✅ **Hermetic tests:** No shared state, no order dependencies
-- ✅ **Real infra for integration:** Testcontainers (PostgreSQL, Kafka)
-- ✅ **Verify API contracts:** Status codes, headers, payload structure
-- ✅ **Use @DisplayName:** Clear test documentation
-- ✅ **Parallel execution safe:** Tests can run concurrently
+Test Data Builders (Fixtures)
 
----
+Keep tests declarative and independent of persistence behavior.
+Never set fields managed by frameworks (id, version, timestamps).
 
-## 🚫 ANTI-PATTERNS (Don'ts)
+🚫 ANTI-PATTERNS (Don’ts)
 
-### Critical: Hibernate-Managed Fields
+❌ Manually set Hibernate-managed fields (id, version, audit fields`)
 
-**❌ NEVER manually set fields that Hibernate manages!**
+❌ Thread.sleep() — use awaitility instead
 
-```java
-// ❌ WRONG - Manual UUID causes conflicts
-public Fiber fromCreateRequest(CreateFiberRequest request) {
-    return Fiber.builder()
-            .id(UUID.randomUUID())  // ← BUG! Hibernate manages this
-            .version(0L)            // ← BUG! Hibernate manages this
-            .createdAt(LocalDateTime.now())  // ← BUG! @CreatedDate manages this
-            .build();
-}
+❌ External dependencies — always use Testcontainers
 
-// ✅ CORRECT - Let Hibernate manage lifecycle fields
-public Fiber fromCreateRequest(CreateFiberRequest request) {
-    return Fiber.builder()
-            .tenantId(tenantId)
-            .code(request.getCode())
-            .name(request.getName())
-            .build();
-}
-```
+❌ Random test data — use deterministic fixtures
 
-**Why It's Critical:**
+❌ Shared state between tests
 
-- `@GeneratedValue(strategy = UUID)` → Hibernate controls ID generation
-- `@Version` → Optimistic locking, Hibernate increments
-- `@CreatedDate` / `@LastModifiedDate` → Spring Data auditing
-- Manual setting causes: duplicate keys, version conflicts, audit failures
+❌ Test order dependencies
 
-**Prevention:**
+❌ Over-mocking entire systems
 
-1. ✅ **Integration tests:** Assert `entity.getId()` is null before persist
-2. ✅ **Test fixtures:** Never set `.id()`, `.version()`, audit fields
-3. ✅ **Code review:** Flag manual UUID/version setting
+❌ Duplicate tests across layers
 
-### General Anti-Patterns
+🧩 CI/CD ENFORCEMENT
+Build Gates
 
-- ❌ **No Thread.sleep:** Use awaitility or deterministic triggers
-- ❌ **No external services:** Use Testcontainers for isolation
-- ❌ **No flaky timing:** Tests must be 100% deterministic
-- ❌ **No over-mocking:** Mock collaborators, not the system under test
-- ❌ **No duplicate tests:** Test each concern at the right layer
-- ❌ **No random data:** Use fixtures with predictable values
-- ❌ **No shared state:** Each test fully isolated
-- ❌ **No order dependencies:** Tests run in any order
+✅ mvn clean verify must pass for all merges
 
----
+✅ Coverage ≥ 80% (BUNDLE level)
 
-## 🗂️ TEST DOCUMENTATION STANDARD (Per Service)
+✅ Zero test failures, zero flaky tests
 
-Each service MUST maintain testing docs under:
+✅ Performance checks mandatory in staging
 
-```
-docs/services/{service}/testing/
-├── TEST_ARCHITECTURE.md     # Strategy, structure, examples
-├── TEST_SUMMARY.md          # Coverage by layer, test count
-├── TEST_RESULTS.md          # Latest execution results
-└── TEST_ANTI_PATTERNS.md    # Service-specific gotchas
-```
-
-**Documentation Contents:**
-
-- **TEST_ARCHITECTURE.md:**
-
-  - Test philosophy and principles
-  - Test pyramid (unit/integration/e2e breakdown)
-  - Test structure and organization
-  - Example test code for each layer
-  - Fixture/builder patterns
-  - Running tests locally and in CI
-
-- **TEST_SUMMARY.md:**
-
-  - Test statistics (total count, by type)
-  - Coverage by layer (actual percentages)
-  - What's tested (scenarios by layer)
-  - Runtime performance metrics
-
-- **TEST_RESULTS.md:**
-
-  - Latest `mvn test` output
-  - JaCoCo coverage report summary
-  - Build status and CI pipeline links
-
-- **TEST_ANTI_PATTERNS.md:**
-  - Service-specific bugs prevented
-  - Lessons learned
-  - Prevention strategies
-
-**Service README:**
-
-Service root `services/{service}/README.md` should:
-
-- Link to testing docs (no duplication)
-- Show quick test commands
-- Reference canonical examples
-
-**Canonical Example:**
-
-See `docs/services/fabric-fiber-service/testing/` for complete implementation.
-
----
-
-## 📝 LAYER-SPECIFIC TESTING PATTERNS
-
-### Unit Tests (75% of suite)
-
-**Service Layer Test Example:**
-
-```java
-@ExtendWith(MockitoExtension.class)
-@DisplayName("FiberService Unit Tests")
-class FiberServiceTest {
-
-    @Mock private FiberRepository repository;
-    @Mock private FiberEventPublisher eventPublisher;
-    @InjectMocks private FiberService service;
-
-    @Test
-    @DisplayName("Should create fiber when valid request")
-    void shouldCreateFiber_whenValidRequest() {
-        // Given
-        var request = createPureFiberRequest("CO", "Cotton");
-        when(repository.existsByCode("CO")).thenReturn(false);
-        when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        // When
-        UUID fiberId = service.createFiber(request);
-
-        // Then
-        assertThat(fiberId).isNotNull();
-        verify(repository).save(any(Fiber.class));
-        verify(eventPublisher).publishFiberDefined(any());
-    }
-}
-```
-
-**Mapper Layer Test Example:**
-
-```java
-@ExtendWith(MockitoExtension.class)
-@DisplayName("FiberMapper Unit Tests")
-class FiberMapperTest {
-
-    @InjectMocks private FiberMapperImpl mapper;
-
-    @Test
-    @DisplayName("Should map request to entity correctly")
-    void shouldMapRequestToEntity() {
-        // Given
-        var request = createPureFiberRequest("CO", "Cotton");
-
-        // When
-        Fiber fiber = mapper.fromCreateRequest(request);
-
-        // Then
-        assertThat(fiber.getCode()).isEqualTo("CO");
-        assertThat(fiber.getName()).isEqualTo("Cotton");
-        assertThat(fiber.getId()).isNull(); // Hibernate manages!
-    }
-}
-```
-
-### Integration Tests (20% of suite)
-
-**Repository Integration Test with Testcontainers:**
-
-```java
-@DataJpaTest
-@Testcontainers
-@AutoConfigureTestDatabase(replace = Replace.NONE)
-@DisplayName("FiberRepository Integration Tests")
-class FiberRepositoryIT {
-
-    @Container
-    static PostgreSQLContainer<?> postgres =
-        new PostgreSQLContainer<>("postgres:16-alpine");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }
-
-    @Autowired private FiberRepository repository;
-
-    @Test
-    @DisplayName("Should auto-generate UUID when saving")
-    void shouldAutoGenerateUUID() {
-        // Given
-        Fiber fiber = createPureFiber("CO", "Cotton");
-        assertThat(fiber.getId()).isNull(); // Pre-persist check
-
-        // When
-        Fiber saved = repository.save(fiber);
-
-        // Then
-        assertThat(saved.getId()).isNotNull();
-        assertThat(saved.getId()).isInstanceOf(UUID.class);
-    }
-}
-```
-
-### E2E Tests (5% of suite)
-
-**Full Workflow Test with REST Assured:**
-
-```java
-@SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
-@DisplayName("Fiber Service E2E Tests")
-class FiberLifecycleE2ETest {
-
-    @Container static PostgreSQLContainer<?> postgres = ...;
-    @Container static KafkaContainer kafka = ...;
-
-    @LocalServerPort private int port;
-
-    @BeforeEach
-    void setUp() {
-        RestAssured.port = port;
-        RestAssured.basePath = "/api/v1/fibers";
-    }
-
-    @Test
-    @DisplayName("Complete lifecycle: Create → Read → Update → Delete")
-    void shouldCompleteFullLifecycle() {
-        // Create
-        String fiberId = given()
-            .contentType(JSON)
-            .body(createFiberRequest())
-        .when()
-            .post()
-        .then()
-            .statusCode(201)
-            .extract().path("data");
-
-        // Read
-        given()
-            .pathParam("id", fiberId)
-        .when()
-            .get("/{id}")
-        .then()
-            .statusCode(200)
-            .body("data.code", equalTo("CO"));
-    }
-}
-```
-
----
-
-## 🧩 CI/CD ENFORCEMENT
-
-### Build Gates
-
-- ✅ **`mvn clean verify`** must pass for PR merge
-- ✅ **JaCoCo coverage ≥ 80%** enforced at BUNDLE level
-- ✅ **Zero test failures** policy
-- ✅ **Zero flaky tests** tolerance
-
-### JaCoCo Configuration
-
-**Root pom.xml defines global coverage enforcement:**
-
-```xml
-<!-- pom.xml - Root Project -->
-<plugin>
-    <groupId>org.jacoco</groupId>
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <version>${jacoco-maven-plugin.version}</version>
-    <executions>
-        <execution>
-            <goals>
-                <goal>prepare-agent</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-                <goal>report</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>jacoco-check</id>
-            <goals>
-                <goal>check</goal>
-            </goals>
-            <configuration>
-                <rules>
-                    <rule>
-                        <element>BUNDLE</element>
-                        <limits>
-                            <limit>
-                                <counter>LINE</counter>
-                                <value>COVEREDRATIO</value>
-                                <minimum>0.80</minimum>
-                            </limit>
-                        </limits>
-                    </rule>
-                </rules>
-            </configuration>
-        </execution>
-    </executions>
-</plugin>
-```
-
-**Child services MUST activate the plugin (config auto-inherited):**
-
-```xml
-<!-- services/{service}/pom.xml -->
-<build>
-    <plugins>
-        <!-- JaCoCo plugin - inherits config from parent -->
-        <plugin>
-            <groupId>org.jacoco</groupId>
-            <artifactId>jacoco-maven-plugin</artifactId>
-            <!-- NO version, NO executions - inherited from root pom.xml -->
-        </plugin>
-    </plugins>
-</build>
-```
-
-**Why?**
-
-- Root `pom.xml` uses `<pluginManagement>` (defines config, PASSIVE)
-- Child must use `<plugins>` (activates plugin, ACTIVE)
-- Config auto-inherited from parent (ZERO duplication!)
-
-**Applies to:** fiber-service, user-service, company-service, contact-service, notification-service
-
-### CI Pipeline Example
-
-```yaml
-# GitHub Actions / GitLab CI
+Pipeline Example
 test:
-  stage: test
-  script:
-    - mvn clean verify
-    - mvn jacoco:report
-  coverage: "/Total.*?([0-9]{1,3})%/"
-  artifacts:
-    reports:
-      junit: target/surefire-reports/TEST-*.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: target/site/jacoco/jacoco.xml
-  rules:
-    - if: coverage < 80%
-      when: fail
-```
+stage: test
+script: - mvn clean verify - mvn jacoco:report
+coverage: "/Total.\*?([0-9]{1,3})%/"
+rules: - if: coverage < 80%
+when: fail
 
-### Test Commands
+🧪 PERFORMANCE TESTING (k6)
+Purpose
 
-```bash
-# Run all tests with coverage + coverage check (RECOMMENDED)
-mvn clean verify
+Validate system stability and responsiveness under realistic load.
 
-# Run specific service tests with coverage
-mvn clean verify -pl services/fiber-service -am
+Detect performance bottlenecks before production.
 
-# View coverage report (after mvn verify)
-open services/fiber-service/target/site/jacoco/index.html
+Measure latency (p95/p99), throughput (req/s), and error rate.
 
-# Run only tests (no coverage report generation)
-mvn clean test
+When
 
-# Run only unit tests (fast)
-mvn test -Dtest=**/*Test
+Optional during development
 
-# Run only integration tests
-mvn test -Dtest=**/*IT
+Mandatory in staging/pre-production
 
-# Run only E2E tests
-mvn test -Dtest=**/*E2ETest
+Structure
+tests/performance/
+├── load_test.js
+└── reports/
 
-# Skip tests (emergency only!)
-mvn clean install -DskipTests
-```
+Example k6 Script
+// tests/performance/load_test.js
+import http from 'k6/http';
+import { sleep, check } from 'k6';
 
-**Important:**
+export const options = {
+vus: 20, // concurrent users
+duration: '30s', // total run time
+thresholds: {
+http_req_duration: ['p(95)<500'], // 95% < 500ms
+http_req_failed: ['rate<0.01'], // <1% errors allowed
+},
+};
 
-- Use `mvn verify` for coverage reports (runs `test` + `jacoco:report` + `jacoco:check`)
-- Use `mvn test` for fast test-only runs (no coverage report)
-- Coverage report generated at: `target/site/jacoco/index.html`
+export default function () {
+const res = http.get('http://localhost:8080/api/v1/health');
+check(res, { 'status is 200': (r) => r.status === 200 });
+sleep(1);
+}
 
----
+Run Command
+k6 run tests/performance/load_test.js
 
-## 📋 PR CHECKLIST (Testing)
+Tip: Store k6 results under tests/performance/reports/ and review before release.
+
+📋 PR CHECKLIST
 
 Before submitting a PR, ensure:
 
-- [ ] **Tests written/updated** for the change
-- [ ] **All impacted layers tested** (controller, service, mapper, repository)
-- [ ] **Test naming follows convention:** `should{Behavior}_when{Condition}`
-- [ ] **Unit tests are fast:** < 100ms each
-- [ ] **Integration tests use Testcontainers** (real infra)
-- [ ] **E2E tests verify workflows** (if applicable)
-- [ ] **API contracts verified** (status codes, headers, payload)
-- [ ] **Coverage ≥ 80%** (enforced by JaCoCo)
-- [ ] **Layer targets met:** Service 95%, Mapper 90%, Controller 85%
-- [ ] **No flaky tests:** All tests deterministic
-- [ ] **No Hibernate anti-patterns:** Never set `.id()`, `.version()`, audit fields
-- [ ] **Test fixtures updated** (if domain models changed)
-- [ ] **Test docs updated** under `docs/services/{service}/testing/`
-- [ ] **`mvn clean verify` passes** locally
+Architecture and boundaries defined
 
----
+Tests written or updated for new behavior
 
-## 🎯 SUCCESS CRITERIA
+Test names follow convention
 
-```
+All affected layers covered
+
+Coverage ≥ 80%
+
+Unit tests < 100 ms each
+
+Integration uses Testcontainers
+
+E2E covers main workflows
+
+No flaky or order-dependent tests
+
+No Hibernate-managed fields set manually
+
+Test fixtures and docs updated
+
+Performance testing (staging) validated if applicable
+
+mvn clean verify passes locally
+
+🧾 TEST DOCUMENTATION STANDARD
+
+Each service must maintain:
+
+docs/testing/
+├── TEST_ARCHITECTURE.md # Strategy, structure, patterns
+├── TEST_SUMMARY.md # Coverage, test count
+├── TEST_RESULTS.md # Latest results
+└── TEST_ANTI_PATTERNS.md # Service-specific notes
+
+🎯 SUCCESS CRITERIA
 ╔══════════════════════════════════════════════════════════════════╗
-║                                                                  ║
-║  ✅ ALL TESTS PASSING (0 failures)                              ║
-║  ✅ COVERAGE ≥ 80% (enforced at BUNDLE level)                   ║
-║  ✅ NO FLAKY TESTS (100% deterministic)                         ║
-║  ✅ FAST EXECUTION (unit < 10s, integration < 30s)              ║
-║  ✅ PRODUCTION PARITY (Testcontainers for real infra)           ║
-║  ✅ DOCUMENTED (Test docs updated)                              ║
-║                                                                  ║
-║  If ANY of these fail → BUILD FAILS                             ║
-║                                                                  ║
+║ ✅ All tests passing (0 failures) ║
+║ ✅ Coverage ≥ 80% (enforced globally) ║
+║ ✅ No flaky tests (100% deterministic) ║
+║ ✅ Fast execution (unit < 10 s, integration < 30 s) ║
+║ ✅ Production parity via Testcontainers ║
+║ ✅ Performance validated pre-production ║
+║ ✅ Documentation up to date ║
 ╚══════════════════════════════════════════════════════════════════╝
-```
 
----
+🧪 TEST COMMANDS (Universal)
 
-## 🔗 REFERENCES
+# Run all tests with coverage + validation
 
-### Documentation
+mvn clean verify
 
-- **Architecture Principles:** `docs/ARCHITECTURE.md`
-- **Documentation Standards:** `docs/DOCUMENTATION_PRINCIPLES.md`
-- **Developer Protocol:** `docs/DEVELOPER_PROTOCOL.md`
+# Run unit tests only
 
-### Canonical Test Implementation
+mvn test -Dtest=\**/*Test
 
-- **Fiber Service Tests:** `docs/services/fabric-fiber-service/testing/`
-  - `TEST_ARCHITECTURE.md` - Complete test strategy & examples
-  - `TEST_SUMMARY.md` - Coverage by layer, test scenarios
-  - `TEST_ANTI_PATTERNS.md` - Lessons learned, bug prevention
+# Run integration tests
 
-### Code Examples
+mvn test -Dtest=\**/*IT
 
-- **Unit Tests:** `services/fiber-service/src/test/java/.../unit/`
-- **Integration Tests:** `services/fiber-service/src/test/java/.../integration/`
-- **E2E Tests:** `services/fiber-service/src/test/java/.../e2e/`
-- **Test Fixtures:** `services/fiber-service/src/test/java/.../fixtures/`
+# Run end-to-end tests
 
-### Configuration
+mvn test -Dtest=\**/*E2ETest
 
-- **Root JaCoCo Config:** `pom.xml` (global 80% enforcement)
-- **Testcontainers:** All integration tests use real PostgreSQL, Kafka
-- **CI Pipeline:** `.github/workflows/test.yml` (when implemented)
+# Run performance tests (manual)
 
----
+k6 run tests/performance/load_test.js
 
-## 🏆 QUALITY STANDARDS
+# View coverage report
 
-**Google/Amazon/Netflix Enterprise-Level Testing:**
+open target/site/jacoco/index.html
 
-- ✅ **TDD:** Test-Driven Development (write tests first)
-- ✅ **AAA Pattern:** Arrange-Act-Assert (Given-When-Then)
-- ✅ **Test Pyramid:** 75% unit, 20% integration, 5% E2E
-- ✅ **Real Infrastructure:** Testcontainers (production parity)
-- ✅ **Fast Feedback:** Unit suite < 10s, full suite < 2 minutes
-- ✅ **Zero Flakiness:** 100% deterministic, isolated tests
-- ✅ **AssertJ:** Fluent, readable assertions
-- ✅ **Coverage Enforcement:** JaCoCo at BUNDLE level (80% minimum)
+# Skip tests (emergency use only)
 
-**Quality Bar:**
+mvn clean install -DskipTests
 
-> "Would you trust this code with your bank account?"
->
-> If the answer is not a confident YES, keep testing!
+🔗 REFERENCES
 
----
+Architecture Principles: docs/ARCHITECTURE.md
 
-**Enforced By:** Engineering Team  
-**Violations:** PR will be blocked until compliant  
-**Last Updated:** 2025-10-20  
-**Canonical Example:** `docs/services/fabric-fiber-service/testing/`
+Documentation Principles: docs/DOCUMENTATION_PRINCIPLES.md
+
+Developer Protocol: docs/DEVELOPER_PROTOCOL.md
+
+🏆 GLOBAL QUALITY STANDARD
+
+✅ Architecture First — Define boundaries before implementation
+
+✅ TDD for Business Logic — Test-first for internal behavior
+
+✅ Contracts Define Boundaries — Consumer/provider alignment
+
+✅ AAA Pattern — Arrange–Act–Assert
+
+✅ Test Pyramid — 75% unit, 20% integration, 5% E2E
+
+✅ Real Infrastructure — Testcontainers for production parity
+
+✅ Performance Testing (k6) — Mandatory pre-production
+
+✅ Fast Feedback — < 2 minutes total suite
+
+✅ Zero Flakiness — Deterministic, isolated tests
+
+✅ AssertJ Fluent Assertions — Readable intent
+
+✅ JaCoCo Coverage Enforcement — ≥ 80% at bundle level
+
+“Would you trust this code with your bank account?”
+If not, keep testing.
+
+Enforced By: Engineering Team
+Violations: PR blocked until compliant
+Last Updated: 2025-10-22
