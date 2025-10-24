@@ -23,19 +23,28 @@
 ## 🏗️ TARGET ARCHITECTURE OVERVIEW
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                   FABRIC MANAGEMENT                       │
-│                 (Modular Monolith Core)                  │
-├──────────────────────────────────────────────────────────┤
-│  common/           → Platform (auth, user, company, policy, audit, config, monitoring, communication) + Infrastructure (persistence, events, mapping, cqrs, web, security, util) │
-│  production/       → MasterData, Planning, Execution, Quality                     │
-│  logistics/        → Inventory, Shipment, Customs                                 │
-│  finance/          → Accounting, Costing, Billing                                 │
-│  human/            → Employee, Payroll, Performance, Leave                        │
-│  procurement/      → Supplier, Purchase, GRN, RFQ                                 │
-│  integration/      → Adapters, Webhooks, Schedulers, Outbox                       │
-│  insight/          → Analytics, Intelligence (AI, Forecasts)                     │
-└──────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                   FABRIC MANAGEMENT PLATFORM                         │
+│                    (Modular Monolith Core)                          │
+├──────────────────────────────────────────────────────────────────────┤
+│  common/           → Platform + Infrastructure + Utilities           │
+│                      (auth, user, company, policy, audit, events)    │
+├──────────────────────────────────────────────────────────────────────┤
+│  governance/       → ⭐ Access & Policy Governance + Compliance      │
+│                      (policy engine, access review, anomaly)         │
+├──────────────────────────────────────────────────────────────────────┤
+│  operations/       → ⭐ CENTRAL ORCHESTRATOR (Job, Workflow, SLA)   │
+│                      (job management, assignment, tracking)          │
+├──────────────────────────────────────────────────────────────────────┤
+│  BUSINESS DOMAINS:                                                   │
+│  ├─ production/    → MasterData, Planning, Execution, Quality        │
+│  ├─ logistics/     → Inventory, Shipment, Customs                    │
+│  ├─ finance/       → Accounting, Costing, Billing                    │
+│  ├─ human/         → Employee, Payroll, Performance, Leave           │
+│  ├─ procurement/   → Supplier, Purchase, GRN, RFQ                    │
+│  ├─ integration/   → Adapters, Webhooks, Schedulers, Outbox          │
+│  └─ insight/       → Analytics, Intelligence (AI, Forecasts)         │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 **Tek deploy (monolith), ama her domain modül olarak izole.**  
@@ -252,30 +261,225 @@ public class MaterialCreatedEvent extends DomainEvent {
 
 ## 🧱 DIRECTORY STRUCTURE (FINAL)
 
-### Proje Kök Yapısı (Tek App)
+### Proje Kök Yapısı (Modular Monolith - Tek Uygulama)
 
 ```
-fabric-management-backend/
-├─ build.gradle / pom.xml
+fabric-management-backend/  (ROOT - Tek Modular Monolith)
+├─ pom.xml                  # Ana uygulama POM (parent değil, tek uygulama)
+├─ docker-compose.yml       # PostgreSQL, Redis, Kafka, Monitoring
+├─ Dockerfile.service       # Production deployment
+├─ .env, .env.example       # Environment configuration
 ├─ src/main/java/com/fabricmanagement/
-│  ├─ common/                 # TÜM CROSS-CUTTING CONCERNS
-│  │  ├─ platform/           # İşletim altyapısı (auth, user, policy, audit, config, monitoring, communication)
-│  │  ├─ infrastructure/     # Teknik altyapı (persistence, events, mapping, cqrs, web, security, util)
-│  │  └─ util/               # Yardımcı sınıflar
-│  ├─ production/             # Business Domain: masterdata, planning, execution, quality
-│  ├─ logistics/              # Business Domain: inventory, shipment, customs
-│  ├─ finance/                # Business Domain: ar, ap, invoice, costing
-│  ├─ human/                  # Business Domain: employee, org, leave, payroll, performance
-│  ├─ procurement/            # Business Domain: supplier, requisition, rfq, po, grn
-│  ├─ integration/            # Business Domain: adapters, webhooks, transforms, notifications
-│  └─ insight/                # Business Domain: analytics(read models), intelligence(AI/forecasts)
-└─ src/main/resources/
-   ├─ application.yml
-   └─ db/migration/           # Flyway: V1__*.sql (domain-schema'lar)
+│  ├─ FabricManagementApplication.java  # Main Spring Boot class
+│  │
+│  ├─ common/                 # 🧱 CROSS-CUTTING & CORE INFRASTRUCTURE
+│  │  ├─ platform/            # Platform Services (application-level cores)
+│  │  │  ├─ auth/             # Authentication & Authorization
+│  │  │  ├─ user/             # User Management (identity, profile, roles)
+│  │  │  ├─ company/          # Company/Tenant Management (hierarchy, departments)
+│  │  │  ├─ policy/           # Policy Engine (runtime access evaluation)
+│  │  │  ├─ audit/            # Audit Logging & Compliance
+│  │  │  ├─ config/           # Centralized Configuration
+│  │  │  ├─ monitoring/       # Metrics, Health, Tracing, Observability
+│  │  │  ├─ communication/    # Notifications (Email, SMS, WhatsApp, in-app)
+│  │  │  └─ subscription/     # OS-based Subscription & Feature Management
+│  │  │
+│  │  ├─ infrastructure/      # Shared Infrastructure Layer
+│  │  │  ├─ persistence/      # BaseEntity, AuditableEntity, Repository base
+│  │  │  ├─ events/           # DomainEvent, OutboxEvent, Event Bus
+│  │  │  ├─ mapping/          # DTO-Entity Mappers (MapStruct)
+│  │  │  ├─ cqrs/             # CommandBus, QueryBus, Handler interfaces
+│  │  │  ├─ web/              # ApiResponse, PagedResponse, GlobalExceptionHandler
+│  │  │  ├─ security/         # JWT, TenantFilter, Security Context
+│  │  │  └─ cache/            # Redis cache utilities, invalidation manager
+│  │  │
+│  │  └─ util/                # Common Utilities
+│  │     ├─ Money.java        # Currency-aware value object
+│  │     ├─ Unit.java         # Measurement unit value object
+│  │     └─ TimeHelper.java   # Time & date utilities
+│  │
+│  ├─ governance/             # 🛡️ ACCESS & POLICY GOVERNANCE LAYER
+│  │  ├─ access/              # Access Governance Protocol (AGP)
+│  │  │  ├─ policy/           # Policy Registry, Evaluation Engine
+│  │  │  │  ├─ registry/      # Policy definitions & storage
+│  │  │  │  ├─ engine/        # Policy evaluation logic
+│  │  │  │  ├─ cache/         # Policy decision caching
+│  │  │  │  └─ api/           # Policy management REST API
+│  │  │  ├─ review/           # Dual approval & version control for policies
+│  │  │  ├─ audit/            # Policy decision audit trail
+│  │  │  └─ sync/             # Cache invalidation & policy propagation
+│  │  │
+│  │  └─ compliance/          # Compliance & Risk Monitoring
+│  │     ├─ review/           # Periodic access reviews
+│  │     ├─ anomaly/          # Suspicious access pattern detection
+│  │     └─ report/           # Audit & compliance reports
+│  │
+│  ├─ operations/             # 🎯 OPERATIONS ORCHESTRATION DOMAIN
+│  │  ├─ job/                 # Job & Work Order Management
+│  │  │  ├─ domain/           # Job, WorkOrder, WorkOrderStage entities
+│  │  │  ├─ app/              # JobService, WorkOrderService
+│  │  │  │  ├─ command/       # CreateJobCommand, AdvanceStageCommand
+│  │  │  │  └─ query/         # GetJobQuery, ListActiveJobsQuery
+│  │  │  ├─ infra/repository/ # JobRepository, WorkOrderRepository
+│  │  │  └─ api/              # REST & Facade interfaces
+│  │  │
+│  │  ├─ assignment/          # Personnel & Team Assignment
+│  │  │  ├─ domain/           # Assignment, SkillTag, RoleRequirement
+│  │  │  ├─ app/              # Assignment matching, capacity check
+│  │  │  └─ policy/           # Assignment rules & governance integration
+│  │  │
+│  │  ├─ workflow/            # Workflow Engine & Templates
+│  │  │  ├─ template/         # WorkflowTemplate definitions
+│  │  │  ├─ engine/           # Stage transitions, rules, automation
+│  │  │  └─ sla/              # SLA monitoring, performance metrics
+│  │  │
+│  │  └─ tracking/            # Traceability & Event Tracking
+│  │     ├─ timeline/         # Activity timeline for visualization
+│  │     └─ event/            # JobCreatedEvent, StageAdvancedEvent, etc.
+│  │
+│  ├─ production/             # 🏭 PRODUCTION DOMAIN
+│  │  ├─ masterdata/          # Material, Recipe master data
+│  │  │  ├─ material/         # Fiber, Yarn, Fabric materials
+│  │  │  └─ recipe/           # Weave, Dye, Finish recipes
+│  │  ├─ planning/            # Production planning
+│  │  │  ├─ capacity/         # Capacity management
+│  │  │  ├─ scheduling/       # Production scheduling
+│  │  │  └─ workcenter/       # Work center management
+│  │  ├─ execution/           # Production execution
+│  │  │  ├─ fiber/            # Fiber processing
+│  │  │  ├─ yarn/             # Yarn spinning
+│  │  │  ├─ loom/             # Weaving (loom operations)
+│  │  │  ├─ knit/             # Knitting
+│  │  │  └─ dye/              # Dyeing & finishing
+│  │  └─ quality/             # Quality control
+│  │     ├─ inspection/       # Quality inspections
+│  │     └─ result/           # Test results
+│  │
+│  ├─ logistics/              # 📦 LOGISTICS DOMAIN
+│  │  ├─ inventory/           # Inventory management
+│  │  │  ├─ item/             # Inventory items
+│  │  │  ├─ lot/              # Lot tracking
+│  │  │  ├─ movement/         # Stock movements
+│  │  │  └─ location/         # Warehouse locations
+│  │  ├─ shipment/            # Shipment management
+│  │  │  ├─ order/            # Shipment orders
+│  │  │  ├─ carrier/          # Carrier management
+│  │  │  └─ tracking/         # Shipment tracking
+│  │  └─ customs/             # Customs declarations
+│  │
+│  ├─ finance/                # 💰 FINANCE DOMAIN
+│  │  ├─ ar/                  # Accounts Receivable
+│  │  ├─ ap/                  # Accounts Payable
+│  │  ├─ cashbank/            # Cash & Bank Management
+│  │  ├─ invoice/             # Invoicing
+│  │  └─ costing/             # Cost Accounting
+│  │
+│  ├─ human/                  # 👥 HUMAN RESOURCES DOMAIN
+│  │  ├─ employee/            # Employee Management
+│  │  ├─ org/                 # Organization Structure
+│  │  ├─ leave/               # Leave Management
+│  │  ├─ payroll/             # Payroll Processing
+│  │  └─ performance/         # Performance Management
+│  │
+│  ├─ procurement/            # 🛒 PROCUREMENT DOMAIN
+│  │  ├─ supplier/            # Supplier Management
+│  │  ├─ requisition/         # Purchase Requisition
+│  │  ├─ rfq/                 # Request for Quotation
+│  │  ├─ po/                  # Purchase Order
+│  │  └─ grn/                 # Goods Receipt Note
+│  │
+│  ├─ integration/            # 🔗 INTEGRATION SERVICES
+│  │  ├─ adapters/            # ERP, E-Invoice, Carriers
+│  │  ├─ webhooks/            # Webhook Management
+│  │  ├─ transforms/          # Data Transformation
+│  │  └─ notifications/       # Notification Providers
+│  │
+│  └─ insight/                # 🧠 INSIGHT & ANALYTICS
+│     ├─ analytics/           # Read Models, Dashboards
+│     └─ intelligence/        # AI, Forecasts, Optimization
+│
+├─ src/main/resources/
+│  ├─ application.yml         # Spring Boot configuration
+│  ├─ application-local.yml   # Local environment
+│  ├─ application-prod.yml    # Production environment
+│  ├─ db/migration/           # Flyway: V1__*.sql (domain-schema'lar)
+│  └─ policies/               # Static policy templates (bootstrap)
+│
+├─ src/test/java/com/fabricmanagement/
+│  └─ ...                     # Test structure mirrors main
+│
+├─ monitoring/                # Prometheus, Grafana, AlertManager configs
+├─ scripts/                   # Deployment & utility scripts
+└─ postman/                   # API collections
 ```
 
-**Tek jar, tek deploy, ama her domain kendi paketi.**  
-**Domainler arası doğrudan çağrı yok; olması gerekenler için açık arayüz (facade) + domain event.**
+**✅ Tek JAR, tek deploy, ama her domain kendi paketi.**  
+**✅ Domainler arası doğrudan çağrı yok; facade + domain event kullanılır.**  
+**✅ Parent POM yok - direkt Spring Boot application olarak yapılandırılır.**
+
+---
+
+## 🎯 NEW STRATEGIC DOMAINS
+
+### **Governance Domain** 🛡️
+
+**Purpose:** Centralized access control, policy management, and compliance monitoring.
+
+**Key Features:**
+
+- **Access Governance Protocol (AGP):** Policy registry, evaluation engine, decision caching
+- **Policy Review:** Dual approval & version control for critical policies
+- **Policy Audit:** Complete decision trail for compliance
+- **Policy Sync:** Real-time cache invalidation across instances
+- **Compliance:** Access reviews, anomaly detection, audit reports
+
+**Integration with common/platform/policy:**
+
+- common/platform/policy: **Runtime** policy evaluation (Layer 1-5 checks)
+- governance/access/policy: **Management** policy definitions, registry, audit
+
+### **Operations Domain** 🎯
+
+**Purpose:** Central orchestration layer for all operational activities.
+
+**Key Features:**
+
+- **Job Management:** High-level work definition (e.g., "Dyeing for Order #123")
+- **WorkOrder:** Executable operational units with stage tracking
+- **Assignment:** Personnel & team assignment based on skills & capacity
+- **Workflow Templates:** Predefined stage sequences (spinning, weaving, dyeing)
+- **SLA Monitoring:** Deadline tracking, escalation, notifications
+- **Timeline Tracking:** Complete traceability of all actions
+
+**Cross-Domain Orchestration:**
+
+```
+Operations coordinates:
+├─ Production → Generates jobs for manufacturing processes
+├─ Logistics → Creates jobs for shipment & warehousing
+├─ Procurement → Triggers jobs for PO follow-up & inbound
+├─ Human → Assigns personnel based on skills & workload
+└─ Finance → Links cost data to jobs for performance analysis
+```
+
+**Workflow Example:**
+
+```
+Job: "Weave 1000m Denim Fabric for Order #456"
+├─ Stage 1: Yarn Preparation (Production/Yarn) → Assigned to Team A
+├─ Stage 2: Loom Setup (Production/Loom) → Assigned to Technician B
+├─ Stage 3: Weaving (Production/Loom) → Assigned to Operator C
+├─ Stage 4: Quality Check (Production/Quality) → Assigned to QC Team
+└─ Stage 5: Warehouse Transfer (Logistics/Inventory) → Assigned to Logistics
+
+Each stage:
+✅ Has SLA deadline
+✅ Sends notifications on delay
+✅ Records timeline events
+✅ Requires policy approval for transitions
+```
+
+---
 
 ### Common Module Yapısı (Platform + Infrastructure)
 
@@ -682,14 +886,37 @@ Broker down ise birikiyor; sistem çalışmaya devam eder.
 
 ### Modül Kısa Özetleri (sınır ve içerik)
 
-- **common/:** platform (auth, user, company, policy, audit, config, monitoring, communication) + infrastructure (persistence, events, mapping, cqrs, web, security, util)
-- **production/:** masterdata(material, recipe), planning(capacity, scheduling, workcenter), execution(fiber, yarn, loom, knit, dye), quality(inspections, results)
-- **logistics/:** inventory(item, lot, movement, location), shipment(order, carrier, tracking), customs (opsiyonel alt modül)
-- **finance/:** ar, ap, cashbank, invoice, costing (+ gerekirse accounting)
+- **common/:**
+
+  - platform: auth, user, company, policy, audit, config, monitoring, communication, subscription
+  - infrastructure: persistence, events, mapping, cqrs, web, security, cache
+  - util: Money, Unit, TimeHelper
+
+- **governance/:**
+
+  - access: policy registry, evaluation engine, review, audit, sync, dashboard
+  - compliance: access review, anomaly detection, compliance reports
+
+- **operations/:** ⭐ **MERKEZI ORCHESTRATOR**
+
+  - job: Job, WorkOrder, WorkOrderStage management
+  - assignment: Personnel & team assignment, capacity matching
+  - workflow: Workflow templates, stage transitions, SLA monitoring
+  - tracking: Timeline, traceability, event logging
+
+- **production/:** masterdata(material, recipe), planning(capacity, scheduling, workcenter), execution(fiber, yarn, loom, knit, dye), quality(inspection, result)
+
+- **logistics/:** inventory(item, lot, movement, location), shipment(order, carrier, tracking), customs
+
+- **finance/:** ar, ap, cashbank, invoice, costing
+
 - **human/:** employee, org, leave, payroll, performance
+
 - **procurement/:** supplier, requisition, rfq, po, grn
-- **integration/:** adapters (erp, e-invoice, carriers), webhooks, transforms, notifications (provider), scheduler
-- **insight/:** analytics (read models, dashboards), intelligence (forecasts/optimization). Kaynak domain verisini değiştirmez.
+
+- **integration/:** adapters (erp, e-invoice, carriers), webhooks, transforms, notifications
+
+- **insight/:** analytics (read models, dashboards), intelligence (AI forecasts/optimization)
 
 ### Kod Örneği (Facade + Service imzası)
 
@@ -756,16 +983,18 @@ class LogisticsModule {}
 
 **Derleme zamanı ihlalde fail! Spagetti bağımlılıklarını baştan engeller.**
 
-| Module        | Allowed Dependencies                   |
-| ------------- | -------------------------------------- |
-| `common`      | none                                   |
-| `production`  | common                                 |
-| `logistics`   | common, production                     |
-| `finance`     | common, logistics, production          |
-| `human`       | common                                 |
-| `procurement` | common, finance                        |
-| `integration` | common, production, logistics, finance |
-| `insight`     | common, production, logistics, finance |
+| Module        | Allowed Dependencies                               |
+| ------------- | -------------------------------------------------- |
+| `common`      | none                                               |
+| `governance`  | common                                             |
+| `operations`  | common, governance, production, logistics, human   |
+| `production`  | common, governance                                 |
+| `logistics`   | common, governance, production                     |
+| `finance`     | common, governance, logistics, production          |
+| `human`       | common, governance                                 |
+| `procurement` | common, governance, finance                        |
+| `integration` | common, governance, production, logistics, finance |
+| `insight`     | common, production, logistics, finance, operations |
 
 **Kurallar ArchUnit veya Spring Modulith ile enforce edilecektir.**
 

@@ -182,6 +182,24 @@ Detaylı deployment rehberi için: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 - [📈 Monitoring Module](./common/platform/monitoring/MONITORING_PROTOCOL.md)
 - [💬 Communication Module](./common/platform/communication/COMMUNICATION_PROTOCOL.md)
 
+### **Governance Domain** ⭐ NEW
+
+- [🛡️ Governance Domain Overview](./governance/GOVERNANCE_DOMAIN_PROTOCOL.md)
+  - [📋 Policy Registry](./governance/access/policy/POLICY_REGISTRY_PROTOCOL.md)
+  - [✍️ Policy Review](./governance/access/review/POLICY_REVIEW_PROTOCOL.md)
+  - [📊 Policy Audit](./governance/access/audit/POLICY_AUDIT_PROTOCOL.md)
+  - [🔄 Policy Sync](./governance/access/sync/POLICY_SYNC_PROTOCOL.md)
+  - [🔍 Access Review](./governance/compliance/review/ACCESS_REVIEW_PROTOCOL.md)
+  - [⚠️ Anomaly Detection](./governance/compliance/anomaly/ANOMALY_DETECTION_PROTOCOL.md)
+
+### **Operations Domain** ⭐ NEW - STRATEGIC CORE
+
+- [🎯 Operations Domain Overview](./business/operations/OPERATIONS_PROTOCOL.md)
+  - [📋 Job Management](./business/operations/job/JOB_PROTOCOL.md)
+  - [👥 Assignment](./business/operations/assignment/ASSIGNMENT_PROTOCOL.md)
+  - [⚙️ Workflow Engine](./business/operations/workflow/WORKFLOW_PROTOCOL.md)
+  - [📊 Tracking](./business/operations/tracking/TRACKING_PROTOCOL.md)
+
 ### **Business Module Dokümantasyonu**
 
 - [🏭 Production Module](./business/production/PRODUCTION_PROTOCOL.md)
@@ -204,5 +222,6 @@ Sorular veya sorunlar için:
 
 ---
 
-**Last Updated:** 2025-01-27  
-**Maintained By:** Fabric Management Team
+**Last Updated:** 2025-10-24  
+**Maintained By:** Fabric Management Team  
+**Latest Addition:** ⭐ Operations & Governance Domains

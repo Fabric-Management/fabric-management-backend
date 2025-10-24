@@ -633,5 +633,46 @@ subscriptionRepository.save(subscription);
 
 ---
 
-**Last Updated:** 2025-01-27  
-**Maintained By:** Fabric Management Team
+## 🎯 OS RECOMMENDATIONS BY COMPANY TYPE
+
+### **Tenant Companies (Can Subscribe)**
+
+| Company Type             | Suggested OS      | Modules Included                      |
+| ------------------------ | ----------------- | ------------------------------------- |
+| **SPINNER**              | SpinnerOS, YarnOS | Fiber processing, Yarn production     |
+| **WEAVER**               | WeaverOS, LoomOS  | Loom operations, Weaving planning     |
+| **KNITTER**              | KnitterOS, KnitOS | Knitting machines, Pattern management |
+| **DYER_FINISHER**        | DyeOS, FinishOS   | Dyeing, Finishing, Chemical tracking  |
+| **VERTICAL_MILL**        | FabricOS          | ALL modules (fiber→yarn→fabric→dye)   |
+| **GARMENT_MANUFACTURER** | GarmentOS         | Cutting, Sewing, Finishing, QC        |
+
+### **Non-Tenant Companies (Cannot Subscribe)**
+
+| Company Type        | Category         | OS Access                                   |
+| ------------------- | ---------------- | ------------------------------------------- |
+| FIBER_SUPPLIER      | SUPPLIER         | ❌ No subscription                          |
+| YARN_SUPPLIER       | SUPPLIER         | ❌ No subscription                          |
+| CHEMICAL_SUPPLIER   | SUPPLIER         | ❌ No subscription                          |
+| CONSUMABLE_SUPPLIER | SUPPLIER         | ❌ No subscription                          |
+| PACKAGING_SUPPLIER  | SUPPLIER         | ❌ No subscription                          |
+| MACHINE_SUPPLIER    | SUPPLIER         | ❌ No subscription                          |
+| LOGISTICS_PROVIDER  | SERVICE_PROVIDER | ❌ No subscription                          |
+| MAINTENANCE_SERVICE | SERVICE_PROVIDER | ❌ No subscription                          |
+| IT_SERVICE_PROVIDER | SERVICE_PROVIDER | ❌ No subscription                          |
+| KITCHEN_SUPPLIER    | SERVICE_PROVIDER | ❌ No subscription                          |
+| HR_SERVICE_PROVIDER | SERVICE_PROVIDER | ❌ No subscription                          |
+| LAB                 | SERVICE_PROVIDER | ❌ No subscription                          |
+| UTILITY_PROVIDER    | SERVICE_PROVIDER | ❌ No subscription                          |
+| FASON               | PARTNER          | ❌ No subscription (uses tenant's platform) |
+| AGENT               | PARTNER          | ❌ No subscription                          |
+| TRADER              | PARTNER          | ❌ No subscription                          |
+| FINANCE_PARTNER     | PARTNER          | ❌ No subscription                          |
+| CUSTOMER            | CUSTOMER         | ❌ No subscription                          |
+
+**Note:** Non-tenant companies are registered in the system for procurement, logistics, and relationship management, but they don't get platform subscriptions.
+
+---
+
+**Last Updated:** 2025-10-24  
+**Maintained By:** Fabric Management Team  
+**Latest Update:** Added comprehensive company type classification (22 types)

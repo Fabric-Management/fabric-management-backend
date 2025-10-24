@@ -107,7 +107,7 @@ public class Company extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private CompanyType companyType = CompanyType.MANUFACTURER; // MANUFACTURER, SUPPLIER, FASON, CUSTOMER
+    private CompanyType companyType = CompanyType.VERTICAL_MILL;
 
     @Column
     private UUID parentCompanyId; // Parent-child relationship
@@ -129,7 +129,86 @@ public class Company extends BaseEntity {
     public void setParentCompany(UUID parentCompanyId) {
         this.parentCompanyId = parentCompanyId;
     }
+
+    public boolean isTenant() {
+        return this.companyType.isTenant();
+    }
+
+    public CompanyCategory getCategory() {
+        return this.companyType.getCategory();
+    }
+
+    public String[] getSuggestedOS() {
+        return this.companyType.getSuggestedOS();
+    }
 }
+```
+
+### **CompanyType Enum (22 Types)**
+
+```java
+// TENANT COMPANIES (Platform Users - 6 types)
+SPINNER              → İplikçi (OS: SpinnerOS, YarnOS)
+WEAVER               → Dokumacı (OS: WeaverOS, LoomOS)
+KNITTER              → Örücü (OS: KnitterOS)
+DYER_FINISHER        → Boyahane/Terbiye (OS: DyeOS, FinishOS)
+VERTICAL_MILL        → Entegre Tesis (OS: FabricOS - all modules)
+GARMENT_MANUFACTURER → Konfeksiyon (OS: GarmentOS)
+
+// SUPPLIER COMPANIES (Material Suppliers - 6 types)
+FIBER_SUPPLIER       → Elyaf tedarikçisi
+YARN_SUPPLIER        → İplik tedarikçisi
+CHEMICAL_SUPPLIER    → Kimyasal tedarikçisi
+CONSUMABLE_SUPPLIER  → Sarf malzeme (yağ, iğne, makine parçası)
+PACKAGING_SUPPLIER   → Ambalaj tedarikçisi
+MACHINE_SUPPLIER     → Makine tedarikçisi (Dornier, Monforts, Mayer)
+
+// SERVICE PROVIDER COMPANIES (7 types)
+LOGISTICS_PROVIDER   → Kargo, depo, gümrükleme
+MAINTENANCE_SERVICE  → Makine bakım, teknik servis
+IT_SERVICE_PROVIDER  → ERP, yazılım, network
+KITCHEN_SUPPLIER     → Mutfak, kantin, hijyen
+HR_SERVICE_PROVIDER  → İK danışmanlık, işe alım
+LAB                  → Test, kalite kontrol, Ar-Ge
+UTILITY_PROVIDER     → Elektrik, su, doğalgaz
+
+// PARTNER COMPANIES (4 types)
+FASON                → Fason üretim
+AGENT                → Aracı, komisyoncu
+TRADER               → Tüccar (al-sat)
+FINANCE_PARTNER      → Banka, leasing, sigorta
+
+// CUSTOMER COMPANIES (1 type)
+CUSTOMER             → Son müşteri
+```
+
+### **CompanyCategory Enum**
+
+```java
+TENANT           → Platform kullanıcıları (kendi sistemleri var)
+SUPPLIER         → Malzeme tedarikçileri
+SERVICE_PROVIDER → Hizmet sağlayıcılar
+PARTNER          → İş ortakları
+CUSTOMER         → Müşteriler
+```
+
+### **Smart Methods**
+
+```java
+// Check if company can be platform tenant
+boolean isTenant = companyType.isTenant();
+// SPINNER, WEAVER, KNITTER, DYER_FINISHER, VERTICAL_MILL, GARMENT_MANUFACTURER → true
+// Others → false
+
+// Get category for grouping
+CompanyCategory category = companyType.getCategory();
+// Returns: TENANT, SUPPLIER, SERVICE_PROVIDER, PARTNER, or CUSTOMER
+
+// Get suggested OS subscriptions
+String[] suggestedOS = companyType.getSuggestedOS();
+// SPINNER → ["SpinnerOS", "YarnOS"]
+// VERTICAL_MILL → ["FabricOS"]
+// CHEMICAL_SUPPLIER → [] (not a tenant)
 ```
 
 ### **Department Entity**
@@ -203,15 +282,19 @@ public class Subscription extends BaseEntity {
 
 ## 🔗 ENDPOINTS
 
-| Endpoint                                   | Method | Purpose            | Auth Required        |
-| ------------------------------------------ | ------ | ------------------ | -------------------- |
-| `/api/common/companies`                    | GET    | List companies     | ✅ Yes               |
-| `/api/common/companies/{id}`               | GET    | Get company by ID  | ✅ Yes               |
-| `/api/common/companies`                    | POST   | Create company     | ✅ Yes (SUPER_ADMIN) |
-| `/api/common/companies/{id}`               | PUT    | Update company     | ✅ Yes (ADMIN)       |
-| `/api/common/companies/{id}/departments`   | GET    | List departments   | ✅ Yes               |
-| `/api/common/companies/{id}/subscriptions` | GET    | List subscriptions | ✅ Yes (ADMIN)       |
-| `/api/common/companies/{id}/subscriptions` | POST   | Add subscription   | ✅ Yes (ADMIN)       |
+| Endpoint                                                    | Method | Purpose               | Auth Required        |
+| ----------------------------------------------------------- | ------ | --------------------- | -------------------- |
+| `/api/common/companies`                                     | GET    | List all companies    | ✅ Yes               |
+| `/api/common/companies/tenants`                             | GET    | List tenant companies | ✅ Yes               |
+| `/api/common/companies/type/{type}`                         | GET    | List by type          | ✅ Yes               |
+| `/api/common/companies/{id}`                                | GET    | Get company by ID     | ✅ Yes               |
+| `/api/common/companies`                                     | POST   | Create company        | ✅ Yes (SUPER_ADMIN) |
+| `/api/common/companies/{id}`                                | PUT    | Update company        | ✅ Yes (ADMIN)       |
+| `/api/common/companies/{id}`                                | DELETE | Deactivate company    | ✅ Yes (ADMIN)       |
+| `/api/common/companies/{id}/departments`                    | GET    | List departments      | ✅ Yes               |
+| `/api/common/companies/{id}/subscriptions`                  | GET    | List subscriptions    | ✅ Yes (ADMIN)       |
+| `/api/common/companies/{id}/subscriptions`                  | POST   | Add subscription      | ✅ Yes (ADMIN)       |
+| `/api/common/companies/{id}/subscriptions/{subId}/activate` | POST   | Activate subscription | ✅ Yes (ADMIN)       |
 
 ---
 
@@ -226,5 +309,54 @@ public class Subscription extends BaseEntity {
 
 ---
 
-**Last Updated:** 2025-01-27  
-**Maintained By:** Fabric Management Team
+## 💡 USAGE EXAMPLES
+
+### **Create Tenant Company (Platform User)**
+
+```java
+CreateCompanyRequest request = CreateCompanyRequest.builder()
+    .companyName("ACME İplik A.Ş.")
+    .taxId("1234567890")
+    .companyType(CompanyType.SPINNER) // Can be platform tenant
+    .city("Istanbul")
+    .country("Turkey")
+    .build();
+
+CompanyDto company = companyService.createCompany(request);
+// company.isTenant() = true
+// company.getSuggestedOS() = ["SpinnerOS", "YarnOS"]
+```
+
+### **Create Supplier Company**
+
+```java
+CreateCompanyRequest request = CreateCompanyRequest.builder()
+    .companyName("Global Chemicals Ltd.")
+    .taxId("9876543210")
+    .companyType(CompanyType.CHEMICAL_SUPPLIER)
+    .build();
+
+CompanyDto supplier = companyService.createCompany(request);
+// supplier.isTenant() = false (cannot use platform)
+// supplier.getCategory() = SUPPLIER
+```
+
+### **Query by Category**
+
+```java
+// Get only tenant companies (platform users)
+List<CompanyDto> tenants = companyService.getTenantCompanies();
+// Returns: SPINNER, WEAVER, KNITTER, DYER_FINISHER, VERTICAL_MILL, GARMENT_MANUFACTURER
+
+// Get specific type
+List<CompanyDto> spinners = companyService.getCompaniesByType(CompanyType.SPINNER);
+
+// Get all suppliers
+List<CompanyDto> suppliers = companyService.findByCategory(CompanyCategory.SUPPLIER);
+```
+
+---
+
+**Last Updated:** 2025-10-24  
+**Maintained By:** Fabric Management Team  
+**Latest Update:** Added 22 company types with category classification
