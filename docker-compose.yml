@@ -84,73 +84,50 @@ services:
     logging: *default-logging
 
   # ==============================================
-  # MESSAGE BROKER - Zookeeper (for Kafka)
+  # MESSAGE BROKER - Kafka & Zookeeper (Optional)
   # ==============================================
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
-    container_name: fabric-zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT:-2181}
-      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME:-2000}
-      ALLOW_ANONYMOUS_LOGIN: "yes"
-    ports:
-      - "${ZOOKEEPER_PORT:-2181}:2181"
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-      - zookeeper_data:/var/lib/zookeeper/log
-    networks:
-      - fabric-network
-    healthcheck:
-      test: ["CMD-SHELL", "echo srvr | nc localhost 2181 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
-    logging: *default-logging
+  # YAGNI: Not needed for development phase
+  # Spring Events handles in-process events
+  # Uncomment when ready for external event streaming
+  
+  # zookeeper:
+  #   image: confluentinc/cp-zookeeper:7.6.0
+  #   container_name: fabric-zookeeper
+  #   restart: unless-stopped
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #     ZOOKEEPER_TICK_TIME: 2000
+  #   ports:
+  #     - "2181:2181"
+  #   volumes:
+  #     - zookeeper_data:/var/lib/zookeeper/data
+  #   networks:
+  #     - fabric-network
 
-  # ==============================================
-  # MESSAGE BROKER - Kafka
-  # ==============================================
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: fabric-kafka
-    restart: unless-stopped
-    depends_on:
-      zookeeper:
-        condition: service_healthy
-    environment:
-      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID:-1}
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:${ZOOKEEPER_CLIENT_PORT:-2181}
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:${KAFKA_PORT:-9092}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-1}
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: ${KAFKA_AUTO_CREATE_TOPICS:-true}
-    ports:
-      - "${KAFKA_PORT:-9092}:9092"
-    volumes:
-      - kafka_data:/var/lib/kafka/data
-    networks:
-      - fabric-network
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
-    logging: *default-logging
+  # kafka:
+  #   image: confluentinc/cp-kafka:7.6.0
+  #   container_name: fabric-kafka
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - zookeeper
+  #   environment:
+  #     KAFKA_BROKER_ID: 1
+  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #   ports:
+  #     - "9092:9092"
+  #   volumes:
+  #     - kafka_data:/var/lib/kafka/data
+  #   networks:
+  #     - fabric-network
 
   # ==============================================
   # MONITORING (Optional - Uncomment when needed)
   # ==============================================
   # YAGNI: Not needed for development phase
   # Uncomment below when ready for production monitoring
-  
+
   # prometheus:
   #   image: prom/prometheus:latest
   #   container_name: fabric-prometheus
