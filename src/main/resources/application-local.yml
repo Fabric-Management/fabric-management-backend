@@ -51,6 +51,11 @@ spring:
         from: ${PLATFORM_EMAIL_FROM:info@storeandsale.shop}
         from-name: ${PLATFORM_EMAIL_FROM_NAME:Fabricode}
 
+management:
+  health:
+    mail:
+      enabled: false
+
   flyway:
     enabled: true
     baseline-on-migrate: true
