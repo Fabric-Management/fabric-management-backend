@@ -17,21 +17,24 @@ import java.util.List;
  *
  * <h2>Available OS Examples:</h2>
  * <ul>
- *   <li><b>YarnOS:</b> Yarn production management</li>
- *   <li><b>LoomOS:</b> Weaving/Loom operations</li>
- *   <li><b>DyeOS:</b> Dyeing and finishing</li>
- *   <li><b>PlanOS:</b> Production planning</li>
- *   <li><b>FinOS:</b> Financial management</li>
- *   <li><b>FabricOS:</b> Complete fabric management (all modules)</li>
+ *   <li><b>YarnOS:</b> Yarn production management (Starter, Professional, Enterprise)</li>
+ *   <li><b>LoomOS:</b> Weaving/Loom operations (Starter, Professional, Enterprise)</li>
+ *   <li><b>AnalyticsOS:</b> BI & Reporting (Standard, Advanced, Enterprise)</li>
+ *   <li><b>IntelligenceOS:</b> AI/ML (Professional, Enterprise)</li>
+ *   <li><b>FabricOS:</b> Base platform (Base tier, included for all)</li>
  * </ul>
  *
  * <h2>Module Inclusion:</h2>
  * <p>includedModules defines which business modules are accessible:
  * <pre>
  * YarnOS includes: ["production.fiber", "production.yarn"]
- * LoomOS includes: ["production.loom", "production.weaving"]
- * FabricOS includes: ["production.*", "logistics.*", "finance.*"]
+ * LoomOS includes: ["production.weaving"]
+ * FabricOS includes: ["auth", "user", "policy", "audit", "company"]
  * </pre>
+ *
+ * <h2>Pricing Tiers:</h2>
+ * <p>Each OS can have multiple pricing tiers with different features.
+ * Tier names are defined in {@link PricingTierValidator}.</p>
  */
 @Entity
 @Table(name = "common_os_definition", schema = "common_company",
@@ -64,10 +67,29 @@ public class OSDefinition extends BaseEntity {
     @Builder.Default
     private List<String> includedModules = new ArrayList<>();
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "pricing_tier", nullable = false, length = 20)
+    /**
+     * Available pricing tiers for this OS.
+     *
+     * <p>Examples:</p>
+     * <ul>
+     *   <li>YarnOS: ["Starter", "Professional", "Enterprise"]</li>
+     *   <li>AnalyticsOS: ["Standard", "Advanced", "Enterprise"]</li>
+     *   <li>IntelligenceOS: ["Professional", "Enterprise"]</li>
+     *   <li>FabricOS: ["Base"]</li>
+     * </ul>
+     */
+    @Type(JsonType.class)
+    @Column(name = "available_tiers", columnDefinition = "jsonb")
     @Builder.Default
-    private PricingTier pricingTier = PricingTier.PROFESSIONAL;
+    private List<String> availableTiers = new ArrayList<>();
+
+    /**
+     * Default tier for this OS (entry-level tier).
+     *
+     * <p>Used when creating new subscriptions without explicit tier selection.</p>
+     */
+    @Column(name = "default_tier", length = 50)
+    private String defaultTier;
 
     public boolean includesModule(String modulePath) {
         return includedModules.stream()
@@ -85,6 +107,56 @@ public class OSDefinition extends BaseEntity {
 
     public void removeModule(String modulePath) {
         includedModules.remove(modulePath);
+    }
+
+    /**
+     * Check if a tier is available for this OS.
+     *
+     * @param tierName the tier name to check
+     * @return true if the tier is available
+     */
+    public boolean hasTier(String tierName) {
+        return availableTiers != null && availableTiers.contains(tierName);
+    }
+
+    /**
+     * Get the default tier for this OS.
+     *
+     * @return the default tier name, or null if not set
+     */
+    public String getDefaultTier() {
+        if (defaultTier != null) {
+            return defaultTier;
+        }
+        // Fallback to validator
+        return PricingTierValidator.getDefaultTier(osCode);
+    }
+
+    /**
+     * Validate OS definition before persisting.
+     */
+    @PrePersist
+    @PreUpdate
+    private void validate() {
+        // Set available tiers from validator if not set
+        if (availableTiers == null || availableTiers.isEmpty()) {
+            this.availableTiers = new ArrayList<>(
+                PricingTierValidator.getValidTiers(osCode)
+            );
+        }
+
+        // Set default tier from validator if not set
+        if (defaultTier == null) {
+            this.defaultTier = PricingTierValidator.getDefaultTier(osCode);
+        }
+
+        // Validate default tier is in available tiers
+        if (defaultTier != null && !availableTiers.contains(defaultTier)) {
+            throw new IllegalStateException(
+                String.format("Default tier '%s' must be in available tiers: %s",
+                    defaultTier, availableTiers)
+            );
+        }
     }
 }
 

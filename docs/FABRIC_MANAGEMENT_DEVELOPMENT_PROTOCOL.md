@@ -1,9 +1,28 @@
 # 🧭 FABRIC MANAGEMENT PLATFORM – DEVELOPMENT PROTOCOL
 
-**Version:** 3.0  
+**Version:** 4.0  
 **Status:** ✅ Approved – Ready for Implementation  
 **Scope:** Development standards, architectural principles, and operational patterns for the Fabric Management System  
-**Last Updated:** 2025-01-27
+**Last Updated:** 2025-10-25  
+**Latest Addition:** ⭐ Composable Feature-Based Subscription Model
+
+---
+
+## 📋 QUICK NAVIGATION
+
+| Section                                                                   | Description                       | Key Topics                                                    |
+| ------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------- |
+| [Primary Goals](#primary-goals)                                           | Platform objectives               | Performance, modularity, security                             |
+| [Target Architecture](#target-architecture-overview)                      | System overview                   | Modular monolith structure                                    |
+| [Architectural Principles](#architectural-principles)                     | Core principles                   | Domain boundaries, events, multi-tenancy, **⭐ subscription** |
+| [Enterprise Flow Chain](#enterprise-flow-chain)                           | Request flow                      | Controller → Service → Domain → Event                         |
+| [Directory Structure](#directory-structure-final)                         | Code organization                 | Module layout, **⭐ subscription/**                           |
+| [Strategic Domains](#new-strategic-domains)                               | Governance & Operations           | Policy governance, job orchestration                          |
+| [Security & Policy](#security--policy-protocol)                           | Security layers                   | JWT, RBAC, ABAC                                               |
+| [**⭐ Subscription Model**](#composable-feature-based-subscription-model) | **⭐ Feature-based subscription** | **OS catalog, tiers, quotas**                                 |
+| [Quality Checklist](#quality-checklist)                                   | Quality standards                 | Test coverage, security, performance                          |
+| [Summary](#summary)                                                       | Platform summary                  | Key achievements                                              |
+| [Next Steps](#next-steps)                                                 | Implementation roadmap            | Migration steps                                               |
 
 ---
 
@@ -78,11 +97,37 @@
 - RLS (Row-Level Security) PostgreSQL'de aktif
 - `TenantFilter` (common/security) request'ten tenant'ı alır ve DB context'e aktarır
 
-### 5. Centralized Policy Control
+### 5. Centralized Policy & Subscription Control
 
-- Endpoint bazlı erişim denetimi `common/policy` modülünde yapılır
-- Policy'ler subscription, department, role, conditions üzerinden değerlendirilir
-- Tüm domain endpoint'leri `@PolicyCheck` anotasyonu ile korunur
+**4-Layer Access Control Architecture:**
+
+```
+┌────────────────────────────────────────────┐
+│  Layer 1: OS Subscription                  │  ← ⭐ NEW
+│  ─────────────────────────────             │
+│  Tenant YarnOS'a abone mi?                 │
+├────────────────────────────────────────────┤
+│  Layer 2: Feature Entitlement              │  ← ⭐ NEW
+│  ─────────────────────────────             │
+│  YarnOS "yarn.blend" feature'ı var mı?     │
+├────────────────────────────────────────────┤
+│  Layer 3: Usage Quota                      │  ← ⭐ NEW
+│  ─────────────────────────────             │
+│  Fiber entity limiti aşıldı mı?            │
+├────────────────────────────────────────────┤
+│  Layer 4: Policy Engine (RBAC/ABAC)        │
+│  ─────────────────────────────             │
+│  User role & permission check              │
+└────────────────────────────────────────────┘
+```
+
+- **Subscription Layer** (`common/platform/subscription`) - OS-based subscription validation
+- **Feature Entitlement** - Granular feature-level access control
+- **Usage Quotas** - API, storage, entity limit enforcement
+- **Policy Engine** (`common/platform/policy`) - Role & permission based access
+- Tüm domain endpoint'leri `@PolicyCheck` ve subscription check ile korunur
+
+**Detaylı bilgi:** [SUBSCRIPTION_MODEL.md](./modular_monolith/SUBSCRIPTION_MODEL.md)
 
 ### 6. Self-Healing & Degraded Mode
 
@@ -121,12 +166,21 @@ HTTP Request → Controller → DTO → Service → Domain → Repository → Ev
 public class MaterialController {
 
     private final MaterialService materialService;
+    private final EnhancedSubscriptionService subscriptionService;  // ⭐ NEW
 
     @PolicyCheck(resource="fabric.material.create", action="POST")
     @AuditLog(action="MATERIAL_CREATE", resource="material")
     @PostMapping
     public ResponseEntity<ApiResponse<MaterialDto>> createMaterial(@Valid @RequestBody CreateMaterialRequest request) {
         log.info("Creating material: {}", request.getName());
+
+        // ⭐ SUBSCRIPTION CHECK (4-Layer Control)
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        subscriptionService.enforceEntitlement(
+            tenantId,
+            "production.material.create",  // Feature ID
+            "material_entities"             // Quota type (optional)
+        );
 
         MaterialDto created = materialService.createMaterial(request);
 
@@ -282,7 +336,11 @@ fabric-management-backend/  (ROOT - Tek Modular Monolith)
 │  │  │  ├─ config/           # Centralized Configuration
 │  │  │  ├─ monitoring/       # Metrics, Health, Tracing, Observability
 │  │  │  ├─ communication/    # Notifications (Email, SMS, WhatsApp, in-app)
-│  │  │  └─ subscription/     # OS-based Subscription & Feature Management
+│  │  │  └─ subscription/     # ⭐ Composable Feature-Based Subscription
+│  │  │     ├─ domain/        # Subscription, SubscriptionQuota, FeatureCatalog
+│  │  │     ├─ app/           # SubscriptionService, QuotaService
+│  │  │     ├─ infra/         # Repositories (Subscription, Quota, Feature)
+│  │  │     └─ api/           # Subscription management endpoints
 │  │  │
 │  │  ├─ infrastructure/      # Shared Infrastructure Layer
 │  │  │  ├─ persistence/      # BaseEntity, AuditableEntity, Repository base
@@ -888,7 +946,10 @@ Broker down ise birikiyor; sistem çalışmaya devam eder.
 
 - **common/:**
 
-  - platform: auth, user, company, policy, audit, config, monitoring, communication, subscription
+  - platform: auth, user, company, policy, audit, config, monitoring, communication, **subscription** ⭐
+    - **subscription:** OS catalog (FabricOS, YarnOS, LoomOS, etc.), feature entitlement, usage quotas
+    - Supports: String-based pricing tiers, JSONB feature storage, composable OS model
+    - See: [SUBSCRIPTION_MODEL.md](./modular_monolith/SUBSCRIPTION_MODEL.md)
   - infrastructure: persistence, events, mapping, cqrs, web, security, cache
   - util: Money, Unit, TimeHelper
 
@@ -1061,6 +1122,89 @@ public class ReceivingService {
 
 ---
 
+## 💳 COMPOSABLE FEATURE-BASED SUBSCRIPTION MODEL
+
+### **⭐ Overview**
+
+FabricOS, **esnek, özellik tabanlı** abonelik modeli kullanır. Kullanıcılar sadece ihtiyaç duydukları OS'ları satın alır.
+
+### **Architecture Layers**
+
+```
+Layer 1: OS Subscription     → Tenant YarnOS'a abone mi?
+Layer 2: Feature Entitlement → YarnOS "yarn.blend" var mı?
+Layer 3: Usage Quota         → Fiber entity limiti aşıldı mı?
+Layer 4: Policy Engine       → User permission check
+```
+
+### **OS Catalog (10 OS)**
+
+| OS                 | Tier'lar                         | Entry Price | Açıklama                         |
+| ------------------ | -------------------------------- | ----------- | -------------------------------- |
+| **FabricOS**       | Base (zorunlu)                   | $199/mo     | Tüm tenantlar için base platform |
+| **YarnOS**         | Starter/Professional/Enterprise  | $99/mo      | İplik üretimi (fiber + yarn)     |
+| **LoomOS**         | Starter/Professional/Enterprise  | $149/mo     | Dokuma üretimi                   |
+| **KnitOS**         | Starter/Professional/Enterprise  | $129/mo     | Örme üretimi                     |
+| **DyeOS**          | Starter/Professional/Enterprise  | $119/mo     | Boya & Apre                      |
+| **AnalyticsOS**    | Standard/Advanced/Enterprise     | $149/mo     | BI & Raporlama                   |
+| **IntelligenceOS** | Professional/Enterprise          | $299/mo     | AI & Tahminleme                  |
+| **EdgeOS**         | Starter/Professional/Enterprise  | $199/mo     | IoT & Sensörler                  |
+| **AccountOS**      | Standard/Professional/Enterprise | $79/mo      | Resmi Muhasebe                   |
+| **CustomOS**       | Standard/Professional/Enterprise | $399/mo     | Dış Entegrasyonlar               |
+
+### **Key Features**
+
+✅ **String-Based Tiers** - Her OS'un kendi tier isimleri (enum yok!)  
+✅ **JSONB Storage** - Esnek feature ve tier yapısı  
+✅ **Composable** - Sadece ihtiyaç duyulan OS'lar alınır  
+✅ **Granular Control** - Feature-level entitlement  
+✅ **Usage Quotas** - API, storage, entity limitleri  
+✅ **Database-Driven** - Feature catalog database'de saklanır
+
+### **Implementation Example**
+
+```java
+@Service
+public class EnhancedSubscriptionService {
+
+    public void enforceEntitlement(UUID tenantId, String featureId, String quotaType) {
+        // Layer 1: OS Subscription
+        String osCode = extractOsCode(featureId);
+        if (!hasActiveSubscription(tenantId, osCode)) {
+            throw new SubscriptionRequiredException(osCode + " required");
+        }
+
+        // Layer 2: Feature Entitlement
+        if (!hasFeature(tenantId, featureId)) {
+            throw new FeatureNotAvailableException("Feature not in your tier");
+        }
+
+        // Layer 3: Usage Quota
+        if (quotaType != null && !hasQuota(tenantId, quotaType)) {
+            throw new QuotaExceededException("Quota exceeded");
+        }
+    }
+}
+```
+
+### **Database Tables**
+
+- `common_subscription` - OS subscriptions (pricing_tier: String)
+- `common_subscription_quota` - Usage quotas (users, API calls, entities)
+- `common_feature_catalog` - Feature entitlement rules (available_in_tiers: JSONB)
+- `common_os_definition` - OS definitions (available_tiers: JSONB)
+
+### **Documentation**
+
+**Detaylı bilgi için:**
+
+- [SUBSCRIPTION_INDEX.md](./modular_monolith/SUBSCRIPTION_INDEX.md) - Documentation index
+- [SUBSCRIPTION_MODEL.md](./modular_monolith/SUBSCRIPTION_MODEL.md) - Kapsamlı dokümantasyon (1167 satır)
+- [SUBSCRIPTION_QUICK_START.md](./modular_monolith/SUBSCRIPTION_QUICK_START.md) - Hızlı başlangıç
+- [common/platform/company/SUBSCRIPTION.md](./modular_monolith/common/platform/company/SUBSCRIPTION.md) - Implementation guide
+
+---
+
 ## ✅ QUALITY CHECKLIST
 
 | Kategori                | Gereklilik                                 |
@@ -1068,7 +1212,7 @@ public class ReceivingService {
 | 🔍 **Test Coverage**    | %80 minimum (module-based)                 |
 | 🧠 **Code Readability** | Domain-first structure, no "god services"  |
 | 🧩 **Extensibility**    | Yeni domain eklenebilir, eskiye dokunmadan |
-| 🔒 **Security**         | JWT + Policy enforcement aktif             |
+| 🔒 **Security**         | JWT + Policy + Subscription enforcement    |
 | ⚡ **Performance**      | Endpoint latency < 50ms (in-process calls) |
 | 🧱 **Fault Tolerance**  | Outbox + retry + cache                     |
 | 🧾 **Auditability**     | Common/Audit log records for every action  |
@@ -1081,7 +1225,8 @@ Fabric Management Platform artık:
 
 - 🧩 **Modular Monolith** mimarisiyle yönetilebilir
 - 🔄 **Event-driven** yapıda ölçeklenebilir
-- 🔐 **Common platform engine** ile güvenli
+- 🔐 **4-Layer Security** ile korunur (Subscription → Feature → Quota → Policy)
+- 💳 **Composable Subscription Model** ile esnek fiyatlandırma sunar
 - ⚙️ **Low-latency** ve **low-cost** şekilde çalışabilir
 - 💡 Geliştiriciler için sade, net, esnek bir yapı sunar
 
@@ -1091,13 +1236,24 @@ Fabric Management Platform artık:
 
 1. **Common modülü** oluştur (platform + infrastructure)
 2. **@ApplicationModule** yapılarını tanımla (Spring Modulith)
-3. **PolicyEngine** ve **TenantFilter**'ı aktif et
-4. **Outbox + Redis + Flyway** altyapısını kur
-5. **İlk modül**: Yarn Production Flow (fiber → yarn → fabric)
-6. **Integration testleri**yle domain eventlerini doğrula
+3. **SubscriptionService + PolicyEngine** aktif et (4-layer control)
+4. **Subscription database migrations** oluştur
+5. **Outbox + Redis + Flyway** altyapısını kur
+6. **Feature catalog seeding** implement et
+7. **İlk modül**: Yarn Production Flow (fiber → yarn → fabric)
+8. **Integration testleri** ile subscription + policy + events doğrula
 
 ---
 
-**Protocol Version:** 3.0  
-**Last Updated:** 2025-01-27  
-**Maintained By:** Fabric Management Team
+**Protocol Version:** 4.0  
+**Last Updated:** 2025-10-25  
+**Maintained By:** Fabric Management Team  
+**Latest Addition:** ⭐ Composable Feature-Based Subscription Model
+
+---
+
+**📚 Key Documentation:**
+
+- [SUBSCRIPTION_INDEX.md](./modular_monolith/SUBSCRIPTION_INDEX.md) - Subscription documentation index
+- [ARCHITECTURE.md](./modular_monolith/ARCHITECTURE.md) - Modular monolith architecture
+- [PROJECT_PROGRESS.md](./modular_monolith/PROJECT_PROGRESS.md) - Implementation progress

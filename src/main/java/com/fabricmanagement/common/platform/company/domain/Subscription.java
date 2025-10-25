@@ -35,9 +35,17 @@ import java.util.Map;
  *     .status(SubscriptionStatus.TRIAL)
  *     .startDate(Instant.now())
  *     .trialEndsAt(Instant.now().plus(14, ChronoUnit.DAYS))
- *     .pricingTier(PricingTier.PROFESSIONAL)
+ *     .pricingTier("Professional")
  *     .build();
  * }</pre>
+ *
+ * <h2>Pricing Tier Examples by OS:</h2>
+ * <ul>
+ *   <li>YarnOS: "Starter", "Professional", "Enterprise"</li>
+ *   <li>AnalyticsOS: "Standard", "Advanced", "Enterprise"</li>
+ *   <li>IntelligenceOS: "Professional", "Enterprise"</li>
+ *   <li>EdgeOS: "Starter", "Professional", "Enterprise"</li>
+ * </ul>
  */
 @Entity
 @Table(name = "common_subscription", schema = "common_company",
@@ -77,10 +85,18 @@ public class Subscription extends BaseEntity {
     @Builder.Default
     private Map<String, Boolean> features = new HashMap<>();
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "pricing_tier", nullable = false, length = 20)
-    @Builder.Default
-    private PricingTier pricingTier = PricingTier.BASIC;
+    /**
+     * Pricing tier for this subscription.
+     *
+     * <p>Tier names vary by OS:</p>
+     * <ul>
+     *   <li>YarnOS, LoomOS, KnitOS, DyeOS, EdgeOS: "Starter", "Professional", "Enterprise"</li>
+     *   <li>AnalyticsOS, AccountOS, CustomOS: "Standard", "Professional", "Enterprise"</li>
+     *   <li>IntelligenceOS: "Professional", "Enterprise"</li>
+     * </ul>
+     */
+    @Column(name = "pricing_tier", nullable = false, length = 50)
+    private String pricingTier;
 
     public boolean isActive() {
         if (this.status == SubscriptionStatus.ACTIVE) {
@@ -135,6 +151,28 @@ public class Subscription extends BaseEntity {
 
     public void disableFeature(String featureName) {
         this.features.put(featureName, false);
+    }
+
+    /**
+     * Validate subscription before persisting.
+     */
+    @PrePersist
+    @PreUpdate
+    private void validate() {
+        // Validate pricing tier for this OS
+        if (osCode != null && pricingTier != null) {
+            if (!PricingTierValidator.isValidTier(osCode, pricingTier)) {
+                throw new IllegalStateException(
+                    String.format("Invalid pricing tier '%s' for OS '%s'. Valid tiers: %s",
+                        pricingTier, osCode, PricingTierValidator.getValidTiers(osCode))
+                );
+            }
+        }
+
+        // Set default tier if not specified
+        if (pricingTier == null && osCode != null) {
+            this.pricingTier = PricingTierValidator.getDefaultTier(osCode);
+        }
     }
 }
 
