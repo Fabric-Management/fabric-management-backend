@@ -94,6 +94,7 @@
 - Kafka **optional** - development'ta Spring Events yeterli, production'da Kafka eklenebilir
 
 **Async Architecture:**
+
 ```java
 // Publisher (main thread)
 eventPublisher.publish(new UserCreatedEvent(...));
@@ -110,6 +111,7 @@ public void onUserCreated(UserCreatedEvent event) {
 ```
 
 **Benefits:**
+
 - ✅ Non-blocking operations
 - ✅ Transaction-safe (Spring Modulith)
 - ✅ Reliable delivery (event_publication table)
@@ -1093,26 +1095,27 @@ class LogisticsModule {}
 
 **Domainler arası:**
 
-1. **Event-first (ASYNC!):** 
+1. **Event-first (ASYNC!):**
+
    - `ApplicationEventPublisher` ile event publish
    - **Spring Modulith Events** - event_publication tablosuna yazılır (transaction-safe!)
    - **@Async @EventListener** ile async processing (non-blocking!)
    - Kafka **optional** - external systems için (YAGNI principle!)
-   
+
    ```java
    // Async event pattern (RECOMMENDED!)
    @Service
    public class MaterialService {
        public MaterialDto create(CreateMaterialRequest request) {
            Material saved = materialRepository.save(material);
-           
+
            // ASYNC EVENT - immediate return!
            eventPublisher.publish(new MaterialCreatedEvent(...));
-           
+
            return MaterialDto.from(saved); // Returns immediately!
        }
    }
-   
+
    // Listener (separate module, async!)
    @EventListener
    @Async  // ← Runs in background thread!
@@ -1124,7 +1127,7 @@ class LogisticsModule {}
    ```
 
 2. **Read-only façade (SYNC):** Başka domain verisini okumak için api/Facade üzerinden in-process call.
-   
+
    ```java
    // Synchronous facade call
    Optional<MaterialDto> material = materialFacade.findById(tenantId, materialId);
@@ -1132,6 +1135,7 @@ class LogisticsModule {}
    ```
 
 **Event vs Facade:**
+
 - **Facade:** Synchronous read (immediate response needed)
 - **Events:** Asynchronous writes (fire-and-forget, eventual consistency)
 

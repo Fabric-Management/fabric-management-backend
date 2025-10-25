@@ -32,7 +32,7 @@ CREATE TABLE common_auth.common_auth_user (
 
 CREATE UNIQUE INDEX idx_auth_contact ON common_auth.common_auth_user(contact_value);
 CREATE INDEX idx_auth_verified ON common_auth.common_auth_user(is_verified) WHERE is_verified = TRUE;
-CREATE INDEX idx_auth_locked ON common_auth.common_auth_user(locked_until) WHERE locked_until > CURRENT_TIMESTAMP;
+CREATE INDEX idx_auth_locked ON common_auth.common_auth_user(locked_until) WHERE locked_until IS NOT NULL;
 
 COMMENT ON TABLE common_auth.common_auth_user IS 'Authentication credentials - BCrypt password hashing';
 COMMENT ON COLUMN common_auth.common_auth_user.password_hash IS 'BCrypt hash (strength 10)';
