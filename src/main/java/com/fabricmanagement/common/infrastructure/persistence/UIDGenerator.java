@@ -66,7 +66,7 @@ public class UIDGenerator {
         }
 
         // For now, generate a simple sequential number
-        // TODO: Implement database sequence-based generation
+        //TODO: Implement database sequence-based generation 
         long sequence = System.currentTimeMillis() % 100000;
 
         String uid = String.format("%s-%s-%05d", tenantUid, moduleCode.toUpperCase(), sequence);
