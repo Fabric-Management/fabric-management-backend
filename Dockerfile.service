@@ -1,46 +1,35 @@
 # =============================================================================
-# FABRIC MANAGEMENT - UNIVERSAL SERVICE DOCKERFILE
+# FABRIC MANAGEMENT - MODULAR MONOLITH DOCKERFILE
 # =============================================================================
-# DRY Principle: Single parameterized Dockerfile for ALL services
-# Usage: docker build -f Dockerfile.service --build-arg SERVICE_NAME=api-gateway --build-arg SERVICE_PORT=8080 .
-#
-# Supports: user-service, contact-service, company-service, api-gateway
-
-# Build arguments
-ARG SERVICE_NAME
-ARG SERVICE_PORT
+# Single deployable JAR - All modules in one application
+# Updated: 2025-10-25
 
 # =============================================================================
-# Stage 1: Build (Optimized with dependency caching)
+# Stage 1: Build (Maven Build with Dependency Caching)
 # =============================================================================
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 
-ARG SERVICE_NAME
-
 WORKDIR /build
 
-# Copy parent POM for dependency resolution
+# Copy POM for dependency resolution (cache layer)
 COPY pom.xml .
 
-# Copy shared modules first (changes less frequently)
-COPY shared/ shared/
+# Download dependencies (cached if POM unchanged)
+RUN mvn dependency:go-offline -B
 
-# Copy ALL services (Maven reactor needs all modules defined in parent POM)
-COPY services/ services/
+# Copy source code
+COPY src/ src/
 
-# Build only the specific service with its dependencies
-RUN mvn clean package -pl services/${SERVICE_NAME} -am -DskipTests -B
+# Build application
+RUN mvn clean package -DskipTests -B
 
 # =============================================================================
 # Stage 2: Runtime Image (Minimal & Secure)
 # =============================================================================
 FROM eclipse-temurin:21-jre-alpine
 
-ARG SERVICE_NAME
-ARG SERVICE_PORT
-
-# Install only essential tools
-RUN apk add --no-cache curl bash netcat-openbsd && \
+# Install essential tools
+RUN apk add --no-cache curl bash && \
     rm -rf /var/cache/apk/*
 
 # Create non-root user for security
@@ -49,15 +38,15 @@ RUN addgroup -g 1001 -S fabricuser && \
 
 WORKDIR /app
 
-# Copy JAR from build stage with ownership
+# Copy JAR from build stage
 COPY --from=build --chown=fabricuser:fabricuser \
-    /build/services/${SERVICE_NAME}/target/${SERVICE_NAME}-1.0.0-SNAPSHOT.jar app.jar
+    /build/target/fabric-management-backend-1.0.0-SNAPSHOT.jar app.jar
 
-# Copy optimized entrypoint script
+# Copy entrypoint script
 COPY --chown=fabricuser:fabricuser scripts/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Create logs directory with proper permissions
+# Create logs directory
 RUN mkdir -p /app/logs && \
     chown -R fabricuser:fabricuser /app
 
@@ -65,15 +54,18 @@ RUN mkdir -p /app/logs && \
 USER fabricuser
 
 # Expose application port
-EXPOSE ${SERVICE_PORT}
+EXPOSE 8080
 
-# Health check (dynamic based on service)
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:${SERVICE_PORT}/actuator/health || exit 1
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 # Environment variables
-ENV SPRING_APPLICATION_NAME=${SERVICE_NAME}
-ENV SERVER_PORT=${SERVICE_PORT}
+ENV SPRING_APPLICATION_NAME=fabric-management-system
+ENV SERVER_PORT=8080
 
-# Use optimized entrypoint
+# JVM options for production
+ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+# Use entrypoint
 ENTRYPOINT ["/docker-entrypoint.sh"]

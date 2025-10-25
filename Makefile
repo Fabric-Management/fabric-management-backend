@@ -1,9 +1,9 @@
 # =============================================================================
-# FABRIC MANAGEMENT SYSTEM - MAKEFILE
+# FABRIC MANAGEMENT SYSTEM - MAKEFILE (Modular Monolith)
 # =============================================================================
 # Production-ready development & deployment commands
 
-.PHONY: help setup validate-env build test clean deploy down restart logs status health db-shell rebuild-service restart-service logs-service kafka-topics kafka-describe kafka-delete kafka-consumer
+.PHONY: help setup validate-env build test clean deploy down restart logs status health db-shell db-migrate app-run app-build
 
 .DEFAULT_GOAL := help
 
@@ -18,15 +18,16 @@ NC := \033[0m
 # HELP
 # =============================================================================
 help: ## Show available commands
-	@echo "$(GREEN)========================================$(NC)"
-	@echo "$(GREEN)  Fabric Management - Make Commands$(NC)"
-	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)============================================$(NC)"
+	@echo "$(GREEN)  Fabric Management - Modular Monolith$(NC)"
+	@echo "$(GREEN)============================================$(NC)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(BLUE)%-25s$(NC) %s\n", $$1, $$2}'
 	@echo ""
-	@echo "$(YELLOW)Examples:$(NC)"
-	@echo "  make rebuild-service SERVICE=user-service"
-	@echo "  make logs-service SERVICE=contact-service"
+	@echo "$(YELLOW)Quick Start:$(NC)"
+	@echo "  make dev          # Start PostgreSQL + Redis"
+	@echo "  make app-run      # Run Spring Boot app"
+	@echo "  make health       # Check application health"
 	@echo ""
 
 # =============================================================================
@@ -50,306 +51,338 @@ validate-env: ## Validate .env file exists
 	@echo "$(GREEN)✅ Environment valid$(NC)"
 
 # =============================================================================
-# BUILD
+# APPLICATION BUILD & RUN
 # =============================================================================
-build: ## Build all services (Maven + Docker)
-	@echo "$(YELLOW)🏗️  Building all services...$(NC)"
-	@mvn clean install -DskipTests
-	@docker compose up -d
-	@docker compose build --no-cache
-	@echo "$(GREEN)✅ Build completed & services started$(NC)"
-	@sleep 200
-	@make status
+app-build: ## Build Spring Boot application (Maven)
+	@echo "$(YELLOW)🏗️  Building application...$(NC)"
+	@mvn clean package -DskipTests
+	@echo "$(GREEN)✅ Application built → target/fabric-management-backend-1.0.0-SNAPSHOT.jar$(NC)"
 
-build-shared: ## Build all shared modules (domain, infrastructure, security)
-	@echo "$(YELLOW)🏗️  Building shared modules...$(NC)"
-	@cd shared/shared-domain && mvn clean install -DskipTests
-	@cd shared/shared-application && mvn clean install -DskipTests
-	@cd shared/shared-infrastructure && mvn clean install -DskipTests
-	@cd shared/shared-security && mvn clean install -DskipTests
-	@echo "$(GREEN)✅ Shared modules built$(NC)"
+app-run: ## Run Spring Boot application
+	@echo "$(YELLOW)🚀 Running application...$(NC)"
+	@mvn spring-boot:run -Dspring-boot.run.profiles=local
 
-build-service: ## Build specific service (make build-service SERVICE=user-service)
-	@echo "$(YELLOW)🏗️  Building $(SERVICE)...$(NC)"
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Specify: make build-service SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	@mvn clean package -pl services/$(SERVICE) -am -DskipTests
-	@echo "$(GREEN)✅ $(SERVICE) built$(NC)"
-
-rebuild-service: ## Rebuild + restart service (make rebuild-service SERVICE=user-service)
-	@echo "$(YELLOW)⚡ Rebuilding $(SERVICE)...$(NC)"
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Specify: make rebuild-service SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	@mvn clean package -pl services/$(SERVICE) -am -DskipTests
-	@docker compose up -d --build --no-deps fabric-$(SERVICE)
-	@echo "$(GREEN)✅ $(SERVICE) rebuilt & restarted$(NC)"
-
-rebuild-with-shared: ## Rebuild shared + service + restart (make rebuild-with-shared SERVICE=user-service)
-	@echo "$(YELLOW)⚡ Rebuilding shared + $(SERVICE)...$(NC)"
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Specify: make rebuild-with-shared SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	@make build-shared
-	@mvn clean package -pl services/$(SERVICE) -DskipTests
-	@docker compose up -d --build --no-deps fabric-$(SERVICE)
-	@echo "$(GREEN)✅ Shared + $(SERVICE) rebuilt & restarted$(NC)"
-
-rebuild: ## 🔄 Full clean rebuild (remove everything & rebuild all)
-	@echo "$(YELLOW)🧹  Cleaning up all Docker resources...$(NC)"
-	@docker compose down --rmi all --volumes --remove-orphans || true
-	@docker builder prune -a -f || true
-	@docker system prune -a --volumes -f || true
-	@echo "$(YELLOW)🏗️  Building all services (Maven + Docker)...$(NC)"
-	@mvn clean install -DskipTests
-	@echo "$(YELLOW)🚧  Building Docker images without cache...$(NC)"
-	@docker compose build --no-cache
-	@echo "$(YELLOW)🚀  Starting Docker containers...$(NC)"
-	@docker compose up -d
-	@echo "$(GREEN)✅  Rebuild completed & services started$(NC)"
-	@sleep 240
-	@make status
-
-# =============================================================================
-# TEST
-# =============================================================================
-test: ## Run all tests
+app-test: ## Run all tests
 	@echo "$(YELLOW)🧪 Running tests...$(NC)"
-	mvn test
+	@mvn test
 	@echo "$(GREEN)✅ Tests completed$(NC)"
 
-test-service: ## Test specific service (make test-service SERVICE=user-service)
-	@echo "$(YELLOW)🧪 Testing $(SERVICE)...$(NC)"
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Specify: make test-service SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	mvn test -pl services/$(SERVICE)
-	@echo "$(GREEN)✅ $(SERVICE) tests completed$(NC)"
+app-integration-test: ## Run integration tests
+	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
+	@mvn verify
+	@echo "$(GREEN)✅ Integration tests completed$(NC)"
 
 # =============================================================================
-# DEPLOYMENT
+# DOCKER INFRASTRUCTURE
 # =============================================================================
-deploy-infra: validate-env ## Deploy infrastructure (PostgreSQL, Redis, Kafka)
+dev: validate-env ## Start PostgreSQL + Redis (fast dev mode)
+	@echo "$(YELLOW)🚀 Starting development infrastructure...$(NC)"
+	@docker compose up -d postgres redis
+	@echo "$(GREEN)✅ Infrastructure started$(NC)"
+	@sleep 3
+	@make status
+
+deploy-infra: validate-env ## Deploy full infrastructure (PostgreSQL, Redis, Kafka, Monitoring)
 	@echo "$(YELLOW)🚀 Deploying infrastructure...$(NC)"
-	docker compose up -d postgres redis kafka
+	@docker compose up -d postgres redis kafka prometheus grafana
 	@echo "$(GREEN)✅ Infrastructure deployed$(NC)"
 	@sleep 5
 	@make status
 
-deploy: validate-env ## Deploy all services
+deploy-all: validate-env ## Deploy infrastructure + monitoring
 	@echo "$(YELLOW)🚀 Deploying complete system...$(NC)"
-	docker compose up -d
+	@docker compose up -d
 	@echo "$(GREEN)✅ System deployed$(NC)"
 	@sleep 10
-	@make health
+	@make status
 
 # =============================================================================
 # MANAGEMENT
 # =============================================================================
-down: ## Stop all services
+down: ## Stop all Docker services
 	@echo "$(YELLOW)🛑 Stopping services...$(NC)"
-	docker compose down
+	@docker compose down
 	@echo "$(GREEN)✅ Services stopped$(NC)"
 
 down-clean: ## Stop services + remove volumes (DESTRUCTIVE!)
 	@echo "$(RED)⚠️  Stopping services & removing volumes...$(NC)"
-	docker compose down -v
+	@docker compose down -v
 	@echo "$(GREEN)✅ Services stopped, volumes removed$(NC)"
 
-restart: ## Restart all services
+restart: ## Restart all Docker services
 	@echo "$(YELLOW)🔄 Restarting services...$(NC)"
-	docker compose restart
+	@docker compose restart
 	@echo "$(GREEN)✅ Services restarted$(NC)"
 
-restart-service: ## Restart specific service (make restart-service SERVICE=user-service)
-	@echo "$(YELLOW)🔄 Restarting $(SERVICE)...$(NC)"
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Specify: make restart-service SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	docker compose restart fabric-$(SERVICE)
-	@echo "$(GREEN)✅ $(SERVICE) restarted$(NC)"
+restart-db: ## Restart PostgreSQL only
+	@echo "$(YELLOW)🔄 Restarting PostgreSQL...$(NC)"
+	@docker compose restart postgres
+	@echo "$(GREEN)✅ PostgreSQL restarted$(NC)"
 
 # =============================================================================
 # MONITORING
 # =============================================================================
-status: ## Show service status
+status: ## Show Docker service status
 	@echo "$(YELLOW)📊 Service Status:$(NC)"
 	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 
 logs: ## Show logs from all services
-	docker compose logs -f --tail=100
+	@docker compose logs -f --tail=100
 
-logs-service: ## Show logs from service (make logs-service SERVICE=user-service)
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Specify: make logs-service SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	docker compose logs -f --tail=100 fabric-$(SERVICE)
+logs-db: ## Show PostgreSQL logs
+	@docker compose logs -f --tail=100 postgres
+
+logs-redis: ## Show Redis logs
+	@docker compose logs -f --tail=100 redis
 
 logs-errors: ## Show ERROR/EXCEPTION logs
 	@docker compose logs --tail=200 | grep -iE "error|exception|failed" || echo "$(GREEN)✅ No errors$(NC)"
 
-health: ## Check service health
+health: ## Check application health
 	@echo "$(BLUE)🏥 Health Check:$(NC)"
-	@echo "\n$(YELLOW)User Service:$(NC)"
-	@curl -s http://localhost:8081/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Not responding$(NC)"
-	@echo "\n$(YELLOW)Contact Service:$(NC)"
-	@curl -s http://localhost:8082/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Not responding$(NC)"
-	@echo "\n$(YELLOW)Company Service:$(NC)"
-	@curl -s http://localhost:8083/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Not responding$(NC)"
+	@echo "\n$(YELLOW)Application Health:$(NC)"
+	@curl -s http://localhost:8080/api/health | jq . 2>/dev/null || echo "$(RED)❌ Application not responding$(NC)"
+	@echo "\n$(YELLOW)Actuator Health:$(NC)"
+	@curl -s http://localhost:8080/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Actuator not responding$(NC)"
+	@echo "\n$(YELLOW)PostgreSQL:$(NC)"
+	@docker compose ps postgres | grep -q "(healthy)" && echo "$(GREEN)✅ Healthy$(NC)" || echo "$(RED)❌ Unhealthy$(NC)"
+	@echo "\n$(YELLOW)Redis:$(NC)"
+	@docker compose ps redis | grep -q "(healthy)" && echo "$(GREEN)✅ Healthy$(NC)" || echo "$(RED)❌ Unhealthy$(NC)"
 
-ps: ## Show running containers
+ps: ## Show running Docker containers
 	@docker ps --filter "name=fabric-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 # =============================================================================
-# DATABASE
+# DATABASE (PostgreSQL)
 # =============================================================================
 db-shell: ## Open PostgreSQL shell
-	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb
+	@docker exec -it fabric-postgres psql -U fabric_user -d fabric_management
 
-db-tables: ## List all tables with row counts
+db-migrate: ## Run Flyway migrations manually
+	@echo "$(YELLOW)🗄️  Running database migrations...$(NC)"
+	@mvn flyway:migrate
+	@echo "$(GREEN)✅ Migrations completed$(NC)"
+
+db-info: ## Show Flyway migration status
+	@echo "$(YELLOW)📊 Migration Status:$(NC)"
+	@mvn flyway:info
+
+db-validate: ## Validate migrations
+	@echo "$(YELLOW)🔍 Validating migrations...$(NC)"
+	@mvn flyway:validate
+	@echo "$(GREEN)✅ Migrations valid$(NC)"
+
+db-clean: ## Clean database (DESTRUCTIVE! Drops all objects)
+	@echo "$(RED)⚠️  WARNING: This will drop all database objects!$(NC)"
+	@read -p "Are you sure? (yes/no): " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
+		mvn flyway:clean; \
+		echo "$(GREEN)✅ Database cleaned$(NC)"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
+
+db-tables: ## List all tables
 	@echo "$(YELLOW)📊 Database Tables:$(NC)"
-	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
+	@docker exec -it fabric-postgres psql -U fabric_user -d fabric_management -c "\
 		SELECT \
 			schemaname AS schema, \
 			tablename AS table, \
-			pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size, \
-			(SELECT count(*) FROM information_schema.columns WHERE table_name = tablename) AS columns, \
-			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS rows \
+			pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size \
 		FROM pg_tables \
-		WHERE schemaname NOT IN ('pg_catalog', 'information_schema') \
+		WHERE schemaname NOT IN ('pg_catalog', 'information_schema', 'flyway') \
 		ORDER BY schemaname, tablename;"
 
-db-data: ## Show tables with data (non-empty)
-	@echo "$(YELLOW)📊 Tables with Data:$(NC)"
-	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
-		SELECT \
-			schemaname AS schema, \
-			tablename AS table, \
-			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS rows \
-		FROM pg_tables \
-		WHERE schemaname NOT IN ('pg_catalog', 'information_schema') \
-		AND (xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int > 0 \
-		ORDER BY rows DESC;"
-
-db-show: ## Show table data (make db-show TABLE=users LIMIT=10)
-	@if [ -z "$(TABLE)" ]; then \
-		echo "$(RED)❌ Specify: make db-show TABLE=table-name LIMIT=10$(NC)"; \
-		exit 1; \
-	fi
-	@echo "$(YELLOW)📊 Data from $(TABLE):$(NC)"
-	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "SELECT * FROM $(TABLE) LIMIT $${LIMIT:-10};"
-
-db-count: ## Count rows in all tables
-	@echo "$(YELLOW)📊 Row Counts:$(NC)"
-	@docker exec -it fabric-postgres psql -U fabricuser -d fabricdb -c "\
-		SELECT \
-			tablename, \
-			(xpath('/row/count/text()', query_to_xml('SELECT count(*) FROM '||schemaname||'.'||tablename, true, false, '')))[1]::text::int AS row_count \
-		FROM pg_tables \
-		WHERE schemaname = 'public' \
-		ORDER BY row_count DESC NULLS LAST;"
+db-schemas: ## List all schemas
+	@echo "$(YELLOW)📂 Database Schemas:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabric_user -d fabric_management -c "\
+		SELECT schema_name \
+		FROM information_schema.schemata \
+		WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'flyway') \
+		ORDER BY schema_name;"
 
 db-backup: ## Backup database
 	@echo "$(YELLOW)💾 Backing up database...$(NC)"
-	@docker exec -t fabric-postgres pg_dump -U fabricuser fabricdb > backup-$$(date +%Y%m%d-%H%M%S).sql
-	@echo "$(GREEN)✅ Database backed up$(NC)"
+	@mkdir -p backups
+	@docker exec -t fabric-postgres pg_dump -U fabric_user fabric_management > backups/backup-$$(date +%Y%m%d-%H%M%S).sql
+	@echo "$(GREEN)✅ Database backed up to backups/$(NC)"
 
-db-restore: ## Restore database (make db-restore FILE=backup.sql)
+db-restore: ## Restore database (make db-restore FILE=backups/backup.sql)
 	@echo "$(YELLOW)📥 Restoring database...$(NC)"
 	@if [ -z "$(FILE)" ]; then \
 		echo "$(RED)❌ Specify: make db-restore FILE=backup.sql$(NC)"; \
 		exit 1; \
 	fi
-	@docker exec -i fabric-postgres psql -U fabricuser fabricdb < $(FILE)
+	@docker exec -i fabric-postgres psql -U fabric_user fabric_management < $(FILE)
 	@echo "$(GREEN)✅ Database restored$(NC)"
 
-# =============================================================================
-# CLEANUP
-# =============================================================================
-clean: ## Clean Maven build artifacts
-	@echo "$(YELLOW)🧹 Cleaning build artifacts...$(NC)"
-	mvn clean
-	@echo "$(GREEN)✅ Clean completed$(NC)"
-
-clean-docker: ## Remove Docker images (DESTRUCTIVE!)
-	@echo "$(RED)⚠️  Removing Docker images...$(NC)"
-	docker compose down --rmi all
-	@echo "$(GREEN)✅ Docker images removed$(NC)"
-
-prune: ## Clean Docker system (dangling resources)
-	@echo "$(YELLOW)🧹 Pruning Docker system...$(NC)"
-	docker system prune -f
-	@echo "$(GREEN)✅ Docker system pruned$(NC)"
+db-reset: ## Reset database (drop + recreate + migrate)
+	@echo "$(RED)⚠️  Resetting database...$(NC)"
+	@docker compose down postgres
+	@docker volume rm fabric-management-backend_postgres_data 2>/dev/null || true
+	@docker compose up -d postgres
+	@echo "$(YELLOW)⏳ Waiting for PostgreSQL to be ready...$(NC)"
+	@sleep 5
+	@echo "$(GREEN)✅ Database reset complete. Flyway will run on next app start.$(NC)"
 
 # =============================================================================
-# CODE QUALITY
+# KAFKA MANAGEMENT
 # =============================================================================
-format: ## Format code (Spotless)
-	@echo "$(YELLOW)💅 Formatting code...$(NC)"
-	mvn spotless:apply
-	@echo "$(GREEN)✅ Code formatted$(NC)"
-
-lint: ## Lint code (Spotless check)
-	@echo "$(YELLOW)🔍 Linting code...$(NC)"
-	mvn spotless:check
-	@echo "$(GREEN)✅ Linting completed$(NC)"
-
-# =============================================================================
-# KAFKA MANAGEMENT (Debug & Inspection)
-# =============================================================================
-# NOTE: Topics auto-initialize via docker-compose.yml kafka-init container
-#       These commands are for debugging and inspection only
-
 kafka-topics: ## List all Kafka topics
-	@echo "$(YELLOW)📋 Listing Kafka topics...$(NC)"
+	@echo "$(YELLOW)📋 Kafka Topics:$(NC)"
 	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --list
 
-kafka-describe: ## Describe a Kafka topic (make kafka-describe TOPIC=user.created)
+kafka-describe: ## Describe Kafka topic (make kafka-describe TOPIC=user.created)
 	@if [ -z "$(TOPIC)" ]; then \
 		echo "$(RED)❌ Specify: make kafka-describe TOPIC=topic-name$(NC)"; \
 		exit 1; \
 	fi
 	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --describe --topic $(TOPIC)
 
-kafka-delete: ## Delete a Kafka topic (make kafka-delete TOPIC=user.created)
-	@if [ -z "$(TOPIC)" ]; then \
-		echo "$(RED)❌ Specify: make kafka-delete TOPIC=topic-name$(NC)"; \
-		exit 1; \
-	fi
-	@echo "$(RED)⚠️  Deleting topic: $(TOPIC)$(NC)"
-	@docker exec fabric-kafka kafka-topics --bootstrap-server localhost:9092 --delete --topic $(TOPIC)
-	@echo "$(GREEN)✅ Topic deleted: $(TOPIC)$(NC)"
-
-kafka-consumer: ## Consume messages from a topic (make kafka-consumer TOPIC=user.created)
+kafka-consumer: ## Consume messages (make kafka-consumer TOPIC=user.created)
 	@if [ -z "$(TOPIC)" ]; then \
 		echo "$(RED)❌ Specify: make kafka-consumer TOPIC=topic-name$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(YELLOW)📨 Consuming from topic: $(TOPIC)$(NC)"
+	@echo "$(YELLOW)📨 Consuming from: $(TOPIC)$(NC)"
 	@docker exec -it fabric-kafka kafka-console-consumer \
 		--bootstrap-server localhost:9092 \
 		--topic $(TOPIC) \
 		--from-beginning
 
 # =============================================================================
+# CLEANUP
+# =============================================================================
+clean: ## Clean Maven build artifacts
+	@echo "$(YELLOW)🧹 Cleaning build artifacts...$(NC)"
+	@mvn clean
+	@echo "$(GREEN)✅ Clean completed$(NC)"
+
+clean-docker: ## Remove Docker images (DESTRUCTIVE!)
+	@echo "$(RED)⚠️  Removing Docker images...$(NC)"
+	@docker compose down --rmi all
+	@echo "$(GREEN)✅ Docker images removed$(NC)"
+
+prune: ## Clean Docker system
+	@echo "$(YELLOW)🧹 Pruning Docker system...$(NC)"
+	@docker system prune -f
+	@echo "$(GREEN)✅ Docker system pruned$(NC)"
+
+rebuild: ## Full rebuild (clean Docker + Maven + deploy)
+	@echo "$(YELLOW)🧹 Full clean rebuild...$(NC)"
+	@make down-clean
+	@make clean
+	@make app-build
+	@make deploy-all
+	@echo "$(GREEN)✅ Rebuild completed$(NC)"
+
+# =============================================================================
+# CODE QUALITY
+# =============================================================================
+lint: ## Check code quality
+	@echo "$(YELLOW)🔍 Checking code quality...$(NC)"
+	@mvn verify -DskipTests
+	@echo "$(GREEN)✅ Code quality check completed$(NC)"
+
+format: ## Format code
+	@echo "$(YELLOW)💅 Formatting code...$(NC)"
+	@mvn spotless:apply 2>/dev/null || echo "$(YELLOW)⚠️  Spotless not configured$(NC)"
+	@echo "$(GREEN)✅ Code formatted$(NC)"
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+metrics: ## Show Prometheus metrics
+	@echo "$(YELLOW)📊 Application Metrics:$(NC)"
+	@curl -s http://localhost:8080/actuator/metrics | jq . 2>/dev/null || echo "$(RED)❌ Metrics not available$(NC)"
+
+prometheus: ## Open Prometheus UI
+	@echo "$(BLUE)📊 Opening Prometheus...$(NC)"
+	@open http://localhost:9090 || xdg-open http://localhost:9090 2>/dev/null || echo "Visit: http://localhost:9090"
+
+grafana: ## Open Grafana UI
+	@echo "$(BLUE)📊 Opening Grafana...$(NC)"
+	@open http://localhost:3000 || xdg-open http://localhost:3000 2>/dev/null || echo "Visit: http://localhost:3000 (admin/admin)"
+
+swagger: ## Open Swagger UI
+	@echo "$(BLUE)📖 Opening Swagger UI...$(NC)"
+	@open http://localhost:8080/swagger-ui.html || xdg-open http://localhost:8080/swagger-ui.html 2>/dev/null || echo "Visit: http://localhost:8080/swagger-ui.html"
+
+# =============================================================================
+# TESTING
+# =============================================================================
+test: ## Run unit tests
+	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
+	@mvn test
+	@echo "$(GREEN)✅ Unit tests completed$(NC)"
+
+test-integration: ## Run integration tests
+	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
+	@mvn verify
+	@echo "$(GREEN)✅ Integration tests completed$(NC)"
+
+test-coverage: ## Generate test coverage report
+	@echo "$(YELLOW)📊 Generating coverage report...$(NC)"
+	@mvn jacoco:report
+	@echo "$(GREEN)✅ Coverage report: target/site/jacoco/index.html$(NC)"
+
+# =============================================================================
 # DEVELOPMENT SHORTCUTS
 # =============================================================================
-dev: deploy-infra ## Start infrastructure only (fast dev mode)
+dev-quick: ## Quick start (PostgreSQL + Redis only)
+	@make dev
 
-dev-all: deploy ## Start everything
+dev-full: ## Full stack (All infrastructure + Monitoring)
+	@make deploy-all
 
-dev-test: ## Quick test cycle (build + restart service)
-	@if [ -z "$(SERVICE)" ]; then \
-		echo "$(RED)❌ Specify: make dev-test SERVICE=service-name$(NC)"; \
-		exit 1; \
-	fi
-	@make rebuild-service SERVICE=$(SERVICE)
-	@sleep 5
-	@make logs-service SERVICE=$(SERVICE)
+dev-clean-start: ## Clean restart (remove volumes + rebuild)
+	@make down-clean
+	@make dev
+	@echo "$(GREEN)✅ Clean start ready. Run: make app-run$(NC)"
+
+# =============================================================================
+# GIT HELPERS
+# =============================================================================
+git-status: ## Show detailed git status
+	@git status
+	@echo "\n$(YELLOW)Recent commits:$(NC)"
+	@git log --oneline -5
+
+git-branch: ## Show current branch
+	@git branch --show-current
+
+git-diff: ## Show unstaged changes
+	@git diff
+
+# =============================================================================
+# USEFUL INFO
+# =============================================================================
+info: ## Show system info
+	@echo "$(BLUE)📋 System Information:$(NC)"
+	@echo "$(YELLOW)Java Version:$(NC)"
+	@java -version 2>&1 | head -1
+	@echo "$(YELLOW)Maven Version:$(NC)"
+	@mvn -version | head -1
+	@echo "$(YELLOW)Docker Version:$(NC)"
+	@docker --version
+	@echo "$(YELLOW)Docker Compose Version:$(NC)"
+	@docker compose version
+
+endpoints: ## Show available API endpoints
+	@echo "$(BLUE)📡 API Endpoints:$(NC)"
+	@echo "$(YELLOW)Health:$(NC)        http://localhost:8080/api/health"
+	@echo "$(YELLOW)Info:$(NC)          http://localhost:8080/api/info"
+	@echo "$(YELLOW)Swagger:$(NC)       http://localhost:8080/swagger-ui.html"
+	@echo "$(YELLOW)Actuator:$(NC)      http://localhost:8080/actuator"
+	@echo "$(YELLOW)Metrics:$(NC)       http://localhost:8080/actuator/metrics"
+	@echo "$(YELLOW)Prometheus:$(NC)    http://localhost:9090"
+	@echo "$(YELLOW)Grafana:$(NC)       http://localhost:3000 (admin/admin)"
+
+# =============================================================================
+# ALIASES (Backward Compatibility)
+# =============================================================================
+build: app-build ## Alias for app-build
+
+run: app-run ## Alias for app-run
+
+deploy: deploy-infra ## Alias for deploy-infra

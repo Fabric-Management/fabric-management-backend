@@ -70,5 +70,10 @@ public class RefreshToken extends BaseEntity {
         this.isRevoked = true;
         this.revokedAt = Instant.now();
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "TOKEN";
+    }
 }
 

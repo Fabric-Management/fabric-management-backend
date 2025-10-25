@@ -34,8 +34,10 @@ import java.util.UUID;
  *     @Column(nullable = false)
  *     private String name;
  *
- *     @Enumerated(EnumType.STRING)
- *     private MaterialType type;
+ *     @Override
+ *     protected String getModuleCode() {
+ *         return "MAT";  // Module code for UID generation
+ *     }
  * }
  * }</pre>
  *
@@ -44,8 +46,9 @@ import java.util.UUID;
  * during entity creation. This ensures proper tenant isolation at the database level.</p>
  *
  * <h2>Human-Readable IDs:</h2>
- * <p>The {@code uid} field is generated using {@link UIDGenerator} and follows
- * the pattern: {@code {TENANT_UID}-{MODULE}-{ENTITY}-{SEQUENCE}}</p>
+ * <p>The {@code uid} field is auto-generated using {@link UIDGenerator} and follows
+ * the pattern: {@code {TENANT_UID}-{MODULE}-{SEQUENCE}}</p>
+ * <p>Example: "ACME-001-USER-00042", "XYZ-002-MAT-05123"</p>
  *
  * @see TenantContext
  * @see UIDGenerator
@@ -125,13 +128,36 @@ public abstract class BaseEntity implements Serializable {
     private Long version = 0L;
 
     /**
-     * Pre-persist hook - sets tenant ID and creation timestamps
+     * Get module code for UID generation.
+     * 
+     * <p>Each entity must return its module code (e.g., "USER", "MAT", "INV")</p>
+     * <p>This is used to generate human-readable UIDs.</p>
+     *
+     * @return module code (2-4 uppercase letters)
+     */
+    protected abstract String getModuleCode();
+
+    /**
+     * Pre-persist hook - sets tenant ID, UID, and timestamps.
      */
     @PrePersist
     protected void onCreate() {
         if (this.tenantId == null) {
             this.tenantId = TenantContext.getCurrentTenantId();
         }
+        
+        // Auto-generate UID if not set
+        if (this.uid == null || this.uid.isBlank()) {
+            String tenantUid = TenantContext.getCurrentTenantUid();
+            if (tenantUid == null) {
+                tenantUid = "SYS-000";
+            }
+            
+            // Simple sequence based on timestamp (TODO: use DB sequence)
+            long sequence = System.currentTimeMillis() % 100000;
+            this.uid = String.format("%s-%s-%05d", tenantUid, getModuleCode(), sequence);
+        }
+        
         if (this.createdAt == null) {
             this.createdAt = Instant.now();
         }

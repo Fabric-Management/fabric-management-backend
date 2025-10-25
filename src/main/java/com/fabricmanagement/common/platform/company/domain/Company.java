@@ -107,5 +107,10 @@ public class Company extends BaseEntity {
         this.city = city;
         this.country = country;
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "COMP";
+    }
 }
 

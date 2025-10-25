@@ -153,6 +153,11 @@ public class Subscription extends BaseEntity {
         this.features.put(featureName, false);
     }
 
+    @Override
+    protected String getModuleCode() {
+        return "SUB";
+    }
+
     /**
      * Validate subscription before persisting.
      */

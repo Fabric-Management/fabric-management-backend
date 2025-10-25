@@ -226,5 +226,10 @@ public class SubscriptionQuota extends BaseEntity {
             throw new IllegalStateException("Quota used cannot be negative");
         }
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "QUOTA";
+    }
 }
 
