@@ -1,0 +1,364 @@
+{
+	"info": {
+		"_postman_id": "fabric-mgmt-mm-001",
+		"name": "Fabric Management - Modular Monolith API",
+		"description": "Complete API collection for Fabric Management System\n\nModules:\n- Health & Info\n- Company Management\n- User Management  \n- Authentication\n- Subscription Management\n- Policy Management\n- Audit Logs",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health & Info",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/health",
+							"host": ["{{base_url}}"],
+							"path": ["api", "health"]
+						}
+					}
+				},
+				{
+					"name": "Application Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/info",
+							"host": ["{{base_url}}"],
+							"path": ["api", "info"]
+						}
+					}
+				},
+				{
+					"name": "Actuator Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/actuator/health",
+							"host": ["{{base_url}}"],
+							"path": ["actuator", "health"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register - Check Eligibility",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contactValue\": \"fatih@akkayalartekstil.com.tr\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register/check",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register", "check"]
+						}
+					}
+				},
+				{
+					"name": "Register - Verify & Complete",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contactValue\": \"fatih@akkayalartekstil.com.tr\",\n  \"code\": \"837706\",\n  \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register/verify",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register", "verify"]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.accessToken) {",
+									"    pm.environment.set('access_token', jsonData.data.accessToken);",
+									"    pm.environment.set('refresh_token', jsonData.data.refreshToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contactValue\": \"fatih@akkayalartekstil.com.tr\",\n  \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Company Management",
+			"item": [
+				{
+					"name": "Create Company",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"companyName\": \"ACME İplik A.Ş.\",\n  \"taxId\": \"1234567890\",\n  \"companyType\": \"SPINNER\",\n  \"city\": \"Istanbul\",\n  \"country\": \"Turkey\",\n  \"email\": \"info@acme-iplik.com\",\n  \"phoneNumber\": \"+90 555 123 4567\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/common/companies",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "companies"]
+						}
+					}
+				},
+				{
+					"name": "Get All Companies",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/common/companies",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "companies"]
+						}
+					}
+				},
+				{
+					"name": "Get Tenant Companies Only",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/common/companies/tenants",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "companies", "tenants"]
+						}
+					}
+				},
+				{
+					"name": "Get Companies by Type",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/common/companies/type/SPINNER",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "companies", "type", "SPINNER"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Fatih\",\n  \"lastName\": \"Akkaya\",\n  \"contactValue\": \"fatih@akkayalartekstil.com.tr\",\n  \"contactType\": \"EMAIL\",\n  \"companyId\": \"{{company_id}}\",\n  \"department\": \"production\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/common/users",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "users"]
+						}
+					}
+				},
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/common/users",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "users"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Policy Management",
+			"item": [
+				{
+					"name": "Create Policy",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"policyId\": \"fabric.material.create\",\n  \"resource\": \"fabric.material\",\n  \"action\": \"create\",\n  \"priority\": 100,\n  \"effect\": \"ALLOW\",\n  \"description\": \"Allow material creation for planners\",\n  \"conditions\": {\n    \"roles\": [\"PLANNER\", \"ADMIN\"],\n    \"departments\": [\"production\"]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/common/policies",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "policies"]
+						}
+					}
+				},
+				{
+					"name": "Get All Policies",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/common/policies",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "policies"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Audit Logs",
+			"item": [
+				{
+					"name": "Get Audit Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/common/audit/logs?page=0&size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "common", "audit", "logs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "0"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								}
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "company_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
