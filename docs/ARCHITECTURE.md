@@ -91,15 +91,53 @@ public ResponseEntity<?> createYarn(@RequestBody YarnDto dto) {
 
 **Detaylı bilgi için:** [modular_monolith/POLICY_ENGINE.md](./modular_monolith/POLICY_ENGINE.md)
 
-### OS Subscription Model
+### ⭐ Composable Feature-Based Subscription Model
 
-Platform, **OS (Operating Subscription)** bazlı abonelik modeli kullanır:
+Platform, **esnek, özellik tabanlı** abonelik modeli kullanır:
 
-- **FabricOS** - Base platform (FREE) - Tüm tenantlar için
-- **YarnOS, LoomOS, KnitOS, DyeOS** - Production OS'lar (PROFESSIONAL)
-- **AccountOS, AnalyticsOS, IntelligenceOS** - Premium OS'lar (ENTERPRISE)
+#### **Subscription Architecture**
 
-**Detaylı bilgi için:** [modular_monolith/OS_SUBSCRIPTION_MODEL.md](./modular_monolith/OS_SUBSCRIPTION_MODEL.md)
+```
+┌────────────────────────────────────────────┐
+│  Layer 1: OS Subscription                  │
+│  ────────────────────────                  │
+│  Tenant YarnOS'a abone mi?                 │
+├────────────────────────────────────────────┤
+│  Layer 2: Feature Entitlement              │
+│  ────────────────────────                  │
+│  YarnOS'ta "yarn.blend" feature'ı var mı?  │
+├────────────────────────────────────────────┤
+│  Layer 3: Usage Quota                      │
+│  ────────────────────────                  │
+│  Fiber entity limiti aşıldı mı?            │
+├────────────────────────────────────────────┤
+│  Layer 4: RBAC/ABAC (Policy Engine)        │
+│  ────────────────────────                  │
+│  User yetkisi var mı?                      │
+└────────────────────────────────────────────┘
+```
+
+#### **OS Catalog**
+
+- **FabricOS** (Base) - $199/mo - ZORUNLU - Tüm tenantlar için
+- **YarnOS, LoomOS, KnitOS, DyeOS** - $99-$149/mo - Production OS'lar
+- **AnalyticsOS** - $149/mo - BI & Reporting
+- **IntelligenceOS** - $299/mo - AI & ML
+- **EdgeOS** - $199/mo - IoT & Sensors
+- **AccountOS** - $79/mo - Full Accounting
+- **CustomOS** - $399/mo - External Integrations
+
+#### **Key Features**
+
+- ✅ **String-Based Tiers** - Her OS'un kendi tier isimleri (Starter/Professional/Enterprise, Standard/Advanced)
+- ✅ **JSONB Feature Storage** - Esnek feature entitlement
+- ✅ **Usage Quotas** - API calls, users, storage, entity limits
+- ✅ **Composable** - Kullanıcılar sadece ihtiyaç duydukları OS'ları alır
+
+**Detaylı bilgi için:**
+
+- [modular_monolith/SUBSCRIPTION_MODEL.md](./modular_monolith/SUBSCRIPTION_MODEL.md) - Kapsamlı dokümantasyon
+- [modular_monolith/SUBSCRIPTION_QUICK_START.md](./modular_monolith/SUBSCRIPTION_QUICK_START.md) - Hızlı başlangıç
 
 ---
 
@@ -115,16 +153,39 @@ Platform, **OS (Operating Subscription)** bazlı abonelik modeli kullanır:
 ### Schema Structure
 
 ```
+-- Common Platform (Authentication, Authorization, Subscription)
 common_auth, common_user, common_company, common_policy, common_audit
-common_subscription, common_os_definition, common_os_dependency
+common_subscription, common_subscription_quota, common_feature_catalog
+common_os_definition
+
+-- Production Domain (Manufacturing)
 prod_fiber, prod_yarn, prod_manufacturing
+
+-- Logistics Domain (Supply Chain)
 logi_inventory, logi_shipment
+
+-- Finance Domain (Accounting & Billing)
 fin_accounting, fin_billing
+
+-- Human Domain (HR & Payroll)
 hr_employee, hr_payroll
+
+-- Procurement Domain (Purchasing)
 proc_supplier, proc_purchase
+
+-- Integration Domain (External Systems)
 integ_outbox, integ_webhook
+
+-- Insight Domain (Analytics & AI)
 ins_analytics, ins_intelligence
 ```
+
+**⭐ Subscription Tables:**
+
+- `common_subscription` - OS subscriptions per tenant
+- `common_subscription_quota` - Usage quotas (users, API calls, storage, entities)
+- `common_feature_catalog` - Feature entitlement catalog
+- `common_os_definition` - OS definitions & available tiers
 
 ---
 
@@ -274,6 +335,7 @@ When needed, modules can be extracted to independent microservices:
 
 ---
 
-**Architecture Version:** 2.0  
-**Last Updated:** 2025-01-27  
-**Maintained By:** Fabric Management Team
+**Architecture Version:** 3.0  
+**Last Updated:** 2025-10-25  
+**Maintained By:** Fabric Management Team  
+**Latest Addition:** ⭐ Composable Feature-Based Subscription Model

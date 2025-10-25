@@ -1,6 +1,5 @@
 package com.fabricmanagement.common.platform.company.dto;
 
-import com.fabricmanagement.common.platform.company.domain.PricingTier;
 import com.fabricmanagement.common.platform.company.domain.Subscription;
 import com.fabricmanagement.common.platform.company.domain.SubscriptionStatus;
 import lombok.AllArgsConstructor;
@@ -28,7 +27,19 @@ public class SubscriptionDto {
     private Instant expiryDate;
     private Instant trialEndsAt;
     private Map<String, Boolean> features;
-    private PricingTier pricingTier;
+    
+    /**
+     * Pricing tier for this subscription.
+     *
+     * <p>Tier names vary by OS:</p>
+     * <ul>
+     *   <li>YarnOS, LoomOS, etc.: "Starter", "Professional", "Enterprise"</li>
+     *   <li>AnalyticsOS: "Standard", "Advanced", "Enterprise"</li>
+     *   <li>IntelligenceOS: "Professional", "Enterprise"</li>
+     * </ul>
+     */
+    private String pricingTier;
+    
     private Boolean isActive;
     private Instant createdAt;
 

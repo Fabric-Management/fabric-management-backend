@@ -35,33 +35,52 @@
 
 ### **Ana Dokümantasyon**
 
-| Document                  | Status       | Progress | Last Updated |
-| ------------------------- | ------------ | -------- | ------------ |
-| README.md                 | ✅ Completed | 100%     | 2025-01-27   |
-| PROJECT_PROGRESS.md       | ✅ Completed | 100%     | 2025-01-27   |
-| ARCHITECTURE.md           | ✅ Completed | 100%     | 2025-01-27   |
-| OS_SUBSCRIPTION_MODEL.md  | ✅ Completed | 100%     | 2025-01-27   |
-| POLICY_ENGINE.md          | ✅ Completed | 100%     | 2025-01-27   |
-| MODULE_PROTOCOLS.md       | ✅ Completed | 100%     | 2025-01-27   |
-| COMMUNICATION_PATTERNS.md | ✅ Completed | 100%     | 2025-01-27   |
-| SECURITY_POLICIES.md      | ✅ Completed | 100%     | 2025-01-27   |
-| TESTING_STRATEGIES.md     | ✅ Completed | 100%     | 2025-01-27   |
-| DEPLOYMENT_GUIDE.md       | ✅ Completed | 100%     | 2025-01-27   |
+| Document                    | Status       | Progress | Last Updated |
+| --------------------------- | ------------ | -------- | ------------ |
+| README.md                   | ✅ Completed | 100%     | 2025-10-25   |
+| PROJECT_PROGRESS.md         | ✅ Completed | 100%     | 2025-10-25   |
+| ARCHITECTURE.md             | ✅ Completed | 100%     | 2025-10-25   |
+| SUBSCRIPTION_MODEL.md       | ✅ Completed | 100%     | 2025-10-25   |
+| SUBSCRIPTION_QUICK_START.md | ✅ Completed | 100%     | 2025-10-25   |
+| POLICY_ENGINE.md            | ✅ Completed | 100%     | 2025-01-27   |
+| MODULE_PROTOCOLS.md         | ✅ Completed | 100%     | 2025-01-27   |
+| COMMUNICATION_PATTERNS.md   | ✅ Completed | 100%     | 2025-01-27   |
+| SECURITY_POLICIES.md        | ✅ Completed | 100%     | 2025-01-27   |
+| TESTING_STRATEGIES.md       | ✅ Completed | 100%     | 2025-01-27   |
+| DEPLOYMENT_GUIDE.md         | ✅ Completed | 100%     | 2025-01-27   |
+| IDENTITY_AND_SECURITY.md    | ✅ Completed | 100%     | 2025-01-27   |
+| GOVERNANCE_DOMAIN.md        | ✅ Completed | 100%     | 2025-01-27   |
+| OPERATIONS_DOMAIN.md        | ✅ Completed | 100%     | 2025-01-27   |
 
 ### **Common Module Dokümantasyonu**
 
 #### **Platform Modülleri**
 
-| Module            | PROTOCOL.md | ENDPOINTS.md | MISSIONS.md | FOLDER_STRUCTURE.md | EXAMPLES.md | Progress |
-| ----------------- | ----------- | ------------ | ----------- | ------------------- | ----------- | -------- |
-| **auth**          | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **user**          | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **company**       | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **policy**        | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **audit**         | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **config**        | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **monitoring**    | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **communication** | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| Module            | PROTOCOL.md    | ENDPOINTS.md | MISSIONS.md | FOLDER_STRUCTURE.md | EXAMPLES.md | Progress |
+| ----------------- | -------------- | ------------ | ----------- | ------------------- | ----------- | -------- |
+| **auth**          | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| **user**          | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| **company**       | 🚧 In Progress | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 40%      |
+| **policy**        | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| **audit**         | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| **config**        | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| **monitoring**    | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| **communication** | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+
+#### **Company Module - Subscription Implementation** ⭐ NEW
+
+| Component               | Status       | Progress | Notes                                                                               |
+| ----------------------- | ------------ | -------- | ----------------------------------------------------------------------------------- |
+| **Domain Models**       | ✅ Completed | 100%     | Subscription, SubscriptionQuota, FeatureCatalog, OSDefinition, PricingTierValidator |
+| **Repositories**        | ✅ Completed | 100%     | SubscriptionRepository, SubscriptionQuotaRepository, FeatureCatalogRepository       |
+| **Services**            | ✅ Completed | 100%     | SubscriptionService, QuotaService (mevcut)                                          |
+| **DTOs**                | ✅ Completed | 100%     | SubscriptionDto (güncellendi)                                                       |
+| **Exceptions**          | ✅ Completed | 100%     | SubscriptionRequiredException, FeatureNotAvailableException, QuotaExceededException |
+| **Documentation**       | ✅ Completed | 100%     | SUBSCRIPTION_MODEL.md, SUBSCRIPTION_QUICK_START.md                                  |
+| **Database Migrations** | ⏳ Pending   | 0%       | Migration scripts needed                                                            |
+| **API Endpoints**       | ⏳ Pending   | 0%       | Subscription management endpoints                                                   |
+| **Integration Tests**   | ⏳ Pending   | 0%       | Feature entitlement tests                                                           |
+| **Feature Seeding**     | ⏳ Pending   | 0%       | FeatureCatalogSeeder implementation                                                 |
 
 #### **Infrastructure Modülleri**
 

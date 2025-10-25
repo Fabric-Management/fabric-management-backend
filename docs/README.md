@@ -8,17 +8,19 @@
 
 ## 🎯 Quick Start
 
-| Role                    | Document                                                                                 | Description                              |
-| ----------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------- |
-| **🌟 Global**           | [FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md](./FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md) | Modular Monolith development standards   |
-| **🧩 Modular Monolith** | [modular_monolith/README.md](./modular_monolith/README.md)                               | Detailed modular monolith documentation  |
-| **🧭 OS Model**         | [modular_monolith/OS_SUBSCRIPTION_MODEL.md](./modular_monolith/OS_SUBSCRIPTION_MODEL.md) | OS subscription & licensing model        |
-| **🛡️ Policy**           | [modular_monolith/POLICY_ENGINE.md](./modular_monolith/POLICY_ENGINE.md)                 | 5-layer policy engine (Enterprise-grade) |
-| **📋 TODO**             | [TODO/README.md](./TODO/README.md)                                                       | Production migration & roadmap           |
-| **🤖 AI**               | [AI_ASSISTANT_LEARNINGS.md](./AI_ASSISTANT_LEARNINGS.md)                                 | AI behavior & project philosophy         |
-| **💎 Developer**        | [DEVELOPER_PROTOCOL.md](./DEVELOPER_PROTOCOL.md)                                         | Developer DNA manifesto (mandatory)      |
-| **🏗️ Architect**        | [ARCHITECTURE.md](./ARCHITECTURE.md)                                                     | System architecture                      |
-| **👥 Roles**            | [architecture/ROLES_QUICK_REFERENCE.md](./architecture/ROLES_QUICK_REFERENCE.md)         | System roles & permissions               |
+| Role                    | Document                                                                                       | Description                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **🌟 Global**           | [FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md](./FABRIC_MANAGEMENT_DEVELOPMENT_PROTOCOL.md)       | Modular Monolith development standards   |
+| **🧩 Modular Monolith** | [modular_monolith/README.md](./modular_monolith/README.md)                                     | Detailed modular monolith documentation  |
+| **💳 Subscription**     | [modular_monolith/SUBSCRIPTION_INDEX.md](./modular_monolith/SUBSCRIPTION_INDEX.md)             | ⭐ **Subscription documentation index**  |
+|                         | [modular_monolith/SUBSCRIPTION_MODEL.md](./modular_monolith/SUBSCRIPTION_MODEL.md)             | Feature-based subscription model         |
+|                         | [modular_monolith/SUBSCRIPTION_QUICK_START.md](./modular_monolith/SUBSCRIPTION_QUICK_START.md) | Subscription quick reference             |
+| **🛡️ Policy**           | [modular_monolith/POLICY_ENGINE.md](./modular_monolith/POLICY_ENGINE.md)                       | 5-layer policy engine (Enterprise-grade) |
+| **📋 TODO**             | [TODO/README.md](./TODO/README.md)                                                             | Production migration & roadmap           |
+| **🤖 AI**               | [AI_ASSISTANT_LEARNINGS.md](./AI_ASSISTANT_LEARNINGS.md)                                       | AI behavior & project philosophy         |
+| **💎 Developer**        | [DEVELOPER_PROTOCOL.md](./DEVELOPER_PROTOCOL.md)                                               | Developer DNA manifesto (mandatory)      |
+| **🏗️ Architect**        | [ARCHITECTURE.md](./ARCHITECTURE.md)                                                           | System architecture                      |
+| **👥 Roles**            | [architecture/ROLES_QUICK_REFERENCE.md](./architecture/ROLES_QUICK_REFERENCE.md)               | System roles & permissions               |
 
 ---
 
@@ -37,15 +39,22 @@ docs/
 │   ├── README.md                         # Main index
 │   ├── PROJECT_PROGRESS.md               # Progress tracking
 │   ├── ARCHITECTURE.md                   # Detailed architecture
-│   ├── OS_SUBSCRIPTION_MODEL.md          # OS subscription & licensing
+│   ├── ⭐ SUBSCRIPTION_INDEX.md          # ⭐ **Subscription documentation index**
+│   ├── SUBSCRIPTION_MODEL.md             # ⭐ Feature-based subscription model (main)
+│   ├── SUBSCRIPTION_QUICK_START.md       # ⭐ Subscription quick reference
 │   ├── POLICY_ENGINE.md                  # 5-layer policy engine
 │   ├── MODULE_PROTOCOLS.md               # Module standards
 │   ├── COMMUNICATION_PATTERNS.md         # Inter-module communication
 │   ├── SECURITY_POLICIES.md              # Security guidelines
 │   ├── TESTING_STRATEGIES.md             # Testing approach
 │   ├── DEPLOYMENT_GUIDE.md               # Deployment procedures
+│   ├── IDENTITY_AND_SECURITY.md          # Identity & security model
+│   ├── GOVERNANCE_DOMAIN.md              # Governance domain overview
+│   ├── OPERATIONS_DOMAIN.md              # Operations domain overview
 │   ├── common/                           # Common module docs
 │   │   ├── platform/                     # Platform modules (auth, user, company, etc.)
+│   │   │   ├── company/                  # ⭐ Company & Subscription management
+│   │   │   │   └── SUBSCRIPTION.md       # ⭐ Subscription implementation details
 │   │   └── infrastructure/               # Infrastructure modules (persistence, events, etc.)
 │   └── business/                         # Business module docs
 │       ├── production/                   # Production module
@@ -87,12 +96,14 @@ docs/
 2. **development/principles.md** (30 min) - SOLID, DRY, NO USERNAME
 3. **development/data_types_standards.md** (10 min) - UUID mandatory
 
-### Architecture Understanding (120 min)
+### Architecture Understanding (150 min)
 
 1. **ARCHITECTURE.md** (30 min) - System overview
 2. **modular_monolith/ARCHITECTURE.md** (30 min) - Modular monolith details
-3. **modular_monolith/OS_SUBSCRIPTION_MODEL.md** (30 min) - OS subscription model
-4. **modular_monolith/POLICY_ENGINE.md** (30 min) - Policy engine (5-layer)
+3. **modular_monolith/SUBSCRIPTION_INDEX.md** (5 min) - ⭐ **Subscription index** (start here!)
+4. **modular_monolith/SUBSCRIPTION_MODEL.md** (40 min) - ⭐ Feature-based subscription model
+5. **modular_monolith/SUBSCRIPTION_QUICK_START.md** (10 min) - ⭐ Subscription quick reference
+6. **modular_monolith/POLICY_ENGINE.md** (35 min) - Policy engine (5-layer)
 
 ---
 
@@ -144,13 +155,38 @@ Cache: Redis 5 min TTL
 Audit: Her decision loglanır
 ```
 
-### **OS Subscription Model**
+### **⭐ Composable Feature-Based Subscription Model**
 
-- **FabricOS** - Base platform (FREE) - Core + Inventory + Shipment + Finance + Human + Procurement + Planning + Analytics
-- **YarnOS** - Yarn production (PROFESSIONAL) - Fiber + Yarn + Quality
-- **LoomOS** - Weaving production (PROFESSIONAL) - Loom + Quality
-- **KnitOS** - Knitting production (PROFESSIONAL) - Knit + Quality
-- **DyeOS** - Dyeing & Finishing (PROFESSIONAL) - Dye + Finishing
-- **AccountOS** - Full accounting (ENTERPRISE) - Legal accounting + Tax
-- **AnalyticsOS** - Advanced analytics (ENTERPRISE) - BI + Dashboards
-- **IntelligenceOS** - AI & ML (ENTERPRISE) - Predictions + Optimization
+#### **FabricOS (Base Platform)** — **ZORUNLU** ($199/mo)
+
+- **Tier:** Base (tek tier)
+- **İçerik:** auth, user, policy, audit, company, monitoring
+- **Kısıtlı Modüller:** logistics/inventory, finance, human, procurement, production/planning
+- **Hedef:** Tüm tenantlar için temel platform
+
+#### **Optional OS Add-ons** — **COMPOSABLE**
+
+| OS                 | Tier'lar                         | Başlangıç | Açıklama                     |
+| ------------------ | -------------------------------- | --------- | ---------------------------- |
+| **YarnOS**         | Starter/Professional/Enterprise  | $99/mo    | İplik üretimi (fiber + yarn) |
+| **LoomOS**         | Starter/Professional/Enterprise  | $149/mo   | Dokuma üretimi (weaving)     |
+| **KnitOS**         | Starter/Professional/Enterprise  | $129/mo   | Örme üretimi (knitting)      |
+| **DyeOS**          | Starter/Professional/Enterprise  | $119/mo   | Boya & Apre (finishing)      |
+| **AnalyticsOS**    | Standard/Advanced/Enterprise     | $149/mo   | BI & Raporlama               |
+| **IntelligenceOS** | Professional/Enterprise          | $299/mo   | AI & Tahminleme              |
+| **EdgeOS**         | Starter/Professional/Enterprise  | $199/mo   | IoT & Sensörler              |
+| **AccountOS**      | Standard/Professional/Enterprise | $79/mo    | Resmi Muhasebe               |
+| **CustomOS**       | Standard/Professional/Enterprise | $399/mo   | Dış Entegrasyonlar           |
+
+**🔑 Key Features:**
+
+- ✅ **Composable** - Sadece ihtiyaç duyulan OS'lar alınır
+- ✅ **String-Based Tiers** - Her OS'un kendi tier isimleri (enum yok!)
+- ✅ **Feature Entitlement** - JSONB ile granular feature kontrolü
+- ✅ **Usage Quotas** - API, storage, entity limitleri
+- ✅ **4-Layer Policy Engine** - OS → Feature → Quota → RBAC
+
+**📚 Detaylı Bilgi:**
+
+- [SUBSCRIPTION_MODEL.md](./modular_monolith/SUBSCRIPTION_MODEL.md) - Kapsamlı dokümantasyon
+- [SUBSCRIPTION_QUICK_START.md](./modular_monolith/SUBSCRIPTION_QUICK_START.md) - Hızlı başlangıç

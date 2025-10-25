@@ -1,7 +1,7 @@
 # 🏗️ MODULAR MONOLITH ARCHITECTURE
 
-**Version:** 1.0  
-**Last Updated:** 2025-01-27  
+**Version:** 2.0  
+**Last Updated:** 2025-10-25  
 **Status:** ✅ Active Development
 
 ---
@@ -18,6 +18,9 @@
 8. [Data Management](#data-management)
 9. [Event-Driven Architecture](#event-driven-architecture)
 10. [Technology Stack](#technology-stack)
+11. [Subscription Model Architecture](#subscription-model-architecture) ⭐ NEW
+12. [Performance Characteristics](#performance-characteristics)
+13. [Future Evolution](#future-evolution)
 
 ---
 
@@ -558,6 +561,241 @@ CREATE POLICY tenant_isolation_policy ON prod_material
 
 ---
 
+## 💳 SUBSCRIPTION MODEL ARCHITECTURE
+
+### **⭐ Composable Feature-Based Subscription**
+
+FabricOS, **String-based, flexible** pricing tier sistemi kullanır. Her OS'un kendi tier isimlendirmesi vardır.
+
+### **Architecture Layers**
+
+```
+┌────────────────────────────────────────────────────┐
+│  1. OS Subscription Layer                          │
+│  ─────────────────────────────                     │
+│  • Entity: Subscription                            │
+│  • Check: Tenant YarnOS'a abone mi?                │
+│  • Database: common_subscription                   │
+│  • Field: os_code, pricing_tier (String)           │
+├────────────────────────────────────────────────────┤
+│  2. Feature Entitlement Layer                      │
+│  ─────────────────────────────                     │
+│  • Entity: FeatureCatalog                          │
+│  • Check: YarnOS'ta "yarn.blend" feature var mı?   │
+│  • Database: common_feature_catalog                │
+│  • Field: feature_id, available_in_tiers (JSONB)   │
+├────────────────────────────────────────────────────┤
+│  3. Usage Quota Layer                              │
+│  ─────────────────────────────                     │
+│  • Entity: SubscriptionQuota                       │
+│  • Check: Fiber entity limiti aşıldı mı?           │
+│  • Database: common_subscription_quota             │
+│  • Field: quota_type, quota_limit, quota_used      │
+├────────────────────────────────────────────────────┤
+│  4. Policy Engine Layer (RBAC/ABAC)                │
+│  ─────────────────────────────                     │
+│  • Entity: PolicyRule                              │
+│  • Check: User yetkisi var mı? Context uygun mu?   │
+│  • Database: common_policy_rule                    │
+└────────────────────────────────────────────────────┘
+```
+
+### **Domain Model**
+
+```java
+// Subscription Entity - String-based pricing tier
+@Entity
+@Table(name = "common_subscription", schema = "common_company")
+public class Subscription extends BaseEntity {
+    private String osCode;              // "YarnOS", "LoomOS", etc.
+    private String osName;
+    private SubscriptionStatus status;  // TRIAL, ACTIVE, EXPIRED
+    private String pricingTier;         // "Starter", "Professional", "Enterprise"
+                                        // OR "Standard", "Advanced"
+    private Map<String, Boolean> features;  // JSONB override
+    private Instant startDate;
+    private Instant expiryDate;
+}
+
+// FeatureCatalog Entity - Feature entitlement rules
+@Entity
+@Table(name = "common_feature_catalog", schema = "common_company")
+public class FeatureCatalog extends BaseEntity {
+    private String featureId;                  // "yarn.blend.management"
+    private String osCode;                      // "YarnOS"
+    private String featureName;
+    private List<String> availableInTiers;      // ["Professional", "Enterprise"]
+    private Boolean isActive;
+}
+
+// SubscriptionQuota Entity - Usage limits
+@Entity
+@Table(name = "common_subscription_quota", schema = "common_company")
+public class SubscriptionQuota extends BaseEntity {
+    private UUID subscriptionId;
+    private String quotaType;       // "users", "api_calls", "fiber_entities"
+    private Long quotaLimit;
+    private Long quotaUsed;
+    private String resetPeriod;     // "MONTHLY", "DAILY", "NONE"
+}
+
+// PricingTierValidator - Tier validation utility
+public class PricingTierValidator {
+    private static final Map<String, Set<String>> OS_VALID_TIERS = Map.of(
+        "YarnOS", Set.of("Starter", "Professional", "Enterprise"),
+        "AnalyticsOS", Set.of("Standard", "Advanced", "Enterprise"),
+        "IntelligenceOS", Set.of("Professional", "Enterprise"),
+        "FabricOS", Set.of("Base")
+    );
+
+    public static boolean isValidTier(String osCode, String tierName);
+    public static String getDefaultTier(String osCode);
+}
+```
+
+### **OS Catalog**
+
+| OS                 | Tier'lar                         | Entry Price | Modules                |
+| ------------------ | -------------------------------- | ----------- | ---------------------- |
+| **FabricOS**       | Base (zorunlu)                   | $199/mo     | auth, user, policy     |
+| **YarnOS**         | Starter/Professional/Enterprise  | $99/mo      | fiber, yarn            |
+| **LoomOS**         | Starter/Professional/Enterprise  | $149/mo     | weaving                |
+| **KnitOS**         | Starter/Professional/Enterprise  | $129/mo     | knitting               |
+| **DyeOS**          | Starter/Professional/Enterprise  | $119/mo     | finishing              |
+| **AnalyticsOS**    | Standard/Advanced/Enterprise     | $149/mo     | analytics              |
+| **IntelligenceOS** | Professional/Enterprise          | $299/mo     | intelligence (AI/ML)   |
+| **EdgeOS**         | Starter/Professional/Enterprise  | $199/mo     | IoT integration        |
+| **AccountOS**      | Standard/Professional/Enterprise | $79/mo      | accounting             |
+| **CustomOS**       | Standard/Professional/Enterprise | $399/mo     | integration (ERP, EDI) |
+
+### **Feature Gating Example**
+
+```java
+@RestController
+@RequestMapping("/api/v1/yarn/fibers")
+public class FiberController {
+
+    @Autowired
+    private EnhancedSubscriptionService subscriptionService;
+
+    @PostMapping("/{fiberId}/blend")
+    public ResponseEntity<FiberBlendDto> createBlend(
+        @PathVariable UUID fiberId,
+        @RequestBody CreateBlendRequest request
+    ) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+
+        // ⭐ SUBSCRIPTION CHECK
+        subscriptionService.enforceEntitlement(
+            tenantId,
+            "yarn.blend.management",  // Feature ID
+            null                       // No quota check
+        );
+
+        FiberBlendDto blend = fiberService.createBlend(fiberId, request);
+        return ResponseEntity.ok(blend);
+    }
+}
+
+// EnhancedSubscriptionService implementation
+public void enforceEntitlement(UUID tenantId, String featureId, String quotaType) {
+    // Layer 1: OS Subscription Check
+    String osCode = extractOsCode(featureId);  // "yarn.blend.management" → "YarnOS"
+    if (!hasActiveSubscription(tenantId, osCode)) {
+        throw new SubscriptionRequiredException(osCode + " subscription required");
+    }
+
+    // Layer 2: Feature Entitlement Check
+    if (!hasFeature(tenantId, featureId)) {
+        throw new FeatureNotAvailableException(
+            "Feature requires Professional tier or higher"
+        );
+    }
+
+    // Layer 3: Usage Quota Check (if applicable)
+    if (quotaType != null && !hasQuota(tenantId, quotaType)) {
+        throw new QuotaExceededException("Quota exceeded for " + quotaType);
+    }
+}
+```
+
+### **Database Schema**
+
+```sql
+-- Subscription table
+CREATE TABLE common_company.common_subscription (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    os_code VARCHAR(50) NOT NULL,
+    os_name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    pricing_tier VARCHAR(50) NOT NULL,  -- ⭐ String, not ENUM!
+    start_date TIMESTAMP NOT NULL,
+    expiry_date TIMESTAMP,
+    features JSONB,                      -- ⭐ Feature override
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(tenant_id, os_code)
+);
+
+-- Feature catalog table
+CREATE TABLE common_company.common_feature_catalog (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    feature_id VARCHAR(100) UNIQUE NOT NULL,
+    os_code VARCHAR(50) NOT NULL,
+    feature_name VARCHAR(255) NOT NULL,
+    available_in_tiers JSONB,           -- ⭐ ["Professional", "Enterprise"]
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Usage quota table
+CREATE TABLE common_company.common_subscription_quota (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    subscription_id UUID REFERENCES common_subscription(id),
+    quota_type VARCHAR(50) NOT NULL,
+    quota_limit BIGINT NOT NULL,
+    quota_used BIGINT DEFAULT 0,
+    reset_period VARCHAR(20),          -- "MONTHLY", "DAILY", "NONE"
+    last_reset_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(tenant_id, subscription_id, quota_type)
+);
+
+-- OS definition table
+CREATE TABLE common_company.common_os_definition (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    os_code VARCHAR(50) UNIQUE NOT NULL,
+    os_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    included_modules JSONB,             -- ["production.fiber", "production.yarn"]
+    available_tiers JSONB,              -- ⭐ ["Starter", "Professional", "Enterprise"]
+    default_tier VARCHAR(50),           -- ⭐ "Starter"
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### **Key Features**
+
+✅ **String-Based Tiers** - Her OS'un kendi tier isimleri (enum yok!)  
+✅ **JSONB Storage** - Esnek feature ve tier yapısı  
+✅ **Composable** - Sadece ihtiyaç duyulan OS'lar alınır  
+✅ **Granular Control** - Feature-level entitlement  
+✅ **Usage Quotas** - API, storage, entity limitleri  
+✅ **Multi-Tier Support** - OS bazlı farklı tier isimlendirme  
+✅ **Database-Driven** - Feature catalog database'de saklanır
+
+### **Documentation**
+
+**Detaylı bilgi için:**
+
+- [SUBSCRIPTION_MODEL.md](./SUBSCRIPTION_MODEL.md) - Kapsamlı dokümantasyon (1167 satır)
+- [SUBSCRIPTION_QUICK_START.md](./SUBSCRIPTION_QUICK_START.md) - Hızlı başlangıç kılavuzu
+
+---
+
 ## 📊 PERFORMANCE CHARACTERISTICS
 
 | Metric               | Target       | Measurement      |
@@ -605,5 +843,7 @@ Bazı modüller monolith içinde, bazıları mikroservis olarak çalışabilir:
 
 ---
 
-**Last Updated:** 2025-01-27  
-**Maintained By:** Fabric Management Team
+**Version:** 2.0  
+**Last Updated:** 2025-10-25  
+**Maintained By:** Fabric Management Team  
+**Latest Addition:** ⭐ Composable Feature-Based Subscription Model

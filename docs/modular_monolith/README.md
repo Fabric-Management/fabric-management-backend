@@ -162,7 +162,9 @@ Detaylı deployment rehberi için: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 - [📊 PROJECT_PROGRESS.md](./PROJECT_PROGRESS.md) - Proje ilerleme takibi
 - [📖 ARCHITECTURE.md](./ARCHITECTURE.md) - Genel mimari
 - [🔐 IDENTITY_AND_SECURITY.md](./IDENTITY_AND_SECURITY.md) - Identity & Security model
-- [🧭 OS_SUBSCRIPTION_MODEL.md](./OS_SUBSCRIPTION_MODEL.md) - OS abonelik modeli
+- [📇 SUBSCRIPTION_INDEX.md](./SUBSCRIPTION_INDEX.md) - ⭐ **Subscription documentation index** (START HERE!)
+- [💳 SUBSCRIPTION_MODEL.md](./SUBSCRIPTION_MODEL.md) - ⭐ **Feature-based subscription model** (main doc)
+- [🚀 SUBSCRIPTION_QUICK_START.md](./SUBSCRIPTION_QUICK_START.md) - ⭐ **Subscription quick reference**
 - [🛡️ POLICY_ENGINE.md](./POLICY_ENGINE.md) - Policy engine detayları
 - [📋 MODULE_PROTOCOLS.md](./MODULE_PROTOCOLS.md) - Modül protokolleri
 - [💬 COMMUNICATION_PATTERNS.md](./COMMUNICATION_PATTERNS.md) - İletişim desenleri
@@ -175,7 +177,7 @@ Detaylı deployment rehberi için: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 - [🔐 Auth Module](./common/platform/auth/AUTH_PROTOCOL.md)
 - [👤 User Module](./common/platform/user/USER_PROTOCOL.md)
 - [🏢 Company Module](./common/platform/company/COMPANY_PROTOCOL.md)
-  - [📋 Subscription Management](./common/platform/company/SUBSCRIPTION_MANAGEMENT.md)
+  - [💳 Subscription Management](./common/platform/company/SUBSCRIPTION.md) - ⭐ **Subscription implementation**
 - [📜 Policy Module](./common/platform/policy/POLICY_PROTOCOL.md)
 - [📊 Audit Module](./common/platform/audit/AUDIT_PROTOCOL.md)
 - [⚙️ Config Module](./common/platform/config/CONFIG_PROTOCOL.md)
@@ -222,6 +224,6 @@ Sorular veya sorunlar için:
 
 ---
 
-**Last Updated:** 2025-10-24  
+**Last Updated:** 2025-10-25  
 **Maintained By:** Fabric Management Team  
-**Latest Addition:** ⭐ Operations & Governance Domains
+**Latest Addition:** ⭐ **Composable Feature-Based Subscription Model**
