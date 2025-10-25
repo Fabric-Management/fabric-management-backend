@@ -121,5 +121,10 @@ public class User extends BaseEntity {
     public void changeDepartment(String department) {
         this.department = department;
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "USER";
+    }
 }
 

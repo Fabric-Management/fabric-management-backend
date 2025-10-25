@@ -158,5 +158,10 @@ public class OSDefinition extends BaseEntity {
             );
         }
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "OS";
+    }
 }
 

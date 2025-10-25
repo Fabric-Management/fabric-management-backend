@@ -106,5 +106,10 @@ public class AuthUser extends BaseEntity {
     public void changePassword(String newPasswordHash) {
         this.passwordHash = newPasswordHash;
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "AUTH";
+    }
 }
 

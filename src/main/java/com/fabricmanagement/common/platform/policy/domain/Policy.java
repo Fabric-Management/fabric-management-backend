@@ -123,5 +123,10 @@ public class Policy extends BaseEntity {
     public boolean isDeny() {
         return this.effect == PolicyEffect.DENY;
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "POL";
+    }
 }
 

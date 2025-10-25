@@ -103,5 +103,10 @@ public class AuditLog extends BaseEntity {
             .timestamp(Instant.now())
             .build();
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "AUD";
+    }
 }
 

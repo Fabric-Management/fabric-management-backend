@@ -88,5 +88,10 @@ public class VerificationCode extends BaseEntity {
         this.isUsed = true;
         this.usedAt = Instant.now();
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "VERIFY";
+    }
 }
 

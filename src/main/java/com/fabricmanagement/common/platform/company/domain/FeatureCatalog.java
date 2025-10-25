@@ -233,5 +233,10 @@ public class FeatureCatalog extends BaseEntity {
             throw new IllegalStateException("OS code is required");
         }
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "FEAT";
+    }
 }
 

@@ -71,5 +71,10 @@ public class Department extends BaseEntity {
     public boolean hasManager() {
         return this.managerId != null;
     }
+
+    @Override
+    protected String getModuleCode() {
+        return "DEPT";
+    }
 }
 
