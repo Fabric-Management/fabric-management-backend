@@ -12,12 +12,12 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-        use_sql_comments: true
+        format_sql: ${HIBERNATE_FORMAT_SQL:true}
+        use_sql_comments: ${HIBERNATE_USE_COMMENTS:true}
         jdbc:
-          batch_size: 20
-        order_inserts: true
-        order_updates: true
+          batch_size: ${HIBERNATE_BATCH_SIZE:20}
+        order_inserts: ${HIBERNATE_ORDER_INSERTS:true}
+        order_updates: ${HIBERNATE_ORDER_UPDATES:true}
     show-sql: false
 
   flyway:
@@ -29,12 +29,12 @@ spring:
   cache:
     type: caffeine
     caffeine:
-      spec: maximumSize=10000,expireAfterWrite=300s
+      spec: maximumSize=${CACHE_MAX_SIZE:10000},expireAfterWrite=${CACHE_EXPIRE_SECONDS:300}s
 
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:10MB}
 
 # Server Configuration
 server:
@@ -45,9 +45,9 @@ server:
     include-stacktrace: on_param
     include-exception: false
   compression:
-    enabled: true
-    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
-    min-response-size: 1024
+    enabled: ${SERVER_COMPRESSION_ENABLED:true}
+    mime-types: ${SERVER_COMPRESSION_MIME_TYPES:text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json}
+    min-response-size: ${SERVER_COMPRESSION_MIN_SIZE:1024}
 
 # Management & Actuator
 management:
@@ -75,9 +75,9 @@ management:
 info:
   app:
     name: ${spring.application.name}
-    description: Modular Monolith Fabric Management System
-    version: 1.0.0
-    architecture: Modular Monolith
+    description: ${APP_DESCRIPTION:Modular Monolith Fabric Management System}
+    version: ${APP_VERSION:1.0.0}
+    architecture: ${APP_ARCHITECTURE:Modular Monolith}
     encoding: ${project.build.sourceEncoding:UTF-8}
     java:
       version: ${java.version:21}
