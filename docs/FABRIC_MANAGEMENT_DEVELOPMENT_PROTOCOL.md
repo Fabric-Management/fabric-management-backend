@@ -85,11 +85,38 @@
 - Doğrudan Java method çağrısı (Facade arayüzü)
 - Bu sayede latency ≈ 0, network overhead yok
 
-### 3. Event-Driven Interaction
+### 3. Event-Driven Interaction (Async!)
 
 - Her domain `DomainEventPublisher` ile olay fırlatır
-- Olaylar `integration` modülündeki Outbox tablosuna yazılır
-- Event'ler Kafka'ya taşınır ama sistem Kafka olmadan da çalışabilir
+- **Spring Modulith Events** kullanarak reliable async event processing
+- Event'ler `event_publication` tablosuna yazılır (transaction-safe!)
+- @EventListener methodları **@Async** ile çalışabilir (non-blocking)
+- Kafka **optional** - development'ta Spring Events yeterli, production'da Kafka eklenebilir
+
+**Async Architecture:**
+
+```java
+// Publisher (main thread)
+eventPublisher.publish(new UserCreatedEvent(...));
+// ↓ Returns immediately!
+
+// Listener (separate thread!)
+@EventListener
+@Async  // ← Async execution!
+@Transactional
+public void onUserCreated(UserCreatedEvent event) {
+    // Runs in background thread
+    // Doesn't block main operation!
+}
+```
+
+**Benefits:**
+
+- ✅ Non-blocking operations
+- ✅ Transaction-safe (Spring Modulith)
+- ✅ Reliable delivery (event_publication table)
+- ✅ No Kafka needed for development
+- ✅ Can add Kafka later without code changes
 
 ### 4. Multi-Tenant Aware
 
@@ -131,8 +158,11 @@
 
 ### 6. Self-Healing & Degraded Mode
 
-- Kafka veya Redis geçici olarak erişilemezse sistem çalışmaya devam eder
-- Outbox tabloları, cache'ler ve async retry mekanizması devreye girer
+- Redis geçici olarak erişilemezse sistem çalışmaya devam eder (cache bypass)
+- Spring Modulith event_publication table güvenilir event delivery sağlar
+- @Async operations retry mechanism ile desteklenir
+- Kafka **optional** - yoksa in-process events kullanılır
+- Sistem critical dependencies olmadan çalışabilir (graceful degradation)
 
 ---
 
@@ -1065,9 +1095,49 @@ class LogisticsModule {}
 
 **Domainler arası:**
 
-1. **Event-first:** ApplicationEventPublisher (modül içi) + Outbox tablosu → Kafka/Redpanda (dış entegrasyon veya güçlü asenkron).
+1. **Event-first (ASYNC!):**
 
-2. **Read-only façade:** Başka domain verisini değiştirmeden okumak için yalnızca api/Facade üzerinden çağrı.
+   - `ApplicationEventPublisher` ile event publish
+   - **Spring Modulith Events** - event_publication tablosuna yazılır (transaction-safe!)
+   - **@Async @EventListener** ile async processing (non-blocking!)
+   - Kafka **optional** - external systems için (YAGNI principle!)
+
+   ```java
+   // Async event pattern (RECOMMENDED!)
+   @Service
+   public class MaterialService {
+       public MaterialDto create(CreateMaterialRequest request) {
+           Material saved = materialRepository.save(material);
+
+           // ASYNC EVENT - immediate return!
+           eventPublisher.publish(new MaterialCreatedEvent(...));
+
+           return MaterialDto.from(saved); // Returns immediately!
+       }
+   }
+
+   // Listener (separate module, async!)
+   @EventListener
+   @Async  // ← Runs in background thread!
+   @Transactional
+   public void onMaterialCreated(MaterialCreatedEvent event) {
+       // Inventory operations...
+       // Doesn't block MaterialService!
+   }
+   ```
+
+2. **Read-only façade (SYNC):** Başka domain verisini okumak için api/Facade üzerinden in-process call.
+
+   ```java
+   // Synchronous facade call
+   Optional<MaterialDto> material = materialFacade.findById(tenantId, materialId);
+   // Fast in-process, no network overhead
+   ```
+
+**Event vs Facade:**
+
+- **Facade:** Synchronous read (immediate response needed)
+- **Events:** Asynchronous writes (fire-and-forget, eventual consistency)
 
 **Facade örneği (read-only):**
 
