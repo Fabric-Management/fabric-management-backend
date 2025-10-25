@@ -56,16 +56,16 @@
 
 #### **Platform Modülleri**
 
-| Module            | PROTOCOL.md    | ENDPOINTS.md | MISSIONS.md | FOLDER_STRUCTURE.md | EXAMPLES.md | Progress |
-| ----------------- | -------------- | ------------ | ----------- | ------------------- | ----------- | -------- |
-| **auth**          | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **user**          | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **company**       | 🚧 In Progress | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 40%      |
-| **policy**        | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **audit**         | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **config**        | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **monitoring**    | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **communication** | ⏳ Pending     | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| Module            | PROTOCOL.md  | ENDPOINTS.md | MISSIONS.md | FOLDER_STRUCTURE.md | EXAMPLES.md | Progress |
+| ----------------- | ------------ | ------------ | ----------- | ------------------- | ----------- | -------- |
+| **company**       | ✅ Completed | ✅ Completed | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **user**          | ✅ Completed | ✅ Completed | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **auth**          | ✅ Completed | ✅ Completed | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **policy**        | ✅ Completed | ✅ Completed | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **audit**         | ✅ Completed | ✅ Completed | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **communication** | ✅ Completed | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 60%      |
+| **config**        | ⏳ Pending   | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| **monitoring**    | ⏳ Pending   | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
 
 #### **Company Module - Subscription Implementation** ⭐ NEW
 
@@ -84,14 +84,14 @@
 
 #### **Infrastructure Modülleri**
 
-| Module          | PROTOCOL.md | ENDPOINTS.md | MISSIONS.md | FOLDER_STRUCTURE.md | EXAMPLES.md | Progress |
-| --------------- | ----------- | ------------ | ----------- | ------------------- | ----------- | -------- |
-| **persistence** | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **events**      | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **mapping**     | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **cqrs**        | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **web**         | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
-| **security**    | ⏳ Pending  | ⏳ Pending   | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 0%       |
+| Module          | PROTOCOL.md  | ENDPOINTS.md | MISSIONS.md | FOLDER_STRUCTURE.md | EXAMPLES.md | Progress |
+| --------------- | ------------ | ------------ | ----------- | ------------------- | ----------- | -------- |
+| **persistence** | ✅ Completed | N/A          | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **events**      | ✅ Completed | N/A          | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **mapping**     | ✅ Completed | N/A          | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **cqrs**        | ✅ Completed | N/A          | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **web**         | ✅ Completed | N/A          | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 80%      |
+| **security**    | ⏳ Pending   | N/A          | ⏳ Pending  | ⏳ Pending          | ⏳ Pending  | 60%      |
 
 ### **Business Module Dokümantasyonu**
 
