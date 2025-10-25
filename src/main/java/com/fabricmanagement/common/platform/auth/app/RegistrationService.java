@@ -10,6 +10,7 @@ import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.VerificationCodeRepository;
+import com.fabricmanagement.common.platform.communication.app.VerificationService;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,7 @@ public class RegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
+    private final VerificationService verificationService;
 
     @Value("${application.verification.code-length:6}")
     private int codeLength;
@@ -95,11 +97,16 @@ public class RegistrationService {
         );
         verificationCodeRepository.save(verificationCode);
 
-        // TODO: Send via Communication module (multi-channel)
-        log.info("Verification code generated: contactValue={}, code={} (TODO: Send via Communication)",
-            request.getContactValue(), code);
+        // Send verification code via multi-channel (WhatsApp → Email → SMS)
+        try {
+            verificationService.sendVerificationCode(request.getContactValue(), code);
+            log.info("✅ Verification code sent successfully to: {}", request.getContactValue());
+        } catch (Exception e) {
+            log.error("❌ Failed to send verification code to: {}", request.getContactValue(), e);
+            // Continue anyway - code is in database, user can try again
+        }
 
-        return "Verification code sent. Please check your messages.";
+        return "Verification code sent. Please check your email.";
     }
 
     @Transactional
