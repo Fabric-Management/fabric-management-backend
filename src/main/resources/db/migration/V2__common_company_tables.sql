@@ -85,6 +85,7 @@ CREATE TABLE common_company.common_os_definition (
     os_type VARCHAR(20) NOT NULL DEFAULT 'FULL',
     description TEXT,
     included_modules JSONB NOT NULL DEFAULT '[]'::jsonb,
+    available_tiers JSONB DEFAULT '[]'::jsonb,
     default_tier VARCHAR(50) DEFAULT 'Professional',
     
     is_active BOOLEAN NOT NULL DEFAULT TRUE,

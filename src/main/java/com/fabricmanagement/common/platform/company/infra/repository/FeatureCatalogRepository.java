@@ -58,7 +58,7 @@ public interface FeatureCatalogRepository extends JpaRepository<FeatureCatalog, 
     @Query(value = "SELECT * FROM common_company.common_feature_catalog " +
                    "WHERE is_active = true " +
                    "AND (available_in_tiers IS NULL OR available_in_tiers = '[]' " +
-                   "OR available_in_tiers::jsonb ? :tier)",
+                   "OR available_in_tiers::jsonb @> CAST(:tier AS jsonb))",
            nativeQuery = true)
     List<FeatureCatalog> findByTier(@Param("tier") String tier);
 
@@ -72,7 +72,7 @@ public interface FeatureCatalogRepository extends JpaRepository<FeatureCatalog, 
     @Query(value = "SELECT * FROM common_company.common_feature_catalog " +
                    "WHERE os_code = :osCode AND is_active = true " +
                    "AND (available_in_tiers IS NULL OR available_in_tiers = '[]' " +
-                   "OR available_in_tiers::jsonb ? :tier)",
+                   "OR available_in_tiers::jsonb @> CAST(:tier AS jsonb))",
            nativeQuery = true)
     List<FeatureCatalog> findByOsCodeAndTier(@Param("osCode") String osCode, @Param("tier") String tier);
 
