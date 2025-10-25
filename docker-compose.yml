@@ -89,7 +89,7 @@ services:
   # YAGNI: Not needed for development phase
   # Spring Events handles in-process events
   # Uncomment when ready for external event streaming
-  
+
   # zookeeper:
   #   image: confluentinc/cp-zookeeper:7.6.0
   #   container_name: fabric-zookeeper
