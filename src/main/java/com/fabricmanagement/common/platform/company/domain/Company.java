@@ -23,6 +23,10 @@ import java.util.UUID;
  * For hierarchical tenants (parent-child), both share same tenant_id but have
  * different company IDs.</p>
  *
+ * <h2>Special Case - ROOT Tenant:</h2>
+ * <p><b>CRITICAL:</b> For ROOT tenant companies, tenant_id = company_id (self-referencing).
+ * This is the ONLY entity where tenant_id is updatable.</p>
+ *
  * <h2>Example:</h2>
  * <pre>{@code
  * Company acme = Company.builder()
@@ -36,6 +40,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "common_company", schema = "common_company")
+@AttributeOverride(name = "tenantId", column = @Column(name = "tenant_id", nullable = false, updatable = true))
 @Getter
 @Setter
 @Builder

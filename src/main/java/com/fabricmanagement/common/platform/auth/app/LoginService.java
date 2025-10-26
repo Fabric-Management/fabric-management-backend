@@ -8,8 +8,11 @@ import com.fabricmanagement.common.platform.auth.dto.LoginRequest;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
+import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
+import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Login Service - Authentication logic.
@@ -38,6 +42,7 @@ public class LoginService {
     private final AuthUserRepository authUserRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserFacade userFacade;
+    private final CompanyFacade companyFacade;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
@@ -47,23 +52,27 @@ public class LoginService {
 
     @Transactional
     public LoginResponse login(LoginRequest request, String ipAddress) {
-        log.info("Login attempt: contactValue={}", request.getContactValue());
+        log.info("Login attempt: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         AuthUser authUser = authUserRepository.findByContactValue(request.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+            .orElseThrow(() -> createContextAwareNotFoundException(request.getContactValue()));
 
         if (authUser.isLocked()) {
-            log.warn("Account locked: contactValue={}", request.getContactValue());
+            log.warn("Account locked: contactValue={}", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
             throw new IllegalArgumentException("Account is temporarily locked. Try again later.");
         }
 
         if (!authUser.getIsVerified()) {
-            log.warn("Account not verified: contactValue={}", request.getContactValue());
+            log.warn("Account not verified: contactValue={}", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
             throw new IllegalArgumentException("Account not verified. Please complete registration.");
         }
 
         if (!authUser.getIsActive()) {
-            log.warn("Account not active: contactValue={}", request.getContactValue());
+            log.warn("Account not active: contactValue={}", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
             throw new IllegalArgumentException("Account is deactivated");
         }
 
@@ -72,7 +81,8 @@ public class LoginService {
             authUserRepository.save(authUser);
             
             log.warn("Invalid password: contactValue={}, attempts={}", 
-                request.getContactValue(), authUser.getFailedLoginAttempts());
+                PiiMaskingUtil.maskEmail(request.getContactValue()), 
+                authUser.getFailedLoginAttempts());
             
             throw new IllegalArgumentException("Invalid credentials");
         }
@@ -135,6 +145,66 @@ public class LoginService {
         user.setIsActive(dto.getIsActive());
         
         return user;
+    }
+
+    /**
+     * Create context-aware user not found exception.
+     *
+     * <p>Provides helpful error messages based on context:</p>
+     * <ul>
+     *   <li>Known tenant company user: "Contact your IT team"</li>
+     *   <li>Known supplier company user: "Contact your customer representative"</li>
+     *   <li>Unknown: "Sign up at fabricmanagement.com"</li>
+     * </ul>
+     */
+    private IllegalArgumentException createContextAwareNotFoundException(String contactValue) {
+        String domain = extractEmailDomain(contactValue);
+        if (domain == null) {
+            return new IllegalArgumentException("User not found. Please check your credentials.");
+        }
+
+        Optional<UserDto> anyUserWithDomain = userFacade.findByContactValue(
+            contactValue.substring(0, 1) + "@" + domain
+        );
+
+        if (anyUserWithDomain.isPresent()) {
+            UserDto existingUser = anyUserWithDomain.get();
+            Optional<CompanyDto> company = companyFacade.findById(
+                existingUser.getTenantId(),
+                existingUser.getCompanyId()
+            );
+
+            if (company.isPresent()) {
+                CompanyDto companyDto = company.get();
+                
+                if (companyDto.getIsTenant()) {
+                    return new IllegalArgumentException(
+                        "User not found. If you're a " + companyDto.getCompanyName() + 
+                        " employee, please contact your IT team or manager to add you to the system."
+                    );
+                } else {
+                    return new IllegalArgumentException(
+                        "User not found. Please contact your customer representative at " + 
+                        companyDto.getCompanyName() + " to add you to the system."
+                    );
+                }
+            }
+        }
+
+        return new IllegalArgumentException(
+            "User not found. If you're a new customer, please sign up at fabricmanagement.com"
+        );
+    }
+
+    /**
+     * Extract domain from email address.
+     */
+    private String extractEmailDomain(String email) {
+        if (email == null || !email.contains("@")) {
+            return null;
+        }
+        String[] parts = email.split("@");
+        return parts.length == 2 ? parts[1] : null;
     }
 }
 

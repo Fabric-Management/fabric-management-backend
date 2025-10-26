@@ -29,6 +29,7 @@ public class CompanyDto {
     private CompanyType companyType;
     private UUID parentCompanyId;
     private Boolean isActive;
+    private Boolean isTenant;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -47,6 +48,7 @@ public class CompanyDto {
             .companyType(company.getCompanyType())
             .parentCompanyId(company.getParentCompanyId())
             .isActive(company.getIsActive())
+            .isTenant(company.isTenant())
             .createdAt(company.getCreatedAt())
             .updatedAt(company.getUpdatedAt())
             .build();

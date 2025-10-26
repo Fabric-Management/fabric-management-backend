@@ -142,12 +142,39 @@ public class PolicyService {
 
         // Check time range (if specified)
         if (conditions.containsKey("timeRange")) {
-            // TODO: Implement time range check
-            // For now, always pass
+            String timeRange = (String) conditions.get("timeRange");
+            if (!isWithinTimeRange(timeRange)) {
+                log.debug("Time range check failed: range={}, current={}", timeRange, java.time.LocalTime.now());
+                return false;
+            }
         }
 
         // All conditions passed
         return true;
+    }
+
+    /**
+     * Check if current time is within specified range.
+     *
+     * @param timeRange Format: "HH:mm-HH:mm" (e.g., "08:00-18:00")
+     * @return true if within range
+     */
+    private boolean isWithinTimeRange(String timeRange) {
+        if (timeRange == null || !timeRange.contains("-")) {
+            return true;
+        }
+
+        try {
+            String[] parts = timeRange.split("-");
+            java.time.LocalTime start = java.time.LocalTime.parse(parts[0].trim());
+            java.time.LocalTime end = java.time.LocalTime.parse(parts[1].trim());
+            java.time.LocalTime now = java.time.LocalTime.now();
+
+            return !now.isBefore(start) && !now.isAfter(end);
+        } catch (Exception e) {
+            log.warn("Invalid time range format: {}", timeRange);
+            return true;
+        }
     }
 
     /**

@@ -2,11 +2,14 @@ package com.fabricmanagement.common.platform.auth.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.LoginService;
+import com.fabricmanagement.common.platform.auth.app.PasswordSetupService;
 import com.fabricmanagement.common.platform.auth.app.RegistrationService;
 import com.fabricmanagement.common.platform.auth.dto.LoginRequest;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
+import com.fabricmanagement.common.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
+import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,11 +37,13 @@ public class AuthController {
 
     private final LoginService loginService;
     private final RegistrationService registrationService;
+    private final PasswordSetupService passwordSetupService;
 
     @PostMapping("/register/check")
     public ResponseEntity<ApiResponse<String>> checkRegistrationEligibility(
             @Valid @RequestBody RegisterCheckRequest request) {
-        log.info("Registration eligibility check: contactValue={}", request.getContactValue());
+        log.info("Registration eligibility check: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         String message = registrationService.checkEligibilityAndSendCode(request);
 
@@ -48,18 +53,40 @@ public class AuthController {
     @PostMapping("/register/verify")
     public ResponseEntity<ApiResponse<LoginResponse>> verifyAndRegister(
             @Valid @RequestBody VerifyAndRegisterRequest request) {
-        log.info("Verify and register: contactValue={}", request.getContactValue());
+        log.info("Verify and register: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         LoginResponse response = registrationService.verifyAndRegister(request);
 
         return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
     }
 
+    @PostMapping("/setup-password")
+    public ResponseEntity<ApiResponse<LoginResponse>> setupPassword(
+            @Valid @RequestBody PasswordSetupRequest request) {
+        
+        log.info("Password setup request: token={}...", 
+            request.getToken().substring(0, 8));
+
+        LoginResponse response = passwordSetupService.setupPassword(request);
+
+        log.info("✅ Password setup successful, needsOnboarding={}", 
+            response.getNeedsOnboarding());
+
+        return ResponseEntity.ok(ApiResponse.success(
+            response,
+            response.getNeedsOnboarding()
+                ? "Welcome! Complete your profile to get started."
+                : "Welcome back! You're all set."
+        ));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
-        log.info("Login request: contactValue={}", request.getContactValue());
+        log.info("Login request: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         String ipAddress = getClientIpAddress(httpRequest);
         LoginResponse response = loginService.login(request, ipAddress);

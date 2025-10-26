@@ -174,7 +174,10 @@ Detaylı deployment rehberi için: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 
 ### **Common Module Dokümantasyonu**
 
+#### **Platform Modules**
+
 - [🔐 Auth Module](./common/platform/auth/AUTH_PROTOCOL.md)
+  - [🚀 Onboarding Flow](./common/platform/auth/ONBOARDING_FLOW.md) - ⭐ **Sales-led + Self-service flows**
 - [👤 User Module](./common/platform/user/USER_PROTOCOL.md)
 - [🏢 Company Module](./common/platform/company/COMPANY_PROTOCOL.md)
   - [💳 Subscription Management](./common/platform/company/SUBSCRIPTION.md) - ⭐ **Subscription implementation**
@@ -183,6 +186,15 @@ Detaylı deployment rehberi için: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 - [⚙️ Config Module](./common/platform/config/CONFIG_PROTOCOL.md)
 - [📈 Monitoring Module](./common/platform/monitoring/MONITORING_PROTOCOL.md)
 - [💬 Communication Module](./common/platform/communication/COMMUNICATION_PROTOCOL.md)
+
+#### **Infrastructure Modules**
+
+- [📝 Logging Protocol](./common/infrastructure/LOGGING_PROTOCOL.md) - ⭐ **PII masking, GDPR/KVKK compliance**
+- [🗄️ Persistence Module](./common/infrastructure/persistence/PERSISTENCE_PROTOCOL.md)
+- [🔄 Events Module](./common/infrastructure/events/EVENTS_PROTOCOL.md)
+- [🗺️ Mapping Module](./common/infrastructure/mapping/MAPPING_PROTOCOL.md)
+- [🎯 CQRS Module](./common/infrastructure/cqrs/CQRS_PROTOCOL.md)
+- [🌐 Web Module](./common/infrastructure/web/WEB_PROTOCOL.md)
 
 ### **Governance Domain** ⭐ NEW
 
@@ -226,4 +238,4 @@ Sorular veya sorunlar için:
 
 **Last Updated:** 2025-10-25  
 **Maintained By:** Fabric Management Team  
-**Latest Addition:** ⭐ **Composable Feature-Based Subscription Model**
+**Latest Addition:** ⭐ **Dual-Path Tenant Onboarding System (Sales-Led + Self-Service)**

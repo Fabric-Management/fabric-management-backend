@@ -114,7 +114,7 @@ CREATE TABLE common_company.common_subscription (
     os_code VARCHAR(50) NOT NULL,
     os_name VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'TRIAL',
-    pricing_tier VARCHAR(50) NOT NULL DEFAULT 'Starter',
+    pricing_tier VARCHAR(50),  -- OPTIONAL: Simple OS-based model (no tiers)
     
     start_date TIMESTAMP NOT NULL,
     expiry_date TIMESTAMP,
@@ -129,17 +129,16 @@ CREATE TABLE common_company.common_subscription (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_tenant_os UNIQUE(tenant_id, os_code),
-    CONSTRAINT fk_subscription_os FOREIGN KEY (os_code) 
-        REFERENCES common_company.common_os_definition(os_code) ON DELETE RESTRICT
+    CONSTRAINT uk_tenant_os UNIQUE(tenant_id, os_code)
+    -- FK constraint removed: Simple model, no OS catalog needed
 );
 
 CREATE INDEX idx_subscription_tenant_os ON common_company.common_subscription(tenant_id, os_code);
 CREATE INDEX idx_subscription_status ON common_company.common_subscription(status);
 CREATE INDEX idx_subscription_expiry ON common_company.common_subscription(expiry_date) WHERE expiry_date IS NOT NULL;
 
-COMMENT ON TABLE common_company.common_subscription IS 'Tenant OS subscriptions with feature-based access control';
-COMMENT ON COLUMN common_company.common_subscription.pricing_tier IS 'String-based: Starter, Professional, Enterprise, Standard, Advanced';
+COMMENT ON TABLE common_company.common_subscription IS 'Tenant OS subscriptions - Simple OS-based pricing model';
+COMMENT ON COLUMN common_company.common_subscription.pricing_tier IS 'OPTIONAL: For future feature-gating (not used in simple model)';
 COMMENT ON COLUMN common_company.common_subscription.features IS 'JSONB map of feature overrides: {"yarn.blend.management": true}';
 
 -- ============================================================================

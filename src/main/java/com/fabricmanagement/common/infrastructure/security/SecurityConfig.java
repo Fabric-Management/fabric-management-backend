@@ -49,7 +49,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/health", "/api/info").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**").permitAll()
-                .anyRequest().permitAll()
+                .requestMatchers("/api/dev/**").permitAll()  // Development tools
+                .requestMatchers("/api/public/**").permitAll()  // Public signup
+                .requestMatchers("/api/auth/**").permitAll()  // Auth endpoints
+                .requestMatchers("/api/admin/**").permitAll()  // ⚠️ TEMP: Admin endpoints (will be secured in production)
+                .anyRequest().permitAll()  // ⚠️ DEVELOPMENT: Allow all
             )
             .build();
     }
@@ -65,9 +69,11 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/health").permitAll()
-                .requestMatchers("/api/auth/login", "/api/auth/register/**").permitAll()
+                .requestMatchers("/api/health", "/api/info").permitAll()
+                .requestMatchers("/api/public/**").permitAll()  // Public signup
+                .requestMatchers("/api/auth/login", "/api/auth/register/**", "/api/auth/setup-password").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("PLATFORM_ADMIN")  // ✅ Admin endpoints protected
                 .anyRequest().authenticated()
             )
             .build();

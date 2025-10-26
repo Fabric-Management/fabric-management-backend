@@ -35,26 +35,22 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
   mail:
-    host: ${PLATFORM_SMTP_HOST:smtp.hostinger.com}
-    port: ${PLATFORM_SMTP_PORT:465}
-    username: ${PLATFORM_SMTP_USERNAME:info@storeandsale.shop}
-    password: ${PLATFORM_SMTP_PASSWORD:}
+    host: ${MAIL_HOST:smtp.hostinger.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:info@storeandsale.shop}
+    password: ${MAIL_PASSWORD:Akk789987@}
     properties:
       mail:
         smtp:
-          auth: true
+          auth: ${MAIL_SMTP_AUTH:true}
           starttls:
-            enable: true
-            required: false
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+            required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
           ssl:
-            enable: true
-        from: ${PLATFORM_EMAIL_FROM:info@storeandsale.shop}
-        from-name: ${PLATFORM_EMAIL_FROM_NAME:Fabricode}
-
-management:
-  health:
-    mail:
-      enabled: false
+            enable: ${MAIL_SMTP_SSL_ENABLE:true}
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
+          timeout: ${MAIL_SMTP_TIMEOUT:5000}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
 
   flyway:
     enabled: true
@@ -87,3 +83,6 @@ application:
     expiration: 3600000 # 1 hour for local development
     refresh-expiration: 2592000000 # 30 days for local development
 
+  mail:
+    from-email: ${MAIL_FROM_EMAIL:info@storeandsale.shop}
+    from-name: ${MAIL_FROM_NAME:Fabricode}

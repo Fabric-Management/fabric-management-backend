@@ -70,11 +70,14 @@ tmp/
 
 # Environment & Configuration
 # ==========================================
-#.env
-#.env.local
-#env.*.local
-#env.backup.*
-#!.env.example
+.env
+.env.local
+.env.*.local
+.env.staging
+.env.production
+env.backup.*
+!.env.example
+!.env.template
 
 # Docker
 # ==========================================

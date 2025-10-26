@@ -3,7 +3,7 @@
 # =============================================================================
 # Production-ready development & deployment commands
 
-.PHONY: help setup validate-env build test clean deploy down restart logs status health db-shell db-migrate app-run app-build
+.PHONY: help setup validate-env build test clean deploy down restart logs status health db-shell db-migrate app-run app-build dev-reset dev-clean-tokens dev-clean-codes dev-stats dev-tools-health quick-test full-cycle dev-workflow endpoints db-view-companies db-view-users db-view-subscriptions db-view-tokens db-view-all
 
 .DEFAULT_GOAL := help
 
@@ -28,6 +28,11 @@ help: ## Show available commands
 	@echo "  make dev          # Start PostgreSQL + Redis"
 	@echo "  make app-run      # Run Spring Boot app"
 	@echo "  make health       # Check application health"
+	@echo ""
+	@echo "$(YELLOW)Development Tools (NEW):$(NC)"
+	@echo "  make dev-stats    # Database statistics"
+	@echo "  make dev-reset    # ⚠️  Reset ALL data"
+	@echo "  make endpoints    # Show all API endpoints"
 	@echo ""
 
 # =============================================================================
@@ -201,6 +206,71 @@ db-schemas: ## List all schemas
 		WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'flyway') \
 		ORDER BY schema_name;"
 
+db-view-companies: ## View company table contents
+	@echo "$(BLUE)🏢 Companies:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabric_user -d fabric_management -c "\
+		SELECT \
+			id, \
+			tenant_id, \
+			CASE WHEN id = tenant_id THEN '✅ ROOT' ELSE '⚠️ BRANCH' END as type, \
+			uid, \
+			company_name, \
+			company_type, \
+			city \
+		FROM common_company.common_company \
+		ORDER BY created_at DESC;"
+
+db-view-users: ## View user table contents
+	@echo "$(BLUE)👤 Users:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabric_user -d fabric_management -c "\
+		SELECT \
+			u.uid, \
+			u.first_name || ' ' || u.last_name as name, \
+			u.contact_value, \
+			u.tenant_id, \
+			c.company_name, \
+			u.department, \
+			CASE WHEN u.onboarding_completed_at IS NULL THEN '⏳ Pending' ELSE '✅ Done' END as onboarding \
+		FROM common_user.common_user u \
+		JOIN common_company.common_company c ON u.company_id = c.id \
+		ORDER BY u.created_at DESC;"
+
+db-view-subscriptions: ## View subscription table contents
+	@echo "$(BLUE)💳 Subscriptions:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabric_user -d fabric_management -c "\
+		SELECT \
+			os_code, \
+			os_name, \
+			status, \
+			pricing_tier, \
+			trial_ends_at::date as trial_ends, \
+			c.company_name \
+		FROM common_company.common_subscription s \
+		JOIN common_company.common_company c ON s.tenant_id = c.id \
+		ORDER BY s.created_at;"
+
+db-view-tokens: ## View registration tokens
+	@echo "$(BLUE)🔑 Registration Tokens:$(NC)"
+	@docker exec -it fabric-postgres psql -U fabric_user -d fabric_management -c "\
+		SELECT \
+			token, \
+			contact_value, \
+			token_type, \
+			CASE WHEN is_used THEN '✅ Used' ELSE '⏳ Pending' END as status, \
+			expires_at::date as expires \
+		FROM common_auth.common_registration_token \
+		ORDER BY created_at DESC \
+		LIMIT 5;"
+
+db-view-all: ## View all table contents (summary)
+	@make db-view-companies
+	@echo ""
+	@make db-view-users
+	@echo ""
+	@make db-view-subscriptions
+	@echo ""
+	@make db-view-tokens
+
 db-backup: ## Backup database
 	@echo "$(YELLOW)💾 Backing up database...$(NC)"
 	@mkdir -p backups
@@ -341,6 +411,95 @@ dev-clean-start: ## Clean restart (remove volumes + rebuild)
 	@echo "$(GREEN)✅ Clean start ready. Run: make app-run$(NC)"
 
 # =============================================================================
+# DEVELOPMENT TOOLS (API-Based Cleanup) ⭐ NEW
+# =============================================================================
+dev-reset: ## ⚠️ Reset ALL application data (via API)
+	@echo "$(RED)⚠️  WARNING: This will DELETE ALL data from database!$(NC)"
+	@echo "$(YELLOW)   Companies, Users, Auth, Subscriptions, Policies, Tokens, Codes...$(NC)"
+	@read -p "Are you sure? Type 'yes' to confirm: " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
+		echo "$(YELLOW)🔥 Resetting all data...$(NC)"; \
+		curl -s -X POST http://localhost:8080/api/dev/reset-all | jq . 2>/dev/null || echo "$(RED)❌ API not responding$(NC)"; \
+		echo "$(GREEN)✅ Data reset complete$(NC)"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
+
+dev-clean-tokens: ## Clean expired registration tokens
+	@echo "$(YELLOW)🧹 Cleaning expired tokens...$(NC)"
+	@curl -s -X POST http://localhost:8080/api/dev/clean-tokens | jq . 2>/dev/null || echo "$(RED)❌ API not responding$(NC)"
+	@echo "$(GREEN)✅ Tokens cleaned$(NC)"
+
+dev-clean-codes: ## Clean expired verification codes
+	@echo "$(YELLOW)🧹 Cleaning expired verification codes...$(NC)"
+	@curl -s -X POST http://localhost:8080/api/dev/clean-codes | jq . 2>/dev/null || echo "$(RED)❌ API not responding$(NC)"
+	@echo "$(GREEN)✅ Codes cleaned$(NC)"
+
+dev-stats: ## Show database statistics (via API)
+	@echo "$(BLUE)📊 Database Statistics:$(NC)"
+	@curl -s http://localhost:8080/api/dev/stats | jq . 2>/dev/null || echo "$(RED)❌ API not responding$(NC)"
+
+dev-tools-health: ## Check if development tools are available
+	@echo "$(BLUE)🔧 Development Tools Status:$(NC)"
+	@curl -s http://localhost:8080/api/dev/health | jq . 2>/dev/null || echo "$(RED)❌ Development tools not available (check profile=local)$(NC)"
+
+# =============================================================================
+# QUICK WORKFLOWS ⭐ NEW
+# =============================================================================
+quick-test: ## Quick test cycle (stats → reset → stats)
+	@echo "$(BLUE)🧪 Quick Test Cycle:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)1️⃣ Current Stats:$(NC)"
+	@make dev-stats
+	@echo ""
+	@echo "$(YELLOW)2️⃣ Resetting data...$(NC)"
+	@curl -s -X POST http://localhost:8080/api/dev/reset-all | jq . 2>/dev/null
+	@echo ""
+	@echo "$(YELLOW)3️⃣ Clean Stats:$(NC)"
+	@make dev-stats
+	@echo ""
+	@echo "$(GREEN)✅ Ready for fresh testing!$(NC)"
+
+full-cycle: ## Full test cycle (reset → onboard → login → test)
+	@echo "$(BLUE)🚀 Full Test Cycle:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)1️⃣ Resetting database...$(NC)"
+	@curl -s -X POST http://localhost:8080/api/dev/reset-all | jq -r '.message' 2>/dev/null
+	@echo ""
+	@echo "$(YELLOW)2️⃣ Creating tenant (Akkayalar Tekstil)...$(NC)"
+	@curl -s -X POST http://localhost:8080/api/admin/onboarding/tenant \
+		-H "Content-Type: application/json" \
+		-d '{"companyName":"Akkayalar Tekstil Dokuma San. Tic. Ltd.Sti","taxId":"4420543162","companyType":"WEAVER","adminFirstName":"Fatih","adminLastName":"Akkaya","adminContact":"fatih@akkayalartekstil.com.tr","selectedOS":["LoomOS","AccountOS"],"trialDays":90}' \
+		| jq -r '"Company: " + .data.companyName + "\nSetup URL: " + .data.setupUrl + "\nToken: " + .data.registrationToken' 2>/dev/null
+	@echo ""
+	@echo "$(GREEN)✅ Tenant created! Use token from above for password setup.$(NC)"
+	@echo "$(YELLOW)Next: Run password setup in Postman with the token$(NC)"
+
+dev-workflow: ## Complete dev workflow with instructions
+	@echo "$(BLUE)📚 Development Workflow:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 1: Start Infrastructure$(NC)"
+	@echo "  make dev"
+	@echo ""
+	@echo "$(YELLOW)Step 2: Run Application$(NC)"
+	@echo "  make app-run"
+	@echo ""
+	@echo "$(YELLOW)Step 3: Check Health$(NC)"
+	@echo "  make health"
+	@echo ""
+	@echo "$(YELLOW)Step 4: View Stats$(NC)"
+	@echo "  make dev-stats"
+	@echo ""
+	@echo "$(YELLOW)Step 5: Test in Postman$(NC)"
+	@echo "  Import: postman/Fabric-Management-Modular-Monolith.postman_collection.json"
+	@echo "  Run: Sales-Led Tenant Creation → Setup Password"
+	@echo ""
+	@echo "$(YELLOW)Step 6: Reset When Needed$(NC)"
+	@echo "  make dev-reset"
+	@echo ""
+	@echo "$(GREEN)💡 Tip: Use 'make quick-test' for rapid reset$(NC)"
+
+# =============================================================================
 # GIT HELPERS
 # =============================================================================
 git-status: ## Show detailed git status
@@ -370,13 +529,39 @@ info: ## Show system info
 
 endpoints: ## Show available API endpoints
 	@echo "$(BLUE)📡 API Endpoints:$(NC)"
-	@echo "$(YELLOW)Health:$(NC)        http://localhost:8080/api/health"
-	@echo "$(YELLOW)Info:$(NC)          http://localhost:8080/api/info"
-	@echo "$(YELLOW)Swagger:$(NC)       http://localhost:8080/swagger-ui.html"
-	@echo "$(YELLOW)Actuator:$(NC)      http://localhost:8080/actuator"
-	@echo "$(YELLOW)Metrics:$(NC)       http://localhost:8080/actuator/metrics"
-	@echo "$(YELLOW)Prometheus:$(NC)    http://localhost:9090"
-	@echo "$(YELLOW)Grafana:$(NC)       http://localhost:3000 (admin/admin)"
+	@echo ""
+	@echo "$(YELLOW)🎯 Health & Monitoring:$(NC)"
+	@echo "  http://localhost:8080/api/health"
+	@echo "  http://localhost:8080/api/info"
+	@echo "  http://localhost:8080/actuator/health"
+	@echo "  http://localhost:8080/swagger-ui.html"
+	@echo ""
+	@echo "$(YELLOW)🚀 Onboarding (NEW):$(NC)"
+	@echo "  POST http://localhost:8080/api/admin/onboarding/tenant"
+	@echo "  POST http://localhost:8080/api/public/signup"
+	@echo "  POST http://localhost:8080/api/auth/setup-password"
+	@echo ""
+	@echo "$(YELLOW)🔐 Authentication:$(NC)"
+	@echo "  POST http://localhost:8080/api/auth/login"
+	@echo "  POST http://localhost:8080/api/auth/register/check"
+	@echo "  POST http://localhost:8080/api/auth/register/verify"
+	@echo ""
+	@echo "$(YELLOW)🏢 Companies:$(NC)"
+	@echo "  GET  http://localhost:8080/api/common/companies"
+	@echo "  POST http://localhost:8080/api/common/companies"
+	@echo ""
+	@echo "$(YELLOW)👤 Users:$(NC)"
+	@echo "  GET  http://localhost:8080/api/common/users"
+	@echo "  POST http://localhost:8080/api/common/users"
+	@echo ""
+	@echo "$(YELLOW)🧪 Development Tools (local only):$(NC)"
+	@echo "  POST http://localhost:8080/api/dev/reset-all"
+	@echo "  POST http://localhost:8080/api/dev/clean-tokens"
+	@echo "  GET  http://localhost:8080/api/dev/stats"
+	@echo ""
+	@echo "$(YELLOW)📊 Monitoring:$(NC)"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana:    http://localhost:3000 (admin/admin)"
 
 # =============================================================================
 # ALIASES (Backward Compatibility)

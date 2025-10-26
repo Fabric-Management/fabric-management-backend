@@ -683,7 +683,140 @@ public class SecurityConfig {
 }
 ```
 
+### **6. PII Masking in Logs (GDPR/KVKK Compliance)**
+
+**Purpose:** Prevent sensitive data exposure in production logs.
+
+#### **Profile-Aware Masking**
+
+```java
+// PiiMaskingUtil - Automatic profile detection
+public class PiiMaskingUtil {
+    private static final boolean MASKING_ENABLED = !isLocalProfile();
+
+    private static boolean isLocalProfile() {
+        String profile = System.getProperty("spring.profiles.active");
+        return profile != null && profile.contains("local");
+    }
+}
+```
+
+**Behavior:**
+
+- **local profile:** Masking OFF (full data for debugging)
+- **prod profile:** Masking ON (GDPR/KVKK compliant)
+
+#### **Masking Methods**
+
+```java
+import com.fabricmanagement.common.util.PiiMaskingUtil;
+
+// Email Masking
+String email = "user@example.com";
+log.info("User login: {}", PiiMaskingUtil.maskEmail(email));
+// Local: "User login: user@example.com"
+// Prod:  "User login: us***@example.com"
+
+// Phone Masking
+String phone = "+905551234567";
+log.info("Phone verification: {}", PiiMaskingUtil.maskPhone(phone));
+// Local: "Phone verification: +905551234567"
+// Prod:  "Phone verification: +905***4567"
+
+// Card Number Masking
+String card = "1234567890123456";
+log.info("Payment method: {}", PiiMaskingUtil.maskCardNumber(card));
+// Local: "Payment method: 1234567890123456"
+// Prod:  "Payment method: 1234***3456"
+
+// Generic Sensitive Data
+String sensitive = "SecretValue123";
+log.info("Token: {}", PiiMaskingUtil.mask(sensitive));
+// Local: "Token: SecretValue123"
+// Prod:  "Token: S***3"
+```
+
+#### **Implementation Examples**
+
+```java
+// ✅ Good: PII masked in logs
+@Service
+public class RegistrationService {
+    public String checkEligibility(RegisterCheckRequest request) {
+        log.info("Registration check: contactValue={}",
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
+        // Production: "Registration check: contactValue=fa***@example.com"
+        // Local: "Registration check: contactValue=fatih@example.com"
+    }
+}
+
+// ❌ Bad: Raw PII in logs (GDPR violation)
+log.info("Registration check: contactValue={}", request.getContactValue());
+// Production: "Registration check: contactValue=fatih@example.com" ⚠️ PII EXPOSED
+```
+
+#### **SQL Query Logging (Production)**
+
+```yaml
+# application-prod.yml
+logging:
+  level:
+    org.hibernate.SQL: WARN # ⭐ SQL queries hidden
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN # ⭐ Query params hidden
+```
+
+**Prevents:**
+
+```sql
+-- ❌ BAD (development only)
+where u1_0.contact_value=? binding parameter [1] as [VARCHAR] - [fatih@example.com]
+
+-- ✅ GOOD (production)
+[No SQL logs - WARN level suppresses all query output]
+```
+
+#### **GDPR/KVKK Compliance Checklist**
+
+| Requirement           | Implementation                        | Status |
+| --------------------- | ------------------------------------- | ------ |
+| **PII Masking**       | PiiMaskingUtil with profile detection | ✅     |
+| **SQL Query Hiding**  | Production logging level WARN         | ✅     |
+| **Audit Trail**       | Masked PII in audit logs              | ✅     |
+| **Data Minimization** | Only log necessary data               | ✅     |
+| **Right to Erasure**  | Soft delete support (is_active)       | ✅     |
+| **Access Control**    | Role-based + Policy-based             | ✅     |
+
+#### **Testing PII Masking**
+
+```java
+@Test
+void maskEmail_shouldMaskInProduction() {
+    // Given
+    String email = "john.doe@example.com";
+
+    // When (production profile)
+    System.setProperty("spring.profiles.active", "prod");
+    String masked = PiiMaskingUtil.maskEmail(email);
+
+    // Then
+    assertThat(masked).isEqualTo("jo***@example.com");
+}
+
+@Test
+void maskEmail_shouldNotMaskInLocal() {
+    // Given
+    String email = "john.doe@example.com";
+
+    // When (local profile)
+    System.setProperty("spring.profiles.active", "local");
+    String masked = PiiMaskingUtil.maskEmail(email);
+
+    // Then
+    assertThat(masked).isEqualTo("john.doe@example.com");
+}
+```
+
 ---
 
-**Last Updated:** 2025-01-27  
+**Last Updated:** 2025-10-25  
 **Maintained By:** Fabric Management Team

@@ -38,6 +38,24 @@ spring:
       acks: ${KAFKA_PRODUCER_ACKS:all}
       retries: ${KAFKA_PRODUCER_RETRIES:3}
 
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+            required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
+          ssl:
+            enable: ${MAIL_SMTP_SSL_ENABLE:true}
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:10000}
+          timeout: ${MAIL_SMTP_TIMEOUT:10000}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:10000}
+
   jpa:
     show-sql: false
     properties:
@@ -52,6 +70,8 @@ logging:
     org.springframework.web: WARN
     org.springframework.security: WARN
     org.hibernate: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
   file:
     name: ${LOG_FILE_PATH:/var/log/fabric-management}/application.log
     max-size: ${LOG_FILE_MAX_SIZE:100MB}
@@ -70,3 +90,6 @@ application:
     expiration: 900000 # 15 minutes
     refresh-expiration: 604800000 # 7 days
 
+  mail:
+    from-email: ${MAIL_FROM_EMAIL}
+    from-name: ${MAIL_FROM_NAME}

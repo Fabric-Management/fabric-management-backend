@@ -28,6 +28,8 @@ public class UserDto {
     private String department;
     private Boolean isActive;
     private Instant lastActiveAt;
+    private Instant onboardingCompletedAt;
+    private Boolean hasCompletedOnboarding;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -45,6 +47,8 @@ public class UserDto {
             .department(user.getDepartment())
             .isActive(user.getIsActive())
             .lastActiveAt(user.getLastActiveAt())
+            .onboardingCompletedAt(user.getOnboardingCompletedAt())
+            .hasCompletedOnboarding(user.hasCompletedOnboarding())
             .createdAt(user.getCreatedAt())
             .updatedAt(user.getUpdatedAt())
             .build();

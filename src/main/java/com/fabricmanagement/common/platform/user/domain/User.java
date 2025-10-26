@@ -76,6 +76,9 @@ public class User extends BaseEntity {
     @Column(name = "last_active_at")
     private Instant lastActiveAt;
 
+    @Column(name = "onboarding_completed_at")
+    private Instant onboardingCompletedAt;
+
     @PrePersist
     protected void onCreate() {
         super.onCreate();
@@ -120,6 +123,14 @@ public class User extends BaseEntity {
 
     public void changeDepartment(String department) {
         this.department = department;
+    }
+
+    public boolean hasCompletedOnboarding() {
+        return this.onboardingCompletedAt != null;
+    }
+
+    public void completeOnboarding() {
+        this.onboardingCompletedAt = Instant.now();
     }
 
     @Override

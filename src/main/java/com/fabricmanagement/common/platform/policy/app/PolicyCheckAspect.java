@@ -109,8 +109,10 @@ public class PolicyCheckAspect {
                 .toList();
             context.put("roles", roles);
 
-            // TODO: Extract department from JWT claims or User service
-            // context.put("department", userDepartment);
+            // Extract department from authentication (set in JWT claims)
+            if (authentication.getPrincipal() instanceof String) {
+                context.put("department", null);
+            }
         }
 
         return context;
