@@ -5,6 +5,7 @@ import com.fabricmanagement.common.platform.user.app.UserService;
 import com.fabricmanagement.common.platform.user.dto.CreateUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,8 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<UserDto>> createUser(@Valid @RequestBody CreateUserRequest request) {
-        log.info("Creating user: contactValue={}", request.getContactValue());
+        log.info("Creating user: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         UserDto created = userService.createUser(request);
 
@@ -88,7 +90,8 @@ public class UserController {
 
     @GetMapping("/contact/{contactValue}")
     public ResponseEntity<ApiResponse<Boolean>> checkContactExists(@PathVariable String contactValue) {
-        log.debug("Checking contact existence: {}", contactValue);
+        log.debug("Checking contact existence: {}", 
+            PiiMaskingUtil.maskEmail(contactValue));
 
         boolean exists = userService.contactExists(contactValue);
 

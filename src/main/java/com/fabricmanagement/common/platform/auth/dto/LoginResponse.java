@@ -16,5 +16,8 @@ public class LoginResponse {
     private String refreshToken;
     private Long expiresIn;
     private UserDto user;
+    
+    @Builder.Default
+    private Boolean needsOnboarding = false;
 }
 

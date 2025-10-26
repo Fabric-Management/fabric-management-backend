@@ -159,16 +159,24 @@ Priority 3: SMS (AWS SNS)
 
 ### **REST Endpoints**
 
-| Endpoint                           | Method | Purpose                               | Auth Required         |
-| ---------------------------------- | ------ | ------------------------------------- | --------------------- |
-| `/api/auth/register/check`         | POST   | Check registration eligibility        | ❌ No                 |
-| `/api/auth/register/verify`        | POST   | Verify code and complete registration | ❌ No                 |
-| `/api/auth/login`                  | POST   | Login with credentials                | ❌ No                 |
-| `/api/auth/logout`                 | POST   | Logout and invalidate token           | ✅ Yes                |
-| `/api/auth/refresh`                | POST   | Refresh access token                  | ❌ No (refresh token) |
-| `/api/auth/change-password`        | POST   | Change password                       | ✅ Yes                |
-| `/api/auth/reset-password/request` | POST   | Request password reset                | ❌ No                 |
-| `/api/auth/reset-password/confirm` | POST   | Confirm password reset                | ❌ No                 |
+| Endpoint                           | Method | Purpose                                  | Auth Required         |
+| ---------------------------------- | ------ | ---------------------------------------- | --------------------- |
+| `/api/auth/register/check`         | POST   | Check registration eligibility           | ❌ No                 |
+| `/api/auth/register/verify`        | POST   | Verify code and complete registration    | ❌ No                 |
+| `/api/auth/login`                  | POST   | Login with credentials                   | ❌ No                 |
+| `/api/auth/logout`                 | POST   | Logout and invalidate token              | ✅ Yes                |
+| `/api/auth/refresh`                | POST   | Refresh access token                     | ❌ No (refresh token) |
+| `/api/auth/change-password`        | POST   | Change password                          | ✅ Yes                |
+| `/api/auth/reset-password/request` | POST   | Request password reset                   | ❌ No                 |
+| `/api/auth/reset-password/confirm` | POST   | Confirm password reset                   | ❌ No                 |
+| `/api/auth/setup-password`         | POST   | ⭐ Complete password setup (token-based) | ❌ No (token)         |
+
+### **Onboarding Endpoints** ⭐ NEW
+
+| Endpoint                       | Method | Purpose                   | Auth Required     |
+| ------------------------------ | ------ | ------------------------- | ----------------- |
+| `/api/admin/onboarding/tenant` | POST   | Sales-led tenant creation | ✅ PLATFORM_ADMIN |
+| `/api/public/signup`           | POST   | Self-service signup       | ❌ Public         |
 
 ### **Internal API (Facade)**
 
@@ -361,5 +369,12 @@ public class VerificationCode extends BaseEntity {
 
 ---
 
-**Last Updated:** 2025-01-27  
-**Maintained By:** Fabric Management Team
+## 📚 RELATED DOCUMENTATION
+
+- [ONBOARDING_FLOW.md](./ONBOARDING_FLOW.md) - ⭐ **Detailed onboarding flows** (sales-led + self-service)
+
+---
+
+**Last Updated:** 2025-10-25  
+**Maintained By:** Fabric Management Team  
+**Latest Addition:** ⭐ Token-Based Onboarding System

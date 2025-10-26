@@ -34,6 +34,24 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
+  mail:
+    host: ${MAIL_HOST:smtp.hostinger.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:info@storeandsale.shop}
+    password: ${MAIL_PASSWORD:Akk789987@}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+            required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
+          ssl:
+            enable: ${MAIL_SMTP_SSL_ENABLE:true}
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
+          timeout: ${MAIL_SMTP_TIMEOUT:5000}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
+
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -65,3 +83,6 @@ application:
     expiration: 3600000 # 1 hour for local development
     refresh-expiration: 2592000000 # 30 days for local development
 
+  mail:
+    from-email: ${MAIL_FROM_EMAIL:info@storeandsale.shop}
+    from-name: ${MAIL_FROM_NAME:Fabricode}

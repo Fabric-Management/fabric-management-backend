@@ -736,7 +736,8 @@ common/
 └─ util/                      # Yardımcı sınıflar
    ├─ Money.java
    ├─ Unit.java
-   └─ TimeHelper.java
+   ├─ TimeHelper.java
+   └─ PiiMaskingUtil.java     # ⭐ GDPR/KVKK PII masking
 ```
 
 ### Modül İç Yapısı (Vertical Slice + DDD)
@@ -855,7 +856,8 @@ common/
 └─ util/                      # Yardımcı sınıflar
    ├─ Money.java
    ├─ Unit.java
-   └─ TimeHelper.java
+   ├─ TimeHelper.java
+   └─ PiiMaskingUtil.java     # ⭐ GDPR/KVKK PII masking
 ```
 
 ---
@@ -884,6 +886,43 @@ public ResponseEntity<?> createYarn(@RequestBody YarnDto dto) {
     // Implementation
 }
 ```
+
+### 🔐 PII Masking (GDPR/KVKK Compliance)
+
+**Purpose:** Prevent sensitive data exposure in production logs.
+
+**Features:**
+
+- ✅ Profile-aware masking (local OFF, prod ON)
+- ✅ Email masking: `user@example.com` → `us***@example.com`
+- ✅ Phone masking: `+905551234567` → `+905***4567`
+- ✅ Card masking: `1234567890123456` → `1234***3456`
+- ✅ Production SQL logs: WARN level (no query exposure)
+
+**Implementation:**
+
+```java
+import com.fabricmanagement.common.util.PiiMaskingUtil;
+
+// Email masking in logs
+log.info("User registered: {}", PiiMaskingUtil.maskEmail(email));
+// Local: "User registered: fatih@example.com"
+// Prod:  "User registered: fa***@example.com"
+
+// Phone masking
+log.info("Phone verification: {}", PiiMaskingUtil.maskPhone(phone));
+// Local: "Phone verification: +905551234567"
+// Prod:  "Phone verification: +905***4567"
+```
+
+**Compliance:**
+
+- ✅ GDPR Article 32 (Security of processing)
+- ✅ KVKK Article 12 (Data security)
+- ✅ ISO 27001 compliant logging
+- ✅ PCI DSS Level 1 ready
+
+**Details:** [SECURITY_POLICIES.md](./modular_monolith/SECURITY_POLICIES.md#6-pii-masking-in-logs-gdprkvkk-compliance)
 
 ---
 

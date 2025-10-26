@@ -111,6 +111,11 @@ application:
   tenant:
     default-tenant-id: ${DEFAULT_TENANT_ID:00000000-0000-0000-0000-000000000000}
 
+  # Mail Configuration
+  mail:
+    from-email: ${MAIL_FROM_EMAIL:noreply@fabricmanagement.com}
+    from-name: ${MAIL_FROM_NAME:Fabric Management}
+
   # Verification Configuration
   verification:
     code-length: 6

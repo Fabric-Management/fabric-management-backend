@@ -86,16 +86,12 @@ public class Subscription extends BaseEntity {
     private Map<String, Boolean> features = new HashMap<>();
 
     /**
-     * Pricing tier for this subscription.
+     * Pricing tier (OPTIONAL - for future feature-gating).
      *
-     * <p>Tier names vary by OS:</p>
-     * <ul>
-     *   <li>YarnOS, LoomOS, KnitOS, DyeOS, EdgeOS: "Starter", "Professional", "Enterprise"</li>
-     *   <li>AnalyticsOS, AccountOS, CustomOS: "Standard", "Professional", "Enterprise"</li>
-     *   <li>IntelligenceOS: "Professional", "Enterprise"</li>
-     * </ul>
+     * <p><b>Simple Model:</b> OS-based pricing only (no tiers)</p>
+     * <p>This field is nullable for simple subscription model.</p>
      */
-    @Column(name = "pricing_tier", nullable = false, length = 50)
+    @Column(name = "pricing_tier", length = 50)
     private String pricingTier;
 
     public boolean isActive() {
@@ -160,24 +156,19 @@ public class Subscription extends BaseEntity {
 
     /**
      * Validate subscription before persisting.
+     * 
+     * <p>Simple model: Only OS-based pricing (no tiers)</p>
      */
     @PrePersist
     @PreUpdate
     private void validate() {
-        // Validate pricing tier for this OS
-        if (osCode != null && pricingTier != null) {
-            if (!PricingTierValidator.isValidTier(osCode, pricingTier)) {
-                throw new IllegalStateException(
-                    String.format("Invalid pricing tier '%s' for OS '%s'. Valid tiers: %s",
-                        pricingTier, osCode, PricingTierValidator.getValidTiers(osCode))
-                );
-            }
+        // Simple validation: osCode required
+        if (osCode == null || osCode.isBlank()) {
+            throw new IllegalStateException("OS code is required");
         }
-
-        // Set default tier if not specified
-        if (pricingTier == null && osCode != null) {
-            this.pricingTier = PricingTierValidator.getDefaultTier(osCode);
-        }
+        
+        // pricingTier is optional (simple OS-based model)
+        // No tier validation needed
     }
 }
 

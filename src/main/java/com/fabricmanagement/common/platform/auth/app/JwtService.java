@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.platform.user.domain.User;
+import com.fabricmanagement.common.platform.user.dto.UserDto;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -74,6 +75,44 @@ public class JwtService {
 
     public String generateRefreshToken(User user) {
         log.debug("Generating refresh token for user: {}", user.getContactValue());
+
+        return UUID.randomUUID().toString();
+    }
+
+    /**
+     * Generate access token from UserDto (overload for DTO).
+     *
+     * @param userDto User DTO
+     * @return JWT access token
+     */
+    public String generateAccessToken(UserDto userDto) {
+        log.debug("Generating access token for user DTO: {}", userDto.getContactValue());
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tenant_id", userDto.getTenantId().toString());
+        claims.put("tenant_uid", extractTenantUid(userDto.getUid()));
+        claims.put("user_id", userDto.getId().toString());
+        claims.put("user_uid", userDto.getUid());
+        claims.put("company_id", userDto.getCompanyId().toString());
+        claims.put("department", userDto.getDepartment());
+
+        return Jwts.builder()
+            .subject(userDto.getContactValue())
+            .claims(claims)
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plusMillis(accessTokenExpiration)))
+            .signWith(secretKey)
+            .compact();
+    }
+
+    /**
+     * Generate refresh token from UserDto (overload for DTO).
+     *
+     * @param userDto User DTO
+     * @return Refresh token string
+     */
+    public String generateRefreshToken(UserDto userDto) {
+        log.debug("Generating refresh token for user DTO: {}", userDto.getContactValue());
 
         return UUID.randomUUID().toString();
     }

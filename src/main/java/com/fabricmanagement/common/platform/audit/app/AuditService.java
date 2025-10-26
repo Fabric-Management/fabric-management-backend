@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.audit.domain.AuditLog;
 import com.fabricmanagement.common.platform.audit.domain.AuditSeverity;
 import com.fabricmanagement.common.platform.audit.infra.repository.AuditLogRepository;
+import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -53,6 +54,7 @@ import java.util.UUID;
 public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
+    private final UserFacade userFacade;
 
     /**
      * Log an action (async for performance).
@@ -68,9 +70,13 @@ public class AuditService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         UUID userId = TenantContext.getCurrentUserId();
 
+        String userUid = userId != null 
+            ? userFacade.findById(tenantId, userId).map(u -> u.getUid()).orElse("UNKNOWN")
+            : "SYSTEM";
+
         AuditLog auditLog = AuditLog.create(
             userId,
-            null, // userUid - TODO: get from User service
+            userUid,
             action,
             resource,
             resourceId,

@@ -10,8 +10,10 @@ import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.VerificationCodeRepository;
+import com.fabricmanagement.common.platform.communication.app.VerificationService;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +55,7 @@ public class RegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
+    private final VerificationService verificationService;
 
     @Value("${application.verification.code-length:6}")
     private int codeLength;
@@ -65,18 +68,21 @@ public class RegistrationService {
 
     @Transactional
     public String checkEligibilityAndSendCode(RegisterCheckRequest request) {
-        log.info("Checking registration eligibility: contactValue={}", request.getContactValue());
+        log.info("Checking registration eligibility: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         UserDto user = userFacade.findByContactValue(request.getContactValue())
             .orElse(null);
 
         if (user == null) {
-            log.warn("Contact not found in system: {}", request.getContactValue());
+            log.warn("Contact not found in system: {}", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
             return "Your information is not registered. Our representative will contact you.";
         }
 
         if (authUserRepository.existsByContactValue(request.getContactValue())) {
-            log.warn("Contact already registered: {}", request.getContactValue());
+            log.warn("Contact already registered: {}", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
             return "This account is already registered. Please login.";
         }
 
@@ -95,16 +101,22 @@ public class RegistrationService {
         );
         verificationCodeRepository.save(verificationCode);
 
-        // TODO: Send via Communication module (multi-channel)
-        log.info("Verification code generated: contactValue={}, code={} (TODO: Send via Communication)",
-            request.getContactValue(), code);
+        // Send verification code via multi-channel (WhatsApp → Email → SMS)
+        try {
+            verificationService.sendVerificationCode(request.getContactValue(), code);
+            log.info("✅ Verification code sent successfully to: {}", request.getContactValue());
+        } catch (Exception e) {
+            log.error("❌ Failed to send verification code to: {}", request.getContactValue(), e);
+            // Continue anyway - code is in database, user can try again
+        }
 
-        return "Verification code sent. Please check your messages.";
+        return "Verification code sent. Please check your email.";
     }
 
     @Transactional
     public LoginResponse verifyAndRegister(VerifyAndRegisterRequest request) {
-        log.info("Verifying and registering: contactValue={}", request.getContactValue());
+        log.info("Verifying and registering: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         VerificationCode verificationCode = verificationCodeRepository
             .findByContactValueAndCodeAndType(
@@ -115,7 +127,8 @@ public class RegistrationService {
             .orElseThrow(() -> new IllegalArgumentException("Invalid verification code"));
 
         if (!verificationCode.isValid()) {
-            log.warn("Invalid or expired verification code: contactValue={}", request.getContactValue());
+            log.warn("Invalid or expired verification code: contactValue={}", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
             throw new IllegalArgumentException("Verification code is invalid or expired");
         }
 

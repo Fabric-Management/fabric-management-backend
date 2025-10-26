@@ -11,6 +11,7 @@ import com.fabricmanagement.common.platform.user.dto.CreateUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,8 @@ public class UserService implements UserFacade {
 
     @Transactional
     public UserDto createUser(CreateUserRequest request) {
-        log.info("Creating user: contactValue={}", request.getContactValue());
+        log.info("Creating user: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         UUID tenantId = TenantContext.getCurrentTenantId();
 
@@ -93,7 +95,8 @@ public class UserService implements UserFacade {
     @Override
     @Transactional(readOnly = true)
     public Optional<UserDto> findByContactValue(String contactValue) {
-        log.debug("Finding user by contact: contactValue={}", contactValue);
+        log.debug("Finding user by contact: contactValue={}", 
+            PiiMaskingUtil.maskEmail(contactValue));
 
         return userRepository.findByContactValue(contactValue)
             .map(UserDto::from);
