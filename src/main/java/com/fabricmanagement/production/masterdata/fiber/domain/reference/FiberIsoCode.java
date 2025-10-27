@@ -26,9 +26,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class FiberIsoCode extends BaseEntity {
 
-    @Column(name = "category_id")
-    private UUID categoryId;
-
     @Column(name = "iso_code", unique = true, nullable = false, length = 10, updatable = false)
     private String isoCode;
 
