@@ -44,13 +44,22 @@ public class FiberService implements FiberFacade {
         log.info("Creating fiber: code={}, name={}", 
             request.getFiberCode(), request.getFiberName());
 
+        // Check if this is a pure 100% fiber being recreated
+        if (request.getIsoCodeId() != null) {
+            throw new IllegalArgumentException(
+                "Pure 100% fibers are pre-defined by the system. " +
+                "You can only create blended fibers (combinations of existing fibers). " +
+                "If you need a custom fiber, please use the default fiber types available.");
+        }
+
         if (fiberRepository.existsByTenantIdAndFiberCode(tenantId, request.getFiberCode())) {
-            throw new IllegalArgumentException("Fiber code already exists");
+            throw new IllegalArgumentException(
+                String.format("Fiber with code '%s' already exists in your tenant", request.getFiberCode()));
         }
 
         // Check if material already has a fiber detail
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
-            throw new IllegalArgumentException("Material already has fiber details");
+            throw new IllegalArgumentException("Material already has fiber details. Each material can only have one fiber.");
         }
 
         Fiber fiber = Fiber.createPureFiber(
