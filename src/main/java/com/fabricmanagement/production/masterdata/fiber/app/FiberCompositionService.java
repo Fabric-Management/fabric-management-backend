@@ -14,9 +14,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Fiber Composition Service - Handles blended fiber composition logic.
+ * Fiber Composition Service - Handles blended fiber composition database operations.
  *
- * <p>Validates that blended fiber compositions always sum to exactly 100%.</p>
+ * <p>No validation here - all validation is done in FiberValidationService.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -24,25 +24,6 @@ import java.util.stream.Collectors;
 public class FiberCompositionService {
 
     private final FiberCompositionRepository compositionRepository;
-
-    /**
-     * Validate that compositions sum to 100%.
-     *
-     * @param blendedFiberId Blended fiber ID
-     * @return true if total is 100%
-     * @throws IllegalArgumentException if total is not 100%
-     */
-    @Transactional(readOnly = true)
-    public boolean validateCompositionPercentage(UUID blendedFiberId) {
-        Double totalPercentage = compositionRepository.getTotalPercentage(blendedFiberId);
-        
-        if (totalPercentage == null || Math.abs(totalPercentage - 100.0) > 0.01) {
-            throw new IllegalArgumentException(
-                String.format("Fiber composition must sum to exactly 100%%, got: %.2f%%", totalPercentage));
-        }
-        
-        return true;
-    }
 
     /**
      * Set composition for a blended fiber.
