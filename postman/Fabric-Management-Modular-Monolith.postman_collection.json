@@ -428,6 +428,140 @@
       ]
     },
     {
+      "name": "🏭 Production - Materials",
+      "item": [
+        {
+          "name": "Create Material",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materialName\": \"Pamuk Elyaf - Grade A\",\n  \"materialType\": \"FIBER\",\n  \"categoryId\": \"{{cotton_category_id}}\",\n  \"unit\": \"kg\",\n  \"description\": \"High quality cotton fiber\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/materials",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "materials"]
+            }
+          }
+        },
+        {
+          "name": "Get All Materials",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/materials",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "materials"]
+            }
+          }
+        },
+        {
+          "name": "Get Materials by Type",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/materials/type/FIBER",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "materials", "type", "FIBER"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧵 Production - Fibers",
+      "item": [
+        {
+          "name": "Create Fiber",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materialId\": \"{{material_id}}\",\n  \"categoryId\": \"{{fiber_category_id}}\",\n  \"isoCodeId\": \"{{fiber_iso_code_id}}\",\n  \"fiberCode\": \"COT-001\",\n  \"fiberName\": \"Cotton Fiber Grade A\",\n  \"fiberGrade\": \"A\",\n  \"fineness\": 4.2,\n  \"lengthMm\": 28.5,\n  \"strengthCndTex\": 25.6,\n  \"elongationPercent\": 6.8,\n  \"remarks\": \"High quality cotton fiber\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "fibers"]
+            }
+          }
+        },
+        {
+          "name": "Get All Fibers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "fibers"]
+            }
+          }
+        },
+        {
+          "name": "Get Fiber by Material",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers/material/{{material_id}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "production",
+                "fibers",
+                "material",
+                "{{material_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "📜 Policy Management",
       "item": [
         {
@@ -588,6 +722,21 @@
     },
     {
       "key": "registration_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "material_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fiber_category_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fiber_iso_code_id",
       "value": "",
       "type": "string"
     }
