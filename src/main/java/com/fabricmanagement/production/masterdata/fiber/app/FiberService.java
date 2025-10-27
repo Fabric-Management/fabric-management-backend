@@ -15,9 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Fiber Service - Business logic for fiber management.
@@ -114,11 +117,19 @@ public class FiberService implements FiberFacade {
                 String.format("Composition percentages must sum to exactly 100%%, got: %.2f%%", total));
         }
 
-        // Verify all base fibers exist
+        // Verify all base fibers exist and get their names
+        Map<UUID, String> baseFiberNames = new HashMap<>();
         for (UUID baseFiberId : request.getComposition().keySet()) {
-            if (!fiberRepository.existsById(baseFiberId)) {
-                throw new IllegalArgumentException("Base fiber not found: " + baseFiberId);
-            }
+            Fiber baseFiber = fiberRepository.findById(baseFiberId)
+                .orElseThrow(() -> new IllegalArgumentException("Base fiber not found: " + baseFiberId));
+            baseFiberNames.put(baseFiberId, baseFiber.getFiberName());
+        }
+
+        // Generate suggested name if not provided
+        String fiberName = request.getFiberName();
+        if (fiberName == null || fiberName.isBlank()) {
+            fiberName = generateFiberName(request.getComposition(), baseFiberNames);
+            log.info("Generated fiber name: {}", fiberName);
         }
 
         // Create blended fiber
@@ -127,7 +138,7 @@ public class FiberService implements FiberFacade {
             request.getCategoryId(),
             request.getIsoCodeId(),
             request.getFiberCode(),
-            request.getFiberName(),
+            fiberName,  // Use generated or provided name
             request.getFiberGrade()
         );
         
@@ -249,5 +260,25 @@ public class FiberService implements FiberFacade {
     public boolean exists(UUID id) {
         UUID tenantId = TenantContext.getCurrentTenantId();
         return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent();
+    }
+
+    /**
+     * Generate a suggested name for a blended fiber based on composition.
+     * 
+     * <p>Example: 60% Cotton + 40% Viscose → "Cotton 60% Viscose 40% Blend"</p>
+     * 
+     * @param composition Map of baseFiberId → percentage
+     * @param baseFiberNames Map of baseFiberId → fiberName
+     * @return Suggested fiber name
+     */
+    private String generateFiberName(Map<UUID, BigDecimal> composition, Map<UUID, String> baseFiberNames) {
+        return composition.entrySet().stream()
+            .sorted((a, b) -> b.getValue().compareTo(a.getValue())) // Sort by percentage descending
+            .map(entry -> {
+                String fiberName = baseFiberNames.get(entry.getKey());
+                BigDecimal percentage = entry.getValue();
+                return String.format("%s %.0f%%", fiberName, percentage);
+            })
+            .collect(Collectors.joining(" + ")) + " Blend";
     }
 }

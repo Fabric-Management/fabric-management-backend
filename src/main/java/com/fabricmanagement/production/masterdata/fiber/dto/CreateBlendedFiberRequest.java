@@ -33,7 +33,11 @@ public class CreateBlendedFiberRequest {
     @NotBlank(message = "Fiber code is required")
     private String fiberCode;
 
-    @NotBlank(message = "Fiber name is required")
+    /**
+     * Fiber name (optional - will be auto-generated if not provided).
+     * 
+     * <p>Example: "Cotton 60% Viscose 40% Blend"</p>
+     */
     private String fiberName;
 
     private String fiberGrade;
