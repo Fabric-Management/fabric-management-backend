@@ -100,6 +100,7 @@ COMMENT ON COLUMN production.prod_fiber.status IS 'NEW, IN_USE, EXHAUSTED, OBSOL
 CREATE TABLE production.prod_fiber_composition (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
     
     -- Relationships
     blended_fiber_id UUID NOT NULL REFERENCES production.prod_fiber(id) ON DELETE CASCADE,
