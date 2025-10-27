@@ -14,9 +14,8 @@ import lombok.*;
 @Entity
 @Table(name = "prod_fiber_certification", schema = "production",
     indexes = {
-        @Index(name = "idx_fiber_cert_code", columnList = "cert_code"),
-        @Index(name = "idx_fiber_cert_type", columnList = "cert_type"),
-        @Index(name = "idx_fiber_cert_active", columnList = "is_active")
+        @Index(name = "idx_fiber_certification_code", columnList = "certification_code"),
+        @Index(name = "idx_fiber_certification_active", columnList = "is_active")
     })
 @Getter
 @Setter
@@ -25,20 +24,17 @@ import lombok.*;
 @AllArgsConstructor
 public class FiberCertification extends BaseEntity {
 
-    @Column(name = "cert_code", unique = true, nullable = false, length = 50, updatable = false)
-    private String certCode;
+    @Column(name = "certification_code", unique = true, nullable = false, length = 50, updatable = false)
+    private String certificationCode;
 
-    @Column(name = "cert_name", nullable = false, length = 100)
-    private String certName;
+    @Column(name = "certification_name", nullable = false, length = 100)
+    private String certificationName;
 
-    @Column(name = "cert_type", nullable = false, length = 50)
-    private String certType;
+    @Column(name = "certifying_body", length = 255)
+    private String certifyingBody;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
-
-    @Column(name = "issuing_authority", length = 255)
-    private String issuingAuthority;
 
     @Column(name = "display_order")
     private Integer displayOrder;
