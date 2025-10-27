@@ -38,21 +38,21 @@ public class FiberController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<FiberDto>> getFiber(@PathVariable UUID id) {
-        return fiberService.findById(id)
+        return fiberService.getById(id)
             .map(fiber -> ResponseEntity.ok(ApiResponse.success(fiber)))
             .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/material/{materialId}")
     public ResponseEntity<ApiResponse<FiberDto>> getFiberByMaterial(@PathVariable UUID materialId) {
-        return fiberService.findByMaterialId(materialId)
+        return fiberService.getByMaterialId(materialId)
             .map(fiber -> ResponseEntity.ok(ApiResponse.success(fiber)))
             .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<FiberDto>>> getAllFibers() {
-        List<FiberDto> fibers = fiberService.findByTenant();
+        List<FiberDto> fibers = fiberService.getAll();
         return ResponseEntity.ok(ApiResponse.success(fibers));
     }
 

@@ -79,26 +79,26 @@ public class FiberService implements FiberFacade {
     }
 
     @Transactional(readOnly = true)
-    public Optional<FiberDto> findById(UUID id) {
+    public Optional<FiberDto> getById(UUID id) {
         UUID tenantId = TenantContext.getCurrentTenantId();
-        log.debug("Finding fiber: tenantId={}, id={}", tenantId, id);
+        log.debug("Getting fiber: tenantId={}, id={}", tenantId, id);
 
         return fiberRepository.findByTenantIdAndId(tenantId, id)
             .map(FiberDto::from);
     }
 
     @Transactional(readOnly = true)
-    public Optional<FiberDto> findByMaterialId(UUID materialId) {
-        log.debug("Finding fiber by materialId: materialId={}", materialId);
+    public Optional<FiberDto> getByMaterialId(UUID materialId) {
+        log.debug("Getting fiber by materialId: materialId={}", materialId);
 
         return fiberRepository.findByMaterialId(materialId)
             .map(FiberDto::from);
     }
 
     @Transactional(readOnly = true)
-    public List<FiberDto> findByTenant() {
+    public List<FiberDto> getAll() {
         UUID tenantId = TenantContext.getCurrentTenantId();
-        log.debug("Finding all fibers: tenantId={}", tenantId);
+        log.debug("Getting all fibers: tenantId={}", tenantId);
 
         return fiberRepository.findByTenantIdAndIsActiveTrue(tenantId)
             .stream()
@@ -141,5 +141,39 @@ public class FiberService implements FiberFacade {
         fiberRepository.save(fiber);
 
         log.info("✅ Fiber deactivated: id={}", id);
+    }
+
+    // =====================================================
+    // FiberFacade Implementation
+    // =====================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<FiberDto> findById(UUID id) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("FiberFacade: Finding fiber: tenantId={}, id={}", tenantId, id);
+        return fiberRepository.findByTenantIdAndId(tenantId, id)
+            .map(FiberDto::from);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<FiberDto> findByMaterialId(UUID materialId) {
+        log.debug("FiberFacade: Finding fiber by materialId: materialId={}", materialId);
+        return fiberRepository.findByMaterialId(materialId)
+            .map(FiberDto::from);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FiberDto> findAll() {
+        return getAll();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean exists(UUID id) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent();
     }
 }
