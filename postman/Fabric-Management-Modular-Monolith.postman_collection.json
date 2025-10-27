@@ -495,7 +495,22 @@
       "name": "🧵 Production - Fibers",
       "item": [
         {
-          "name": "Create Fiber",
+          "name": "Create Pure Fiber (100%)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.environment.set('fiber_id_cotton', jsonData.data.id);",
+                  "    console.log('Cotton fiber created:', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -516,6 +531,86 @@
               "raw": "{{base_url}}/api/production/fibers",
               "host": ["{{base_url}}"],
               "path": ["api", "production", "fibers"]
+            }
+          }
+        },
+        {
+          "name": "Create Viscose Fiber (100%)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.environment.set('fiber_id_viscose', jsonData.data.id);",
+                  "    console.log('Viscose fiber created:', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materialId\": \"{{material_id_viscose}}\",\n  \"categoryId\": \"{{fiber_category_id_visco}}\",\n  \"isoCodeId\": \"{{fiber_iso_code_id_visco}}\",\n  \"fiberCode\": \"VIS-001\",\n  \"fiberName\": \"Viscose Fiber\",\n  \"fiberGrade\": \"Premium\",\n  \"fineness\": 3.8,\n  \"lengthMm\": 35.0,\n  \"strengthCndTex\": 18.5,\n  \"elongationPercent\": 15.2,\n  \"remarks\": \"Premium viscose fiber\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "fibers"]
+            }
+          }
+        },
+        {
+          "name": "Create Blended Fiber (60% Cotton + 40% Viscose)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.environment.set('fiber_id_blended', jsonData.data.id);",
+                  "    console.log('✅ Blended fiber created:', jsonData.data.fiberName);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materialId\": \"{{material_id_blend}}\",\n  \"categoryId\": \"{{fiber_category_id_mixed}}\",\n  \"fiberCode\": \"BLEND-COT-VIS-60-40\",\n  \"composition\": {\n    \"{{fiber_id_cotton}}\": 60.0,\n    \"{{fiber_id_viscose}}\": 40.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers/blended",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "fibers", "blended"]
             }
           }
         },
@@ -556,6 +651,23 @@
                 "material",
                 "{{material_id}}"
               ]
+            }
+          }
+        },
+        {
+          "name": "Get Blended Fiber Composition",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers/{{fiber_id_blended}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "fibers", "{{fiber_id_blended}}"]
             }
           }
         }
@@ -737,6 +849,21 @@
     },
     {
       "key": "fiber_iso_code_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fiber_id_cotton",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fiber_id_viscose",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fiber_id_blended",
       "value": "",
       "type": "string"
     }
