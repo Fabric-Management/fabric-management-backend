@@ -4,8 +4,6 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.UUID;
-
 /**
  * Fiber ISO Code - Reference table for fiber ISO 2076 codes.
  *
