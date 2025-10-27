@@ -125,6 +125,12 @@ public class FiberService implements FiberFacade {
             baseFiberNames.put(baseFiberId, baseFiber.getFiberName());
         }
 
+        // Check if a fiber with identical composition already exists
+        if (isDuplicateComposition(request.getComposition())) {
+            throw new IllegalArgumentException(
+                "A fiber with this exact composition already exists. Cannot create duplicate blend.");
+        }
+
         // Generate suggested name if not provided
         String fiberName = request.getFiberName();
         if (fiberName == null || fiberName.isBlank()) {
@@ -260,6 +266,68 @@ public class FiberService implements FiberFacade {
     public boolean exists(UUID id) {
         UUID tenantId = TenantContext.getCurrentTenantId();
         return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent();
+    }
+
+    /**
+     * Check if a fiber with identical composition already exists.
+     * 
+     * <p>Compares compositions by base fiber IDs and percentages.</p>
+     * 
+     * @param composition Map of baseFiberId → percentage
+     * @return true if duplicate exists
+     */
+    private boolean isDuplicateComposition(Map<UUID, BigDecimal> composition) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        
+        // Get all blended fibers for this tenant
+        List<Fiber> allFibers = fiberRepository.findByTenantIdAndIsActiveTrue(tenantId);
+        
+        for (Fiber fiber : allFibers) {
+            Map<UUID, BigDecimal> existingComposition = compositionService.getComposition(fiber.getId());
+            
+            // Check if composition maps are identical
+            if (compositionsMatch(composition, existingComposition)) {
+                log.warn("Duplicate composition found: fiber={}, composition={}", fiber.getFiberCode(), existingComposition);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Compare two compositions to check if they match exactly.
+     * 
+     * @param composition1 First composition
+     * @param composition2 Second composition
+     * @return true if compositions are identical
+     */
+    private boolean compositionsMatch(Map<UUID, BigDecimal> composition1, Map<UUID, BigDecimal> composition2) {
+        // Empty compositions don't match
+        if (composition1.isEmpty() && composition2.isEmpty()) {
+            return false;
+        }
+        
+        // Different sizes can't match
+        if (composition1.size() != composition2.size()) {
+            return false;
+        }
+        
+        // Compare each entry
+        for (Map.Entry<UUID, BigDecimal> entry : composition1.entrySet()) {
+            BigDecimal percentage2 = composition2.get(entry.getKey());
+            
+            if (percentage2 == null) {
+                return false;
+            }
+            
+            // Compare percentages with 0.01 tolerance
+            if (Math.abs(entry.getValue().subtract(percentage2).doubleValue()) > 0.01) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     /**
