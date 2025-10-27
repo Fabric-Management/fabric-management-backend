@@ -4,6 +4,8 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.UUID;
+
 /**
  * Fiber ISO Code - Reference table for fiber ISO 2076 codes.
  *
@@ -23,6 +25,9 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FiberIsoCode extends BaseEntity {
+
+    @Column(name = "category_id")
+    private UUID categoryId;
 
     @Column(name = "iso_code", unique = true, nullable = false, length = 10, updatable = false)
     private String isoCode;

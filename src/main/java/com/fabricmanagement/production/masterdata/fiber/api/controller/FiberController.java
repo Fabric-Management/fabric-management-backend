@@ -1,10 +1,9 @@
 package com.fabricmanagement.production.masterdata.fiber.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.production.masterdata.fiber.dto.CreateBlendedFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.*;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
+import com.fabricmanagement.production.masterdata.fiber.app.FiberTypeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +24,7 @@ import java.util.UUID;
 public class FiberController {
 
     private final FiberService fiberService;
+    private final FiberTypeService fiberTypeService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<FiberDto>> createFiber(
@@ -84,5 +84,26 @@ public class FiberController {
     public ResponseEntity<ApiResponse<Void>> deactivateFiber(@PathVariable UUID id) {
         fiberService.deactivateFiber(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Fiber deactivated successfully"));
+    }
+
+    // =====================================================
+    // FIBER TYPE MANAGEMENT (Platform-Level)
+    // =====================================================
+
+    @PostMapping("/types")
+    public ResponseEntity<ApiResponse<FiberTypeDto>> createNewFiberType(
+            @Valid @RequestBody CreateNewFiberTypeRequest request) {
+        log.info("Creating new fiber type: isoCode={}", request.getIsoCode());
+        
+        FiberTypeDto fiberType = fiberTypeService.createNewFiberType(request);
+        
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success(fiberType, "Fiber type created successfully (accessible by all tenants)"));
+    }
+
+    @GetMapping("/types")
+    public ResponseEntity<ApiResponse<List<FiberTypeDto>>> getAllFiberTypes() {
+        List<FiberTypeDto> fiberTypes = fiberTypeService.getAllActiveFiberTypes();
+        return ResponseEntity.ok(ApiResponse.success(fiberTypes));
     }
 }
