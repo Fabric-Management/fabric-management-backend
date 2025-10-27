@@ -15,6 +15,7 @@ CREATE TABLE production.prod_material_category (
     material_type VARCHAR(20) CHECK (material_type IN ('FIBER', 'YARN', 'FABRIC', 'CHEMICAL', 'CONSUMABLE')),
     description TEXT,
     display_order INTEGER,
+    is_system_category BOOLEAN NOT NULL DEFAULT FALSE,
     
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
