@@ -210,7 +210,7 @@ VALUES
     ('SYS-000-FISO-00025', 'CMD', 'Modal', 'REGENERATED_CELLULOSIC', 'High-wet-modulus regenerated cellulose', TRUE, 25),
     ('SYS-000-FISO-00026', 'CLY', 'Lyocell', 'REGENERATED_CELLULOSIC', 'Solvent-spun cellulose (Tencel)', TRUE, 26),
     ('SYS-000-FISO-00027', 'CUP', 'Cupro', 'REGENERATED_CELLULOSIC', 'Cuprammonium regenerated cellulose', TRUE, 27),
-    ('SYS-000-FISO-00028', 'CA', 'Cellulose Acetate', 'REGENERATED_CELLULOSIC', 'Partially acetylated cellulose', TRUE, 28),
+    ('SYS-000-FISO-00028', 'ACTA', 'Cellulose Acetate', 'REGENERATED_CELLULOSIC', 'Partially acetylated cellulose', TRUE, 28),
     ('SYS-000-FISO-00029', 'CTA', 'Triacetate', 'REGENERATED_CELLULOSIC', 'Highly acetylated cellulose', TRUE, 29),
     ('SYS-000-FISO-00030', 'BBO', 'Bamboo Viscose', 'REGENERATED_CELLULOSIC', 'Chemically regenerated bamboo', TRUE, 30),
     ('SYS-000-FISO-00031', 'COC', 'Co-Cupro', 'REGENERATED_CELLULOSIC', 'Cupro-lyocell hybrid', TRUE, 31),
