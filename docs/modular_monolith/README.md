@@ -190,9 +190,9 @@ Detaylı deployment rehberi için: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 #### **Infrastructure Modules**
 
 - [📝 Logging Protocol](./common/infrastructure/LOGGING_PROTOCOL.md) - ⭐ **PII masking, GDPR/KVKK compliance**
+- [🗺️ Mapping Standard](./common/infrastructure/MAPPING_STANDARD.md) - ⭐ **DTO static from() pattern (MANDATORY)**
 - [🗄️ Persistence Module](./common/infrastructure/persistence/PERSISTENCE_PROTOCOL.md)
 - [🔄 Events Module](./common/infrastructure/events/EVENTS_PROTOCOL.md)
-- [🗺️ Mapping Module](./common/infrastructure/mapping/MAPPING_PROTOCOL.md)
 - [🎯 CQRS Module](./common/infrastructure/cqrs/CQRS_PROTOCOL.md)
 - [🌐 Web Module](./common/infrastructure/web/WEB_PROTOCOL.md)
 

@@ -1075,7 +1075,7 @@ class YarnService implements YarnFacade {
 
 | Alan                       | Kural                                                  |
 | -------------------------- | ------------------------------------------------------ |
-| **DTO – Entity Mapping**   | Sadece MapStruct kullanılacak                          |
+| **DTO – Entity Mapping**   | ⭐ DTO'da static from() method (MapStruct YOK)         |
 | **Transaction Boundaries** | Transaction'lar domain bazında; cross-domain işlem yok |
 | **Caching**                | Redis; domain içinde `@Cacheable`                      |
 | **Events**                 | DomainEvent + Outbox; Kafka opsiyonel                  |

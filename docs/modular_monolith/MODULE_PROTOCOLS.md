@@ -321,7 +321,14 @@ public interface {Feature}Repository extends JpaRepository<{Feature}, UUID> {
 
 ### **DTO Layer**
 
-**Sorumluluk:** Data transfer objects
+**Sorumluluk:** Data transfer objects + Entity mapping
+
+**⭐ MAPPING STANDARD:**
+
+- ✅ DTO'da static from() method (ALWAYS!)
+- ❌ Service'de mapping logic YOK
+- ❌ Ayrı Mapper class YOK (MapStruct kullanmıyoruz)
+- ✅ Clean, self-contained, simple
 
 ```java
 @Data
@@ -336,6 +343,11 @@ public class {Feature}Dto {
     private Instant createdAt;
     private Instant updatedAt;
 
+    /**
+     * Map entity to DTO.
+     *
+     * <p><b>STANDARD:</b> All DTOs MUST have this method</p>
+     */
     public static {Feature}Dto from({Feature} entity) {
         return {Feature}Dto.builder()
             .id(entity.getId())
@@ -346,6 +358,18 @@ public class {Feature}Dto {
             .build();
     }
 }
+```
+
+**Usage in Service:**
+
+```java
+// ✅ Good: DTO handles mapping
+MaterialDto dto = MaterialDto.from(material);
+
+// ❌ Bad: Service does mapping
+MaterialDto dto = new MaterialDto();
+dto.setId(material.getId());
+dto.setName(material.getName());
 ```
 
 ---
