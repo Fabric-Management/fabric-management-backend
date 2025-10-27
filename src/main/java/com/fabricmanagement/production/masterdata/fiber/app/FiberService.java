@@ -35,6 +35,7 @@ public class FiberService implements FiberFacade {
     private final FiberRepository fiberRepository;
     private final DomainEventPublisher eventPublisher;
     private final FiberCompositionService compositionService;
+    private final FiberValidationService validationService;
 
     @Transactional
     public FiberDto createFiber(CreateFiberRequest request) {
@@ -107,15 +108,17 @@ public class FiberService implements FiberFacade {
             throw new IllegalArgumentException("Material already has fiber details");
         }
 
-        // Validate composition percentages sum to 100%
-        double total = request.getComposition().values().stream()
-            .mapToDouble(BigDecimal::doubleValue)
-            .sum();
+        // Validate fiber code format
+        validationService.validateFiberCodeFormat(request.getFiberCode());
 
-        if (Math.abs(total - 100.0) > 0.01) {
-            throw new IllegalArgumentException(
-                String.format("Composition percentages must sum to exactly 100%%, got: %.2f%%", total));
-        }
+        // Validate composition percentages
+        validationService.validateCompositionPercentages(request.getComposition());
+
+        // Validate minimum ratio (no fiber less than 5%)
+        validationService.validateMinimumRatio(request.getComposition(), 5.0);
+
+        // Validate maximum components (max 5 fibers in a blend)
+        validationService.validateMaxComponents(request.getComposition(), 5);
 
         // Verify all base fibers exist and get their names
         Map<UUID, String> baseFiberNames = new HashMap<>();
