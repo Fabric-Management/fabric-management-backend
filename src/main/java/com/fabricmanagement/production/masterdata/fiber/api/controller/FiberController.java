@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.masterdata.fiber.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.production.masterdata.fiber.dto.CreateBlendedFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
@@ -34,6 +35,18 @@ public class FiberController {
         
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(fiber, "Fiber created successfully"));
+    }
+
+    @PostMapping("/blended")
+    public ResponseEntity<ApiResponse<FiberDto>> createBlendedFiber(
+            @Valid @RequestBody CreateBlendedFiberRequest request) {
+        log.info("Creating blended fiber: code={}, composition={}", 
+            request.getFiberCode(), request.getComposition());
+        
+        FiberDto fiber = fiberService.createBlendedFiber(request);
+        
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success(fiber, "Blended fiber created successfully"));
     }
 
     @GetMapping("/{id}")

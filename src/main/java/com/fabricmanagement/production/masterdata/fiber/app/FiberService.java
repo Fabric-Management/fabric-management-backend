@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.event.FiberCreatedEvent;
+import com.fabricmanagement.production.masterdata.fiber.dto.CreateBlendedFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +31,7 @@ public class FiberService implements FiberFacade {
 
     private final FiberRepository fiberRepository;
     private final DomainEventPublisher eventPublisher;
+    private final FiberCompositionService compositionService;
 
     @Transactional
     public FiberDto createFiber(CreateFiberRequest request) {
@@ -74,6 +77,77 @@ public class FiberService implements FiberFacade {
         ));
 
         log.info("✅ Fiber created: id={}, uid={}", saved.getId(), saved.getUid());
+
+        return FiberDto.from(saved);
+    }
+
+    /**
+     * Create a blended fiber (e.g., 60% Cotton + 40% Viscose).
+     *
+     * <p>This creates a new fiber and sets its composition automatically.</p>
+     *
+     * @param request Blended fiber request with composition map
+     * @return Created blended fiber
+     */
+    @Transactional
+    public FiberDto createBlendedFiber(CreateBlendedFiberRequest request) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        
+        log.info("Creating blended fiber: code={}, name={}", 
+            request.getFiberCode(), request.getFiberName());
+
+        if (fiberRepository.existsByTenantIdAndFiberCode(tenantId, request.getFiberCode())) {
+            throw new IllegalArgumentException("Fiber code already exists");
+        }
+
+        if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
+            throw new IllegalArgumentException("Material already has fiber details");
+        }
+
+        // Validate composition percentages sum to 100%
+        double total = request.getComposition().values().stream()
+            .mapToDouble(BigDecimal::doubleValue)
+            .sum();
+
+        if (Math.abs(total - 100.0) > 0.01) {
+            throw new IllegalArgumentException(
+                String.format("Composition percentages must sum to exactly 100%%, got: %.2f%%", total));
+        }
+
+        // Verify all base fibers exist
+        for (UUID baseFiberId : request.getComposition().keySet()) {
+            if (!fiberRepository.existsById(baseFiberId)) {
+                throw new IllegalArgumentException("Base fiber not found: " + baseFiberId);
+            }
+        }
+
+        // Create blended fiber
+        Fiber blendedFiber = Fiber.createBlendedFiber(
+            request.getMaterialId(),
+            request.getCategoryId(),
+            request.getIsoCodeId(),
+            request.getFiberCode(),
+            request.getFiberName(),
+            request.getFiberGrade()
+        );
+        
+        blendedFiber.setRemarks(request.getRemarks());
+        Fiber saved = fiberRepository.save(blendedFiber);
+
+        // Set composition
+        compositionService.setComposition(saved.getId(), request.getComposition());
+
+        // Publish domain event
+        eventPublisher.publish(new FiberCreatedEvent(
+            saved.getTenantId(),
+            saved.getId(),
+            saved.getFiberCode(),
+            saved.getFiberName(),
+            saved.getCategoryId(),
+            saved.getIsoCodeId()
+        ));
+
+        log.info("✅ Blended fiber created: id={}, uid={}", saved.getId(), saved.getUid());
 
         return FiberDto.from(saved);
     }
