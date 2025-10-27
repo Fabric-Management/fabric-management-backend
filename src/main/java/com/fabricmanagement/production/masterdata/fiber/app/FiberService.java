@@ -120,7 +120,7 @@ public class FiberService implements FiberFacade {
         // Validate maximum components (max 5 fibers in a blend)
         validationService.validateMaxComponents(request.getComposition(), 5);
 
-        // Verify all base fibers exist and get their names
+        // Validate base fibers exist and are active
         Map<UUID, String> baseFiberNames = new HashMap<>();
         for (UUID baseFiberId : request.getComposition().keySet()) {
             Fiber baseFiber = fiberRepository.findById(baseFiberId)
@@ -128,11 +128,21 @@ public class FiberService implements FiberFacade {
             baseFiberNames.put(baseFiberId, baseFiber.getFiberName());
         }
 
+        // Validate base fibers are active
+        validationService.validateBaseFibersActive(request.getComposition());
+
         // Check if a fiber with identical composition already exists
         if (isDuplicateComposition(request.getComposition())) {
             throw new IllegalArgumentException(
                 "A fiber with this exact composition already exists. Cannot create duplicate blend.");
         }
+
+        // Validate circular references
+        validationService.validateNoCircularReferences(request.getComposition());
+
+        // Validate tenant consistency
+        UUID currentTenantId = TenantContext.getCurrentTenantId();
+        validationService.validateTenantConsistency(request.getComposition(), currentTenantId);
 
         // Generate suggested name if not provided
         String fiberName = request.getFiberName();

@@ -55,15 +55,8 @@ public class FiberCompositionService {
     public void setComposition(UUID blendedFiberId, Map<UUID, BigDecimal> composition) {
         log.info("Setting composition for fiber: {}", blendedFiberId);
 
-        // Validate total percentage
-        double total = composition.values().stream()
-            .mapToDouble(BigDecimal::doubleValue)
-            .sum();
-
-        if (Math.abs(total - 100.0) > 0.01) {
-            throw new IllegalArgumentException(
-                String.format("Composition percentages must sum to exactly 100%%, got: %.2f%%", total));
-        }
+        // Validation is handled by FiberValidationService in FiberService
+        // No duplicate validation here - just save the composition
 
         // Delete existing compositions
         compositionRepository.deleteByBlendedFiberId(blendedFiberId);
@@ -78,9 +71,6 @@ public class FiberCompositionService {
             .toList();
 
         compositionRepository.saveAll(compositions);
-
-        // Note: Event publishing will be handled after fetching fiber details
-        // For now, composition is saved successfully
 
         log.info("✅ Composition set for fiber: {}", blendedFiberId);
     }
