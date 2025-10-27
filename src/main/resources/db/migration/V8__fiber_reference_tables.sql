@@ -9,13 +9,18 @@
 CREATE SCHEMA IF NOT EXISTS production;
 
 -- =====================================================
--- Fiber Category Reference Table
+-- FIBER REFERENCE TABLES (Platform-Level)
 -- =====================================================
+-- System-defined fiber categories, attributes, certifications, and ISO codes
+-- Accessible by all tenants (SYSTEM_TENANT_ID = '00000000-0000-0000-0000-000000000000')
 
-CREATE TABLE production.prod_fiber_category (
+-- =====================================================
+-- Fiber Category (Read-Only Reference)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS production.prod_fiber_category (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    uid VARCHAR(100) UNIQUE NOT NULL,
+    uid VARCHAR(100) UNIQUE NOT NULL DEFAULT 'SYS-000-FCAT-00000',
     
     category_code VARCHAR(50) UNIQUE NOT NULL,
     category_name VARCHAR(100) NOT NULL,
@@ -33,31 +38,32 @@ CREATE TABLE production.prod_fiber_category (
 CREATE INDEX idx_fiber_category_code ON production.prod_fiber_category(category_code);
 CREATE INDEX idx_fiber_category_active ON production.prod_fiber_category(is_active) WHERE is_active = TRUE;
 
-COMMENT ON TABLE production.prod_fiber_category IS 'Fiber category reference - READ-ONLY system data';
-COMMENT ON COLUMN production.prod_fiber_category.category_code IS 'NATURAL_PLANT, NATURAL_ANIMAL, SYNTHETIC_POLYMER, etc.';
+COMMENT ON TABLE production.prod_fiber_category IS 'Fiber categories (NATURAL_PLANT, NATURAL_ANIMAL, etc.) - System-defined, tenant-independent';
+COMMENT ON COLUMN production.prod_fiber_category.tenant_id IS 'Always SYSTEM_TENANT_ID for platform-level reference data';
 
--- Seed Fiber Categories
+-- Seed Categories
 INSERT INTO production.prod_fiber_category 
-    (uid, category_code, category_name, description, display_order) 
+    (tenant_id, uid, category_code, category_name, description, display_order) 
 VALUES
-    ('SYS-000-FCAT-00001', 'NATURAL_PLANT', 'Natural Plant', 'Bitkisel kaynaklı doğal lifler', 1),
-    ('SYS-000-FCAT-00002', 'NATURAL_ANIMAL', 'Natural Animal', 'Hayvansal kaynaklı doğal lifler', 2),
-    ('SYS-000-FCAT-00003', 'REGENERATED_CELLULOSIC', 'Regenerated Cellulosic', 'Selülozdan kimyasal işlemle üretilen lifler', 3),
-    ('SYS-000-FCAT-00004', 'REGENERATED_PROTEIN', 'Regenerated Protein', 'Protein bazlı rejeneratif lifler', 4),
-    ('SYS-000-FCAT-00005', 'SYNTHETIC_POLYMER', 'Synthetic Polymer', 'Petrokimyasal türevli yapay lifler', 5),
-    ('SYS-000-FCAT-00006', 'TECHNICAL_ADVANCED', 'Technical/Advanced', 'Yüksek performanslı özel lifler', 6);
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00001', 'NATURAL_PLANT', 'Natural Plant Fibers', 'Cotton, Linen, Hemp, Jute, etc.', 1),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00002', 'NATURAL_ANIMAL', 'Natural Animal Fibers', 'Wool, Silk, Cashmere, Alpaca, etc.', 2),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00003', 'REGENERATED_CELLULOSIC', 'Regenerated Cellulosic Fibers', 'Viscose, Modal, Lyocell, Acetate, etc.', 3),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00004', 'REGENERATED_PROTEIN', 'Regenerated Protein Fibers', 'Soy, Milk, Chitin, etc.', 4),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00005', 'SYNTHETIC_POLYMER', 'Synthetic Polymer Fibers', 'Polyester, Nylon, Polypropylene, etc.', 5),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00006', 'TECHNICAL_ADVANCED', 'Technical & Advanced Fibers', 'Carbon, Aramid, Ceramic, etc.', 6),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00007', 'MINERAL', 'Mineral Fibers', 'Asbestos, Glass Fiber, etc.', 7);
 
 -- =====================================================
--- Fiber Attribute Reference Table
+-- Fiber Attribute (Read-Only Reference)
 -- =====================================================
-
-CREATE TABLE production.prod_fiber_attribute (
+CREATE TABLE IF NOT EXISTS production.prod_fiber_attribute (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    uid VARCHAR(100) UNIQUE NOT NULL,
+    uid VARCHAR(100) UNIQUE NOT NULL DEFAULT 'SYS-000-FATR-00000',
     
     attribute_code VARCHAR(50) UNIQUE NOT NULL,
     attribute_name VARCHAR(100) NOT NULL,
+    attribute_group VARCHAR(50),
     description TEXT,
     display_order INTEGER,
     
@@ -69,43 +75,46 @@ CREATE TABLE production.prod_fiber_attribute (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_fiber_attr_code ON production.prod_fiber_attribute(attribute_code);
-CREATE INDEX idx_fiber_attr_active ON production.prod_fiber_attribute(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_fiber_attribute_code ON production.prod_fiber_attribute(attribute_code);
+CREATE INDEX idx_fiber_attribute_active ON production.prod_fiber_attribute(is_active) WHERE is_active = TRUE;
 
-COMMENT ON TABLE production.prod_fiber_attribute IS 'Fiber attribute reference - READ-ONLY system data';
-COMMENT ON COLUMN production.prod_fiber_attribute.attribute_code IS 'ORGANIC, RECYCLED, FAIRTRADE, etc.';
+COMMENT ON TABLE production.prod_fiber_attribute IS 'Fiber attributes (durable, biodegradable, hydrophobic, etc.) - System-defined, tenant-independent';
+COMMENT ON COLUMN production.prod_fiber_attribute.tenant_id IS 'Always SYSTEM_TENANT_ID for platform-level reference data';
 
--- Seed Fiber Attributes
+-- Seed Attributes
 INSERT INTO production.prod_fiber_attribute 
-    (uid, attribute_code, attribute_name, description, display_order) 
+    (tenant_id, uid, attribute_code, attribute_name, attribute_group, description, display_order) 
 VALUES
-    ('SYS-000-FATR-00001', 'ORGANIC', 'Organic', 'Doğal kaynaklı, kimyasal gübre/pestisit kullanılmadan üretilmiş', 1),
-    ('SYS-000-FATR-00002', 'RECYCLED', 'Recycled', 'Atık materyallerden geri dönüştürülmüş', 2),
-    ('SYS-000-FATR-00003', 'CONVENTIONAL', 'Conventional', 'Standart endüstriyel üretim', 3),
-    ('SYS-000-FATR-00004', 'BCI_COMPLIANT', 'BCI Compliant', 'Better Cotton Initiative programına uygun', 4),
-    ('SYS-000-FATR-00005', 'FAIRTRADE', 'Fairtrade', 'Adil ticaret sertifikalı üretim', 5),
-    ('SYS-000-FATR-00006', 'VEGAN', 'Vegan', 'Hayvansal içerik barındırmaz', 6),
-    ('SYS-000-FATR-00007', 'LOW_IMPACT', 'Low Impact', 'Düşük karbon ve su tüketimiyle üretilmiş', 7),
-    ('SYS-000-FATR-00008', 'BIOBASED', 'Biobased', 'Fosil kaynaklı değil, biyolojik kaynaklı polimerden üretilmiş', 8),
-    ('SYS-000-FATR-00009', 'BIODEGRADABLE', 'Biodegradable', 'Doğada çözünebilen', 9),
-    ('SYS-000-FATR-00010', 'CARBON_NEUTRAL', 'Carbon Neutral', 'Üretim sürecinde karbon nötr sertifikalı', 10),
-    ('SYS-000-FATR-00011', 'TRACEABLE', 'Traceable', 'Kaynağı izlenebilir', 11),
-    ('SYS-000-FATR-00012', 'CIRCULAR', 'Circular', 'Döngüsel ekonomi kapsamında yeniden işlenebilir', 12);
+    -- Physical Properties
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00001', 'DURABLE', 'Durable', 'PHYSICAL', 'Long-lasting fiber', 1),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00002', 'STRONG', 'Strong', 'PHYSICAL', 'High tensile strength', 2),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00003', 'ELASTIC', 'Elastic', 'PHYSICAL', 'High elongation', 3),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00004', 'MOISTURE_ABSORBENT', 'Moisture Absorbent', 'PHYSICAL', 'Good water absorption', 4),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00005', 'WICKING', 'Moisture Wicking', 'PHYSICAL', 'Transports moisture away', 5),
+    -- Chemical Properties
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00006', 'HYDROPHOBIC', 'Hydrophobic', 'CHEMICAL', 'Water-repellent', 6),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00007', 'OLEOPHOBIC', 'Oleophobic', 'CHEMICAL', 'Oil-repellent', 7),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00008', 'FLAME_RESISTANT', 'Flame Resistant', 'CHEMICAL', 'Resists ignition', 8),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00009', 'UV_RESISTANT', 'UV Resistant', 'CHEMICAL', 'Resists UV degradation', 9),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00010', 'CHEMICAL_RESISTANT', 'Chemical Resistant', 'CHEMICAL', 'Resists chemical damage', 10),
+    -- Environmental Properties
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00011', 'BIODEGRADABLE', 'Biodegradable', 'ENVIRONMENTAL', 'Naturally decomposes', 11),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00012', 'RECYCLABLE', 'Recyclable', 'ENVIRONMENTAL', 'Can be recycled', 12),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00013', 'RENEWABLE', 'Renewable', 'ENVIRONMENTAL', 'From renewable sources', 13),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FATR-00014', 'ORGANIC', 'Organic', 'ENVIRONMENTAL', 'Certified organic', 14);
 
 -- =====================================================
--- Certification Reference Table
+-- Fiber Certification (Read-Only Reference)
 -- =====================================================
-
-CREATE TABLE production.prod_fiber_certification (
+CREATE TABLE IF NOT EXISTS production.prod_fiber_certification (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    uid VARCHAR(100) UNIQUE NOT NULL,
+    uid VARCHAR(100) UNIQUE NOT NULL DEFAULT 'SYS-000-FCER-00000',
     
-    cert_code VARCHAR(50) UNIQUE NOT NULL,
-    cert_name VARCHAR(100) NOT NULL,
-    cert_type VARCHAR(50) NOT NULL,
+    certification_code VARCHAR(50) UNIQUE NOT NULL,
+    certification_name VARCHAR(100) NOT NULL,
+    certifying_body VARCHAR(100),
     description TEXT,
-    issuing_authority VARCHAR(255),
     display_order INTEGER,
     
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -116,43 +125,32 @@ CREATE TABLE production.prod_fiber_certification (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_fiber_cert_code ON production.prod_fiber_certification(cert_code);
-CREATE INDEX idx_fiber_cert_type ON production.prod_fiber_certification(cert_type);
-CREATE INDEX idx_fiber_cert_active ON production.prod_fiber_certification(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_fiber_certification_code ON production.prod_fiber_certification(certification_code);
+CREATE INDEX idx_fiber_certification_active ON production.prod_fiber_certification(is_active) WHERE is_active = TRUE;
 
-COMMENT ON TABLE production.prod_fiber_certification IS 'Fiber certification reference - READ-ONLY system data';
-COMMENT ON COLUMN production.prod_fiber_certification.cert_type IS 'ORGANIC, RECYCLED, SAFETY, ENVIRONMENTAL, etc.';
+COMMENT ON TABLE production.prod_fiber_certification IS 'Fiber certifications (GOTS, OEKO-TEX, BCI, etc.) - System-defined, tenant-independent';
+COMMENT ON COLUMN production.prod_fiber_certification.tenant_id IS 'Always SYSTEM_TENANT_ID for platform-level reference data';
 
 -- Seed Certifications
 INSERT INTO production.prod_fiber_certification 
-    (uid, cert_code, cert_name, cert_type, description, issuing_authority, display_order) 
+    (tenant_id, uid, certification_code, certification_name, certifying_body, description, display_order) 
 VALUES
-    ('SYS-000-FCERT-00001', 'GOTS', 'Global Organic Textile Standard', 'ORGANIC', 'Organik liflerin üretimi ve işlenmesi', 'GOTS International', 1),
-    ('SYS-000-FCERT-00002', 'OCS', 'Organic Content Standard', 'ORGANIC', 'Organik içeriğin izlenebilirliği', 'Textile Exchange', 2),
-    ('SYS-000-FCERT-00003', 'BCI', 'Better Cotton Initiative', 'SUSTAINABILITY', 'Sürdürülebilir pamuk üretimi', 'Better Cotton', 3),
-    ('SYS-000-FCERT-00004', 'GRS', 'Global Recycled Standard', 'RECYCLED', 'Geri dönüştürülmüş içerik ve tedarik zinciri kontrolü', 'Textile Exchange', 4),
-    ('SYS-000-FCERT-00005', 'RCS', 'Recycled Claim Standard', 'RECYCLED', 'Recycled materyal yüzdesi beyanı', 'Textile Exchange', 5),
-    ('SYS-000-FCERT-00006', 'OEKO_TEX', 'OEKO-TEX Standard 100', 'SAFETY', 'Zararlı kimyasal limitleri', 'OEKO-TEX Association', 6),
-    ('SYS-000-FCERT-00007', 'FAIRTRADE_TEXTILE', 'Fairtrade Textile Standard', 'ETHICAL', 'Adil ticaret, işçi hakları', 'Fairtrade International', 7),
-    ('SYS-000-FCERT-00008', 'RWS', 'Responsible Wool Standard', 'ANIMAL_WELFARE', 'Hayvansal refah ve izlenebilirlik', 'Textile Exchange', 8),
-    ('SYS-000-FCERT-00009', 'RMS', 'Responsible Mohair Standard', 'ANIMAL_WELFARE', 'Mohair üretiminde hayvan refahı', 'Textile Exchange', 9),
-    ('SYS-000-FCERT-00010', 'RDS', 'Responsible Down Standard', 'ANIMAL_WELFARE', 'Kuş tüyü tedarikinde hayvan refahı', 'Textile Exchange', 10),
-    ('SYS-000-FCERT-00011', 'FSC', 'Forest Stewardship Council', 'ENVIRONMENTAL', 'Ağaç kaynaklı liflerin sorumlu yönetimi', 'FSC', 11),
-    ('SYS-000-FCERT-00012', 'PEFC', 'PEFC Certification', 'ENVIRONMENTAL', 'Orman bazlı ürünlerde sürdürülebilirlik', 'PEFC', 12),
-    ('SYS-000-FCERT-00013', 'BLUESIGN', 'Bluesign Approved', 'CHEMICAL', 'Kimyasal yönetim ve güvenlik sistemi', 'Bluesign Technologies', 13),
-    ('SYS-000-FCERT-00014', 'HIGG_INDEX', 'Higg Material Sustainability Index', 'SUSTAINABILITY', 'Çevresel etki ölçüm standardı', 'SAC', 14),
-    ('SYS-000-FCERT-00015', 'VEGAN_CERT', 'Certified Vegan', 'ETHICAL', 'Hayvansal içerik barındırmaz ürün', 'The Vegan Society', 15),
-    ('SYS-000-FCERT-00016', 'CARBON_TRUST', 'Carbon Trust Certification', 'CLIMATE', 'Karbon emisyonu ve enerji verimliliği', 'Carbon Trust', 16),
-    ('SYS-000-FCERT-00017', 'EU_ECOLABEL', 'EU Ecolabel', 'ENVIRONMENTAL', 'Avrupa çevre etiket standardı', 'European Commission', 17);
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCER-00001', 'GOTS', 'Global Organic Textile Standard', 'Global Standard gGmbH', 'Organic textile certification', 1),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCER-00002', 'BCI', 'Better Cotton Initiative', 'BCI', 'Sustainable cotton', 2),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCER-00003', 'OEKO_TEX_100', 'OEKO-TEX Standard 100', 'OEKO-TEX', 'Harmful substance testing', 3),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCER-00004', 'GRS', 'Global Recycled Standard', 'Textile Exchange', 'Recycled content', 4),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCER-00005', 'FSC', 'Forest Stewardship Council', 'FSC', 'Responsible forest management', 5),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCER-00006', 'OBCS', 'Organic Blended Content Standard', 'Textile Exchange', 'Organic blend certification', 6);
 
 -- =====================================================
--- Fiber ISO Code Reference Table (Textile Labeling Standards)
+-- Fiber ISO Code (Read-Only Reference)
 -- =====================================================
+-- PLAFORM-LEVEL: All standard 100% fiber types accessible by all tenants
 
-CREATE TABLE production.prod_fiber_iso_code (
+CREATE TABLE IF NOT EXISTS production.prod_fiber_iso_code (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    uid VARCHAR(100) UNIQUE NOT NULL,
+    uid VARCHAR(100) UNIQUE NOT NULL DEFAULT 'SYS-000-FISO-00000',
     
     iso_code VARCHAR(10) UNIQUE NOT NULL,
     fiber_name VARCHAR(255) NOT NULL,
@@ -172,7 +170,8 @@ CREATE TABLE production.prod_fiber_iso_code (
 CREATE INDEX idx_fiber_iso_code ON production.prod_fiber_iso_code(iso_code);
 CREATE INDEX idx_fiber_iso_active ON production.prod_fiber_iso_code(is_active) WHERE is_active = TRUE;
 
-COMMENT ON TABLE production.prod_fiber_iso_code IS 'Fiber ISO code reference - Textile labeling standards (ISO 2076)';
+COMMENT ON TABLE production.prod_fiber_iso_code IS 'Fiber ISO 2076 codes - Platform-level, tenant-independent. Standard 100% fiber types accessible by all tenants.';
+COMMENT ON COLUMN production.prod_fiber_iso_code.tenant_id IS 'Always SYSTEM_TENANT_ID (00000000-0000-0000-0000-000000000000) for platform-level reference data';
 COMMENT ON COLUMN production.prod_fiber_iso_code.iso_code IS 'ISO 2076 official codes (CO, PES, PA, etc.)';
 
 -- Seed ISO Codes (Natural Fibers)
