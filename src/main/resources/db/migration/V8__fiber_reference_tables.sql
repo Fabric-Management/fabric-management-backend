@@ -253,16 +253,46 @@ VALUES
     ('SYS-000-FISO-00057', 'bPU', 'Bio-Based PU', 'SYNTHETIC_POLYMER', 'BioSpandex', FALSE, 57),
     ('SYS-000-FISO-00058', 'bPLA', 'Bio-Based PLA', 'SYNTHETIC_POLYMER', 'Biobased variant', FALSE, 58);
 
+-- Missing Natural Plant Fibers
+INSERT INTO production.prod_fiber_iso_code 
+    (uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order) 
+VALUES
+    ('SYS-000-FISO-00059', 'KAP', 'Kapok', 'NATURAL_PLANT', 'Kapok ağacından dolgu lifi', TRUE, 24),
+    ('SYS-000-FISO-00060', 'KEN', 'Kenaf', 'NATURAL_PLANT', 'Hibiscus cannabinus bitkisinden', TRUE, 25),
+    ('SYS-000-FISO-00061', 'ROS', 'Roselle', 'NATURAL_PLANT', 'Hibiscus sabdariffa bitkisinden', TRUE, 26);
+
+-- Missing Regenerated Protein Fibers
+INSERT INTO production.prod_fiber_iso_code 
+    (uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order) 
+VALUES
+    ('SYS-000-FISO-00062', 'SOY', 'Soy Fiber', 'REGENERATED_PROTEIN', 'Soya proteini', FALSE, 35),
+    ('SYS-000-FISO-00063', 'MC', 'Milk Fiber', 'REGENERATED_PROTEIN', 'Süt proteini (Casein)', FALSE, 36),
+    ('SYS-000-FISO-00064', 'CHITIN', 'Chitin Fiber', 'REGENERATED_PROTEIN', 'Kabuklu deniz canlılarından', FALSE, 37);
+
 -- Industry Codes (Non-ISO)
 INSERT INTO production.prod_fiber_iso_code 
     (uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order) 
 VALUES
-    ('SYS-000-FISO-00059', 'EL', 'Elastane', 'SYNTHETIC_POLYMER', 'Spandex / Lycra', FALSE, 59),
-    ('SYS-000-FISO-00060', 'MOD', 'Modacrylic', 'SYNTHETIC_POLYMER', 'Modified acrylic copolymer', FALSE, 60),
-    ('SYS-000-FISO-00061', 'NY', 'Nylon (shorthand)', 'SYNTHETIC_POLYMER', 'Common shorthand for PA', FALSE, 61),
-    ('SYS-000-FISO-00062', 'AC', 'Acrylic (shorthand)', 'SYNTHETIC_POLYMER', 'Common shorthand for PAN', FALSE, 62),
-    ('SYS-000-FISO-00063', 'TR', 'Triacetate', 'REGENERATED_CELLULOSIC', 'Triacetate shorthand', FALSE, 63),
-    ('SYS-000-FISO-00064', 'CVL', 'Viscose-Lyocell Hybrid', 'REGENERATED_CELLULOSIC', 'Hybrid fiber', FALSE, 64),
-    ('SYS-000-FISO-00065', 'ECO', 'Eco Fiber', 'MIXED', 'Generic eco/sustainable tag', FALSE, 65);
+    ('SYS-000-FISO-00065', 'EL', 'Elastane', 'SYNTHETIC_POLYMER', 'Spandex / Lycra', FALSE, 52),
+    ('SYS-000-FISO-00066', 'MOD', 'Modacrylic', 'SYNTHETIC_POLYMER', 'Modified acrylic copolymer', FALSE, 53),
+    ('SYS-000-FISO-00067', 'NY', 'Nylon (shorthand)', 'SYNTHETIC_POLYMER', 'Common shorthand for PA', FALSE, 54),
+    ('SYS-000-FISO-00068', 'AC', 'Acrylic (shorthand)', 'SYNTHETIC_POLYMER', 'Common shorthand for PAN', FALSE, 55),
+    ('SYS-000-FISO-00069', 'TR', 'Triacetate', 'REGENERATED_CELLULOSIC', 'Triacetate shorthand', FALSE, 56),
+    ('SYS-000-FISO-00070', 'CVL', 'Viscose-Lyocell Hybrid', 'REGENERATED_CELLULOSIC', 'Hybrid fiber', FALSE, 57),
+    ('SYS-000-FISO-00071', 'ECO', 'Eco Fiber', 'MIXED', 'Generic eco/sustainable tag', FALSE, 58);
+
+-- Missing Advanced/Special Fibers
+INSERT INTO production.prod_fiber_iso_code 
+    (uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order) 
+VALUES
+    ('SYS-000-FISO-00072', 'NF', 'Nanofiber', 'TECHNICAL_ADVANCED', 'Nanoteknolojiyle üretilmiş ultra ince lif', FALSE, 59),
+    ('SYS-000-FISO-00073', 'GRF', 'Graphene Fiber', 'TECHNICAL_ADVANCED', 'İletken ve dayanıklı karbon fiber türü', FALSE, 60),
+    ('SYS-000-FISO-00074', 'CEF', 'Ceramic Fiber', 'TECHNICAL_ADVANCED', 'Isıya dayanıklı seramik bazlı', FALSE, 61);
+
+-- Missing Recycled Fibers
+INSERT INTO production.prod_fiber_iso_code 
+    (uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order) 
+VALUES
+    ('SYS-000-FISO-00075', 'rPP', 'Recycled Polypropylene', 'SYNTHETIC_POLYMER', 'Industrial waste', FALSE, 62);
 
 -- =====================================================
