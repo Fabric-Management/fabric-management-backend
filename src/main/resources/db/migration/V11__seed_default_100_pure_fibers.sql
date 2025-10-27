@@ -32,6 +32,7 @@ BEGIN
         
         -- Insert into prod_material
         INSERT INTO production.prod_material (
+            id,
             tenant_id,
             uid,
             material_code,
@@ -44,6 +45,7 @@ BEGIN
             updated_at,
             version
         ) VALUES (
+            material_id_var,
             '00000000-0000-0000-0000-000000000000',
             'SYS-MAT-' || LPAD(fiber_code_counter::TEXT, 6, '0'),
             'DEFAULT-' || iso_code_record.iso_code,
