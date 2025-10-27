@@ -1,7 +1,10 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
+import com.fabricmanagement.production.masterdata.fiber.domain.event.FiberCreatedEvent;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
@@ -16,13 +19,16 @@ import java.util.UUID;
 
 /**
  * Fiber Service - Business logic for fiber management.
+ *
+ * <p>Implements FiberFacade for cross-module communication.</p>
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class FiberService {
+public class FiberService implements FiberFacade {
 
     private final FiberRepository fiberRepository;
+    private final DomainEventPublisher eventPublisher;
 
     @Transactional
     public FiberDto createFiber(CreateFiberRequest request) {
@@ -56,6 +62,16 @@ public class FiberService {
         fiber.setRemarks(request.getRemarks());
 
         Fiber saved = fiberRepository.save(fiber);
+
+        // Publish domain event
+        eventPublisher.publish(new FiberCreatedEvent(
+            saved.getTenantId(),
+            saved.getId(),
+            saved.getFiberCode(),
+            saved.getFiberName(),
+            saved.getCategoryId(),
+            saved.getIsoCodeId()
+        ));
 
         log.info("✅ Fiber created: id={}, uid={}", saved.getId(), saved.getUid());
 
