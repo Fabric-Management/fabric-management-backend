@@ -504,15 +504,17 @@
                   "var jsonData = pm.response.json();",
                   "if (jsonData.data && jsonData.data.length > 0) {",
                   "    // Find Viscose fiber (CV code)",
-                  "    var viscose = jsonData.data.find(f => f.fiberCode.includes('CV') || f.fiberName.includes('Viscose'));",
+                  "    var cotton = jsonData.data.find(f => f.fiberName.includes('Cotton'));",
+                  "    var viscose = jsonData.data.find(f => f.fiberName.includes('Viscose'));",
+                  "    if (cotton) {",
+                  "        pm.environment.set('fiber_id_cotton', cotton.id);",
+                  "        pm.environment.set('fiber_category_id', cotton.fiberCategoryId);",
+                  "        console.log('✅ Cotton fiber ID:', cotton.id);",
+                  "        console.log('✅ Category ID:', cotton.fiberCategoryId);",
+                  "    }",
                   "    if (viscose) {",
-                  "        pm.environment.set('material_id_viscose', viscose.materialId);",
-                  "        pm.environment.set('fiber_category_id_visco', viscose.categoryId);",
-                  "        pm.environment.set('fiber_iso_code_id_visco', viscose.isoCodeId);",
-                  "        console.log('✅ Found Viscose fiber:');",
-                  "        console.log('Material ID:', viscose.materialId);",
-                  "        console.log('Category ID:', viscose.categoryId);",
-                  "        console.log('ISO Code ID:', viscose.isoCodeId);",
+                  "        pm.environment.set('fiber_id_viscose', viscose.id);",
+                  "        console.log('✅ Viscose fiber ID:', viscose.id);",
                   "    }",
                   "}"
                 ],
@@ -536,7 +538,8 @@
           }
         },
         {
-          "name": "Create Pure Fiber (100%)",
+          "name": "⚠️ Create Pure Fiber (DISABLED - Use System Defaults)",
+          "disabled": true,
           "event": [
             {
               "listen": "test",
@@ -566,7 +569,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"materialId\": \"{{material_id}}\",\n  \"categoryId\": \"{{fiber_category_id}}\",\n  \"isoCodeId\": \"{{fiber_iso_code_id}}\",\n  \"fiberCode\": \"COT-001\",\n  \"fiberName\": \"Cotton Fiber Grade A\",\n  \"fiberGrade\": \"A\",\n  \"fineness\": 4.2,\n  \"lengthMm\": 28.5,\n  \"strengthCndTex\": 25.6,\n  \"elongationPercent\": 6.8,\n  \"remarks\": \"High quality cotton fiber\"\n}"
+              "raw": "{\n  \"materialId\": \"{{material_id}}\",\n  \"fiberCategoryId\": \"{{fiber_category_id}}\",\n  \"fiberIsoCodeId\": \"{{fiber_iso_code_id}}\",\n  \"fiberName\": \"Cotton Fiber Grade A\",\n  \"fiberGrade\": \"A\",\n  \"fineness\": 4.2,\n  \"lengthMm\": 28.5,\n  \"strengthCndTex\": 25.6,\n  \"elongationPercent\": 6.8,\n  \"remarks\": \"High quality cotton fiber\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/production/fibers",
@@ -576,7 +579,8 @@
           }
         },
         {
-          "name": "Create Viscose Fiber (100%)",
+          "name": "⚠️ Create Viscose Fiber (DISABLED - Use System Defaults)",
+          "disabled": true,
           "event": [
             {
               "listen": "test",
@@ -606,7 +610,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"materialId\": \"{{material_id_viscose}}\",\n  \"categoryId\": \"{{fiber_category_id_visco}}\",\n  \"isoCodeId\": \"{{fiber_iso_code_id_visco}}\",\n  \"fiberCode\": \"VIS-001\",\n  \"fiberName\": \"Viscose Fiber\",\n  \"fiberGrade\": \"Premium\",\n  \"fineness\": 3.8,\n  \"lengthMm\": 35.0,\n  \"strengthCndTex\": 18.5,\n  \"elongationPercent\": 15.2,\n  \"remarks\": \"Premium viscose fiber\"\n}"
+              "raw": "{\n  \"materialId\": \"{{material_id_viscose}}\",\n  \"fiberCategoryId\": \"{{fiber_category_id_visco}}\",\n  \"fiberIsoCodeId\": \"{{fiber_iso_code_id_visco}}\",\n  \"fiberName\": \"Viscose Fiber\",\n  \"fiberGrade\": \"Premium\",\n  \"fineness\": 3.8,\n  \"lengthMm\": 35.0,\n  \"strengthCndTex\": 18.5,\n  \"elongationPercent\": 15.2,\n  \"remarks\": \"Premium viscose fiber\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/production/fibers",
@@ -616,7 +620,47 @@
           }
         },
         {
-          "name": "Create Blended Fiber (60% Cotton + 40% Viscose)",
+          "name": "1️⃣ Create Material for Blended Fiber",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.environment.set('material_id_blended', jsonData.data.id);",
+                  "    console.log('✅ Material created for blended fiber:', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materialType\": \"FIBER\",\n  \"unit\": \"KG\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/materials",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "materials"]
+            }
+          }
+        },
+        {
+          "name": "2️⃣ Create Blended Fiber (60% Cotton + 40% Viscose)",
           "event": [
             {
               "listen": "test",
@@ -646,7 +690,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"materialId\": \"{{material_id_blend}}\",\n  \"categoryId\": \"{{fiber_category_id_mixed}}\",\n  \"fiberCode\": \"BLEND-COT-VIS-60-40\",\n  \"composition\": {\n    \"{{fiber_id_cotton}}\": 60.0,\n    \"{{fiber_id_viscose}}\": 40.0\n  }\n}"
+              "raw": "{\n  \"materialId\": \"{{material_id_blended}}\",\n  \"fiberCategoryId\": \"{{fiber_category_id}}\",\n  \"fiberGrade\": \"Premium\",\n  \"remarks\": \"Auto-generated name: Cotton 60% + Viscose 40% Blend\",\n  \"composition\": {\n    \"{{fiber_id_cotton}}\": 60.0,\n    \"{{fiber_id_viscose}}\": 40.0\n  }\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/production/fibers/blended",

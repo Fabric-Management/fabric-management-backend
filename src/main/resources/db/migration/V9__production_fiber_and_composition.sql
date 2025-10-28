@@ -26,7 +26,6 @@ CREATE TABLE production.prod_material (
 );
 
 CREATE INDEX idx_material_tenant_type ON production.prod_material(tenant_id, material_type);
-CREATE INDEX idx_material_code ON production.prod_material(material_code) WHERE material_code IS NOT NULL;
 CREATE INDEX idx_material_active ON production.prod_material(is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_material_tenant_active ON production.prod_material(tenant_id, is_active) WHERE is_active = TRUE;
 
@@ -48,7 +47,6 @@ CREATE TABLE production.prod_fiber (
     fiber_iso_code_id UUID REFERENCES production.prod_fiber_iso_code(id),
     
     -- Identity
-    fiber_code VARCHAR(50) NOT NULL,
     fiber_name VARCHAR(255) NOT NULL,
     fiber_grade VARCHAR(50),
     
@@ -69,21 +67,17 @@ CREATE TABLE production.prod_fiber (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
-    version BIGINT NOT NULL DEFAULT 0,
-    
-    CONSTRAINT uk_fiber_tenant_code UNIQUE (tenant_id, fiber_code)
+    version BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX idx_fiber_tenant ON production.prod_fiber(tenant_id);
 CREATE INDEX idx_fiber_material ON production.prod_fiber(material_id);
-CREATE INDEX idx_fiber_code ON production.prod_fiber(tenant_id, fiber_code);
 CREATE INDEX idx_fiber_category ON production.prod_fiber(fiber_category_id);
 CREATE INDEX idx_fiber_iso ON production.prod_fiber(fiber_iso_code_id);
 CREATE INDEX idx_fiber_status ON production.prod_fiber(status);
 CREATE INDEX idx_fiber_tenant_active ON production.prod_fiber(tenant_id, is_active) WHERE is_active = TRUE;
 
 COMMENT ON TABLE production.prod_fiber IS 'Fiber instances - Can be pure (100%) or blended';
-COMMENT ON COLUMN production.prod_fiber.fiber_code IS 'Tenant-specific identifier';
 COMMENT ON COLUMN production.prod_fiber.fiber_iso_code_id IS 'FK to fiber ISO code (CO, PES, PA, etc.)';
 COMMENT ON COLUMN production.prod_fiber.fineness IS 'Micronaire or dtex (only for pure fibers)';
 COMMENT ON COLUMN production.prod_fiber.status IS 'NEW, IN_USE, EXHAUSTED, OBSOLETE';

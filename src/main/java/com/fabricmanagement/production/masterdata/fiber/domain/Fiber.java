@@ -6,10 +6,6 @@ import lombok.*;
 
 import java.util.UUID;
 
-/**
- * Fiber - technical specifications for fiber instances.
- * Pure (100%) or blended. Composition must sum to 100%.
- */
 @Entity
 @Table(name = "prod_fiber", schema = "production",
     indexes = {
@@ -39,10 +35,6 @@ public class Fiber extends BaseEntity {
     @Column(name = "fiber_iso_code_id")
     private UUID fiberIsoCodeId;  // FK → FiberIsoCode
 
-    @Column(name = "fiber_code", nullable = false, length = 50)
-    private String fiberCode;
-
-   
     @Column(name = "fiber_name", nullable = false, length = 255)
     private String fiberName;
 
@@ -73,7 +65,6 @@ public class Fiber extends BaseEntity {
             UUID materialId,
             UUID fiberCategoryId,
             UUID fiberIsoCodeId,
-            String fiberCode,
             String fiberName,
             String fiberGrade,
             Double fineness,
@@ -85,7 +76,6 @@ public class Fiber extends BaseEntity {
             .materialId(materialId)
             .fiberCategoryId(fiberCategoryId)
             .fiberIsoCodeId(fiberIsoCodeId)
-            .fiberCode(fiberCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .fineness(fineness)
@@ -100,7 +90,6 @@ public class Fiber extends BaseEntity {
             UUID materialId,
             UUID fiberCategoryId,
             UUID fiberIsoCodeId,
-            String fiberCode,
             String fiberName,
             String fiberGrade) {
         
@@ -108,7 +97,6 @@ public class Fiber extends BaseEntity {
             .materialId(materialId)
             .fiberCategoryId(fiberCategoryId)
             .fiberIsoCodeId(fiberIsoCodeId)
-            .fiberCode(fiberCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .status(FiberStatus.NEW)

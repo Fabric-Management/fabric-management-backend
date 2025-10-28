@@ -29,7 +29,7 @@ public class FiberController {
     @PostMapping
     public ResponseEntity<ApiResponse<FiberDto>> createFiber(
             @Valid @RequestBody CreateFiberRequest request) {
-        log.info("Creating fiber: code={}", request.getFiberCode());
+        log.info("Creating fiber: name={}", request.getFiberName());
         
         FiberDto fiber = fiberService.createFiber(request);
         
@@ -40,8 +40,8 @@ public class FiberController {
     @PostMapping("/blended")
     public ResponseEntity<ApiResponse<FiberDto>> createBlendedFiber(
             @Valid @RequestBody CreateBlendedFiberRequest request) {
-        log.info("Creating blended fiber: code={}, composition={}", 
-            request.getFiberCode(), request.getComposition());
+        log.info("Creating blended fiber: name={}, composition={}", 
+            request.getFiberName(), request.getComposition());
         
         FiberDto fiber = fiberService.createBlendedFiber(request);
         

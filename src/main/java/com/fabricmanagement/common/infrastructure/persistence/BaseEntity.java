@@ -153,7 +153,6 @@ public abstract class BaseEntity implements Serializable {
                 tenantUid = "SYS-000";
             }
             
-            // Simple sequence based on timestamp (TODO: use DB sequence)
             long sequence = System.currentTimeMillis() % 100000;
             this.uid = String.format("%s-%s-%05d", tenantUid, getModuleCode(), sequence);
         }

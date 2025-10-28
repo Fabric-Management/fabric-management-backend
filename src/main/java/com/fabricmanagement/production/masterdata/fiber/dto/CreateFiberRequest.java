@@ -26,9 +26,6 @@ public class CreateFiberRequest {
 
     private UUID fiberIsoCodeId;
 
-    @NotBlank(message = "Fiber code is required")
-    private String fiberCode;
-
     @NotBlank(message = "Fiber name is required")
     private String fiberName;
 

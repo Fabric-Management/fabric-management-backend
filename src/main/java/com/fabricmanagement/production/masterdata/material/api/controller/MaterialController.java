@@ -30,7 +30,7 @@ public class MaterialController {
     public ResponseEntity<ApiResponse<MaterialDto>> createMaterial(
             @Valid @RequestBody CreateMaterialRequest request) {
         
-        log.info("Creating material: name={}", request.getMaterialName());
+        log.info("Creating material: type={}", request.getMaterialType());
 
         MaterialDto created = materialService.createMaterial(request);
 

@@ -36,16 +36,6 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
     List<Fiber> findByTenantIdAndStatusAndIsActiveTrue(UUID tenantId, FiberStatus status);
 
     /**
-     * Find fiber by code within tenant.
-     */
-    boolean existsByTenantIdAndFiberCode(UUID tenantId, String fiberCode);
-
-    /**
-     * Find fiber by code.
-     */
-    Optional<Fiber> findByTenantIdAndFiberCode(UUID tenantId, String fiberCode);
-
-    /**
      * Find active fibers with material details.
      */
     @Query("SELECT f FROM Fiber f " +

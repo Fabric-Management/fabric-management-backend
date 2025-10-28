@@ -182,21 +182,6 @@ public class FiberValidationService {
         }
     }
 
-    /**
-     * Validate fiber code format.
-     * 
-     * <p>Rule: Fiber code must match pattern: [A-Z0-9-]{3,50}</p>
-     */
-    public void validateFiberCodeFormat(String fiberCode) {
-        if (fiberCode == null || fiberCode.isBlank()) {
-            return;
-        }
-        
-        if (!fiberCode.matches("^[A-Z0-9-]{3,50}$")) {
-            throw new IllegalArgumentException(
-                "Fiber code must contain only uppercase letters, numbers, and hyphens (3-50 chars)");
-        }
-    }
 
     /**
      * Validate fiber name format.
@@ -221,9 +206,6 @@ public class FiberValidationService {
      */
     @Transactional(readOnly = true)
     public void validateCategoryCompatibility(UUID blendedCategoryId, Map<UUID, BigDecimal> composition) {
-        // TODO: Implement category compatibility rules
-        // Example: NATURAL_PLANT + NATURAL_ANIMAL → NATURAL_PLANT
-        // Example: NATURAL_PLANT + SYNTHETIC_POLYMER → MIXED_CATEGORY
     }
 }
 

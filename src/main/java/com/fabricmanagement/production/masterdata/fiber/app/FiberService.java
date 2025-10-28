@@ -39,10 +39,7 @@ public class FiberService implements FiberFacade {
 
     @Transactional
     public FiberDto createFiber(CreateFiberRequest request) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
-        log.info("Creating fiber: code={}, name={}", 
-            request.getFiberCode(), request.getFiberName());
+        log.info("Creating fiber: name={}", request.getFiberName());
 
         // Check if this is a pure 100% fiber being recreated
         if (request.getFiberIsoCodeId() != null) {
@@ -52,10 +49,6 @@ public class FiberService implements FiberFacade {
                 "If you need a custom fiber, please use the default fiber types available.");
         }
 
-        if (fiberRepository.existsByTenantIdAndFiberCode(tenantId, request.getFiberCode())) {
-            throw new IllegalArgumentException(
-                String.format("Fiber with code '%s' already exists in your tenant", request.getFiberCode()));
-        }
 
         // Check if material already has a fiber detail
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
@@ -66,7 +59,6 @@ public class FiberService implements FiberFacade {
             request.getMaterialId(),
             request.getFiberCategoryId(),
             request.getFiberIsoCodeId(),
-            request.getFiberCode(),
             request.getFiberName(),
             request.getFiberGrade(),
             request.getFineness(),
@@ -83,7 +75,6 @@ public class FiberService implements FiberFacade {
         eventPublisher.publish(new FiberCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
-            saved.getFiberCode(),
             saved.getFiberName(),
             saved.getFiberCategoryId(),
             saved.getFiberIsoCodeId()
@@ -104,21 +95,12 @@ public class FiberService implements FiberFacade {
      */
     @Transactional
     public FiberDto createBlendedFiber(CreateBlendedFiberRequest request) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
-        log.info("Creating blended fiber: code={}, name={}", 
-            request.getFiberCode(), request.getFiberName());
-
-        if (fiberRepository.existsByTenantIdAndFiberCode(tenantId, request.getFiberCode())) {
-            throw new IllegalArgumentException("Fiber code already exists");
-        }
+        log.info("Creating blended fiber: name={}", request.getFiberName());
 
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details");
         }
 
-        // Validate fiber code format
-        validationService.validateFiberCodeFormat(request.getFiberCode());
 
         // Validate composition percentages
         validationService.validateCompositionPercentages(request.getComposition());
@@ -165,7 +147,6 @@ public class FiberService implements FiberFacade {
             request.getMaterialId(),
             request.getFiberCategoryId(),
             request.getFiberIsoCodeId(),
-            request.getFiberCode(),
             fiberName,  // Use generated or provided name
             request.getFiberGrade()
         );
@@ -180,7 +161,6 @@ public class FiberService implements FiberFacade {
         eventPublisher.publish(new FiberCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
-            saved.getFiberCode(),
             saved.getFiberName(),
             saved.getFiberCategoryId(),
             saved.getFiberIsoCodeId()
@@ -309,7 +289,7 @@ public class FiberService implements FiberFacade {
             
             // Check if composition maps are identical
             if (compositionsMatch(composition, existingComposition)) {
-                log.warn("Duplicate composition found: fiber={}, composition={}", fiber.getFiberCode(), existingComposition);
+                log.warn("Duplicate composition found: fiber={}, composition={}", fiber.getFiberName(), existingComposition);
                 return true;
             }
         }

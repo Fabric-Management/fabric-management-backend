@@ -1,6 +1,5 @@
 package com.fabricmanagement.production.masterdata.fiber.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,9 +28,6 @@ public class CreateBlendedFiberRequest {
     private UUID fiberCategoryId;
 
     private UUID fiberIsoCodeId;
-
-    @NotBlank(message = "Fiber code is required")
-    private String fiberCode;
 
     /**
      * Fiber name (optional - will be auto-generated if not provided).

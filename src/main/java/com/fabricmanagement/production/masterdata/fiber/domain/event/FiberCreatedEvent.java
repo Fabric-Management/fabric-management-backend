@@ -12,7 +12,6 @@ import java.util.UUID;
 public class FiberCreatedEvent extends DomainEvent {
     
     private final UUID fiberId;
-    private final String fiberCode;
     private final String fiberName;
     private final UUID fiberCategoryId;
     private final UUID fiberIsoCodeId;
@@ -20,13 +19,11 @@ public class FiberCreatedEvent extends DomainEvent {
     public FiberCreatedEvent(
             UUID tenantId,
             UUID fiberId,
-            String fiberCode,
             String fiberName,
             UUID fiberCategoryId,
             UUID fiberIsoCodeId) {
         super(tenantId, "FIBER_CREATED");
         this.fiberId = fiberId;
-        this.fiberCode = fiberCode;
         this.fiberName = fiberName;
         this.fiberCategoryId = fiberCategoryId;
         this.fiberIsoCodeId = fiberIsoCodeId;

@@ -4,8 +4,6 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.UUID;
-
 /**
  * Material - master data for production materials.
  * Types: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE
