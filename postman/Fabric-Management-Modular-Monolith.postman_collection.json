@@ -619,7 +619,47 @@
           }
         },
         {
-          "name": "Create Blended Fiber (60% Cotton + 40% Viscose)",
+          "name": "1️⃣ Create Material for Blended Fiber",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.environment.set('material_id_blended', jsonData.data.id);",
+                  "    console.log('✅ Material created for blended fiber:', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materialType\": \"FIBER\",\n  \"unit\": \"KG\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/materials",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "materials"]
+            }
+          }
+        },
+        {
+          "name": "2️⃣ Create Blended Fiber (60% Cotton + 40% Viscose)",
           "event": [
             {
               "listen": "test",
