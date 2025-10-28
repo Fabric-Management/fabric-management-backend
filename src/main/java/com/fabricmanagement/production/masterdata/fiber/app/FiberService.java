@@ -99,9 +99,7 @@ public class FiberService implements FiberFacade {
     public FiberDto createBlendedFiber(CreateBlendedFiberRequest request) {
         UUID tenantId = TenantContext.getCurrentTenantId();
         
-        log.info("Creating blended fiber: code={}, name={}", 
-            request.getFiberCode(), request.getFiberName());
-
+        log.info("Creating blended fiber: name={}", request.getFiberName());
 
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details");
