@@ -64,10 +64,6 @@ public class Material extends BaseEntity {
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
-
-    // ⚠️ NO DIRECT RELATIONSHIP to Fiber/Yarn/Fabric detail tables
-    // Reason: Each detail has material_id FK → can query when needed via materialId
-    // This keeps Material generic and avoids circular dependencies
     
     public static Material create(String name, MaterialType type, UUID categoryId, String unit) {
         return Material.builder()
