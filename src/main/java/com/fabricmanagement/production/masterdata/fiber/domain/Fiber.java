@@ -39,10 +39,6 @@ public class Fiber extends BaseEntity {
     @Column(name = "fiber_iso_code_id")
     private UUID fiberIsoCodeId;  // FK → FiberIsoCode
 
-    @Column(name = "fiber_code", nullable = false, length = 50)
-    private String fiberCode;
-
-   
     @Column(name = "fiber_name", nullable = false, length = 255)
     private String fiberName;
 

@@ -48,7 +48,6 @@ CREATE TABLE production.prod_fiber (
     fiber_iso_code_id UUID REFERENCES production.prod_fiber_iso_code(id),
     
     -- Identity
-    fiber_code VARCHAR(50) NOT NULL,
     fiber_name VARCHAR(255) NOT NULL,
     fiber_grade VARCHAR(50),
     
