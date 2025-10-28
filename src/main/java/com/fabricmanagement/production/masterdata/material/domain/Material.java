@@ -7,30 +7,8 @@ import lombok.*;
 import java.util.UUID;
 
 /**
- * Material entity - Master data for production materials.
- *
- * <p>Represents all materials used in production:</p>
- * <ul>
- *   <li>FIBER - Raw materials (cotton, polyester)</li>
- *   <li>YARN - Spun yarns</li>
- *   <li>FABRIC - Finished fabrics</li>
- *   <li>CHEMICAL - Dyes and auxiliaries</li>
- *   <li>CONSUMABLE - Supplies and spare parts</li>
- * </ul>
- *
- * <h2>Multi-Tenancy:</h2>
- * <p>Each tenant has their own material catalog.</p>
- *
- * <h2>Example:</h2>
- * <pre>{@code
- * Material cotton = Material.create(
- *     "Cotton Fiber - Grade A",
- *     MaterialType.FIBER,
- *     "Cotton",
- *     "kg",
- *     new BigDecimal("5.50")
- * );
- * }</pre>
+ * Material - master data for production materials.
+ * Types: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE
  */
 @Entity
 @Table(name = "prod_material", schema = "production",
@@ -74,9 +52,6 @@ public class Material extends BaseEntity {
             .build();
     }
 
-    /**
-     * Update material details.
-     */
     public void update(String name, UUID categoryId, String description) {
         this.materialName = name;
         this.categoryId = categoryId;
