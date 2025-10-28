@@ -7,7 +7,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -36,6 +38,9 @@ public class FiberDto {
     private Boolean isActive;
     private Instant createdAt;
     private Instant updatedAt;
+    
+    @Builder.Default
+    private Map<UUID, BigDecimal> composition = Map.of();
 
     /**
      * Map entity to DTO.
