@@ -182,21 +182,6 @@ public class FiberValidationService {
         }
     }
 
-    /**
-     * Validate fiber code format.
-     * 
-     * <p>Rule: Fiber code must match pattern: [A-Z0-9-]{3,50}</p>
-     */
-    public void validateFiberCodeFormat(String fiberCode) {
-        if (fiberCode == null || fiberCode.isBlank()) {
-            return;
-        }
-        
-        if (!fiberCode.matches("^[A-Z0-9-]{3,50}$")) {
-            throw new IllegalArgumentException(
-                "Fiber code must contain only uppercase letters, numbers, and hyphens (3-50 chars)");
-        }
-    }
 
     /**
      * Validate fiber name format.

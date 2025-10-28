@@ -293,7 +293,7 @@ public class FiberService implements FiberFacade {
             
             // Check if composition maps are identical
             if (compositionsMatch(composition, existingComposition)) {
-                log.warn("Duplicate composition found: fiber={}, composition={}", fiber.getFiberCode(), existingComposition);
+                log.warn("Duplicate composition found: fiber={}, composition={}", fiber.getFiberName(), existingComposition);
                 return true;
             }
         }

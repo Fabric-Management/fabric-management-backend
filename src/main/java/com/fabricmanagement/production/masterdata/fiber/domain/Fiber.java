@@ -76,7 +76,6 @@ public class Fiber extends BaseEntity {
             .materialId(materialId)
             .fiberCategoryId(fiberCategoryId)
             .fiberIsoCodeId(fiberIsoCodeId)
-            .fiberCode(fiberCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .fineness(fineness)

@@ -16,17 +16,17 @@ import java.util.UUID;
 public class FiberCompositionChangedEvent extends DomainEvent {
     
     private final UUID blendedFiberId;
-    private final String fiberCode;
+    private final String fiberName;
     private final Map<UUID, BigDecimal> composition;  // baseFiberId → percentage
     
     public FiberCompositionChangedEvent(
             UUID tenantId,
             UUID blendedFiberId,
-            String fiberCode,
+            String fiberName,
             Map<UUID, BigDecimal> composition) {
         super(tenantId, "FIBER_COMPOSITION_CHANGED");
         this.blendedFiberId = blendedFiberId;
-        this.fiberCode = fiberCode;
+        this.fiberName = fiberName;
         this.composition = composition;
     }
 }
