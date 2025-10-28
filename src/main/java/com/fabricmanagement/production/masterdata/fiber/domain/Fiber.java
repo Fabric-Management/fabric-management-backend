@@ -6,10 +6,6 @@ import lombok.*;
 
 import java.util.UUID;
 
-/**
- * Fiber - technical specifications for fiber instances.
- * Pure (100%) or blended. Composition must sum to 100%.
- */
 @Entity
 @Table(name = "prod_fiber", schema = "production",
     indexes = {
