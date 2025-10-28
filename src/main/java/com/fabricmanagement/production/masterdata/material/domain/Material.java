@@ -1,7 +1,6 @@
 package com.fabricmanagement.production.masterdata.material.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -66,21 +65,10 @@ public class Material extends BaseEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    // ⚠️ Pricing & Supplier removed - These are dynamic transaction data
-    // Future: MaterialPrice entity or Procurement module
-
-    /**
-     * Bidirectional reference to Fiber detail (if materialType == FIBER).
-     * OneToOne: Managed by Fiber.materialId (Fiber owns the FK).
-     * <p>This is a read-only reference for navigation purposes.</p>
-     */
-    @OneToOne(mappedBy = "materialId", fetch = FetchType.LAZY)
-    @Transient
-    private Fiber fiber;
-
-    /**
-     * Create new material.
-     */
+    // ⚠️ NO DIRECT RELATIONSHIP to Fiber/Yarn/Fabric detail tables
+    // Reason: Each detail has material_id FK → can query when needed via materialId
+    // This keeps Material generic and avoids circular dependencies
+    
     public static Material create(String name, MaterialType type, UUID categoryId, String unit) {
         return Material.builder()
             .materialName(name)
