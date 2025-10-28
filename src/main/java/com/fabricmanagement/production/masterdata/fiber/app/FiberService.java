@@ -61,7 +61,6 @@ public class FiberService implements FiberFacade {
             request.getMaterialId(),
             request.getFiberCategoryId(),
             request.getFiberIsoCodeId(),
-            request.getFiberCode(),
             request.getFiberName(),
             request.getFiberGrade(),
             request.getFineness(),
@@ -78,7 +77,6 @@ public class FiberService implements FiberFacade {
         eventPublisher.publish(new FiberCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
-            saved.getFiberCode(),
             saved.getFiberName(),
             saved.getFiberCategoryId(),
             saved.getFiberIsoCodeId()
@@ -175,7 +173,6 @@ public class FiberService implements FiberFacade {
         eventPublisher.publish(new FiberCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
-            saved.getFiberCode(),
             saved.getFiberName(),
             saved.getFiberCategoryId(),
             saved.getFiberIsoCodeId()
