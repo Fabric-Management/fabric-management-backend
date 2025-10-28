@@ -689,7 +689,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"materialId\": \"{{material_id_blended}}\",\n  \"fiberCategoryId\": \"{{fiber_category_id_mixed}}\",\n  \"fiberName\": \"Cotton Viscose Blend (60/40)\",\n  \"fiberGrade\": \"Premium\",\n  \"remarks\": \"Blended fiber for testing\",\n  \"composition\": {\n    \"{{fiber_id_cotton}}\": 60.0,\n    \"{{fiber_id_viscose}}\": 40.0\n  }\n}"
+              "raw": "{\n  \"materialId\": \"{{material_id_blended}}\",\n  \"fiberCategoryId\": \"{{fiber_category_id_mixed}}\",\n  \"fiberGrade\": \"Premium\",\n  \"remarks\": \"Auto-generated name: Cotton 60% + Viscose 40% Blend\",\n  \"composition\": {\n    \"{{fiber_id_cotton}}\": 60.0,\n    \"{{fiber_id_viscose}}\": 40.0\n  }\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/production/fibers/blended",
