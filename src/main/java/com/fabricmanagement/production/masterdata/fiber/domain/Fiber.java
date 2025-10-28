@@ -33,11 +33,11 @@ public class Fiber extends BaseEntity {
     @Column(name = "material_id", nullable = false, unique = true)
     private UUID materialId;
 
-    @Column(name = "category_id")
-    private UUID categoryId;  // FK → FiberCategory
+    @Column(name = "fiber_category_id")
+    private UUID fiberCategoryId;  // FK → FiberCategory
 
-    @Column(name = "iso_code_id")
-    private UUID isoCodeId;  // FK → FiberIsoCode
+    @Column(name = "fiber_iso_code_id")
+    private UUID fiberIsoCodeId;  // FK → FiberIsoCode
 
     @Column(name = "fiber_code", nullable = false, length = 50)
     private String fiberCode;
@@ -71,8 +71,8 @@ public class Fiber extends BaseEntity {
 
     public static Fiber createPureFiber(
             UUID materialId,
-            UUID categoryId,
-            UUID isoCodeId,
+            UUID fiberCategoryId,
+            UUID fiberIsoCodeId,
             String fiberCode,
             String fiberName,
             String fiberGrade,
@@ -83,8 +83,8 @@ public class Fiber extends BaseEntity {
         
         return Fiber.builder()
             .materialId(materialId)
-            .categoryId(categoryId)
-            .isoCodeId(isoCodeId)
+            .fiberCategoryId(fiberCategoryId)
+            .fiberIsoCodeId(fiberIsoCodeId)
             .fiberCode(fiberCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
@@ -98,16 +98,16 @@ public class Fiber extends BaseEntity {
 
     public static Fiber createBlendedFiber(
             UUID materialId,
-            UUID categoryId,
-            UUID isoCodeId,
+            UUID fiberCategoryId,
+            UUID fiberIsoCodeId,
             String fiberCode,
             String fiberName,
             String fiberGrade) {
         
         return Fiber.builder()
             .materialId(materialId)
-            .categoryId(categoryId)
-            .isoCodeId(isoCodeId)
+            .fiberCategoryId(fiberCategoryId)
+            .fiberIsoCodeId(fiberIsoCodeId)
             .fiberCode(fiberCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)

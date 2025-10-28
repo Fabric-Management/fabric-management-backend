@@ -44,8 +44,8 @@ CREATE TABLE production.prod_fiber (
     
     -- Relationships
     material_id UUID NOT NULL UNIQUE REFERENCES production.prod_material(id) ON DELETE CASCADE,
-    category_id UUID REFERENCES production.prod_fiber_category(id),
-    iso_code_id UUID REFERENCES production.prod_fiber_iso_code(id),
+    fiber_category_id UUID REFERENCES production.prod_fiber_category(id),
+    fiber_iso_code_id UUID REFERENCES production.prod_fiber_iso_code(id),
     
     -- Identity
     fiber_code VARCHAR(50) NOT NULL,
@@ -77,14 +77,14 @@ CREATE TABLE production.prod_fiber (
 CREATE INDEX idx_fiber_tenant ON production.prod_fiber(tenant_id);
 CREATE INDEX idx_fiber_material ON production.prod_fiber(material_id);
 CREATE INDEX idx_fiber_code ON production.prod_fiber(tenant_id, fiber_code);
-CREATE INDEX idx_fiber_category ON production.prod_fiber(category_id);
-CREATE INDEX idx_fiber_iso ON production.prod_fiber(iso_code_id);
+CREATE INDEX idx_fiber_category ON production.prod_fiber(fiber_category_id);
+CREATE INDEX idx_fiber_iso ON production.prod_fiber(fiber_iso_code_id);
 CREATE INDEX idx_fiber_status ON production.prod_fiber(status);
 CREATE INDEX idx_fiber_tenant_active ON production.prod_fiber(tenant_id, is_active) WHERE is_active = TRUE;
 
 COMMENT ON TABLE production.prod_fiber IS 'Fiber instances - Can be pure (100%) or blended';
 COMMENT ON COLUMN production.prod_fiber.fiber_code IS 'Tenant-specific identifier';
-COMMENT ON COLUMN production.prod_fiber.iso_code_id IS 'FK to fiber ISO code (CO, PES, PA, etc.)';
+COMMENT ON COLUMN production.prod_fiber.fiber_iso_code_id IS 'FK to fiber ISO code (CO, PES, PA, etc.)';
 COMMENT ON COLUMN production.prod_fiber.fineness IS 'Micronaire or dtex (only for pure fibers)';
 COMMENT ON COLUMN production.prod_fiber.status IS 'NEW, IN_USE, EXHAUSTED, OBSOLETE';
 
