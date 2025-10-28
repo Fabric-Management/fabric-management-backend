@@ -8,8 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.UUID;
-
 /**
  * Request for creating new material.
  */
@@ -19,20 +17,10 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateMaterialRequest {
 
-    private String materialCode;
-
-    @NotBlank(message = "Material name is required")
-    private String materialName;
-
     @NotNull(message = "Material type is required")
     private MaterialType materialType;
 
-    @NotNull(message = "Category ID is required")
-    private UUID categoryId;
-
     @NotBlank(message = "Unit is required")
     private String unit;
-
-    private String description;
 }
 

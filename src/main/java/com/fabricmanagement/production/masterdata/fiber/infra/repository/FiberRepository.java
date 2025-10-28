@@ -29,6 +29,11 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
      * Find all active fibers for a tenant.
      */
     List<Fiber> findByTenantIdAndIsActiveTrue(UUID tenantId);
+    
+    /**
+     * Find fibers by name (case-insensitive).
+     */
+    List<Fiber> findByTenantIdAndFiberNameContainingIgnoreCase(UUID tenantId, String fiberName);
 
     /**
      * Find fibers by status.

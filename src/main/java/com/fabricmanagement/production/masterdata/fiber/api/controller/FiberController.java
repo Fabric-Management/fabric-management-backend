@@ -4,7 +4,9 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateBlendedFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ import java.util.UUID;
 public class FiberController {
 
     private final FiberService fiberService;
+    private final FiberCategoryRepository fiberCategoryRepository;
 
     @PostMapping
     public ResponseEntity<ApiResponse<FiberDto>> createFiber(
@@ -69,6 +72,13 @@ public class FiberController {
         return ResponseEntity.ok(ApiResponse.success(fibers));
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<FiberDto>>> searchFibers(
+            @RequestParam String name) {
+        List<FiberDto> fibers = fiberService.searchByName(name);
+        return ResponseEntity.ok(ApiResponse.success(fibers));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<FiberDto>> updateFiber(
             @PathVariable UUID id,
@@ -84,5 +94,14 @@ public class FiberController {
     public ResponseEntity<ApiResponse<Void>> deactivateFiber(@PathVariable UUID id) {
         fiberService.deactivateFiber(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Fiber deactivated successfully"));
+    }
+
+    @GetMapping("/categories")
+    public ResponseEntity<ApiResponse<List<FiberCategoryDto>>> getCategories() {
+        List<FiberCategoryDto> categories = fiberCategoryRepository.findByIsActiveTrue()
+            .stream()
+            .map(FiberCategoryDto::from)
+            .toList();
+        return ResponseEntity.ok(ApiResponse.success(categories));
     }
 }

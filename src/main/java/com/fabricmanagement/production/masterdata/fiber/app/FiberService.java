@@ -177,7 +177,11 @@ public class FiberService implements FiberFacade {
         log.debug("Getting fiber: tenantId={}, id={}", tenantId, id);
 
         return fiberRepository.findByTenantIdAndId(tenantId, id)
-            .map(FiberDto::from);
+            .map(fiber -> {
+                FiberDto dto = FiberDto.from(fiber);
+                dto.setComposition(compositionService.getComposition(fiber.getId()));
+                return dto;
+            });
     }
 
     @Transactional(readOnly = true)
@@ -185,7 +189,11 @@ public class FiberService implements FiberFacade {
         log.debug("Getting fiber by materialId: materialId={}", materialId);
 
         return fiberRepository.findByMaterialId(materialId)
-            .map(FiberDto::from);
+            .map(fiber -> {
+                FiberDto dto = FiberDto.from(fiber);
+                dto.setComposition(compositionService.getComposition(fiber.getId()));
+                return dto;
+            });
     }
 
     @Transactional(readOnly = true)
@@ -195,7 +203,26 @@ public class FiberService implements FiberFacade {
 
         return fiberRepository.findByTenantIdAndIsActiveTrue(tenantId)
             .stream()
-            .map(FiberDto::from)
+            .map(fiber -> {
+                FiberDto dto = FiberDto.from(fiber);
+                dto.setComposition(compositionService.getComposition(fiber.getId()));
+                return dto;
+            })
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<FiberDto> searchByName(String fiberName) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Searching fibers by name: tenantId={}, name={}", tenantId, fiberName);
+
+        return fiberRepository.findByTenantIdAndFiberNameContainingIgnoreCase(tenantId, fiberName)
+            .stream()
+            .map(fiber -> {
+                FiberDto dto = FiberDto.from(fiber);
+                dto.setComposition(compositionService.getComposition(fiber.getId()));
+                return dto;
+            })
             .toList();
     }
 

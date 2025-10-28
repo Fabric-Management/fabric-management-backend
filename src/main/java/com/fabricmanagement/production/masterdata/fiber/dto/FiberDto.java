@@ -7,7 +7,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -23,6 +25,8 @@ public class FiberDto {
     private UUID tenantId;
     private String uid;
     private UUID materialId;
+    private UUID fiberCategoryId;
+    private UUID fiberIsoCodeId;
     private String fiberName;
     private String fiberGrade;
     private Double fineness;
@@ -34,6 +38,9 @@ public class FiberDto {
     private Boolean isActive;
     private Instant createdAt;
     private Instant updatedAt;
+    
+    @Builder.Default
+    private Map<UUID, BigDecimal> composition = Map.of();
 
     /**
      * Map entity to DTO.
@@ -46,6 +53,8 @@ public class FiberDto {
             .tenantId(entity.getTenantId())
             .uid(entity.getUid())
             .materialId(entity.getMaterialId())
+            .fiberCategoryId(entity.getFiberCategoryId())
+            .fiberIsoCodeId(entity.getFiberIsoCodeId())
             .fiberName(entity.getFiberName())
             .fiberGrade(entity.getFiberGrade())
             .fineness(entity.getFineness())

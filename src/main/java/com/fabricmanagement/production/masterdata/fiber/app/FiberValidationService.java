@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 public class FiberValidationService {
 
     private final FiberRepository fiberRepository;
+    private final FiberCompositionService compositionService;
 
     // =====================================================
     // VALIDATION RULES FOR BLENDED FIBERS
@@ -128,15 +129,9 @@ public class FiberValidationService {
             }
             
             // Check if base fiber itself has a composition (it's also a blend)
-            long compositionCount = fiberRepository.findById(baseFiberId)
-                .map(fiber -> {
-                    // This would need checking FiberComposition table
-                    // For now, we'll check if fiber has any technical specs
-                    return fiber.getFineness() == null && fiber.getLengthMm() == null ? 1 : 0;
-                })
-                .orElse(0);
+            boolean isBlend = compositionService.getComposition(baseFiberId).size() > 0;
             
-            if (compositionCount > 0) {
+            if (isBlend) {
                 throw new IllegalArgumentException(
                     String.format("Base fiber '%s' is also a blend. Cannot blend already-blended fibers.", 
                         baseFiber.getFiberName()));
