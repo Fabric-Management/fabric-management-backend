@@ -10,9 +10,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 /**
  * Repository for Fiber entity.
  */
@@ -32,6 +29,11 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
      * Find all active fibers for a tenant.
      */
     List<Fiber> findByTenantIdAndIsActiveTrue(UUID tenantId);
+    
+    /**
+     * Find fibers by name (case-insensitive).
+     */
+    List<Fiber> findByTenantIdAndFiberNameContainingIgnoreCase(UUID tenantId, String fiberName);
 
     /**
      * Find fibers by status.
