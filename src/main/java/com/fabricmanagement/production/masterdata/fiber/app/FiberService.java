@@ -41,8 +41,7 @@ public class FiberService implements FiberFacade {
     public FiberDto createFiber(CreateFiberRequest request) {
         UUID tenantId = TenantContext.getCurrentTenantId();
         
-        log.info("Creating fiber: code={}, name={}", 
-            request.getFiberCode(), request.getFiberName());
+        log.info("Creating fiber: name={}", request.getFiberName());
 
         // Check if this is a pure 100% fiber being recreated
         if (request.getFiberIsoCodeId() != null) {
@@ -52,10 +51,6 @@ public class FiberService implements FiberFacade {
                 "If you need a custom fiber, please use the default fiber types available.");
         }
 
-        if (fiberRepository.existsByTenantIdAndFiberCode(tenantId, request.getFiberCode())) {
-            throw new IllegalArgumentException(
-                String.format("Fiber with code '%s' already exists in your tenant", request.getFiberCode()));
-        }
 
         // Check if material already has a fiber detail
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {

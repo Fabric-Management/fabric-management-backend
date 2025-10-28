@@ -65,7 +65,6 @@ public class Fiber extends BaseEntity {
             UUID materialId,
             UUID fiberCategoryId,
             UUID fiberIsoCodeId,
-            String fiberCode,
             String fiberName,
             String fiberGrade,
             Double fineness,
@@ -92,7 +91,6 @@ public class Fiber extends BaseEntity {
             UUID materialId,
             UUID fiberCategoryId,
             UUID fiberIsoCodeId,
-            String fiberCode,
             String fiberName,
             String fiberGrade) {
         
@@ -100,7 +98,6 @@ public class Fiber extends BaseEntity {
             .materialId(materialId)
             .fiberCategoryId(fiberCategoryId)
             .fiberIsoCodeId(fiberIsoCodeId)
-            .fiberCode(fiberCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .status(FiberStatus.NEW)
