@@ -33,8 +33,6 @@ public class MaterialService implements MaterialFacade {
 
     @Transactional
     public MaterialDto createMaterial(CreateMaterialRequest request) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
         log.info("Creating material: type={}", request.getMaterialType());
 
         Material material = Material.create(

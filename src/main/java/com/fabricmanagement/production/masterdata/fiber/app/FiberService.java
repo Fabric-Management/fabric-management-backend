@@ -39,8 +39,6 @@ public class FiberService implements FiberFacade {
 
     @Transactional
     public FiberDto createFiber(CreateFiberRequest request) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
         log.info("Creating fiber: name={}", request.getFiberName());
 
         // Check if this is a pure 100% fiber being recreated
@@ -97,8 +95,6 @@ public class FiberService implements FiberFacade {
      */
     @Transactional
     public FiberDto createBlendedFiber(CreateBlendedFiberRequest request) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
         log.info("Creating blended fiber: name={}", request.getFiberName());
 
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {

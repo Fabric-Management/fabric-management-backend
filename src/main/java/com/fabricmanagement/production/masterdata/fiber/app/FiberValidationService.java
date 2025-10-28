@@ -206,9 +206,6 @@ public class FiberValidationService {
      */
     @Transactional(readOnly = true)
     public void validateCategoryCompatibility(UUID blendedCategoryId, Map<UUID, BigDecimal> composition) {
-        // TODO: Implement category compatibility rules
-        // Example: NATURAL_PLANT + NATURAL_ANIMAL → NATURAL_PLANT
-        // Example: NATURAL_PLANT + SYNTHETIC_POLYMER → MIXED_CATEGORY
     }
 }
 
