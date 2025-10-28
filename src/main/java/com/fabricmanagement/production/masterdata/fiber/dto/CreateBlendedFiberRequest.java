@@ -30,9 +30,6 @@ public class CreateBlendedFiberRequest {
 
     private UUID fiberIsoCodeId;
 
-    @NotBlank(message = "Fiber code is required")
-    private String fiberCode;
-
     /**
      * Fiber name (optional - will be auto-generated if not provided).
      * 

@@ -102,16 +102,11 @@ public class FiberService implements FiberFacade {
         log.info("Creating blended fiber: code={}, name={}", 
             request.getFiberCode(), request.getFiberName());
 
-        if (fiberRepository.existsByTenantIdAndFiberCode(tenantId, request.getFiberCode())) {
-            throw new IllegalArgumentException("Fiber code already exists");
-        }
 
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details");
         }
 
-        // Validate fiber code format
-        validationService.validateFiberCodeFormat(request.getFiberCode());
 
         // Validate composition percentages
         validationService.validateCompositionPercentages(request.getComposition());
@@ -158,7 +153,6 @@ public class FiberService implements FiberFacade {
             request.getMaterialId(),
             request.getFiberCategoryId(),
             request.getFiberIsoCodeId(),
-            request.getFiberCode(),
             fiberName,  // Use generated or provided name
             request.getFiberGrade()
         );
