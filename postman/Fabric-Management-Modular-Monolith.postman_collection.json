@@ -446,7 +446,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"materialName\": \"Pamuk Elyaf - Grade A\",\n  \"materialType\": \"FIBER\",\n  \"categoryId\": \"{{cotton_category_id}}\",\n  \"unit\": \"kg\",\n  \"description\": \"High quality cotton fiber\"\n}"
+              "raw": "{\n  \"materialType\": \"FIBER\",\n  \"unit\": \"KG\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/production/materials",
