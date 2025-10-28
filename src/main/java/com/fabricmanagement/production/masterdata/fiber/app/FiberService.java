@@ -45,7 +45,7 @@ public class FiberService implements FiberFacade {
             request.getFiberCode(), request.getFiberName());
 
         // Check if this is a pure 100% fiber being recreated
-        if (request.getIsoCodeId() != null) {
+        if (request.getFiberIsoCodeId() != null) {
             throw new IllegalArgumentException(
                 "Pure 100% fibers are pre-defined by the system. " +
                 "You can only create blended fibers (combinations of existing fibers). " +
@@ -64,8 +64,8 @@ public class FiberService implements FiberFacade {
 
         Fiber fiber = Fiber.createPureFiber(
             request.getMaterialId(),
-            request.getCategoryId(),
-            request.getIsoCodeId(),
+            request.getFiberCategoryId(),
+            request.getFiberIsoCodeId(),
             request.getFiberCode(),
             request.getFiberName(),
             request.getFiberGrade(),
@@ -85,8 +85,8 @@ public class FiberService implements FiberFacade {
             saved.getId(),
             saved.getFiberCode(),
             saved.getFiberName(),
-            saved.getCategoryId(),
-            saved.getIsoCodeId()
+            saved.getFiberCategoryId(),
+            saved.getFiberIsoCodeId()
         ));
 
         log.info("✅ Fiber created: id={}, uid={}", saved.getId(), saved.getUid());
@@ -163,8 +163,8 @@ public class FiberService implements FiberFacade {
         // Create blended fiber
         Fiber blendedFiber = Fiber.createBlendedFiber(
             request.getMaterialId(),
-            request.getCategoryId(),
-            request.getIsoCodeId(),
+            request.getFiberCategoryId(),
+            request.getFiberIsoCodeId(),
             request.getFiberCode(),
             fiberName,  // Use generated or provided name
             request.getFiberGrade()
@@ -182,8 +182,8 @@ public class FiberService implements FiberFacade {
             saved.getId(),
             saved.getFiberCode(),
             saved.getFiberName(),
-            saved.getCategoryId(),
-            saved.getIsoCodeId()
+            saved.getFiberCategoryId(),
+            saved.getFiberIsoCodeId()
         ));
 
         log.info("✅ Blended fiber created: id={}, uid={}", saved.getId(), saved.getUid());

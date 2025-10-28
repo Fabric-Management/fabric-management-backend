@@ -495,6 +495,47 @@
       "name": "🧵 Production - Fibers",
       "item": [
         {
+          "name": "Get Default System Fibers (100% Pure)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.length > 0) {",
+                  "    // Find Viscose fiber (CV code)",
+                  "    var viscose = jsonData.data.find(f => f.fiberCode.includes('CV') || f.fiberName.includes('Viscose'));",
+                  "    if (viscose) {",
+                  "        pm.environment.set('material_id_viscose', viscose.materialId);",
+                  "        pm.environment.set('fiber_category_id_visco', viscose.categoryId);",
+                  "        pm.environment.set('fiber_iso_code_id_visco', viscose.isoCodeId);",
+                  "        console.log('✅ Found Viscose fiber:');",
+                  "        console.log('Material ID:', viscose.materialId);",
+                  "        console.log('Category ID:', viscose.categoryId);",
+                  "        console.log('ISO Code ID:', viscose.isoCodeId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "fibers"]
+            }
+          }
+        },
+        {
           "name": "Create Pure Fiber (100%)",
           "event": [
             {
@@ -864,6 +905,21 @@
     },
     {
       "key": "fiber_id_blended",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "material_id_viscose",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fiber_category_id_visco",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fiber_iso_code_id_visco",
       "value": "",
       "type": "string"
     }

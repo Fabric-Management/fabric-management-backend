@@ -21,11 +21,15 @@ BEGIN
         WHERE is_active = true
         ORDER BY id
     LOOP
-        -- Get category_id based on fiber_type
-        SELECT id INTO category_id_var 
-        FROM production.prod_fiber_category 
-        WHERE category_code = iso_code_record.fiber_type 
-        LIMIT 1;
+        -- Get category_id based on fiber_type (handle 'TECHNICAL_ADVANCED' mapping)
+        SELECT 
+            CASE 
+                WHEN iso_code_record.fiber_type IN ('NATURAL_PLANT', 'NATURAL_ANIMAL') THEN (SELECT id FROM production.prod_fiber_category WHERE category_code = iso_code_record.fiber_type LIMIT 1)
+                WHEN iso_code_record.fiber_type = 'REGENERATED_CELLULOSIC' THEN (SELECT id FROM production.prod_fiber_category WHERE category_code = 'REGENERATED_CELLULOSIC' LIMIT 1)
+                WHEN iso_code_record.fiber_type = 'SYNTHETIC_POLYMER' THEN (SELECT id FROM production.prod_fiber_category WHERE category_code = 'SYNTHETIC_POLYMER' LIMIT 1)
+                ELSE (SELECT id FROM production.prod_fiber_category WHERE category_code = 'TECHNICAL_ADVANCED' LIMIT 1)
+            END 
+        INTO category_id_var;
         
         -- Generate material_id
         material_id_var := gen_random_uuid();
@@ -64,8 +68,8 @@ BEGIN
             tenant_id,
             uid,
             material_id,
-            category_id,
-            iso_code_id,
+            fiber_category_id,
+            fiber_iso_code_id,
             fiber_code,
             fiber_name,
             fiber_grade,
