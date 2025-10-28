@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.fiber.domain.FiberBatch;
 import com.fabricmanagement.production.execution.fiber.dto.CreateFiberBatchRequest;
 import com.fabricmanagement.production.execution.fiber.dto.FiberBatchDto;
@@ -32,7 +33,7 @@ public class FiberBatchService {
         log.debug("Creating fiber batch: tenantId={}, request={}", tenantId, request);
         
         if (fiberBatchRepository.existsByTenantIdAndBatchCode(tenantId, request.getBatchCode())) {
-            throw new IllegalArgumentException("Batch code already exists");
+            throw new IllegalArgumentException("Batch code already exists: " + request.getBatchCode());
         }
         
         FiberBatch batch = FiberBatch.create(
@@ -142,6 +143,6 @@ public class FiberBatchService {
     
     private FiberBatch loadBatchWithLock(UUID id, UUID tenantId) {
         return fiberBatchRepository.findByIdAndTenantId(id, tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("Fiber batch not found: " + id));
+            .orElseThrow(() -> new NotFoundException("Fiber batch not found: " + id));
     }
 }
