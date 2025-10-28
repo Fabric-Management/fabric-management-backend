@@ -17,7 +17,6 @@ CREATE TABLE production.prod_material (
     material_code VARCHAR(50) UNIQUE,
     material_name VARCHAR(255) NOT NULL,
     material_type VARCHAR(20) NOT NULL CHECK (material_type IN ('FIBER', 'YARN', 'FABRIC', 'CHEMICAL', 'CONSUMABLE')),
-    category_id UUID,
     unit VARCHAR(20) NOT NULL,
     description TEXT,
     

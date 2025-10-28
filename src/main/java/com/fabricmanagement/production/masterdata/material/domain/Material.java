@@ -34,27 +34,22 @@ public class Material extends BaseEntity {
     @Column(name = "material_type", nullable = false, length = 20)
     private MaterialType materialType;
 
-    @Column(name = "category_id")
-    private UUID categoryId;  // FK → MaterialCategory
-
     @Column(name = "unit", nullable = false, length = 20)
     private String unit;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     
-    public static Material create(String name, MaterialType type, UUID categoryId, String unit) {
+    public static Material create(String name, MaterialType type, String unit) {
         return Material.builder()
             .materialName(name)
             .materialType(type)
-            .categoryId(categoryId)
             .unit(unit)
             .build();
     }
 
-    public void update(String name, UUID categoryId, String description) {
+    public void update(String name, String description) {
         this.materialName = name;
-        this.categoryId = categoryId;
         this.description = description;
     }
 
