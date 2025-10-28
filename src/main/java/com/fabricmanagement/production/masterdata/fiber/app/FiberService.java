@@ -211,6 +211,21 @@ public class FiberService implements FiberFacade {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<FiberDto> searchByName(String fiberName) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Searching fibers by name: tenantId={}, name={}", tenantId, fiberName);
+
+        return fiberRepository.findByTenantIdAndFiberNameContainingIgnoreCase(tenantId, fiberName)
+            .stream()
+            .map(fiber -> {
+                FiberDto dto = FiberDto.from(fiber);
+                dto.setComposition(compositionService.getComposition(fiber.getId()));
+                return dto;
+            })
+            .toList();
+    }
+
     @Transactional
     public FiberDto updateFiber(UUID id, CreateFiberRequest request) {
         UUID tenantId = TenantContext.getCurrentTenantId();

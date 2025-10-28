@@ -72,6 +72,13 @@ public class FiberController {
         return ResponseEntity.ok(ApiResponse.success(fibers));
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<FiberDto>>> searchFibers(
+            @RequestParam String name) {
+        List<FiberDto> fibers = fiberService.searchByName(name);
+        return ResponseEntity.ok(ApiResponse.success(fibers));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<FiberDto>> updateFiber(
             @PathVariable UUID id,

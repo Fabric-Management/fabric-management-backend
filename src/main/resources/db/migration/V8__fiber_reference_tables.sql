@@ -51,7 +51,8 @@ VALUES
     ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00004', 'REGENERATED_PROTEIN', 'Regenerated Protein Fibers', 'Soy, Milk, Chitin, etc.', 4),
     ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00005', 'SYNTHETIC_POLYMER', 'Synthetic Polymer Fibers', 'Polyester, Nylon, Polypropylene, etc.', 5),
     ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00006', 'TECHNICAL_ADVANCED', 'Technical & Advanced Fibers', 'Carbon, Aramid, Ceramic, etc.', 6),
-    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00007', 'MINERAL', 'Mineral Fibers', 'Asbestos, Glass Fiber, etc.', 7);
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00007', 'MINERAL', 'Mineral Fibers', 'Asbestos, Glass Fiber, etc.', 7),
+    ('00000000-0000-0000-0000-000000000000', 'SYS-000-FCAT-00008', 'MIXED_BLEND', 'Mixed Blend', 'Blends of different fiber origins (e.g., Cotton + Viscose)', 8);
 
 -- =====================================================
 -- Fiber Attribute (Read-Only Reference)
