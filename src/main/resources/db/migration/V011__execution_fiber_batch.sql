@@ -5,7 +5,7 @@
 -- Prevents over-issue and race conditions with reservation logic
 
 CREATE TABLE IF NOT EXISTS production.production_execution_fiber_batch (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) NOT NULL,
     
