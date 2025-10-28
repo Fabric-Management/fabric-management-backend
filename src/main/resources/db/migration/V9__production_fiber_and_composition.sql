@@ -68,9 +68,7 @@ CREATE TABLE production.prod_fiber (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
-    version BIGINT NOT NULL DEFAULT 0,
-    
-    CONSTRAINT uk_fiber_tenant_code UNIQUE (tenant_id, fiber_code)
+    version BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX idx_fiber_tenant ON production.prod_fiber(tenant_id);
