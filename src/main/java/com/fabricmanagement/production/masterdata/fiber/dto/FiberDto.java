@@ -23,6 +23,8 @@ public class FiberDto {
     private UUID tenantId;
     private String uid;
     private UUID materialId;
+    private UUID fiberCategoryId;
+    private UUID fiberIsoCodeId;
     private String fiberName;
     private String fiberGrade;
     private Double fineness;
@@ -46,6 +48,8 @@ public class FiberDto {
             .tenantId(entity.getTenantId())
             .uid(entity.getUid())
             .materialId(entity.getMaterialId())
+            .fiberCategoryId(entity.getFiberCategoryId())
+            .fiberIsoCodeId(entity.getFiberIsoCodeId())
             .fiberName(entity.getFiberName())
             .fiberGrade(entity.getFiberGrade())
             .fineness(entity.getFineness())
