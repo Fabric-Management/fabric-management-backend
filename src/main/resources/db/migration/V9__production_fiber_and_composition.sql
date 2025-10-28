@@ -14,11 +14,8 @@ CREATE TABLE production.prod_material (
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
-    material_code VARCHAR(50) UNIQUE,
-    material_name VARCHAR(255) NOT NULL,
     material_type VARCHAR(20) NOT NULL CHECK (material_type IN ('FIBER', 'YARN', 'FABRIC', 'CHEMICAL', 'CONSUMABLE')),
     unit VARCHAR(20) NOT NULL,
-    description TEXT,
     
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

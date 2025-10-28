@@ -13,30 +13,15 @@ package com.fabricmanagement.production.masterdata.material.domain;
  * </ul>
  */
 public enum MaterialType {
-    
-    /**
-     * Raw fiber - Cotton, polyester, wool, etc.
-     */
+
     FIBER,
-    
-    /**
-     * Yarn - Spun from fibers.
-     */
+ 
     YARN,
-    
-    /**
-     * Fabric - Woven or knitted fabric.
-     */
+ 
     FABRIC,
-    
-    /**
-     * Chemical - Dyes, auxiliaries, finishing chemicals.
-     */
+ 
     CHEMICAL,
-    
-    /**
-     * Consumable - Oils, needles, machine parts, cleaning supplies.
-     */
+ 
     CONSUMABLE
 }
 

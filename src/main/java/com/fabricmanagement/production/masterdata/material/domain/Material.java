@@ -24,33 +24,18 @@ import java.util.UUID;
 @AllArgsConstructor
 public class Material extends BaseEntity {
 
-    @Column(name = "material_code", unique = true, length = 50)
-    private String materialCode;
-
-    @Column(name = "material_name", nullable = false, length = 255)
-    private String materialName;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "material_type", nullable = false, length = 20)
     private MaterialType materialType;
 
     @Column(name = "unit", nullable = false, length = 20)
     private String unit;
-
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
     
-    public static Material create(String name, MaterialType type, String unit) {
+    public static Material create(MaterialType type, String unit) {
         return Material.builder()
-            .materialName(name)
             .materialType(type)
             .unit(unit)
             .build();
-    }
-
-    public void update(String name, String description) {
-        this.materialName = name;
-        this.description = description;
     }
 
     @Override
