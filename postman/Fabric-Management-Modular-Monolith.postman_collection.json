@@ -717,6 +717,23 @@
           }
         },
         {
+          "name": "Get Fiber Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/fibers/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "fibers", "categories"]
+            }
+          }
+        },
+        {
           "name": "Get Fiber by Material",
           "request": {
             "method": "GET",
