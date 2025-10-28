@@ -26,7 +26,6 @@ CREATE TABLE production.prod_material (
 );
 
 CREATE INDEX idx_material_tenant_type ON production.prod_material(tenant_id, material_type);
-CREATE INDEX idx_material_code ON production.prod_material(material_code) WHERE material_code IS NOT NULL;
 CREATE INDEX idx_material_active ON production.prod_material(is_active) WHERE is_active = TRUE;
 CREATE INDEX idx_material_tenant_active ON production.prod_material(tenant_id, is_active) WHERE is_active = TRUE;
 
