@@ -21,8 +21,6 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
     Optional<Material> findByTenantIdAndId(UUID tenantId, UUID id);
 
-    Optional<Material> findByTenantIdAndMaterialCode(UUID tenantId, String materialCode);
-
     List<Material> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
     List<Material> findByTenantIdAndMaterialType(UUID tenantId, MaterialType materialType);
@@ -30,11 +28,6 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
     List<Material> findByTenantIdAndMaterialTypeAndIsActiveTrue(UUID tenantId, MaterialType materialType);
 
     boolean existsByTenantIdAndId(UUID tenantId, UUID id);
-
-    boolean existsByTenantIdAndMaterialCode(UUID tenantId, String materialCode);
-
-    @Query("SELECT m FROM Material m WHERE m.tenantId = :tenantId AND m.materialName LIKE %:search%")
-    List<Material> searchByName(@Param("tenantId") UUID tenantId, @Param("search") String search);
 
     long countByTenantIdAndIsActiveTrue(UUID tenantId);
 
