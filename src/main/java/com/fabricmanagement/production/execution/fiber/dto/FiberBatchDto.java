@@ -27,6 +27,9 @@ public class FiberBatchDto {
     private String batchCode;
     private String supplierBatchCode;
     private BigDecimal quantity;
+    private BigDecimal reservedQuantity;
+    private BigDecimal consumedQuantity;
+    private BigDecimal availableQuantity;
     private String unit;
     private Instant productionDate;
     private Instant expiryDate;
@@ -49,6 +52,9 @@ public class FiberBatchDto {
             .batchCode(entity.getBatchCode())
             .supplierBatchCode(entity.getSupplierBatchCode())
             .quantity(entity.getQuantity())
+            .reservedQuantity(entity.getReservedQuantity())
+            .consumedQuantity(entity.getConsumedQuantity())
+            .availableQuantity(entity.getAvailableQuantity())
             .unit(entity.getUnit())
             .productionDate(entity.getProductionDate())
             .expiryDate(entity.getExpiryDate())

@@ -2,9 +2,12 @@ package com.fabricmanagement.production.execution.fiber.infra.repository;
 
 import com.fabricmanagement.production.execution.fiber.domain.FiberBatch;
 import com.fabricmanagement.production.execution.fiber.domain.FiberBatchStatus;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,7 +19,8 @@ public interface FiberBatchRepository extends JpaRepository<FiberBatch, UUID> {
     
     List<FiberBatch> findByTenantIdAndIsActiveTrue(UUID tenantId);
     
-    Optional<FiberBatch> findByTenantIdAndId(UUID tenantId, UUID id);
+    @Lock(LockModeType.OPTIMISTIC)
+    Optional<FiberBatch> findByIdAndTenantId(UUID id, UUID tenantId);
     
     List<FiberBatch> findByTenantIdAndFiberId(UUID tenantId, UUID fiberId);
     
@@ -24,6 +28,11 @@ public interface FiberBatchRepository extends JpaRepository<FiberBatch, UUID> {
     
     Optional<FiberBatch> findByTenantIdAndBatchCode(UUID tenantId, String batchCode);
     
+    boolean existsByTenantIdAndBatchCode(UUID tenantId, String batchCode);
+    
     List<FiberBatch> findByTenantIdAndStatus(UUID tenantId, FiberBatchStatus status);
+    
+    List<FiberBatch> findByTenantIdAndFiberIdAndStatusIn(
+        UUID tenantId, UUID fiberId, Collection<FiberBatchStatus> statuses);
 }
 

@@ -38,7 +38,7 @@ public class FiberBatch extends BaseEntity {
     @Column(name = "fiber_id", nullable = false)
     private UUID fiberId;
     
-    @Column(name = "batch_code", nullable = false, unique = true)
+    @Column(name = "batch_code", nullable = false)
     private String batchCode;
     
     @Column(name = "supplier_batch_code")
@@ -46,6 +46,12 @@ public class FiberBatch extends BaseEntity {
     
     @Column(name = "quantity", nullable = false, precision = 15, scale = 3)
     private BigDecimal quantity;
+    
+    @Column(name = "reserved_quantity", nullable = false, precision = 15, scale = 3)
+    private BigDecimal reservedQuantity;
+    
+    @Column(name = "consumed_quantity", nullable = false, precision = 15, scale = 3)
+    private BigDecimal consumedQuantity;
     
     @Column(name = "unit", nullable = false)
     private String unit;
@@ -80,6 +86,8 @@ public class FiberBatch extends BaseEntity {
         batch.setBatchCode(batchCode);
         batch.setSupplierBatchCode(supplierBatchCode);
         batch.setQuantity(quantity);
+        batch.setReservedQuantity(BigDecimal.ZERO);
+        batch.setConsumedQuantity(BigDecimal.ZERO);
         batch.setUnit(unit);
         batch.setProductionDate(productionDate);
         batch.setExpiryDate(expiryDate);
@@ -89,6 +97,47 @@ public class FiberBatch extends BaseEntity {
         batch.onCreate();
         
         return batch;
+    }
+    
+    /**
+     * Get available quantity (quantity - reserved - consumed).
+     */
+    public BigDecimal getAvailableQuantity() {
+        return quantity.subtract(reservedQuantity).subtract(consumedQuantity);
+    }
+    
+    /**
+     * Reserve quantity for production order.
+     */
+    public void reserve(BigDecimal qty) {
+        if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Reservation amount must be positive");
+        }
+        if (getAvailableQuantity().compareTo(qty) < 0) {
+            throw new IllegalStateException("Insufficient available quantity");
+        }
+        this.reservedQuantity = this.reservedQuantity.add(qty);
+        if (this.status == FiberBatchStatus.NEW) {
+            this.status = FiberBatchStatus.RESERVED;
+        }
+        onUpdate();
+    }
+    
+    /**
+     * Release reserved quantity (cancellation).
+     */
+    public void release(BigDecimal qty) {
+        if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Release amount must be positive");
+        }
+        if (this.reservedQuantity.compareTo(qty) < 0) {
+            throw new IllegalStateException("Insufficient reserved quantity");
+        }
+        this.reservedQuantity = this.reservedQuantity.subtract(qty);
+        if (this.reservedQuantity.compareTo(BigDecimal.ZERO) == 0) {
+            this.status = FiberBatchStatus.NEW;
+        }
+        onUpdate();
     }
 
     /**
@@ -116,21 +165,36 @@ public class FiberBatch extends BaseEntity {
     }
 
     /**
-     * Deduct quantity from batch.
+     * Consume quantity from batch (covers both reserved and available).
      */
-    public void deduct(BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Deduction amount must be positive");
+    public void consume(BigDecimal qty) {
+        if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Consumption amount must be positive");
         }
-        if (amount.compareTo(this.quantity) > 0) {
-            throw new IllegalArgumentException("Insufficient quantity in batch");
-        }
-        this.quantity = this.quantity.subtract(amount);
-        onUpdate();
         
-        if (this.quantity.compareTo(BigDecimal.ZERO) == 0) {
-            markDepleted();
+        // First consume from reserved quantity
+        BigDecimal fromReserve = reservedQuantity.min(qty);
+        this.reservedQuantity = this.reservedQuantity.subtract(fromReserve);
+        BigDecimal remaining = qty.subtract(fromReserve);
+        
+        // Check if available quantity is sufficient
+        BigDecimal available = getAvailableQuantity();
+        if (available.compareTo(remaining) < 0) {
+            throw new IllegalStateException("Insufficient available quantity");
         }
+        
+        this.consumedQuantity = this.consumedQuantity.add(qty);
+        
+        // Update status
+        if (this.consumedQuantity.compareTo(this.quantity) == 0) {
+            this.status = FiberBatchStatus.DEPLETED;
+        } else if (this.status == FiberBatchStatus.NEW) {
+            this.status = FiberBatchStatus.IN_USE;
+        } else if (this.status == FiberBatchStatus.RESERVED) {
+            this.status = FiberBatchStatus.IN_USE;
+        }
+        
+        onUpdate();
     }
 
     private static String generateUid(String batchCode) {

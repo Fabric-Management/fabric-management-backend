@@ -10,13 +10,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Service for managing fiber batches.
+ * Service for managing fiber batches with production-ready reservation logic.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,7 +31,7 @@ public class FiberBatchService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Creating fiber batch: tenantId={}, request={}", tenantId, request);
         
-        if (fiberBatchRepository.findByTenantIdAndBatchCode(tenantId, request.getBatchCode()).isPresent()) {
+        if (fiberBatchRepository.existsByTenantIdAndBatchCode(tenantId, request.getBatchCode())) {
             throw new IllegalArgumentException("Batch code already exists");
         }
         
@@ -84,5 +85,63 @@ public class FiberBatchService {
             .map(FiberBatchDto::from)
             .toList();
     }
+    
+    /**
+     * Reserve quantity for a production order.
+     */
+    @Transactional
+    public FiberBatchDto reserve(UUID batchId, BigDecimal quantity) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Reserving batch: tenantId={}, batchId={}, quantity={}", tenantId, batchId, quantity);
+        
+        FiberBatch batch = loadBatchWithLock(batchId, tenantId);
+        batch.reserve(quantity);
+        
+        FiberBatch saved = fiberBatchRepository.save(batch);
+        log.info("Reserved batch: id={}, reservedQty={}, availableQty={}", 
+            saved.getId(), saved.getReservedQuantity(), saved.getAvailableQuantity());
+        
+        return FiberBatchDto.from(saved);
+    }
+    
+    /**
+     * Release reserved quantity (cancellation).
+     */
+    @Transactional
+    public FiberBatchDto release(UUID batchId, BigDecimal quantity) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Releasing batch: tenantId={}, batchId={}, quantity={}", tenantId, batchId, quantity);
+        
+        FiberBatch batch = loadBatchWithLock(batchId, tenantId);
+        batch.release(quantity);
+        
+        FiberBatch saved = fiberBatchRepository.save(batch);
+        log.info("Released batch: id={}, reservedQty={}, availableQty={}", 
+            saved.getId(), saved.getReservedQuantity(), saved.getAvailableQuantity());
+        
+        return FiberBatchDto.from(saved);
+    }
+    
+    /**
+     * Consume quantity from batch (from reserved + available).
+     */
+    @Transactional
+    public FiberBatchDto consume(UUID batchId, BigDecimal quantity) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Consuming batch: tenantId={}, batchId={}, quantity={}", tenantId, batchId, quantity);
+        
+        FiberBatch batch = loadBatchWithLock(batchId, tenantId);
+        batch.consume(quantity);
+        
+        FiberBatch saved = fiberBatchRepository.save(batch);
+        log.info("Consumed from batch: id={}, consumedQty={}, status={}", 
+            saved.getId(), saved.getConsumedQuantity(), saved.getStatus());
+        
+        return FiberBatchDto.from(saved);
+    }
+    
+    private FiberBatch loadBatchWithLock(UUID id, UUID tenantId) {
+        return fiberBatchRepository.findByIdAndTenantId(id, tenantId)
+            .orElseThrow(() -> new IllegalArgumentException("Fiber batch not found: " + id));
+    }
 }
-
