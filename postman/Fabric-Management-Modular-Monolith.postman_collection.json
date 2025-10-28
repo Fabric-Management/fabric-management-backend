@@ -508,11 +508,12 @@
                   "    var viscose = jsonData.data.find(f => f.fiberName.includes('Viscose'));",
                   "    if (cotton) {",
                   "        pm.environment.set('fiber_id_cotton', cotton.id);",
+                  "        pm.environment.set('fiber_category_id', cotton.fiberCategoryId);",
                   "        console.log('✅ Cotton fiber ID:', cotton.id);",
+                  "        console.log('✅ Category ID:', cotton.fiberCategoryId);",
                   "    }",
                   "    if (viscose) {",
                   "        pm.environment.set('fiber_id_viscose', viscose.id);",
-                  "        pm.environment.set('material_id_viscose', viscose.materialId);",
                   "        console.log('✅ Viscose fiber ID:', viscose.id);",
                   "    }",
                   "}"
@@ -689,7 +690,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"materialId\": \"{{material_id_blended}}\",\n  \"fiberCategoryId\": \"{{fiber_category_id_mixed}}\",\n  \"fiberGrade\": \"Premium\",\n  \"remarks\": \"Auto-generated name: Cotton 60% + Viscose 40% Blend\",\n  \"composition\": {\n    \"{{fiber_id_cotton}}\": 60.0,\n    \"{{fiber_id_viscose}}\": 40.0\n  }\n}"
+              "raw": "{\n  \"materialId\": \"{{material_id_blended}}\",\n  \"fiberCategoryId\": \"{{fiber_category_id}}\",\n  \"fiberGrade\": \"Premium\",\n  \"remarks\": \"Auto-generated name: Cotton 60% + Viscose 40% Blend\",\n  \"composition\": {\n    \"{{fiber_id_cotton}}\": 60.0,\n    \"{{fiber_id_viscose}}\": 40.0\n  }\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/production/fibers/blended",
