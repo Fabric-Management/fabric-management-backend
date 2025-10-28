@@ -1,6 +1,8 @@
 -- ============================================================================
 -- V2: Company Module Tables
 -- ============================================================================
+-- Creates company, department, subscription tables
+-- Must run BEFORE user tables (V003)
 -- Company, Department, Subscription, OSDefinition, FeatureCatalog, SubscriptionQuota
 -- Last Updated: 2025-10-25
 -- ============================================================================
