@@ -21,10 +21,10 @@ public class CreateFiberRequest {
     @NotNull(message = "Material ID is required")
     private UUID materialId;
 
-    @NotNull(message = "Category ID is required")
-    private UUID categoryId;
+    @NotNull(message = "Fiber Category ID is required")
+    private UUID fiberCategoryId;
 
-    private UUID isoCodeId;
+    private UUID fiberIsoCodeId;
 
     @NotBlank(message = "Fiber code is required")
     private String fiberCode;

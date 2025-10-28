@@ -14,22 +14,22 @@ public class FiberCreatedEvent extends DomainEvent {
     private final UUID fiberId;
     private final String fiberCode;
     private final String fiberName;
-    private final UUID categoryId;
-    private final UUID isoCodeId;
+    private final UUID fiberCategoryId;
+    private final UUID fiberIsoCodeId;
     
     public FiberCreatedEvent(
             UUID tenantId,
             UUID fiberId,
             String fiberCode,
             String fiberName,
-            UUID categoryId,
-            UUID isoCodeId) {
+            UUID fiberCategoryId,
+            UUID fiberIsoCodeId) {
         super(tenantId, "FIBER_CREATED");
         this.fiberId = fiberId;
         this.fiberCode = fiberCode;
         this.fiberName = fiberName;
-        this.categoryId = categoryId;
-        this.isoCodeId = isoCodeId;
+        this.fiberCategoryId = fiberCategoryId;
+        this.fiberIsoCodeId = fiberIsoCodeId;
     }
 }
 
