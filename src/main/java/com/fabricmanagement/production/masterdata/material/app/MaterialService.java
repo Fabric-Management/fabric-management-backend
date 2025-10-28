@@ -44,23 +44,16 @@ public class MaterialService implements MaterialFacade {
         }
 
         Material material = Material.create(
-            request.getMaterialName(),
             request.getMaterialType(),
-            request.getCategoryId(),
             request.getUnit()
         );
-        
-        material.setMaterialCode(request.getMaterialCode());
-        material.setDescription(request.getDescription());
 
         Material saved = materialRepository.save(material);
 
         eventPublisher.publish(new MaterialCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
-            saved.getMaterialName(),
-            saved.getMaterialType(),
-            saved.getMaterialCode()
+            saved.getMaterialType()
         ));
 
         log.info("✅ Material created: id={}, uid={}", saved.getId(), saved.getUid());

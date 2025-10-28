@@ -15,17 +15,12 @@ import java.util.UUID;
 public class MaterialCreatedEvent extends DomainEvent {
 
     private final UUID materialId;
-    private final String materialName;
     private final MaterialType materialType;
-    private final String materialCode;
 
-    public MaterialCreatedEvent(UUID tenantId, UUID materialId, String materialName, 
-                               MaterialType materialType, String materialCode) {
+    public MaterialCreatedEvent(UUID tenantId, UUID materialId, MaterialType materialType) {
         super(tenantId, "MATERIAL_CREATED");
         this.materialId = materialId;
-        this.materialName = materialName;
         this.materialType = materialType;
-        this.materialCode = materialCode;
     }
 }
 
