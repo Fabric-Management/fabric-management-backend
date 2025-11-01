@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+    <title>Welcome to Fabricode OS</title>
+    <!-- Prevents Outlook from auto-linking email addresses -->
+    <!--[if mso]>
+    <style type="text/css">
+      a { text-decoration: none !important; }
+    </style>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb;">
+    
+    <!-- Container -->
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 0;">
+        
+        <!-- Header -->
+        <div style="background-color: #0f172a; padding: 40px 32px; text-align: center;">
+            <p style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0;">
+                Fabricode OS
+            </p>
+        </div>
+        
+        <!-- Main Content -->
+        <div style="padding: 64px 32px 56px 32px; background-color: #ffffff;">
+            
+            <!-- Heading -->
+            <h1 style="font-size: 24px; font-weight: 700; color: #111827; margin-top: 0; margin-bottom: 12px; text-align: center;">
+                Welcome to Fabricode OS!
+            </h1>
+            
+            <!-- Greeting -->
+            <p style="font-size: 16px; line-height: 1.6; color: #374151; margin-bottom: 12px;">
+                Hello {{firstName}}
+            </p>
+            
+            <!-- Next Steps Card - Gray Box -->
+            <div style="background: #F3F4F6; border-radius: 12px; border: 1px solid #E5E7EB; padding: 24px; margin: 0 0 16px 0; text-align: left; width: 100%; box-sizing: border-box;">
+                
+                <p style="font-size: 16px; line-height: 1.6; color: #374151; margin: 0 0 16px 0;">
+                    Your Fabricode OS account for <strong>{{companyName}}</strong> has been successfully created and activated!
+                </p>
+                
+                <p style="font-size: 16px; line-height: 1.6; color: #374151; margin: 16px 0 0 0;">
+                    You can now start managing your fabric operations, track inventory, and access all the features of your OS platform.
+                </p>
+                
+                {{subscriptionsList}}
+            </div>
+            
+            <!-- Action Button - Same width as gray box -->
+            <div style="width: 100%; margin: 0 0 24px 0; padding: 0;">
+                <a href="{{setupUrl}}" 
+                   style="display: block; width: 100%; background-color: #0f172a; color: #ffffff; 
+                          font-size: 16px; font-weight: 500; padding: 12px 24px; 
+                          border-radius: 8px; text-decoration: none; text-align: center; 
+                          border: none; box-sizing: border-box; margin: 0;">
+                    Go to Dashboard
+                </a>
+            </div>
+            
+            <!-- Support Link - Matches success page format -->
+            <p style="font-size: 14px; line-height: 1.6; color: #6b7280; text-align: center; margin: 0;">
+                Need help? <a href="mailto:support@fabricmanagement.com" 
+                              style="font-weight: 500; color: #111827; text-decoration: underline;">
+                    Contact support@fabricmanagement.com
+                </a>
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style="border-top: 1px solid #e5e7eb; margin: 32px 0;"></div>
+        <div style="padding: 0 32px 32px; text-align: center;">
+            <p style="font-size: 12px; color: #6b7280; margin: 0 0 8px 0;">
+                © 2024 Fabricode OS. All rights reserved.
+            </p>
+            <p style="font-size: 12px; color: #9ca3af; margin: 0 0 8px 0;">
+                This email was sent to you as part of your Fabricode OS account notifications.
+            </p>
+            <!-- Unsubscribe link for email deliverability (Hotmail/Outlook requirement) -->
+            <p style="font-size: 11px; color: #9ca3af; margin: 0;">
+                <a href="mailto:support@fabricmanagement.com?subject=Unsubscribe" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> | 
+                <a href="mailto:support@fabricmanagement.com" style="color: #6b7280; text-decoration: underline;">Contact Support</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

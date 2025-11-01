@@ -4,6 +4,9 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -54,21 +57,6 @@ public class Company extends BaseEntity {
     @Column(name = "tax_id", nullable = false, unique = true, length = 50)
     private String taxId;
 
-    @Column(name = "address", length = 500)
-    private String address;
-
-    @Column(name = "city", length = 100)
-    private String city;
-
-    @Column(name = "country", length = 100)
-    private String country;
-
-    @Column(name = "phone_number", length = 50)
-    private String phoneNumber;
-
-    @Column(name = "email", length = 255)
-    private String email;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "company_type", nullable = false)
     @Builder.Default
@@ -76,6 +64,44 @@ public class Company extends BaseEntity {
 
     @Column(name = "parent_company_id")
     private UUID parentCompanyId;
+
+    @OneToMany(mappedBy = "company", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<com.fabricmanagement.common.platform.communication.domain.CompanyContact> companyContacts = new ArrayList<>();
+
+    @OneToMany(mappedBy = "company", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<com.fabricmanagement.common.platform.communication.domain.CompanyAddress> companyAddresses = new ArrayList<>();
+
+    /**
+     * Get default contact for business communication.
+     */
+    public Optional<com.fabricmanagement.common.platform.communication.domain.Contact> getDefaultContact() {
+        return companyContacts.stream()
+            .filter(cc -> Boolean.TRUE.equals(cc.getIsDefault()))
+            .findFirst()
+            .map(com.fabricmanagement.common.platform.communication.domain.CompanyContact::getContact);
+    }
+
+    /**
+     * Get headquarters address.
+     */
+    public Optional<com.fabricmanagement.common.platform.communication.domain.Address> getHeadquartersAddress() {
+        return companyAddresses.stream()
+            .filter(ca -> Boolean.TRUE.equals(ca.getIsHeadquarters()))
+            .findFirst()
+            .map(com.fabricmanagement.common.platform.communication.domain.CompanyAddress::getAddress);
+    }
+
+    /**
+     * Get primary address.
+     */
+    public Optional<com.fabricmanagement.common.platform.communication.domain.Address> getPrimaryAddress() {
+        return companyAddresses.stream()
+            .filter(ca -> Boolean.TRUE.equals(ca.getIsPrimary()))
+            .findFirst()
+            .map(com.fabricmanagement.common.platform.communication.domain.CompanyAddress::getAddress);
+    }
 
     public CompanyCategory getCategory() {
         return this.companyType.getCategory();
@@ -105,12 +131,9 @@ public class Company extends BaseEntity {
         return this.parentCompanyId != null;
     }
 
-    public void update(String companyName, String taxId, String address, String city, String country) {
+    public void update(String companyName, String taxId) {
         this.companyName = companyName;
         this.taxId = taxId;
-        this.address = address;
-        this.city = city;
-        this.country = country;
     }
 
     @Override

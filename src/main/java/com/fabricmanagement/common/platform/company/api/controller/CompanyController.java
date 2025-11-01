@@ -3,8 +3,10 @@ package com.fabricmanagement.common.platform.company.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.company.app.CompanyService;
 import com.fabricmanagement.common.platform.company.app.SubscriptionService;
+import com.fabricmanagement.common.platform.company.domain.CompanyCategory;
 import com.fabricmanagement.common.platform.company.domain.CompanyType;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
+import com.fabricmanagement.common.platform.company.dto.CompanyTypeDto;
 import com.fabricmanagement.common.platform.company.dto.CreateCompanyRequest;
 import com.fabricmanagement.common.platform.company.dto.SubscriptionDto;
 import jakarta.validation.Valid;
@@ -99,6 +101,76 @@ public class CompanyController {
         SubscriptionDto activated = subscriptionService.activateSubscription(subscriptionId);
 
         return ResponseEntity.ok(ApiResponse.success(activated, "Subscription activated successfully"));
+    }
+
+    /**
+     * Get all company types (for dropdowns, forms, etc.).
+     * 
+     * <p><b>Public endpoint</b> - No authentication required (useful for signup forms)</p>
+     * 
+     * <p>Returns all company types with metadata (category, tenant status, suggested OS).</p>
+     */
+    @GetMapping("/types")
+    public ResponseEntity<ApiResponse<List<CompanyTypeDto>>> getCompanyTypes() {
+        log.debug("Getting all company types");
+
+        List<CompanyTypeDto> types = List.of(CompanyType.values())
+            .stream()
+            .map(CompanyTypeDto::from)
+            .toList();
+
+        return ResponseEntity.ok(ApiResponse.success(types));
+    }
+
+    /**
+     * Get tenant company types only (for self-service signup).
+     * 
+     * <p><b>Public endpoint</b> - No authentication required</p>
+     * 
+     * <p>Returns only company types that can be platform tenants.
+     * Perfect for signup forms where users select their company type.</p>
+     * 
+     * @return List of tenant company types (6 types)
+     */
+    @GetMapping("/types/tenant")
+    public ResponseEntity<ApiResponse<List<CompanyTypeDto>>> getTenantCompanyTypes() {
+        log.debug("Getting tenant company types only");
+
+        List<CompanyTypeDto> tenantTypes = List.of(CompanyType.values())
+            .stream()
+            .filter(CompanyType::isTenant)
+            .map(CompanyTypeDto::from)
+            .toList();
+
+        return ResponseEntity.ok(ApiResponse.success(tenantTypes, 
+            "Found " + tenantTypes.size() + " tenant company types"));
+    }
+
+    /**
+     * Get company types by category.
+     * 
+     * <p><b>Public endpoint</b> - No authentication required</p>
+     * 
+     * <p>Filter company types by category (TENANT, SUPPLIER, SERVICE_PROVIDER, PARTNER, CUSTOMER).</p>
+     * 
+     * @param category Company category
+     * @return List of company types in the specified category
+     */
+    @GetMapping("/types/category/{category}")
+    public ResponseEntity<ApiResponse<List<CompanyTypeDto>>> getCompanyTypesByCategory(
+            @PathVariable String category) {
+        log.debug("Getting company types by category: {}", category);
+
+        CompanyCategory companyCategory = CompanyCategory.valueOf(category.toUpperCase());
+        
+        List<CompanyTypeDto> types = List.of(CompanyType.values())
+            .stream()
+            .filter(type -> type.getCategory() == companyCategory)
+            .map(CompanyTypeDto::from)
+            .toList();
+
+        return ResponseEntity.ok(ApiResponse.success(types, 
+            "Found " + types.size() + " company types in category " + category));
     }
 }
 

@@ -11,6 +11,7 @@ CREATE SCHEMA IF NOT EXISTS common_user;
 CREATE SCHEMA IF NOT EXISTS common_auth;
 CREATE SCHEMA IF NOT EXISTS common_policy;
 CREATE SCHEMA IF NOT EXISTS common_audit;
+CREATE SCHEMA IF NOT EXISTS common_communication;
 
 -- Create sequence for UID generation
 -- Pattern: {TENANT_UID}-{MODULE}-{SEQUENCE}
@@ -27,6 +28,7 @@ COMMENT ON SCHEMA common_user IS 'User management';
 COMMENT ON SCHEMA common_auth IS 'Authentication, verification codes, refresh tokens';
 COMMENT ON SCHEMA common_policy IS 'Policy definitions, access control rules';
 COMMENT ON SCHEMA common_audit IS 'Audit trail, compliance logging';
+COMMENT ON SCHEMA common_communication IS 'Communication infrastructure: contacts, addresses, notifications';
 
 -- ============================================================================
 -- TABLE: event_publication (Spring Modulith Events)

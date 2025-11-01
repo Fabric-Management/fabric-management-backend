@@ -1,188 +1,361 @@
-# 🏭 EXECUTION - Fiber Batch Module
+# 🏭 Fiber Batch Execution Module
 
 **Location:** `production/execution/fiber`  
-**Purpose:** Track physical fiber batches/lots for production inventory
+**Status:** ✅ PRODUCTION-READY  
+**Last Updated:** 2025-10-28
 
 ---
 
-## 📋 MODULE OVERVIEW
+## 📋 OVERVIEW
 
-**Fiber Batch** represents the **physical reality** of fiber inventory, not just the definition.
+The **Fiber Batch** module tracks physical fiber inventory (batches/lots) for production.
 
-### **Key Difference:**
+### Key Concept
 
-| Aspect          | Masterdata Fiber             | Execution Batch                  |
-| --------------- | ---------------------------- | -------------------------------- |
-| **Purpose**     | What is fiber? (definition)  | How much fiber? (inventory)      |
-| **Example**     | "Cotton 60% + Viscose 40%"   | "500 kg Cotton - BATCH-2025-001" |
-| **Granularity** | Type-level                   | Lot-level                        |
-| **Tracking**    | Composition, attributes      | Quantity, location, status       |
-| **Lifecycle**   | Created once, rarely changed | Frequently updated (deductions)  |
+```
+Fiber (Masterdata)  = "Cotton 60% + Viscose 40%" definition
+Fiber Batch         = "500 kg of Cotton batch received on 2025-01-15"
+```
 
 ---
 
 ## 🏗️ ARCHITECTURE
 
-### **Domain Model:**
+### Domain Model
 
 ```java
 FiberBatch {
-    fiberId: UUID              // Links to Fiber (masterdata)
-    batchCode: "BATCH-2025-001" // Unique batch identifier
-    supplierBatchCode: String   // Supplier's batch code
-    quantity: BigDecimal        // Available quantity (15,3 precision)
-    unit: String                // kg, lbs, etc.
-    status: FiberBatchStatus   // NEW → RESERVED → IN_USE → DEPLETED
-    warehouseLocation: String   // WH-A-01
-    productionDate: Instant
-    expiryDate: Instant
+    fiberId: UUID                      // Links to Fiber masterdata
+    batchCode: "BATCH-2025-001"       // Unique batch identifier
+    supplierBatchCode: String         // Supplier's batch code
+    quantity: 500.000                 // Total quantity (DECIMAL 15,3)
+    reservedQuantity: 100.000         // Reserved for production orders
+    consumedQuantity: 50.000          // Already consumed in production
+    unit: "kg"                        // Measurement unit
+    status: FiberBatchStatus          // NEW → RESERVED → IN_USE → DEPLETED
+    warehouseLocation: "WH-A-01"      // Physical location
+    productionDate: Instant           // When batch was produced
+    expiryDate: Instant               // Expiry date
 }
 ```
 
-### **Status Lifecycle:**
+### Quantity Tracking
 
 ```
-┌─────┐    markInUse()     ┌──────┐
-│ NEW │──────────────────►  │IN_USE│
-└─────┘                      └──────┘
-                             │     │
-                             │     │ deduct() → quantity = 0
-                             │     │
-                             ▼     ▼
-                          ┌──────────┐
-                          │ DEPLETED │
-                          └──────────┘
+availableQuantity = quantity - reservedQuantity - consumedQuantity
+
+Example:
+- Total: 500 kg
+- Reserved: 100 kg
+- Consumed: 50 kg
+- Available: 350 kg
 ```
+
+---
+
+## 🔄 STATUS LIFECYCLE
+
+```
+┌─────┐    reserve()       ┌──────────┐    markInUse()     ┌────────┐
+│ NEW │──────────────────► │ RESERVED │──────────────────► │IN_USE │
+└─────┘                      └──────────┘                    └────┬───┘
+                                                                 │
+                                               consume() → quantity = 0
+                                                                 │
+                                                                 ▼
+                                                           ┌──────────┐
+                                                           │ DEPLETED │
+                                                           └──────────┘
+```
+
+### Status Transitions
+
+| From     | To       | Method        | Trigger                  |
+| -------- | -------- | ------------- | ------------------------ |
+| NEW      | RESERVED | `reserve()`   | Reserve for production   |
+| RESERVED | NEW      | `release()`   | Cancel reservation       |
+| NEW      | IN_USE   | `markInUse()` | Start using immediately  |
+| RESERVED | IN_USE   | `consume()`   | Start consuming reserved |
+| IN_USE   | DEPLETED | `consume()`   | All quantity consumed    |
 
 ---
 
 ## 🔧 KEY OPERATIONS
 
-### **1. Create Batch**
+### 1. Create Batch
 
-```java
-// When receiving fiber from supplier
+```http
 POST /api/production/batches/fiber
+
 {
-  "fiberId": "uuid-of-cotton-fiber",
+  "fiberId": "uuid-of-fiber",
   "batchCode": "BATCH-2025-001",
   "supplierBatchCode": "SUP-12345",
   "quantity": 500.000,
   "unit": "kg",
-  "warehouseLocation": "WH-A-01"
+  "warehouseLocation": "WH-A-01",
+  "productionDate": "2025-01-15T00:00:00Z",
+  "expiryDate": "2026-01-15T00:00:00Z",
+  "remarks": "High-grade cotton"
 }
 ```
 
-### **2. List Batches**
+### 2. Reserve Quantity
 
-```java
-// Get all active batches for current tenant
+Prevents race conditions when multiple production orders compete for the same batch.
+
+```http
+POST /api/production/batches/{batchId}/reserve
+
+{
+  "quantity": 100.000
+}
+```
+
+**Business Rules:**
+
+- Cannot reserve more than available quantity
+- Status changes: NEW → RESERVED
+- Uses optimistic locking to prevent concurrent updates
+
+### 3. Release Reserved Quantity
+
+Cancels a previous reservation (e.g., production order cancelled).
+
+```http
+POST /api/production/batches/{batchId}/release
+
+{
+  "quantity": 50.000
+}
+```
+
+**Business Rules:**
+
+- Cannot release more than reserved
+- Status changes: RESERVED → NEW (if all released)
+
+### 4. Consume Quantity
+
+Actually uses the fiber in production. Consumes from reserved first, then available.
+
+```http
+POST /api/production/batches/{batchId}/consume
+
+{
+  "quantity": 150.000
+}
+```
+
+**Business Rules:**
+
+- First consumes from reserved quantity
+- Then consumes from available quantity
+- Status auto-updates: DEPLETED when consumed = quantity
+- Cannot consume more than available
+
+### 5. List Batches
+
+```http
 GET /api/production/batches/fiber
+
+Response:
+[
+  {
+    "id": "uuid",
+    "fiberId": "uuid",
+    "batchCode": "BATCH-2025-001",
+    "quantity": 500.000,
+    "reservedQuantity": 100.000,
+    "consumedQuantity": 50.000,
+    "availableQuantity": 350.000,
+    "unit": "kg",
+    "status": "IN_USE",
+    "warehouseLocation": "WH-A-01",
+    "productionDate": "2025-01-15T00:00:00Z",
+    "expiryDate": "2026-01-15T00:00:00Z"
+  }
+]
 ```
 
-### **3. Use Fiber in Production**
+### 6. Get Batches by Fiber
 
-```java
-// Deduct quantity from batch
-batch.deduct(new BigDecimal("100")); // Use 100 kg
-// Status automatically changes to DEPLETED if quantity = 0
-```
+```http
+GET /api/production/batches/fiber/fiber/{fiberId}
 
-### **4. Mark as In Use**
-
-```java
-// Reserve batch for production order
-batch.markInUse(); // Status: NEW → IN_USE
+Response: List of all batches for a specific fiber
 ```
 
 ---
 
-## 📊 DATABASE SCHEMA
+## 🗄️ DATABASE SCHEMA
 
 ```sql
 CREATE TABLE production.production_execution_fiber_batch (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
-    uid VARCHAR(100) UNIQUE NOT NULL,
-    fiber_id UUID NOT NULL,           -- FK to prod_fiber
-    batch_code VARCHAR(100) UNIQUE,    -- "BATCH-2025-001"
+    uid VARCHAR(100) NOT NULL,
+    fiber_id UUID NOT NULL,
+    batch_code VARCHAR(100) NOT NULL,
     supplier_batch_code VARCHAR(100),
-    quantity DECIMAL(15,3) NOT NULL,    -- Precision: 15,3
-    unit VARCHAR(20) NOT NULL,         -- kg, lbs
-    production_date TIMESTAMP,
-    expiry_date TIMESTAMP,
-    status VARCHAR(20) NOT NULL,       -- NEW, RESERVED, IN_USE, DEPLETED
+    quantity DECIMAL(15,3) NOT NULL,
+    reserved_quantity DECIMAL(15,3) NOT NULL DEFAULT 0,
+    consumed_quantity DECIMAL(15,3) NOT NULL DEFAULT 0,
+    unit VARCHAR(20) NOT NULL,
+    production_date TIMESTAMPTZ,
+    expiry_date TIMESTAMPTZ,
+    status VARCHAR(20) NOT NULL,  -- NEW, RESERVED, IN_USE, DEPLETED
     warehouse_location VARCHAR(100),
     remarks TEXT,
-    is_active BOOLEAN NOT NULL,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    version BIGINT NOT NULL
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ,
+    version BIGINT NOT NULL,
+
+    CONSTRAINT fk_batch_fiber FOREIGN KEY (fiber_id) REFERENCES production.prod_fiber(id),
+    CONSTRAINT uq_batch_tenant_code UNIQUE (tenant_id, batch_code),
+    CONSTRAINT uq_batch_tenant_uid UNIQUE (tenant_id, uid),
+    CONSTRAINT ck_qty_nonneg CHECK (quantity >= 0 AND reserved_quantity >= 0 AND consumed_quantity >= 0),
+    CONSTRAINT ck_qty_bounds CHECK (reserved_quantity + consumed_quantity <= quantity)
 );
+
+CREATE INDEX idx_batch_tenant_fiber_status ON production.production_execution_fiber_batch (tenant_id, fiber_id, status);
+CREATE INDEX idx_batch_tenant_loc_status ON production.production_execution_fiber_batch (tenant_id, warehouse_location, status);
+```
+
+### Key Constraints
+
+- **Tenant Isolation:** All queries filtered by `tenant_id`
+- **Unique Batch Code:** `UNIQUE (tenant_id, batch_code)` per tenant
+- **Quantity Integrity:** `reserved + consumed ≤ total`
+- **Optimistic Locking:** `version` field prevents concurrent update conflicts
+
+---
+
+## 🎯 USAGE SCENARIOS
+
+### Scenario 1: Create and Reserve Batch
+
+```
+1. Warehouse receives 500 kg of "Cotton 100%" from supplier
+2. Create batch: BATCH-2025-001
+3. Production order needs 200 kg → RESERVE 200 kg
+4. Batch status: RESERVED
+5. Available: 300 kg (500 - 200 reserved)
+```
+
+### Scenario 2: Consume Reserved Quantity
+
+```
+1. Batch: 500 kg total, 200 kg reserved, 0 consumed
+2. Production consumes: 150 kg
+3. From reserved: 150 kg
+4. Reserved: 50 kg remaining
+5. Status: IN_USE (not depleted yet)
+```
+
+### Scenario 3: Batch Depleted
+
+```
+1. Batch: 500 kg total, 200 reserved, 300 consumed
+2. Production needs: 200 kg more
+3. Consume: 150 kg from reserved + 50 kg from available
+4. Consumed: 500 kg (all)
+5. Status: DEPLETED (automatic)
 ```
 
 ---
 
-## 🎯 USAGE SCENARIO
+## 🔐 SECURITY & MULTI-TENANCY
 
-### **Scenario: Production Order Needs Fiber**
+### Tenant Isolation
 
-1. **Order Created:** Need 200 kg of "Cotton 60% + Viscose 40%"
-2. **Find Batch:** System finds batch with 500 kg available
-3. **Reserve:** Mark batch as IN_USE
-4. **Deduct:** Deduct 200 kg → batch now has 300 kg
-5. **Status:** Batch still IN_USE (quantity > 0)
+All operations filtered by `tenantId`:
 
-### **Scenario: Batch Depleted**
+```java
+UUID tenantId = TenantContext.getCurrentTenantId();
+fiberBatchRepository.findByTenantIdAndBatchCode(tenantId, batchCode);
+```
 
-1. **Production:** Need 200 kg more
-2. **Deduct:** batch has 200 kg remaining
-3. **Deduct 200 kg:** quantity becomes 0
-4. **Auto Status:** Status automatically changes to DEPLETED
+### Roles
+
+- `ADMIN` - Full access
+- `PRODUCTION_MANAGER` - Create, reserve, consume batches
+- `WAREHOUSE_MANAGER` - Create and read batches
 
 ---
 
-## 🔐 SECURITY
+## 🛡️ EXCEPTION HANDLING
 
-### **Roles:**
+### Custom Exceptions
 
-- `ADMIN` - Full access
-- `PRODUCTION_MANAGER` - Create and manage batches
-- `WAREHOUSE_MANAGER` - Read-only access
+```java
+NotFoundException         // Batch not found (404)
+DomainException           // Business rule violation (400)
+IllegalStateException     // Status transition invalid (409)
+```
 
-### **Tenant Isolation:**
+### Error Responses
 
-All queries filtered by `tenantId` from `TenantContext`
+```json
+{
+  "success": false,
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Insufficient available quantity: 350.000 kg < 400.000 kg"
+  },
+  "timestamp": "2025-10-28T15:30:00.000Z"
+}
+```
 
 ---
 
 ## 🚀 FUTURE ENHANCEMENTS
 
-1. **Batch Splitting:** Split one batch into multiple lots
-2. **Batch Merging:** Merge multiple batches (same fiber)
-3. **Quality Tracking:** Link to quality test results
-4. **Cost Tracking:** Track cost per batch
-5. **Supplier Integration:** Auto-create batches from PO receipts
-6. **Expiry Alerts:** Notify when batch nearing expiry
+1. **Split Batch** - Divide one batch into multiple lots
+2. **Merge Batches** - Combine batches of same fiber
+3. **Quality Tracking** - Link to quality test results
+4. **Cost Tracking** - FIFO/LIFO/Moving Average cost calculation
+5. **Supplier Integration** - Auto-create from PO receipts
+6. **Expiry Alerts** - Notify when batch nearing expiry
+7. **Audit Trail** - Track all quantity changes
 
 ---
 
-## 📝 FILE STRUCTURE
+## 📁 FILE STRUCTURE
 
 ```
 execution/fiber/
 ├── domain/
-│   ├── FiberBatch.java           # Main entity
-│   └── FiberBatchStatus.java    # Enum
+│   ├── FiberBatch.java           # Main entity with business logic
+│   └── FiberBatchStatus.java     # NEW, RESERVED, IN_USE, DEPLETED
 ├── dto/
 │   ├── CreateFiberBatchRequest.java
-│   └── FiberBatchDto.java
+│   ├── FiberBatchDto.java        # Includes availableQuantity
+│   └── ReserveRequest.java
 ├── app/
-│   └── FiberBatchService.java   # Business logic
+│   └── FiberBatchService.java   # Business logic with optimistic locking
 ├── infra/
 │   └── repository/
-│       └── FiberBatchRepository.java
+│       └── FiberBatchRepository.java  # @Lock(LockModeType.OPTIMISTIC)
 └── api/
     └── controller/
         └── FiberBatchController.java
 ```
+
+---
+
+## ✅ PRODUCTION-READY FEATURES
+
+- ✅ Reserved quantity tracking (prevents over-booking)
+- ✅ Optimistic locking (prevents race conditions)
+- ✅ Tenant-scoped unique constraints
+- ✅ Status-based lifecycle management
+- ✅ Automatic depletion when consumed = quantity
+- ✅ Exception handling with clear error messages
+- ✅ UID generation for external traceability
+- ✅ Audit fields (created_at, updated_at, version)
+
+---
+
+**Next:** Implement Yarn Batch Execution module (similar pattern)

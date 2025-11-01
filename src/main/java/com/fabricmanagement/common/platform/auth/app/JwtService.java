@@ -54,7 +54,12 @@ public class JwtService {
     }
 
     public String generateAccessToken(User user) {
-        log.debug("Generating access token for user: {}", user.getContactValue());
+        // Get primary contact for JWT subject
+        String contactValue = user.getPrimaryContact()
+            .map(contact -> contact.getContactValue())
+            .orElseThrow(() -> new IllegalArgumentException("User has no authentication contact"));
+
+        log.debug("Generating access token for user: {}", contactValue);
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("tenant_id", user.getTenantId().toString());
@@ -62,10 +67,24 @@ public class JwtService {
         claims.put("user_id", user.getId().toString());
         claims.put("user_uid", user.getUid());
         claims.put("company_id", user.getCompanyId().toString());
-        claims.put("department", user.getDepartment());
+        // Add first and last name
+        claims.put("firstName", user.getFirstName());
+        claims.put("lastName", user.getLastName());
+        // Get primary department from UserDepartment junction
+        String department = user.getUserDepartments().stream()
+            .filter(ud -> Boolean.TRUE.equals(ud.getIsPrimary()))
+            .findFirst()
+            .map(ud -> ud.getDepartment().getDepartmentName())
+            .orElse(null);
+        claims.put("department", department);
+        // Add role_id to JWT
+        if (user.getRole() != null) {
+            claims.put("role_id", user.getRole().getId().toString());
+            claims.put("role", user.getRole().getRoleName());
+        }
 
         return Jwts.builder()
-            .subject(user.getContactValue())
+            .subject(contactValue)
             .claims(claims)
             .issuedAt(Date.from(Instant.now()))
             .expiration(Date.from(Instant.now().plusMillis(accessTokenExpiration)))
@@ -74,47 +93,37 @@ public class JwtService {
     }
 
     public String generateRefreshToken(User user) {
-        log.debug("Generating refresh token for user: {}", user.getContactValue());
+        String contactValue = user.getPrimaryContact()
+            .map(contact -> contact.getContactValue())
+            .orElseThrow(() -> new IllegalArgumentException("User has no authentication contact"));
+
+        log.debug("Generating refresh token for user: {}", contactValue);
 
         return UUID.randomUUID().toString();
     }
 
     /**
      * Generate access token from UserDto (overload for DTO).
+     * <p>Note: UserDto should be created from User entity that has contacts/departments loaded.</p>
      *
-     * @param userDto User DTO
+     * @param userDto User DTO (must have contactValue and department populated from entity)
      * @return JWT access token
      */
     public String generateAccessToken(UserDto userDto) {
-        log.debug("Generating access token for user DTO: {}", userDto.getContactValue());
-
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("tenant_id", userDto.getTenantId().toString());
-        claims.put("tenant_uid", extractTenantUid(userDto.getUid()));
-        claims.put("user_id", userDto.getId().toString());
-        claims.put("user_uid", userDto.getUid());
-        claims.put("company_id", userDto.getCompanyId().toString());
-        claims.put("department", userDto.getDepartment());
-
-        return Jwts.builder()
-            .subject(userDto.getContactValue())
-            .claims(claims)
-            .issuedAt(Date.from(Instant.now()))
-            .expiration(Date.from(Instant.now().plusMillis(accessTokenExpiration)))
-            .signWith(secretKey)
-            .compact();
+        // UserDto no longer has contactValue - should use User entity directly
+        // This method kept for backward compatibility but should use User entity version
+        throw new UnsupportedOperationException(
+            "Use generateAccessToken(User) instead. UserDto no longer includes contactValue/department fields.");
     }
 
     /**
      * Generate refresh token from UserDto (overload for DTO).
-     *
-     * @param userDto User DTO
-     * @return Refresh token string
+     * <p>Note: Should use User entity directly instead.</p>
      */
     public String generateRefreshToken(UserDto userDto) {
-        log.debug("Generating refresh token for user DTO: {}", userDto.getContactValue());
-
-        return UUID.randomUUID().toString();
+        // UserDto no longer has contactValue - should use User entity directly
+        throw new UnsupportedOperationException(
+            "Use generateRefreshToken(User) instead. UserDto no longer includes contactValue field.");
     }
 
     public boolean validateToken(String token) {

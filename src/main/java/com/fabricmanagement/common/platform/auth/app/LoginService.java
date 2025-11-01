@@ -12,6 +12,7 @@ import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class LoginService {
     private final AuthUserRepository authUserRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserFacade userFacade;
+    private final UserRepository userRepository;
     private final CompanyFacade companyFacade;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -94,12 +96,13 @@ public class LoginService {
             throw new IllegalArgumentException("User account is deactivated");
         }
 
-        String accessToken = jwtService.generateAccessToken(
-            convertToUserEntity(user)
-        );
-        String refreshToken = jwtService.generateRefreshToken(
-            convertToUserEntity(user)
-        );
+        // Get User entity with contacts/departments loaded for JWT generation
+        com.fabricmanagement.common.platform.user.domain.User userEntity = 
+            userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
+
+        String accessToken = jwtService.generateAccessToken(userEntity);
+        String refreshToken = jwtService.generateRefreshToken(userEntity);
 
         RefreshToken refreshTokenEntity = RefreshToken.create(
             user.getId(),
@@ -111,10 +114,15 @@ public class LoginService {
         authUser.recordSuccessfulLogin();
         authUserRepository.save(authUser);
 
+        // Get contact value from Contact entity
+        String contactValue = userEntity.getPrimaryContact()
+            .map(contact -> contact.getContactValue())
+            .orElse(request.getContactValue());
+
         eventPublisher.publish(new UserLoginEvent(
             user.getTenantId(),
             user.getId(),
-            user.getContactValue(),
+            contactValue,
             ipAddress
         ));
 
@@ -128,24 +136,6 @@ public class LoginService {
             .build();
     }
 
-    private com.fabricmanagement.common.platform.user.domain.User convertToUserEntity(UserDto dto) {
-        com.fabricmanagement.common.platform.user.domain.User user = 
-            com.fabricmanagement.common.platform.user.domain.User.builder()
-                .firstName(dto.getFirstName())
-                .lastName(dto.getLastName())
-                .contactValue(dto.getContactValue())
-                .contactType(dto.getContactType())
-                .companyId(dto.getCompanyId())
-                .department(dto.getDepartment())
-                .build();
-        
-        user.setId(dto.getId());
-        user.setTenantId(dto.getTenantId());
-        user.setUid(dto.getUid());
-        user.setIsActive(dto.getIsActive());
-        
-        return user;
-    }
 
     /**
      * Create context-aware user not found exception.
