@@ -776,6 +776,244 @@
       ]
     },
     {
+      "name": "🏭 Production - Fiber Batches",
+      "item": [
+        {
+          "name": "Create Fiber Batch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.environment.set('batch_id', jsonData.data.id);",
+                  "    console.log('✅ Batch created:', jsonData.data.batchCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fiberId\": \"{{fiber_id_cotton}}\",\n  \"batchCode\": \"BATCH-2025-001\",\n  \"supplierBatchCode\": \"SUP-12345\",\n  \"quantity\": 500.000,\n  \"unit\": \"kg\",\n  \"warehouseLocation\": \"WH-A-01\",\n  \"remarks\": \"High-grade cotton batch\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/batches/fiber",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "batches", "fiber"]
+            }
+          }
+        },
+        {
+          "name": "Get All Batches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/batches/fiber",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "batches", "fiber"]
+            }
+          }
+        },
+        {
+          "name": "Get Batch by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/batches/fiber/{{batch_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "production", "batches", "fiber", "{{batch_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Batches by Fiber ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/production/batches/fiber/fiber/{{fiber_id_cotton}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "production",
+                "batches",
+                "fiber",
+                "fiber",
+                "{{fiber_id_cotton}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1️⃣ Reserve Quantity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "console.log('✅ Reserved:', jsonData.data.reservedQuantity, 'kg');",
+                  "console.log('Available:', jsonData.data.availableQuantity, 'kg');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 200.000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/batches/fiber/{{batch_id}}/reserve",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "production",
+                "batches",
+                "fiber",
+                "{{batch_id}}",
+                "reserve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2️⃣ Consume Quantity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "console.log('✅ Consumed:', jsonData.data.consumedQuantity, 'kg');",
+                  "console.log('Status:', jsonData.data.status);",
+                  "console.log('Available:', jsonData.data.availableQuantity, 'kg');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 150.000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/batches/fiber/{{batch_id}}/consume",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "production",
+                "batches",
+                "fiber",
+                "{{batch_id}}",
+                "consume"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3️⃣ Release Reserved Quantity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "console.log('✅ Released. Reserved:', jsonData.data.reservedQuantity, 'kg');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 50.000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/production/batches/fiber/{{batch_id}}/release",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "production",
+                "batches",
+                "fiber",
+                "{{batch_id}}",
+                "release"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "📜 Policy Management",
       "item": [
         {

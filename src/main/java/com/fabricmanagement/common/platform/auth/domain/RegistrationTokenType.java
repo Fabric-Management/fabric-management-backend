@@ -28,10 +28,13 @@ public enum RegistrationTokenType {
      *
      * <p>Flow:</p>
      * <pre>
-     * User signs up → Email sent with token + code
-     * → User clicks link → Enters code + password
+     * User signs up → Email sent with token
+     * → User clicks link → Password setup (email verified by click)
      * → Auto-login → Onboarding wizard
      * </pre>
+     * 
+     * <p><b>Note:</b> No verification code needed - email link click verifies ownership.
+     * Verification codes are only used for unverified contacts during login flows.</p>
      */
     SELF_SERVICE
 }

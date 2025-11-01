@@ -4,19 +4,29 @@ import com.fabricmanagement.common.platform.communication.domain.strategy.EmailS
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
- * Notification Service - Send notifications via email.
+ * Notification Service - Send notifications via email (async for better UX).
  *
- * <p>Simple email notification service for user communications.</p>
+ * <p>Email sending is asynchronous to prevent blocking user requests.
+ * Users get immediate response while email is sent in background.</p>
  *
  * <h2>Usage:</h2>
  * <pre>{@code
+ * // Async (default) - doesn't block user response
  * notificationService.sendNotification(
  *     "user@example.com",
  *     "Welcome to FabricOS",
  *     "Your account has been created..."
+ * );
+ * 
+ * // Sync (for critical emails that must be sent before response)
+ * notificationService.sendNotificationSync(
+ *     "user@example.com",
+ *     "Security Alert",
+ *     "Your password was changed..."
  * );
  * }</pre>
  */
@@ -28,14 +38,18 @@ public class NotificationService {
     private final EmailStrategy emailStrategy;
 
     /**
-     * Send notification via email (synchronous for now).
+     * Send notification via email (async - doesn't block user response).
+     * 
+     * <p>Performance: Non-blocking async execution ensures fast user responses.
+     * Email sending happens in background thread pool.</p>
      *
      * @param recipient Email address
      * @param subject Email subject
      * @param message Email body
      */
+    @Async
     public void sendNotification(String recipient, String subject, String message) {
-        log.info("Sending notification to: {}", PiiMaskingUtil.maskEmail(recipient));
+        log.info("Sending notification (async) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
         try {
             emailStrategy.sendEmail(recipient, subject, message);

@@ -1,9 +1,12 @@
 package com.fabricmanagement.common.platform.company.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.common.platform.user.domain.UserDepartment;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -51,6 +54,14 @@ public class Department extends BaseEntity {
 
     @Column(name = "manager_id")
     private UUID managerId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_category_id")
+    private DepartmentCategory departmentCategory;
+
+    @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, orphanRemoval = false)
+    @Builder.Default
+    private List<UserDepartment> userDepartments = new ArrayList<>();
 
     public static Department create(UUID companyId, String departmentName, String description) {
         return Department.builder()

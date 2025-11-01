@@ -21,11 +21,6 @@ public class CompanyDto {
     private String uid;
     private String companyName;
     private String taxId;
-    private String address;
-    private String city;
-    private String country;
-    private String phoneNumber;
-    private String email;
     private CompanyType companyType;
     private UUID parentCompanyId;
     private Boolean isActive;
@@ -40,11 +35,6 @@ public class CompanyDto {
             .uid(company.getUid())
             .companyName(company.getCompanyName())
             .taxId(company.getTaxId())
-            .address(company.getAddress())
-            .city(company.getCity())
-            .country(company.getCountry())
-            .phoneNumber(company.getPhoneNumber())
-            .email(company.getEmail())
             .companyType(company.getCompanyType())
             .parentCompanyId(company.getParentCompanyId())
             .isActive(company.getIsActive())

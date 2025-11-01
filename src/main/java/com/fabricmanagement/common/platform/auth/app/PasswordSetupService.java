@@ -10,6 +10,8 @@ import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserReposi
 import com.fabricmanagement.common.platform.auth.infra.repository.RegistrationTokenRepository;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.platform.communication.app.UserContactService;
+import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 /**
  * Password Setup Service - Complete registration with secure token.
@@ -43,6 +47,8 @@ public class PasswordSetupService {
     private final RegistrationTokenRepository tokenRepository;
     private final AuthUserRepository authUserRepository;
     private final UserFacade userFacade;
+    private final UserRepository userRepository;
+    private final UserContactService userContactService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
@@ -53,15 +59,20 @@ public class PasswordSetupService {
     /**
      * Complete password setup using secure token.
      *
-     * <p><b>Simple flow:</b> Token only (email verified by click)</p>
-     * <p>No verification code needed - email link click proves ownership.</p>
+     * <p><b>Two flows supported:</b></p>
+     * <ul>
+     *   <li><b>Sales-led:</b> Token only (email verified by click)</li>
+     *   <li><b>Self-service:</b> Token + verification code (double security)</li>
+     * </ul>
      *
      * @param request Password setup request
      * @return Login response with tokens and onboarding status
      */
     @Transactional
     public LoginResponse setupPassword(PasswordSetupRequest request) {
-        log.info("Password setup initiated: token={}", request.getToken().substring(0, 8) + "...");
+        log.info("Password setup initiated: token={}..., tokenType={}",
+            request.getToken().substring(0, Math.min(8, request.getToken().length())),
+            "checking...");
 
         RegistrationToken token = tokenRepository.findByToken(request.getToken())
             .orElseThrow(() -> new IllegalArgumentException("Invalid registration token"));
@@ -71,6 +82,12 @@ public class PasswordSetupService {
             throw new IllegalArgumentException("Registration token is invalid or expired");
         }
 
+        log.debug("Token type: {}", token.getTokenType());
+
+        // Both SALES_LED and SELF_SERVICE tokens work the same way:
+        // Email link click = email verified (no verification code needed)
+        // Verification codes are only needed for unverified contacts during login flows
+
         UserDto user = userFacade.findByContactValue(token.getContactValue())
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -78,33 +95,54 @@ public class PasswordSetupService {
             throw new IllegalArgumentException("User already has password set");
         }
 
-        AuthUser authUser = AuthUser.builder()
-            .contactValue(user.getContactValue())
-            .contactType(user.getContactType())
-            .passwordHash(passwordEncoder.encode(request.getPassword()))
-            .isVerified(true)
-            .build();
-        authUser.setIsActive(true);
+        // Get User entity to find authentication contact
+        com.fabricmanagement.common.platform.user.domain.User userEntity = 
+            userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
+
+        // Get primary authentication contact
+        UUID contactId = userContactService.getAuthenticationContact(userEntity.getId())
+            .map(uc -> uc.getContactId())
+            .orElseThrow(() -> new IllegalStateException("User has no authentication contact"));
+
+        // Check if AuthUser already exists for this contact
+        if (authUserRepository.existsByContactId(contactId)) {
+            throw new IllegalArgumentException("User already has password set");
+        }
+
+        // Create AuthUser with Contact entity (new system)
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+        AuthUser authUser = AuthUser.create(contactId, passwordHash);
         authUser.setTenantId(user.getTenantId());
+        authUser.verify();
         authUserRepository.save(authUser);
 
         token.markAsUsed();
         tokenRepository.save(token);
 
-        UserDto freshUser = userFacade.findById(user.getTenantId(), user.getId())
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        // Reload User entity with contacts/departments for JWT generation
+        com.fabricmanagement.common.platform.user.domain.User freshUserEntity = 
+            userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        String accessToken = jwtService.generateAccessToken(freshUser);
-        String refreshToken = jwtService.generateRefreshToken(freshUser);
+        String accessToken = jwtService.generateAccessToken(freshUserEntity);
+        String refreshToken = jwtService.generateRefreshToken(freshUserEntity);
+
+        // Get contact value for event
+        String contactValue = freshUserEntity.getPrimaryContact()
+            .map(contact -> contact.getContactValue())
+            .orElse(token.getContactValue());
 
         eventPublisher.publish(new UserRegisteredEvent(
             user.getTenantId(),
             user.getId(),
-            user.getContactValue()
+            contactValue
         ));
 
+        UserDto freshUser = UserDto.from(freshUserEntity);
+
         log.info("✅ Password setup completed: user={}, needsOnboarding={}",
-            PiiMaskingUtil.maskEmail(user.getContactValue()),
+            PiiMaskingUtil.maskEmail(contactValue),
             !user.getHasCompletedOnboarding());
 
         return LoginResponse.builder()

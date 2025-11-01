@@ -1,6 +1,5 @@
 package com.fabricmanagement.common.platform.user.dto;
 
-import com.fabricmanagement.common.platform.user.domain.ContactType;
 import com.fabricmanagement.common.platform.user.domain.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,10 +21,9 @@ public class UserDto {
     private String firstName;
     private String lastName;
     private String displayName;
-    private String contactValue;
-    private ContactType contactType;
     private UUID companyId;
-    private String department;
+    private UUID roleId;
+    private String role; // Role name for display
     private Boolean isActive;
     private Instant lastActiveAt;
     private Instant onboardingCompletedAt;
@@ -41,10 +39,9 @@ public class UserDto {
             .firstName(user.getFirstName())
             .lastName(user.getLastName())
             .displayName(user.getDisplayName())
-            .contactValue(user.getContactValue())
-            .contactType(user.getContactType())
             .companyId(user.getCompanyId())
-            .department(user.getDepartment())
+            .roleId(user.getRole() != null ? user.getRole().getId() : null)
+            .role(user.getRole() != null ? user.getRole().getRoleName() : null)
             .isActive(user.getIsActive())
             .lastActiveAt(user.getLastActiveAt())
             .onboardingCompletedAt(user.getOnboardingCompletedAt())

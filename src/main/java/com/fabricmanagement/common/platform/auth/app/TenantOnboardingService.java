@@ -15,9 +15,17 @@ import com.fabricmanagement.common.platform.company.domain.SubscriptionStatus;
 import com.fabricmanagement.common.platform.company.domain.event.CompanyCreatedEvent;
 import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
+import com.fabricmanagement.common.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.common.platform.communication.app.NotificationService;
-import com.fabricmanagement.common.platform.user.domain.ContactType;
 import com.fabricmanagement.common.platform.user.domain.User;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
+import com.fabricmanagement.common.platform.communication.app.UserContactService;
+import com.fabricmanagement.common.platform.communication.app.CompanyContactService;
+import com.fabricmanagement.common.platform.communication.app.AddressService;
+import com.fabricmanagement.common.platform.communication.app.CompanyAddressService;
+import com.fabricmanagement.common.platform.communication.domain.AddressType;
+import com.fabricmanagement.common.platform.company.infra.repository.DepartmentRepository;
+import com.fabricmanagement.common.platform.user.app.UserDepartmentService;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
@@ -63,6 +71,14 @@ public class TenantOnboardingService {
     private final RegistrationTokenRepository tokenRepository;
     private final DomainEventPublisher eventPublisher;
     private final NotificationService notificationService;
+    private final EmailTemplateRenderer emailTemplateRenderer;
+    private final ContactService contactService;
+    private final UserContactService userContactService;
+    private final CompanyContactService companyContactService;
+    private final AddressService addressService;
+    private final CompanyAddressService companyAddressService;
+    private final DepartmentRepository departmentRepository;
+    private final UserDepartmentService userDepartmentService;
 
     /**
      * Create new tenant via sales-led process.
@@ -81,13 +97,11 @@ public class TenantOnboardingService {
         Company company = createTenantCompany(
             request.getCompanyName(),
             request.getTaxId(),
-            request.getCompanyType(),
-            request.getAddress(),
-            request.getCity(),
-            request.getCountry(),
-            request.getPhoneNumber(),
-            request.getCompanyEmail()
+            request.getCompanyType()
         );
+        
+        // Add company address and contact if provided (new communication system)
+        addCompanyAddressAndContact(company.getId(), company.getTenantId(), request);
 
         User adminUser = createAdminUser(
             company.getId(),
@@ -98,10 +112,16 @@ public class TenantOnboardingService {
             request.getAdminDepartment()
         );
 
+        // Get selected OS from request, or default to base platform (FabricOS)
+        // This ensures every tenant has at least base platform subscription
+        List<String> selectedOS = request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
+            ? request.getSelectedOS()
+            : List.of("FabricOS"); // Default: At least base platform for sales-led onboarding
+
         List<Subscription> subscriptions = createInitialSubscriptions(
             company.getId(),
             company.getTenantId(),
-            request.getSelectedOS(),
+            selectedOS,
             request.getTrialDays()
         );
 
@@ -120,9 +140,14 @@ public class TenantOnboardingService {
             subscriptions
         );
 
+        // Get admin contact value from Contact entity
+        String adminContact = adminUser.getPrimaryContact()
+            .map(contact -> contact.getContactValue())
+            .orElse(request.getAdminContact());
+
         log.info("✅ Sales-led tenant created - company: {}, admin: {}, token: {}",
             company.getUid(),
-            PiiMaskingUtil.maskEmail(adminUser.getContactValue()),
+            PiiMaskingUtil.maskEmail(adminContact),
             token.getToken());
 
         return TenantOnboardingResponse.builder()
@@ -131,10 +156,10 @@ public class TenantOnboardingService {
             .companyUid(company.getUid())
             .companyName(company.getCompanyName())
             .adminUserId(adminUser.getId())
-            .adminContactValue(adminUser.getContactValue())
+            .adminContactValue(adminContact)
             .registrationToken(token.getToken())
             .subscriptions(subscriptions.stream().map(s -> s.getOsCode()).toList())
-            .trialEndsAt(subscriptions.get(0).getTrialEndsAt())
+            .trialEndsAt(subscriptions.isEmpty() ? null : subscriptions.get(0).getTrialEndsAt())
             .setupUrl(generateSetupUrl(token.getToken()))
             .build();
     }
@@ -160,8 +185,7 @@ public class TenantOnboardingService {
         Company company = createTenantCompany(
             request.getCompanyName(),
             request.getTaxId(),
-            request.getCompanyType(),
-            null, null, null, null, null
+            request.getCompanyType()
         );
 
         User adminUser = createAdminUser(
@@ -173,9 +197,10 @@ public class TenantOnboardingService {
             null
         );
 
-        List<String> selectedOS = request.getSelectedOS() != null
+        // Get selected OS from request, or default to base platform (FabricOS)
+        List<String> selectedOS = request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()
-            : List.of();
+            : List.of("FabricOS"); // Default: At least base platform for self-service signup
 
         List<Subscription> subscriptions = createInitialSubscriptions(
             company.getId(),
@@ -191,9 +216,18 @@ public class TenantOnboardingService {
             company.getId()
         );
 
+        // Self-service signup: No verification code needed
+        // Email link click = email verified (user registered with their own email)
+        // Verification codes are only needed for unverified contacts during login
+
+        // Get admin contact value from Contact entity
+        String adminContact = adminUser.getPrimaryContact()
+            .map(contact -> contact.getContactValue())
+            .orElse(request.getEmail());
+
         log.info("✅ Self-service tenant created - company: {}, admin: {}, token: {}",
             company.getUid(),
-            PiiMaskingUtil.maskEmail(adminUser.getContactValue()),
+            PiiMaskingUtil.maskEmail(adminContact),
             token.getToken());
 
         return TenantOnboardingResponse.builder()
@@ -202,12 +236,123 @@ public class TenantOnboardingService {
             .companyUid(company.getUid())
             .companyName(company.getCompanyName())
             .adminUserId(adminUser.getId())
-            .adminContactValue(adminUser.getContactValue())
+            .adminContactValue(adminContact)
             .registrationToken(token.getToken())
             .subscriptions(subscriptions.stream().map(s -> s.getOsCode()).toList())
-            .trialEndsAt(subscriptions.get(0).getTrialEndsAt())
+            .trialEndsAt(subscriptions.isEmpty() ? null : subscriptions.get(0).getTrialEndsAt())
             .setupUrl(generateSetupUrl(token.getToken()))
             .build();
+    }
+
+    /**
+     * Add company address and contact if provided in request.
+     * 
+     * <p>Creates Address and Contact entities, then assigns them to company via junction tables.</p>
+     */
+    private void addCompanyAddressAndContact(UUID companyId, UUID tenantId,
+                                            TenantOnboardingRequest request) {
+        addCompanyAddressAndContact(companyId, tenantId,
+            request.getAddress(), request.getCity(), request.getCountry(),
+            request.getPhoneNumber(), request.getCompanyEmail());
+    }
+
+    /**
+     * Add company address and contact if provided.
+     */
+    private void addCompanyAddressAndContact(UUID companyId, UUID tenantId,
+                                            String address, String city, String country,
+                                            String phoneNumber, String email) {
+        boolean hasAddressInfo = address != null || city != null || country != null;
+        boolean hasContactInfo = phoneNumber != null || email != null;
+
+        if (!hasAddressInfo && !hasContactInfo) {
+            return; // Nothing to add
+        }
+
+        log.debug("Adding company address/contact: companyId={}, hasAddress={}, hasContact={}",
+            companyId, hasAddressInfo, hasContactInfo);
+
+        // Set tenant context for address/contact creation
+        UUID originalTenantId = TenantContext.getCurrentTenantId();
+        try {
+            TenantContext.setCurrentTenantId(tenantId);
+
+            // Add address if provided
+            if (hasAddressInfo) {
+                com.fabricmanagement.common.platform.communication.domain.Address addr = 
+                    addressService.createAddress(
+                        address != null ? address : "",
+                        city != null ? city : "",
+                        null, // state
+                        null, // postalCode
+                        country != null ? country : "",
+                        AddressType.HEADQUARTERS,
+                        "Headquarters"
+                    );
+
+                companyAddressService.assignAddress(
+                    companyId,
+                    addr.getId(),
+                    true,  // isPrimary
+                    true   // isHeadquarters
+                );
+
+                log.info("✅ Company headquarters address added: companyId={}", companyId);
+            }
+
+            // Add phone contact if provided
+            if (phoneNumber != null) {
+                com.fabricmanagement.common.platform.communication.domain.Contact phoneContact = 
+                    contactService.createContact(
+                        phoneNumber,
+                        com.fabricmanagement.common.platform.communication.domain.ContactType.PHONE,
+                        "Main Phone",
+                        false, // isPersonal (company contact)
+                        null   // parentContactId
+                    );
+
+                companyContactService.assignContact(
+                    companyId,
+                    phoneContact.getId(),
+                    true,  // isDefault
+                    null   // department
+                );
+
+                log.info("✅ Company phone contact added: companyId={}", companyId);
+            }
+
+            // Add email contact if provided
+            if (email != null) {
+                com.fabricmanagement.common.platform.communication.domain.Contact emailContact = 
+                    contactService.createContact(
+                        email,
+                        com.fabricmanagement.common.platform.communication.domain.ContactType.EMAIL,
+                        "Main Email",
+                        false, // isPersonal (company contact)
+                        null   // parentContactId
+                    );
+
+                // Only set as default if phone wasn't added
+                boolean isDefault = phoneNumber == null;
+                companyContactService.assignContact(
+                    companyId,
+                    emailContact.getId(),
+                    isDefault,
+                    null   // department
+                );
+
+                log.info("✅ Company email contact added: companyId={}", companyId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to add company address/contact: companyId={}, error={}", 
+                companyId, e.getMessage());
+            // Continue - address/contact addition is not critical for onboarding
+        } finally {
+            // Restore original tenant context
+            if (originalTenantId != null) {
+                TenantContext.setCurrentTenantId(originalTenantId);
+            }
+        }
     }
 
     /**
@@ -215,9 +360,7 @@ public class TenantOnboardingService {
      *
      * <p><b>CRITICAL:</b> This is the ONLY place where tenant_id equals company_id</p>
      */
-    private Company createTenantCompany(String name, String taxId, CompanyType type,
-                                       String address, String city, String country,
-                                       String phone, String email) {
+    private Company createTenantCompany(String name, String taxId, CompanyType type) {
         log.debug("Creating tenant company: name={}, type={}", name, type);
 
         if (!type.isTenant()) {
@@ -225,11 +368,6 @@ public class TenantOnboardingService {
         }
 
         Company company = Company.create(name, taxId, type);
-        company.setAddress(address);
-        company.setCity(city);
-        company.setCountry(country);
-        company.setPhoneNumber(phone);
-        company.setEmail(email);
 
         // ⚠️ CRITICAL: Save first to get company ID
         Company saved = companyRepository.save(company);
@@ -266,22 +404,56 @@ public class TenantOnboardingService {
             PiiMaskingUtil.maskEmail(contactValue));
 
         return TenantContext.executeInTenantContext(tenantId, () -> {
+            // Create User (new system - no deprecated fields)
             User user = User.create(
                 firstName,
                 lastName,
-                contactValue,
-                ContactType.EMAIL,
-                companyId,
-                department != null ? department : "management"
+                companyId
             );
 
             User saved = userRepository.save(user);
 
+            // Create Contact entity and assign to user (new system)
+            com.fabricmanagement.common.platform.communication.domain.Contact contact = 
+                contactService.createContact(
+                    contactValue,
+                    com.fabricmanagement.common.platform.communication.domain.ContactType.EMAIL,
+                    "Primary",
+                    true, // isPersonal
+                    null  // parentContactId
+                );
+
+            // Assign contact to user with authentication flag
+            userContactService.assignContact(
+                saved.getId(),
+                contact.getId(),
+                true,  // isDefault
+                true   // isForAuthentication
+            );
+
+            // Assign department if provided (new system)
+            if (department != null) {
+                // Find department by name (assumes department exists in seed data)
+                // Note: Department lookup requires tenantId and companyId
+                UUID currentTenantId = TenantContext.getCurrentTenantId();
+                departmentRepository.findByTenantIdAndCompanyIdAndDepartmentName(
+                    currentTenantId, companyId, department
+                ).ifPresent(dept -> {
+                    userDepartmentService.assignDepartment(
+                        saved.getId(),
+                        dept.getId(),
+                        true,  // isPrimary
+                        TenantContext.getCurrentUserId()
+                    );
+                });
+            }
+
+            String savedContactValue = contact.getContactValue();
             eventPublisher.publish(new UserCreatedEvent(
                 saved.getTenantId(),
                 saved.getId(),
                 saved.getDisplayName(),
-                saved.getContactValue(),
+                savedContactValue,
                 saved.getCompanyId()
             ));
 
@@ -357,12 +529,19 @@ public class TenantOnboardingService {
     }
 
     /**
-     * Generate setup URL for email.
+     * Generate setup URL for email using configured frontend URL.
+     * 
+     * <p>Priority: FRONTEND_URL → APP_BASE_URL → localhost fallback (dev only)</p>
      */
     private String generateSetupUrl(String token) {
-        String baseUrl = System.getenv("APP_BASE_URL");
-        if (baseUrl == null) {
+        String baseUrl = System.getenv("FRONTEND_URL");
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            baseUrl = System.getenv("APP_BASE_URL");
+        }
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            // Fallback for local development only
             baseUrl = "http://localhost:3000";
+            log.warn("⚠️ Using hardcoded frontend URL for setup link. Set FRONTEND_URL or APP_BASE_URL env var.");
         }
         return baseUrl + "/setup?token=" + token;
     }
@@ -376,43 +555,13 @@ public class TenantOnboardingService {
         String osList = subscriptions.stream()
             .map(s -> "<li style='margin: 10px 0; color: #374151;'>" + s.getOsCode() + "</li>")
             .reduce((a, b) -> a + b)
-            .orElse("<li>None</li>");
+            .orElse("<li style='margin: 10px 0; color: #374151;'>None</li>");
 
         String subject = "Welcome to FabricOS";
         
-        String message = String.format("""
-            <p style="font-size: 18px; color: #1f2937; font-weight: 600; margin: 0 0 20px 0;">Hello %s! 👋</p>
-            
-            <p style="color: #4b5563; margin: 0 0 10px 0;">Welcome to <strong>FabricOS</strong>!</p>
-            <p style="color: #4b5563; margin: 0 0 30px 0;">Your account for <strong>%s</strong> has been created successfully.</p>
-            
-            <div style="background: #f9fafb; padding: 24px; border-radius: 6px; border: 1px solid #e5e7eb; margin: 0 0 24px 0;">
-                <p style="margin: 0 0 12px 0; font-weight: 600; color: #1f2937; font-size: 15px;">Your Active Subscriptions</p>
-                <ul style="margin: 0; padding-left: 20px; list-style: none;">
-                    %s
-                </ul>
-            </div>
-            
-            <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 16px; border-radius: 6px; margin: 0 0 30px 0;">
-                <p style="margin: 0; color: #166534; font-size: 14px;">🎁 <strong>Trial Period:</strong> 90 days FREE</p>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="%s" style="display: inline-block; background: #667eea; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 15px;">
-                    Complete Registration →
-                </a>
-            </div>
-            
-            <p style="font-size: 13px; color: #9ca3af; text-align: center; margin: 20px 0 0 0;">
-                This link will expire in 24 hours
-            </p>
-            
-            <div style="height: 1px; background: #e5e7eb; margin: 30px 0;"></div>
-            
-            <p style="font-size: 13px; color: #6b7280; margin: 0;">
-                Need help? Contact <a href="mailto:support@fabricmanagement.com" style="color: #667eea; text-decoration: none;">support@fabricmanagement.com</a>
-            </p>
-            """, firstName, companyName, osList, setupUrl);
+        // Smart renderer: Uses frontend templates with backend fallback
+        // Frontend templates prioritized for better UX (design system consistency)
+        String message = emailTemplateRenderer.renderWelcome(firstName, companyName, osList, setupUrl);
 
         notificationService.sendNotification(email, subject, message);
     }

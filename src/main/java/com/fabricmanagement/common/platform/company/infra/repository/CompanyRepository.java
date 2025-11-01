@@ -35,6 +35,8 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
 
     boolean existsByTaxId(String taxId);
 
+    boolean existsByTenantIdAndTaxId(UUID tenantId, String taxId);
+
     @Query("SELECT c FROM Company c WHERE c.tenantId = :tenantId AND c.companyName LIKE %:name%")
     List<Company> searchByName(@Param("tenantId") UUID tenantId, @Param("name") String name);
 

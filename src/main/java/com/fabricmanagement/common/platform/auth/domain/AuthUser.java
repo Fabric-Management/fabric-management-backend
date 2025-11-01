@@ -1,18 +1,18 @@
 package com.fabricmanagement.common.platform.auth.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.common.platform.user.domain.ContactType;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * AuthUser entity - Authentication credentials for users.
  *
  * <p><b>CRITICAL DESIGN:</b></p>
  * <ul>
- *   <li>❌ NO username field - Use contactValue (email/phone)</li>
+ *   <li>✅ References Contact entity (new communication system)</li>
  *   <li>✅ Password stored as BCrypt hash</li>
  *   <li>✅ Verification status tracked</li>
  *   <li>✅ Failed login attempts & lockout</li>
@@ -26,11 +26,12 @@ import java.time.Instant;
  *   <li>Must be verified before login</li>
  *   <li>Tracks last login for security audit</li>
  * </ul>
+ *
  */
 @Entity
 @Table(name = "common_auth_user", schema = "common_auth",
     indexes = {
-        @Index(name = "idx_auth_contact", columnList = "contact_value", unique = true)
+        @Index(name = "idx_auth_contact", columnList = "contact_id", unique = true)
     })
 @Getter
 @Setter
@@ -39,12 +40,16 @@ import java.time.Instant;
 @AllArgsConstructor
 public class AuthUser extends BaseEntity {
 
-    @Column(name = "contact_value", nullable = false, unique = true, length = 255)
-    private String contactValue;
+    /**
+     * Contact entity reference (new system)
+     * <p>References Contact entity from communication module.</p>
+     */
+    @Column(name = "contact_id", nullable = false, unique = true)
+    private UUID contactId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "contact_type", nullable = false, length = 20)
-    private ContactType contactType;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contact_id", insertable = false, updatable = false)
+    private com.fabricmanagement.common.platform.communication.domain.Contact contact;
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
@@ -63,14 +68,23 @@ public class AuthUser extends BaseEntity {
     @Column(name = "locked_until")
     private Instant lockedUntil;
 
-    public static AuthUser create(String contactValue, ContactType contactType, String passwordHash) {
+    /**
+     * Create AuthUser with Contact entity (new system).
+     */
+    public static AuthUser create(UUID contactId, String passwordHash) {
         return AuthUser.builder()
-            .contactValue(contactValue)
-            .contactType(contactType)
+            .contactId(contactId)
             .passwordHash(passwordHash)
             .isVerified(false)
             .failedLoginAttempts(0)
             .build();
+    }
+
+    /**
+     * Get contact value from Contact entity.
+     */
+    public String getContactValue() {
+        return contact != null ? contact.getContactValue() : null;
     }
 
     public void verify() {

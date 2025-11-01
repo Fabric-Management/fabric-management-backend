@@ -1,6 +1,7 @@
 -- ============================================================================
 -- V3: User Module Tables
 -- ============================================================================
+-- Creates user tables (depends on company tables from V002)
 -- User management - NO username field! Uses contactValue (email/phone)
 -- Last Updated: 2025-10-25
 -- ============================================================================

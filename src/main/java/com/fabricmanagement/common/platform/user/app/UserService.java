@@ -3,6 +3,8 @@ package com.fabricmanagement.common.platform.user.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
+import com.fabricmanagement.common.platform.communication.app.UserContactService;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
@@ -42,6 +44,8 @@ public class UserService implements UserFacade {
     private final UserRepository userRepository;
     private final CompanyFacade companyFacade;
     private final DomainEventPublisher eventPublisher;
+    private final ContactService contactService;
+    private final UserContactService userContactService;
 
     @Transactional
     public UserDto createUser(CreateUserRequest request) {
@@ -50,6 +54,7 @@ public class UserService implements UserFacade {
 
         UUID tenantId = TenantContext.getCurrentTenantId();
 
+        // Check if contact already exists
         if (userRepository.existsByContactValue(request.getContactValue())) {
             throw new IllegalArgumentException("Contact value already registered");
         }
@@ -58,29 +63,56 @@ public class UserService implements UserFacade {
             throw new IllegalArgumentException("Company not found");
         }
 
+        // Create User (new system - no deprecated fields)
         User user = User.create(
             request.getFirstName(),
             request.getLastName(),
-            request.getContactValue(),
-            request.getContactType(),
-            request.getCompanyId(),
-            request.getDepartment()
+            request.getCompanyId()
         );
 
         User saved = userRepository.save(user);
+
+        // Create Contact entity (new system)
+        com.fabricmanagement.common.platform.communication.domain.Contact contact = 
+            contactService.createContact(
+                request.getContactValue(),
+                mapContactType(request.getContactType()),
+                "Primary",
+                true, // isPersonal
+                null  // parentContactId
+            );
+
+        // Create UserContact junction (authentication contact)
+        userContactService.assignContact(
+            saved.getId(),
+            contact.getId(),
+            true,  // isDefault
+            true   // isForAuthentication
+        );
 
         eventPublisher.publish(new UserCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
             saved.getDisplayName(),
-            saved.getContactValue(),
+            request.getContactValue(), // Use request value (from Contact entity now)
             saved.getCompanyId()
         ));
 
-        log.info("User created: id={}, uid={}, displayName={}", 
-            saved.getId(), saved.getUid(), saved.getDisplayName());
+        log.info("User created: id={}, uid={}, displayName={}, contactId={}", 
+            saved.getId(), saved.getUid(), saved.getDisplayName(), contact.getId());
 
         return UserDto.from(saved);
+    }
+
+    /**
+     * Map User module ContactType to Communication module ContactType.
+     */
+    private com.fabricmanagement.common.platform.communication.domain.ContactType mapContactType(
+            com.fabricmanagement.common.platform.user.domain.ContactType userContactType) {
+        return switch (userContactType) {
+            case EMAIL -> com.fabricmanagement.common.platform.communication.domain.ContactType.EMAIL;
+            case PHONE -> com.fabricmanagement.common.platform.communication.domain.ContactType.PHONE;
+        };
     }
 
     @Override
@@ -145,9 +177,7 @@ public class UserService implements UserFacade {
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         user.updateProfile(request.getFirstName(), request.getLastName());
-        if (request.getDepartment() != null) {
-            user.changeDepartment(request.getDepartment());
-        }
+        // Department updates handled via UserDepartmentService
 
         User saved = userRepository.save(user);
 

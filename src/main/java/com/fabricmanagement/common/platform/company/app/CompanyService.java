@@ -43,8 +43,41 @@ public class CompanyService implements CompanyFacade {
     public CompanyDto createCompany(CreateCompanyRequest request) {
         log.info("Creating company: {}", request.getCompanyName());
 
-        if (companyRepository.existsByTaxId(request.getTaxId())) {
-            throw new IllegalArgumentException("Company with this tax ID already exists");
+        // Validate tenant context
+        UUID currentTenantId = TenantContext.getCurrentTenantId();
+        if (currentTenantId == null) {
+            throw new IllegalStateException("Tenant context must be set to create a company");
+        }
+
+        // Tax ID uniqueness check (tenant-bazlı)
+        if (companyRepository.existsByTenantIdAndTaxId(currentTenantId, request.getTaxId())) {
+            throw new IllegalArgumentException("Company with this tax ID already exists in your organization");
+        }
+
+        // Parent company validation
+        if (request.getParentCompanyId() != null) {
+            Company parent = companyRepository.findById(request.getParentCompanyId())
+                .orElseThrow(() -> new IllegalArgumentException("Parent company not found"));
+            
+            // Security check: Parent must belong to same tenant
+            if (!parent.getTenantId().equals(currentTenantId)) {
+                throw new IllegalArgumentException("Parent company must belong to the same tenant");
+            }
+            
+            // Business check: Parent must be active
+            if (!parent.getIsActive()) {
+                throw new IllegalArgumentException("Parent company must be active");
+            }
+
+            // Prevent circular reference (will be checked after save, but log warning)
+            log.debug("Creating company with parent: parentId={}", request.getParentCompanyId());
+        }
+
+        // Company type validation (warning for tenant types)
+        if (request.getCompanyType().isTenant()) {
+            log.warn("Creating tenant-type company via normal endpoint. " +
+                     "Consider using onboarding endpoints (/api/admin/onboarding/tenant or /api/public/signup) " +
+                     "for proper tenant setup.");
         }
 
         Company company = Company.create(
@@ -53,14 +86,21 @@ public class CompanyService implements CompanyFacade {
             request.getCompanyType()
         );
 
-        company.setAddress(request.getAddress());
-        company.setCity(request.getCity());
-        company.setCountry(request.getCountry());
-        company.setPhoneNumber(request.getPhoneNumber());
-        company.setEmail(request.getEmail());
+        // Address/Contact info should be added via CompanyAddress/CompanyContact services after creation
         company.setParent(request.getParentCompanyId());
 
         Company saved = companyRepository.save(company);
+
+        // Circular reference check (after save to have company ID)
+        if (saved.hasParent()) {
+            UUID parentId = saved.getParentCompanyId();
+            Company checkParent = companyRepository.findById(parentId).orElse(null);
+            if (checkParent != null && saved.getId().equals(checkParent.getParentCompanyId())) {
+                // Rollback would be complex, but log error
+                log.error("⚠️ Circular reference detected! Company {} and {} are each other's parent. " +
+                         "This should not happen.", saved.getId(), parentId);
+            }
+        }
 
         eventPublisher.publish(new CompanyCreatedEvent(
             saved.getTenantId(),
@@ -69,7 +109,8 @@ public class CompanyService implements CompanyFacade {
             saved.getCompanyType().name()
         ));
 
-        log.info("Company created: id={}, uid={}", saved.getId(), saved.getUid());
+        log.info("Company created: id={}, uid={}, tenantId={}", 
+            saved.getId(), saved.getUid(), saved.getTenantId());
 
         return CompanyDto.from(saved);
     }

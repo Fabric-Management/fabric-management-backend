@@ -29,22 +29,12 @@ import java.util.UUID;
 @AllArgsConstructor
 public class FiberComposition extends BaseEntity {
 
-    /**
-     * Blended fiber (e.g., "Cotton-Poly Blend 60/40")
-     */
     @Column(name = "blended_fiber_id", nullable = false)
     private UUID blendedFiberId;  // FK → Fiber (blended)
 
-    /**
-     * Base fiber in the blend (e.g., Cotton @ 60%, Polyester @ 40%)
-     */
     @Column(name = "base_fiber_id", nullable = false)
     private UUID baseFiberId;  // FK → Fiber (base)
 
-    /**
-     * Percentage of base_fiber in blended_fiber.
-     * Must be > 0 and <= 100, and all percentages for a blended_fiber_id must sum to 100.
-     */
     @Column(name = "percentage", nullable = false, precision = 5, scale = 2)
     private BigDecimal percentage;
 

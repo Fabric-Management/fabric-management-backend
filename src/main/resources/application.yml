@@ -33,8 +33,10 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
-      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:10MB}
+      enabled: true
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:25MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:25MB}
+      file-size-threshold: ${MULTIPART_FILE_SIZE_THRESHOLD:2MB}
 
 # Server Configuration
 server:
@@ -116,6 +118,16 @@ application:
     from-email: ${MAIL_FROM_EMAIL:noreply@fabricmanagement.com}
     from-name: ${MAIL_FROM_NAME:Fabric Management}
 
+  # Email Template Configuration
+  # Note: Frontend pi email render endpoint removed - backend uses its own HTML templates
+  email:
+    # Template provider: "auto" (smart fallback), "frontend", or "backend"
+    template-provider: ${EMAIL_TEMPLATE_PROVIDER:backend} # ✅ Backend templates only (frontend endpoint removed)
+    frontend:
+      enabled: ${EMAIL_FRONTEND_ENABLED:false} # ✅ Disabled (frontend endpoint removed)
+      timeout-ms: ${EMAIL_FRONTEND_TIMEOUT_MS:5000}
+      url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
+
   # Verification Configuration
   verification:
     code-length: 6
@@ -135,6 +147,24 @@ application:
     outbox-enabled: true
     outbox-batch-size: 100
     outbox-poll-interval-ms: 5000
+
+  # AI Configuration
+  ai:
+    provider: ${AI_PROVIDER:openai} # openai | anthropic | local
+    api-key: ${AI_API_KEY:} # From .env
+    model: ${AI_MODEL:gpt-4o-mini} # gpt-4o-mini | claude-3-haiku
+    temperature: ${AI_TEMPERATURE:0.7}
+    max-tokens: ${AI_MAX_TOKENS:1000}
+    timeout: ${AI_TIMEOUT:30000} # 30 seconds
+    enabled: ${AI_ENABLED:true}
+
+  # Google Maps Platform Configuration
+  google:
+    maps:
+      api-key: ${GOOGLE_MAPS_API_KEY:}
+      enabled: ${GOOGLE_MAPS_ENABLED:true}
+      timeout: ${GOOGLE_MAPS_TIMEOUT:10000}
+      region-bias: ${GOOGLE_MAPS_REGION_BIAS:TR,GB,DE,FR,IT,ES}
 
 # OpenAPI / Swagger
 springdoc:

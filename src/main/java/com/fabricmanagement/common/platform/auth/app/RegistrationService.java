@@ -10,9 +10,12 @@ import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.VerificationCodeRepository;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
+import com.fabricmanagement.common.platform.communication.app.UserContactService;
 import com.fabricmanagement.common.platform.communication.app.VerificationService;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +24,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 
 /**
  * Registration Service - User registration with multi-channel verification.
@@ -50,12 +55,15 @@ import java.util.Random;
 public class RegistrationService {
 
     private final UserFacade userFacade;
+    private final UserRepository userRepository;
     private final AuthUserRepository authUserRepository;
     private final VerificationCodeRepository verificationCodeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
     private final VerificationService verificationService;
+    private final ContactService contactService;
+    private final UserContactService userContactService;
 
     @Value("${application.verification.code-length:6}")
     private int codeLength;
@@ -138,28 +146,35 @@ public class RegistrationService {
         UserDto user = userFacade.findByContactValue(request.getContactValue())
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // Find Contact entity for authentication
+        com.fabricmanagement.common.platform.communication.domain.Contact contact = 
+            findAuthenticationContact(user.getId(), request.getContactValue())
+                .orElseThrow(() -> new IllegalStateException("Authentication contact not found for user"));
+
         String passwordHash = passwordEncoder.encode(request.getPassword());
 
+        // Create AuthUser with Contact entity (new system)
         AuthUser authUser = AuthUser.create(
-            user.getContactValue(),
-            user.getContactType(),
+            contact.getId(),
             passwordHash
         );
         authUser.setTenantId(user.getTenantId());
         authUser.verify();
         authUserRepository.save(authUser);
 
-        String accessToken = jwtService.generateAccessToken(
-            convertToUserEntity(user)
-        );
-        String refreshToken = jwtService.generateRefreshToken(
-            convertToUserEntity(user)
-        );
+        // Get User entity for JWT generation (needs contacts/departments loaded)
+        com.fabricmanagement.common.platform.user.domain.User userEntity = 
+            userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
+                .orElseThrow(() -> new IllegalStateException("User not found after registration"));
 
+        String accessToken = jwtService.generateAccessToken(userEntity);
+        String refreshToken = jwtService.generateRefreshToken(userEntity);
+
+        String contactValue = contact.getContactValue();
         eventPublisher.publish(new UserRegisteredEvent(
             user.getTenantId(),
             user.getId(),
-            user.getContactValue()
+            contactValue
         ));
 
         log.info("User registered successfully: userId={}, uid={}", user.getId(), user.getUid());
@@ -172,29 +187,22 @@ public class RegistrationService {
             .build();
     }
 
+    /**
+     * Find authentication contact for user by contactValue.
+     * <p>Uses UserContact junction table to find Contact entity with isForAuthentication=true.</p>
+     */
+    private Optional<com.fabricmanagement.common.platform.communication.domain.Contact> 
+            findAuthenticationContact(UUID userId, String contactValue) {
+        return userContactService.getAuthenticationContact(userId)
+            .flatMap(uc -> contactService.findById(uc.getContactId()))
+            .filter(c -> c.getContactValue().equals(contactValue));
+    }
+
     private String generateVerificationCode() {
         Random random = new Random();
         int code = random.nextInt((int) Math.pow(10, codeLength));
         return String.format("%0" + codeLength + "d", code);
     }
 
-    private com.fabricmanagement.common.platform.user.domain.User convertToUserEntity(UserDto dto) {
-        com.fabricmanagement.common.platform.user.domain.User user = 
-            com.fabricmanagement.common.platform.user.domain.User.builder()
-                .firstName(dto.getFirstName())
-                .lastName(dto.getLastName())
-                .contactValue(dto.getContactValue())
-                .contactType(dto.getContactType())
-                .companyId(dto.getCompanyId())
-                .department(dto.getDepartment())
-                .build();
-        
-        user.setId(dto.getId());
-        user.setTenantId(dto.getTenantId());
-        user.setUid(dto.getUid());
-        user.setIsActive(dto.getIsActive());
-        
-        return user;
-    }
 }
 
