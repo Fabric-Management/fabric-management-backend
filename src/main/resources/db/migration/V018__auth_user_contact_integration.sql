@@ -35,3 +35,26 @@ COMMENT ON COLUMN common_auth.common_auth_user.contact_id IS 'References Contact
 COMMENT ON COLUMN common_auth.common_auth_user.contact_value IS 'DEPRECATED: Use contactId and Contact entity instead. Will be removed after migration.';
 COMMENT ON COLUMN common_auth.common_auth_user.contact_type IS 'DEPRECATED: Use contactId and Contact entity instead. Will be removed after migration.';
 
+-- ============================================================================
+-- ALTER TABLE: common_user - Remove NOT NULL constraints from deprecated fields
+-- ============================================================================
+
+-- Remove NOT NULL constraint from contact_value (deprecated - now via Contact entity)
+ALTER TABLE common_user.common_user
+ALTER COLUMN contact_value DROP NOT NULL;
+
+-- Remove NOT NULL constraint from contact_type (deprecated - now via Contact entity)
+ALTER TABLE common_user.common_user
+ALTER COLUMN contact_type DROP NOT NULL;
+
+-- Drop unique index on contact_value (no longer unique - Contact entity handles uniqueness)
+DROP INDEX IF EXISTS common_user.idx_user_contact;
+
+-- Drop index on department (deprecated - now via UserDepartment junction)
+DROP INDEX IF EXISTS common_user.idx_user_department;
+
+-- Update comments to mark as deprecated
+COMMENT ON COLUMN common_user.common_user.contact_value IS 'DEPRECATED: Removed from entity. Use Contact entity via UserContact junction instead. Will be dropped in future.';
+COMMENT ON COLUMN common_user.common_user.contact_type IS 'DEPRECATED: Removed from entity. Use Contact entity via UserContact junction instead. Will be dropped in future.';
+COMMENT ON COLUMN common_user.common_user.department IS 'DEPRECATED: Removed from entity. Use UserDepartment junction instead. Will be dropped in future.';
+
