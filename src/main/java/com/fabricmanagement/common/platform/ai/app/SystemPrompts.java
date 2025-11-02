@@ -132,6 +132,16 @@ public class SystemPrompts {
             if (user.getCompanyId() != null) {
                 prompt.append("Company ID: ").append(user.getCompanyId()).append("\n");
             }
+            
+            // Add learned preferences if available
+            if (context.getPreferences() != null) {
+                UserBehaviorLearner.UserPreferences prefs = context.getPreferences();
+                if (prefs.getLanguageConfidence() > 0.5) {
+                    prompt.append("User's preferred language: ").append(prefs.getPreferredLanguage()).append("\n");
+                    prompt.append("(Based on ").append(prefs.getTrCount() + prefs.getEnCount())
+                        .append(" previous interactions)\n");
+                }
+            }
         }
 
         return prompt.toString();
@@ -146,6 +156,7 @@ public class SystemPrompts {
         private String screen;
         @SuppressWarnings("unused") // Reserved for future use
         private Map<String, Object> filters;
+        private UserBehaviorLearner.UserPreferences preferences;
 
         public static UserContext of(UserDto user) {
             UserContext context = new UserContext();
@@ -163,6 +174,14 @@ public class SystemPrompts {
 
         public void setFilters(Map<String, Object> filters) {
             this.filters = filters;
+        }
+
+        public void setPreferences(UserBehaviorLearner.UserPreferences preferences) {
+            this.preferences = preferences;
+        }
+
+        public UserBehaviorLearner.UserPreferences getPreferences() {
+            return preferences;
         }
     }
 }

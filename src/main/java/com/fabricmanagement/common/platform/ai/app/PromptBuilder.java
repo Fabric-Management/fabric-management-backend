@@ -16,6 +16,7 @@ import java.util.Map;
  * <ul>
  *   <li>System prompt (from SystemPrompts)</li>
  *   <li>User context (tenant, role, department)</li>
+ *   <li>User preferences (learned behavior)</li>
  *   <li>User message</li>
  * </ul>
  */

@@ -39,6 +39,7 @@ public class FabricAIService {
     private final ConversationStore conversationStore;
     private final AICache aiCache;
     private final HistoryTrimmer historyTrimmer;
+    private final UserBehaviorLearner behaviorLearner;
 
     @Transactional(readOnly = true)
     public ChatResponse chat(String userMessage, UUID userId, UUID conversationId) {
@@ -56,6 +57,9 @@ public class FabricAIService {
             user = userFacade.findById(tenantId, userId).orElse(null);
         }
 
+        // Detect user language for learning
+        String detectedLanguage = behaviorLearner.detectLanguage(userMessage);
+        
         // Check cache first (for simple queries)
         String normalizedQuery = normalizeQuery(userMessage);
         Optional<String> cachedResponse = aiCache.get(userId, normalizedQuery);
@@ -65,6 +69,9 @@ public class FabricAIService {
                 .message(cachedResponse.get())
                 .conversationId(conversationId != null ? conversationId : UUID.randomUUID())
                 .build();
+            
+            // Learn from cached interaction (still track behavior)
+            behaviorLearner.learn(userId, userMessage, null, detectedLanguage);
             return cached;
         }
 
@@ -77,9 +84,21 @@ public class FabricAIService {
         // Build prompt with trimmed history
         List<Map<String, Object>> messages = new ArrayList<>();
         
+        // Get user preferences for personalization
+        UserBehaviorLearner.UserPreferences prefs = userId != null 
+            ? behaviorLearner.getPreferences(userId) 
+            : null;
+        
         // Add system message (only once, at the start)
         if (conversationHistory.isEmpty()) {
-            // New conversation - add system prompt
+            // New conversation - add system prompt with preferences
+            SystemPrompts.UserContext userContext = user != null 
+                ? SystemPrompts.UserContext.of(user) 
+                : null;
+            if (userContext != null && prefs != null) {
+                userContext.setPreferences(prefs);
+            }
+            
             List<Map<String, String>> promptMessages = promptBuilder.buildPrompt("", user);
             for (Map<String, String> msg : promptMessages) {
                 if ("system".equals(msg.get("role"))) {
@@ -239,6 +258,19 @@ public class FabricAIService {
 
         // Set conversationId in response
         response.setConversationId(finalConversationId);
+        
+        // Learn from interaction
+        String functionName = null;
+        if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
+            // Track first function call
+            functionName = response.getToolCalls().get(0).getFunctionName();
+        }
+        
+        // Detect response language (from AI response)
+        String responseLanguage = behaviorLearner.detectLanguage(response.getMessage());
+        
+        // Learn: track user behavior
+        behaviorLearner.learn(userId, userMessage, functionName, responseLanguage);
         
         // Cache simple responses (non-function-call responses)
         if (response.getToolCalls() == null || response.getToolCalls().isEmpty()) {
