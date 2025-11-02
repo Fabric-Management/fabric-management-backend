@@ -110,13 +110,17 @@ public class AIToolBuilder {
                 )
             ),
             buildTool("create_fiber",
-                "Create a new fiber. Use this when user wants to create a fiber. Material must exist with type=FIBER. REQUIRES USER CONFIRMATION.",
+                "Create a new fiber. USER-FRIENDLY: If materialId is not provided, Material will be auto-created with type=FIBER. REQUIRES USER CONFIRMATION.",
                 Map.of(
                     "type", "object",
                     "properties", Map.of(
                         "materialId", Map.of(
                             "type", "string",
-                            "description", "Material ID (UUID) - Material must exist with type=FIBER (required)"
+                            "description", "Material ID (UUID) - Optional. If not provided, Material will be auto-created with type=FIBER using the 'unit' parameter"
+                        ),
+                        "unit", Map.of(
+                            "type", "string",
+                            "description", "Unit for Material (kg, ton, m, etc.) - Required if materialId is not provided. Used when auto-creating Material"
                         ),
                         "fiberCategoryId", Map.of(
                             "type", "string",
@@ -151,7 +155,8 @@ public class AIToolBuilder {
                             "description", "Additional remarks (optional)"
                         )
                     ),
-                    "required", List.of("materialId", "fiberCategoryId", "fiberName")
+                    "required", List.of("fiberCategoryId", "fiberName")
+                    // Note: materialId OR unit is required (handled in AIFunctionCaller)
                 )
             )
         );

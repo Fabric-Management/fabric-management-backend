@@ -446,17 +446,23 @@ public class AIFunctionCaller {
     /**
      * Create a new fiber.
      * 
-     * <p>Required: materialId (UUID of FIBER-type Material), fiberCategoryId (UUID), fiberName</p>
-     * <p>Optional: fiberGrade, fineness, lengthMm, strengthCndTex, elongationPercent, remarks</p>
+     * <p><b>USER-FRIENDLY:</b> Material can be auto-created if materialId is not provided.</p>
+     * 
+     * <p>Required: fiberCategoryId (UUID), fiberName, unit (if materialId is null)</p>
+     * <p>Optional: materialId (if provided, existing Material will be used), fiberGrade, fineness, lengthMm, strengthCndTex, elongationPercent, remarks</p>
      */
     private String createFiber(UUID tenantId, Map<String, Object> parameters) {
         try {
             String materialIdStr = (String) parameters.get("materialId");
+            String unit = (String) parameters.get("unit");
             String fiberCategoryIdStr = (String) parameters.get("fiberCategoryId");
             String fiberName = (String) parameters.get("fiberName");
 
-            if (materialIdStr == null || materialIdStr.isBlank()) {
-                return "❌ Material ID is required. Material must exist with type=FIBER.";
+            // USER-FRIENDLY: If materialId is not provided, unit is required (Material will be auto-created)
+            if ((materialIdStr == null || materialIdStr.isBlank()) && (unit == null || unit.isBlank())) {
+                return "❌ Either materialId or unit is required.\n\n" +
+                       "Option 1: Provide materialId to use existing Material\n" +
+                       "Option 2: Provide unit (e.g., 'kg') and Material will be auto-created with type=FIBER";
             }
 
             if (fiberCategoryIdStr == null || fiberCategoryIdStr.isBlank()) {
@@ -467,25 +473,28 @@ public class AIFunctionCaller {
                 return "❌ Fiber Name is required.";
             }
 
-            UUID materialId;
+            UUID materialId = null;
             UUID fiberCategoryId;
             try {
-                materialId = UUID.fromString(materialIdStr);
+                if (materialIdStr != null && !materialIdStr.isBlank()) {
+                    materialId = UUID.fromString(materialIdStr);
+                    
+                    // Validate Material exists and belongs to current tenant if provided
+                    if (!materialFacade.exists(tenantId, materialId)) {
+                        return String.format(
+                            "❌ Material not found: %s\n\n" +
+                            "Possible reasons:\n" +
+                            "- Material ID is incorrect\n" +
+                            "- Material belongs to another tenant\n" +
+                            "- Material was deleted\n\n" +
+                            "Please use search_materials to find the correct Material ID, or provide unit to auto-create Material.",
+                            materialId);
+                    }
+                }
+                
                 fiberCategoryId = UUID.fromString(fiberCategoryIdStr);
             } catch (IllegalArgumentException e) {
                 return "❌ Invalid UUID format for materialId or fiberCategoryId.";
-            }
-
-            // Validate Material exists and belongs to current tenant BEFORE creating fiber
-            if (!materialFacade.exists(tenantId, materialId)) {
-                return String.format(
-                    "❌ Material not found: %s\n\n" +
-                    "Possible reasons:\n" +
-                    "- Material ID is incorrect\n" +
-                    "- Material belongs to another tenant\n" +
-                    "- Material was deleted\n\n" +
-                    "Please use search_materials to find the correct Material ID.",
-                    materialId);
             }
 
             // Optional fields
@@ -508,7 +517,8 @@ public class AIFunctionCaller {
             String remarks = (String) parameters.get("remarks");
 
             CreateFiberRequest request = CreateFiberRequest.builder()
-                .materialId(materialId)
+                .materialId(materialId)  // Optional - if null, Material will be auto-created
+                .unit(unit)  // Required if materialId is null
                 .fiberCategoryId(fiberCategoryId)
                 .fiberIsoCodeId(fiberIsoCodeId)
                 .fiberName(fiberName)

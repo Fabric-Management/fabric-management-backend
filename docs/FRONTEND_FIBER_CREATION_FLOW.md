@@ -2,7 +2,7 @@
 
 ## 📋 Genel Bakış
 
-Kullanıcı bir "Pamuk" (Cotton) fiber oluşturmak istediğinde, önce Material (FIBER type) oluşturulmalı, sonra Fiber oluşturulmalıdır.
+**USER-FRIENDLY DESIGN:** Kullanıcı bir "Pamuk" (Cotton) fiber oluşturmak istediğinde, **tek form** doldurur. Material **otomatik olarak** sistem tarafından oluşturulur (FIBER type, unit=kg). Kullanıcı Material oluşturma adımıyla uğraşmaz!
 
 ---
 
@@ -10,30 +10,14 @@ Kullanıcı bir "Pamuk" (Cotton) fiber oluşturmak istediğinde, önce Material 
 
 ```mermaid
 flowchart TD
-    Start([Kullanıcı: Pamuk Fiber Oluştur]) --> CheckMaterial{Material<br/>Var mı?}
+    Start([Kullanıcı: Pamuk Fiber Oluştur]) --> Step2[Fiber Oluştur Formu<br/>Material Otomatik Oluşturulur]
     
-    CheckMaterial -->|Hayır| Step1[1. Material Oluştur Formu]
-    CheckMaterial -->|Evet| Step2[2. Fiber Oluştur Formu]
-    
-    Step1 --> MaterialForm[Material Form<br/>━━━━━━━━━━<br/>Type: FIBER<br/>Unit: kg<br/>━━━━━━━━━━]
-    
-    MaterialForm --> MaterialValidate{Validasyon}
-    MaterialValidate -->|Geçersiz| MaterialForm
-    MaterialValidate -->|Geçerli| MaterialSubmit[POST /api/materials]
-    
-    MaterialSubmit --> MaterialSuccess{Material<br/>Oluşturuldu?}
-    MaterialSuccess -->|Hata| MaterialError[Hata Mesajı<br/>Göster]
-    MaterialSuccess -->|Başarılı| MaterialCreated[✅ Material Created<br/>ID: xxx]
-    
-    MaterialError --> MaterialForm
-    MaterialCreated --> Step2
-    
-    Step2 --> FiberForm[Fiber Form<br/>━━━━━━━━━━<br/>Material ID: xxx<br/>Category: Natural<br/>Name: Cotton<br/>━━━━━━━━━━]
+    Step2 --> FiberForm[Fiber Form<br/>━━━━━━━━━━<br/>Unit: kg (Material için)<br/>Category: Natural<br/>Name: Cotton<br/>━━━━━━━━━━<br/>Material: Otomatik Oluşturulur]
     
     FiberForm --> LoadCategories[GET /api/fibers/categories]
     LoadCategories --> CategoryDropdown[Kategori Dropdown<br/>• Natural<br/>• Synthetic<br/>• Artificial]
     
-    CategoryDropdown --> FillForm[Doldur:<br/>• Fiber Name: Cotton<br/>• Fiber Grade: Optional<br/>• Fineness: Optional<br/>• Length: Optional<br/>• Strength: Optional<br/>• Elongation: Optional<br/>• Remarks: Optional]
+    CategoryDropdown --> FillForm[Doldur:<br/>• Unit: kg (Material için)<br/>• Fiber Name: Cotton<br/>• Category: Natural<br/>• Fiber Grade: Optional<br/>• Fineness: Optional<br/>• Length: Optional<br/>• Strength: Optional<br/>• Elongation: Optional<br/>• Remarks: Optional]
     
     FillForm --> FiberValidate{Validasyon}
     FiberValidate -->|Geçersiz| FiberForm
@@ -47,62 +31,17 @@ flowchart TD
     
     style Start fill:#e1f5ff
     style End fill:#d4edda
-    style MaterialForm fill:#fff3cd
-    style FiberForm fill:#fff3cd
-    style MaterialError fill:#f8d7da
+    style FiberForm fill:#d1ecf1
     style FiberError fill:#f8d7da
-    style MaterialCreated fill:#d4edda
 ```
 
 ---
 
 ## 📝 Detaylı Form Adımları
 
-### **ADIM 1: Material Kontrolü ve Oluşturma**
+### **TEK ADIM: Fiber Oluşturma (Material Otomatik)**
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  🔍 ADIM 1: Material Kontrolü                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  1.1. Material Var mı Kontrol Et                            │
-│       GET /api/materials?type=FIBER&query=cotton            │
-│                                                               │
-│      ┌─────────────────────────────────────────┐            │
-│      │  Sonuçlar:                              │            │
-│      │  • Material bulundu? → ADIM 2'ye git   │            │
-│      │  • Material yok? → Material Form aç    │            │
-│      └─────────────────────────────────────────┘            │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│  📝 Material Oluştur Formu                                  │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Material Type *                                      │   │
-│  │ ╭───────────────────────────────────────────╮       │   │
-│  │ │ FIBER ▼                                    │       │   │
-│  │ ╰───────────────────────────────────────────╯       │   │
-│  │ [YARN, FABRIC, CHEMICAL, CONSUMABLE] (disabled)     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                               │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Unit *                                               │   │
-│  │ ╭───────────────────────────────────────────╮       │   │
-│  │ │ kg ▼                                        │       │   │
-│  │ ╰───────────────────────────────────────────╯       │   │
-│  │ [kg, ton, m, m², piece, liter]                      │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                               │
-│  [İptal]  [Material Oluştur →]                              │
-│                                                               │
-│  * Zorunlu Alanlar                                          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### **ADIM 2: Fiber Oluşturma**
+**USER-FRIENDLY:** Material otomatik oluşturulur, kullanıcı Material formu doldurmaz!
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -110,11 +49,19 @@ flowchart TD
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ Material * (Auto-filled veya Seç)                   │   │
+│  │ Unit (Material için) *                                │   │
 │  │ ╭───────────────────────────────────────────╮       │   │
-│  │ │ Cotton (FIBER) - ID: xxx ▼                 │       │   │
+│  │ │ kg ▼                                      │       │   │
 │  │ ╰───────────────────────────────────────────╯       │   │
-│  │ Material Type: FIBER, Unit: kg ✅                   │   │
+│  │ [kg, ton] (Fiber için genellikle kg)              │   │
+│  │                                                    │   │
+│  │ ℹ️ Material otomatik oluşturulacak (FIBER, kg)    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Material ID (Opsiyonel - Mevcut Material kullan)    │   │
+│  │ [________________________________]                   │   │
+│  │ Boş bırakırsanız Material otomatik oluşturulur      │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                               │
 │  ┌─────────────────────────────────────────────────────┐   │

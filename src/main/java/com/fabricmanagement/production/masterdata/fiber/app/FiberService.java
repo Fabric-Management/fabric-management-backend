@@ -62,11 +62,27 @@ public class FiberService implements FiberFacade {
         }
 
 
-        // Load Material entity with tenant check
         UUID tenantId = TenantContext.getCurrentTenantId();
-        Material material = materialRepository.findByTenantIdAndId(tenantId, request.getMaterialId())
-            .orElseThrow(() -> new IllegalArgumentException(
-                String.format("Material not found: %s (or not accessible for current tenant)", request.getMaterialId())));
+        
+        // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation reduces user errors)
+        Material material;
+        if (request.getMaterialId() != null) {
+            // Use existing Material
+            material = materialRepository.findByTenantIdAndId(tenantId, request.getMaterialId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                    String.format("Material not found: %s (or not accessible for current tenant)", request.getMaterialId())));
+        } else {
+            // Auto-create Material (USER-FRIENDLY: System handles Material creation automatically)
+            if (request.getUnit() == null || request.getUnit().isBlank()) {
+                throw new IllegalArgumentException(
+                    "Unit is required when materialId is not provided. Material will be auto-created with type=FIBER.");
+            }
+            
+            log.info("Auto-creating Material: type=FIBER, unit={}", request.getUnit());
+            material = Material.create(com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER, request.getUnit());
+            material = materialRepository.save(material);
+            log.info("✅ Material auto-created: id={}, uid={}", material.getId(), material.getUid());
+        }
 
         // Validate material type is FIBER
         if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
@@ -74,7 +90,8 @@ public class FiberService implements FiberFacade {
         }
 
         // Check if material already has a fiber detail
-        if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
+        UUID materialIdToCheck = material.getId(); // Use material from above (either existing or newly created)
+        if (fiberRepository.findByMaterialId(materialIdToCheck).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details. Each material can only have one fiber.");
         }
 

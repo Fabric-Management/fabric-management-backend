@@ -11,6 +11,10 @@ import java.util.UUID;
 
 /**
  * Request for creating new fiber.
+ * 
+ * <p><b>User-Friendly Design:</b> Material can be auto-created automatically.</p>
+ * <p>If materialId is provided, existing Material will be used.</p>
+ * <p>If materialId is null, Material will be auto-created with type=FIBER and provided unit.</p>
  */
 @Data
 @Builder
@@ -18,8 +22,19 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateFiberRequest {
 
-    @NotNull(message = "Material ID is required")
+    /**
+     * Material ID (optional).
+     * 
+     * <p>If null, Material will be auto-created with type=FIBER and unit.</p>
+     */
     private UUID materialId;
+    
+    /**
+     * Unit for Material (required if materialId is null).
+     * 
+     * <p>Used when auto-creating Material. Examples: "kg", "ton", "m", etc.</p>
+     */
+    private String unit;
 
     @NotNull(message = "Fiber Category ID is required")
     private UUID fiberCategoryId;
