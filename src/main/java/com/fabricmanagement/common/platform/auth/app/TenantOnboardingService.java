@@ -27,7 +27,9 @@ import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.company.infra.repository.DepartmentRepository;
 import com.fabricmanagement.common.platform.user.app.UserDepartmentService;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
+import com.fabricmanagement.common.platform.user.domain.Role;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.common.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +81,7 @@ public class TenantOnboardingService {
     private final CompanyAddressService companyAddressService;
     private final DepartmentRepository departmentRepository;
     private final UserDepartmentService userDepartmentService;
+    private final RoleRepository roleRepository;
 
     /**
      * Create new tenant via sales-led process.
@@ -452,6 +455,24 @@ public class TenantOnboardingService {
                 });
             }
 
+            // Assign ADMIN role to first user (tenant admin)
+            // If roles don't exist for this tenant, create default roles first
+            UUID currentTenantId = TenantContext.getCurrentTenantId();
+            Role adminRole = roleRepository.findByTenantIdAndRoleCode(currentTenantId, "ADMIN")
+                .orElseGet(() -> {
+                    // Create default roles for new tenant if they don't exist
+                    log.info("Creating default roles for new tenant: tenantId={}", currentTenantId);
+                    seedDefaultRolesForTenant(currentTenantId);
+                    return roleRepository.findByTenantIdAndRoleCode(currentTenantId, "ADMIN")
+                        .orElseThrow(() -> new IllegalStateException(
+                            "Failed to create ADMIN role for tenant: " + currentTenantId));
+                });
+
+            saved.setRole(adminRole);
+            userRepository.save(saved);
+            log.info("✅ Admin role assigned to user: userId={}, roleCode={}", 
+                saved.getId(), adminRole.getRoleCode());
+
             String savedContactValue = contact.getContactValue();
             eventPublisher.publish(new UserCreatedEvent(
                 saved.getTenantId(),
@@ -568,6 +589,62 @@ public class TenantOnboardingService {
         String message = emailTemplateRenderer.renderWelcome(firstName, companyName, osList, setupUrl);
 
         notificationService.sendNotification(email, subject, message);
+    }
+
+    /**
+     * Seed default roles for a new tenant.
+     * 
+     * <p>Creates standard roles (ADMIN, DIRECTOR, MANAGER, etc.) when tenant is first created.</p>
+     */
+    private void seedDefaultRolesForTenant(UUID tenantId) {
+        log.debug("Seeding default roles for tenant: tenantId={}", tenantId);
+
+        // System tenant roles are seeded via migration (V014)
+        // For new tenants, we copy roles from system tenant or create default ones
+        UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+
+        // Copy roles from system tenant if they exist
+        List<Role> systemRoles = roleRepository.findByTenantIdAndIsActiveTrue(systemTenantId);
+        
+        if (systemRoles.isEmpty()) {
+            // Fallback: Create default roles if system tenant roles don't exist
+            createDefaultRole(tenantId, "Administrator", "ADMIN", "Full system access");
+            createDefaultRole(tenantId, "Director", "DIRECTOR", "Üst yönetim erişimi");
+            createDefaultRole(tenantId, "Manager", "MANAGER", "Departman yönetimi");
+            createDefaultRole(tenantId, "Supervisor", "SUPERVISOR", "Vardiya / ekip lideri");
+            createDefaultRole(tenantId, "User", "USER", "Standart çalışan");
+            createDefaultRole(tenantId, "Intern", "INTERN", "Stajyer erişimi");
+            createDefaultRole(tenantId, "Viewer", "VIEWER", "Sadece okuma yetkisi");
+        } else {
+            // Copy roles from system tenant
+            for (Role systemRole : systemRoles) {
+                if (!roleRepository.existsByTenantIdAndRoleCode(tenantId, systemRole.getRoleCode())) {
+                    Role tenantRole = Role.create(
+                        systemRole.getRoleName(),
+                        systemRole.getRoleCode(),
+                        systemRole.getDescription()
+                    );
+                    tenantRole.setTenantId(tenantId);
+                    roleRepository.save(tenantRole);
+                    log.debug("Copied role to tenant: roleCode={}, tenantId={}", 
+                        systemRole.getRoleCode(), tenantId);
+                }
+            }
+        }
+
+        log.info("✅ Default roles seeded for tenant: tenantId={}", tenantId);
+    }
+
+    /**
+     * Create a default role for tenant.
+     */
+    private void createDefaultRole(UUID tenantId, String roleName, String roleCode, String description) {
+        if (!roleRepository.existsByTenantIdAndRoleCode(tenantId, roleCode)) {
+            Role role = Role.create(roleName, roleCode, description);
+            role.setTenantId(tenantId);
+            roleRepository.save(role);
+            log.debug("Created default role: roleCode={}, tenantId={}", roleCode, tenantId);
+        }
     }
 
     /**
