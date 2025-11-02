@@ -212,12 +212,35 @@ public class AIFunctionCaller {
                 List<FiberDto> allFibers = new java.util.ArrayList<>(tenantFibers);
                 allFibers.addAll(systemFibers);
                 
+                // Improved matching: remove suffixes and try multiple strategies
+                String lowerQuery = query.toLowerCase();
+                String lowerNormalized = normalizedQuery.toLowerCase();
+                String cleanedQuery = lowerQuery
+                    .replace("elyaf", "")
+                    .replace("elyafı", "")
+                    .replace("fiber", "")
+                    .replace("materyal", "")
+                    .replace("materyali", "")
+                    .replace("yun", "")
+                    .replace("yün", "")
+                    .trim();
+                String cleanedNormalized = lowerNormalized
+                    .replace("fiber", "")
+                    .replace("material", "")
+                    .trim();
+                
                 List<FiberDto> matching = allFibers.stream()
                     .filter(f -> {
                         if (f.getFiberName() == null) return false;
                         String fiberName = f.getFiberName().toLowerCase();
-                        return fiberName.contains(normalizedQuery.toLowerCase()) || 
-                               fiberName.contains(query.toLowerCase());
+                        
+                        // Multiple matching strategies
+                        return fiberName.contains(lowerQuery) || 
+                               fiberName.contains(lowerNormalized) ||
+                               fiberName.contains(cleanedQuery) ||
+                               fiberName.contains(cleanedNormalized) ||
+                               fiberName.matches(".*\\b" + cleanedQuery + "\\b.*") ||
+                               fiberName.matches(".*\\b" + cleanedNormalized + "\\b.*");
                     })
                     .toList();
                 
@@ -291,10 +314,34 @@ public class AIFunctionCaller {
                 List<FiberDto> allFibers = new java.util.ArrayList<>(tenantFibers);
                 allFibers.addAll(systemFibers);
                 
+                // Improved matching for UNKNOWN type
+                String lowerQuery = query.toLowerCase();
+                String lowerNormalized = normalizedQuery.toLowerCase();
+                String cleanedQuery = lowerQuery
+                    .replace("elyaf", "")
+                    .replace("elyafı", "")
+                    .replace("fiber", "")
+                    .replace("materyal", "")
+                    .replace("materyali", "")
+                    .replace("yun", "")
+                    .replace("yün", "")
+                    .trim();
+                String cleanedNormalized = lowerNormalized
+                    .replace("fiber", "")
+                    .replace("material", "")
+                    .trim();
+                
                 List<FiberDto> matchingFibers = allFibers.stream()
-                    .filter(f -> f.getFiberName() != null && 
-                                (f.getFiberName().toLowerCase().contains(normalizedQuery.toLowerCase()) ||
-                                 f.getFiberName().toLowerCase().contains(query.toLowerCase())))
+                    .filter(f -> {
+                        if (f.getFiberName() == null) return false;
+                        String fiberName = f.getFiberName().toLowerCase();
+                        return fiberName.contains(lowerQuery) || 
+                               fiberName.contains(lowerNormalized) ||
+                               fiberName.contains(cleanedQuery) ||
+                               fiberName.contains(cleanedNormalized) ||
+                               fiberName.matches(".*\\b" + cleanedQuery + "\\b.*") ||
+                               fiberName.matches(".*\\b" + cleanedNormalized + "\\b.*");
+                    })
                     .toList();
                 
                 // Try Materials (YARN, FABRIC)
@@ -623,15 +670,35 @@ public class AIFunctionCaller {
         // Turkish-to-English translation for fiber names
         String normalizedQuery = normalizeFiberQuery(query);
 
+        // Improved matching: remove suffixes and try multiple strategies
+        String lowerQuery = query.toLowerCase();
+        String lowerNormalized = normalizedQuery.toLowerCase();
+        String cleanedQuery = lowerQuery
+            .replace("elyaf", "")
+            .replace("elyafı", "")
+            .replace("fiber", "")
+            .replace("materyal", "")
+            .replace("materyali", "")
+            .replace("yun", "")
+            .replace("yün", "")
+            .trim();
+        String cleanedNormalized = lowerNormalized
+            .replace("fiber", "")
+            .replace("material", "")
+            .trim();
+        
         List<FiberDto> matching = fibers.stream()
             .filter(f -> {
                 if (f.getFiberName() == null) return false;
                 String fiberName = f.getFiberName().toLowerCase();
-                String searchTerm = normalizedQuery.toLowerCase();
                 
-                // Check if fiber name contains the search term (Turkish or English)
-                return fiberName.contains(searchTerm) || 
-                       fiberName.contains(query.toLowerCase());
+                // Multiple matching strategies for better results
+                return fiberName.contains(lowerQuery) || 
+                       fiberName.contains(lowerNormalized) ||
+                       fiberName.contains(cleanedQuery) ||
+                       fiberName.contains(cleanedNormalized) ||
+                       fiberName.matches(".*\\b" + cleanedQuery + "\\b.*") ||
+                       fiberName.matches(".*\\b" + cleanedNormalized + "\\b.*");
             })
             .toList();
 
