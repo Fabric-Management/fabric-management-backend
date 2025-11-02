@@ -215,6 +215,8 @@ public class AIFunctionCaller {
                 // Improved matching: remove suffixes and try multiple strategies
                 String lowerQuery = query.toLowerCase();
                 String lowerNormalized = normalizedQuery.toLowerCase();
+                
+                // Clean query: remove common suffixes
                 String cleanedQuery = lowerQuery
                     .replace("elyaf", "")
                     .replace("elyafı", "")
@@ -223,24 +225,37 @@ public class AIFunctionCaller {
                     .replace("materyali", "")
                     .replace("yun", "")
                     .replace("yün", "")
+                    .replace("var mı", "")
+                    .replace("var mi", "")
                     .trim();
                 String cleanedNormalized = lowerNormalized
                     .replace("fiber", "")
                     .replace("material", "")
                     .trim();
                 
+                // Debug log for troubleshooting
+                log.debug("FIBER search - query: '{}', normalized: '{}', cleaned: '{}', cleanedNormalized: '{}', totalFibers: {}", 
+                    query, normalizedQuery, cleanedQuery, cleanedNormalized, allFibers.size());
+                
                 List<FiberDto> matching = allFibers.stream()
                     .filter(f -> {
                         if (f.getFiberName() == null) return false;
                         String fiberName = f.getFiberName().toLowerCase();
                         
-                        // Multiple matching strategies
-                        return fiberName.contains(lowerQuery) || 
+                        // Multiple matching strategies for robust search
+                        boolean matches = fiberName.contains(lowerQuery) || 
                                fiberName.contains(lowerNormalized) ||
                                fiberName.contains(cleanedQuery) ||
                                fiberName.contains(cleanedNormalized) ||
-                               fiberName.matches(".*\\b" + cleanedQuery + "\\b.*") ||
-                               fiberName.matches(".*\\b" + cleanedNormalized + "\\b.*");
+                               fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedQuery) + "\\b.*") ||
+                               fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedNormalized) + "\\b.*");
+                        
+                        if (matches) {
+                            log.debug("✅ Matched fiber: '{}' with query '{}' (normalized: '{}')", 
+                                fiberName, query, normalizedQuery);
+                        }
+                        
+                        return matches;
                     })
                     .toList();
                 
@@ -673,6 +688,8 @@ public class AIFunctionCaller {
         // Improved matching: remove suffixes and try multiple strategies
         String lowerQuery = query.toLowerCase();
         String lowerNormalized = normalizedQuery.toLowerCase();
+        
+        // Clean query: remove common suffixes and question words
         String cleanedQuery = lowerQuery
             .replace("elyaf", "")
             .replace("elyafı", "")
@@ -681,11 +698,16 @@ public class AIFunctionCaller {
             .replace("materyali", "")
             .replace("yun", "")
             .replace("yün", "")
+            .replace("var mı", "")
+            .replace("var mi", "")
             .trim();
         String cleanedNormalized = lowerNormalized
             .replace("fiber", "")
             .replace("material", "")
             .trim();
+        
+        log.debug("searchFibers - query: '{}', normalized: '{}', cleaned: '{}', cleanedNormalized: '{}'", 
+            query, normalizedQuery, cleanedQuery, cleanedNormalized);
         
         List<FiberDto> matching = fibers.stream()
             .filter(f -> {
@@ -693,12 +715,18 @@ public class AIFunctionCaller {
                 String fiberName = f.getFiberName().toLowerCase();
                 
                 // Multiple matching strategies for better results
-                return fiberName.contains(lowerQuery) || 
+                boolean matches = fiberName.contains(lowerQuery) || 
                        fiberName.contains(lowerNormalized) ||
                        fiberName.contains(cleanedQuery) ||
                        fiberName.contains(cleanedNormalized) ||
-                       fiberName.matches(".*\\b" + cleanedQuery + "\\b.*") ||
-                       fiberName.matches(".*\\b" + cleanedNormalized + "\\b.*");
+                       fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedQuery) + "\\b.*") ||
+                       fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedNormalized) + "\\b.*");
+                
+                if (matches) {
+                    log.debug("✅ Matched fiber: '{}' with query '{}'", fiberName, query);
+                }
+                
+                return matches;
             })
             .toList();
 
