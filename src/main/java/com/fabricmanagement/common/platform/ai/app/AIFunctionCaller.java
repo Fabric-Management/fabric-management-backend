@@ -368,9 +368,10 @@ public class AIFunctionCaller {
         }
         
         // FIBER indicators (base materials, but not yarn/fabric)
-        if (lowerQuery.matches(".*\\b(pamuk|cotton|polyester|poliester|yün|wool|keten|linen|ipek|silk|akrilik|acrylic|naylon|nylon|viscose|viskoz|elastan|elastane)\\b.*") &&
+        if (lowerQuery.matches(".*\\b(pamuk|cotton|polyester|poliester|yün|wool|keten|linen|ipek|silk|akrilik|acrylic|naylon|nylon|viscose|viskoz|viskon|elastan|elastane)\\b.*") &&
             !lowerQuery.contains("iplik") && !lowerQuery.contains("yarn") &&
-            !lowerQuery.contains("kumaş") && !lowerQuery.contains("fabric")) {
+            !lowerQuery.contains("kumaş") && !lowerQuery.contains("fabric") &&
+            !lowerQuery.contains("elyaf") && !lowerQuery.contains("fiber")) {
             return EntityType.FIBER;
         }
         
@@ -876,6 +877,7 @@ public class AIFunctionCaller {
         translations.put("nylon", "nylon");
         translations.put("viscose", "viscose");
         translations.put("viskoz", "viscose");
+        translations.put("viskon", "viscose");
         translations.put("elastan", "elastane");
         translations.put("spandeks", "elastane");
         translations.put("elastane", "elastane");
