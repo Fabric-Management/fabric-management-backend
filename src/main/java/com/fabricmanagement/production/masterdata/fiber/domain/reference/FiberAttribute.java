@@ -31,6 +31,9 @@ public class FiberAttribute extends BaseEntity {
     @Column(name = "attribute_name", nullable = false, length = 100)
     private String attributeName;
 
+    @Column(name = "attribute_group", length = 50)
+    private String attributeGroup;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
