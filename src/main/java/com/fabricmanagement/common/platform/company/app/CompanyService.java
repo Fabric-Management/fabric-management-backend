@@ -9,6 +9,13 @@ import com.fabricmanagement.common.platform.company.domain.event.CompanyCreatedE
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.company.dto.CreateCompanyRequest;
 import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
+import com.fabricmanagement.common.platform.communication.app.CompanyContactService;
+import com.fabricmanagement.common.platform.communication.app.AddressService;
+import com.fabricmanagement.common.platform.communication.app.CompanyAddressService;
+import com.fabricmanagement.common.platform.communication.domain.ContactType;
+import com.fabricmanagement.common.platform.communication.domain.AddressType;
+import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +45,12 @@ public class CompanyService implements CompanyFacade {
 
     private final CompanyRepository companyRepository;
     private final DomainEventPublisher eventPublisher;
+    
+    // USER-FRIENDLY: Auto-create Contact/Address services
+    private final ContactService contactService;
+    private final CompanyContactService companyContactService;
+    private final AddressService addressService;
+    private final CompanyAddressService companyAddressService;
 
     @Transactional
     public CompanyDto createCompany(CreateCompanyRequest request) {
@@ -86,10 +99,13 @@ public class CompanyService implements CompanyFacade {
             request.getCompanyType()
         );
 
-        // Address/Contact info should be added via CompanyAddress/CompanyContact services after creation
         company.setParent(request.getParentCompanyId());
 
         Company saved = companyRepository.save(company);
+
+        // USER-FRIENDLY: Auto-create Contact and Address if provided
+        // This reduces user errors and simplifies workflow (one form instead of multiple steps)
+        autoCreateCompanyContactAndAddress(saved.getId(), saved.getTenantId(), request);
 
         // Circular reference check (after save to have company ID)
         if (saved.hasParent()) {
@@ -192,6 +208,131 @@ public class CompanyService implements CompanyFacade {
         companyRepository.save(company);
 
         log.info("Company deactivated: id={}, uid={}", company.getId(), company.getUid());
+    }
+
+    /**
+     * USER-FRIENDLY: Auto-create Contact and Address for Company if provided.
+     * 
+     * <p>Reduces user errors by automatically creating Contact/Address entities when
+     * email/phone/address information is provided in the request.</p>
+     * 
+     * <p>Benefits:
+     * <ul>
+     *   <li>One form instead of multiple steps</li>
+     *   <li>Cleaner data (no missing contacts/addresses)</li>
+     *   <li>Faster workflow</li>
+     * </ul>
+     */
+    private void autoCreateCompanyContactAndAddress(UUID companyId, UUID tenantId, 
+                                                     CreateCompanyRequest request) {
+        UUID originalTenantId = TenantContext.getCurrentTenantId();
+        try {
+            TenantContext.setCurrentTenantId(tenantId);
+            
+            // Auto-create Email Contact if provided
+            if (request.getEmail() != null && !request.getEmail().isBlank()) {
+                try {
+                    com.fabricmanagement.common.platform.communication.domain.Contact emailContact = 
+                        contactService.createContact(
+                            request.getEmail(),
+                            ContactType.EMAIL,
+                            "Main Email",
+                            false, // isPersonal (company contact)
+                            null   // parentContactId
+                        );
+                    
+                    companyContactService.assignContact(
+                        companyId,
+                        emailContact.getId(),
+                        true,  // isDefault (first contact = default)
+                        null   // department (company-wide)
+                    );
+                    
+                    log.info("✅ Company email contact auto-created: companyId={}, email={}", 
+                        companyId, PiiMaskingUtil.maskEmail(request.getEmail()));
+                } catch (Exception e) {
+                    log.warn("Failed to auto-create company email contact: companyId={}, error={}", 
+                        companyId, e.getMessage());
+                    // Continue - contact creation is not critical
+                }
+            }
+            
+            // Auto-create Phone Contact if provided
+            if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+                try {
+                    com.fabricmanagement.common.platform.communication.domain.Contact phoneContact = 
+                        contactService.createContact(
+                            request.getPhoneNumber(),
+                            ContactType.PHONE,
+                            "Main Phone",
+                            false, // isPersonal (company contact)
+                            null   // parentContactId
+                        );
+                    
+                    // Set as default only if email wasn't provided
+                    boolean isDefault = request.getEmail() == null || request.getEmail().isBlank();
+                    companyContactService.assignContact(
+                        companyId,
+                        phoneContact.getId(),
+                        isDefault,
+                        null   // department
+                    );
+                    
+                    log.info("✅ Company phone contact auto-created: companyId={}", companyId);
+                } catch (Exception e) {
+                    log.warn("Failed to auto-create company phone contact: companyId={}, error={}", 
+                        companyId, e.getMessage());
+                    // Continue
+                }
+            }
+            
+            // Auto-create Address if provided
+            if (hasAddressInfo(request)) {
+                try {
+                    com.fabricmanagement.common.platform.communication.domain.Address address = 
+                        addressService.createAddress(
+                            request.getAddress() != null ? request.getAddress() : "",
+                            request.getCity() != null ? request.getCity() : "",
+                            null, // state
+                            null, // postalCode
+                            request.getCountry() != null ? request.getCountry() : "",
+                            AddressType.HEADQUARTERS,
+                            "Headquarters"
+                        );
+                    
+                    companyAddressService.assignAddress(
+                        companyId,
+                        address.getId(),
+                        true,  // isPrimary
+                        true   // isHeadquarters
+                    );
+                    
+                    log.info("✅ Company address auto-created: companyId={}, city={}", 
+                        companyId, request.getCity());
+                } catch (Exception e) {
+                    log.warn("Failed to auto-create company address: companyId={}, error={}", 
+                        companyId, e.getMessage());
+                    // Continue
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-create company contact/address: companyId={}, error={}", 
+                companyId, e.getMessage());
+            // Continue - contact/address creation is not critical for company creation
+        } finally {
+            if (originalTenantId != null) {
+                TenantContext.setCurrentTenantId(originalTenantId);
+            }
+        }
+    }
+
+    /**
+     * Check if request has address information.
+     */
+    private boolean hasAddressInfo(CreateCompanyRequest request) {
+        return (request.getAddress() != null && !request.getAddress().isBlank()) ||
+               (request.getCity() != null && !request.getCity().isBlank()) ||
+               (request.getCountry() != null && !request.getCountry().isBlank());
     }
 }
 

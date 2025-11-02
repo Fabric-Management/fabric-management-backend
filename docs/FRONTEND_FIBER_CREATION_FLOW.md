@@ -11,24 +11,24 @@
 ```mermaid
 flowchart TD
     Start([Kullanıcı: Pamuk Fiber Oluştur]) --> Step2[Fiber Oluştur Formu<br/>Material Otomatik Oluşturulur]
-    
+
     Step2 --> FiberForm[Fiber Form<br/>━━━━━━━━━━<br/>Unit: kg (Material için)<br/>Category: Natural<br/>Name: Cotton<br/>━━━━━━━━━━<br/>Material: Otomatik Oluşturulur]
-    
+
     FiberForm --> LoadCategories[GET /api/fibers/categories]
     LoadCategories --> CategoryDropdown[Kategori Dropdown<br/>• Natural<br/>• Synthetic<br/>• Artificial]
-    
+
     CategoryDropdown --> FillForm[Doldur:<br/>• Unit: kg (Material için)<br/>• Fiber Name: Cotton<br/>• Category: Natural<br/>• Fiber Grade: Optional<br/>• Fineness: Optional<br/>• Length: Optional<br/>• Strength: Optional<br/>• Elongation: Optional<br/>• Remarks: Optional]
-    
+
     FillForm --> FiberValidate{Validasyon}
     FiberValidate -->|Geçersiz| FiberForm
     FiberValidate -->|Geçerli| FiberSubmit[POST /api/fibers]
-    
+
     FiberSubmit --> FiberSuccess{Fiber<br/>Oluşturuldu?}
     FiberSuccess -->|Hata| FiberError[Hata Mesajı<br/>Göster]
     FiberSuccess -->|Başarılı| End([✅ Cotton Fiber<br/>Başarıyla Oluşturuldu!])
-    
+
     FiberError --> FiberForm
-    
+
     style Start fill:#e1f5ff
     style End fill:#d4edda
     style FiberForm fill:#d1ecf1
@@ -156,10 +156,12 @@ Kullanıcı: "Yeni Fiber Oluştur" butonuna tıkla
 ## ✅ Validasyon Kuralları
 
 ### **Material Validasyonu:**
+
 - ✅ Material Type: `FIBER` olmalı
 - ✅ Unit: Boş olamaz (örn: "kg", "ton")
 
 ### **Fiber Validasyonu:**
+
 - ✅ Material ID: Geçerli UUID, Material mevcut olmalı
 - ✅ Material Type: Material'ın type'ı `FIBER` olmalı
 - ✅ Material: Daha önce Fiber ile ilişkilendirilmemiş olmalı (unique constraint)
@@ -168,6 +170,7 @@ Kullanıcı: "Yeni Fiber Oluştur" butonuna tıkla
 - ⚠️ ISO Code: Eğer verilirse, pure fiber oluşturma denenir ve sistem tarafından reddedilir
 
 ### **Teknik Özellikler (Opsiyonel ama geçerli olmalı):**
+
 - Fineness: Pozitif sayı (0 < fineness)
 - Length: Pozitif sayı (0 < lengthMm)
 - Strength: Pozitif sayı (0 < strengthCndTex)
@@ -178,27 +181,32 @@ Kullanıcı: "Yeni Fiber Oluştur" butonuna tıkla
 ## 🎨 UI/UX Önerileri
 
 ### **1. Material Seçimi:**
+
 - **Dropdown** ile mevcut Material'ları göster
 - **Arama** özelliği ekle
 - Material yoksa **"+ Yeni Material Oluştur"** butonu göster
 - Material seçildiğinde **Type ve Unit bilgisini** göster
 
 ### **2. Category Seçimi:**
+
 - **Dropdown** ile kategorileri göster
 - Her kategori için **açıklama** ekle
 - **Cotton** için otomatik **"Natural"** seçimi öner
 
 ### **3. Fiber Name:**
+
 - **Auto-suggest** ekle (Material adından türet)
 - **Real-time validation** (min 2 karakter)
 - **Duplicate kontrolü** (aynı isimde fiber var mı?)
 
 ### **4. Teknik Özellikler:**
+
 - **Collapsible section** (başlangıçta kapalı)
 - **Unit bilgileri** göster (dtex, mm, cN/dtex, %)
 - **Input mask** ekle (örn: sadece sayı kabul et)
 
 ### **5. Form Durumları:**
+
 - **Loading state**: API çağrıları sırasında
 - **Error state**: Validasyon hatalarını göster
 - **Success state**: Başarılı oluşturma mesajı + yeni fiber detayları
@@ -208,6 +216,7 @@ Kullanıcı: "Yeni Fiber Oluştur" butonuna tıkla
 ## 🔌 API Endpoints
 
 ### **Material Oluştur:**
+
 ```http
 POST /api/production/materials
 Content-Type: application/json
@@ -219,11 +228,13 @@ Content-Type: application/json
 ```
 
 ### **Fiber Categories Listesi:**
+
 ```http
 GET /api/production/fibers/categories
 ```
 
 ### **Fiber Oluştur:**
+
 ```http
 POST /api/production/fibers
 Content-Type: application/json
@@ -246,14 +257,17 @@ Content-Type: application/json
 ## 📱 Responsive Design Önerileri
 
 ### **Desktop (>1024px):**
+
 - **2 kolon layout**: Sol tarafta form, sağ tarafta önizleme
 - **Sidebar** ile adımlar göster (Step 1/2)
 
 ### **Tablet (768px - 1024px):**
+
 - **Single column**: Form full width
 - **Sticky header** ile progress bar
 
 ### **Mobile (<768px):**
+
 - **Single column**: Form full width
 - **Bottom sheet** ile adımlar
 - **Floating action button** ile submit
@@ -273,6 +287,7 @@ Content-Type: application/json
 ## ⚠️ Hata Senaryoları
 
 ### **1. Material Bulunamadı:**
+
 ```
 ❌ Material not found: xxx
 Possible reasons:
@@ -284,6 +299,7 @@ Possible reasons:
 ```
 
 ### **2. Material Type Hatası:**
+
 ```
 ❌ Material type must be FIBER, got: YARN
 
@@ -291,14 +307,16 @@ Possible reasons:
 ```
 
 ### **3. Material Zaten Fiber'e Sahip:**
+
 ```
-❌ Material already has fiber details. 
+❌ Material already has fiber details.
 Each material can only have one fiber.
 
 [Farklı Material Seç] [Mevcut Fiber'i Görüntüle]
 ```
 
 ### **4. Category Bulunamadı:**
+
 ```
 ❌ Fiber category not found: xxx
 
@@ -332,4 +350,3 @@ Each material can only have one fiber.
 ## 🎯 Sonuç
 
 Bu diyagram, kullanıcının "Pamuk fiber oluştur" işlemini tamamlaması için gereken tüm adımları ve form yapılarını gösterir. Form, Material oluşturma ve Fiber oluşturma adımlarını içerir ve kullanıcı dostu bir deneyim sunar.
-

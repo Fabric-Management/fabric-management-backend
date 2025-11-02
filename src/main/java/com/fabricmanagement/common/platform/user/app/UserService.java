@@ -5,6 +5,10 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.app.UserContactService;
+import com.fabricmanagement.common.platform.communication.app.AddressService;
+import com.fabricmanagement.common.platform.communication.app.UserAddressService;
+import com.fabricmanagement.common.platform.communication.app.CompanyAddressService;
+import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
@@ -46,6 +50,11 @@ public class UserService implements UserFacade {
     private final DomainEventPublisher eventPublisher;
     private final ContactService contactService;
     private final UserContactService userContactService;
+    
+    // USER-FRIENDLY: Auto-create Address from Company
+    private final AddressService addressService;
+    private final UserAddressService userAddressService;
+    private final CompanyAddressService companyAddressService;
 
     @Transactional
     public UserDto createUser(CreateUserRequest request) {
@@ -90,6 +99,10 @@ public class UserService implements UserFacade {
             true   // isForAuthentication
         );
 
+        // USER-FRIENDLY: Auto-create UserAddress from Company if available
+        // This reduces user errors and provides default work address
+        autoCreateUserAddressFromCompany(saved.getId(), request.getCompanyId(), tenantId);
+
         eventPublisher.publish(new UserCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
@@ -102,6 +115,64 @@ public class UserService implements UserFacade {
             saved.getId(), saved.getUid(), saved.getDisplayName(), contact.getId());
 
         return UserDto.from(saved);
+    }
+
+    /**
+     * USER-FRIENDLY: Auto-create UserAddress from Company's primary address if available.
+     * 
+     * <p>Benefits:
+     * <ul>
+     *   <li>Users automatically get work address from their company</li>
+     *   <li>Reduces manual data entry</li>
+     *   <li>Ensures data consistency</li>
+     * </ul>
+     */
+    private void autoCreateUserAddressFromCompany(UUID userId, UUID companyId, UUID tenantId) {
+        try {
+            // Get company's primary address (if exists)
+            Optional<com.fabricmanagement.common.platform.communication.domain.CompanyAddress> 
+                companyAddressOpt = companyAddressService.getPrimaryAddress(companyId);
+            
+            if (companyAddressOpt.isPresent()) {
+                com.fabricmanagement.common.platform.communication.domain.CompanyAddress companyAddress = 
+                    companyAddressOpt.get();
+                
+                // Get Address entity from AddressRepository (CompanyAddress has addressId)
+                com.fabricmanagement.common.platform.communication.domain.Address companyAddr = 
+                    addressService.findById(companyAddress.getAddressId())
+                        .orElseThrow(() -> new IllegalStateException(
+                            "Company address found but Address entity not found: " + companyAddress.getAddressId()));
+                
+                // Create UserAddress from Company Address (WORK address)
+                com.fabricmanagement.common.platform.communication.domain.Address userWorkAddress = 
+                    addressService.createAddress(
+                        companyAddr.getStreetAddress(),
+                        companyAddr.getCity(),
+                        companyAddr.getState(),
+                        companyAddr.getPostalCode(),
+                        companyAddr.getCountry(),
+                        AddressType.WORK,
+                        "Work Address"
+                    );
+                
+                userAddressService.assignAddress(
+                    userId,
+                    userWorkAddress.getId(),
+                    true,  // isPrimary (first address = primary)
+                    true   // isWorkAddress
+                );
+                
+                log.info("✅ User work address auto-created from company: userId={}, companyId={}", 
+                    userId, companyId);
+            } else {
+                log.debug("Company has no primary address, skipping user address auto-creation: companyId={}", 
+                    companyId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-create user address from company: userId={}, companyId={}, error={}", 
+                userId, companyId, e.getMessage());
+            // Continue - address creation is optional
+        }
     }
 
     /**
