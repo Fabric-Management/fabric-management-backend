@@ -41,7 +41,7 @@ public class FabricAIService {
     private final HistoryTrimmer historyTrimmer;
     private final UserBehaviorLearner behaviorLearner;
 
-    @Transactional(readOnly = true)
+    @Transactional  // Removed readOnly=true because AI functions may perform writes
     public ChatResponse chat(String userMessage, UUID userId, UUID conversationId) {
         if (!aiProperties.getEnabled()) {
             throw new IllegalStateException("AI features are disabled");
