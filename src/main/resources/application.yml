@@ -132,7 +132,7 @@ application:
   ai:
     enabled: ${AI_ENABLED:true}
     provider: ${AI_PROVIDER:openai} # openai | anthropic | local
-    api-key: ${OPENAI_API_KEY:} # From .env
+    api-key: ${OPENAI_API_KEY:${AI_API_KEY:}} # From .env (supports both OPENAI_API_KEY and AI_API_KEY)
     model: ${AI_MODEL:gpt-4o-mini} # gpt-4o-mini | claude-3-haiku
     temperature: ${AI_TEMPERATURE:0.7}
     max-tokens: ${AI_MAX_TOKENS:1000}
