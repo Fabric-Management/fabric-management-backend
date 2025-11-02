@@ -146,8 +146,6 @@ public class UserBehaviorLearner {
         }
 
         // Simple Turkish language detection
-        String lower = query.toLowerCase();
-        
         // Common Turkish words/patterns
         Pattern turkishPattern = Pattern.compile(
             ".*(stok|fiber|malzeme|durum|ara|bul|var|yok|kaç|ne|nasıl|neden|hangi|kim|nere|gibi|ile|için|üretim|satış).*",
