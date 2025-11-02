@@ -332,6 +332,8 @@ public class AIFunctionCaller {
                 // Improved matching for UNKNOWN type
                 String lowerQuery = query.toLowerCase();
                 String lowerNormalized = normalizedQuery.toLowerCase();
+                
+                // Clean query: remove common suffixes and question words
                 String cleanedQuery = lowerQuery
                     .replace("elyaf", "")
                     .replace("elyafı", "")
@@ -340,6 +342,8 @@ public class AIFunctionCaller {
                     .replace("materyali", "")
                     .replace("yun", "")
                     .replace("yün", "")
+                    .replace("var mı", "")
+                    .replace("var mi", "")
                     .trim();
                 String cleanedNormalized = lowerNormalized
                     .replace("fiber", "")
@@ -350,12 +354,14 @@ public class AIFunctionCaller {
                     .filter(f -> {
                         if (f.getFiberName() == null) return false;
                         String fiberName = f.getFiberName().toLowerCase();
+                        
+                        // Multiple matching strategies
                         return fiberName.contains(lowerQuery) || 
                                fiberName.contains(lowerNormalized) ||
                                fiberName.contains(cleanedQuery) ||
                                fiberName.contains(cleanedNormalized) ||
-                               fiberName.matches(".*\\b" + cleanedQuery + "\\b.*") ||
-                               fiberName.matches(".*\\b" + cleanedNormalized + "\\b.*");
+                               fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedQuery) + "\\b.*") ||
+                               fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedNormalized) + "\\b.*");
                     })
                     .toList();
                 
