@@ -37,6 +37,7 @@ public class AIFunctionCaller {
 
     private final MaterialFacade materialFacade;
     private final FiberFacade fiberFacade;
+    private final FiberRepository fiberRepository;
     private final InventoryFacade inventoryFacade;
     private final com.fabricmanagement.logistics.inventory.app.MaterialMatcher materialMatcher;
     private final FiberCategoryRepository fiberCategoryRepository;
@@ -200,9 +201,8 @@ public class AIFunctionCaller {
                 // Get current tenant fibers
                 List<FiberDto> tenantFibers = fiberFacade.findAll();
                 
-                // Also search system tenant fibers (00000000-0000-0000-0000-000000000000)
-                // These are shared/global fibers available to all tenants
-                UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+                // Also search system tenant fibers (shared/global fibers available to all tenants)
+                UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
                 List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
                     .stream()
                     .map(FiberDto::from)
@@ -283,7 +283,7 @@ public class AIFunctionCaller {
                 
                 // Try FIBER (including system tenant)
                 List<FiberDto> tenantFibers = fiberFacade.findAll();
-                UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+                UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
                 List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
                     .stream()
                     .map(FiberDto::from)
@@ -605,7 +605,7 @@ public class AIFunctionCaller {
         List<FiberDto> tenantFibers = fiberFacade.findAll();
         
         // Also include system tenant fibers (shared/global)
-        UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
         List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
             .stream()
             .map(FiberDto::from)
