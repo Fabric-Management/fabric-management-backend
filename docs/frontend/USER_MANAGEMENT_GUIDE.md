@@ -1376,7 +1376,7 @@ export function CreateUserForm() {
         />
       </div>
 
-      <div className="form-group">
+      <div>
         <label>Last Name *</label>
         <input
           type="text"
@@ -1389,7 +1389,7 @@ export function CreateUserForm() {
       </div>
 
       {/* Contact Info */}
-      <div className="form-group">
+      <div>
         <label>Email *</label>
         <input
           type="email"
@@ -1401,7 +1401,7 @@ export function CreateUserForm() {
         />
       </div>
 
-      <div className="form-group">
+      <div>
         <label>Phone (Optional)</label>
         <input
           type="tel"
@@ -1414,7 +1414,7 @@ export function CreateUserForm() {
       </div>
 
       {/* Address with Google Places Autocomplete */}
-      <div className="form-group">
+      <div>
         <label>
           Work Address (Optional - Auto-filled from Company if not provided)
         </label>
@@ -1426,26 +1426,14 @@ export function CreateUserForm() {
             }}
             type="text"
             placeholder="Start typing address..."
-            className="address-autocomplete"
           />
         ) : (
           <input type="text" placeholder="Loading Google Maps..." disabled />
         )}
-
-        {/* Show parsed address components (optional - for debugging) */}
-        {formData.address.city && (
-          <div
-            className="address-preview"
-            style={{ marginTop: "8px", fontSize: "12px", color: "#666" }}>
-            📍 {formData.address.streetAddress}, {formData.address.city},{" "}
-            {formData.address.country}
-            {formData.address.postalCode && ` (${formData.address.postalCode})`}
-          </div>
-        )}
       </div>
 
       {/* Company & Role */}
-      <div className="form-group">
+      <div>
         <label>Company *</label>
         <CompanySelector
           value={formData.companyId}
@@ -1453,7 +1441,7 @@ export function CreateUserForm() {
         />
       </div>
 
-      <div className="form-group">
+      <div>
         <label>Role (Optional)</label>
         <RoleSelector
           value={formData.roleId}
@@ -1461,9 +1449,7 @@ export function CreateUserForm() {
         />
       </div>
 
-      <button type="submit" className="submit-button">
-        Create User
-      </button>
+      <button type="submit">Create User</button>
     </form>
   );
 }
