@@ -829,29 +829,29 @@ public class AIFunctionCaller {
         String lowerQuery = query.toLowerCase().trim();
         
         // Turkish-to-English fiber name mapping
-        Map<String, String> translations = Map.of(
-            "pamuk", "cotton",
-            "polyester", "polyester",
-            "poliester", "polyester",
-            "yün", "wool",
-            "naylon", "nylon",
-            "nylon", "nylon",
-            "viscose", "viscose",
-            "viskoz", "viscose",
-            "elastan", "elastane",
-            "spandeks", "elastane",
-            "elastane", "elastane",
-            "polypropilen", "polypropylene",
-            "polypropylene", "polypropylene",
-            "keten", "linen",
-            "linen", "linen",
-            "ipek", "silk",
-            "silk", "silk",
-            "akrilik", "acrylic",
-            "acrylic", "acrylic",
-            "materyal", "material",
-            "materyali", "material"
-        );
+        // Using HashMap to avoid Map.of() 10-pair limit
+        Map<String, String> translations = new HashMap<>();
+        translations.put("pamuk", "cotton");
+        translations.put("polyester", "polyester");
+        translations.put("poliester", "polyester");
+        translations.put("yün", "wool");
+        translations.put("naylon", "nylon");
+        translations.put("nylon", "nylon");
+        translations.put("viscose", "viscose");
+        translations.put("viskoz", "viscose");
+        translations.put("elastan", "elastane");
+        translations.put("spandeks", "elastane");
+        translations.put("elastane", "elastane");
+        translations.put("polypropilen", "polypropylene");
+        translations.put("polypropylene", "polypropylene");
+        translations.put("keten", "linen");
+        translations.put("linen", "linen");
+        translations.put("ipek", "silk");
+        translations.put("silk", "silk");
+        translations.put("akrilik", "acrylic");
+        translations.put("acrylic", "acrylic");
+        translations.put("materyal", "material");
+        translations.put("materyali", "material");
         
         // Check for exact matches first
         for (Map.Entry<String, String> entry : translations.entrySet()) {
