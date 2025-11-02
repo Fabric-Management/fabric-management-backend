@@ -221,32 +221,21 @@ Kullanıcı: "Yeni Fiber Oluştur" butonuna tıkla
 
 ## 🔌 API Endpoints
 
-### **Material Oluştur:**
-
-```http
-POST /api/production/materials
-Content-Type: application/json
-
-{
-  "materialType": "FIBER",
-  "unit": "kg"
-}
-```
-
 ### **Fiber Categories Listesi:**
 
 ```http
 GET /api/production/fibers/categories
 ```
 
-### **Fiber Oluştur:**
+### **Fiber Oluştur (YENİ - Material Otomatik):**
 
 ```http
 POST /api/production/fibers
 Content-Type: application/json
 
+# Option 1: Auto-create Material (USER-FRIENDLY - ÖNERİLEN)
 {
-  "materialId": "320ce0ab-5155-45fb-b0cc-aa8678f3dc80",
+  "unit": "kg",
   "fiberCategoryId": "550e8400-e29b-41d4-a716-446655440000",
   "fiberName": "Cotton",
   "fiberGrade": "Premium",
@@ -256,7 +245,27 @@ Content-Type: application/json
   "elongationPercent": 5.5,
   "remarks": "Premium quality cotton fiber"
 }
+
+# Backend automatically:
+# ✅ Material.create(FIBER, "kg")
+# ✅ Fiber.create(material, ...)
+# ✅ Material-Fiber relationship
+
+# Option 2: Use existing Material
+{
+  "materialId": "320ce0ab-5155-45fb-b0cc-aa8678f3dc80",
+  "fiberCategoryId": "550e8400-e29b-41d4-a716-446655440000",
+  "fiberName": "Cotton"
+}
+
+# Backend:
+# ✅ Uses existing Material
+# ✅ Fiber.create(material, ...)
 ```
+
+### **⚠️ NOT: Material API Artık Gereksiz**
+
+Material otomatik oluşturulduğu için, Fiber oluştururken ayrı Material API'si çağrısı yapmaya gerek yok! Sadece `unit` parametresi yeterli.
 
 ---
 
@@ -292,7 +301,7 @@ Content-Type: application/json
 
 ## ⚠️ Hata Senaryoları
 
-### **1. Material Bulunamadı:**
+### **1. Material Bulunamadı (Eğer materialId verilmişse):**
 
 ```
 ❌ Material not found: xxx
@@ -301,7 +310,8 @@ Possible reasons:
 - Material belongs to another tenant
 - Material was deleted
 
-[Yeni Material Oluştur] [Material Ara]
+Çözüm: materialId'yi boş bırakın, unit sağlayın → Material otomatik oluşturulur
+[Unit ile Material Otomatik Oluştur] [Material Ara]
 ```
 
 ### **2. Material Type Hatası:**
@@ -342,14 +352,17 @@ Each material can only have one fiber.
     "fiberName": "Cotton",
     "fiberGrade": "Premium",
     "materialId": "320ce0ab-5155-45fb-b0cc-aa8678f3dc80",
+    "materialUid": "MAT-2025-001",
     "fiberCategoryId": "550e8400-e29b-41d4-a716-446655440000",
     "fiberCategoryName": "Natural",
     "status": "NEW",
     "createdAt": "2025-11-02T10:00:00Z"
   },
-  "message": "Fiber created successfully"
+  "message": "Fiber created successfully. Material auto-created."
 }
 ```
+
+**Note:** `materialId` response'da döner (otomatik oluşturulmuş olsa bile).
 
 ---
 
