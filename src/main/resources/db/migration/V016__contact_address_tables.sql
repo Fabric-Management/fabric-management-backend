@@ -96,10 +96,9 @@ COMMENT ON TABLE common_communication.common_address IS 'Generic address informa
 COMMENT ON COLUMN common_communication.common_address.address_type IS 'Address type: HOME, WORK, HEADQUARTERS, BRANCH, WAREHOUSE, SHIPPING, BILLING';
 
 -- ============================================================================
--- TABLE: common_user_contact
+-- TABLE: common_user_contact (Junction table - Composite Primary Key)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS common_communication.common_user_contact (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
@@ -116,7 +115,7 @@ CREATE TABLE IF NOT EXISTS common_communication.common_user_contact (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_user_contact UNIQUE(user_id, contact_id),
+    PRIMARY KEY (user_id, contact_id),
     CONSTRAINT fk_user_contact_user FOREIGN KEY (user_id) 
         REFERENCES common_user.common_user(id) ON DELETE CASCADE,
     CONSTRAINT fk_user_contact_contact FOREIGN KEY (contact_id) 
@@ -132,10 +131,9 @@ COMMENT ON TABLE common_communication.common_user_contact IS 'Junction table: Us
 COMMENT ON COLUMN common_communication.common_user_contact.is_for_authentication IS 'true = this contact can be used for login/authentication';
 
 -- ============================================================================
--- TABLE: common_company_contact
+-- TABLE: common_company_contact (Junction table - Composite Primary Key)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS common_communication.common_company_contact (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
@@ -152,7 +150,7 @@ CREATE TABLE IF NOT EXISTS common_communication.common_company_contact (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_company_contact UNIQUE(company_id, contact_id),
+    PRIMARY KEY (company_id, contact_id),
     CONSTRAINT fk_company_contact_company FOREIGN KEY (company_id) 
         REFERENCES common_company.common_company(id) ON DELETE CASCADE,
     CONSTRAINT fk_company_contact_contact FOREIGN KEY (contact_id) 
@@ -168,10 +166,9 @@ COMMENT ON TABLE common_communication.common_company_contact IS 'Junction table:
 COMMENT ON COLUMN common_communication.common_company_contact.department IS 'Department-specific contact (e.g., "Sales", "Support"), null = company-wide';
 
 -- ============================================================================
--- TABLE: common_user_address
+-- TABLE: common_user_address (Junction table - Composite Primary Key)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS common_communication.common_user_address (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
@@ -188,7 +185,7 @@ CREATE TABLE IF NOT EXISTS common_communication.common_user_address (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_user_address UNIQUE(user_id, address_id),
+    PRIMARY KEY (user_id, address_id),
     CONSTRAINT fk_user_address_user FOREIGN KEY (user_id) 
         REFERENCES common_user.common_user(id) ON DELETE CASCADE,
     CONSTRAINT fk_user_address_address FOREIGN KEY (address_id) 
@@ -203,10 +200,9 @@ COMMENT ON TABLE common_communication.common_user_address IS 'Junction table: Us
 COMMENT ON COLUMN common_communication.common_user_address.is_work_address IS 'true = work/office address (independent from company address)';
 
 -- ============================================================================
--- TABLE: common_company_address
+-- TABLE: common_company_address (Junction table - Composite Primary Key)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS common_communication.common_company_address (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
@@ -223,7 +219,7 @@ CREATE TABLE IF NOT EXISTS common_communication.common_company_address (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_company_address UNIQUE(company_id, address_id),
+    PRIMARY KEY (company_id, address_id),
     CONSTRAINT fk_company_address_company FOREIGN KEY (company_id) 
         REFERENCES common_company.common_company(id) ON DELETE CASCADE,
     CONSTRAINT fk_company_address_address FOREIGN KEY (address_id) 
