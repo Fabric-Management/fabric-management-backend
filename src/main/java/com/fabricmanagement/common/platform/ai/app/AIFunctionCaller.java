@@ -54,6 +54,7 @@ public class AIFunctionCaller {
         return switch (functionName) {
             case "check_material_stock" -> checkMaterialStock(tenantId, parameters);
             case "search_materials" -> searchMaterials(tenantId, parameters);
+            case "smart_search" -> smartSearch(tenantId, parameters);
             case "get_production_status" -> getProductionStatus(tenantId);
             case "get_fiber_info" -> getFiberInfo(tenantId, parameters);
             case "search_fibers" -> searchFibers(tenantId, parameters);
@@ -159,6 +160,217 @@ public class AIFunctionCaller {
     }
 
     /**
+     * Smart search that automatically detects entity type from query and searches accordingly.
+     * 
+     * <p>Entity Type Detection Rules:</p>
+     * <ul>
+     *   <li>"pamuk" (without suffix) → FIBER</li>
+     *   <li>"pamuk ipliği" / "cotton yarn" → YARN</li>
+     *   <li>"gabardin" / "kumaş" → FABRIC</li>
+     *   <li>"iplik" / "yarn" → YARN</li>
+     *   <li>Technical specs (30/1, GSM) → Usually FABRIC or YARN</li>
+     * </ul>
+     * 
+     * <p>This is more efficient than separate searches - one function call, smart detection.</p>
+     */
+    private String smartSearch(UUID tenantId, Map<String, Object> parameters) {
+        String query = (String) parameters.getOrDefault("query", "");
+        
+        if (query.isBlank()) {
+            return "Arama sorgusu gereklidir. Örnek: 'pamuk', 'pamuk ipliği', 'gabardin'";
+        }
+        
+        // Detect entity type from query
+        EntityType entityType = detectEntityType(query);
+        
+        // Normalize query (Turkish → English)
+        String normalizedQuery = normalizeFiberQuery(query);
+        
+        StringBuilder result = new StringBuilder();
+        result.append(String.format("🔍 '%s' için arama yapılıyor...\n", query));
+        result.append(String.format("📌 Algılanan tip: %s\n\n", entityType.displayName));
+        
+        boolean found = false;
+        
+        // Search based on detected type
+        switch (entityType) {
+            case FIBER -> {
+                List<FiberDto> fibers = fiberFacade.findAll();
+                List<FiberDto> matching = fibers.stream()
+                    .filter(f -> {
+                        if (f.getFiberName() == null) return false;
+                        String fiberName = f.getFiberName().toLowerCase();
+                        return fiberName.contains(normalizedQuery.toLowerCase()) || 
+                               fiberName.contains(query.toLowerCase());
+                    })
+                    .toList();
+                
+                if (!matching.isEmpty()) {
+                    found = true;
+                    result.append("✅ Fiber Bulundu:\n");
+                    for (FiberDto f : matching.size() > 5 ? matching.subList(0, 5) : matching) {
+                        result.append(String.format("- %s (UID: %s, Status: %s)\n", 
+                            f.getFiberName(), f.getUid(), f.getStatus()));
+                    }
+                    if (matching.size() > 5) {
+                        result.append(String.format("\n(%d fiber bulundu, ilk 5 gösteriliyor)\n", matching.size()));
+                    }
+                }
+            }
+            case YARN -> {
+                // Search Materials with type=YARN
+                List<MaterialDto> materials = materialFacade.findByTenant(tenantId);
+                List<MaterialDto> matching = materials.stream()
+                    .filter(m -> m.getMaterialType() == MaterialType.YARN && 
+                                (m.getUid() != null && 
+                                 (m.getUid().toLowerCase().contains(normalizedQuery.toLowerCase()) ||
+                                  m.getUid().toLowerCase().contains(query.toLowerCase()))))
+                    .toList();
+                
+                if (!matching.isEmpty()) {
+                    found = true;
+                    result.append("✅ İplik (YARN) Bulundu:\n");
+                    for (MaterialDto m : matching.size() > 5 ? matching.subList(0, 5) : matching) {
+                        result.append(String.format("- %s (Type: %s, UID: %s)\n", 
+                            m.getUid(), m.getMaterialType(), m.getUid()));
+                    }
+                    if (matching.size() > 5) {
+                        result.append(String.format("\n(%d iplik bulundu, ilk 5 gösteriliyor)\n", matching.size()));
+                    }
+                }
+            }
+            case FABRIC -> {
+                // Search Materials with type=FABRIC
+                List<MaterialDto> materials = materialFacade.findByTenant(tenantId);
+                List<MaterialDto> matching = materials.stream()
+                    .filter(m -> m.getMaterialType() == MaterialType.FABRIC && 
+                                (m.getUid() != null && 
+                                 (m.getUid().toLowerCase().contains(normalizedQuery.toLowerCase()) ||
+                                  m.getUid().toLowerCase().contains(query.toLowerCase()))))
+                    .toList();
+                
+                if (!matching.isEmpty()) {
+                    found = true;
+                    result.append("✅ Kumaş (FABRIC) Bulundu:\n");
+                    for (MaterialDto m : matching.size() > 5 ? matching.subList(0, 5) : matching) {
+                        result.append(String.format("- %s (Type: %s, UID: %s)\n", 
+                            m.getUid(), m.getMaterialType(), m.getUid()));
+                    }
+                    if (matching.size() > 5) {
+                        result.append(String.format("\n(%d kumaş bulundu, ilk 5 gösteriliyor)\n", matching.size()));
+                    }
+                }
+            }
+            case UNKNOWN -> {
+                // Try all entity types
+                result.append("⚠️ Tip belirsiz, tüm entity tiplerinde aranıyor...\n\n");
+                
+                // Try FIBER
+                List<FiberDto> fibers = fiberFacade.findAll();
+                List<FiberDto> matchingFibers = fibers.stream()
+                    .filter(f -> f.getFiberName() != null && 
+                                (f.getFiberName().toLowerCase().contains(normalizedQuery.toLowerCase()) ||
+                                 f.getFiberName().toLowerCase().contains(query.toLowerCase())))
+                    .toList();
+                
+                // Try Materials (YARN, FABRIC)
+                List<MaterialDto> materials = materialFacade.findByTenant(tenantId);
+                List<MaterialDto> matchingMaterials = materials.stream()
+                    .filter(m -> m.getUid() != null && 
+                                (m.getUid().toLowerCase().contains(normalizedQuery.toLowerCase()) ||
+                                 m.getUid().toLowerCase().contains(query.toLowerCase())))
+                    .toList();
+                
+                if (!matchingFibers.isEmpty()) {
+                    found = true;
+                    result.append("✅ Fiber Bulundu:\n");
+                    for (FiberDto f : matchingFibers.size() > 3 ? matchingFibers.subList(0, 3) : matchingFibers) {
+                        result.append(String.format("- Fiber: %s (UID: %s)\n", f.getFiberName(), f.getUid()));
+                    }
+                    if (matchingFibers.size() > 3) {
+                        result.append(String.format("(%d fiber bulundu)\n", matchingFibers.size()));
+                    }
+                }
+                
+                if (!matchingMaterials.isEmpty()) {
+                    found = true;
+                    result.append("\n✅ Material Bulundu:\n");
+                    for (MaterialDto m : matchingMaterials.size() > 3 ? matchingMaterials.subList(0, 3) : matchingMaterials) {
+                        result.append(String.format("- Material: %s (Type: %s, UID: %s)\n", 
+                            m.getUid(), m.getMaterialType(), m.getUid()));
+                    }
+                    if (matchingMaterials.size() > 3) {
+                        result.append(String.format("(%d material bulundu)\n", matchingMaterials.size()));
+                    }
+                }
+            }
+        }
+        
+        if (!found) {
+            result.append(String.format("\n❌ '%s' için sonuç bulunamadı.\n", query));
+            result.append("💡 İpuçları:\n");
+            result.append("- 'pamuk' → Fiber arayın\n");
+            result.append("- 'pamuk ipliği' → İplik (YARN) arayın\n");
+            result.append("- 'gabardin' → Kumaş (FABRIC) arayın\n");
+        }
+        
+        return result.toString();
+    }
+
+    /**
+     * Detect entity type from query string using intelligent pattern matching.
+     */
+    private EntityType detectEntityType(String query) {
+        if (query == null || query.isBlank()) {
+            return EntityType.UNKNOWN;
+        }
+        
+        String lowerQuery = query.toLowerCase().trim();
+        
+        // YARN indicators
+        if (lowerQuery.contains("iplik") || lowerQuery.contains("yarn") || 
+            lowerQuery.contains("ipliği") || lowerQuery.contains("ipliğin")) {
+            return EntityType.YARN;
+        }
+        
+        // FABRIC indicators
+        if (lowerQuery.contains("kumaş") || lowerQuery.contains("fabric") ||
+            lowerQuery.contains("gabardin") || lowerQuery.contains("poplin") ||
+            lowerQuery.contains("denim") || lowerQuery.contains("twill") ||
+            lowerQuery.contains("jersey") || lowerQuery.contains("rib") ||
+            // Technical specs often indicate fabric
+            lowerQuery.matches(".*\\d+/\\d+.*") || lowerQuery.contains("gsm")) {
+            return EntityType.FABRIC;
+        }
+        
+        // FIBER indicators (base materials, but not yarn/fabric)
+        if (lowerQuery.matches(".*\\b(pamuk|cotton|polyester|poliester|yün|wool|keten|linen|ipek|silk|akrilik|acrylic|naylon|nylon|viscose|viskoz|elastan|elastane)\\b.*") &&
+            !lowerQuery.contains("iplik") && !lowerQuery.contains("yarn") &&
+            !lowerQuery.contains("kumaş") && !lowerQuery.contains("fabric")) {
+            return EntityType.FIBER;
+        }
+        
+        // Default to unknown - will search all
+        return EntityType.UNKNOWN;
+    }
+
+    /**
+     * Entity type enum for smart search.
+     */
+    private enum EntityType {
+        FIBER("Fiber (Pamuk, Polyester, Yün, vb.)"),
+        YARN("İplik (Yarn)"),
+        FABRIC("Kumaş (Fabric)"),
+        UNKNOWN("Belirsiz (Tüm tiplerde arama)");
+        
+        private final String displayName;
+        
+        EntityType(String displayName) {
+            this.displayName = displayName;
+        }
+    }
+
+    /**
      * Search materials by query.
      * Also checks if there are related fibers for better context.
      */
@@ -204,7 +416,7 @@ public class AIFunctionCaller {
                     result.append(String.format("- Fiber: %s (UID: %s, Status: %s)\n", 
                         f.getFiberName(), f.getUid(), f.getStatus()));
                     if (f.getMaterialId() != null) {
-                        materialFacade.findById(f.getMaterialId()).ifPresent(m -> {
+                        materialFacade.findById(tenantId, f.getMaterialId()).ifPresent(m -> {
                             result.append(String.format("  → İlişkili Material: %s (UID: %s)\n", 
                                 m.getMaterialType(), m.getUid()));
                         });
@@ -603,6 +815,54 @@ public class AIFunctionCaller {
             log.error("Error creating fiber", e);
             return "❌ Error creating fiber: " + e.getMessage();
         }
+    }
+
+    /**
+     * Normalize fiber query by translating Turkish fiber names to English.
+     * This helps users search with Turkish names (e.g., "pamuk") and find English-named fibers (e.g., "Cotton").
+     */
+    private String normalizeFiberQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return query;
+        }
+        
+        String lowerQuery = query.toLowerCase().trim();
+        
+        // Turkish-to-English fiber name mapping
+        Map<String, String> translations = Map.of(
+            "pamuk", "cotton",
+            "polyester", "polyester",
+            "poliester", "polyester",
+            "yün", "wool",
+            "naylon", "nylon",
+            "nylon", "nylon",
+            "viscose", "viscose",
+            "viskoz", "viscose",
+            "elastan", "elastane",
+            "spandeks", "elastane",
+            "elastane", "elastane",
+            "polypropilen", "polypropylene",
+            "polypropylene", "polypropylene",
+            "keten", "linen",
+            "linen", "linen",
+            "ipek", "silk",
+            "silk", "silk",
+            "akrilik", "acrylic",
+            "acrylic", "acrylic",
+            "materyal", "material",
+            "materyali", "material"
+        );
+        
+        // Check for exact matches first
+        for (Map.Entry<String, String> entry : translations.entrySet()) {
+            if (lowerQuery.contains(entry.getKey())) {
+                // Replace Turkish word with English, but keep other parts of query
+                return lowerQuery.replace(entry.getKey(), entry.getValue());
+            }
+        }
+        
+        // If no translation found, return original query
+        return query;
     }
 }
 
