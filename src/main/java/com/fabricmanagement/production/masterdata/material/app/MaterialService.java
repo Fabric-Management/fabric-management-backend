@@ -31,8 +31,11 @@ public class MaterialService implements MaterialFacade {
     private final MaterialRepository materialRepository;
     private final DomainEventPublisher eventPublisher;
 
+    /**
+     * Create material (internal method).
+     */
     @Transactional
-    public MaterialDto createMaterial(CreateMaterialRequest request) {
+    public MaterialDto createMaterialInternal(CreateMaterialRequest request) {
         log.info("Creating material: type={}", request.getMaterialType());
 
         Material material = Material.create(
@@ -101,6 +104,12 @@ public class MaterialService implements MaterialFacade {
         materialRepository.save(material);
 
         log.info("✅ Material deactivated: id={}", id);
+    }
+
+    @Override
+    @Transactional
+    public MaterialDto createMaterial(CreateMaterialRequest request) {
+        return createMaterialInternal(request);
     }
 }
 

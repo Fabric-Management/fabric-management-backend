@@ -4,8 +4,11 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade.StockInfo;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
+import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
 import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +54,8 @@ public class AIFunctionCaller {
             case "get_production_status" -> getProductionStatus(tenantId);
             case "get_fiber_info" -> getFiberInfo(tenantId, parameters);
             case "search_fibers" -> searchFibers(tenantId, parameters);
+            case "create_material" -> createMaterial(tenantId, parameters);
+            case "create_fiber" -> createFiber(tenantId, parameters);
             default -> "Unknown function: " + functionName;
         };
     }
@@ -354,6 +359,142 @@ public class AIFunctionCaller {
                 f.getUid()));
         }
         return result.toString();
+    }
+
+    /**
+     * Create a new material.
+     * 
+     * <p>Required: materialType (FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE), unit (kg, m, piece, etc.)</p>
+     */
+    private String createMaterial(UUID tenantId, Map<String, Object> parameters) {
+        try {
+            String materialTypeStr = (String) parameters.get("materialType");
+            String unit = (String) parameters.get("unit");
+
+            if (materialTypeStr == null || materialTypeStr.isBlank()) {
+                return "❌ Material Type is required. Valid values: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE";
+            }
+
+            if (unit == null || unit.isBlank()) {
+                return "❌ Unit is required. Examples: kg, m, piece, liter";
+            }
+
+            MaterialType materialType;
+            try {
+                materialType = MaterialType.valueOf(materialTypeStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return String.format("❌ Invalid Material Type: %s. Valid values: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE", materialTypeStr);
+            }
+
+            CreateMaterialRequest request = CreateMaterialRequest.builder()
+                .materialType(materialType)
+                .unit(unit)
+                .build();
+
+            MaterialDto created = materialFacade.createMaterial(request);
+
+            return String.format(
+                "✅ Material created successfully!\n\n" +
+                "Material ID: %s\n" +
+                "UID: %s\n" +
+                "Type: %s\n" +
+                "Unit: %s\n" +
+                "Status: Active",
+                created.getId(),
+                created.getUid(),
+                created.getMaterialType(),
+                created.getUnit()
+            );
+        } catch (Exception e) {
+            log.error("Error creating material", e);
+            return "❌ Error creating material: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Create a new fiber.
+     * 
+     * <p>Required: materialId (UUID of FIBER-type Material), fiberCategoryId (UUID), fiberName</p>
+     * <p>Optional: fiberGrade, fineness, lengthMm, strengthCndTex, elongationPercent, remarks</p>
+     */
+    private String createFiber(UUID tenantId, Map<String, Object> parameters) {
+        try {
+            String materialIdStr = (String) parameters.get("materialId");
+            String fiberCategoryIdStr = (String) parameters.get("fiberCategoryId");
+            String fiberName = (String) parameters.get("fiberName");
+
+            if (materialIdStr == null || materialIdStr.isBlank()) {
+                return "❌ Material ID is required. Material must exist with type=FIBER.";
+            }
+
+            if (fiberCategoryIdStr == null || fiberCategoryIdStr.isBlank()) {
+                return "❌ Fiber Category ID is required.";
+            }
+
+            if (fiberName == null || fiberName.isBlank()) {
+                return "❌ Fiber Name is required.";
+            }
+
+            UUID materialId;
+            UUID fiberCategoryId;
+            try {
+                materialId = UUID.fromString(materialIdStr);
+                fiberCategoryId = UUID.fromString(fiberCategoryIdStr);
+            } catch (IllegalArgumentException e) {
+                return "❌ Invalid UUID format for materialId or fiberCategoryId.";
+            }
+
+            // Optional fields
+            UUID fiberIsoCodeId = parameters.get("fiberIsoCodeId") != null 
+                ? UUID.fromString(parameters.get("fiberIsoCodeId").toString())
+                : null;
+            String fiberGrade = (String) parameters.get("fiberGrade");
+            Double fineness = parameters.get("fineness") != null 
+                ? Double.parseDouble(parameters.get("fineness").toString())
+                : null;
+            Double lengthMm = parameters.get("lengthMm") != null 
+                ? Double.parseDouble(parameters.get("lengthMm").toString())
+                : null;
+            Double strengthCndTex = parameters.get("strengthCndTex") != null 
+                ? Double.parseDouble(parameters.get("strengthCndTex").toString())
+                : null;
+            Double elongationPercent = parameters.get("elongationPercent") != null 
+                ? Double.parseDouble(parameters.get("elongationPercent").toString())
+                : null;
+            String remarks = (String) parameters.get("remarks");
+
+            CreateFiberRequest request = CreateFiberRequest.builder()
+                .materialId(materialId)
+                .fiberCategoryId(fiberCategoryId)
+                .fiberIsoCodeId(fiberIsoCodeId)
+                .fiberName(fiberName)
+                .fiberGrade(fiberGrade)
+                .fineness(fineness)
+                .lengthMm(lengthMm)
+                .strengthCndTex(strengthCndTex)
+                .elongationPercent(elongationPercent)
+                .remarks(remarks)
+                .build();
+
+            FiberDto created = fiberFacade.createFiber(request);
+
+            return String.format(
+                "✅ Fiber created successfully!\n\n" +
+                "Fiber ID: %s\n" +
+                "UID: %s\n" +
+                "Name: %s\n" +
+                "Grade: %s\n" +
+                "Status: %s",
+                created.getId(),
+                created.getUid(),
+                created.getFiberName(),
+                created.getFiberGrade() != null ? created.getFiberGrade() : "N/A",
+                created.getStatus() != null ? created.getStatus() : "N/A"
+            );
+        } catch (Exception e) {
+            log.error("Error creating fiber", e);
+            return "❌ Error creating fiber: " + e.getMessage();
+        }
     }
 }
 

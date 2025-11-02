@@ -83,6 +83,68 @@ public class AIToolBuilder {
                     ),
                     "required", List.of("query")
                 )
+            ),
+            buildTool("create_material",
+                "Create a new material. Use this when user wants to create a material. REQUIRES USER CONFIRMATION.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "materialType", Map.of(
+                            "type", "string",
+                            "description", "Material type: FIBER, YARN, FABRIC, CHEMICAL, or CONSUMABLE (required)"
+                        ),
+                        "unit", Map.of(
+                            "type", "string",
+                            "description", "Unit of measurement: kg, m, piece, liter, etc. (required)"
+                        )
+                    ),
+                    "required", List.of("materialType", "unit")
+                )
+            ),
+            buildTool("create_fiber",
+                "Create a new fiber. Use this when user wants to create a fiber. Material must exist with type=FIBER. REQUIRES USER CONFIRMATION.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "materialId", Map.of(
+                            "type", "string",
+                            "description", "Material ID (UUID) - Material must exist with type=FIBER (required)"
+                        ),
+                        "fiberCategoryId", Map.of(
+                            "type", "string",
+                            "description", "Fiber Category ID (UUID) - required"
+                        ),
+                        "fiberName", Map.of(
+                            "type", "string",
+                            "description", "Fiber name (required)"
+                        ),
+                        "fiberGrade", Map.of(
+                            "type", "string",
+                            "description", "Fiber grade (optional)"
+                        ),
+                        "fineness", Map.of(
+                            "type", "number",
+                            "description", "Fineness value (optional)"
+                        ),
+                        "lengthMm", Map.of(
+                            "type", "number",
+                            "description", "Length in millimeters (optional)"
+                        ),
+                        "strengthCndTex", Map.of(
+                            "type", "number",
+                            "description", "Strength in cN/dtex (optional)"
+                        ),
+                        "elongationPercent", Map.of(
+                            "type", "number",
+                            "description", "Elongation percentage (optional)"
+                        ),
+                        "remarks", Map.of(
+                            "type", "string",
+                            "description", "Additional remarks (optional)"
+                        )
+                    ),
+                    "required", List.of("materialId", "fiberCategoryId", "fiberName")
+                )
             )
         );
     }

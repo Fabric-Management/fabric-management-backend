@@ -46,8 +46,11 @@ public class FiberService implements FiberFacade {
     private final FiberCompositionService compositionService;
     private final FiberValidationService validationService;
 
+    /**
+     * Create fiber (internal method).
+     */
     @Transactional
-    public FiberDto createFiber(CreateFiberRequest request) {
+    public FiberDto createFiberInternal(CreateFiberRequest request) {
         log.info("Creating fiber: name={}", request.getFiberName());
 
         // Check if this is a pure 100% fiber being recreated
@@ -425,5 +428,11 @@ public class FiberService implements FiberFacade {
                 return String.format("%s %.0f%%", fiberName, percentage);
             })
             .collect(Collectors.joining(" + ")) + " Blend";
+    }
+
+    @Override
+    @Transactional
+    public FiberDto createFiber(CreateFiberRequest request) {
+        return createFiberInternal(request);
     }
 }
