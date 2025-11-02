@@ -47,32 +47,36 @@ The User management system has been **significantly refactored**:
 ### 1. Removed Fields from UserDto
 
 **REMOVED:**
+
 ```typescript
 // ❌ These fields no longer exist in UserDto:
 interface UserDto {
-  contactValue?: string;      // REMOVED
-  contactType?: string;       // REMOVED
-  department?: string;        // REMOVED (deprecated)
+  contactValue?: string; // REMOVED
+  contactType?: string; // REMOVED
+  department?: string; // REMOVED (deprecated)
 }
 ```
 
 **NEW APPROACH:**
+
 ```typescript
 // ✅ Fetch separately via Communication module
-GET /api/common/users/{userId}/contacts
-GET /api/common/users/{userId}/addresses
-GET /api/common/users/{userId}/departments
+GET / api / common / users / { userId } / contacts;
+GET / api / common / users / { userId } / addresses;
+GET / api / common / users / { userId } / departments;
 ```
 
 ### 2. Department Field Deprecated
 
 **OLD (Still works, but deprecated):**
+
 ```typescript
 const user = await getUser(userId);
 const department = user.department; // ❌ Deprecated
 ```
 
 **NEW (Recommended):**
+
 ```typescript
 const departments = await getUserDepartments(userId);
 const primaryDept = departments.find(d => d.isPrimary);
@@ -91,21 +95,21 @@ const primaryDept = departments.find(d => d.isPrimary);
 
 ```typescript
 interface UserDto {
-  id: string;                           // UUID
-  tenantId: string;                     // UUID
-  uid: string;                          // Auto-generated (e.g., "ACME-001-USER-00042")
-  firstName: string;                    // Required
-  lastName: string;                     // Required
-  displayName: string;                   // Auto-generated: "firstName lastName"
-  companyId: string;                    // UUID - Required (user belongs to company)
-  roleId?: string;                      // UUID - Optional (references Role entity)
-  role?: string;                        // Role name for display (e.g., "Manager")
+  id: string; // UUID
+  tenantId: string; // UUID
+  uid: string; // Auto-generated (e.g., "ACME-001-USER-00042")
+  firstName: string; // Required
+  lastName: string; // Required
+  displayName: string; // Auto-generated: "firstName lastName"
+  companyId: string; // UUID - Required (user belongs to company)
+  roleId?: string; // UUID - Optional (references Role entity)
+  role?: string; // Role name for display (e.g., "Manager")
   isActive: boolean;
-  lastActiveAt?: string;                // ISO 8601 timestamp
-  onboardingCompletedAt?: string;       // ISO 8601 timestamp
-  hasCompletedOnboarding: boolean;       // Computed: onboardingCompletedAt != null
-  createdAt: string;                    // ISO 8601
-  updatedAt: string;                    // ISO 8601
+  lastActiveAt?: string; // ISO 8601 timestamp
+  onboardingCompletedAt?: string; // ISO 8601 timestamp
+  hasCompletedOnboarding: boolean; // Computed: onboardingCompletedAt != null
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
 }
 ```
 
@@ -130,12 +134,14 @@ All user endpoints: `/api/common/users`
 ### User CRUD Endpoints
 
 #### Get User by ID
+
 ```http
 GET /api/common/users/{userId}
 Authorization: Bearer {token}
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -158,6 +164,7 @@ Authorization: Bearer {token}
 ```
 
 #### Get All Users (Tenant)
+
 ```http
 GET /api/common/users
 Authorization: Bearer {token}
@@ -166,6 +173,7 @@ Authorization: Bearer {token}
 **Response:** Array of `UserDto`
 
 #### Get Users by Company
+
 ```http
 GET /api/common/users/company/{companyId}
 Authorization: Bearer {token}
@@ -174,6 +182,7 @@ Authorization: Bearer {token}
 **Response:** Array of `UserDto`
 
 #### Create User
+
 ```http
 POST /api/common/users
 Content-Type: application/json
@@ -192,18 +201,21 @@ Authorization: Bearer {token}
 **Response:** `UserDto` with created user
 
 **✅ USER-FRIENDLY AUTOMATION:**
+
 - **ContactValue provided** → Contact entity automatically created
 - **Contact linked** → UserContact with `isForAuthentication: true` and `isDefault: true`
 - **displayName** → Auto-generated from `firstName + lastName`
 - **Address copied** → If Company has a primary address, UserAddress (WORK) is automatically created from Company's address
 
 **Benefits:**
+
 - ✅ Single form - no separate Contact/Address creation steps
 - ✅ Company address automatically copied to user (WORK address)
 - ✅ Reduces user errors
 - ✅ Ensures data integrity
 
 #### Update User
+
 ```http
 PUT /api/common/users/{userId}
 Content-Type: application/json
@@ -219,12 +231,14 @@ Authorization: Bearer {token}
 **Note:** Only `firstName` and `lastName` can be updated via this endpoint. For contacts, addresses, departments, use respective endpoints.
 
 #### Deactivate User
+
 ```http
 DELETE /api/common/users/{userId}
 Authorization: Bearer {token}
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -233,16 +247,18 @@ Authorization: Bearer {token}
 ```
 
 #### Check Contact Exists
+
 ```http
 GET /api/common/users/contact/{contactValue}
 Authorization: Bearer {token}
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
-  "data": true                              // or false
+  "data": true // or false
 }
 ```
 
@@ -267,12 +283,14 @@ Roles are **database-driven**, not static enums. Standard roles are seeded, but 
 ### Role Endpoints
 
 #### Get All Roles
+
 ```http
 GET /api/common/roles
 Authorization: Bearer {token}
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -291,12 +309,14 @@ Authorization: Bearer {token}
 ```
 
 #### Get Role by ID
+
 ```http
 GET /api/common/roles/{roleId}
 Authorization: Bearer {token}
 ```
 
 #### Get Role by Code
+
 ```http
 GET /api/common/roles/code/{code}
 Authorization: Bearer {token}
@@ -305,6 +325,7 @@ Authorization: Bearer {token}
 **Example:** `GET /api/common/roles/code/ADMIN`
 
 #### Create Role
+
 ```http
 POST /api/common/roles
 Content-Type: application/json
@@ -318,6 +339,7 @@ Authorization: Bearer {token}
 ```
 
 #### Update Role
+
 ```http
 PUT /api/common/roles/{roleId}
 Content-Type: application/json
@@ -331,6 +353,7 @@ Authorization: Bearer {token}
 ```
 
 #### Deactivate Role
+
 ```http
 DELETE /api/common/roles/{roleId}
 Authorization: Bearer {token}
@@ -340,12 +363,12 @@ Authorization: Bearer {token}
 
 ```typescript
 interface RoleDto {
-  id: string;                    // UUID
-  tenantId: string;              // UUID
-  uid: string;                   // Auto-generated
-  roleName: string;               // Display name (e.g., "Administrator")
-  roleCode: string;               // Code for policies (e.g., "ADMIN")
-  description?: string;           // Optional description
+  id: string; // UUID
+  tenantId: string; // UUID
+  uid: string; // Auto-generated
+  roleName: string; // Display name (e.g., "Administrator")
+  roleCode: string; // Code for policies (e.g., "ADMIN")
+  description?: string; // Optional description
   isActive: boolean;
 }
 ```
@@ -367,12 +390,14 @@ interface RoleDto {
 ### User-Department Endpoints
 
 #### Get User Departments
+
 ```http
 GET /api/common/users/{userId}/departments
 Authorization: Bearer {token}
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -389,6 +414,7 @@ Authorization: Bearer {token}
 ```
 
 #### Get Primary Department
+
 ```http
 GET /api/common/users/{userId}/departments/primary
 Authorization: Bearer {token}
@@ -397,6 +423,7 @@ Authorization: Bearer {token}
 **Response:** Single `UserDepartmentDto`
 
 #### Assign Department to User
+
 ```http
 POST /api/common/users/{userId}/departments
 Content-Type: application/json
@@ -411,6 +438,7 @@ Authorization: Bearer {token}
 **Response:** `UserDepartmentDto`
 
 #### Set Primary Department
+
 ```http
 PUT /api/common/users/{userId}/departments/{departmentId}/primary
 Authorization: Bearer {token}
@@ -419,6 +447,7 @@ Authorization: Bearer {token}
 **Note:** This sets the specified department as primary and unsets other primary flags.
 
 #### Remove Department Assignment
+
 ```http
 DELETE /api/common/users/{userId}/departments/{departmentId}
 Authorization: Bearer {token}
@@ -428,11 +457,11 @@ Authorization: Bearer {token}
 
 ```typescript
 interface UserDepartmentDto {
-  userId: string;                     // UUID
-  departmentId: string;                // UUID
-  isPrimary: boolean;                  // Is this the primary department?
-  assignedAt: string;                  // ISO 8601 timestamp
-  assignedBy?: string;                 // UUID of user who assigned
+  userId: string; // UUID
+  departmentId: string; // UUID
+  isPrimary: boolean; // Is this the primary department?
+  assignedAt: string; // ISO 8601 timestamp
+  assignedBy?: string; // UUID of user who assigned
 }
 ```
 
@@ -454,26 +483,31 @@ User contacts and addresses are managed via the **Communication module**. See `C
 ### Quick Reference
 
 #### Get User Contacts
+
 ```http
 GET /api/common/users/{userId}/contacts
 ```
 
 #### Get Authentication Contact
+
 ```http
 GET /api/common/users/{userId}/contacts/authentication
 ```
 
 #### Get Default Contact
+
 ```http
 GET /api/common/users/{userId}/contacts/default
 ```
 
 #### Get User Addresses
+
 ```http
 GET /api/common/users/{userId}/addresses
 ```
 
 #### Get Primary Address
+
 ```http
 GET /api/common/users/{userId}/addresses/primary
 ```
@@ -488,19 +522,19 @@ GET /api/common/users/{userId}/addresses/primary
 
 ```typescript
 interface JwtPayload {
-  sub: string;                        // contactValue (from authentication contact)
-  user_id: string;                     // UUID
-  tenant_id: string;                   // UUID
-  tenant_uid: string;                  // e.g., "ACME-001"
-  user_uid: string;                    // e.g., "ACME-001-USER-00042"
-  company_id: string;                  // UUID
-  firstName: string;                   // User's first name
-  lastName: string;                    // User's last name
-  department?: string;                 // ⚠️ Display only (from primary department)
-  role_id?: string;                     // UUID - Role reference
-  role?: string;                       // Display only (role name)
-  iat: number;                         // Issued at (Unix timestamp)
-  exp: number;                         // Expiration (Unix timestamp)
+  sub: string; // contactValue (from authentication contact)
+  user_id: string; // UUID
+  tenant_id: string; // UUID
+  tenant_uid: string; // e.g., "ACME-001"
+  user_uid: string; // e.g., "ACME-001-USER-00042"
+  company_id: string; // UUID
+  firstName: string; // User's first name
+  lastName: string; // User's last name
+  department?: string; // ⚠️ Display only (from primary department)
+  role_id?: string; // UUID - Role reference
+  role?: string; // Display only (role name)
+  iat: number; // Issued at (Unix timestamp)
+  exp: number; // Expiration (Unix timestamp)
 }
 ```
 
@@ -519,8 +553,8 @@ const payload = jwtDecode<JwtPayload>(token);
 
 // Display user info
 const userName = `${payload.firstName} ${payload.lastName}`;
-const userRole = payload.role;              // "Manager"
-const userDepartment = payload.department;  // "Engineering" (display only)
+const userRole = payload.role; // "Manager"
+const userDepartment = payload.department; // "Engineering" (display only)
 
 // For authorization, use backend API endpoints
 const userDepartments = await getUserDepartments(payload.user_id);
@@ -540,9 +574,9 @@ async function getUserWithDetails(userId: string) {
     api.get(`/api/common/users/${userId}/addresses`),
     api.get(`/api/common/users/${userId}/departments`),
     // Fetch role if roleId exists
-    user.roleId 
+    user.roleId
       ? api.get(`/api/common/roles/${user.roleId}`)
-      : Promise.resolve({ data: { data: null } })
+      : Promise.resolve({ data: { data: null } }),
   ]);
 
   return {
@@ -550,7 +584,7 @@ async function getUserWithDetails(userId: string) {
     contacts: contacts.data.data,
     addresses: addresses.data.data,
     departments: departments.data.data,
-    role: role.data.data
+    role: role.data.data,
   };
 }
 ```
@@ -560,8 +594,8 @@ async function getUserWithDetails(userId: string) {
 **✅ SUPER USER-FRIENDLY APPROACH - Single Form with Google Places API:**
 
 ```typescript
-import { usePlacesWidget } from '@react-google-places/autocomplete';
-import { useGoogleMap } from '@react-google-maps/api';
+import { usePlacesWidget } from "@react-google-places/autocomplete";
+import { useGoogleMap } from "@react-google-maps/api";
 
 interface CreateUserFormData {
   firstName: string;
@@ -583,52 +617,52 @@ async function createUserWithContact(userData: CreateUserFormData) {
   // 2. UserContact junction with isForAuthentication=true
   // 3. displayName auto-generation
   // 4. UserAddress (WORK) from Company's address OR provided address
-  
-  const userResponse = await api.post('/api/common/users', {
+
+  const userResponse = await api.post("/api/common/users", {
     firstName: userData.firstName,
     lastName: userData.lastName,
-    contactValue: userData.email,    // Required for authentication
-    contactType: 'EMAIL',
-    companyId: userData.companyId
+    contactValue: userData.email, // Required for authentication
+    contactType: "EMAIL",
+    companyId: userData.companyId,
   });
 
   const user = userResponse.data.data;
-  
+
   // ✅ Contact and displayName are automatically created!
-  
+
   // Optional: Add phone contact if provided
   if (userData.phone) {
     await api.post(`/api/common/users/${user.id}/contacts`, {
       contactValue: userData.phone,
-      contactType: 'PHONE',
+      contactType: "PHONE",
       isDefault: false,
-      isForAuthentication: false
+      isForAuthentication: false,
     });
   }
-  
+
   // Optional: Add custom address if provided (overrides Company address)
   if (userData.address || userData.city || userData.country) {
     // Create Address entity first
-    const addressResponse = await api.post('/api/common/addresses', {
-      addressLine1: userData.address || '',
-      city: userData.city || '',
-      country: userData.country || '',
+    const addressResponse = await api.post("/api/common/addresses", {
+      addressLine1: userData.address || "",
+      city: userData.city || "",
+      country: userData.country || "",
       postalCode: userData.postalCode,
-      addressType: 'WORK'
+      addressType: "WORK",
     });
-    
+
     // Link to User
     await api.post(`/api/common/users/${user.id}/addresses`, {
       addressId: addressResponse.data.data.id,
       isPrimary: true,
-      addressType: 'WORK'
+      addressType: "WORK",
     });
   }
-  
+
   // Assign role (if provided)
   if (userData.roleId) {
     await api.put(`/api/common/users/${user.id}`, {
-      roleId: userData.roleId
+      roleId: userData.roleId,
     });
   }
 
@@ -637,6 +671,7 @@ async function createUserWithContact(userData: CreateUserFormData) {
 ```
 
 **What Gets Auto-Created:**
+
 - ✅ **Contact (EMAIL)** with `contactValue`
 - ✅ **UserContact** junction with `isForAuthentication: true` and `isDefault: true`
 - ✅ **displayName**: "John Doe" (firstName + lastName)
@@ -647,8 +682,8 @@ async function createUserWithContact(userData: CreateUserFormData) {
 ### Example 3: User Profile Component
 
 ```typescript
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from "react";
+import axios from "axios";
 
 interface UserProfileProps {
   userId: string;
@@ -663,27 +698,30 @@ function UserProfile({ userId }: UserProfileProps) {
 
   useEffect(() => {
     // Fetch user
-    axios.get(`/api/common/users/${userId}`)
-      .then(res => {
-        setUser(res.data.data);
-        
-        // Fetch role if roleId exists
-        if (res.data.data.roleId) {
-          axios.get(`/api/common/roles/${res.data.data.roleId}`)
-            .then(roleRes => setRole(roleRes.data.data));
-        }
-      });
+    axios.get(`/api/common/users/${userId}`).then(res => {
+      setUser(res.data.data);
+
+      // Fetch role if roleId exists
+      if (res.data.data.roleId) {
+        axios
+          .get(`/api/common/roles/${res.data.data.roleId}`)
+          .then(roleRes => setRole(roleRes.data.data));
+      }
+    });
 
     // Fetch contacts
-    axios.get(`/api/common/users/${userId}/contacts`)
+    axios
+      .get(`/api/common/users/${userId}/contacts`)
       .then(res => setContacts(res.data.data));
 
     // Fetch addresses
-    axios.get(`/api/common/users/${userId}/addresses`)
+    axios
+      .get(`/api/common/users/${userId}/addresses`)
       .then(res => setAddresses(res.data.data));
 
     // Fetch departments
-    axios.get(`/api/common/users/${userId}/departments`)
+    axios
+      .get(`/api/common/users/${userId}/departments`)
       .then(res => setDepartments(res.data.data));
   }, [userId]);
 
@@ -696,10 +734,13 @@ function UserProfile({ userId }: UserProfileProps) {
   return (
     <div>
       <h1>{user.displayName}</h1>
-      <p>Role: {role?.roleName || user.role || 'N/A'}</p>
-      <p>Primary Department: {primaryDept ? 'Department ID: ' + primaryDept.departmentId : 'N/A'}</p>
-      <p>Email: {authContact?.contact.contactValue || 'N/A'}</p>
-      <p>Address: {primaryAddress?.address.formattedAddress || 'N/A'}</p>
+      <p>Role: {role?.roleName || user.role || "N/A"}</p>
+      <p>
+        Primary Department:{" "}
+        {primaryDept ? "Department ID: " + primaryDept.departmentId : "N/A"}
+      </p>
+      <p>Email: {authContact?.contact.contactValue || "N/A"}</p>
+      <p>Address: {primaryAddress?.address.formattedAddress || "N/A"}</p>
     </div>
   );
 }
@@ -709,7 +750,7 @@ function UserProfile({ userId }: UserProfileProps) {
 
 ```typescript
 async function getUsersWithDepartments() {
-  const usersResponse = await axios.get('/api/common/users');
+  const usersResponse = await axios.get("/api/common/users");
   const users = usersResponse.data.data;
 
   // Fetch departments for each user
@@ -724,13 +765,13 @@ async function getUsersWithDepartments() {
           departments: deptsResponse.data.data,
           primaryDepartment: deptsResponse.data.data.find(
             (d: UserDepartmentDto) => d.isPrimary
-          )
+          ),
         };
       } catch (error) {
         return {
           ...user,
           departments: [],
-          primaryDepartment: null
+          primaryDepartment: null,
         };
       }
     })
@@ -752,7 +793,7 @@ async function assignDepartmentsToUser(
   for (const deptId of departmentIds) {
     await axios.post(`/api/common/users/${userId}/departments`, {
       departmentId: deptId,
-      isPrimary: deptId === primaryDepartmentId
+      isPrimary: deptId === primaryDepartmentId,
     });
   }
 
@@ -768,21 +809,28 @@ async function assignDepartmentsToUser(
 ### Example 6: Role Dropdown Component
 
 ```typescript
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from "react";
+import axios from "axios";
 
-function RoleSelector({ value, onChange }: { value?: string; onChange: (roleId: string) => void }) {
+function RoleSelector({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange: (roleId: string) => void;
+}) {
   const [roles, setRoles] = useState<RoleDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/api/common/roles')
+    axios
+      .get("/api/common/roles")
       .then(res => {
         setRoles(res.data.data.filter((r: RoleDto) => r.isActive));
         setLoading(false);
       })
       .catch(err => {
-        console.error('Failed to fetch roles:', err);
+        console.error("Failed to fetch roles:", err);
         setLoading(false);
       });
   }, []);
@@ -790,7 +838,7 @@ function RoleSelector({ value, onChange }: { value?: string; onChange: (roleId: 
   if (loading) return <div>Loading roles...</div>;
 
   return (
-    <select value={value || ''} onChange={(e) => onChange(e.target.value)}>
+    <select value={value || ""} onChange={e => onChange(e.target.value)}>
       <option value="">Select Role</option>
       {roles.map(role => (
         <option key={role.id} value={role.id}>
@@ -809,14 +857,16 @@ function RoleSelector({ value, onChange }: { value?: string; onChange: (roleId: 
 ### Step 1: Remove Direct Field Usage
 
 **Before:**
+
 ```typescript
 // ❌ Don't use these
 const user = await getUser(userId);
-const email = user.contactValue;      // REMOVED
-const department = user.department;   // DEPRECATED
+const email = user.contactValue; // REMOVED
+const department = user.department; // DEPRECATED
 ```
 
 **After:**
+
 ```typescript
 // ✅ Fetch separately
 const user = await getUser(userId);
@@ -830,21 +880,23 @@ const department = departments.find(d => d.isPrimary);
 ### Step 2: Update User Forms
 
 **Before:**
+
 ```typescript
 function UserForm() {
-  const [email, setEmail] = useState('');
-  const [department, setDepartment] = useState('');
-  
+  const [email, setEmail] = useState("");
+  const [department, setDepartment] = useState("");
+
   // ...
 }
 ```
 
 **After:**
+
 ```typescript
 function UserForm() {
   const [contacts, setContacts] = useState<UserContactDto[]>([]);
   const [departments, setDepartments] = useState<UserDepartmentDto[]>([]);
-  
+
   // Use Contact component for email/phone
   // Use Department selector for departments
 }
@@ -853,12 +905,14 @@ function UserForm() {
 ### Step 3: Update JWT Usage
 
 **Before:**
+
 ```typescript
 const payload = jwtDecode(token);
 const department = payload.department; // Used for authorization
 ```
 
 **After:**
+
 ```typescript
 const payload = jwtDecode(token);
 const department = payload.department; // Display only
@@ -870,18 +924,20 @@ const userDepartments = await getUserDepartments(payload.user_id);
 ### Step 4: Update Role Handling
 
 **Before:**
+
 ```typescript
 enum Role {
-  ADMIN = 'ADMIN',
-  MANAGER = 'MANAGER'
+  ADMIN = "ADMIN",
+  MANAGER = "MANAGER",
 }
 ```
 
 **After:**
+
 ```typescript
 // Fetch from API on app startup
 const roles = await getRoles();
-const adminRole = roles.find(r => r.roleCode === 'ADMIN');
+const adminRole = roles.find(r => r.roleCode === "ADMIN");
 ```
 
 ---
@@ -895,9 +951,9 @@ function getUserDisplayInfo(user: UserDto, contacts: UserContactDto[]) {
   const authContact = contacts.find(c => c.isForAuthentication);
   return {
     name: user.displayName,
-    email: authContact?.contact.contactValue || 'N/A',
-    role: user.role || 'No Role',
-    uid: user.uid
+    email: authContact?.contact.contactValue || "N/A",
+    role: user.role || "No Role",
+    uid: user.uid,
   };
 }
 ```
@@ -914,9 +970,9 @@ function getPrimaryDepartment(departments: UserDepartmentDto[]) {
 
 ```typescript
 function getUserStatus(user: UserDto) {
-  if (!user.isActive) return 'Inactive';
-  if (!user.hasCompletedOnboarding) return 'Pending Onboarding';
-  return 'Active';
+  if (!user.isActive) return "Inactive";
+  if (!user.hasCompletedOnboarding) return "Pending Onboarding";
+  return "Active";
 }
 ```
 
@@ -925,14 +981,14 @@ function getUserStatus(user: UserDto) {
 ```typescript
 function getUserEmail(contacts: UserContactDto[]): string | null {
   const emailContact = contacts.find(
-    c => c.contact.contactType === 'EMAIL' && c.isDefault
+    c => c.contact.contactType === "EMAIL" && c.isDefault
   );
   return emailContact?.contact.contactValue || null;
 }
 
 function getUserPhone(contacts: UserContactDto[]): string | null {
   const phoneContact = contacts.find(
-    c => c.contact.contactType === 'PHONE' && c.isDefault
+    c => c.contact.contactType === "PHONE" && c.isDefault
   );
   return phoneContact?.contact.contactValue || null;
 }
@@ -948,7 +1004,7 @@ function hasRole(user: UserDto, roleCode: string, roles: RoleDto[]): boolean {
 }
 
 // Usage
-const isAdmin = hasRole(user, 'ADMIN', allRoles);
+const isAdmin = hasRole(user, "ADMIN", allRoles);
 ```
 
 ---
@@ -986,6 +1042,7 @@ For user creation, provide `contactValue` and `contactType` in `CreateUserReques
 ### Common Errors
 
 #### User Not Found
+
 ```json
 {
   "success": false,
@@ -995,6 +1052,7 @@ For user creation, provide `contactValue` and `contactType` in `CreateUserReques
 ```
 
 #### Contact Already Exists
+
 ```json
 {
   "success": false,
@@ -1004,6 +1062,7 @@ For user creation, provide `contactValue` and `contactType` in `CreateUserReques
 ```
 
 #### Company Not Found
+
 ```json
 {
   "success": false,
@@ -1020,7 +1079,7 @@ try {
 } catch (error: any) {
   if (error.response?.status === 404) {
     // Handle not found
-  } else if (error.response?.data?.error === 'CONTACT_EXISTS') {
+  } else if (error.response?.data?.error === "CONTACT_EXISTS") {
     // Handle contact exists
   } else {
     // Handle generic error
@@ -1041,36 +1100,47 @@ try {
 ## ❓ FAQ
 
 ### Q: How do I get a user's email?
+
 **A:** Fetch user contacts and find the one with `isForAuthentication: true`:
+
 ```typescript
 const contacts = await getUserContacts(userId);
 const email = contacts.find(c => c.isForAuthentication)?.contact.contactValue;
 ```
 
 ### Q: Can a user have multiple roles?
+
 **A:** No. A user can have only one role (via `roleId`). However, they can have multiple departments.
 
 ### Q: How do I assign a role to a user?
+
 **A:** Currently, role assignment may be done during user creation or via user update endpoint. Check backend for role assignment endpoint.
 
 ### Q: What's the difference between `role` and `roleCode`?
-**A:** 
+
+**A:**
+
 - `role` - Display name (e.g., "Manager")
 - `roleCode` - Code used in policies (e.g., "MANAGER")
 
 ### Q: How do I check if a user is an admin?
+
 **A:** Check their role code:
+
 ```typescript
 const user = await getUser(userId);
 const role = await getRole(user.roleId);
-const isAdmin = role?.roleCode === 'ADMIN';
+const isAdmin = role?.roleCode === "ADMIN";
 ```
 
 ### Q: Can I set `displayName` manually?
+
 **A:** No. It's auto-generated from `firstName + lastName`. Don't send it in requests.
 
 ### Q: How do I update a user's department?
+
 **A:** Use the department assignment endpoints:
+
 ```typescript
 // Assign new department
 await assignDepartment(userId, newDepartmentId, true);
@@ -1086,6 +1156,7 @@ await removeDepartment(userId, oldDepartmentId);
 ### Overview
 
 For the **best user experience**, implement address autocomplete using **Google Places API**. This provides:
+
 - ✅ **Address Autocomplete** - Users type, system suggests valid addresses
 - ✅ **Address Validation** - Ensures addresses are real and formatted correctly
 - ✅ **Auto-fill** - Automatically fills city, country, postal code
@@ -1118,12 +1189,12 @@ VITE_GOOGLE_MAPS_API_KEY=your-api-key-here
 
 ```typescript
 // lib/google-maps.ts
-import { Loader } from '@googlemaps/js-api-loader';
+import { Loader } from "@googlemaps/js-api-loader";
 
 const loader = new Loader({
   apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-  version: 'weekly',
-  libraries: ['places']
+  version: "weekly",
+  libraries: ["places"],
 });
 
 export const initGoogleMaps = () => loader.load();
@@ -1137,9 +1208,9 @@ export const initGoogleMaps = () => loader.load();
 
 ```typescript
 // components/CreateUserForm.tsx
-import { useState, useRef } from 'react';
-import { usePlacesWidget } from '@react-google-places/autocomplete';
-import { initGoogleMaps } from '../lib/google-maps';
+import { useState, useRef } from "react";
+import { usePlacesWidget } from "@react-google-places/autocomplete";
+import { initGoogleMaps } from "../lib/google-maps";
 
 interface AddressComponents {
   streetAddress: string;
@@ -1151,15 +1222,15 @@ interface AddressComponents {
 
 export function CreateUserForm() {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    companyId: '',
-    roleId: '',
-    address: {} as AddressComponents
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    companyId: "",
+    roleId: "",
+    address: {} as AddressComponents,
   });
-  
+
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -1168,38 +1239,38 @@ export function CreateUserForm() {
     initGoogleMaps()
       .then(() => {
         setIsGoogleMapsLoaded(true);
-        console.log('✅ Google Maps API loaded');
+        console.log("✅ Google Maps API loaded");
       })
-      .catch((error) => {
-        console.error('❌ Failed to load Google Maps API:', error);
+      .catch(error => {
+        console.error("❌ Failed to load Google Maps API:", error);
       });
   }, []);
 
   // Google Places Autocomplete hook
   const { ref: placesRef } = usePlacesWidget({
-    onPlaceSelected: (place) => {
+    onPlaceSelected: place => {
       // Parse address components from Google Places result
       const addressComponents: AddressComponents = {
-        streetAddress: '',
-        city: '',
-        country: '',
-        state: '',
-        postalCode: ''
+        streetAddress: "",
+        city: "",
+        country: "",
+        state: "",
+        postalCode: "",
       };
 
       // Extract address components
-      place.address_components?.forEach((component) => {
+      place.address_components?.forEach(component => {
         const type = component.types[0];
-        
-        if (type === 'street_number' || type === 'route') {
-          addressComponents.streetAddress += component.long_name + ' ';
-        } else if (type === 'locality') {
+
+        if (type === "street_number" || type === "route") {
+          addressComponents.streetAddress += component.long_name + " ";
+        } else if (type === "locality") {
           addressComponents.city = component.long_name;
-        } else if (type === 'administrative_area_level_1') {
+        } else if (type === "administrative_area_level_1") {
           addressComponents.state = component.long_name;
-        } else if (type === 'country') {
+        } else if (type === "country") {
           addressComponents.country = component.long_name;
-        } else if (type === 'postal_code') {
+        } else if (type === "postal_code") {
           addressComponents.postalCode = component.long_name;
         }
       });
@@ -1213,21 +1284,21 @@ export function CreateUserForm() {
 
       setFormData(prev => ({
         ...prev,
-        address: addressComponents
+        address: addressComponents,
       }));
 
       // Fill input with formatted address
       if (addressInputRef.current) {
-        addressInputRef.current.value = place.formatted_address || '';
+        addressInputRef.current.value = place.formatted_address || "";
       }
 
-      console.log('✅ Address selected:', addressComponents);
+      console.log("✅ Address selected:", addressComponents);
     },
     options: {
-      types: ['address'], // Only show addresses, not businesses
-      componentRestrictions: { country: ['tr', 'us', 'de'] }, // Restrict to specific countries
-      fields: ['address_components', 'formatted_address', 'geometry']
-    }
+      types: ["address"], // Only show addresses, not businesses
+      componentRestrictions: { country: ["tr", "us", "de"] }, // Restrict to specific countries
+      fields: ["address_components", "formatted_address", "geometry"],
+    },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1235,12 +1306,12 @@ export function CreateUserForm() {
 
     try {
       // Step 1: Create user (backend auto-creates Contact and Address from Company)
-      const userResponse = await api.post('/api/common/users', {
+      const userResponse = await api.post("/api/common/users", {
         firstName: formData.firstName,
         lastName: formData.lastName,
         contactValue: formData.email,
-        contactType: 'EMAIL',
-        companyId: formData.companyId
+        contactType: "EMAIL",
+        companyId: formData.companyId,
       });
 
       const user = userResponse.data.data;
@@ -1249,41 +1320,41 @@ export function CreateUserForm() {
       if (formData.phone) {
         await api.post(`/api/common/users/${user.id}/contacts`, {
           contactValue: formData.phone,
-          contactType: 'PHONE',
+          contactType: "PHONE",
           isDefault: false,
-          isForAuthentication: false
+          isForAuthentication: false,
         });
       }
 
       // Step 3: Create custom address if provided (overrides Company address)
       if (formData.address.streetAddress || formData.address.city) {
-        const addressResponse = await api.post('/api/common/addresses', {
-          streetAddress: formData.address.streetAddress || '',
-          city: formData.address.city || '',
+        const addressResponse = await api.post("/api/common/addresses", {
+          streetAddress: formData.address.streetAddress || "",
+          city: formData.address.city || "",
           state: formData.address.state,
-          country: formData.address.country || '',
+          country: formData.address.country || "",
           postalCode: formData.address.postalCode,
-          addressType: 'WORK'
+          addressType: "WORK",
         });
 
         await api.post(`/api/common/users/${user.id}/addresses`, {
           addressId: addressResponse.data.data.id,
           isPrimary: true,
-          addressType: 'WORK'
+          addressType: "WORK",
         });
       }
 
       // Step 4: Assign role (if provided)
       if (formData.roleId) {
         await api.put(`/api/common/users/${user.id}`, {
-          roleId: formData.roleId
+          roleId: formData.roleId,
         });
       }
 
-      alert('✅ User created successfully!');
+      alert("✅ User created successfully!");
       // Reset form or navigate
     } catch (error: any) {
-      console.error('❌ Error creating user:', error);
+      console.error("❌ Error creating user:", error);
       alert(`Error: ${error.response?.data?.message || error.message}`);
     }
   };
@@ -1298,7 +1369,9 @@ export function CreateUserForm() {
         <input
           type="text"
           value={formData.firstName}
-          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+          onChange={e =>
+            setFormData(prev => ({ ...prev, firstName: e.target.value }))
+          }
           required
         />
       </div>
@@ -1308,7 +1381,9 @@ export function CreateUserForm() {
         <input
           type="text"
           value={formData.lastName}
-          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+          onChange={e =>
+            setFormData(prev => ({ ...prev, lastName: e.target.value }))
+          }
           required
         />
       </div>
@@ -1319,7 +1394,9 @@ export function CreateUserForm() {
         <input
           type="email"
           value={formData.email}
-          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+          onChange={e =>
+            setFormData(prev => ({ ...prev, email: e.target.value }))
+          }
           required
         />
       </div>
@@ -1329,17 +1406,21 @@ export function CreateUserForm() {
         <input
           type="tel"
           value={formData.phone}
-          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+          onChange={e =>
+            setFormData(prev => ({ ...prev, phone: e.target.value }))
+          }
           placeholder="+90 555 123 4567"
         />
       </div>
 
       {/* Address with Google Places Autocomplete */}
       <div className="form-group">
-        <label>Work Address (Optional - Auto-filled from Company if not provided)</label>
+        <label>
+          Work Address (Optional - Auto-filled from Company if not provided)
+        </label>
         {isGoogleMapsLoaded ? (
           <input
-            ref={(node) => {
+            ref={node => {
               placesRef.current = node;
               addressInputRef.current = node;
             }}
@@ -1348,17 +1429,16 @@ export function CreateUserForm() {
             className="address-autocomplete"
           />
         ) : (
-          <input
-            type="text"
-            placeholder="Loading Google Maps..."
-            disabled
-          />
+          <input type="text" placeholder="Loading Google Maps..." disabled />
         )}
-        
+
         {/* Show parsed address components (optional - for debugging) */}
         {formData.address.city && (
-          <div className="address-preview" style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-            📍 {formData.address.streetAddress}, {formData.address.city}, {formData.address.country}
+          <div
+            className="address-preview"
+            style={{ marginTop: "8px", fontSize: "12px", color: "#666" }}>
+            📍 {formData.address.streetAddress}, {formData.address.city},{" "}
+            {formData.address.country}
             {formData.address.postalCode && ` (${formData.address.postalCode})`}
           </div>
         )}
@@ -1369,7 +1449,7 @@ export function CreateUserForm() {
         <label>Company *</label>
         <CompanySelector
           value={formData.companyId}
-          onChange={(companyId) => setFormData(prev => ({ ...prev, companyId }))}
+          onChange={companyId => setFormData(prev => ({ ...prev, companyId }))}
         />
       </div>
 
@@ -1377,7 +1457,7 @@ export function CreateUserForm() {
         <label>Role (Optional)</label>
         <RoleSelector
           value={formData.roleId}
-          onChange={(roleId) => setFormData(prev => ({ ...prev, roleId }))}
+          onChange={roleId => setFormData(prev => ({ ...prev, roleId }))}
         />
       </div>
 
@@ -1399,15 +1479,15 @@ export function CreateUserForm() {
 async function validateAddress(address: AddressComponents): Promise<boolean> {
   // Use Google Geocoding API to validate address
   const geocoder = new google.maps.Geocoder();
-  
-  return new Promise((resolve) => {
+
+  return new Promise(resolve => {
     geocoder.geocode(
       {
         address: `${address.streetAddress}, ${address.city}, ${address.country}`,
-        componentRestrictions: { country: address.country }
+        componentRestrictions: { country: address.country },
       },
       (results, status) => {
-        if (status === 'OK' && results && results.length > 0) {
+        if (status === "OK" && results && results.length > 0) {
           // Address is valid
           resolve(true);
         } else {
@@ -1424,55 +1504,57 @@ async function validateAddress(address: AddressComponents): Promise<boolean> {
 
 ```typescript
 const { suggestions } = usePlacesWidget({
-  onPlaceSelected: (place) => {
+  onPlaceSelected: place => {
     // Handle selection
   },
   options: {
-    types: ['address'],
+    types: ["address"],
     // Show suggestions as user types
-    fields: ['address_components', 'formatted_address']
-  }
+    fields: ["address_components", "formatted_address"],
+  },
 });
 ```
 
 ### 3. Handle Address Formatting
 
 ```typescript
-function formatAddressForBackend(place: google.maps.places.PlaceResult): AddressComponents {
+function formatAddressForBackend(
+  place: google.maps.places.PlaceResult
+): AddressComponents {
   const components: AddressComponents = {
-    streetAddress: '',
-    city: '',
-    country: '',
-    state: '',
-    postalCode: ''
+    streetAddress: "",
+    city: "",
+    country: "",
+    state: "",
+    postalCode: "",
   };
 
-  place.address_components?.forEach((component) => {
+  place.address_components?.forEach(component => {
     const type = component.types[0];
-    
+
     switch (type) {
-      case 'street_number':
-      case 'route':
-        components.streetAddress += component.long_name + ' ';
+      case "street_number":
+      case "route":
+        components.streetAddress += component.long_name + " ";
         break;
-      case 'locality':
-      case 'sublocality':
+      case "locality":
+      case "sublocality":
         components.city = component.long_name;
         break;
-      case 'administrative_area_level_1':
+      case "administrative_area_level_1":
         components.state = component.long_name;
         break;
-      case 'country':
+      case "country":
         components.country = component.short_name; // Use ISO code
         break;
-      case 'postal_code':
+      case "postal_code":
         components.postalCode = component.long_name;
         break;
     }
   });
 
   components.streetAddress = components.streetAddress.trim();
-  
+
   return components;
 }
 ```
@@ -1486,7 +1568,9 @@ function formatAddressForBackend(place: google.maps.places.PlaceResult): Address
 **Show only essential fields first, then expand:**
 
 ```typescript
-const [formStep, setFormStep] = useState<'basic' | 'contact' | 'address' | 'review'>('basic');
+const [formStep, setFormStep] = useState<
+  "basic" | "contact" | "address" | "review"
+>("basic");
 
 // Step 1: Basic Info (First Name, Last Name, Email)
 // Step 2: Contact Info (Phone, Company, Role)
@@ -1500,7 +1584,8 @@ const [formStep, setFormStep] = useState<'basic' | 'contact' | 'address' | 'revi
 // Pre-fill Company address for user
 useEffect(() => {
   if (formData.companyId) {
-    api.get(`/api/common/companies/${formData.companyId}/addresses/primary`)
+    api
+      .get(`/api/common/companies/${formData.companyId}/addresses/primary`)
       .then(res => {
         const companyAddress = res.data.data;
         if (companyAddress) {
@@ -1510,12 +1595,14 @@ useEffect(() => {
               streetAddress: companyAddress.streetAddress,
               city: companyAddress.city,
               country: companyAddress.country,
-              postalCode: companyAddress.postalCode
-            }
+              postalCode: companyAddress.postalCode,
+            },
           }));
-          
+
           // Show info message
-          toast.info('📍 Company address pre-filled. You can override if needed.');
+          toast.info(
+            "📍 Company address pre-filled. You can override if needed."
+          );
         }
       });
   }
@@ -1525,12 +1612,14 @@ useEffect(() => {
 ### Pattern 3: Real-time Validation
 
 ```typescript
-const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+const [validationErrors, setValidationErrors] = useState<
+  Record<string, string>
+>({});
 
 const validateEmail = (email: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    setValidationErrors(prev => ({ ...prev, email: 'Invalid email format' }));
+    setValidationErrors(prev => ({ ...prev, email: "Invalid email format" }));
   } else {
     setValidationErrors(prev => {
       const { email, ...rest } = prev;
@@ -1546,7 +1635,7 @@ const checkContactExists = async (email: string) => {
     if (response.data.data === true) {
       setValidationErrors(prev => ({
         ...prev,
-        email: 'This email is already registered'
+        email: "This email is already registered",
       }));
     }
   } catch (error) {
@@ -1559,29 +1648,37 @@ const checkContactExists = async (email: string) => {
 
 ```typescript
 const [isSubmitting, setIsSubmitting] = useState(false);
-const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">(
+  "idle"
+);
 
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setIsSubmitting(true);
-  setSubmitStatus('idle');
+  setSubmitStatus("idle");
 
   try {
     await createUser(formData);
-    setSubmitStatus('success');
-    toast.success('✅ User created successfully!');
+    setSubmitStatus("success");
+    toast.success("✅ User created successfully!");
   } catch (error) {
-    setSubmitStatus('error');
-    toast.error('❌ Failed to create user');
+    setSubmitStatus("error");
+    toast.error("❌ Failed to create user");
   } finally {
     setIsSubmitting(false);
   }
 };
 
 // Show loading spinner during submission
-{isSubmitting && <Spinner />}
-{submitStatus === 'success' && <SuccessMessage />}
-{submitStatus === 'error' && <ErrorMessage />}
+{
+  isSubmitting && <Spinner />;
+}
+{
+  submitStatus === "success" && <SuccessMessage />;
+}
+{
+  submitStatus === "error" && <ErrorMessage />;
+}
 ```
 
 ---
@@ -1623,27 +1720,36 @@ const handleSubmit = async (e: React.FormEvent) => {
 ### 3. Error Handling UI
 
 ```typescript
-{validationErrors.email && (
-  <div className="error-message" style={{ color: 'red', fontSize: '14px', marginTop: '4px' }}>
-    ⚠️ {validationErrors.email}
-  </div>
-)}
+{
+  validationErrors.email && (
+    <div
+      className="error-message"
+      style={{ color: "red", fontSize: "14px", marginTop: "4px" }}>
+      ⚠️ {validationErrors.email}
+    </div>
+  );
+}
 ```
 
 ### 4. Success Feedback
 
 ```typescript
-{submitStatus === 'success' && (
-  <div className="success-message" style={{ 
-    padding: '16px', 
-    background: '#d4edda', 
-    border: '1px solid #c3e6cb', 
-    borderRadius: '4px',
-    color: '#155724'
-  }}>
-    ✅ User created successfully! All contacts and addresses have been set up automatically.
-  </div>
-)}
+{
+  submitStatus === "success" && (
+    <div
+      className="success-message"
+      style={{
+        padding: "16px",
+        background: "#d4edda",
+        border: "1px solid #c3e6cb",
+        borderRadius: "4px",
+        color: "#155724",
+      }}>
+      ✅ User created successfully! All contacts and addresses have been set up
+      automatically.
+    </div>
+  );
+}
 ```
 
 ---
@@ -1651,6 +1757,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 ## 📦 Complete Package Example
 
 See `docs/frontend/FRONTEND_USER_COMPANY_FORMS.md` for complete form patterns including:
+
 - Company creation with address autocomplete
 - User creation with smart defaults
 - Form validation
@@ -1660,4 +1767,3 @@ See `docs/frontend/FRONTEND_USER_COMPANY_FORMS.md` for complete form patterns in
 ---
 
 **Questions?** Contact backend team or check Swagger documentation.
-
