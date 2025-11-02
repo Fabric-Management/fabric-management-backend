@@ -555,42 +555,79 @@ async function getUserWithDetails(userId: string) {
 }
 ```
 
-### Example 2: Create User with Contact (Simplified)
+### Example 2: Create User with Contact (Modern UX with Address Autocomplete)
 
-**✅ NEW USER-FRIENDLY APPROACH - Single API Call:**
+**✅ SUPER USER-FRIENDLY APPROACH - Single Form with Google Places API:**
 
 ```typescript
-async function createUserWithContact(userData: {
+import { usePlacesWidget } from '@react-google-places/autocomplete';
+import { useGoogleMap } from '@react-google-maps/api';
+
+interface CreateUserFormData {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
   companyId: string;
   roleId?: string;
-}) {
+  // Address fields (optional - if provided, will override Company address)
+  address?: string;
+  city?: string;
+  country?: string;
+  postalCode?: string;
+}
+
+async function createUserWithContact(userData: CreateUserFormData) {
   // ✅ Single API call - Backend handles everything automatically:
-  // 1. Contact entity creation
+  // 1. Contact entity creation (EMAIL + PHONE if provided)
   // 2. UserContact junction with isForAuthentication=true
   // 3. displayName auto-generation
-  // 4. UserAddress (WORK) from Company's address (if Company has address)
+  // 4. UserAddress (WORK) from Company's address OR provided address
   
   const userResponse = await api.post('/api/common/users', {
     firstName: userData.firstName,
     lastName: userData.lastName,
-    contactValue: userData.email,
+    contactValue: userData.email,    // Required for authentication
     contactType: 'EMAIL',
     companyId: userData.companyId
   });
 
   const user = userResponse.data.data;
   
-  // ✅ Contact, Address, and displayName are automatically created!
-  // Only role assignment needs separate call (if backend supports it)
-
-  // Step 2: Assign role (if provided)
-  // Note: Check if backend has role assignment endpoint
+  // ✅ Contact and displayName are automatically created!
+  
+  // Optional: Add phone contact if provided
+  if (userData.phone) {
+    await api.post(`/api/common/users/${user.id}/contacts`, {
+      contactValue: userData.phone,
+      contactType: 'PHONE',
+      isDefault: false,
+      isForAuthentication: false
+    });
+  }
+  
+  // Optional: Add custom address if provided (overrides Company address)
+  if (userData.address || userData.city || userData.country) {
+    // Create Address entity first
+    const addressResponse = await api.post('/api/common/addresses', {
+      addressLine1: userData.address || '',
+      city: userData.city || '',
+      country: userData.country || '',
+      postalCode: userData.postalCode,
+      addressType: 'WORK'
+    });
+    
+    // Link to User
+    await api.post(`/api/common/users/${user.id}/addresses`, {
+      addressId: addressResponse.data.data.id,
+      isPrimary: true,
+      addressType: 'WORK'
+    });
+  }
+  
+  // Assign role (if provided)
   if (userData.roleId) {
-    // Assuming role assignment endpoint exists
-    await api.put(`/api/common/users/${user.id}/role`, {
+    await api.put(`/api/common/users/${user.id}`, {
       roleId: userData.roleId
     });
   }
@@ -603,7 +640,9 @@ async function createUserWithContact(userData: {
 - ✅ **Contact (EMAIL)** with `contactValue`
 - ✅ **UserContact** junction with `isForAuthentication: true` and `isDefault: true`
 - ✅ **displayName**: "John Doe" (firstName + lastName)
-- ✅ **UserAddress (WORK)**: If Company has a primary address, it's automatically copied
+- ✅ **UserAddress (WORK)**: Automatically copied from Company's primary address (if exists)
+- ✅ **Optional Phone Contact**: If `phone` provided
+- ✅ **Optional Custom Address**: If address fields provided (overrides Company address)
 
 ### Example 3: User Profile Component
 
@@ -1039,6 +1078,584 @@ await assignDepartment(userId, newDepartmentId, true);
 // Remove old department
 await removeDepartment(userId, oldDepartmentId);
 ```
+
+---
+
+## 🎨 Modern UX: Address Autocomplete & Validation
+
+### Overview
+
+For the **best user experience**, implement address autocomplete using **Google Places API**. This provides:
+- ✅ **Address Autocomplete** - Users type, system suggests valid addresses
+- ✅ **Address Validation** - Ensures addresses are real and formatted correctly
+- ✅ **Auto-fill** - Automatically fills city, country, postal code
+- ✅ **Geocoding** - Gets coordinates for mapping/location services
+- ✅ **Single Form** - No separate address forms needed
+
+### Setup Google Places API
+
+#### 1. Install Dependencies
+
+```bash
+npm install @react-google-places/autocomplete
+# OR
+npm install @googlemaps/js-api-loader
+```
+
+#### 2. Get Google API Key
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable **Places API** and **Geocoding API**
+4. Create API Key
+5. Add to your `.env`:
+
+```env
+VITE_GOOGLE_MAPS_API_KEY=your-api-key-here
+```
+
+#### 3. Initialize Google Maps Script
+
+```typescript
+// lib/google-maps.ts
+import { Loader } from '@googlemaps/js-api-loader';
+
+const loader = new Loader({
+  apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  version: 'weekly',
+  libraries: ['places']
+});
+
+export const initGoogleMaps = () => loader.load();
+```
+
+---
+
+## 📝 Complete User Creation Form Example
+
+### React Component with Google Places Autocomplete
+
+```typescript
+// components/CreateUserForm.tsx
+import { useState, useRef } from 'react';
+import { usePlacesWidget } from '@react-google-places/autocomplete';
+import { initGoogleMaps } from '../lib/google-maps';
+
+interface AddressComponents {
+  streetAddress: string;
+  city: string;
+  state?: string;
+  country: string;
+  postalCode?: string;
+}
+
+export function CreateUserForm() {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    companyId: '',
+    roleId: '',
+    address: {} as AddressComponents
+  });
+  
+  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize Google Maps on component mount
+  useEffect(() => {
+    initGoogleMaps()
+      .then(() => {
+        setIsGoogleMapsLoaded(true);
+        console.log('✅ Google Maps API loaded');
+      })
+      .catch((error) => {
+        console.error('❌ Failed to load Google Maps API:', error);
+      });
+  }, []);
+
+  // Google Places Autocomplete hook
+  const { ref: placesRef } = usePlacesWidget({
+    onPlaceSelected: (place) => {
+      // Parse address components from Google Places result
+      const addressComponents: AddressComponents = {
+        streetAddress: '',
+        city: '',
+        country: '',
+        state: '',
+        postalCode: ''
+      };
+
+      // Extract address components
+      place.address_components?.forEach((component) => {
+        const type = component.types[0];
+        
+        if (type === 'street_number' || type === 'route') {
+          addressComponents.streetAddress += component.long_name + ' ';
+        } else if (type === 'locality') {
+          addressComponents.city = component.long_name;
+        } else if (type === 'administrative_area_level_1') {
+          addressComponents.state = component.long_name;
+        } else if (type === 'country') {
+          addressComponents.country = component.long_name;
+        } else if (type === 'postal_code') {
+          addressComponents.postalCode = component.long_name;
+        }
+      });
+
+      addressComponents.streetAddress = addressComponents.streetAddress.trim();
+
+      // Also use formatted_address as fallback
+      if (place.formatted_address && !addressComponents.streetAddress) {
+        addressComponents.streetAddress = place.formatted_address;
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        address: addressComponents
+      }));
+
+      // Fill input with formatted address
+      if (addressInputRef.current) {
+        addressInputRef.current.value = place.formatted_address || '';
+      }
+
+      console.log('✅ Address selected:', addressComponents);
+    },
+    options: {
+      types: ['address'], // Only show addresses, not businesses
+      componentRestrictions: { country: ['tr', 'us', 'de'] }, // Restrict to specific countries
+      fields: ['address_components', 'formatted_address', 'geometry']
+    }
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      // Step 1: Create user (backend auto-creates Contact and Address from Company)
+      const userResponse = await api.post('/api/common/users', {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        contactValue: formData.email,
+        contactType: 'EMAIL',
+        companyId: formData.companyId
+      });
+
+      const user = userResponse.data.data;
+
+      // Step 2: Add phone contact (if provided)
+      if (formData.phone) {
+        await api.post(`/api/common/users/${user.id}/contacts`, {
+          contactValue: formData.phone,
+          contactType: 'PHONE',
+          isDefault: false,
+          isForAuthentication: false
+        });
+      }
+
+      // Step 3: Create custom address if provided (overrides Company address)
+      if (formData.address.streetAddress || formData.address.city) {
+        const addressResponse = await api.post('/api/common/addresses', {
+          streetAddress: formData.address.streetAddress || '',
+          city: formData.address.city || '',
+          state: formData.address.state,
+          country: formData.address.country || '',
+          postalCode: formData.address.postalCode,
+          addressType: 'WORK'
+        });
+
+        await api.post(`/api/common/users/${user.id}/addresses`, {
+          addressId: addressResponse.data.data.id,
+          isPrimary: true,
+          addressType: 'WORK'
+        });
+      }
+
+      // Step 4: Assign role (if provided)
+      if (formData.roleId) {
+        await api.put(`/api/common/users/${user.id}`, {
+          roleId: formData.roleId
+        });
+      }
+
+      alert('✅ User created successfully!');
+      // Reset form or navigate
+    } catch (error: any) {
+      console.error('❌ Error creating user:', error);
+      alert(`Error: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="user-form">
+      <h2>Create New User</h2>
+
+      {/* Basic Info */}
+      <div className="form-group">
+        <label>First Name *</label>
+        <input
+          type="text"
+          value={formData.firstName}
+          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+          required
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Last Name *</label>
+        <input
+          type="text"
+          value={formData.lastName}
+          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+          required
+        />
+      </div>
+
+      {/* Contact Info */}
+      <div className="form-group">
+        <label>Email *</label>
+        <input
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+          required
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Phone (Optional)</label>
+        <input
+          type="tel"
+          value={formData.phone}
+          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+          placeholder="+90 555 123 4567"
+        />
+      </div>
+
+      {/* Address with Google Places Autocomplete */}
+      <div className="form-group">
+        <label>Work Address (Optional - Auto-filled from Company if not provided)</label>
+        {isGoogleMapsLoaded ? (
+          <input
+            ref={(node) => {
+              placesRef.current = node;
+              addressInputRef.current = node;
+            }}
+            type="text"
+            placeholder="Start typing address..."
+            className="address-autocomplete"
+          />
+        ) : (
+          <input
+            type="text"
+            placeholder="Loading Google Maps..."
+            disabled
+          />
+        )}
+        
+        {/* Show parsed address components (optional - for debugging) */}
+        {formData.address.city && (
+          <div className="address-preview" style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+            📍 {formData.address.streetAddress}, {formData.address.city}, {formData.address.country}
+            {formData.address.postalCode && ` (${formData.address.postalCode})`}
+          </div>
+        )}
+      </div>
+
+      {/* Company & Role */}
+      <div className="form-group">
+        <label>Company *</label>
+        <CompanySelector
+          value={formData.companyId}
+          onChange={(companyId) => setFormData(prev => ({ ...prev, companyId }))}
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Role (Optional)</label>
+        <RoleSelector
+          value={formData.roleId}
+          onChange={(roleId) => setFormData(prev => ({ ...prev, roleId }))}
+        />
+      </div>
+
+      <button type="submit" className="submit-button">
+        Create User
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## 🗺️ Address Validation Best Practices
+
+### 1. Validate Address Before Submission
+
+```typescript
+async function validateAddress(address: AddressComponents): Promise<boolean> {
+  // Use Google Geocoding API to validate address
+  const geocoder = new google.maps.Geocoder();
+  
+  return new Promise((resolve) => {
+    geocoder.geocode(
+      {
+        address: `${address.streetAddress}, ${address.city}, ${address.country}`,
+        componentRestrictions: { country: address.country }
+      },
+      (results, status) => {
+        if (status === 'OK' && results && results.length > 0) {
+          // Address is valid
+          resolve(true);
+        } else {
+          // Address not found or invalid
+          resolve(false);
+        }
+      }
+    );
+  });
+}
+```
+
+### 2. Show Address Suggestions
+
+```typescript
+const { suggestions } = usePlacesWidget({
+  onPlaceSelected: (place) => {
+    // Handle selection
+  },
+  options: {
+    types: ['address'],
+    // Show suggestions as user types
+    fields: ['address_components', 'formatted_address']
+  }
+});
+```
+
+### 3. Handle Address Formatting
+
+```typescript
+function formatAddressForBackend(place: google.maps.places.PlaceResult): AddressComponents {
+  const components: AddressComponents = {
+    streetAddress: '',
+    city: '',
+    country: '',
+    state: '',
+    postalCode: ''
+  };
+
+  place.address_components?.forEach((component) => {
+    const type = component.types[0];
+    
+    switch (type) {
+      case 'street_number':
+      case 'route':
+        components.streetAddress += component.long_name + ' ';
+        break;
+      case 'locality':
+      case 'sublocality':
+        components.city = component.long_name;
+        break;
+      case 'administrative_area_level_1':
+        components.state = component.long_name;
+        break;
+      case 'country':
+        components.country = component.short_name; // Use ISO code
+        break;
+      case 'postal_code':
+        components.postalCode = component.long_name;
+        break;
+    }
+  });
+
+  components.streetAddress = components.streetAddress.trim();
+  
+  return components;
+}
+```
+
+---
+
+## 🎯 UX Patterns for User Creation
+
+### Pattern 1: Progressive Disclosure
+
+**Show only essential fields first, then expand:**
+
+```typescript
+const [formStep, setFormStep] = useState<'basic' | 'contact' | 'address' | 'review'>('basic');
+
+// Step 1: Basic Info (First Name, Last Name, Email)
+// Step 2: Contact Info (Phone, Company, Role)
+// Step 3: Address (Optional - with autocomplete)
+// Step 4: Review & Submit
+```
+
+### Pattern 2: Smart Defaults
+
+```typescript
+// Pre-fill Company address for user
+useEffect(() => {
+  if (formData.companyId) {
+    api.get(`/api/common/companies/${formData.companyId}/addresses/primary`)
+      .then(res => {
+        const companyAddress = res.data.data;
+        if (companyAddress) {
+          setFormData(prev => ({
+            ...prev,
+            address: {
+              streetAddress: companyAddress.streetAddress,
+              city: companyAddress.city,
+              country: companyAddress.country,
+              postalCode: companyAddress.postalCode
+            }
+          }));
+          
+          // Show info message
+          toast.info('📍 Company address pre-filled. You can override if needed.');
+        }
+      });
+  }
+}, [formData.companyId]);
+```
+
+### Pattern 3: Real-time Validation
+
+```typescript
+const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+const validateEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    setValidationErrors(prev => ({ ...prev, email: 'Invalid email format' }));
+  } else {
+    setValidationErrors(prev => {
+      const { email, ...rest } = prev;
+      return rest;
+    });
+  }
+};
+
+// Check if contact already exists
+const checkContactExists = async (email: string) => {
+  try {
+    const response = await api.get(`/api/common/users/contact/${email}`);
+    if (response.data.data === true) {
+      setValidationErrors(prev => ({
+        ...prev,
+        email: 'This email is already registered'
+      }));
+    }
+  } catch (error) {
+    // Contact doesn't exist - OK
+  }
+};
+```
+
+### Pattern 4: Loading States & Feedback
+
+```typescript
+const [isSubmitting, setIsSubmitting] = useState(false);
+const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsSubmitting(true);
+  setSubmitStatus('idle');
+
+  try {
+    await createUser(formData);
+    setSubmitStatus('success');
+    toast.success('✅ User created successfully!');
+  } catch (error) {
+    setSubmitStatus('error');
+    toast.error('❌ Failed to create user');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+// Show loading spinner during submission
+{isSubmitting && <Spinner />}
+{submitStatus === 'success' && <SuccessMessage />}
+{submitStatus === 'error' && <ErrorMessage />}
+```
+
+---
+
+## 🎨 UI/UX Recommendations
+
+### 1. Form Layout
+
+- **Single Column Layout** - Easier to scan and fill
+- **Group Related Fields** - Basic Info, Contact, Address sections
+- **Visual Hierarchy** - Use spacing and typography to guide the eye
+- **Clear Labels** - Use helpful placeholder text
+
+### 2. Address Input Styling
+
+```css
+.address-autocomplete {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.2s;
+}
+
+.address-autocomplete:focus {
+  border-color: #1976d2;
+  outline: none;
+}
+
+.address-preview {
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+```
+
+### 3. Error Handling UI
+
+```typescript
+{validationErrors.email && (
+  <div className="error-message" style={{ color: 'red', fontSize: '14px', marginTop: '4px' }}>
+    ⚠️ {validationErrors.email}
+  </div>
+)}
+```
+
+### 4. Success Feedback
+
+```typescript
+{submitStatus === 'success' && (
+  <div className="success-message" style={{ 
+    padding: '16px', 
+    background: '#d4edda', 
+    border: '1px solid #c3e6cb', 
+    borderRadius: '4px',
+    color: '#155724'
+  }}>
+    ✅ User created successfully! All contacts and addresses have been set up automatically.
+  </div>
+)}
+```
+
+---
+
+## 📦 Complete Package Example
+
+See `docs/frontend/FRONTEND_USER_COMPANY_FORMS.md` for complete form patterns including:
+- Company creation with address autocomplete
+- User creation with smart defaults
+- Form validation
+- Error handling
+- Success feedback
 
 ---
 
