@@ -160,6 +160,7 @@ public class AIFunctionCaller {
 
     /**
      * Search materials by query.
+     * Also checks if there are related fibers for better context.
      */
     private String searchMaterials(UUID tenantId, Map<String, Object> parameters) {
         String query = (String) parameters.getOrDefault("query", "");
@@ -170,13 +171,50 @@ public class AIFunctionCaller {
             return String.format("Total materials in system: %d", materials.size());
         }
 
+        // Turkish-to-English translation for material/fiber names
+        String normalizedQuery = normalizeFiberQuery(query);
+
         List<MaterialDto> matching = materials.stream()
-            .filter(m -> m.getUid() != null && 
-                        m.getUid().toLowerCase().contains(query.toLowerCase()))
+            .filter(m -> {
+                if (m.getUid() == null) return false;
+                String uid = m.getUid().toLowerCase();
+                String searchTerm = normalizedQuery.toLowerCase();
+                return uid.contains(searchTerm) || uid.contains(query.toLowerCase());
+            })
             .collect(Collectors.toList());
 
+        // If no materials found, check if it might be a fiber name
         if (matching.isEmpty()) {
-            return String.format("No materials found matching '%s'.", query);
+            // Try searching fibers instead
+            List<FiberDto> fibers = fiberFacade.findAll();
+            List<FiberDto> matchingFibers = fibers.stream()
+                .filter(f -> {
+                    if (f.getFiberName() == null) return false;
+                    String fiberName = f.getFiberName().toLowerCase();
+                    String searchTerm = normalizedQuery.toLowerCase();
+                    return fiberName.contains(searchTerm) || 
+                           fiberName.contains(query.toLowerCase());
+                })
+                .toList();
+            
+            if (!matchingFibers.isEmpty()) {
+                StringBuilder result = new StringBuilder();
+                result.append(String.format("⚠️ '%s' için Material bulunamadı, ancak Fiber bulundu:\n\n", query));
+                for (FiberDto f : matchingFibers) {
+                    result.append(String.format("- Fiber: %s (UID: %s, Status: %s)\n", 
+                        f.getFiberName(), f.getUid(), f.getStatus()));
+                    if (f.getMaterialId() != null) {
+                        materialFacade.findById(f.getMaterialId()).ifPresent(m -> {
+                            result.append(String.format("  → İlişkili Material: %s (UID: %s)\n", 
+                                m.getMaterialType(), m.getUid()));
+                        });
+                    }
+                }
+                result.append("\n💡 Not: Material ve Fiber farklı entity'lerdir. Fiber aramak için 'search_fibers' fonksiyonunu kullanın.");
+                return result.toString();
+            }
+            
+            return String.format("No materials found matching '%s'. Try searching fibers with 'search_fibers' if you're looking for fiber names like 'cotton' or 'pamuk'.", query);
         }
 
         // Summarize if too many results (reduce token usage)
@@ -321,6 +359,7 @@ public class AIFunctionCaller {
 
     /**
      * Search fibers by name or other criteria.
+     * Supports Turkish-to-English translation for common fiber names.
      */
     private String searchFibers(UUID tenantId, Map<String, Object> parameters) {
         String query = (String) parameters.getOrDefault("query", "");
@@ -331,13 +370,28 @@ public class AIFunctionCaller {
             return String.format("Toplam fiber sayısı: %d", fibers.size());
         }
 
+        // Turkish-to-English translation for fiber names
+        String normalizedQuery = normalizeFiberQuery(query);
+
         List<FiberDto> matching = fibers.stream()
-            .filter(f -> f.getFiberName() != null && 
-                        f.getFiberName().toLowerCase().contains(query.toLowerCase()))
+            .filter(f -> {
+                if (f.getFiberName() == null) return false;
+                String fiberName = f.getFiberName().toLowerCase();
+                String searchTerm = normalizedQuery.toLowerCase();
+                
+                // Check if fiber name contains the search term (Turkish or English)
+                return fiberName.contains(searchTerm) || 
+                       fiberName.contains(query.toLowerCase());
+            })
             .toList();
 
         if (matching.isEmpty()) {
-            return String.format("'%s' için fiber bulunamadı.", query);
+            // Try to suggest if it's a translation issue
+            if (!normalizedQuery.equalsIgnoreCase(query)) {
+                return String.format("'%s' (veya '%s') için fiber bulunamadı. Lütfen fiber adını kontrol edin veya 'search_fibers' fonksiyonunu kullanın.", 
+                    query, normalizedQuery);
+            }
+            return String.format("'%s' için fiber bulunamadı. Material aramak için 'search_materials' kullanın.", query);
         }
 
         // Summarize if too many results (reduce token usage)
