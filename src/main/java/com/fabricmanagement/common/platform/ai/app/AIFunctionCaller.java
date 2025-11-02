@@ -3,6 +3,8 @@ package com.fabricmanagement.common.platform.ai.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade.StockInfo;
+import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
 import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ import java.util.stream.Collectors;
 public class AIFunctionCaller {
 
     private final MaterialFacade materialFacade;
+    private final FiberFacade fiberFacade;
     private final InventoryFacade inventoryFacade;
     private final com.fabricmanagement.logistics.inventory.app.MaterialMatcher materialMatcher;
 
@@ -46,6 +49,8 @@ public class AIFunctionCaller {
             case "check_material_stock" -> checkMaterialStock(tenantId, parameters);
             case "search_materials" -> searchMaterials(tenantId, parameters);
             case "get_production_status" -> getProductionStatus(tenantId);
+            case "get_fiber_info" -> getFiberInfo(tenantId, parameters);
+            case "search_fibers" -> searchFibers(tenantId, parameters);
             default -> "Unknown function: " + functionName;
         };
     }
@@ -207,6 +212,121 @@ public class AIFunctionCaller {
         status.append("For detailed production tracking, please use the production dashboard.");
 
         return status.toString();
+    }
+
+    /**
+     * Get detailed fiber information including composition and technical specs.
+     */
+    private String getFiberInfo(UUID tenantId, Map<String, Object> parameters) {
+        String fiberName = (String) parameters.get("fiberName");
+        UUID fiberId = parameters.get("fiberId") != null 
+            ? UUID.fromString(parameters.get("fiberId").toString())
+            : null;
+
+        if (fiberId == null && (fiberName == null || fiberName.isBlank())) {
+            return "Fiber ID or name is required. Please provide either 'fiberId' or 'fiberName'.";
+        }
+
+        Optional<FiberDto> fiber;
+        if (fiberId != null) {
+            fiber = fiberFacade.findById(fiberId);
+        } else {
+            // Search by name
+            List<FiberDto> fibers = fiberFacade.findAll().stream()
+                .filter(f -> f.getFiberName() != null && 
+                            f.getFiberName().toLowerCase().contains(fiberName.toLowerCase()))
+                .toList();
+            
+            if (fibers.isEmpty()) {
+                return String.format("Fiber '%s' bulunamadı. Sistemde böyle bir fiber tanımı yok.", fiberName);
+            }
+            
+            if (fibers.size() > 1) {
+                StringBuilder result = new StringBuilder(String.format(
+                    "'%s' için %d farklı fiber bulundu:\n\n", fiberName, fibers.size()));
+                for (FiberDto f : fibers) {
+                    result.append(String.format("- %s (%s)\n", f.getFiberName(), f.getStatus()));
+                }
+                result.append("\nLütfen hangi fiber'ı kontrol etmek istediğinizi belirtin (UID veya tam ad).");
+                return result.toString();
+            }
+            
+            fiber = Optional.of(fibers.get(0));
+        }
+
+        if (fiber.isEmpty()) {
+            return String.format("Fiber bulunamadı (ID: %s)", fiberId);
+        }
+
+        FiberDto f = fiber.get();
+        StringBuilder info = new StringBuilder();
+        info.append(String.format("📊 Fiber Bilgileri: %s\n\n", f.getFiberName()));
+        info.append(String.format("UID: %s\n", f.getUid()));
+        info.append(String.format("Durum: %s\n", f.getStatus() != null ? f.getStatus() : "N/A"));
+        info.append(String.format("Grade: %s\n", f.getFiberGrade() != null ? f.getFiberGrade() : "N/A"));
+        
+        if (f.getFineness() != null || f.getLengthMm() != null || 
+            f.getStrengthCndTex() != null || f.getElongationPercent() != null) {
+            info.append("\nTeknik Özellikler:\n");
+            if (f.getFineness() != null) {
+                info.append(String.format("  - İncelik: %.2f\n", f.getFineness()));
+            }
+            if (f.getLengthMm() != null) {
+                info.append(String.format("  - Uzunluk: %.2f mm\n", f.getLengthMm()));
+            }
+            if (f.getStrengthCndTex() != null) {
+                info.append(String.format("  - Dayanıklılık: %.2f cN/dtex\n", f.getStrengthCndTex()));
+            }
+            if (f.getElongationPercent() != null) {
+                info.append(String.format("  - Uzama: %.2f%%\n", f.getElongationPercent()));
+            }
+        }
+
+        if (f.getComposition() != null && !f.getComposition().isEmpty()) {
+            info.append("\nBileşim (Blended Fiber):\n");
+            f.getComposition().forEach((baseFiberId, percentage) -> {
+                Optional<FiberDto> baseFiber = fiberFacade.findById(baseFiberId);
+                String baseName = baseFiber.map(FiberDto::getFiberName).orElse("Unknown");
+                info.append(String.format("  - %s: %.2f%%\n", baseName, percentage));
+            });
+        }
+
+        if (f.getRemarks() != null && !f.getRemarks().isBlank()) {
+            info.append(String.format("\nNotlar: %s\n", f.getRemarks()));
+        }
+
+        return info.toString();
+    }
+
+    /**
+     * Search fibers by name or other criteria.
+     */
+    private String searchFibers(UUID tenantId, Map<String, Object> parameters) {
+        String query = (String) parameters.getOrDefault("query", "");
+        
+        List<FiberDto> fibers = fiberFacade.findAll();
+        
+        if (query.isBlank()) {
+            return String.format("Toplam fiber sayısı: %d", fibers.size());
+        }
+
+        List<FiberDto> matching = fibers.stream()
+            .filter(f -> f.getFiberName() != null && 
+                        f.getFiberName().toLowerCase().contains(query.toLowerCase()))
+            .toList();
+
+        if (matching.isEmpty()) {
+            return String.format("'%s' için fiber bulunamadı.", query);
+        }
+
+        StringBuilder result = new StringBuilder(String.format("%d fiber bulundu:\n\n", matching.size()));
+        for (FiberDto f : matching) {
+            result.append(String.format("- %s (%s, %s)\n", 
+                f.getFiberName(), 
+                f.getStatus() != null ? f.getStatus() : "N/A",
+                f.getUid()));
+        }
+        return result.toString();
     }
 }
 

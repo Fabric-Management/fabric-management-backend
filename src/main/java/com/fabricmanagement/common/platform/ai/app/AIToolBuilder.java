@@ -53,6 +53,36 @@ public class AIToolBuilder {
                     "properties", Map.of(),
                     "required", List.of()
                 )
+            ),
+            buildTool("get_fiber_info",
+                "Get detailed information about a fiber including composition, technical specifications, and status. Use this when user asks about a specific fiber.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "fiberId", Map.of(
+                            "type", "string",
+                            "description", "Fiber ID (UUID). Use this if user provides exact fiber ID."
+                        ),
+                        "fiberName", Map.of(
+                            "type", "string",
+                            "description", "Fiber name to search for. Preserve technical terms EXACTLY (e.g., 'Cotton 30/1', 'Polyester 40/2'). Use when user mentions a fiber name."
+                        )
+                    ),
+                    "required", List.of()
+                )
+            ),
+            buildTool("search_fibers",
+                "Search for fibers by name. Use this when user wants to find or list fibers.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "query", Map.of(
+                            "type", "string",
+                            "description", "Search query to find fibers. Preserve technical terms EXACTLY."
+                        )
+                    ),
+                    "required", List.of("query")
+                )
             )
         );
     }
