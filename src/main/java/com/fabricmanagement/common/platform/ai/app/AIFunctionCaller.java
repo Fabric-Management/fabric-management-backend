@@ -180,10 +180,11 @@ public class AIFunctionCaller {
         }
 
         // Summarize if too many results (reduce token usage)
-        if (matching.size() > 10) {
+        // Aggressive summarization: limit to 5 results to save tokens
+        if (matching.size() > 5) {
             StringBuilder result = new StringBuilder(String.format(
-                "Found %d materials, showing first 10:\n\n", matching.size()));
-            for (MaterialDto m : matching.subList(0, 10)) {
+                "Found %d materials, showing first 5:\n\n", matching.size()));
+            for (MaterialDto m : matching.subList(0, 5)) {
                 result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
             }
             result.append("\n(Please refine your search for more specific results.)");
@@ -340,11 +341,12 @@ public class AIFunctionCaller {
         }
 
         // Summarize if too many results (reduce token usage)
-        if (matching.size() > 10) {
+        // Aggressive summarization: limit to 5 results to save tokens
+        if (matching.size() > 5) {
             return String.format(
-                "%d fiber bulundu, ilk 10 tanesi:\n\n%s\n\n(Devamı için daha spesifik bir arama yapın.)",
+                "%d fiber bulundu, ilk 5 tanesi:\n\n%s\n\n(Devamı için daha spesifik bir arama yapın.)",
                 matching.size(),
-                formatFiberList(matching.subList(0, 10))
+                formatFiberList(matching.subList(0, 5))
             );
         }
 

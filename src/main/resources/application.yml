@@ -139,7 +139,7 @@ application:
     timeout: ${AI_TIMEOUT:30000} # 30 seconds
     cache-enabled: ${AI_CACHE_ENABLED:true}
     cache-ttl-seconds: ${AI_CACHE_TTL_SECONDS:300}
-    max-context-tokens: ${AI_MAX_CONTEXT_TOKENS:2000}
+    max-context-tokens: ${AI_MAX_CONTEXT_TOKENS:1500} # Reduced from 2000 to save tokens
 
   # Verification Configuration
   verification:
