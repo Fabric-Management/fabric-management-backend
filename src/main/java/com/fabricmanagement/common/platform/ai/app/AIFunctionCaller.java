@@ -476,6 +476,18 @@ public class AIFunctionCaller {
                 return "❌ Invalid UUID format for materialId or fiberCategoryId.";
             }
 
+            // Validate Material exists and belongs to current tenant BEFORE creating fiber
+            if (!materialFacade.exists(tenantId, materialId)) {
+                return String.format(
+                    "❌ Material not found: %s\n\n" +
+                    "Possible reasons:\n" +
+                    "- Material ID is incorrect\n" +
+                    "- Material belongs to another tenant\n" +
+                    "- Material was deleted\n\n" +
+                    "Please use search_materials to find the correct Material ID.",
+                    materialId);
+            }
+
             // Optional fields
             UUID fiberIsoCodeId = parameters.get("fiberIsoCodeId") != null 
                 ? UUID.fromString(parameters.get("fiberIsoCodeId").toString())
