@@ -128,6 +128,19 @@ application:
       timeout-ms: ${EMAIL_FRONTEND_TIMEOUT_MS:5000}
       url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
+  # AI Configuration
+  ai:
+    enabled: ${AI_ENABLED:true}
+    provider: ${AI_PROVIDER:openai}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${AI_MODEL:gpt-4o-mini}
+    temperature: ${AI_TEMPERATURE:0.7}
+    max-tokens: ${AI_MAX_TOKENS:1000}
+    timeout: ${AI_TIMEOUT:30000}
+    cache-enabled: ${AI_CACHE_ENABLED:true}
+    cache-ttl-seconds: ${AI_CACHE_TTL_SECONDS:300}
+    max-context-tokens: ${AI_MAX_CONTEXT_TOKENS:2000}
+
   # Verification Configuration
   verification:
     code-length: 6

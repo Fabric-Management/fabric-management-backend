@@ -170,6 +170,17 @@ public class AIFunctionCaller {
             return String.format("No materials found matching '%s'.", query);
         }
 
+        // Summarize if too many results (reduce token usage)
+        if (matching.size() > 10) {
+            StringBuilder result = new StringBuilder(String.format(
+                "Found %d materials, showing first 10:\n\n", matching.size()));
+            for (MaterialDto m : matching.subList(0, 10)) {
+                result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
+            }
+            result.append("\n(Please refine your search for more specific results.)");
+            return result.toString();
+        }
+
         StringBuilder result = new StringBuilder(String.format("Found %d materials:\n\n", matching.size()));
         for (MaterialDto m : matching) {
             result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
@@ -319,8 +330,24 @@ public class AIFunctionCaller {
             return String.format("'%s' için fiber bulunamadı.", query);
         }
 
-        StringBuilder result = new StringBuilder(String.format("%d fiber bulundu:\n\n", matching.size()));
-        for (FiberDto f : matching) {
+        // Summarize if too many results (reduce token usage)
+        if (matching.size() > 10) {
+            return String.format(
+                "%d fiber bulundu, ilk 10 tanesi:\n\n%s\n\n(Devamı için daha spesifik bir arama yapın.)",
+                matching.size(),
+                formatFiberList(matching.subList(0, 10))
+            );
+        }
+
+        return String.format("%d fiber bulundu:\n\n%s", matching.size(), formatFiberList(matching));
+    }
+
+    /**
+     * Format fiber list (reusable, reduces duplication).
+     */
+    private String formatFiberList(List<FiberDto> fibers) {
+        StringBuilder result = new StringBuilder();
+        for (FiberDto f : fibers) {
             result.append(String.format("- %s (%s, %s)\n", 
                 f.getFiberName(), 
                 f.getStatus() != null ? f.getStatus() : "N/A",
