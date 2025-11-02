@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.fiber.domain;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
+import com.fabricmanagement.production.masterdata.material.domain.Material;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,8 +28,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class Fiber extends BaseEntity {
 
-    @Column(name = "material_id", nullable = false, unique = true, updatable = false)
-    private UUID materialId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "material_id", nullable = false, unique = true, updatable = false)
+    private Material material;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fiber_category_id")
@@ -39,6 +41,10 @@ public class Fiber extends BaseEntity {
     private FiberIsoCode fiberIsoCode;
 
     // Helper methods for accessing IDs without loading entities
+    public UUID getMaterialId() {
+        return material != null ? material.getId() : null;
+    }
+
     public UUID getFiberCategoryId() {
         return fiberCategory != null ? fiberCategory.getId() : null;
     }
@@ -74,7 +80,7 @@ public class Fiber extends BaseEntity {
     private String remarks;
 
     public static Fiber createPureFiber(
-            UUID materialId,
+            Material material,
             FiberCategory fiberCategory,
             FiberIsoCode fiberIsoCode,
             String fiberName,
@@ -85,7 +91,7 @@ public class Fiber extends BaseEntity {
             Double elongationPercent) {
         
         return Fiber.builder()
-            .materialId(materialId)
+            .material(material)
             .fiberCategory(fiberCategory)
             .fiberIsoCode(fiberIsoCode)
             .fiberName(fiberName)
@@ -99,14 +105,14 @@ public class Fiber extends BaseEntity {
     }
 
     public static Fiber createBlendedFiber(
-            UUID materialId,
+            Material material,
             FiberCategory fiberCategory,
             FiberIsoCode fiberIsoCode,
             String fiberName,
             String fiberGrade) {
         
         return Fiber.builder()
-            .materialId(materialId)
+            .material(material)
             .fiberCategory(fiberCategory)
             .fiberIsoCode(fiberIsoCode)
             .fiberName(fiberName)

@@ -13,6 +13,8 @@ import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
+import com.fabricmanagement.production.masterdata.material.domain.Material;
+import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 public class FiberService implements FiberFacade {
 
     private final FiberRepository fiberRepository;
+    private final MaterialRepository materialRepository;
     private final FiberCategoryRepository fiberCategoryRepository;
     private final FiberIsoCodeRepository fiberIsoCodeRepository;
     private final DomainEventPublisher eventPublisher;
@@ -56,6 +59,15 @@ public class FiberService implements FiberFacade {
         }
 
 
+        // Load Material entity
+        Material material = materialRepository.findById(request.getMaterialId())
+            .orElseThrow(() -> new IllegalArgumentException("Material not found: " + request.getMaterialId()));
+
+        // Validate material type is FIBER
+        if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
+            throw new IllegalArgumentException("Material type must be FIBER, got: " + material.getMaterialType());
+        }
+
         // Check if material already has a fiber detail
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details. Each material can only have one fiber.");
@@ -73,7 +85,7 @@ public class FiberService implements FiberFacade {
             : null;
 
         Fiber fiber = Fiber.createPureFiber(
-            request.getMaterialId(),
+            material,
             category,
             isoCode,
             request.getFiberName(),
@@ -113,6 +125,15 @@ public class FiberService implements FiberFacade {
     @Transactional
     public FiberDto createBlendedFiber(CreateBlendedFiberRequest request) {
         log.info("Creating blended fiber: name={}", request.getFiberName());
+
+        // Load Material entity
+        Material material = materialRepository.findById(request.getMaterialId())
+            .orElseThrow(() -> new IllegalArgumentException("Material not found: " + request.getMaterialId()));
+
+        // Validate material type is FIBER
+        if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
+            throw new IllegalArgumentException("Material type must be FIBER, got: " + material.getMaterialType());
+        }
 
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details");
@@ -172,7 +193,7 @@ public class FiberService implements FiberFacade {
 
         // Create blended fiber
         Fiber blendedFiber = Fiber.createBlendedFiber(
-            request.getMaterialId(),
+            material,
             category,
             isoCode,
             fiberName,  // Use generated or provided name
