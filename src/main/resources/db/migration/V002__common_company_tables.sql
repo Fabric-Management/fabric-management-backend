@@ -25,6 +25,9 @@ CREATE TABLE common_company.common_company (
     company_type VARCHAR(50) NOT NULL DEFAULT 'VERTICAL_MILL',
     parent_company_id UUID,
     
+    -- Deprecated fields (kept for backward compatibility, will be removed in future)
+    -- Use CompanyContact and CompanyAddress junction tables instead
+    
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID,
@@ -43,6 +46,11 @@ CREATE INDEX idx_company_active ON common_company.common_company(is_active) WHER
 
 COMMENT ON TABLE common_company.common_company IS 'Company/Tenant registry - 22 types (SPINNER, WEAVER, etc.)';
 COMMENT ON COLUMN common_company.common_company.company_type IS '22 types: SPINNER, WEAVER, KNITTER, DYER_FINISHER, VERTICAL_MILL, etc.';
+COMMENT ON COLUMN common_company.common_company.address IS 'DEPRECATED: Use CompanyAddress junction table and Address entity instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_company.common_company.city IS 'DEPRECATED: Use CompanyAddress junction table and Address entity instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_company.common_company.country IS 'DEPRECATED: Use CompanyAddress junction table and Address entity instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_company.common_company.phone_number IS 'DEPRECATED: Use CompanyContact junction table and Contact entity instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_company.common_company.email IS 'DEPRECATED: Use CompanyContact junction table and Contact entity instead. Will be dropped in future migration.';
 
 -- ============================================================================
 -- TABLE: common_department
