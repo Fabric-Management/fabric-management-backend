@@ -122,7 +122,6 @@ public class HistoryTrimmer {
 
         // Add messages from end (most recent first) until token limit
         int currentTokens = estimateTokens(result);
-        int systemTokens = currentTokens;
 
         // Add recent messages in reverse order (newest first)
         for (int i = messages.size() - 1; i >= 0; i--) {
