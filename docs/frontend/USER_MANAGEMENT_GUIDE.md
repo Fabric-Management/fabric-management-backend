@@ -182,19 +182,26 @@ Authorization: Bearer {token}
 {
   "firstName": "John",
   "lastName": "Doe",
-  "contactValue": "john@example.com",      // Used to create Contact entity
+  "contactValue": "john@example.com",      // ✅ AUTO-CREATES Contact (EMAIL)
   "contactType": "EMAIL",                  // EMAIL or PHONE
-  "companyId": "uuid",
+  "companyId": "uuid",                     // ✅ AUTO-CREATES UserAddress (WORK) from Company
   "department": "Engineering"             // Optional - deprecated (will be removed)
 }
 ```
 
 **Response:** `UserDto` with created user
 
-**Note:** 
-- Backend automatically creates `Contact` entity
-- Backend links contact via `UserContact` with `isForAuthentication: true`
-- Backend sets `isDefault: true` for the contact
+**✅ USER-FRIENDLY AUTOMATION:**
+- **ContactValue provided** → Contact entity automatically created
+- **Contact linked** → UserContact with `isForAuthentication: true` and `isDefault: true`
+- **displayName** → Auto-generated from `firstName + lastName`
+- **Address copied** → If Company has a primary address, UserAddress (WORK) is automatically created from Company's address
+
+**Benefits:**
+- ✅ Single form - no separate Contact/Address creation steps
+- ✅ Company address automatically copied to user (WORK address)
+- ✅ Reduces user errors
+- ✅ Ensures data integrity
 
 #### Update User
 ```http
@@ -548,7 +555,9 @@ async function getUserWithDetails(userId: string) {
 }
 ```
 
-### Example 2: Create User with Contact
+### Example 2: Create User with Contact (Simplified)
+
+**✅ NEW USER-FRIENDLY APPROACH - Single API Call:**
 
 ```typescript
 async function createUserWithContact(userData: {
@@ -558,7 +567,12 @@ async function createUserWithContact(userData: {
   companyId: string;
   roleId?: string;
 }) {
-  // Step 1: Create user (backend creates contact automatically)
+  // ✅ Single API call - Backend handles everything automatically:
+  // 1. Contact entity creation
+  // 2. UserContact junction with isForAuthentication=true
+  // 3. displayName auto-generation
+  // 4. UserAddress (WORK) from Company's address (if Company has address)
+  
   const userResponse = await api.post('/api/common/users', {
     firstName: userData.firstName,
     lastName: userData.lastName,
@@ -568,6 +582,9 @@ async function createUserWithContact(userData: {
   });
 
   const user = userResponse.data.data;
+  
+  // ✅ Contact, Address, and displayName are automatically created!
+  // Only role assignment needs separate call (if backend supports it)
 
   // Step 2: Assign role (if provided)
   // Note: Check if backend has role assignment endpoint
@@ -581,6 +598,12 @@ async function createUserWithContact(userData: {
   return user;
 }
 ```
+
+**What Gets Auto-Created:**
+- ✅ **Contact (EMAIL)** with `contactValue`
+- ✅ **UserContact** junction with `isForAuthentication: true` and `isDefault: true`
+- ✅ **displayName**: "John Doe" (firstName + lastName)
+- ✅ **UserAddress (WORK)**: If Company has a primary address, it's automatically copied
 
 ### Example 3: User Profile Component
 

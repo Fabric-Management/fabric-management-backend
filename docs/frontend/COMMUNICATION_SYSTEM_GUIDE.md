@@ -39,6 +39,23 @@ The system has been **completely redesigned** for managing contacts and addresse
 ✅ **Extensible** - Easy to add new contact/address types  
 ✅ **Normalized** - No data duplication
 
+### ✅ USER-FRIENDLY AUTOMATION
+
+**Company Creation:**
+- Email provided → Contact (EMAIL) + CompanyContact automatically created
+- Phone provided → Contact (PHONE) + CompanyContact automatically created
+- Address provided → Address (HEADQUARTERS) + CompanyAddress automatically created
+
+**User Creation:**
+- ContactValue provided → Contact + UserContact automatically created
+- Company has address → UserAddress (WORK) automatically created from Company's address
+
+**Benefits:**
+- ✅ Single form instead of multiple steps
+- ✅ Reduces user errors
+- ✅ Ensures data integrity
+- ✅ Faster workflow
+
 ---
 
 ## ⚠️ Breaking Changes
@@ -774,6 +791,39 @@ interface User {
 // ✅ Fetch separately
 const userContacts = await getUserContacts(userId);
 const authContact = await getAuthenticationContact(userId);
+```
+
+### 2. Use Automation Features (Recommended)
+
+**✅ NEW APPROACH - Leverage Automation:**
+
+When creating Company:
+```typescript
+// ✅ Single API call - Backend auto-creates Contact/Address
+POST /api/common/companies
+{
+  companyName: "ACME Corp",
+  taxId: "1234567890",
+  companyType: "VERTICAL_MILL",
+  email: "info@acme.com",        // ✅ Auto-creates Contact
+  phoneNumber: "+905551234567",   // ✅ Auto-creates Contact
+  address: "123 Main St",         // ✅ Auto-creates Address
+  city: "Istanbul",
+  country: "Turkey"
+}
+```
+
+When creating User:
+```typescript
+// ✅ Single API call - Backend auto-creates Contact + Address from Company
+POST /api/common/users
+{
+  firstName: "John",
+  lastName: "Doe",
+  contactValue: "john@example.com",  // ✅ Auto-creates Contact
+  contactType: "EMAIL",
+  companyId: "uuid"                  // ✅ Auto-creates Address from Company
+}
 ```
 
 ### 2. Update User Profile Component

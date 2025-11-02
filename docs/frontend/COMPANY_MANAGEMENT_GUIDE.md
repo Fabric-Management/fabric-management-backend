@@ -217,19 +217,30 @@ Authorization: Bearer {token}
   "taxId": "1234567890",
   "companyType": "VERTICAL_MILL",
   "parentCompanyId": null,          // Optional
-  "address": "123 Business St",    // Optional - deprecated (use Communication module)
-  "city": "Istanbul",               // Optional - deprecated
-  "country": "Turkey",               // Optional - deprecated
-  "phoneNumber": "+905551234567",    // Optional - deprecated
-  "email": "info@acme.com"           // Optional - deprecated
+  "email": "info@acme.com",         // Optional - ✅ AUTO-CREATES Contact (EMAIL)
+  "phoneNumber": "+905551234567",    // Optional - ✅ AUTO-CREATES Contact (PHONE)
+  "address": "123 Business St",     // Optional - ✅ AUTO-CREATES Address (HEADQUARTERS)
+  "city": "Istanbul",               // Optional - Required if address provided
+  "country": "Turkey"               // Optional - Required if address provided
 }
 ```
 
 **Response:** `CompanyDto` with created company
 
+**✅ USER-FRIENDLY AUTOMATION:**
+- **Email provided** → Contact (EMAIL) + CompanyContact automatically created
+- **Phone provided** → Contact (PHONE) + CompanyContact automatically created  
+- **Address provided** → Address (HEADQUARTERS) + CompanyAddress automatically created
+
+**Benefits:**
+- ✅ Single form instead of multiple steps
+- ✅ No manual Contact/Address creation needed
+- ✅ Reduces user errors
+- ✅ Ensures data integrity
+
 **Note:** 
-- Address/contact fields are deprecated. Use Communication module endpoints after creation.
 - For tenant companies, consider using onboarding endpoints (`/api/admin/onboarding/tenant` or `/api/public/signup`)
+- If you need more control, you can still create Contact/Address manually via Communication module endpoints after company creation
 
 #### Deactivate Company
 ```http
@@ -395,7 +406,9 @@ async function getCompanyWithDetails(companyId: string) {
 }
 ```
 
-### Example 2: Create Company with Address/Contact
+### Example 2: Create Company with Address/Contact (Simplified)
+
+**✅ NEW USER-FRIENDLY APPROACH - Single API Call:**
 
 ```typescript
 async function createCompanyWithDetails(companyData: {
@@ -412,71 +425,59 @@ async function createCompanyWithDetails(companyData: {
     phone?: string;
   };
 }) {
-  // Step 1: Create company
+  // ✅ Single API call - Backend handles Contact/Address creation automatically
   const companyResponse = await api.post('/api/common/companies', {
     companyName: companyData.companyName,
     taxId: companyData.taxId,
-    companyType: companyData.companyType
+    companyType: companyData.companyType,
+    // Optional - Auto-creates Contact (EMAIL) if provided
+    email: companyData.contact?.email,
+    // Optional - Auto-creates Contact (PHONE) if provided
+    phoneNumber: companyData.contact?.phone,
+    // Optional - Auto-creates Address (HEADQUARTERS) if provided
+    address: companyData.address?.streetAddress,
+    city: companyData.address?.city,
+    country: companyData.address?.country
   });
 
   const company = companyResponse.data.data;
-
-  // Step 2: Add address if provided
-  if (companyData.address) {
-    await api.post(
-      `/api/common/companies/${company.id}/addresses/create-and-assign`,
-      {
-        streetAddress: companyData.address.streetAddress,
-        city: companyData.address.city,
-        country: companyData.address.country,
-        addressType: 'HEADQUARTERS',
-        label: 'Headquarters'
-      },
-      {
-        params: {
-          isPrimary: true,
-          isHeadquarters: true
-        }
-      }
-    );
-  }
-
-  // Step 3: Add contacts if provided
-  if (companyData.contact?.email) {
-    await api.post(
-      `/api/common/companies/${company.id}/contacts/create-and-assign`,
-      {
-        contactValue: companyData.contact.email,
-        contactType: 'EMAIL',
-        label: 'Main Email',
-        isPersonal: false
-      },
-      {
-        params: {
-          isDefault: true
-        }
-      }
-    );
-  }
-
-  if (companyData.contact?.phone) {
-    await api.post(
-      `/api/common/companies/${company.id}/contacts/create-and-assign`,
-      {
-        contactValue: companyData.contact.phone,
-        contactType: 'PHONE',
-        label: 'Main Phone',
-        isPersonal: false
-      },
-      {
-        params: {
-          isDefault: false
-        }
-      }
-    );
-  }
-
+  
+  // ✅ Contact and Address are automatically created and linked!
+  // No need for additional API calls
+  
   return company;
+}
+```
+
+**Old Approach (Still Works, But Not Needed):**
+
+```typescript
+// ❌ Manual approach - Only use if you need more control
+// Step 1: Create company
+const company = await api.post('/api/common/companies', {
+  companyName: companyData.companyName,
+  taxId: companyData.taxId,
+  companyType: companyData.companyType
+});
+
+// Step 2: Add address manually (if automation wasn't used)
+if (companyData.address) {
+  await api.post(
+    `/api/common/companies/${company.id}/addresses/create-and-assign`,
+    {
+      streetAddress: companyData.address.streetAddress,
+      city: companyData.address.city,
+      country: companyData.address.country,
+      addressType: 'HEADQUARTERS',
+      label: 'Headquarters'
+    },
+    {
+      params: {
+        isPrimary: true,
+        isHeadquarters: true
+      }
+    }
+  );
 }
 ```
 
