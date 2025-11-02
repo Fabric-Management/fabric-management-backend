@@ -62,9 +62,11 @@ public class FiberService implements FiberFacade {
         }
 
 
-        // Load Material entity
-        Material material = materialRepository.findById(request.getMaterialId())
-            .orElseThrow(() -> new IllegalArgumentException("Material not found: " + request.getMaterialId()));
+        // Load Material entity with tenant check
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        Material material = materialRepository.findByTenantIdAndId(tenantId, request.getMaterialId())
+            .orElseThrow(() -> new IllegalArgumentException(
+                String.format("Material not found: %s (or not accessible for current tenant)", request.getMaterialId())));
 
         // Validate material type is FIBER
         if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
