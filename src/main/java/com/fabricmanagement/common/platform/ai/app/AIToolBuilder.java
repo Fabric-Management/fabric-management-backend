@@ -84,6 +84,14 @@ public class AIToolBuilder {
                     "required", List.of("query")
                 )
             ),
+            buildTool("list_fiber_categories",
+                "List all available fiber categories. Use this when user wants to create a fiber and needs to select a category.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(),
+                    "required", List.of()
+                )
+            ),
             buildTool("create_material",
                 "Create a new material. Use this when user wants to create a material. REQUIRES USER CONFIRMATION.",
                 Map.of(

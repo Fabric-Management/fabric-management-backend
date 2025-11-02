@@ -4,8 +4,10 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade.StockInfo;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
@@ -35,6 +37,7 @@ public class AIFunctionCaller {
     private final FiberFacade fiberFacade;
     private final InventoryFacade inventoryFacade;
     private final com.fabricmanagement.logistics.inventory.app.MaterialMatcher materialMatcher;
+    private final FiberCategoryRepository fiberCategoryRepository;
 
     /**
      * Execute function call from AI.
@@ -54,6 +57,7 @@ public class AIFunctionCaller {
             case "get_production_status" -> getProductionStatus(tenantId);
             case "get_fiber_info" -> getFiberInfo(tenantId, parameters);
             case "search_fibers" -> searchFibers(tenantId, parameters);
+            case "list_fiber_categories" -> listFiberCategories(tenantId);
             case "create_material" -> createMaterial(tenantId, parameters);
             case "create_fiber" -> createFiber(tenantId, parameters);
             default -> "Unknown function: " + functionName;
@@ -358,6 +362,32 @@ public class AIFunctionCaller {
                 f.getStatus() != null ? f.getStatus() : "N/A",
                 f.getUid()));
         }
+        return result.toString();
+    }
+
+    /**
+     * List all active fiber categories.
+     * 
+     * <p>Helps AI find the right category when creating fibers.</p>
+     */
+    private String listFiberCategories(UUID tenantId) {
+        List<FiberCategory> categories = fiberCategoryRepository.findByIsActiveTrue();
+        
+        if (categories.isEmpty()) {
+            return "No fiber categories found in the system.";
+        }
+
+        StringBuilder result = new StringBuilder("Available Fiber Categories:\n\n");
+        for (FiberCategory category : categories) {
+            result.append(String.format("- %s (Code: %s, ID: %s)\n", 
+                category.getCategoryName(),
+                category.getCategoryCode(),
+                category.getId()));
+            if (category.getDescription() != null && !category.getDescription().isBlank()) {
+                result.append(String.format("  Description: %s\n", category.getDescription()));
+            }
+        }
+        
         return result.toString();
     }
 
