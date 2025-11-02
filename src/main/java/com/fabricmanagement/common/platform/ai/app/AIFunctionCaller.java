@@ -8,6 +8,7 @@ import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCa
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
@@ -196,8 +197,22 @@ public class AIFunctionCaller {
         // Search based on detected type
         switch (entityType) {
             case FIBER -> {
-                List<FiberDto> fibers = fiberFacade.findAll();
-                List<FiberDto> matching = fibers.stream()
+                // Get current tenant fibers
+                List<FiberDto> tenantFibers = fiberFacade.findAll();
+                
+                // Also search system tenant fibers (00000000-0000-0000-0000-000000000000)
+                // These are shared/global fibers available to all tenants
+                UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+                List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
+                    .stream()
+                    .map(FiberDto::from)
+                    .toList();
+                
+                // Combine both lists
+                List<FiberDto> allFibers = new java.util.ArrayList<>(tenantFibers);
+                allFibers.addAll(systemFibers);
+                
+                List<FiberDto> matching = allFibers.stream()
                     .filter(f -> {
                         if (f.getFiberName() == null) return false;
                         String fiberName = f.getFiberName().toLowerCase();
@@ -266,9 +281,17 @@ public class AIFunctionCaller {
                 // Try all entity types
                 result.append("⚠️ Tip belirsiz, tüm entity tiplerinde aranıyor...\n\n");
                 
-                // Try FIBER
-                List<FiberDto> fibers = fiberFacade.findAll();
-                List<FiberDto> matchingFibers = fibers.stream()
+                // Try FIBER (including system tenant)
+                List<FiberDto> tenantFibers = fiberFacade.findAll();
+                UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+                List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
+                    .stream()
+                    .map(FiberDto::from)
+                    .toList();
+                List<FiberDto> allFibers = new java.util.ArrayList<>(tenantFibers);
+                allFibers.addAll(systemFibers);
+                
+                List<FiberDto> matchingFibers = allFibers.stream()
                     .filter(f -> f.getFiberName() != null && 
                                 (f.getFiberName().toLowerCase().contains(normalizedQuery.toLowerCase()) ||
                                  f.getFiberName().toLowerCase().contains(query.toLowerCase())))
@@ -573,11 +596,24 @@ public class AIFunctionCaller {
     /**
      * Search fibers by name or other criteria.
      * Supports Turkish-to-English translation for common fiber names.
+     * Also includes system tenant fibers (shared/global fibers).
      */
     private String searchFibers(UUID tenantId, Map<String, Object> parameters) {
         String query = (String) parameters.getOrDefault("query", "");
         
-        List<FiberDto> fibers = fiberFacade.findAll();
+        // Get current tenant fibers
+        List<FiberDto> tenantFibers = fiberFacade.findAll();
+        
+        // Also include system tenant fibers (shared/global)
+        UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
+            .stream()
+            .map(FiberDto::from)
+            .toList();
+        
+        // Combine both
+        List<FiberDto> fibers = new java.util.ArrayList<>(tenantFibers);
+        fibers.addAll(systemFibers);
         
         if (query.isBlank()) {
             return String.format("Toplam fiber sayısı: %d", fibers.size());
