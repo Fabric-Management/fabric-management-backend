@@ -56,7 +56,7 @@ public class OpenAIClient implements LLMClient {
         }
 
         if (aiProperties.getApiKey() == null || aiProperties.getApiKey().isBlank()) {
-            throw new IllegalStateException("AI API key is not configured. Please set AI_API_KEY in .env file or as environment variable.");
+            throw new IllegalStateException("AI API key is not configured. Please set OPENAI_API_KEY in .env file or as environment variable.");
         }
 
         log.debug("Sending chat request to OpenAI: model={}, messages={}", 

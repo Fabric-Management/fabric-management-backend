@@ -68,7 +68,7 @@ public class WhisperService {
 
         // Check API key
         if (aiProperties.getApiKey() == null || aiProperties.getApiKey().isBlank()) {
-            throw new IllegalStateException("AI API key is not configured. Please set AI_API_KEY in .env file or as environment variable.");
+            throw new IllegalStateException("AI API key is not configured. Please set OPENAI_API_KEY in .env file or as environment variable.");
         }
 
         try {
