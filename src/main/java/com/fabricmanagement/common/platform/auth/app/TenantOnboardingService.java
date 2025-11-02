@@ -414,6 +414,7 @@ public class TenantOnboardingService {
             User saved = userRepository.save(user);
 
             // Create Contact entity and assign to user (new system)
+            // Note: For onboarding, contact is pre-verified (user provides their own email)
             com.fabricmanagement.common.platform.communication.domain.Contact contact = 
                 contactService.createContact(
                     contactValue,
@@ -422,6 +423,9 @@ public class TenantOnboardingService {
                     true, // isPersonal
                     null  // parentContactId
                 );
+            
+            // Verify contact for authentication (onboarding = pre-verified)
+            contact = contactService.verifyContact(contact.getId());
 
             // Assign contact to user with authentication flag
             userContactService.assignContact(

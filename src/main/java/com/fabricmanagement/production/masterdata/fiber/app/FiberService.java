@@ -5,10 +5,16 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.event.FiberCreatedEvent;
+import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
+import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateBlendedFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
+import com.fabricmanagement.production.masterdata.material.domain.Material;
+import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +39,9 @@ import java.util.stream.Collectors;
 public class FiberService implements FiberFacade {
 
     private final FiberRepository fiberRepository;
+    private final MaterialRepository materialRepository;
+    private final FiberCategoryRepository fiberCategoryRepository;
+    private final FiberIsoCodeRepository fiberIsoCodeRepository;
     private final DomainEventPublisher eventPublisher;
     private final FiberCompositionService compositionService;
     private final FiberValidationService validationService;
@@ -50,15 +59,35 @@ public class FiberService implements FiberFacade {
         }
 
 
+        // Load Material entity
+        Material material = materialRepository.findById(request.getMaterialId())
+            .orElseThrow(() -> new IllegalArgumentException("Material not found: " + request.getMaterialId()));
+
+        // Validate material type is FIBER
+        if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
+            throw new IllegalArgumentException("Material type must be FIBER, got: " + material.getMaterialType());
+        }
+
         // Check if material already has a fiber detail
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details. Each material can only have one fiber.");
         }
 
+        // Load reference entities
+        FiberCategory category = request.getFiberCategoryId() != null
+            ? fiberCategoryRepository.findById(request.getFiberCategoryId())
+                .orElseThrow(() -> new IllegalArgumentException("Fiber category not found: " + request.getFiberCategoryId()))
+            : null;
+
+        FiberIsoCode isoCode = request.getFiberIsoCodeId() != null
+            ? fiberIsoCodeRepository.findById(request.getFiberIsoCodeId())
+                .orElseThrow(() -> new IllegalArgumentException("Fiber ISO code not found: " + request.getFiberIsoCodeId()))
+            : null;
+
         Fiber fiber = Fiber.createPureFiber(
-            request.getMaterialId(),
-            request.getFiberCategoryId(),
-            request.getFiberIsoCodeId(),
+            material,
+            category,
+            isoCode,
             request.getFiberName(),
             request.getFiberGrade(),
             request.getFineness(),
@@ -97,6 +126,15 @@ public class FiberService implements FiberFacade {
     public FiberDto createBlendedFiber(CreateBlendedFiberRequest request) {
         log.info("Creating blended fiber: name={}", request.getFiberName());
 
+        // Load Material entity
+        Material material = materialRepository.findById(request.getMaterialId())
+            .orElseThrow(() -> new IllegalArgumentException("Material not found: " + request.getMaterialId()));
+
+        // Validate material type is FIBER
+        if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
+            throw new IllegalArgumentException("Material type must be FIBER, got: " + material.getMaterialType());
+        }
+
         if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details");
         }
@@ -105,11 +143,11 @@ public class FiberService implements FiberFacade {
         // Validate composition percentages
         validationService.validateCompositionPercentages(request.getComposition());
 
-        // Validate minimum ratio (no fiber less than 5%)
-        validationService.validateMinimumRatio(request.getComposition(), 5.0);
+        // Validate minimum ratio (no fiber less than configured minimum)
+        validationService.validateMinimumRatio(request.getComposition(), FiberConstants.MIN_COMPONENT_PERCENTAGE);
 
-        // Validate maximum components (max 5 fibers in a blend)
-        validationService.validateMaxComponents(request.getComposition(), 5);
+        // Validate maximum components (max configured number of fibers in a blend)
+        validationService.validateMaxComponents(request.getComposition(), FiberConstants.MAX_BLEND_COMPONENTS);
 
         // Validate base fibers exist and are active
         Map<UUID, String> baseFiberNames = new HashMap<>();
@@ -142,11 +180,22 @@ public class FiberService implements FiberFacade {
             log.info("Generated fiber name: {}", fiberName);
         }
 
+        // Load reference entities
+        FiberCategory category = request.getFiberCategoryId() != null
+            ? fiberCategoryRepository.findById(request.getFiberCategoryId())
+                .orElseThrow(() -> new IllegalArgumentException("Fiber category not found: " + request.getFiberCategoryId()))
+            : null;
+
+        FiberIsoCode isoCode = request.getFiberIsoCodeId() != null
+            ? fiberIsoCodeRepository.findById(request.getFiberIsoCodeId())
+                .orElseThrow(() -> new IllegalArgumentException("Fiber ISO code not found: " + request.getFiberIsoCodeId()))
+            : null;
+
         // Create blended fiber
         Fiber blendedFiber = Fiber.createBlendedFiber(
-            request.getMaterialId(),
-            request.getFiberCategoryId(),
-            request.getFiberIsoCodeId(),
+            material,
+            category,
+            isoCode,
             fiberName,  // Use generated or provided name
             request.getFiberGrade()
         );
@@ -240,8 +289,7 @@ public class FiberService implements FiberFacade {
             request.getLengthMm(),
             request.getStrengthCndTex(),
             request.getElongationPercent(),
-            request.getRemarks(),
-            fiber.getStatus()
+            request.getRemarks()
         );
 
         Fiber saved = fiberRepository.save(fiber);
@@ -350,8 +398,8 @@ public class FiberService implements FiberFacade {
                 return false;
             }
             
-            // Compare percentages with 0.01 tolerance
-            if (Math.abs(entry.getValue().subtract(percentage2).doubleValue()) > 0.01) {
+            // Compare percentages with configured tolerance
+            if (Math.abs(entry.getValue().subtract(percentage2).doubleValue()) > FiberConstants.COMPOSITION_COMPARISON_TOLERANCE) {
                 return false;
             }
         }

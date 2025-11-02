@@ -53,7 +53,7 @@ public class FiberValidationService {
             .mapToDouble(BigDecimal::doubleValue)
             .sum();
 
-        if (Math.abs(total - 100.0) > 0.01) {
+        if (Math.abs(total - FiberConstants.TOTAL_PERCENTAGE) > FiberConstants.PERCENTAGE_TOLERANCE) {
             throw new IllegalArgumentException(
                 String.format("Composition percentages must sum to exactly 100%%, got: %.2f%%", total));
         }
@@ -75,7 +75,8 @@ public class FiberValidationService {
             }
             
             // No percentages over 100%
-            if (percentage.compareTo(new BigDecimal("100")) > 0) {
+            BigDecimal maxPercentage = BigDecimal.valueOf(FiberConstants.TOTAL_PERCENTAGE);
+            if (percentage.compareTo(maxPercentage) > 0) {
                 throw new IllegalArgumentException(
                     String.format("Percentage cannot exceed 100%%: %.2f%%", percentage));
             }
@@ -188,9 +189,12 @@ public class FiberValidationService {
             return;
         }
         
-        if (fiberName.length() < 3 || fiberName.length() > 255) {
+        if (fiberName.length() < FiberConstants.MIN_FIBER_NAME_LENGTH || 
+            fiberName.length() > FiberConstants.MAX_FIBER_NAME_LENGTH) {
             throw new IllegalArgumentException(
-                "Fiber name must be between 3 and 255 characters");
+                String.format("Fiber name must be between %d and %d characters",
+                    FiberConstants.MIN_FIBER_NAME_LENGTH, 
+                    FiberConstants.MAX_FIBER_NAME_LENGTH));
         }
     }
 

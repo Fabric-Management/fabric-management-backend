@@ -173,11 +173,40 @@ public class AIFunctionCaller {
     }
 
     /**
-     * Get production status (placeholder - implement when production endpoints are available).
+     * Get production status summary.
+     *
+     * <p>Provides overview of production-related entities (materials, fibers).
+     * When operations module is available, will include job/work order statistics.</p>
      */
     private String getProductionStatus(UUID tenantId) {
-        // TODO: Implement when production status endpoint is available
-        return "Production status endpoint not yet implemented. Please check production dashboard for current status.";
+        List<MaterialDto> materials = materialFacade.findByTenant(tenantId);
+        long activeMaterials = materials.stream()
+            .filter(m -> m.getIsActive() != null && m.getIsActive())
+            .count();
+
+        Map<String, Long> materialsByType = materials.stream()
+            .filter(m -> m.getIsActive() != null && m.getIsActive())
+            .collect(Collectors.groupingBy(
+                m -> m.getMaterialType() != null ? m.getMaterialType().toString() : "UNKNOWN",
+                Collectors.counting()
+            ));
+
+        StringBuilder status = new StringBuilder();
+        status.append("📊 Production Status Summary\n\n");
+        status.append(String.format("Active Materials: %d\n", activeMaterials));
+        
+        if (!materialsByType.isEmpty()) {
+            status.append("\nMaterials by Type:\n");
+            materialsByType.forEach((type, count) -> 
+                status.append(String.format("  - %s: %d\n", type, count))
+            );
+        }
+
+        status.append("\n");
+        status.append("ℹ️ Operations module (jobs, work orders) not yet implemented.\n");
+        status.append("For detailed production tracking, please use the production dashboard.");
+
+        return status.toString();
     }
 }
 

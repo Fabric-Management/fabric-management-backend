@@ -13,8 +13,11 @@ CREATE TABLE common_auth.common_auth_user (
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
-    contact_value VARCHAR(255) UNIQUE NOT NULL,
-    contact_type VARCHAR(20) NOT NULL,
+    -- Deprecated fields (kept for backward compatibility, will be removed in future)
+    -- Use Contact entity via contact_id instead (added in V018)
+    -- NOT NULL constraints removed in V018
+    contact_value VARCHAR(255),
+    contact_type VARCHAR(20),
     password_hash VARCHAR(255) NOT NULL,
     
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -30,13 +33,16 @@ CREATE TABLE common_auth.common_auth_user (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE UNIQUE INDEX idx_auth_contact ON common_auth.common_auth_user(contact_value);
+-- Unique index on contact_value removed in V018 (deprecated field)
 CREATE INDEX idx_auth_verified ON common_auth.common_auth_user(is_verified) WHERE is_verified = TRUE;
 CREATE INDEX idx_auth_locked ON common_auth.common_auth_user(locked_until) WHERE locked_until IS NOT NULL;
 
 COMMENT ON TABLE common_auth.common_auth_user IS 'Authentication credentials - BCrypt password hashing';
+COMMENT ON COLUMN common_auth.common_auth_user.contact_value IS 'DEPRECATED: Removed from entity. Use contact_id and Contact entity instead. NOT NULL removed in V018. Will be dropped in future migration.';
+COMMENT ON COLUMN common_auth.common_auth_user.contact_type IS 'DEPRECATED: Removed from entity. Use contact_id and Contact entity instead. NOT NULL removed in V018. Will be dropped in future migration.';
 COMMENT ON COLUMN common_auth.common_auth_user.password_hash IS 'BCrypt hash (strength 10)';
 COMMENT ON COLUMN common_auth.common_auth_user.failed_login_attempts IS 'Locks account after 5 attempts for 30 minutes';
+COMMENT ON COLUMN common_auth.common_auth_user.id IS 'NOTE: contact_id column added in V018 for new communication system integration';
 
 -- ============================================================================
 -- TABLE: common_refresh_token

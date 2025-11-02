@@ -1,6 +1,9 @@
 package com.fabricmanagement.production.masterdata.fiber.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
+import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
+import com.fabricmanagement.production.masterdata.material.domain.Material;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -11,13 +14,12 @@ import java.util.UUID;
     indexes = {
         @Index(name = "idx_fiber_tenant", columnList = "tenant_id"),
         @Index(name = "idx_fiber_material", columnList = "material_id"),
-        @Index(name = "idx_fiber_code", columnList = "fiber_code"),
-        @Index(name = "idx_fiber_category", columnList = "category_id"),
+        @Index(name = "idx_fiber_category", columnList = "fiber_category_id"),
+        @Index(name = "idx_fiber_iso", columnList = "fiber_iso_code_id"),
         @Index(name = "idx_fiber_status", columnList = "status")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_fiber_material", columnNames = {"material_id"}),
-        @UniqueConstraint(name = "uk_fiber_tenant_code", columnNames = {"tenant_id", "fiber_code"})
+        @UniqueConstraint(name = "uk_fiber_material", columnNames = {"material_id"})
     })
 @Getter
 @Setter
@@ -26,14 +28,30 @@ import java.util.UUID;
 @AllArgsConstructor
 public class Fiber extends BaseEntity {
 
-    @Column(name = "material_id", nullable = false, unique = true)
-    private UUID materialId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "material_id", nullable = false, unique = true, updatable = false)
+    private Material material;
 
-    @Column(name = "fiber_category_id")
-    private UUID fiberCategoryId;  // FK → FiberCategory
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fiber_category_id")
+    private FiberCategory fiberCategory;
 
-    @Column(name = "fiber_iso_code_id")
-    private UUID fiberIsoCodeId;  // FK → FiberIsoCode
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fiber_iso_code_id")
+    private FiberIsoCode fiberIsoCode;
+
+    // Helper methods for accessing IDs without loading entities
+    public UUID getMaterialId() {
+        return material != null ? material.getId() : null;
+    }
+
+    public UUID getFiberCategoryId() {
+        return fiberCategory != null ? fiberCategory.getId() : null;
+    }
+
+    public UUID getFiberIsoCodeId() {
+        return fiberIsoCode != null ? fiberIsoCode.getId() : null;
+    }
 
     @Column(name = "fiber_name", nullable = false, length = 255)
     private String fiberName;
@@ -62,9 +80,9 @@ public class Fiber extends BaseEntity {
     private String remarks;
 
     public static Fiber createPureFiber(
-            UUID materialId,
-            UUID fiberCategoryId,
-            UUID fiberIsoCodeId,
+            Material material,
+            FiberCategory fiberCategory,
+            FiberIsoCode fiberIsoCode,
             String fiberName,
             String fiberGrade,
             Double fineness,
@@ -73,9 +91,9 @@ public class Fiber extends BaseEntity {
             Double elongationPercent) {
         
         return Fiber.builder()
-            .materialId(materialId)
-            .fiberCategoryId(fiberCategoryId)
-            .fiberIsoCodeId(fiberIsoCodeId)
+            .material(material)
+            .fiberCategory(fiberCategory)
+            .fiberIsoCode(fiberIsoCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .fineness(fineness)
@@ -87,24 +105,27 @@ public class Fiber extends BaseEntity {
     }
 
     public static Fiber createBlendedFiber(
-            UUID materialId,
-            UUID fiberCategoryId,
-            UUID fiberIsoCodeId,
+            Material material,
+            FiberCategory fiberCategory,
+            FiberIsoCode fiberIsoCode,
             String fiberName,
             String fiberGrade) {
         
         return Fiber.builder()
-            .materialId(materialId)
-            .fiberCategoryId(fiberCategoryId)
-            .fiberIsoCodeId(fiberIsoCodeId)
+            .material(material)
+            .fiberCategory(fiberCategory)
+            .fiberIsoCode(fiberIsoCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .status(FiberStatus.NEW)
             .build();
     }
 
+    /**
+     * Update fiber properties (excluding status - use lifecycle methods instead).
+     */
     public void update(String fiberName, String fiberGrade, Double fineness, Double lengthMm,
-                       Double strengthCndTex, Double elongationPercent, String remarks, FiberStatus status) {
+                       Double strengthCndTex, Double elongationPercent, String remarks) {
         this.fiberName = fiberName;
         this.fiberGrade = fiberGrade;
         this.fineness = fineness;
@@ -112,7 +133,61 @@ public class Fiber extends BaseEntity {
         this.strengthCndTex = strengthCndTex;
         this.elongationPercent = elongationPercent;
         this.remarks = remarks;
-        this.status = status;
+    }
+
+    /**
+     * Mark fiber as in use.
+     * <p>Transition: NEW → IN_USE</p>
+     */
+    public void markInUse() {
+        if (this.status == FiberStatus.NEW) {
+            this.status = FiberStatus.IN_USE;
+        } else {
+            throw new IllegalStateException(
+                String.format("Cannot mark fiber as IN_USE from status: %s. Only NEW fibers can be marked IN_USE.", this.status));
+        }
+    }
+
+    /**
+     * Mark fiber as exhausted.
+     * <p>Transition: IN_USE → EXHAUSTED</p>
+     */
+    public void markExhausted() {
+        if (this.status == FiberStatus.IN_USE) {
+            this.status = FiberStatus.EXHAUSTED;
+        } else {
+            throw new IllegalStateException(
+                String.format("Cannot mark fiber as EXHAUSTED from status: %s. Only IN_USE fibers can be marked EXHAUSTED.", this.status));
+        }
+    }
+
+    /**
+     * Mark fiber as obsolete.
+     * <p>Transition: Any status → OBSOLETE</p>
+     * <p>Can be called from any state when fiber becomes outdated.</p>
+     */
+    public void markObsolete() {
+        this.status = FiberStatus.OBSOLETE;
+    }
+
+    /**
+     * Check if fiber is available for use.
+     *
+     * @return true if status is NEW or IN_USE
+     */
+    public boolean isAvailable() {
+        return this.status == FiberStatus.NEW || this.status == FiberStatus.IN_USE;
+    }
+
+    /**
+     * Check if fiber is pure (not blended).
+     * <p>Pure fibers have technical specifications (fineness, length, etc.).</p>
+     *
+     * @return true if fiber has technical specifications
+     */
+    public boolean isPure() {
+        return this.fineness != null || this.lengthMm != null || 
+               this.strengthCndTex != null || this.elongationPercent != null;
     }
 
     @Override

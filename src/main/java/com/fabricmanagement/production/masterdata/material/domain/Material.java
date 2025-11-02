@@ -12,7 +12,6 @@ import lombok.*;
 @Table(name = "prod_material", schema = "production",
     indexes = {
         @Index(name = "idx_material_tenant_type", columnList = "tenant_id,material_type"),
-        @Index(name = "idx_material_code", columnList = "material_code"),
         @Index(name = "idx_material_active", columnList = "is_active")
     })
 @Getter
