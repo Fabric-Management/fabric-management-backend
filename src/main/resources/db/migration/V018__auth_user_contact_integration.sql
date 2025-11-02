@@ -35,6 +35,17 @@ COMMENT ON COLUMN common_auth.common_auth_user.contact_id IS 'References Contact
 COMMENT ON COLUMN common_auth.common_auth_user.contact_value IS 'DEPRECATED: Use contactId and Contact entity instead. Will be removed after migration.';
 COMMENT ON COLUMN common_auth.common_auth_user.contact_type IS 'DEPRECATED: Use contactId and Contact entity instead. Will be removed after migration.';
 
+-- Remove NOT NULL constraint from contact_value (deprecated - now via Contact entity)
+ALTER TABLE common_auth.common_auth_user
+ALTER COLUMN contact_value DROP NOT NULL;
+
+-- Remove NOT NULL constraint from contact_type (deprecated - now via Contact entity)
+ALTER TABLE common_auth.common_auth_user
+ALTER COLUMN contact_type DROP NOT NULL;
+
+-- Drop unique index on contact_value (no longer unique - Contact entity handles uniqueness)
+DROP INDEX IF EXISTS common_auth.idx_auth_contact;
+
 -- ============================================================================
 -- ALTER TABLE: common_user - Remove NOT NULL constraints from deprecated fields
 -- ============================================================================
