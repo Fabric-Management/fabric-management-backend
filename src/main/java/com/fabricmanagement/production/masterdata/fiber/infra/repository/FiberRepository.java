@@ -22,8 +22,10 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
 
     /**
      * Find fiber by material ID.
+     * <p>Uses material.id relationship since materialId field was replaced with @ManyToOne Material.</p>
      */
-    Optional<Fiber> findByMaterialId(UUID materialId);
+    @Query("SELECT f FROM Fiber f WHERE f.material.id = :materialId")
+    Optional<Fiber> findByMaterialId(@Param("materialId") UUID materialId);
 
     /**
      * Find all active fibers for a tenant.

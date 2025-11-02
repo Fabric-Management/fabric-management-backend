@@ -31,8 +31,26 @@ public class AIToolBuilder {
                     "required", List.of("materialName")
                 )
             ),
+            buildTool("smart_search",
+                "INTELLIGENT SEARCH: Automatically detects entity type (Fiber/Yarn/Fabric) from query and searches accordingly. " +
+                "Use this as PRIMARY search function when user asks about textile items. " +
+                "Examples: 'pamuk' → searches FIBER, 'pamuk ipliği' → searches YARN, 'gabardin' → searches FABRIC. " +
+                "More efficient than separate searches - ONE function call, smart detection, lower token cost.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "query", Map.of(
+                            "type", "string",
+                            "description", "Search query - automatically detects if it's Fiber, Yarn, or Fabric. " +
+                                "Examples: 'pamuk' (fiber), 'pamuk ipliği' (yarn), 'gabardin' (fabric), '30/1 gabardin' (fabric). " +
+                                "Preserve technical textile specifications EXACTLY as user typed (30/1, 40/2, GSM, etc.)."
+                        )
+                    ),
+                    "required", List.of("query")
+                )
+            ),
             buildTool("search_materials",
-                "Search for materials in the system. Use this when user asks about available materials or wants to find a material.",
+                "Search for materials in the system. Use this when user specifically asks about materials or when smart_search doesn't find results.",
                 Map.of(
                     "type", "object",
                     "properties", Map.of(
@@ -52,6 +70,111 @@ public class AIToolBuilder {
                     "type", "object",
                     "properties", Map.of(),
                     "required", List.of()
+                )
+            ),
+            buildTool("get_fiber_info",
+                "Get detailed information about a fiber including composition, technical specifications, and status. Use this when user asks about a specific fiber.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "fiberId", Map.of(
+                            "type", "string",
+                            "description", "Fiber ID (UUID). Use this if user provides exact fiber ID."
+                        ),
+                        "fiberName", Map.of(
+                            "type", "string",
+                            "description", "Fiber name to search for. Preserve technical terms EXACTLY (e.g., 'Cotton 30/1', 'Polyester 40/2'). Use when user mentions a fiber name."
+                        )
+                    ),
+                    "required", List.of()
+                )
+            ),
+            buildTool("search_fibers",
+                "Search for fibers by name. Use this when user wants to find or list fibers.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "query", Map.of(
+                            "type", "string",
+                            "description", "Search query to find fibers. Preserve technical terms EXACTLY."
+                        )
+                    ),
+                    "required", List.of("query")
+                )
+            ),
+            buildTool("list_fiber_categories",
+                "List all available fiber categories. Use this when user wants to create a fiber and needs to select a category.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(),
+                    "required", List.of()
+                )
+            ),
+            buildTool("create_material",
+                "Create a new material. Use this when user wants to create a material. REQUIRES USER CONFIRMATION.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "materialType", Map.of(
+                            "type", "string",
+                            "description", "Material type: FIBER, YARN, FABRIC, CHEMICAL, or CONSUMABLE (required)"
+                        ),
+                        "unit", Map.of(
+                            "type", "string",
+                            "description", "Unit of measurement: kg, m, piece, liter, etc. (required)"
+                        )
+                    ),
+                    "required", List.of("materialType", "unit")
+                )
+            ),
+            buildTool("create_fiber",
+                "Create a new fiber. USER-FRIENDLY: If materialId is not provided, Material will be auto-created with type=FIBER. REQUIRES USER CONFIRMATION.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "materialId", Map.of(
+                            "type", "string",
+                            "description", "Material ID (UUID) - Optional. If not provided, Material will be auto-created with type=FIBER using the 'unit' parameter"
+                        ),
+                        "unit", Map.of(
+                            "type", "string",
+                            "description", "Unit for Material (kg, ton, m, etc.) - Required if materialId is not provided. Used when auto-creating Material"
+                        ),
+                        "fiberCategoryId", Map.of(
+                            "type", "string",
+                            "description", "Fiber Category ID (UUID) - required"
+                        ),
+                        "fiberName", Map.of(
+                            "type", "string",
+                            "description", "Fiber name (required)"
+                        ),
+                        "fiberGrade", Map.of(
+                            "type", "string",
+                            "description", "Fiber grade (optional)"
+                        ),
+                        "fineness", Map.of(
+                            "type", "number",
+                            "description", "Fineness value (optional)"
+                        ),
+                        "lengthMm", Map.of(
+                            "type", "number",
+                            "description", "Length in millimeters (optional)"
+                        ),
+                        "strengthCndTex", Map.of(
+                            "type", "number",
+                            "description", "Strength in cN/dtex (optional)"
+                        ),
+                        "elongationPercent", Map.of(
+                            "type", "number",
+                            "description", "Elongation percentage (optional)"
+                        ),
+                        "remarks", Map.of(
+                            "type", "string",
+                            "description", "Additional remarks (optional)"
+                        )
+                    ),
+                    "required", List.of("fiberCategoryId", "fiberName")
+                    // Note: materialId OR unit is required (handled in AIFunctionCaller)
                 )
             )
         );

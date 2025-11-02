@@ -46,8 +46,11 @@ public class FiberService implements FiberFacade {
     private final FiberCompositionService compositionService;
     private final FiberValidationService validationService;
 
+    /**
+     * Create fiber (internal method).
+     */
     @Transactional
-    public FiberDto createFiber(CreateFiberRequest request) {
+    public FiberDto createFiberInternal(CreateFiberRequest request) {
         log.info("Creating fiber: name={}", request.getFiberName());
 
         // Check if this is a pure 100% fiber being recreated
@@ -59,9 +62,27 @@ public class FiberService implements FiberFacade {
         }
 
 
-        // Load Material entity
-        Material material = materialRepository.findById(request.getMaterialId())
-            .orElseThrow(() -> new IllegalArgumentException("Material not found: " + request.getMaterialId()));
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        
+        // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation reduces user errors)
+        Material material;
+        if (request.getMaterialId() != null) {
+            // Use existing Material
+            material = materialRepository.findByTenantIdAndId(tenantId, request.getMaterialId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                    String.format("Material not found: %s (or not accessible for current tenant)", request.getMaterialId())));
+        } else {
+            // Auto-create Material (USER-FRIENDLY: System handles Material creation automatically)
+            if (request.getUnit() == null || request.getUnit().isBlank()) {
+                throw new IllegalArgumentException(
+                    "Unit is required when materialId is not provided. Material will be auto-created with type=FIBER.");
+            }
+            
+            log.info("Auto-creating Material: type=FIBER, unit={}", request.getUnit());
+            material = Material.create(com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER, request.getUnit());
+            material = materialRepository.save(material);
+            log.info("✅ Material auto-created: id={}, uid={}", material.getId(), material.getUid());
+        }
 
         // Validate material type is FIBER
         if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
@@ -69,7 +90,8 @@ public class FiberService implements FiberFacade {
         }
 
         // Check if material already has a fiber detail
-        if (fiberRepository.findByMaterialId(request.getMaterialId()).isPresent()) {
+        UUID materialIdToCheck = material.getId(); // Use material from above (either existing or newly created)
+        if (fiberRepository.findByMaterialId(materialIdToCheck).isPresent()) {
             throw new IllegalArgumentException("Material already has fiber details. Each material can only have one fiber.");
         }
 
@@ -425,5 +447,11 @@ public class FiberService implements FiberFacade {
                 return String.format("%s %.0f%%", fiberName, percentage);
             })
             .collect(Collectors.joining(" + ")) + " Blend";
+    }
+
+    @Override
+    @Transactional
+    public FiberDto createFiber(CreateFiberRequest request) {
+        return createFiberInternal(request);
     }
 }

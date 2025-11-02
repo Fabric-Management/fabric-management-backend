@@ -56,5 +56,20 @@ public class AIProperties {
      * Enable/disable AI features
      */
     private Boolean enabled = true;
+
+    /**
+     * Enable response caching (reduces costs)
+     */
+    private Boolean cacheEnabled = true;
+
+    /**
+     * Cache TTL in seconds (default: 5 minutes)
+     */
+    private Integer cacheTtlSeconds = 300;
+
+    /**
+     * Max context tokens for conversation history (default: 2000)
+     */
+    private Integer maxContextTokens = 2000;
 }
 

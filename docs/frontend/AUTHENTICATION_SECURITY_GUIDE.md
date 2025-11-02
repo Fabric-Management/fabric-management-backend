@@ -101,6 +101,11 @@ Registration is **2-step** with verification:
 1. **Check Eligibility & Send Code**
 2. **Verify Code & Complete Registration**
 
+**✅ USER-FRIENDLY AUTOMATION:**
+- **First user during tenant registration** → Automatically assigned **ADMIN** role
+- **Contact creation** → Automatically handled during registration
+- **Company setup** → First user becomes company admin automatically
+
 ### Step 1: Check Eligibility & Send Code
 
 ```http

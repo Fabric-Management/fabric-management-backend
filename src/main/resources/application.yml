@@ -128,6 +128,19 @@ application:
       timeout-ms: ${EMAIL_FRONTEND_TIMEOUT_MS:5000}
       url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
+  # AI Configuration
+  ai:
+    enabled: ${AI_ENABLED:true}
+    provider: ${AI_PROVIDER:openai} # openai | anthropic | local
+    api-key: ${OPENAI_API_KEY:${AI_API_KEY:}} # From .env (supports both OPENAI_API_KEY and AI_API_KEY)
+    model: ${AI_MODEL:gpt-4o-mini} # gpt-4o-mini | claude-3-haiku
+    temperature: ${AI_TEMPERATURE:0.7}
+    max-tokens: ${AI_MAX_TOKENS:1000}
+    timeout: ${AI_TIMEOUT:30000} # 30 seconds
+    cache-enabled: ${AI_CACHE_ENABLED:true}
+    cache-ttl-seconds: ${AI_CACHE_TTL_SECONDS:300}
+    max-context-tokens: ${AI_MAX_CONTEXT_TOKENS:1500} # Reduced from 2000 to save tokens
+
   # Verification Configuration
   verification:
     code-length: 6
@@ -147,16 +160,6 @@ application:
     outbox-enabled: true
     outbox-batch-size: 100
     outbox-poll-interval-ms: 5000
-
-  # AI Configuration
-  ai:
-    provider: ${AI_PROVIDER:openai} # openai | anthropic | local
-    api-key: ${AI_API_KEY:} # From .env
-    model: ${AI_MODEL:gpt-4o-mini} # gpt-4o-mini | claude-3-haiku
-    temperature: ${AI_TEMPERATURE:0.7}
-    max-tokens: ${AI_MAX_TOKENS:1000}
-    timeout: ${AI_TIMEOUT:30000} # 30 seconds
-    enabled: ${AI_ENABLED:true}
 
   # Google Maps Platform Configuration
   google:

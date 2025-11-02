@@ -32,7 +32,11 @@ public class FiberController {
     @PostMapping
     public ResponseEntity<ApiResponse<FiberDto>> createFiber(
             @Valid @RequestBody CreateFiberRequest request) {
-        log.info("Creating fiber: name={}", request.getFiberName());
+        log.info("Creating fiber: name={}, materialId={}, unit={}", 
+            request.getFiberName(), request.getMaterialId(), request.getUnit());
+        
+        // USER-FRIENDLY: Material will be auto-created if materialId is null
+        // This reduces user errors and simplifies the workflow
         
         FiberDto fiber = fiberService.createFiber(request);
         

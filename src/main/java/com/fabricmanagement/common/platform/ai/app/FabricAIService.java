@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -36,8 +37,11 @@ public class FabricAIService {
     private final AIFunctionCaller functionCaller;
     private final ObjectMapper objectMapper;
     private final ConversationStore conversationStore;
+    private final AICache aiCache;
+    private final HistoryTrimmer historyTrimmer;
+    private final UserBehaviorLearner behaviorLearner;
 
-    @Transactional(readOnly = true)
+    @Transactional  // Removed readOnly=true because AI functions may perform writes
     public ChatResponse chat(String userMessage, UUID userId, UUID conversationId) {
         if (!aiProperties.getEnabled()) {
             throw new IllegalStateException("AI features are disabled");
@@ -53,15 +57,48 @@ public class FabricAIService {
             user = userFacade.findById(tenantId, userId).orElse(null);
         }
 
+        // Detect user language for learning
+        String detectedLanguage = behaviorLearner.detectLanguage(userMessage);
+        
+        // Check cache first (for simple queries)
+        String normalizedQuery = normalizeQuery(userMessage);
+        Optional<String> cachedResponse = aiCache.get(userId, normalizedQuery);
+        if (cachedResponse.isPresent()) {
+            log.info("Returning cached response for query: {}", normalizedQuery);
+            ChatResponse cached = ChatResponse.builder()
+                .message(cachedResponse.get())
+                .conversationId(conversationId != null ? conversationId : UUID.randomUUID())
+                .build();
+            
+            // Learn from cached interaction (still track behavior)
+            behaviorLearner.learn(userId, userMessage, null, detectedLanguage);
+            return cached;
+        }
+
         // Get conversation history if conversationId provided
         List<Map<String, Object>> conversationHistory = conversationStore.getHistory(conversationId);
         
-        // Build prompt with history
+        // Trim history to reduce tokens
+        List<Map<String, Object>> trimmedHistory = historyTrimmer.trim(conversationHistory);
+        
+        // Build prompt with trimmed history
         List<Map<String, Object>> messages = new ArrayList<>();
+        
+        // Get user preferences for personalization
+        UserBehaviorLearner.UserPreferences prefs = userId != null 
+            ? behaviorLearner.getPreferences(userId) 
+            : null;
         
         // Add system message (only once, at the start)
         if (conversationHistory.isEmpty()) {
-            // New conversation - add system prompt
+            // New conversation - add system prompt with preferences
+            SystemPrompts.UserContext userContext = user != null 
+                ? SystemPrompts.UserContext.of(user) 
+                : null;
+            if (userContext != null && prefs != null) {
+                userContext.setPreferences(prefs);
+            }
+            
             List<Map<String, String>> promptMessages = promptBuilder.buildPrompt("", user);
             for (Map<String, String> msg : promptMessages) {
                 if ("system".equals(msg.get("role"))) {
@@ -71,16 +108,16 @@ public class FabricAIService {
                 }
             }
         } else {
-            // Existing conversation - reuse system message from history
+            // Existing conversation - reuse system message from trimmed history
             // Find first system message
-            for (Map<String, Object> msg : conversationHistory) {
+            for (Map<String, Object> msg : trimmedHistory) {
                 if ("system".equals(msg.get("role"))) {
                     messages.add(msg);
                     break;
                 }
             }
-            // Add conversation history (excluding system message)
-            conversationHistory.stream()
+            // Add trimmed conversation history (excluding system message)
+            trimmedHistory.stream()
                 .filter(msg -> !"system".equals(msg.get("role")))
                 .forEach(messages::add);
         }
@@ -222,7 +259,35 @@ public class FabricAIService {
         // Set conversationId in response
         response.setConversationId(finalConversationId);
         
+        // Learn from interaction
+        String functionName = null;
+        if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
+            // Track first function call
+            functionName = response.getToolCalls().get(0).getFunctionName();
+        }
+        
+        // Detect response language (from AI response)
+        String responseLanguage = behaviorLearner.detectLanguage(response.getMessage());
+        
+        // Learn: track user behavior
+        behaviorLearner.learn(userId, userMessage, functionName, responseLanguage);
+        
+        // Cache simple responses (non-function-call responses)
+        if (response.getToolCalls() == null || response.getToolCalls().isEmpty()) {
+            aiCache.put(userId, normalizedQuery, response.getMessage());
+        }
+        
         return response;
+    }
+
+    /**
+     * Normalize query for caching (lowercase, trim, remove extra spaces).
+     */
+    private String normalizeQuery(String query) {
+        if (query == null) {
+            return "";
+        }
+        return query.toLowerCase().trim().replaceAll("\\s+", " ");
     }
 
     /**

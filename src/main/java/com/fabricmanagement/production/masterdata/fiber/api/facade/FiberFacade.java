@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.masterdata.fiber.api.facade;
 
+import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 
 import java.util.List;
@@ -44,5 +45,13 @@ public interface FiberFacade {
      * @return true if exists
      */
     boolean exists(UUID id);
+
+    /**
+     * Create a new fiber.
+     *
+     * @param request Create fiber request
+     * @return Created fiber DTO
+     */
+    FiberDto createFiber(CreateFiberRequest request);
 }
 
