@@ -1351,20 +1351,20 @@ export function CreateUserForm() {
         });
       }
 
-      alert("✅ User created successfully!");
-      // Reset form or navigate
+      // User created successfully - handle success (navigate, show message, etc.)
+      console.log("✅ User created:", user);
     } catch (error: any) {
       console.error("❌ Error creating user:", error);
-      alert(`Error: ${error.response?.data?.message || error.message}`);
+      // Handle error (show error message, etc.)
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="user-form">
+    <form onSubmit={handleSubmit}>
       <h2>Create New User</h2>
 
       {/* Basic Info */}
-      <div className="form-group">
+      <div>
         <label>First Name *</label>
         <input
           type="text"
@@ -1561,24 +1561,9 @@ function formatAddressForBackend(
 
 ---
 
-## 🎯 UX Patterns for User Creation
+## 🎯 Smart Defaults & Automation Patterns
 
-### Pattern 1: Progressive Disclosure
-
-**Show only essential fields first, then expand:**
-
-```typescript
-const [formStep, setFormStep] = useState<
-  "basic" | "contact" | "address" | "review"
->("basic");
-
-// Step 1: Basic Info (First Name, Last Name, Email)
-// Step 2: Contact Info (Phone, Company, Role)
-// Step 3: Address (Optional - with autocomplete)
-// Step 4: Review & Submit
-```
-
-### Pattern 2: Smart Defaults
+### Pattern 1: Pre-fill Company Address
 
 ```typescript
 // Pre-fill Company address for user
@@ -1599,17 +1584,13 @@ useEffect(() => {
             },
           }));
 
-          // Show info message
-          toast.info(
-            "📍 Company address pre-filled. You can override if needed."
-          );
         }
       });
   }
 }, [formData.companyId]);
 ```
 
-### Pattern 3: Real-time Validation
+### Pattern 2: Real-time Contact Validation
 
 ```typescript
 const [validationErrors, setValidationErrors] = useState<
@@ -1643,126 +1624,6 @@ const checkContactExists = async (email: string) => {
   }
 };
 ```
-
-### Pattern 4: Loading States & Feedback
-
-```typescript
-const [isSubmitting, setIsSubmitting] = useState(false);
-const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">(
-  "idle"
-);
-
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  setSubmitStatus("idle");
-
-  try {
-    await createUser(formData);
-    setSubmitStatus("success");
-    toast.success("✅ User created successfully!");
-  } catch (error) {
-    setSubmitStatus("error");
-    toast.error("❌ Failed to create user");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-
-// Show loading spinner during submission
-{
-  isSubmitting && <Spinner />;
-}
-{
-  submitStatus === "success" && <SuccessMessage />;
-}
-{
-  submitStatus === "error" && <ErrorMessage />;
-}
-```
-
----
-
-## 🎨 UI/UX Recommendations
-
-### 1. Form Layout
-
-- **Single Column Layout** - Easier to scan and fill
-- **Group Related Fields** - Basic Info, Contact, Address sections
-- **Visual Hierarchy** - Use spacing and typography to guide the eye
-- **Clear Labels** - Use helpful placeholder text
-
-### 2. Address Input Styling
-
-```css
-.address-autocomplete {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 0.2s;
-}
-
-.address-autocomplete:focus {
-  border-color: #1976d2;
-  outline: none;
-}
-
-.address-preview {
-  padding: 8px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  margin-top: 4px;
-}
-```
-
-### 3. Error Handling UI
-
-```typescript
-{
-  validationErrors.email && (
-    <div
-      className="error-message"
-      style={{ color: "red", fontSize: "14px", marginTop: "4px" }}>
-      ⚠️ {validationErrors.email}
-    </div>
-  );
-}
-```
-
-### 4. Success Feedback
-
-```typescript
-{
-  submitStatus === "success" && (
-    <div
-      className="success-message"
-      style={{
-        padding: "16px",
-        background: "#d4edda",
-        border: "1px solid #c3e6cb",
-        borderRadius: "4px",
-        color: "#155724",
-      }}>
-      ✅ User created successfully! All contacts and addresses have been set up
-      automatically.
-    </div>
-  );
-}
-```
-
----
-
-## 📦 Complete Package Example
-
-See `docs/frontend/FRONTEND_USER_COMPANY_FORMS.md` for complete form patterns including:
-
-- Company creation with address autocomplete
-- User creation with smart defaults
-- Form validation
-- Error handling
-- Success feedback
 
 ---
 
