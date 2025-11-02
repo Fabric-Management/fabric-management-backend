@@ -11,13 +11,12 @@ import java.util.UUID;
     indexes = {
         @Index(name = "idx_fiber_tenant", columnList = "tenant_id"),
         @Index(name = "idx_fiber_material", columnList = "material_id"),
-        @Index(name = "idx_fiber_code", columnList = "fiber_code"),
-        @Index(name = "idx_fiber_category", columnList = "category_id"),
+        @Index(name = "idx_fiber_category", columnList = "fiber_category_id"),
+        @Index(name = "idx_fiber_iso", columnList = "fiber_iso_code_id"),
         @Index(name = "idx_fiber_status", columnList = "status")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_fiber_material", columnNames = {"material_id"}),
-        @UniqueConstraint(name = "uk_fiber_tenant_code", columnNames = {"tenant_id", "fiber_code"})
+        @UniqueConstraint(name = "uk_fiber_material", columnNames = {"material_id"})
     })
 @Getter
 @Setter
@@ -26,14 +25,25 @@ import java.util.UUID;
 @AllArgsConstructor
 public class Fiber extends BaseEntity {
 
-    @Column(name = "material_id", nullable = false, unique = true)
+    @Column(name = "material_id", nullable = false, unique = true, updatable = false)
     private UUID materialId;
 
-    @Column(name = "fiber_category_id")
-    private UUID fiberCategoryId;  // FK → FiberCategory
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fiber_category_id")
+    private com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory fiberCategory;
 
-    @Column(name = "fiber_iso_code_id")
-    private UUID fiberIsoCodeId;  // FK → FiberIsoCode
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fiber_iso_code_id")
+    private com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode fiberIsoCode;
+
+    // Helper methods for accessing IDs without loading entities
+    public UUID getFiberCategoryId() {
+        return fiberCategory != null ? fiberCategory.getId() : null;
+    }
+
+    public UUID getFiberIsoCodeId() {
+        return fiberIsoCode != null ? fiberIsoCode.getId() : null;
+    }
 
     @Column(name = "fiber_name", nullable = false, length = 255)
     private String fiberName;
@@ -63,8 +73,8 @@ public class Fiber extends BaseEntity {
 
     public static Fiber createPureFiber(
             UUID materialId,
-            UUID fiberCategoryId,
-            UUID fiberIsoCodeId,
+            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory fiberCategory,
+            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode fiberIsoCode,
             String fiberName,
             String fiberGrade,
             Double fineness,
@@ -74,8 +84,8 @@ public class Fiber extends BaseEntity {
         
         return Fiber.builder()
             .materialId(materialId)
-            .fiberCategoryId(fiberCategoryId)
-            .fiberIsoCodeId(fiberIsoCodeId)
+            .fiberCategory(fiberCategory)
+            .fiberIsoCode(fiberIsoCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .fineness(fineness)
@@ -88,15 +98,15 @@ public class Fiber extends BaseEntity {
 
     public static Fiber createBlendedFiber(
             UUID materialId,
-            UUID fiberCategoryId,
-            UUID fiberIsoCodeId,
+            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory fiberCategory,
+            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode fiberIsoCode,
             String fiberName,
             String fiberGrade) {
         
         return Fiber.builder()
             .materialId(materialId)
-            .fiberCategoryId(fiberCategoryId)
-            .fiberIsoCodeId(fiberIsoCodeId)
+            .fiberCategory(fiberCategory)
+            .fiberIsoCode(fiberIsoCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
             .status(FiberStatus.NEW)
