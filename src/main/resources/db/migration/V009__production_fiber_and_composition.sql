@@ -89,11 +89,10 @@ COMMENT ON COLUMN production.prod_fiber.status IS 'NEW, IN_USE, EXHAUSTED, OBSOL
 -- Total % must sum to 100 (enforced by application logic)
 
 CREATE TABLE production.prod_fiber_composition (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE,
     
-    -- Relationships
+    -- Relationships (Composite Primary Key)
     blended_fiber_id UUID NOT NULL REFERENCES production.prod_fiber(id) ON DELETE CASCADE,
     base_fiber_id UUID NOT NULL REFERENCES production.prod_fiber(id) ON DELETE CASCADE,
     
@@ -108,7 +107,7 @@ CREATE TABLE production.prod_fiber_composition (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_composition_blend_base UNIQUE (blended_fiber_id, base_fiber_id)
+    PRIMARY KEY (blended_fiber_id, base_fiber_id)
 );
 
 CREATE INDEX idx_fiber_composition_blend ON production.prod_fiber_composition(blended_fiber_id);
@@ -123,10 +122,10 @@ COMMENT ON COLUMN production.prod_fiber_composition.percentage IS 'Percentage of
 -- =====================================================
 
 CREATE TABLE production.prod_fiber_attribute_link (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
+    -- Relationships (Composite Primary Key)
     fiber_id UUID NOT NULL REFERENCES production.prod_fiber(id) ON DELETE CASCADE,
     attribute_id UUID NOT NULL REFERENCES production.prod_fiber_attribute(id) ON DELETE CASCADE,
     
@@ -137,7 +136,7 @@ CREATE TABLE production.prod_fiber_attribute_link (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_fiber_attribute UNIQUE (fiber_id, attribute_id)
+    PRIMARY KEY (fiber_id, attribute_id)
 );
 
 CREATE INDEX idx_fiber_attr_link_fiber ON production.prod_fiber_attribute_link(fiber_id);
@@ -151,10 +150,10 @@ COMMENT ON TABLE production.prod_fiber_attribute_link IS 'Fiber attributes - Man
 -- =====================================================
 
 CREATE TABLE production.prod_fiber_certification_link (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
+    -- Relationships (Composite Primary Key)
     fiber_id UUID NOT NULL REFERENCES production.prod_fiber(id) ON DELETE CASCADE,
     certification_id UUID NOT NULL REFERENCES production.prod_fiber_certification(id) ON DELETE CASCADE,
     
@@ -169,7 +168,7 @@ CREATE TABLE production.prod_fiber_certification_link (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
-    CONSTRAINT uk_fiber_certification UNIQUE (fiber_id, certification_id)
+    PRIMARY KEY (fiber_id, certification_id)
 );
 
 CREATE INDEX idx_fiber_cert_link_fiber ON production.prod_fiber_certification_link(fiber_id);

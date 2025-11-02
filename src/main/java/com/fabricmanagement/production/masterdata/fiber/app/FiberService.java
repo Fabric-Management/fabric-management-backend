@@ -3,7 +3,6 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
-import com.fabricmanagement.production.masterdata.fiber.app.FiberConstants;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.event.FiberCreatedEvent;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
@@ -269,8 +268,7 @@ public class FiberService implements FiberFacade {
             request.getLengthMm(),
             request.getStrengthCndTex(),
             request.getElongationPercent(),
-            request.getRemarks(),
-            fiber.getStatus()
+            request.getRemarks()
         );
 
         Fiber saved = fiberRepository.save(fiber);

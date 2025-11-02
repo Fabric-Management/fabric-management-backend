@@ -1,6 +1,5 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
-import com.fabricmanagement.production.masterdata.fiber.app.FiberConstants;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import lombok.RequiredArgsConstructor;

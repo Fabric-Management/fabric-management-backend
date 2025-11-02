@@ -1,6 +1,8 @@
 package com.fabricmanagement.production.masterdata.fiber.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
+import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,11 +32,11 @@ public class Fiber extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fiber_category_id")
-    private com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory fiberCategory;
+    private FiberCategory fiberCategory;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fiber_iso_code_id")
-    private com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode fiberIsoCode;
+    private FiberIsoCode fiberIsoCode;
 
     // Helper methods for accessing IDs without loading entities
     public UUID getFiberCategoryId() {
@@ -73,8 +75,8 @@ public class Fiber extends BaseEntity {
 
     public static Fiber createPureFiber(
             UUID materialId,
-            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory fiberCategory,
-            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode fiberIsoCode,
+            FiberCategory fiberCategory,
+            FiberIsoCode fiberIsoCode,
             String fiberName,
             String fiberGrade,
             Double fineness,
@@ -98,8 +100,8 @@ public class Fiber extends BaseEntity {
 
     public static Fiber createBlendedFiber(
             UUID materialId,
-            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory fiberCategory,
-            com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode fiberIsoCode,
+            FiberCategory fiberCategory,
+            FiberIsoCode fiberIsoCode,
             String fiberName,
             String fiberGrade) {
         
@@ -113,8 +115,11 @@ public class Fiber extends BaseEntity {
             .build();
     }
 
+    /**
+     * Update fiber properties (excluding status - use lifecycle methods instead).
+     */
     public void update(String fiberName, String fiberGrade, Double fineness, Double lengthMm,
-                       Double strengthCndTex, Double elongationPercent, String remarks, FiberStatus status) {
+                       Double strengthCndTex, Double elongationPercent, String remarks) {
         this.fiberName = fiberName;
         this.fiberGrade = fiberGrade;
         this.fineness = fineness;
@@ -122,7 +127,61 @@ public class Fiber extends BaseEntity {
         this.strengthCndTex = strengthCndTex;
         this.elongationPercent = elongationPercent;
         this.remarks = remarks;
-        this.status = status;
+    }
+
+    /**
+     * Mark fiber as in use.
+     * <p>Transition: NEW → IN_USE</p>
+     */
+    public void markInUse() {
+        if (this.status == FiberStatus.NEW) {
+            this.status = FiberStatus.IN_USE;
+        } else {
+            throw new IllegalStateException(
+                String.format("Cannot mark fiber as IN_USE from status: %s. Only NEW fibers can be marked IN_USE.", this.status));
+        }
+    }
+
+    /**
+     * Mark fiber as exhausted.
+     * <p>Transition: IN_USE → EXHAUSTED</p>
+     */
+    public void markExhausted() {
+        if (this.status == FiberStatus.IN_USE) {
+            this.status = FiberStatus.EXHAUSTED;
+        } else {
+            throw new IllegalStateException(
+                String.format("Cannot mark fiber as EXHAUSTED from status: %s. Only IN_USE fibers can be marked EXHAUSTED.", this.status));
+        }
+    }
+
+    /**
+     * Mark fiber as obsolete.
+     * <p>Transition: Any status → OBSOLETE</p>
+     * <p>Can be called from any state when fiber becomes outdated.</p>
+     */
+    public void markObsolete() {
+        this.status = FiberStatus.OBSOLETE;
+    }
+
+    /**
+     * Check if fiber is available for use.
+     *
+     * @return true if status is NEW or IN_USE
+     */
+    public boolean isAvailable() {
+        return this.status == FiberStatus.NEW || this.status == FiberStatus.IN_USE;
+    }
+
+    /**
+     * Check if fiber is pure (not blended).
+     * <p>Pure fibers have technical specifications (fineness, length, etc.).</p>
+     *
+     * @return true if fiber has technical specifications
+     */
+    public boolean isPure() {
+        return this.fineness != null || this.lengthMm != null || 
+               this.strengthCndTex != null || this.elongationPercent != null;
     }
 
     @Override
