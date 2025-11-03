@@ -206,12 +206,13 @@ public class EnhancedSubscriptionService {
 
         // Layer 3: Usage Quota (if specified)
         if (quotaType != null && !quotaType.isBlank()) {
-            if (!isWithinQuota(tenantId, quotaType)) {
-                Optional<SubscriptionQuota> quota = quotaRepository
-                    .findByTenantIdAndQuotaType(tenantId, quotaType);
+            // ✅ Performance: Query quota once and reuse result instead of duplicate query
+            Optional<SubscriptionQuota> quota = quotaRepository
+                .findByTenantIdAndQuotaType(tenantId, quotaType);
 
-                Long used = quota.map(SubscriptionQuota::getQuotaUsed).orElse(0L);
-                Long limit = quota.map(SubscriptionQuota::getQuotaLimit).orElse(0L);
+            if (quota.isPresent() && quota.get().isExceeded()) {
+                Long used = quota.get().getQuotaUsed();
+                Long limit = quota.get().getQuotaLimit();
 
                 log.warn("[Entitlement Check] DENIED - Quota exceeded: {}/{}", used, limit);
 

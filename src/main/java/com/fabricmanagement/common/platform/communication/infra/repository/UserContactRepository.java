@@ -44,5 +44,20 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
      */
     @Query("SELECT uc FROM UserContact uc WHERE uc.userId = :userId AND uc.isForAuthentication = true")
     Optional<UserContact> findAuthenticationContactByUserId(@Param("userId") UUID userId);
+
+    /**
+     * Check if user-contact assignment exists.
+     * 
+     * <p><b>Performance:</b> Uses EXISTS query instead of loading full entity.
+     * Used to prevent N+1 problems when checking if contact is already assigned.</p>
+     * 
+     * @param userId the user ID
+     * @param contactId the contact ID
+     * @return true if assignment exists
+     */
+    @Query("SELECT CASE WHEN COUNT(uc) > 0 THEN true ELSE false END " +
+           "FROM UserContact uc " +
+           "WHERE uc.userId = :userId AND uc.contactId = :contactId")
+    boolean existsByUserIdAndContactId(@Param("userId") UUID userId, @Param("contactId") UUID contactId);
 }
 

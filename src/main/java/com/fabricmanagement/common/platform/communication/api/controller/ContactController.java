@@ -6,7 +6,11 @@ import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.dto.ContactDto;
 import com.fabricmanagement.common.platform.communication.dto.CreateContactRequest;
+import com.fabricmanagement.common.platform.communication.dto.WhatsAppCapabilityDto;
+import com.fabricmanagement.common.platform.communication.infra.client.WhatsAppClient;
+import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +27,7 @@ import java.util.stream.Collectors;
 public class ContactController {
 
     private final ContactService contactService;
+    private final WhatsAppClient whatsAppClient;
 
     @PostMapping
     public ResponseEntity<ApiResponse<ContactDto>> createContact(@Valid @RequestBody CreateContactRequest request) {
@@ -87,6 +92,31 @@ public class ContactController {
         contactService.deleteContact(id);
 
         return ResponseEntity.ok(ApiResponse.success(null, "Contact deleted successfully"));
+    }
+
+    /**
+     * Check if phone number has WhatsApp capability.
+     *
+     * <p>Uses WhatsApp Business API to verify if recipient can receive WhatsApp messages.</p>
+     * <p><b>Purpose:</b> Enable frontend to show WhatsApp indicator and prioritize WhatsApp verification.</p>
+     *
+     * @param phoneNumber E.164 format phone number (e.g., +14155551234)
+     * @return WhatsApp capability information
+     */
+    @GetMapping("/check-whatsapp")
+    public ResponseEntity<ApiResponse<WhatsAppCapabilityDto>> checkWhatsAppCapability(
+            @RequestParam @NotBlank(message = "Phone number is required") String phoneNumber) {
+        log.debug("Checking WhatsApp capability: phone={}", PiiMaskingUtil.maskPhone(phoneNumber));
+
+        boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(phoneNumber);
+
+        WhatsAppCapabilityDto dto = WhatsAppCapabilityDto.builder()
+            .phoneNumber(phoneNumber)
+            .hasWhatsApp(hasWhatsApp)
+            .canReceiveMessages(hasWhatsApp)
+            .build();
+
+        return ResponseEntity.ok(ApiResponse.success(dto));
     }
 }
 

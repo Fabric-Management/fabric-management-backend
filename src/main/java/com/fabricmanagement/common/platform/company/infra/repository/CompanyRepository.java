@@ -43,6 +43,23 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
     @Query("SELECT c FROM Company c WHERE c.tenantId = :tenantId AND c.companyType IN :types")
     List<Company> findByTenantIdAndCompanyTypeIn(@Param("tenantId") UUID tenantId, @Param("types") List<CompanyType> types);
 
+    /**
+     * Find all root tenant companies (where id = tenantId).
+     * Used by platform admin to list all tenants in the system.
+     * 
+     * <p><b>Performance:</b> Filters at database level instead of loading all companies
+     * and filtering in Java. This is critical for performance when there are many companies.</p>
+     * 
+     * <p><b>Note:</b> Only includes tenant-type company types (SPINNER, WEAVER, KNITTER, etc.)</p>
+     * 
+     * @return List of root tenant companies (active tenant-type companies)
+     */
+    @Query("SELECT c FROM Company c " +
+           "WHERE c.id = c.tenantId " +
+           "AND c.companyType IN ('SPINNER', 'WEAVER', 'KNITTER', 'DYER_FINISHER', 'VERTICAL_MILL', 'GARMENT_MANUFACTURER') " +
+           "AND c.isActive = true")
+    List<Company> findRootTenants();
+
     long countByTenantIdAndIsActiveTrue(UUID tenantId);
 
     long countByTenantIdAndCompanyType(UUID tenantId, CompanyType companyType);

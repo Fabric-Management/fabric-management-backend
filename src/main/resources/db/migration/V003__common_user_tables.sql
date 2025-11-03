@@ -2,8 +2,8 @@
 -- V3: User Module Tables
 -- ============================================================================
 -- Creates user tables (depends on company tables from V002)
--- User management - NO username field! Uses contactValue (email/phone)
--- Last Updated: 2025-10-25
+-- User management - NO username field! Uses Contact entity via UserContact junction
+-- Last Updated: 2025-01-27 (Consolidated deprecated field handling)
 -- ============================================================================
 
 -- ============================================================================
@@ -20,14 +20,12 @@ CREATE TABLE common_user.common_user (
     
     -- Deprecated fields (kept for backward compatibility, will be removed in future)
     -- Use UserContact junction table and Contact entity instead
-    -- NOT NULL constraints removed in V018
     contact_value VARCHAR(255),
     contact_type VARCHAR(20),
     
     company_id UUID NOT NULL,
     -- Deprecated field (kept for backward compatibility, will be removed in future)
-    -- Use UserDepartment junction table instead
-    -- Index removed in V018
+    -- Use UserDepartment junction table instead (created in V013)
     department VARCHAR(100),
     last_active_at TIMESTAMP,
     
@@ -44,14 +42,12 @@ CREATE TABLE common_user.common_user (
         REFERENCES common_company.common_company(id) ON DELETE RESTRICT
 );
 
--- Index on contact_value removed in V018 (deprecated field)
 CREATE INDEX idx_user_tenant_company ON common_user.common_user(tenant_id, company_id);
--- Index on department removed in V018 (deprecated field)
 CREATE INDEX idx_user_active ON common_user.common_user(is_active) WHERE is_active = TRUE;
 
 COMMENT ON TABLE common_user.common_user IS 'Platform users - NO username! Use Contact entity via UserContact junction';
-COMMENT ON COLUMN common_user.common_user.contact_value IS 'DEPRECATED: Removed from entity. Use Contact entity via UserContact junction instead. NOT NULL removed in V018. Will be dropped in future migration.';
-COMMENT ON COLUMN common_user.common_user.contact_type IS 'DEPRECATED: Removed from entity. Use Contact entity via UserContact junction instead. NOT NULL removed in V018. Will be dropped in future migration.';
-COMMENT ON COLUMN common_user.common_user.department IS 'DEPRECATED: Removed from entity. Use UserDepartment junction table instead. Index removed in V018. Will be dropped in future migration.';
+COMMENT ON COLUMN common_user.common_user.contact_value IS 'DEPRECATED: Use Contact entity via UserContact junction instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_user.common_user.contact_type IS 'DEPRECATED: Use Contact entity via UserContact junction instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_user.common_user.department IS 'DEPRECATED: Use UserDepartment junction table instead (created in V013). Will be dropped in future migration.';
 COMMENT ON COLUMN common_user.common_user.display_name IS 'Auto-generated: firstName + lastName';
 

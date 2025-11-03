@@ -7,9 +7,13 @@ import com.fabricmanagement.common.platform.company.domain.SubscriptionStatus;
 import com.fabricmanagement.common.platform.company.domain.event.SubscriptionActivatedEvent;
 import com.fabricmanagement.common.platform.company.domain.event.SubscriptionExpiredEvent;
 import com.fabricmanagement.common.platform.company.dto.SubscriptionDto;
+import com.fabricmanagement.common.platform.company.dto.UpdateSubscriptionRequest;
 import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -129,33 +133,133 @@ public class SubscriptionService {
     }
 
     /**
+     * Cancel a subscription.
+     * 
+     * <p>Marks subscription as CANCELLED. No reactivation allowed.</p>
+     */
+    @Transactional
+    public SubscriptionDto cancelSubscription(UUID subscriptionId) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.info("Cancelling subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
+
+        Subscription subscription = subscriptionRepository.findByTenantIdAndId(tenantId, subscriptionId)
+            .orElseThrow(() -> new IllegalArgumentException("Subscription not found"));
+
+        if (subscription.getStatus() == SubscriptionStatus.CANCELLED) {
+            log.warn("Subscription already cancelled: id={}", subscriptionId);
+            return SubscriptionDto.from(subscription);
+        }
+
+        subscription.cancel();
+        Subscription saved = subscriptionRepository.save(subscription);
+
+        log.warn("Subscription cancelled: id={}, osCode={}", saved.getId(), saved.getOsCode());
+
+        return SubscriptionDto.from(saved);
+    }
+
+    /**
+     * Update subscription (expiry date, features, pricing tier).
+     */
+    @Transactional
+    public SubscriptionDto updateSubscription(UUID subscriptionId, UpdateSubscriptionRequest request) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.info("Updating subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
+
+        Subscription subscription = subscriptionRepository.findByTenantIdAndId(tenantId, subscriptionId)
+            .orElseThrow(() -> new IllegalArgumentException("Subscription not found"));
+
+        // Update fields if provided
+        if (request.getExpiryDate() != null) {
+            subscription.setExpiryDate(request.getExpiryDate());
+        }
+        if (request.getFeatures() != null) {
+            subscription.setFeatures(request.getFeatures());
+        }
+        if (request.getPricingTier() != null) {
+            subscription.setPricingTier(request.getPricingTier());
+        }
+
+        Subscription saved = subscriptionRepository.save(subscription);
+
+        log.info("Subscription updated: id={}, osCode={}", saved.getId(), saved.getOsCode());
+
+        return SubscriptionDto.from(saved);
+    }
+
+    /**
+     * Get subscription by ID.
+     */
+    @Transactional(readOnly = true)
+    public SubscriptionDto getSubscription(UUID subscriptionId) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Getting subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
+
+        Subscription subscription = subscriptionRepository.findByTenantIdAndId(tenantId, subscriptionId)
+            .orElseThrow(() -> new IllegalArgumentException("Subscription not found"));
+
+        return SubscriptionDto.from(subscription);
+    }
+
+    /**
      * Check expiring subscriptions and auto-expire them.
      * 
-     * <p>Should be called by scheduled job daily.</p>
+     * <p>Uses batch processing with pagination to avoid memory overflow.
+     * Should be called by scheduled job daily.</p>
+     * 
+     * <p><b>Performance Optimization:</b> Processes subscriptions in batches of 100
+     * instead of loading all subscriptions into memory. This prevents system crashes
+     * when there are thousands of subscriptions.</p>
      */
     @Transactional
     public void processExpiringSubscriptions() {
         log.info("Processing expiring subscriptions");
 
-        List<Subscription> allSubscriptions = subscriptionRepository.findAll();
+        Instant now = Instant.now();
+        int pageSize = 100;
+        int page = 0;
+        int totalExpired = 0;
 
-        for (Subscription subscription : allSubscriptions) {
-            if (subscription.isExpired() && subscription.getStatus() != SubscriptionStatus.EXPIRED) {
-                log.warn("Auto-expiring subscription: id={}, osCode={}", 
-                    subscription.getId(), subscription.getOsCode());
+        Page<Subscription> subscriptionPage;
+        do {
+            Pageable pageable = PageRequest.of(page, pageSize);
+            subscriptionPage = subscriptionRepository.findExpiredButNotExpiredStatus(now, pageable);
+
+            List<Subscription> toExpire = subscriptionPage.getContent();
+            
+            if (toExpire.isEmpty()) {
+                break;
+            }
+
+            // Batch update all expired subscriptions
+            for (Subscription subscription : toExpire) {
+                log.warn("Auto-expiring subscription: id={}, osCode={}, tenantId={}", 
+                    subscription.getId(), subscription.getOsCode(), subscription.getTenantId());
                 
                 subscription.expire();
-                subscriptionRepository.save(subscription);
-
+            }
+            
+            // Batch save - more efficient than individual saves
+            subscriptionRepository.saveAll(toExpire);
+            
+            // Publish events for all expired subscriptions
+            for (Subscription subscription : toExpire) {
                 eventPublisher.publish(new SubscriptionExpiredEvent(
                     subscription.getTenantId(),
                     subscription.getId(),
                     subscription.getOsCode()
                 ));
             }
-        }
 
-        log.info("Finished processing expiring subscriptions");
+            totalExpired += toExpire.size();
+            page++;
+            
+            log.debug("Processed batch {}/{}: expired {} subscriptions", 
+                page, subscriptionPage.getTotalPages(), toExpire.size());
+
+        } while (subscriptionPage.hasNext());
+
+        log.info("Finished processing expiring subscriptions. Total expired: {}", totalExpired);
     }
 }
 

@@ -8,12 +8,15 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
+/**
+ * DTO for user address assignment.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserAddressDto {
-
+    private String uid; // Human-readable identifier (BaseJunctionEntity uses composite key, no id field)
     private UUID userId;
     private UUID addressId;
     private AddressDto address;
@@ -21,13 +24,19 @@ public class UserAddressDto {
     private Boolean isWorkAddress;
 
     public static UserAddressDto from(UserAddress userAddress) {
+        if (userAddress == null) {
+            return null;
+        }
+
         return UserAddressDto.builder()
+            .uid(userAddress.getUid())
             .userId(userAddress.getUserId())
             .addressId(userAddress.getAddressId())
-            .address(userAddress.getAddress() != null ? AddressDto.from(userAddress.getAddress()) : null)
+            .address(userAddress.getAddress() != null 
+                ? AddressDto.from(userAddress.getAddress()) 
+                : null)
             .isPrimary(userAddress.getIsPrimary())
             .isWorkAddress(userAddress.getIsWorkAddress())
             .build();
     }
 }
-

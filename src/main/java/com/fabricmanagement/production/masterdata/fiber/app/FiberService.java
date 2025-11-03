@@ -432,21 +432,95 @@ public class FiberService implements FiberFacade {
     /**
      * Generate a suggested name for a blended fiber based on composition.
      * 
-     * <p>Example: 60% Cotton + 40% Viscose → "Cotton 60% Viscose 40% Blend"</p>
+     * <p>Generates compact code format: COT60_LIN40_VIS20</p>
+     * <p>Examples:</p>
+     * <ul>
+     *   <li>60% Cotton + 40% Linen → "COT60_LIN40"</li>
+     *   <li>40% Cotton + 40% Linen + 20% Viscose → "COT40_LIN40_VIS20"</li>
+     * </ul>
      * 
      * @param composition Map of baseFiberId → percentage
      * @param baseFiberNames Map of baseFiberId → fiberName
-     * @return Suggested fiber name
+     * @return Suggested fiber name in compact code format
      */
     private String generateFiberName(Map<UUID, BigDecimal> composition, Map<UUID, String> baseFiberNames) {
         return composition.entrySet().stream()
             .sorted((a, b) -> b.getValue().compareTo(a.getValue())) // Sort by percentage descending
             .map(entry -> {
                 String fiberName = baseFiberNames.get(entry.getKey());
+                String code = getFiberCode(fiberName);
                 BigDecimal percentage = entry.getValue();
-                return String.format("%s %.0f%%", fiberName, percentage);
+                return String.format("%s%.0f", code, percentage);
             })
-            .collect(Collectors.joining(" + ")) + " Blend";
+            .collect(Collectors.joining("_"));
+    }
+    
+    /**
+     * Get fiber code abbreviation from fiber name.
+     * 
+     * <p>Examples:</p>
+     * <ul>
+     *   <li>"Cotton (100%)" → "COT"</li>
+     *   <li>"Linen (100%)" → "LIN"</li>
+     *   <li>"Viscose (100%)" → "VIS"</li>
+     *   <li>"Polyester (100%)" → "POL"</li>
+     *   <li>"Wool (100%)" → "WOL"</li>
+     *   <li>"Nylon (100%)" → "NYL"</li>
+     * </ul>
+     * 
+     * <p>If fiber name doesn't match known patterns, uses first 3 uppercase letters.</p>
+     * 
+     * @param fiberName Full fiber name (e.g., "Cotton (100%)", "Recycled Cotton (100%)")
+     * @return 3-letter uppercase code (e.g., "COT", "LIN", "VIS")
+     */
+    private String getFiberCode(String fiberName) {
+        if (fiberName == null || fiberName.isBlank()) {
+            return "XXX";
+        }
+        
+        // Normalize: remove parentheses, percentages, and extra whitespace
+        String normalized = fiberName
+            .replaceAll("\\(.*?\\)", "")  // Remove (100%) etc.
+            .replaceAll("%", "")          // Remove % signs
+            .replaceAll("\\s+", " ")      // Normalize whitespace
+            .trim()
+            .toLowerCase();
+        
+        // Known fiber type mappings (case-insensitive)
+        if (normalized.contains("cotton")) {
+            return "COT";
+        } else if (normalized.contains("linen")) {
+            return "LIN";
+        } else if (normalized.contains("viscose")) {
+            return "VIS";
+        } else if (normalized.contains("polyester")) {
+            return "POL";
+        } else if (normalized.contains("wool")) {
+            return "WOL";
+        } else if (normalized.contains("nylon")) {
+            return "NYL";
+        } else if (normalized.contains("elastane") || normalized.contains("elastan")) {
+            return "ELA";
+        } else if (normalized.contains("polypropylene")) {
+            return "PPE";
+        } else if (normalized.contains("acrylic")) {
+            return "ACR";
+        } else if (normalized.contains("silk")) {
+            return "SIL";
+        } else if (normalized.contains("recycled") && normalized.contains("cotton")) {
+            return "RCOT"; // Recycled Cotton
+        }
+        
+        // Fallback: Extract first 3 uppercase letters from original name
+        String upper = normalized.toUpperCase().replaceAll("[^A-Z]", "");
+        if (upper.length() >= 3) {
+            return upper.substring(0, 3);
+        } else if (upper.length() > 0) {
+            // Pad with X if less than 3 letters
+            return String.format("%-3s", upper).replace(' ', 'X').substring(0, 3);
+        }
+        
+        return "XXX"; // Unknown fiber type
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.fabricmanagement.common.platform.company.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.company.app.CompanyService;
+import com.fabricmanagement.common.platform.company.app.SubscriptionQuotaService;
 import com.fabricmanagement.common.platform.company.app.SubscriptionService;
 import com.fabricmanagement.common.platform.company.domain.CompanyCategory;
 import com.fabricmanagement.common.platform.company.domain.CompanyType;
@@ -9,6 +10,9 @@ import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.company.dto.CompanyTypeDto;
 import com.fabricmanagement.common.platform.company.dto.CreateCompanyRequest;
 import com.fabricmanagement.common.platform.company.dto.SubscriptionDto;
+import com.fabricmanagement.common.platform.company.dto.SubscriptionQuotaDto;
+import com.fabricmanagement.common.platform.company.dto.UpdateCompanyRequest;
+import com.fabricmanagement.common.platform.company.dto.UpdateSubscriptionRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +30,7 @@ public class CompanyController {
 
     private final CompanyService companyService;
     private final SubscriptionService subscriptionService;
+    private final SubscriptionQuotaService quotaService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<CompanyDto>> createCompany(@Valid @RequestBody CreateCompanyRequest request) {
@@ -74,6 +79,17 @@ public class CompanyController {
         return ResponseEntity.ok(ApiResponse.success(companies));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<CompanyDto>> updateCompany(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateCompanyRequest request) {
+        log.info("Updating company: id={}", id);
+
+        CompanyDto updated = companyService.updateCompany(id, request);
+
+        return ResponseEntity.ok(ApiResponse.success(updated, "Company updated successfully"));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deactivateCompany(@PathVariable UUID id) {
         log.info("Deactivating company: id={}", id);
@@ -101,6 +117,99 @@ public class CompanyController {
         SubscriptionDto activated = subscriptionService.activateSubscription(subscriptionId);
 
         return ResponseEntity.ok(ApiResponse.success(activated, "Subscription activated successfully"));
+    }
+
+    // =========================================================================
+    // SUBSCRIPTION MANAGEMENT ENDPOINTS
+    // =========================================================================
+
+    /**
+     * Get active subscriptions for current tenant.
+     */
+    @GetMapping("/subscriptions/active")
+    public ResponseEntity<ApiResponse<List<SubscriptionDto>>> getActiveSubscriptions() {
+        log.debug("Getting active subscriptions");
+
+        List<SubscriptionDto> subscriptions = subscriptionService.getActiveSubscriptions();
+
+        return ResponseEntity.ok(ApiResponse.success(subscriptions));
+    }
+
+    /**
+     * Get subscription by ID.
+     */
+    @GetMapping("/subscriptions/{subscriptionId}")
+    public ResponseEntity<ApiResponse<SubscriptionDto>> getSubscription(@PathVariable UUID subscriptionId) {
+        log.debug("Getting subscription: subscriptionId={}", subscriptionId);
+
+        SubscriptionDto subscription = subscriptionService.getSubscription(subscriptionId);
+
+        return ResponseEntity.ok(ApiResponse.success(subscription));
+    }
+
+    /**
+     * Update subscription (expiry date, features, pricing tier).
+     */
+    @PutMapping("/subscriptions/{subscriptionId}")
+    public ResponseEntity<ApiResponse<SubscriptionDto>> updateSubscription(
+            @PathVariable UUID subscriptionId,
+            @Valid @RequestBody UpdateSubscriptionRequest request) {
+        log.info("Updating subscription: subscriptionId={}", subscriptionId);
+
+        SubscriptionDto updated = subscriptionService.updateSubscription(subscriptionId, request);
+
+        return ResponseEntity.ok(ApiResponse.success(updated, "Subscription updated successfully"));
+    }
+
+    /**
+     * Cancel subscription.
+     */
+    @PostMapping("/subscriptions/{subscriptionId}/cancel")
+    public ResponseEntity<ApiResponse<SubscriptionDto>> cancelSubscription(@PathVariable UUID subscriptionId) {
+        log.info("Cancelling subscription: subscriptionId={}", subscriptionId);
+
+        SubscriptionDto cancelled = subscriptionService.cancelSubscription(subscriptionId);
+
+        return ResponseEntity.ok(ApiResponse.success(cancelled, "Subscription cancelled successfully"));
+    }
+
+    /**
+     * Get quotas for a subscription.
+     */
+    @GetMapping("/subscriptions/{subscriptionId}/quotas")
+    public ResponseEntity<ApiResponse<List<SubscriptionQuotaDto>>> getSubscriptionQuotas(
+            @PathVariable UUID subscriptionId) {
+        log.debug("Getting quotas for subscription: subscriptionId={}", subscriptionId);
+
+        List<SubscriptionQuotaDto> quotas = quotaService.getSubscriptionQuotas(subscriptionId);
+
+        return ResponseEntity.ok(ApiResponse.success(quotas));
+    }
+
+    /**
+     * Get all quotas for current tenant.
+     */
+    @GetMapping("/subscriptions/quotas")
+    public ResponseEntity<ApiResponse<List<SubscriptionQuotaDto>>> getTenantQuotas() {
+        log.debug("Getting quotas for current tenant");
+
+        List<SubscriptionQuotaDto> quotas = quotaService.getTenantQuotas();
+
+        return ResponseEntity.ok(ApiResponse.success(quotas));
+    }
+
+    /**
+     * Reset quota for a specific subscription and quota type.
+     */
+    @PutMapping("/subscriptions/{subscriptionId}/quotas/{quotaType}/reset")
+    public ResponseEntity<ApiResponse<SubscriptionQuotaDto>> resetQuota(
+            @PathVariable UUID subscriptionId,
+            @PathVariable String quotaType) {
+        log.info("Resetting quota: subscriptionId={}, quotaType={}", subscriptionId, quotaType);
+
+        SubscriptionQuotaDto reset = quotaService.resetQuota(subscriptionId, quotaType);
+
+        return ResponseEntity.ok(ApiResponse.success(reset, "Quota reset successfully"));
     }
 
     /**
