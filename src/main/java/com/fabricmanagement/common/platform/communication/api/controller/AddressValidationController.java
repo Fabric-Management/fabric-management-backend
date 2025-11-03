@@ -5,7 +5,6 @@ import com.fabricmanagement.common.platform.communication.app.AddressValidationS
 import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.dto.AddressDto;
 import com.fabricmanagement.common.platform.communication.dto.AddressValidationResponse;
-import com.fabricmanagement.common.platform.communication.dto.AutocompleteRequest;
 import com.fabricmanagement.common.platform.communication.dto.AutocompleteResponse;
 import com.fabricmanagement.common.platform.communication.dto.ValidateAddressRequest;
 import com.fabricmanagement.common.platform.communication.infra.client.GoogleMapsClient;
@@ -40,16 +39,23 @@ public class AddressValidationController {
      * Autocomplete endpoint - Get address suggestions as user types.
      *
      * <p>Uses Google Places Autocomplete API (New) to provide real-time suggestions.</p>
+     * <p><b>REST Best Practice:</b> GET method for read operations, supports caching.</p>
+     * 
+     * @param input Address input text (required)
+     * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "US", "GB")
      */
-    @PostMapping("/autocomplete")
+    @GetMapping("/autocomplete")
     public ResponseEntity<ApiResponse<AutocompleteResponse>> autocomplete(
-            @Valid @RequestBody AutocompleteRequest request) {
-        log.debug("Autocomplete request: input={}, country={}", request.getInput(), request.getCountry());
+            @RequestParam String input,
+            @RequestParam(required = false) String country) {
+        log.debug("Autocomplete request: input={}, country={}", input, country);
 
-        AutocompleteResponse response = googleMapsClient.autocomplete(
-            request.getInput(),
-            request.getCountry()
-        );
+        if (input == null || input.isBlank()) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("INPUT_REQUIRED", "Input parameter is required"));
+        }
+
+        AutocompleteResponse response = googleMapsClient.autocomplete(input, country);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

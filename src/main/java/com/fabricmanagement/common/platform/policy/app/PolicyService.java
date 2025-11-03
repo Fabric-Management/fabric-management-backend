@@ -4,15 +4,18 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.platform.policy.domain.Policy;
 import com.fabricmanagement.common.platform.policy.domain.event.PolicyEvaluatedEvent;
 import com.fabricmanagement.common.platform.policy.domain.value.PolicyDecision;
+import com.fabricmanagement.common.platform.policy.dto.UpdatePolicyRequest;
 import com.fabricmanagement.common.platform.policy.infra.repository.PolicyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -71,26 +74,43 @@ public class PolicyService {
                 startTime);
         }
 
-        // Amazon IAM style: Check DENY first
+        // ✅ Performance: Single loop instead of iterating twice
+        // Amazon IAM style: Check DENY first (takes priority), then ALLOW
+        Policy denyMatch = null;
+        Policy allowMatch = null;
+
         for (Policy policy : policies) {
-            if (policy.isDeny() && matchesConditions(policy, context)) {
-                log.warn("[Policy Layer 4] DENY match: policyId={}", policy.getPolicyId());
-                return logAndPublishDecision(tenantId, userId, resource, action,
-                    PolicyDecision.deny("Explicit DENY policy matched: " + policy.getPolicyId(), 
-                        policy.getPolicyId(), List.of()), 
-                    startTime);
+            if (!matchesConditions(policy, context)) {
+                continue; // Skip if conditions don't match
+            }
+
+            if (policy.isDeny()) {
+                denyMatch = policy; // DENY takes priority, break immediately
+                break;
+            }
+            
+            // Store first ALLOW match (only if no DENY found yet)
+            if (allowMatch == null && policy.isAllow()) {
+                allowMatch = policy;
             }
         }
 
+        // DENY takes priority over ALLOW
+        if (denyMatch != null) {
+            log.warn("[Policy Layer 4] DENY match: policyId={}", denyMatch.getPolicyId());
+            return logAndPublishDecision(tenantId, userId, resource, action,
+                PolicyDecision.deny("Explicit DENY policy matched: " + denyMatch.getPolicyId(), 
+                    denyMatch.getPolicyId(), List.of()), 
+                startTime);
+        }
+
         // Check ALLOW
-        for (Policy policy : policies) {
-            if (policy.isAllow() && matchesConditions(policy, context)) {
-                log.info("[Policy Layer 4] ALLOW match: policyId={}", policy.getPolicyId());
-                return logAndPublishDecision(tenantId, userId, resource, action,
-                    PolicyDecision.allow("Policy matched: " + policy.getPolicyId(), 
-                        policy.getPolicyId()),
-                    startTime);
-            }
+        if (allowMatch != null) {
+            log.info("[Policy Layer 4] ALLOW match: policyId={}", allowMatch.getPolicyId());
+            return logAndPublishDecision(tenantId, userId, resource, action,
+                PolicyDecision.allow("Policy matched: " + allowMatch.getPolicyId(), 
+                    allowMatch.getPolicyId()),
+                startTime);
         }
 
         // No ALLOW found - default DENY
@@ -213,6 +233,7 @@ public class PolicyService {
     /**
      * Create a new policy.
      */
+    @CacheEvict(value = "policy-decision", allEntries = true)
     @Transactional
     public Policy createPolicy(Policy policy) {
         log.info("Creating policy: policyId={}", policy.getPolicyId());
@@ -221,7 +242,11 @@ public class PolicyService {
             throw new IllegalArgumentException("Policy already exists: " + policy.getPolicyId());
         }
 
-        return policyRepository.save(policy);
+        Policy created = policyRepository.save(policy);
+        
+        log.info("Policy created successfully: id={}, policyId={}", created.getId(), created.getPolicyId());
+        
+        return created;
     }
 
     /**
@@ -230,6 +255,121 @@ public class PolicyService {
     @Transactional(readOnly = true)
     public List<Policy> getAllPolicies() {
         return policyRepository.findByEnabledTrueOrderByPriorityDesc();
+    }
+
+    /**
+     * Get policy by ID.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Policy> getPolicyById(UUID id) {
+        log.debug("Getting policy by ID: {}", id);
+        return policyRepository.findById(id);
+    }
+
+    /**
+     * Get policy by policyId (string identifier).
+     */
+    @Transactional(readOnly = true)
+    public Optional<Policy> getPolicyByPolicyId(String policyId) {
+        log.debug("Getting policy by policyId: {}", policyId);
+        return policyRepository.findByPolicyId(policyId);
+    }
+
+    /**
+     * Update an existing policy.
+     */
+    @CacheEvict(value = "policy-decision", allEntries = true)
+    @Transactional
+    public Policy updatePolicy(UUID id, UpdatePolicyRequest request) {
+        log.info("Updating policy: id={}", id);
+
+        Policy policy = policyRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Policy not found: " + id));
+
+        // Update fields if provided
+        if (request.getResource() != null) {
+            policy.setResource(request.getResource());
+        }
+        if (request.getAction() != null) {
+            policy.setAction(request.getAction());
+        }
+        if (request.getPriority() != null) {
+            policy.setPriority(request.getPriority());
+        }
+        if (request.getEffect() != null) {
+            policy.setEffect(request.getEffect());
+        }
+        if (request.getEnabled() != null) {
+            policy.setEnabled(request.getEnabled());
+        }
+        if (request.getConditions() != null) {
+            policy.setConditions(request.getConditions());
+        }
+        if (request.getDescription() != null) {
+            policy.setDescription(request.getDescription());
+        }
+
+        Policy updated = policyRepository.save(policy);
+        
+        log.info("Policy updated successfully: id={}, policyId={}", updated.getId(), updated.getPolicyId());
+        
+        return updated;
+    }
+
+    /**
+     * Delete a policy (soft delete by disabling).
+     */
+    @CacheEvict(value = "policy-decision", allEntries = true)
+    @Transactional
+    public void deletePolicy(UUID id) {
+        log.info("Deleting policy: id={}", id);
+
+        Policy policy = policyRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Policy not found: " + id));
+
+        // Soft delete: disable instead of hard delete
+        policy.disable();
+        policyRepository.save(policy);
+        
+        log.info("Policy deleted (disabled) successfully: id={}, policyId={}", id, policy.getPolicyId());
+    }
+
+    /**
+     * Enable a policy.
+     */
+    @CacheEvict(value = "policy-decision", allEntries = true)
+    @Transactional
+    public Policy enablePolicy(UUID id) {
+        log.info("Enabling policy: id={}", id);
+
+        Policy policy = policyRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Policy not found: " + id));
+
+        policy.enable();
+        Policy enabled = policyRepository.save(policy);
+        
+        log.info("Policy enabled successfully: id={}, policyId={}", enabled.getId(), enabled.getPolicyId());
+        
+        return enabled;
+    }
+
+    /**
+     * Disable a policy.
+     */
+    @CacheEvict(value = "policy-decision", allEntries = true)
+    @Transactional
+    public Policy disablePolicy(UUID id) {
+        log.info("Disabling policy: id={}", id);
+
+        Policy policy = policyRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Policy not found: " + id));
+
+        policy.disable();
+        Policy disabled = policyRepository.save(policy);
+        
+        log.info("Policy disabled successfully: id={}, policyId={}", disabled.getId(), disabled.getPolicyId());
+        
+        return disabled;
     }
 }
 

@@ -57,6 +57,22 @@ public class UserContactService {
         return userContactRepository.findAuthenticationContactByUserId(userId);
     }
 
+    /**
+     * Check if user-contact assignment exists.
+     * 
+     * <p><b>Performance:</b> Uses EXISTS query instead of loading all contacts.
+     * This prevents N+1 problems when checking assignment status.</p>
+     * 
+     * @param userId the user ID
+     * @param contactId the contact ID
+     * @return true if contact is assigned to user
+     */
+    @Transactional(readOnly = true)
+    public boolean existsUserContact(UUID userId, UUID contactId) {
+        log.trace("Checking if user-contact assignment exists: userId={}, contactId={}", userId, contactId);
+        return userContactRepository.existsByUserIdAndContactId(userId, contactId);
+    }
+
     @Transactional
     public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault, Boolean isForAuthentication) {
         UUID tenantId = TenantContext.getCurrentTenantId();

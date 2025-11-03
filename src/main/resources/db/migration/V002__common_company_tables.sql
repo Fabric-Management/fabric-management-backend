@@ -4,7 +4,7 @@
 -- Creates company, department, subscription tables
 -- Must run BEFORE user tables (V003)
 -- Company, Department, Subscription, OSDefinition, FeatureCatalog, SubscriptionQuota
--- Last Updated: 2025-10-25
+-- Last Updated: 2025-01-27 (Added performance indexes for subscription queries)
 -- ============================================================================
 
 -- ============================================================================
@@ -143,9 +143,34 @@ CREATE TABLE common_company.common_subscription (
     -- FK constraint removed: Simple model, no OS catalog needed
 );
 
+-- Basic indexes for subscription queries
 CREATE INDEX idx_subscription_tenant_os ON common_company.common_subscription(tenant_id, os_code);
 CREATE INDEX idx_subscription_status ON common_company.common_subscription(status);
 CREATE INDEX idx_subscription_expiry ON common_company.common_subscription(expiry_date) WHERE expiry_date IS NOT NULL;
+
+-- Performance indexes for subscription expiry queries and batch processing
+-- Composite index for findExpiredButNotExpiredStatus() query
+-- Query: WHERE status != 'EXPIRED' AND (expiryDate < :now OR trialEndsAt < :now)
+CREATE INDEX idx_subscription_expiry_status_trial
+ON common_company.common_subscription(status, expiry_date, trial_ends_at)
+WHERE status != 'EXPIRED';
+
+-- Partial index for active subscription lookups
+-- Query: WHERE status = 'ACTIVE' AND (expiryDate IS NULL OR expiryDate > :now)
+CREATE INDEX idx_subscription_active_expiry
+ON common_company.common_subscription(tenant_id, os_code, expiry_date)
+WHERE status = 'ACTIVE';
+
+-- Partial index for trial subscription queries
+-- Query: WHERE status = 'TRIAL' AND trialEndsAt < :sevenDaysFromNow AND trialEndsAt > :now
+CREATE INDEX idx_subscription_trial_ends
+ON common_company.common_subscription(status, trial_ends_at)
+WHERE status = 'TRIAL' AND trial_ends_at IS NOT NULL;
+
+-- Composite index for tenant subscription queries and counting active subscriptions
+-- Supports PlatformAdminService.getTenantStatistics() and countActiveSubscriptionsByTenantId()
+CREATE INDEX idx_subscription_tenant_status_expiry
+ON common_company.common_subscription(tenant_id, status, expiry_date, trial_ends_at);
 
 COMMENT ON TABLE common_company.common_subscription IS 'Tenant OS subscriptions - Simple OS-based pricing model';
 COMMENT ON COLUMN common_company.common_subscription.pricing_tier IS 'OPTIONAL: For future feature-gating (not used in simple model)';

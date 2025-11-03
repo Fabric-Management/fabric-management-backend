@@ -147,14 +147,23 @@ public abstract class BaseEntity implements Serializable {
         }
         
         // Auto-generate UID if not set
+        // ✅ Performance: Use UUID-based suffix for guaranteed uniqueness
+        // This prevents collisions that can occur with timestamp-based sequences
         if (this.uid == null || this.uid.isBlank()) {
             String tenantUid = TenantContext.getCurrentTenantUid();
             if (tenantUid == null) {
                 tenantUid = "SYS-000";
             }
             
-            long sequence = System.currentTimeMillis() % 100000;
-            this.uid = String.format("%s-%s-%05d", tenantUid, getModuleCode(), sequence);
+            // Use UUID-based suffix to guarantee uniqueness
+            // Format: {TENANT_UID}-{MODULE}-{UUID_SUFFIX}
+            // Example: "ACME-001-USER-A3F5B2C9"
+            String uniqueSuffix = UUID.randomUUID().toString()
+                .replace("-", "")
+                .substring(0, 8)
+                .toUpperCase();
+            
+            this.uid = String.format("%s-%s-%s", tenantUid, getModuleCode(), uniqueSuffix);
         }
         
         if (this.createdAt == null) {

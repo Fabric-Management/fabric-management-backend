@@ -6,8 +6,10 @@ import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.domain.Company;
 import com.fabricmanagement.common.platform.company.domain.CompanyType;
 import com.fabricmanagement.common.platform.company.domain.event.CompanyCreatedEvent;
+import com.fabricmanagement.common.platform.company.domain.event.CompanyUpdatedEvent;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.company.dto.CreateCompanyRequest;
+import com.fabricmanagement.common.platform.company.dto.UpdateCompanyRequest;
 import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.app.CompanyContactService;
@@ -194,6 +196,74 @@ public class CompanyService implements CompanyFacade {
             .stream()
             .map(CompanyDto::from)
             .toList();
+    }
+
+    @Transactional
+    public CompanyDto updateCompany(UUID companyId, UpdateCompanyRequest request) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.info("Updating company: tenantId={}, companyId={}", tenantId, companyId);
+
+        Company company = companyRepository.findByTenantIdAndId(tenantId, companyId)
+            .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+
+        // Tax ID uniqueness check (if changed)
+        if (!company.getTaxId().equals(request.getTaxId())) {
+            if (companyRepository.existsByTenantIdAndTaxId(tenantId, request.getTaxId())) {
+                throw new IllegalArgumentException(
+                    "Company with this tax ID already exists in your organization"
+                );
+            }
+        }
+
+        // Parent company validation
+        if (request.getParentCompanyId() != null) {
+            Company parent = companyRepository.findById(request.getParentCompanyId())
+                .orElseThrow(() -> new IllegalArgumentException("Parent company not found"));
+
+            if (!parent.getTenantId().equals(tenantId)) {
+                throw new IllegalArgumentException(
+                    "Parent company must belong to the same tenant"
+                );
+            }
+
+            if (!parent.getIsActive()) {
+                throw new IllegalArgumentException("Parent company must be active");
+            }
+
+            // Prevent circular reference (company cannot be its own parent)
+            if (parent.getId().equals(companyId)) {
+                throw new IllegalArgumentException("Company cannot be its own parent");
+            }
+
+            // Prevent setting a child as parent (would create circular reference)
+            // Check if requested parent has this company as its parent
+            if (parent.getParentCompanyId() != null && parent.getParentCompanyId().equals(companyId)) {
+                throw new IllegalArgumentException(
+                    "Cannot set parent: Would create circular reference"
+                );
+            }
+        }
+
+        // Update company information
+        company.update(request.getCompanyName(), request.getTaxId());
+        if (request.getParentCompanyId() != null) {
+            company.setParent(request.getParentCompanyId());
+        } else {
+            // Allow clearing parent company
+            company.setParent(null);
+        }
+
+        Company saved = companyRepository.save(company);
+
+        eventPublisher.publish(new CompanyUpdatedEvent(
+            saved.getTenantId(),
+            saved.getId(),
+            saved.getCompanyName()
+        ));
+
+        log.info("Company updated: id={}, uid={}", saved.getId(), saved.getUid());
+
+        return CompanyDto.from(saved);
     }
 
     @Transactional

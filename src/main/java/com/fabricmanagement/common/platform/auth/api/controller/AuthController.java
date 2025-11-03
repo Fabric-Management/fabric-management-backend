@@ -1,15 +1,20 @@
 package com.fabricmanagement.common.platform.auth.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.platform.auth.app.JwtService;
 import com.fabricmanagement.common.platform.auth.app.LoginService;
+import com.fabricmanagement.common.platform.auth.app.LogoutService;
 import com.fabricmanagement.common.platform.auth.app.PasswordResetService;
 import com.fabricmanagement.common.platform.auth.app.PasswordSetupService;
+import com.fabricmanagement.common.platform.auth.app.RefreshTokenService;
 import com.fabricmanagement.common.platform.auth.app.RegistrationService;
 import com.fabricmanagement.common.platform.auth.dto.LoginRequest;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
+import com.fabricmanagement.common.platform.auth.dto.LogoutRequest;
 import com.fabricmanagement.common.platform.auth.dto.PasswordResetRequest;
 import com.fabricmanagement.common.platform.auth.dto.PasswordResetVerifyRequest;
 import com.fabricmanagement.common.platform.auth.dto.PasswordSetupRequest;
+import com.fabricmanagement.common.platform.auth.dto.RefreshTokenRequest;
 import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.UserContactInfoResponse;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
@@ -20,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 /**
  * Auth Controller - Authentication endpoints.
@@ -47,6 +54,9 @@ public class AuthController {
     private final RegistrationService registrationService;
     private final PasswordSetupService passwordSetupService;
     private final PasswordResetService passwordResetService;
+    private final LogoutService logoutService;
+    private final RefreshTokenService refreshTokenService;
+    private final JwtService jwtService;
 
     @PostMapping("/register/check")
     public ResponseEntity<ApiResponse<String>> checkRegistrationEligibility(
@@ -143,6 +153,46 @@ public class AuthController {
             response,
             "Password reset successful! You have been automatically logged in."
         ));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @Valid @RequestBody LogoutRequest request,
+            HttpServletRequest httpRequest) {
+        log.info("Logout request");
+
+        UUID userId = extractUserIdFromRequest(httpRequest);
+        logoutService.logout(request.getRefreshToken(), userId);
+
+        return ResponseEntity.ok(ApiResponse.success(null, "Logged out successfully"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(
+            @Valid @RequestBody RefreshTokenRequest request) {
+        log.info("Refresh token request");
+
+        LoginResponse response = refreshTokenService.refreshAccessToken(request.getRefreshToken());
+
+        return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
+    }
+
+    /**
+     * Extract user ID from JWT token in Authorization header.
+     */
+    private UUID extractUserIdFromRequest(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Authorization header missing or invalid");
+        }
+
+        String token = authHeader.substring(7);
+        try {
+            return jwtService.getUserIdFromToken(token);
+        } catch (Exception e) {
+            log.warn("Failed to extract userId from token: {}", e.getMessage());
+            throw new IllegalArgumentException("Invalid token");
+        }
     }
 
     private String getClientIpAddress(HttpServletRequest request) {
