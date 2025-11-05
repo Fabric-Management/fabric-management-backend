@@ -4,9 +4,14 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.material.domain.Material;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Type;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -59,52 +64,49 @@ public class Fiber extends BaseEntity {
     @Column(name = "fiber_grade", length = 50)
     private String fiberGrade;
 
-    @Column(name = "fineness")
-    private Double fineness;
-
-    @Column(name = "length_mm")
-    private Double lengthMm;
-
-    @Column(name = "strength_cn_dtex")
-    private Double strengthCndTex;
-
-    @Column(name = "elongation_percent")
-    private Double elongationPercent;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
-    private FiberStatus status = FiberStatus.NEW;
+    private FiberStatus status = FiberStatus.ACTIVE;
 
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
-    public static Fiber createPureFiber(
-            Material material,
-            FiberCategory fiberCategory,
-            FiberIsoCode fiberIsoCode,
-            String fiberName,
-            String fiberGrade,
-            Double fineness,
-            Double lengthMm,
-            Double strengthCndTex,
-            Double elongationPercent) {
-        
-        return Fiber.builder()
-            .material(material)
-            .fiberCategory(fiberCategory)
-            .fiberIsoCode(fiberIsoCode)
-            .fiberName(fiberName)
-            .fiberGrade(fiberGrade)
-            .fineness(fineness)
-            .lengthMm(lengthMm)
-            .strengthCndTex(strengthCndTex)
-            .elongationPercent(elongationPercent)
-            .status(FiberStatus.NEW)
-            .build();
+    /**
+     * Fiber composition as JSONB: Map of baseFiberId → percentage.
+     * 
+     * <p><b>Pure fiber:</b> null or empty Map</p>
+     * <p><b>Blended fiber:</b> Map with base fiber IDs and percentages (must sum to 100%)</p>
+     * <p>Example: {"uuid1": "60.00", "uuid2": "40.00"} for 60%+40% blend</p>
+     */
+    @Type(JsonType.class)
+    @Column(name = "composition", columnDefinition = "jsonb")
+    @Builder.Default
+    private Map<UUID, BigDecimal> composition = new HashMap<>();
+
+    /**
+     * Get composition map (never null).
+     */
+    public Map<UUID, BigDecimal> getComposition() {
+        return composition != null ? composition : new HashMap<>();
     }
 
-    public static Fiber createBlendedFiber(
+    /**
+     * Check if fiber is blended (has composition).
+     */
+    public boolean isBlended() {
+        return composition != null && !composition.isEmpty();
+    }
+
+    /**
+     * Check if fiber is pure (no composition).
+     */
+    public boolean isPure() {
+        return !isBlended();
+    }
+
+    public static Fiber createPureFiber(
             Material material,
             FiberCategory fiberCategory,
             FiberIsoCode fiberIsoCode,
@@ -117,78 +119,62 @@ public class Fiber extends BaseEntity {
             .fiberIsoCode(fiberIsoCode)
             .fiberName(fiberName)
             .fiberGrade(fiberGrade)
-            .status(FiberStatus.NEW)
+            .composition(new HashMap<>())
+            .status(FiberStatus.ACTIVE)
+            .build();
+    }
+
+    public static Fiber createBlendedFiber(
+            Material material,
+            FiberCategory fiberCategory,
+            FiberIsoCode fiberIsoCode,
+            String fiberName,
+            String fiberGrade,
+            Map<UUID, BigDecimal> composition) {
+        
+        return Fiber.builder()
+            .material(material)
+            .fiberCategory(fiberCategory)
+            .fiberIsoCode(fiberIsoCode)
+            .fiberName(fiberName)
+            .fiberGrade(fiberGrade)
+            .composition(composition != null ? composition : new HashMap<>())
+            .status(FiberStatus.ACTIVE)
             .build();
     }
 
     /**
      * Update fiber properties (excluding status - use lifecycle methods instead).
      */
-    public void update(String fiberName, String fiberGrade, Double fineness, Double lengthMm,
-                       Double strengthCndTex, Double elongationPercent, String remarks) {
+    public void update(String fiberName, String fiberGrade, String remarks) {
         this.fiberName = fiberName;
         this.fiberGrade = fiberGrade;
-        this.fineness = fineness;
-        this.lengthMm = lengthMm;
-        this.strengthCndTex = strengthCndTex;
-        this.elongationPercent = elongationPercent;
         this.remarks = remarks;
     }
 
     /**
-     * Mark fiber as in use.
-     * <p>Transition: NEW → IN_USE</p>
-     */
-    public void markInUse() {
-        if (this.status == FiberStatus.NEW) {
-            this.status = FiberStatus.IN_USE;
-        } else {
-            throw new IllegalStateException(
-                String.format("Cannot mark fiber as IN_USE from status: %s. Only NEW fibers can be marked IN_USE.", this.status));
-        }
-    }
-
-    /**
-     * Mark fiber as exhausted.
-     * <p>Transition: IN_USE → EXHAUSTED</p>
-     */
-    public void markExhausted() {
-        if (this.status == FiberStatus.IN_USE) {
-            this.status = FiberStatus.EXHAUSTED;
-        } else {
-            throw new IllegalStateException(
-                String.format("Cannot mark fiber as EXHAUSTED from status: %s. Only IN_USE fibers can be marked EXHAUSTED.", this.status));
-        }
-    }
-
-    /**
      * Mark fiber as obsolete.
-     * <p>Transition: Any status → OBSOLETE</p>
-     * <p>Can be called from any state when fiber becomes outdated.</p>
+     * <p>Transition: ACTIVE → OBSOLETE</p>
+     * <p>Use when fiber is discontinued or no longer valid.</p>
      */
     public void markObsolete() {
-        this.status = FiberStatus.OBSOLETE;
+        if (this.status == FiberStatus.ACTIVE) {
+            this.status = FiberStatus.OBSOLETE;
+        } else {
+            throw new IllegalStateException(
+                String.format("Cannot mark fiber as OBSOLETE from status: %s. Only ACTIVE fibers can be marked OBSOLETE.", this.status));
+        }
     }
 
     /**
      * Check if fiber is available for use.
      *
-     * @return true if status is NEW or IN_USE
+     * @return true if status is ACTIVE
      */
     public boolean isAvailable() {
-        return this.status == FiberStatus.NEW || this.status == FiberStatus.IN_USE;
+        return this.status == FiberStatus.ACTIVE;
     }
 
-    /**
-     * Check if fiber is pure (not blended).
-     * <p>Pure fibers have technical specifications (fineness, length, etc.).</p>
-     *
-     * @return true if fiber has technical specifications
-     */
-    public boolean isPure() {
-        return this.fineness != null || this.lengthMm != null || 
-               this.strengthCndTex != null || this.elongationPercent != null;
-    }
 
     @Override
     protected String getModuleCode() {

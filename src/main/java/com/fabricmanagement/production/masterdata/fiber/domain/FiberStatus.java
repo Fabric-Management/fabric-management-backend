@@ -7,31 +7,24 @@ package com.fabricmanagement.production.masterdata.fiber.domain;
  *
  * <h2>Status Flow:</h2>
  * <pre>
- * NEW → IN_USE → EXHAUSTED
- *   ↓
- * OBSOLETE (can be set from any state)
+ * ACTIVE → OBSOLETE
  * </pre>
+ *
+ * <p><b>Note:</b> Masterdata Fiber is a catalog definition. Physical usage tracking
+ * is handled by FiberBatch (execution layer). Status here is simplified:
+ * ACTIVE = available for use, OBSOLETE = discontinued.</p>
  */
 public enum FiberStatus {
     
     /**
-     * Newly created fiber, not yet used in production.
+     * Fiber is active and available for use in production.
+     * <p>This is the default state for newly created fibers.</p>
      */
-    NEW,
-    
-    /**
-     * Fiber is currently in use in production processes.
-     */
-    IN_USE,
-    
-    /**
-     * Fiber stock is exhausted, no longer available.
-     */
-    EXHAUSTED,
+    ACTIVE,
     
     /**
      * Fiber is obsolete, discontinued, or no longer valid.
-     * <p>Can be set from any state when fiber becomes outdated.</p>
+     * <p>Can be set from ACTIVE when fiber becomes outdated.</p>
      */
     OBSOLETE
 }

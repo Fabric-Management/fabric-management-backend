@@ -7,10 +7,18 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Request for creating new fiber.
+ * Request for creating new fiber (pure or blended).
+ * 
+ * <p><b>Unified Design:</b> Single DTO for both pure and blended fibers.</p>
+ * <ul>
+ *   <li><b>Pure fiber:</b> composition is null or empty</li>
+ *   <li><b>Blended fiber:</b> composition contains base fiber IDs with percentages</li>
+ * </ul>
  * 
  * <p><b>User-Friendly Design:</b> Material can be auto-created automatically.</p>
  * <p>If materialId is provided, existing Material will be used.</p>
@@ -46,13 +54,14 @@ public class CreateFiberRequest {
 
     private String fiberGrade;
 
-    private Double fineness;
-
-    private Double lengthMm;
-
-    private Double strengthCndTex;
-
-    private Double elongationPercent;
+    /**
+     * Composition map: baseFiberId → percentage (optional).
+     * 
+     * <p><b>Pure fiber:</b> null or empty</p>
+     * <p><b>Blended fiber:</b> Map with base fiber IDs and percentages (must sum to 100%)</p>
+     * <p>Example: {cottonId: 60.0, viscoseId: 40.0}</p>
+     */
+    private Map<UUID, BigDecimal> composition;
 
     private String remarks;
 }

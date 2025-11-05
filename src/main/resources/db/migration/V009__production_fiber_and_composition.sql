@@ -50,15 +50,9 @@ CREATE TABLE production.prod_fiber (
     fiber_name VARCHAR(255) NOT NULL,
     fiber_grade VARCHAR(50),
     
-    -- Technical specifications (pure fibers only)
-    fineness DOUBLE PRECISION,
-    length_mm DOUBLE PRECISION,
-    strength_cn_dtex DOUBLE PRECISION,
-    elongation_percent DOUBLE PRECISION,
-    
     -- Status
-    status VARCHAR(20) NOT NULL DEFAULT 'NEW' 
-        CHECK (status IN ('NEW', 'IN_USE', 'EXHAUSTED', 'OBSOLETE')),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' 
+        CHECK (status IN ('ACTIVE', 'OBSOLETE')),
     remarks TEXT,
     
     -- Base entity fields
@@ -77,10 +71,9 @@ CREATE INDEX idx_fiber_iso ON production.prod_fiber(fiber_iso_code_id);
 CREATE INDEX idx_fiber_status ON production.prod_fiber(status);
 CREATE INDEX idx_fiber_tenant_active ON production.prod_fiber(tenant_id, is_active) WHERE is_active = TRUE;
 
-COMMENT ON TABLE production.prod_fiber IS 'Fiber instances - Can be pure (100%) or blended';
+COMMENT ON TABLE production.prod_fiber IS 'Fiber catalog definitions - Can be pure (100%) or blended. Laboratory measurements belong to FiberBatch or FiberTestResult entities.';
 COMMENT ON COLUMN production.prod_fiber.fiber_iso_code_id IS 'FK to fiber ISO code (CO, PES, PA, etc.)';
-COMMENT ON COLUMN production.prod_fiber.fineness IS 'Micronaire or dtex (only for pure fibers)';
-COMMENT ON COLUMN production.prod_fiber.status IS 'NEW, IN_USE, EXHAUSTED, OBSOLETE';
+COMMENT ON COLUMN production.prod_fiber.status IS 'ACTIVE or OBSOLETE (catalog lifecycle)';
 
 -- =====================================================
 -- Fiber Composition Table (Many-to-Many)

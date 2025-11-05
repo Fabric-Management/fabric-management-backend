@@ -1,7 +1,6 @@
 package com.fabricmanagement.production.masterdata.fiber.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.production.masterdata.fiber.dto.CreateBlendedFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
@@ -32,28 +31,21 @@ public class FiberController {
     @PostMapping
     public ResponseEntity<ApiResponse<FiberDto>> createFiber(
             @Valid @RequestBody CreateFiberRequest request) {
-        log.info("Creating fiber: name={}, materialId={}, unit={}", 
+        boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
+        log.info("Creating {} fiber: name={}, materialId={}, unit={}", 
+            isBlended ? "blended" : "pure",
             request.getFiberName(), request.getMaterialId(), request.getUnit());
         
         // USER-FRIENDLY: Material will be auto-created if materialId is null
-        // This reduces user errors and simplifies the workflow
+        // Unified endpoint: composition field determines if pure or blended
+        // - Pure fiber: composition is null or empty
+        // - Blended fiber: composition contains base fiber IDs with percentages
         
         FiberDto fiber = fiberService.createFiber(request);
         
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success(fiber, "Fiber created successfully"));
-    }
-
-    @PostMapping("/blended")
-    public ResponseEntity<ApiResponse<FiberDto>> createBlendedFiber(
-            @Valid @RequestBody CreateBlendedFiberRequest request) {
-        log.info("Creating blended fiber: name={}, composition={}", 
-            request.getFiberName(), request.getComposition());
-        
-        FiberDto fiber = fiberService.createBlendedFiber(request);
-        
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success(fiber, "Blended fiber created successfully"));
+            .body(ApiResponse.success(fiber, 
+                isBlended ? "Blended fiber created successfully" : "Fiber created successfully"));
     }
 
     @GetMapping("/{id}")

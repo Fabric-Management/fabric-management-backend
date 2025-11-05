@@ -28,6 +28,13 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
     Optional<Fiber> findByMaterialId(@Param("materialId") UUID materialId);
 
     /**
+     * Find fibers by multiple material IDs (batch query for performance).
+     * <p>Used to optimize Material search when checking Fiber fiberName for multiple materials.</p>
+     */
+    @Query("SELECT f FROM Fiber f WHERE f.material.id IN :materialIds")
+    List<Fiber> findByMaterialIdIn(@Param("materialIds") List<UUID> materialIds);
+
+    /**
      * Find all active fibers for a tenant.
      */
     List<Fiber> findByTenantIdAndIsActiveTrue(UUID tenantId);
@@ -49,4 +56,15 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
            "WHERE f.tenantId = :tenantId AND f.isActive = true " +
            "ORDER BY f.fiberName")
     List<Fiber> findActiveFibersWithDetails(@Param("tenantId") UUID tenantId);
+    
+    /**
+     * ✅ Performance: Find fibers by query (filtered search).
+     * 
+     * <p>Used for AI searches to avoid loading all fibers.
+     * Searches in fiberName (case-insensitive LIKE).</p>
+     * 
+     * <p>Note: Uses existing findByTenantIdAndFiberNameContainingIgnoreCase method
+     * which already filters by query. Limit is applied in Java code.</p>
+     */
+    // findByTenantIdAndFiberNameContainingIgnoreCase already exists and does filtered search
 }
