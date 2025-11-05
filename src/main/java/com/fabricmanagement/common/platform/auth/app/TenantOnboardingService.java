@@ -25,6 +25,7 @@ import com.fabricmanagement.common.platform.communication.app.AddressService;
 import com.fabricmanagement.common.platform.communication.app.CompanyAddressService;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.company.infra.repository.DepartmentRepository;
+import com.fabricmanagement.common.platform.company.app.TenantSeedService;
 import com.fabricmanagement.common.platform.user.app.UserDepartmentService;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.common.platform.user.domain.Role;
@@ -82,6 +83,7 @@ public class TenantOnboardingService {
     private final DepartmentRepository departmentRepository;
     private final UserDepartmentService userDepartmentService;
     private final RoleRepository roleRepository;
+    private final TenantSeedService tenantSeedService;
 
     /**
      * Create new tenant via sales-led process.
@@ -134,6 +136,9 @@ public class TenantOnboardingService {
             adminUser.getId(),
             company.getId()
         );
+
+        // Seed default departments and positions for new tenant
+        tenantSeedService.seedDepartmentsAndPositions(company.getTenantId(), company.getId());
 
         sendWelcomeEmail(
             request.getAdminContact(),
@@ -218,6 +223,9 @@ public class TenantOnboardingService {
             adminUser.getId(),
             company.getId()
         );
+
+        // Seed default departments and positions for new tenant
+        tenantSeedService.seedDepartmentsAndPositions(company.getTenantId(), company.getId());
 
         // Self-service signup: No verification code needed
         // Email link click = email verified (user registered with their own email)
@@ -372,6 +380,18 @@ public class TenantOnboardingService {
 
         Company company = Company.create(name, taxId, type);
 
+        // ⚠️ CRITICAL: Generate tenant UID from company name BEFORE save
+        // Company UID = Tenant UID (no module code, no UUID suffix)
+        // Format: {COMPANY_NAME_PREFIX}-{SEQUENCE}
+        // Example: "Akkayalar Tekstil" → "AKKAYALAR-001"
+        String tenantUid = generateTenantUidFromCompanyName(name);
+        company.setUid(tenantUid);
+        
+        // ⚠️ CRITICAL: Set tenant UID in TenantContext BEFORE save
+        // This ensures BaseEntity.onCreate() uses correct tenant UID for other fields
+        TenantContext.setCurrentTenantUid(tenantUid);
+        log.debug("Tenant UID generated and set: {} for company: {}", tenantUid, name);
+
         // ⚠️ CRITICAL: Save first to get company ID
         Company saved = companyRepository.save(company);
 
@@ -379,6 +399,10 @@ public class TenantOnboardingService {
         // Company has @AttributeOverride(updatable=true) for this special case
         saved.setTenantId(saved.getId());
         Company finalCompany = companyRepository.save(saved);
+
+        // Ensure tenant UID is still set (redundant but safe)
+        TenantContext.setCurrentTenantUid(finalCompany.getUid());
+        log.debug("Tenant UID confirmed: {} for tenantId={}", finalCompany.getUid(), finalCompany.getTenantId());
 
         eventPublisher.publish(new CompanyCreatedEvent(
             finalCompany.getTenantId(),
@@ -664,6 +688,72 @@ public class TenantOnboardingService {
             case "CustomOS" -> "Custom Integration OS";
             default -> osCode;
         };
+    }
+
+    /**
+     * Generate tenant UID from company name.
+     * 
+     * <p>Format: {COMPANY_NAME_PREFIX}-{SEQUENCE}
+     * Example: "Akkayalar Tekstil Dokuma San.Tic.Ltd.Sti" → "AKKAYALAR-001"
+     * 
+     * <p>Algorithm:
+     * <ol>
+     *   <li>Extract first word from company name (uppercase, max 10 chars)</li>
+     *   <li>Remove special characters</li>
+     *   <li>Add sequence number (001, 002, etc.) - check uniqueness if needed</li>
+     * </ol>
+     * 
+     * @param companyName Company name
+     * @return Generated tenant UID
+     */
+    private String generateTenantUidFromCompanyName(String companyName) {
+        if (companyName == null || companyName.isBlank()) {
+            return "SYS-000"; // Fallback
+        }
+
+        // Extract first word (uppercase, max 10 chars, alphanumeric only)
+        String[] words = companyName.trim().split("\\s+");
+        String firstWord = words[0].toUpperCase()
+            .replaceAll("[^A-Z0-9]", "") // Remove special chars
+            .substring(0, Math.min(10, words[0].length()));
+
+        if (firstWord.isEmpty()) {
+            firstWord = "COMPANY";
+        }
+
+        // Generate sequence: Check existing companies with same prefix for uniqueness
+        // Uses counter-based approach with uniqueness validation
+        // Format: {PREFIX}-{SEQUENCE} where SEQUENCE is 001-999
+        int counter = 1;
+        String candidateUid;
+        do {
+            String sequence = String.format("%03d", counter);
+            candidateUid = String.format("%s-%s", firstWord, sequence);
+            
+            // Check if this UID already exists (global uniqueness check)
+            boolean exists = companyRepository.findByUid(candidateUid).isPresent();
+            if (!exists) {
+                break; // Found unique UID
+            }
+            counter++;
+            
+            // Safety: Prevent infinite loop (max 999 companies with same prefix)
+            if (counter > 999) {
+                // Fallback: Use UUID suffix if too many collisions
+                // This handles edge case where 999+ companies share same prefix
+                String uuidSuffix = UUID.randomUUID().toString()
+                    .replace("-", "")
+                    .substring(0, 4)
+                    .toUpperCase();
+                candidateUid = String.format("%s-%s", firstWord, uuidSuffix);
+                log.warn("Too many collisions for prefix {} (>{}, using UUID suffix: {}", 
+                    firstWord, 999, candidateUid);
+                break;
+            }
+        } while (counter <= 999);
+
+        log.debug("Generated tenant UID: {} from company name: {}", candidateUid, companyName);
+        return candidateUid;
     }
 }
 

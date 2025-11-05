@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -115,6 +116,53 @@ public class AddressValidationController {
             AddressDto.from(address),
             "Address revalidated successfully"
         ));
+    }
+
+    /**
+     * Search addresses by postcode endpoint (Global).
+     *
+     * <p>Uses Google Geocoding API to find all addresses matching a postcode globally.</p>
+     * 
+     * <p><b>Country Parameter (Optional):</b></p>
+     * <ul>
+     *   <li><b>If provided:</b> Filters results to specific country (faster, more accurate)</li>
+     *   <li><b>If omitted:</b> Searches globally across all countries</li>
+     * </ul>
+     * 
+     * <p><b>Country Format:</b> Accepts both ISO code ("GB", "TR") or country name ("United Kingdom", "Turkey")</p>
+     * 
+     * <p><b>Use Cases:</b></p>
+     * <ul>
+     *   <li>User knows country: Select country → Faster, accurate results</li>
+     *   <li>User doesn't know country: Skip country → Global search, may find multiple countries</li>
+     * </ul>
+     * 
+     * <p><b>Examples:</p>
+     * <ul>
+     *   <li>Global: <code>GET /search-by-postcode?postcode=34000</code> (searches worldwide)</li>
+     *   <li>Country-specific: <code>GET /search-by-postcode?postcode=34000&country=TR</code> (Turkey only)</li>
+     *   <li>Country name: <code>GET /search-by-postcode?postcode=MK5 7GE&country=United Kingdom</code></li>
+     * </ul>
+     * 
+     * @param postcode Postal/ZIP code (required)
+     * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "TR", "GB") or country name (e.g., "Turkey", "United Kingdom").
+     *                If omitted, searches globally across all countries.
+     * @return List of addresses matching the postcode
+     */
+    @GetMapping("/search-by-postcode")
+    public ResponseEntity<ApiResponse<List<AddressValidationResponse>>> searchByPostcode(
+            @RequestParam String postcode,
+            @RequestParam(required = false) String country) {
+        log.debug("Postcode search request: postcode={}, country={}", postcode, country);
+
+        if (postcode == null || postcode.isBlank()) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("POSTCODE_REQUIRED", "Postcode parameter is required"));
+        }
+
+        List<AddressValidationResponse> results = googleMapsClient.searchByPostcode(postcode, country);
+
+        return ResponseEntity.ok(ApiResponse.success(results));
     }
 }
 

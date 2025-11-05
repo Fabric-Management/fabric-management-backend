@@ -110,13 +110,11 @@ public class RegistrationService {
         verificationCodeRepository.save(verificationCode);
 
         // Send verification code via multi-channel (WhatsApp → Email → SMS)
-        try {
-            verificationService.sendVerificationCode(request.getContactValue(), code);
-            log.info("✅ Verification code sent successfully to: {}", request.getContactValue());
-        } catch (Exception e) {
-            log.error("❌ Failed to send verification code to: {}", request.getContactValue(), e);
-            // Continue anyway - code is in database, user can try again
-        }
+        // ✅ Performance: Async execution - doesn't block user response
+        // Email/SMS sending happens in background, user gets immediate response
+        verificationService.sendVerificationCode(request.getContactValue(), code);
+        log.info("Verification code queued for sending (async) to: {}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
 
         return "Verification code sent. Please check your email.";
     }

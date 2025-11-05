@@ -2,6 +2,8 @@ package com.fabricmanagement.common.platform.company.infra.repository;
 
 import com.fabricmanagement.common.platform.company.domain.Department;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -27,5 +29,12 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
 
     boolean existsByTenantIdAndCompanyIdAndDepartmentName(
         UUID tenantId, UUID companyId, String departmentName);
+
+    /**
+     * Find all active departments by tenant ID.
+     * Used for user creation form dropdown options.
+     */
+    @Query("SELECT d FROM Department d WHERE d.tenantId = :tenantId AND d.isActive = true ORDER BY d.departmentName")
+    List<Department> findByTenantIdAndIsActiveTrue(@Param("tenantId") UUID tenantId);
 }
 

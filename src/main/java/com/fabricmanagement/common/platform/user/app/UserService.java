@@ -14,25 +14,27 @@ import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.domain.UserAddress;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
+import com.fabricmanagement.common.platform.user.domain.Role;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.common.platform.user.domain.event.UserDeactivatedEvent;
 import com.fabricmanagement.common.platform.user.domain.event.UserOnboardingCompletedEvent;
 import com.fabricmanagement.common.platform.user.domain.event.UserProfileUpdatedEvent;
 import com.fabricmanagement.common.platform.user.domain.value.ProfileCategory;
-import com.fabricmanagement.common.platform.user.dto.CreateUserRequest;
+import com.fabricmanagement.common.platform.user.dto.CreateInternalUserRequest;
+import com.fabricmanagement.common.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -66,37 +68,49 @@ public class UserService implements UserFacade {
     private final UserAddressService userAddressService;
     private final CompanyAddressService companyAddressService;
     private final UserDepartmentService userDepartmentService;
+    
+    private final RoleService roleService;
+    private final com.fabricmanagement.common.platform.company.infra.repository.PositionRepository positionRepository;
+    
+    // WhatsApp capability check
+    private final com.fabricmanagement.common.platform.communication.infra.client.WhatsAppClient whatsAppClient;
+    
+    // HR/Employee management
+    private final com.fabricmanagement.human.employee.app.EmployeeService employeeService;
 
-    @Transactional
-    public UserDto createUser(CreateUserRequest request) {
-        log.info("Creating user: contactValue={}", 
-            PiiMaskingUtil.maskEmail(request.getContactValue()));
-
+    /**
+     * Internal helper: Create user with basic information (shared logic for internal/external).
+     */
+    private UserDto createUserBase(
+            String firstName,
+            String lastName,
+            String contactValue,
+            com.fabricmanagement.common.platform.user.domain.ContactType contactType,
+            UUID companyId,
+            String department,
+            List<com.fabricmanagement.common.platform.user.dto.ContactData> additionalContacts,
+            List<com.fabricmanagement.common.platform.user.dto.AddressData> addresses) {
+        
         UUID tenantId = TenantContext.getCurrentTenantId();
 
         // Check if contact already exists
-        if (userRepository.existsByContactValue(request.getContactValue())) {
+        if (userRepository.existsByContactValue(contactValue)) {
             throw new IllegalArgumentException("Contact value already registered");
         }
 
-        if (!companyFacade.exists(tenantId, request.getCompanyId())) {
+        if (!companyFacade.exists(tenantId, companyId)) {
             throw new IllegalArgumentException("Company not found");
         }
 
         // Create User (new system - no deprecated fields)
-        User user = User.create(
-            request.getFirstName(),
-            request.getLastName(),
-            request.getCompanyId()
-        );
-
+        User user = User.create(firstName, lastName, companyId);
         User saved = userRepository.save(user);
 
-        // Create Contact entity (new system)
-        com.fabricmanagement.common.platform.communication.domain.Contact contact = 
-            contactService.createContact(
-                request.getContactValue(),
-                mapContactType(request.getContactType()),
+        // Create primary Contact entity (authentication contact)
+        com.fabricmanagement.common.platform.communication.domain.Contact primaryContact = 
+            createContactWithWhatsAppCheck(
+                contactValue,
+                mapContactType(contactType),
                 "Primary",
                 true, // isPersonal
                 null  // parentContactId
@@ -105,27 +119,351 @@ public class UserService implements UserFacade {
         // Create UserContact junction (authentication contact)
         userContactService.assignContact(
             saved.getId(),
-            contact.getId(),
+            primaryContact.getId(),
             true,  // isDefault
             true   // isForAuthentication
         );
 
-        // USER-FRIENDLY: Auto-create UserAddress from Company if available
-        // This reduces user errors and provides default work address
-        autoCreateUserAddressFromCompany(saved.getId(), request.getCompanyId(), tenantId);
+        // Create additional contacts if provided
+        if (additionalContacts != null && !additionalContacts.isEmpty()) {
+            for (com.fabricmanagement.common.platform.user.dto.ContactData contactData : additionalContacts) {
+                com.fabricmanagement.common.platform.communication.domain.Contact additionalContact = 
+                    createContactWithWhatsAppCheck(
+                        contactData.getContactValue(),
+                        mapContactType(contactData.getContactType()),
+                        contactData.getLabel() != null ? contactData.getLabel() : 
+                            (contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL ? "Email" : "Phone"),
+                        contactData.getIsPersonal() != null ? contactData.getIsPersonal() : true,
+                        null  // parentContactId
+                    );
+                
+                // Set WhatsApp flag if explicitly provided
+                if (contactData.getIsWhatsApp() != null && 
+                    contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.PHONE) {
+                    additionalContact.setIsWhatsApp(contactData.getIsWhatsApp());
+                }
+
+                // Assign contact to user (not for authentication, not default)
+                userContactService.assignContact(
+                    saved.getId(),
+                    additionalContact.getId(),
+                    false,  // isDefault
+                    false   // isForAuthentication
+                );
+            }
+        }
+
+        // Create addresses if provided
+        if (addresses != null && !addresses.isEmpty()) {
+            boolean isFirstAddress = true;
+            for (com.fabricmanagement.common.platform.user.dto.AddressData addressData : addresses) {
+                com.fabricmanagement.common.platform.communication.domain.AddressType addressType = 
+                    parseAddressType(addressData.getAddressType());
+                
+                com.fabricmanagement.common.platform.communication.domain.Address address = 
+                    addressService.createAddress(
+                        addressData.getStreetAddress(),
+                        addressData.getCity(),
+                        addressData.getState(),
+                        addressData.getPostalCode(),
+                        addressData.getCountry(),
+                        addressType,
+                        addressData.getLabel() != null ? addressData.getLabel() : 
+                            (addressType == com.fabricmanagement.common.platform.communication.domain.AddressType.WORK ? "Work Address" : "Home Address")
+                    );
+
+                // Assign address to user
+                boolean isPrimary = isFirstAddress || Boolean.TRUE.equals(addressData.getIsPrimary());
+                boolean isWorkAddress = addressType == com.fabricmanagement.common.platform.communication.domain.AddressType.WORK;
+                
+                userAddressService.assignAddress(
+                    saved.getId(),
+                    address.getId(),
+                    isPrimary,
+                    isWorkAddress
+                );
+                
+                isFirstAddress = false;
+            }
+        } else {
+            // USER-FRIENDLY: Auto-create UserAddress from Company if available
+            autoCreateUserAddressFromCompany(saved.getId(), companyId, tenantId);
+        }
 
         eventPublisher.publish(new UserCreatedEvent(
             saved.getTenantId(),
             saved.getId(),
             saved.getDisplayName(),
-            request.getContactValue(), // Use request value (from Contact entity now)
+            contactValue,
             saved.getCompanyId()
         ));
 
         log.info("User created: id={}, uid={}, displayName={}, contactId={}", 
-            saved.getId(), saved.getUid(), saved.getDisplayName(), contact.getId());
+            saved.getId(), saved.getUid(), saved.getDisplayName(), primaryContact.getId());
 
         return UserDto.from(saved);
+    }
+
+    /**
+     * Create internal employee (own staff with HR data).
+     * 
+     * <p><b>Use Case:</b> Creating employees for your own company (tenant users with HR records).</p>
+     * 
+     * <p><b>Process:</b></p>
+     * <ol>
+     *   <li>Create User (authentication, basic identity)</li>
+     *   <li>Create Employee record (HR data, personal info, employment details)</li>
+     * </ol>
+     */
+    @Transactional
+    public UserDto createInternalUser(CreateInternalUserRequest request) {
+        log.info("Creating internal employee: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
+
+        // Create User (authentication, basic identity)
+        UserDto user = createUserBase(
+            request.getFirstName(),
+            request.getLastName(),
+            request.getContactValue(),
+            request.getContactType(),
+            request.getCompanyId(),
+            request.getDepartment(),
+            request.getAdditionalContacts(),
+            request.getAddresses()
+        );
+
+        // Create Employee record (HR data) if any HR fields provided
+        // Auto-generate employee number if not provided and any HR data exists
+        String employeeNumber = request.getEmployeeNumber();
+        if (employeeNumber == null || employeeNumber.isBlank()) {
+            // Auto-generate employee number if any HR data will be saved
+            if (request.getTitle() != null || request.getGender() != null || 
+                request.getBirthDate() != null || request.getNationality() != null ||
+                request.getHireDate() != null || request.getEmergencyContact() != null) {
+                
+                employeeNumber = employeeService.generateEmployeeNumber();
+                log.debug("Auto-generated employee number: {} for user: userId={}", employeeNumber, user.getId());
+            }
+        }
+        
+        if (request.getTitle() != null || request.getGender() != null || 
+            request.getBirthDate() != null || request.getNationality() != null ||
+            employeeNumber != null || request.getHireDate() != null ||
+            request.getEmergencyContact() != null) {
+            
+            com.fabricmanagement.human.employee.domain.EmergencyContact emergencyContact = null;
+            if (request.getEmergencyContact() != null) {
+                emergencyContact = com.fabricmanagement.human.employee.domain.EmergencyContact.builder()
+                    .name(request.getEmergencyContact().getName())
+                    .phone(request.getEmergencyContact().getPhone())
+                    .relationship(request.getEmergencyContact().getRelationship())
+                    .build();
+            }
+
+            employeeService.createOrUpdateEmployee(
+                user.getId(),
+                request.getTitle(),
+                request.getGender(),
+                request.getBirthDate(),
+                request.getNationality(),
+                employeeNumber,
+                request.getHireDate(),
+                emergencyContact
+            );
+
+            log.info("Employee record created for user: userId={}, employeeNumber={}", user.getId(), employeeNumber);
+        }
+
+        // Assign role if provided
+        if (request.getRoleId() != null) {
+            UUID tenantId = TenantContext.getCurrentTenantId();
+            Role role = roleService.findById(request.getRoleId())
+                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            
+            User userEntity = userRepository.findByTenantIdAndId(tenantId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            
+            userEntity.setRole(role);
+            userRepository.save(userEntity);
+            
+            log.info("Role assigned to user: userId={}, roleId={}", user.getId(), request.getRoleId());
+        }
+
+        // Assign department if departmentId provided (preferred over department name)
+        if (request.getDepartmentId() != null) {
+            UUID assignedBy = TenantContext.getCurrentUserId();
+            
+            userDepartmentService.assignDepartment(
+                user.getId(),
+                request.getDepartmentId(),
+                true, // isPrimary
+                assignedBy
+            );
+            
+            log.info("Department assigned to user: userId={}, departmentId={}", user.getId(), request.getDepartmentId());
+        }
+
+        // Assign position if provided
+        if (request.getPositionId() != null) {
+            UUID tenantId = TenantContext.getCurrentTenantId();
+            com.fabricmanagement.common.platform.company.domain.Position position = positionRepository
+                .findById(request.getPositionId())
+                .orElseThrow(() -> new IllegalArgumentException("Position not found"));
+            
+            if (!position.getTenantId().equals(tenantId)) {
+                throw new IllegalArgumentException("Position must belong to the same tenant");
+            }
+            
+            User userEntity = userRepository.findByTenantIdAndId(tenantId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            
+            UUID assignedBy = TenantContext.getCurrentUserId();
+            com.fabricmanagement.common.platform.user.domain.UserPosition userPosition = 
+                com.fabricmanagement.common.platform.user.domain.UserPosition.create(
+                    userEntity,
+                    position,
+                    true, // isPrimary
+                    assignedBy
+                );
+            
+            // Add to user's position list (cascade will save it)
+            userEntity.getUserPositions().add(userPosition);
+            userRepository.save(userEntity);
+            
+            log.info("Position assigned to user: userId={}, positionId={}", user.getId(), request.getPositionId());
+        }
+
+        // Track HR compliance (even if Employee record doesn't exist yet, it will be created on update)
+        checkAndTrackHrCompliance(user.getId(), request.getDepartment());
+
+        return user;
+    }
+
+    /**
+     * Check HR compliance and update employee record with tracking data.
+     * 
+     * <p>Validates recommended HR fields and saves compliance status to Employee entity.</p>
+     * 
+     * @param userId User ID to check compliance for
+     * @param department Department name from request (optional)
+     */
+    private void checkAndTrackHrCompliance(UUID userId, String department) {
+        try {
+            Optional<com.fabricmanagement.human.employee.domain.Employee> employeeOpt = 
+                employeeService.getEmployeeByUserId(userId);
+            
+            if (employeeOpt.isPresent()) {
+                com.fabricmanagement.human.employee.domain.Employee employee = employeeOpt.get();
+                List<String> missingFields = employeeService.checkAndUpdateCompliance(employee, department);
+                
+                if (!missingFields.isEmpty()) {
+                    log.warn("⚠️ HR Compliance Tracking: userId={}, missingFields={}, status={}", 
+                        userId, 
+                        String.join(",", missingFields),
+                        employee.getHrComplianceStatus());
+                } else {
+                    log.info("✅ HR Compliance: userId={} is complete", userId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to track HR compliance for userId={}", userId, e);
+            // Don't fail user creation if compliance tracking fails
+        }
+    }
+
+    /**
+     * Create external user (partner/supplier/customer users without HR data).
+     * 
+     * <p><b>Use Case:</b> Creating users for partner companies, suppliers, or customers (no HR records needed).</p>
+     * 
+     * <p><b>Process:</b></p>
+     * <ol>
+     *   <li>Create User only (authentication, basic identity)</li>
+     *   <li>No Employee record created</li>
+     * </ol>
+     */
+    @Transactional
+    public UserDto createExternalUser(CreateExternalUserRequest request) {
+        log.info("Creating external user: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
+
+        // Create User only (no Employee record)
+        return createUserBase(
+            request.getFirstName(),
+            request.getLastName(),
+            request.getContactValue(),
+            request.getContactType(),
+            request.getCompanyId(),
+            request.getDepartment(),
+            request.getAdditionalContacts(),
+            request.getAddresses()
+        );
+    }
+
+    /**
+     * Create contact with automatic WhatsApp capability check for phone numbers.
+     * 
+     * <p>For PHONE contacts, checks WhatsApp capability and sets isWhatsApp flag.</p>
+     * 
+     * @param contactValue Contact value (email or phone)
+     * @param contactType Contact type (EMAIL or PHONE)
+     * @param label Contact label
+     * @param isPersonal Personal contact flag
+     * @param parentContactId Parent contact ID (for extensions)
+     * @return Created contact with WhatsApp flag set if applicable
+     */
+    private com.fabricmanagement.common.platform.communication.domain.Contact createContactWithWhatsAppCheck(
+            String contactValue,
+            com.fabricmanagement.common.platform.communication.domain.ContactType contactType,
+            String label,
+            Boolean isPersonal,
+            UUID parentContactId) {
+        
+        com.fabricmanagement.common.platform.communication.domain.Contact contact = 
+            contactService.createContact(
+                contactValue,
+                contactType,
+                label,
+                isPersonal,
+                parentContactId
+            );
+
+        // Check WhatsApp capability for PHONE contacts
+        if (contactType == com.fabricmanagement.common.platform.communication.domain.ContactType.PHONE) {
+            try {
+                boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(contactValue);
+                contact.setIsWhatsApp(hasWhatsApp);
+                contactService.updateContact(contact); // Save WhatsApp flag
+                
+                if (hasWhatsApp) {
+                    log.debug("✅ WhatsApp capability detected: phone={}, contactId={}", 
+                        PiiMaskingUtil.maskPhone(contactValue), contact.getId());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to check WhatsApp capability for phone: {} - {}", 
+                    PiiMaskingUtil.maskPhone(contactValue), e.getMessage());
+                // Continue - WhatsApp check failure is not critical
+            }
+        }
+
+        return contact;
+    }
+
+    /**
+     * Parse address type string to AddressType enum.
+     */
+    private com.fabricmanagement.common.platform.communication.domain.AddressType parseAddressType(String addressTypeStr) {
+        if (addressTypeStr == null || addressTypeStr.isBlank()) {
+            return com.fabricmanagement.common.platform.communication.domain.AddressType.WORK;
+        }
+        
+        try {
+            return com.fabricmanagement.common.platform.communication.domain.AddressType.valueOf(
+                addressTypeStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid address type: {}, defaulting to WORK", addressTypeStr);
+            return com.fabricmanagement.common.platform.communication.domain.AddressType.WORK;
+        }
     }
 
     /**

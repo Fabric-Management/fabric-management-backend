@@ -11,7 +11,8 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.user.app.ProfileUpdateRequestService;
 import com.fabricmanagement.common.platform.user.app.UserService;
 import com.fabricmanagement.common.platform.user.dto.CreateProfileUpdateRequestDto;
-import com.fabricmanagement.common.platform.user.dto.CreateUserRequest;
+import com.fabricmanagement.common.platform.user.dto.CreateInternalUserRequest;
+import com.fabricmanagement.common.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.common.platform.user.dto.OnboardingStatusResponse;
 import com.fabricmanagement.common.platform.user.dto.ProfileUpdateRequestDto;
 import com.fabricmanagement.common.platform.user.dto.ReviewProfileUpdateRequestDto;
@@ -22,6 +23,7 @@ import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,15 +41,43 @@ public class UserController {
     private final ContactSuggestionService contactSuggestionService;
     private final UserContactService userContactService;
     private final UserAddressService userAddressService;
+    private final com.fabricmanagement.human.employee.app.EmployeeService employeeService;
+    private final com.fabricmanagement.common.platform.company.app.UserCreationOptionsService userCreationOptionsService;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<UserDto>> createUser(@Valid @RequestBody CreateUserRequest request) {
-        log.info("Creating user: contactValue={}", 
+    /**
+     * Create internal employee (own staff with HR data).
+     * 
+     * <p><b>Use Case:</b> Creating employees for your own company (tenant users with HR records).</p>
+     * 
+     * <p><b>Includes:</b> Title, gender, birth date, nationality, emergency contact, employee number, hire date.</p>
+     */
+    @PostMapping("/internal")
+    public ResponseEntity<ApiResponse<UserDto>> createInternalUser(
+            @Valid @RequestBody CreateInternalUserRequest request) {
+        log.info("Creating internal employee: contactValue={}", 
             PiiMaskingUtil.maskEmail(request.getContactValue()));
 
-        UserDto created = userService.createUser(request);
+        UserDto created = userService.createInternalUser(request);
 
-        return ResponseEntity.ok(ApiResponse.success(created, "User created successfully"));
+        return ResponseEntity.ok(ApiResponse.success(created, "Internal employee created successfully"));
+    }
+
+    /**
+     * Create external user (partner/supplier/customer users without HR data).
+     * 
+     * <p><b>Use Case:</b> Creating users for partner companies, suppliers, or customers (no HR records needed).</p>
+     * 
+     * <p><b>Includes:</b> Only basic user information (no HR data).</p>
+     */
+    @PostMapping("/external")
+    public ResponseEntity<ApiResponse<UserDto>> createExternalUser(
+            @Valid @RequestBody CreateExternalUserRequest request) {
+        log.info("Creating external user: contactValue={}", 
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
+
+        UserDto created = userService.createExternalUser(request);
+
+        return ResponseEntity.ok(ApiResponse.success(created, "External user created successfully"));
     }
 
     @GetMapping("/{id}")
@@ -62,13 +92,18 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(user));
     }
 
+    /**
+     * Get all users for current tenant.
+     * 
+     * <p><b>Cached:</b> 5 minutes (tenant-scoped cache key)</p>
+     */
     @GetMapping
+    @Cacheable(value = "users", key = "T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).getCurrentTenantId()")
     public ResponseEntity<ApiResponse<List<UserDto>>> getAllUsers() {
         log.debug("Getting all users");
 
-        List<UserDto> users = userService.findByTenant(
-            com.fabricmanagement.common.infrastructure.persistence.TenantContext.getCurrentTenantId()
-        );
+        UUID tenantId = com.fabricmanagement.common.infrastructure.persistence.TenantContext.getCurrentTenantId();
+        List<UserDto> users = userService.findByTenant(tenantId);
 
         return ResponseEntity.ok(ApiResponse.success(users));
     }
@@ -406,6 +441,69 @@ public class UserController {
 
         return ResponseEntity.ok(ApiResponse.success(rejected, 
             "Profile update request rejected."));
+    }
+
+    /**
+     * Generate employee number (global auto-incrementing sequence).
+     * 
+     * <p><b>Format:</b> {TENANT_UID}-EMP-{SEQUENCE}</p>
+     * <p><b>Example:</b> "ACME-001-EMP-00042"</p>
+     * 
+     * <p>Format breakdown:
+     * <ul>
+     *   <li>{TENANT_UID}: Company tenant UID (e.g., "ACME-001")</li>
+     *   <li>EMP: Employee module code</li>
+     *   <li>{SEQUENCE}: Auto-incrementing global sequence (e.g., "00042")</li>
+     * </ul>
+     * 
+     * <p><b>Design:</b> Global sequence (not year-based) to ensure:
+     * <ul>
+     *   <li>✅ No sequence reset at year boundary</li>
+     *   <li>✅ Unique numbers (never duplicates)</li>
+     *   <li>✅ Supports unlimited employees</li>
+     * </ul>
+     * 
+     * <p>This endpoint is used by frontend "magic wand" button to auto-generate
+     * employee numbers when creating new users.</p>
+     * 
+     * @return Generated employee number
+     */
+    @GetMapping("/generate-employee-number")
+    public ResponseEntity<ApiResponse<String>> generateEmployeeNumber() {
+        log.debug("Generating employee number");
+        
+        String employeeNumber = employeeService.generateEmployeeNumber();
+        
+        return ResponseEntity.ok(ApiResponse.success(employeeNumber));
+    }
+
+    /**
+     * Get all options needed for user creation form.
+     * 
+     * <p><b>Orchestration Endpoint:</b> Returns department categories, departments, and positions
+     * in a single response to optimize frontend form loading.</p>
+     * 
+     * <p><b>Performance Benefits:</b>
+     * <ul>
+     *   <li>✅ Single HTTP request instead of 3 separate requests</li>
+     *   <li>✅ Reduced network overhead</li>
+     *   <li>✅ Faster page load (parallel loading not needed)</li>
+     *   <li>✅ Single database transaction</li>
+     * </ul>
+     * 
+     * <p>This endpoint should be called when the user creation modal/form is opened
+     * to populate all dropdown options.</p>
+     * 
+     * @return User creation options (categories, departments, positions)
+     */
+    @GetMapping("/creation-options")
+    public ResponseEntity<ApiResponse<com.fabricmanagement.common.platform.company.dto.UserCreationOptionsDto>> getUserCreationOptions() {
+        log.debug("Getting user creation options");
+        
+        com.fabricmanagement.common.platform.company.dto.UserCreationOptionsDto options = 
+            userCreationOptionsService.getUserCreationOptions();
+        
+        return ResponseEntity.ok(ApiResponse.success(options));
     }
 }
 

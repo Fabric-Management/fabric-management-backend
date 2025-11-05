@@ -138,7 +138,45 @@ public abstract class BaseEntity implements Serializable {
     protected abstract String getModuleCode();
 
     /**
+     * Generate UID for this entity.
+     * 
+     * <p><b>Template Method Pattern:</b> Subclasses can override this method
+     * to provide custom UID generation logic.</p>
+     * 
+     * <p><b>Default Implementation:</b> Uses standard pattern
+     * {TENANT_UID}-{MODULE}-{UUID_SUFFIX}</p>
+     * 
+     * <p><b>Examples:</b>
+     * <ul>
+     *   <li>User: "ACME-001-USER-A3F5B2C9"</li>
+     *   <li>Material: "ACME-001-MAT-B7E8F9A1"</li>
+     *   <li>Company (override): "ACME-001" (no module code)</li>
+     * </ul>
+     * 
+     * @return Generated UID string
+     */
+    protected String generateUid() {
+        String tenantUid = TenantContext.getCurrentTenantUid();
+        if (tenantUid == null) {
+            tenantUid = "SYS-000";
+        }
+        
+        // Use UUID-based suffix to guarantee uniqueness
+        // Format: {TENANT_UID}-{MODULE}-{UUID_SUFFIX}
+        // Example: "ACME-001-USER-A3F5B2C9"
+        String uniqueSuffix = UUID.randomUUID().toString()
+            .replace("-", "")
+            .substring(0, 8)
+            .toUpperCase();
+        
+        return String.format("%s-%s-%s", tenantUid, getModuleCode(), uniqueSuffix);
+    }
+
+    /**
      * Pre-persist hook - sets tenant ID, UID, and timestamps.
+     * 
+     * <p><b>UID Generation:</b> Uses generateUid() hook method, allowing
+     * subclasses to override for custom UID generation.</p>
      */
     @PrePersist
     protected void onCreate() {
@@ -150,20 +188,7 @@ public abstract class BaseEntity implements Serializable {
         // ✅ Performance: Use UUID-based suffix for guaranteed uniqueness
         // This prevents collisions that can occur with timestamp-based sequences
         if (this.uid == null || this.uid.isBlank()) {
-            String tenantUid = TenantContext.getCurrentTenantUid();
-            if (tenantUid == null) {
-                tenantUid = "SYS-000";
-            }
-            
-            // Use UUID-based suffix to guarantee uniqueness
-            // Format: {TENANT_UID}-{MODULE}-{UUID_SUFFIX}
-            // Example: "ACME-001-USER-A3F5B2C9"
-            String uniqueSuffix = UUID.randomUUID().toString()
-                .replace("-", "")
-                .substring(0, 8)
-                .toUpperCase();
-            
-            this.uid = String.format("%s-%s-%s", tenantUid, getModuleCode(), uniqueSuffix);
+            this.uid = generateUid(); // Hook method - can be overridden by subclasses
         }
         
         if (this.createdAt == null) {

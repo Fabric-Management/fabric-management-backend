@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS common_communication.common_contact (
     label VARCHAR(100),
     parent_contact_id UUID,
     is_personal BOOLEAN NOT NULL DEFAULT TRUE,
+    is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
     
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -52,12 +53,15 @@ CREATE INDEX idx_contact_parent ON common_communication.common_contact(parent_co
 CREATE INDEX idx_contact_tenant ON common_communication.common_contact(tenant_id);
 CREATE INDEX idx_contact_verified ON common_communication.common_contact(is_verified) WHERE is_verified = TRUE;
 CREATE INDEX idx_contact_primary ON common_communication.common_contact(is_primary) WHERE is_primary = TRUE;
+CREATE INDEX idx_contact_whatsapp ON common_communication.common_contact(is_whatsapp) WHERE is_whatsapp = TRUE;
+CREATE INDEX idx_contact_phone_whatsapp ON common_communication.common_contact(contact_type, is_whatsapp) WHERE contact_type = 'PHONE' AND is_whatsapp = TRUE;
 
 COMMENT ON TABLE common_communication.common_contact IS 'Generic contact information (email, phone, WhatsApp, etc.) for User and Company';
 COMMENT ON COLUMN common_communication.common_contact.contact_value IS 'Contact value: email address, phone number (E.164), extension number, URL, etc.';
 COMMENT ON COLUMN common_communication.common_contact.contact_type IS 'Contact type: EMAIL, PHONE, PHONE_EXTENSION, FAX, WEBSITE, WHATSAPP, SOCIAL_MEDIA';
 COMMENT ON COLUMN common_communication.common_contact.parent_contact_id IS 'For PHONE_EXTENSION: references parent PHONE contact';
 COMMENT ON COLUMN common_communication.common_contact.is_personal IS 'true = User personal contact, false = Company-provided contact';
+COMMENT ON COLUMN common_communication.common_contact.is_whatsapp IS 'True if phone number has WhatsApp capability. Used for verification codes and notifications priority.';
 
 -- ============================================================================
 -- TABLE: common_address

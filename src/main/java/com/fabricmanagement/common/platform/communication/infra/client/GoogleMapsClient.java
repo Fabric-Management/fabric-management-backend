@@ -188,6 +188,120 @@ public class GoogleMapsClient {
     }
 
     /**
+     * Search addresses by postcode using Google Geocoding API (Global).
+     * 
+     * <p>Returns all addresses matching the postcode globally or in specified country.</p>
+     * <p><b>Global Search:</b> If country is not provided, searches globally across all countries.</p>
+     * 
+     * @param postcode Postal/ZIP code (required)
+     * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "TR", "GB", "US"). 
+     *                If null, searches globally.
+     * @return List of addresses matching the postcode
+     */
+    public List<AddressValidationResponse> searchByPostcode(String postcode, String country) {
+        if (!properties.getEnabled()) {
+            log.warn("Google Maps features are disabled");
+            return new ArrayList<>();
+        }
+
+        if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
+            log.warn("Google Maps API key is not configured");
+            return new ArrayList<>();
+        }
+
+        try {
+            log.debug("Searching addresses by postcode (global): postcode={}, country={}", postcode, country);
+
+            // Normalize postcode: trim whitespace, preserve UK format (with space)
+            String normalizedPostcode = postcode != null ? postcode.trim() : "";
+            if (normalizedPostcode.isBlank()) {
+                log.warn("Postcode is blank, returning empty list");
+                return new ArrayList<>();
+            }
+
+            // Normalize country: accept ISO code (e.g., "GB", "TR") or country name (e.g., "United Kingdom")
+            // Google API accepts both formats globally, no hardcoded mapping needed
+            String normalizedCountry = country != null ? country.trim() : null;
+            String countryCode = null;
+            
+            if (normalizedCountry != null && !normalizedCountry.isBlank()) {
+                String upper = normalizedCountry.toUpperCase();
+                
+                // If it's a 2-letter code (ISO 3166-1 alpha-2), use it as country code
+                // This allows us to set components parameter for better accuracy
+                if (upper.length() == 2 && upper.matches("[A-Z]{2}")) {
+                    countryCode = upper;
+                }
+                // If it's a country name, use it as-is (Google API handles country names globally)
+            }
+
+            // Build address query: postcode + country (if provided)
+            // Format: "postcode" (global) or "postcode, country" (country-specific)
+            String addressQuery = normalizedPostcode;
+            if (normalizedCountry != null && !normalizedCountry.isBlank()) {
+                // Use country as provided (could be code or name)
+                addressQuery = normalizedPostcode + ", " + normalizedCountry;
+            }
+
+            log.debug("Google Geocoding query: address={}, country={}", addressQuery, normalizedCountry);
+
+            UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(GEOCODING_API_URL)
+                .queryParam("address", addressQuery)
+                .queryParam("key", properties.getApiKey());
+
+            // Add region bias for better results (use ISO code if available, otherwise skip)
+            if (countryCode != null && countryCode.length() == 2) {
+                uriBuilder.queryParam("region", countryCode.toLowerCase());
+            }
+            
+            // Add components restriction for better accuracy (only if we have ISO code)
+            if (countryCode != null && countryCode.length() == 2) {
+                uriBuilder.queryParam("components", "country:" + countryCode);
+            }
+
+            String finalUrl = uriBuilder.toUriString();
+            log.debug("Google Geocoding API URL: {}", finalUrl.replace(properties.getApiKey(), "***"));
+
+            ResponseEntity<GeocodingResponse> response = restTemplate.getForEntity(
+                finalUrl,
+                GeocodingResponse.class
+            );
+
+            GeocodingResponse body = response.getBody();
+            
+            if (body != null) {
+                log.debug("Google Geocoding API response status: {}", body.getStatus());
+                
+                if ("OK".equals(body.getStatus()) && body.getResults() != null && !body.getResults().isEmpty()) {
+                    List<AddressValidationResponse> results = body.getResults().stream()
+                        .map(this::mapToValidationResponse)
+                        .filter(r -> r.getVerificationStatus() != AddressValidationResponse.VerificationStatus.FAILED)
+                        .toList();
+
+                    log.info("Postcode search returned {} addresses for postcode: {}, country: {}", 
+                        results.size(), normalizedPostcode, countryCode);
+                    return results;
+                } else if ("ZERO_RESULTS".equals(body.getStatus())) {
+                    log.warn("No addresses found for postcode: {}, country: {} (ZERO_RESULTS)", 
+                        normalizedPostcode, countryCode);
+                } else {
+                    log.warn("Google Geocoding API returned status: {} for postcode: {}, country: {}", 
+                        body.getStatus(), normalizedPostcode, countryCode);
+                }
+            }
+
+            log.debug("No addresses found for postcode: {} (global search)", normalizedPostcode);
+            return new ArrayList<>();
+
+        } catch (Exception e) {
+            log.error("Error calling Google Geocoding API for postcode search: postcode={}, country={}, error={}", 
+                postcode, country, e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+
+    /**
      * Validate address using Google Geocoding API by address string (fallback).
      */
     public AddressValidationResponse validateByAddress(String address) {
