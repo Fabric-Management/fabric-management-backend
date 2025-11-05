@@ -72,7 +72,7 @@ BEGIN
             iso_record.id,
             iso_record.fiber_name || ' (100%)',
             'STANDARD',
-            'NEW',
+            'ACTIVE',
             true,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP,
