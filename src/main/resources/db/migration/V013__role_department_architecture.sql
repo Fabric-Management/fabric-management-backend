@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS common_company.common_department_category (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_department_category_tenant ON common_company.common_department_category(tenant_id);
-CREATE INDEX idx_department_category_active ON common_company.common_department_category(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_department_category_tenant ON common_company.common_department_category(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_department_category_active ON common_company.common_department_category(is_active) WHERE is_active = TRUE;
 
 COMMENT ON TABLE common_company.common_department_category IS 'Department categories for organizing departments (Production, Administration, etc.)';
 
@@ -57,10 +57,10 @@ CREATE TABLE IF NOT EXISTS common_company.common_role (
     CONSTRAINT uq_role_tenant_code UNIQUE (tenant_id, role_code)
 );
 
-CREATE INDEX idx_role_tenant ON common_company.common_role(tenant_id);
-CREATE INDEX idx_role_category ON common_company.common_role(department_category_id);
-CREATE INDEX idx_role_code ON common_company.common_role(role_code);
-CREATE INDEX idx_role_active ON common_company.common_role(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_role_tenant ON common_company.common_role(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_role_category ON common_company.common_role(department_category_id);
+CREATE INDEX IF NOT EXISTS idx_role_code ON common_company.common_role(role_code);
+CREATE INDEX IF NOT EXISTS idx_role_active ON common_company.common_role(is_active) WHERE is_active = TRUE;
 
 COMMENT ON TABLE common_company.common_role IS 'Roles within the organization (e.g., Production Manager, Quality Control, etc.)';
 COMMENT ON COLUMN common_company.common_role.is_system_role IS 'System roles cannot be deleted or modified by users';
@@ -91,11 +91,11 @@ CREATE TABLE IF NOT EXISTS common_company.common_department (
     CONSTRAINT uq_department_tenant_code UNIQUE (tenant_id, department_code)
 );
 
-CREATE INDEX idx_department_tenant ON common_company.common_department(tenant_id);
-CREATE INDEX idx_department_category ON common_company.common_department(department_category_id);
-CREATE INDEX idx_department_parent ON common_company.common_department(parent_department_id);
-CREATE INDEX idx_department_code ON common_company.common_department(department_code);
-CREATE INDEX idx_department_active ON common_company.common_department(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_department_tenant ON common_company.common_department(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_department_category ON common_company.common_department(department_category_id);
+CREATE INDEX IF NOT EXISTS idx_department_parent ON common_company.common_department(parent_department_id);
+CREATE INDEX IF NOT EXISTS idx_department_code ON common_company.common_department(department_code);
+CREATE INDEX IF NOT EXISTS idx_department_active ON common_company.common_department(is_active) WHERE is_active = TRUE;
 
 COMMENT ON TABLE common_company.common_department IS 'Organizational departments (e.g., Production, Quality Control, etc.)';
 COMMENT ON COLUMN common_company.common_department.is_system_department IS 'System departments cannot be deleted or modified by users';
