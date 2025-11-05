@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.web;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.auth.app.JwtService;
+import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ import java.util.UUID;
 public class JwtContextInterceptor implements HandlerInterceptor {
 
     private final JwtService jwtService;
+    private final CompanyRepository companyRepository;
 
     /**
      * Extract JWT token and set TenantContext before handler execution.
@@ -54,6 +56,11 @@ public class JwtContextInterceptor implements HandlerInterceptor {
     public boolean preHandle(@NonNull HttpServletRequest request, 
                              @NonNull HttpServletResponse response, 
                              @NonNull Object handler) {
+        // Skip OPTIONS requests (CORS preflight) - no JWT processing needed
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
         String token = extractTokenFromRequest(request);
 
         if (token != null && jwtService.validateToken(token)) {
@@ -64,6 +71,44 @@ public class JwtContextInterceptor implements HandlerInterceptor {
                 // Set TenantContext for this request thread
                 TenantContext.setCurrentTenantId(tenantId);
                 TenantContext.setCurrentUserId(userId);
+
+                // Load tenant UID from JWT token (no DB query needed)
+                // ⚠️ Performance: JWT already contains tenant_uid claim, no need for DB query
+                // ⚠️ CRITICAL: Extract tenant UID if JWT contains Company UID format (backward compatibility)
+                try {
+                    String tenantUidFromJwt = jwtService.getTenantUidFromToken(token);
+                    if (tenantUidFromJwt != null) {
+                        // Extract tenant UID from Company UID if it contains module code
+                        // Format: {TENANT_UID}-COMP-{UUID} → {TENANT_UID}
+                        String tenantUid = tenantUidFromJwt;
+                        if (tenantUidFromJwt.contains("-COMP-")) {
+                            String[] parts = tenantUidFromJwt.split("-COMP-");
+                            tenantUid = parts[0]; // First part is tenant UID
+                            log.debug("Extracted tenant UID from JWT Company UID: {} → {}", tenantUidFromJwt, tenantUid);
+                        }
+                        TenantContext.setCurrentTenantUid(tenantUid);
+                        log.trace("Tenant UID set from JWT: {} for tenantId={}", tenantUid, tenantId);
+                    }
+                } catch (Exception e) {
+                    // Fallback: Load from DB if JWT claim missing (backward compatibility)
+                    log.debug("Tenant UID not in JWT, loading from DB: tenantId={}", tenantId);
+                    companyRepository.findById(tenantId)
+                        .ifPresent(company -> {
+                            String companyUid = company.getUid();
+                            if (companyUid != null) {
+                                // Extract tenant UID from Company UID if it contains module code
+                                // Format: {TENANT_UID}-COMP-{UUID} → {TENANT_UID}
+                                String tenantUid = companyUid;
+                                if (companyUid.contains("-COMP-")) {
+                                    String[] parts = companyUid.split("-COMP-");
+                                    tenantUid = parts[0]; // First part is tenant UID
+                                }
+                                TenantContext.setCurrentTenantUid(tenantUid);
+                                log.debug("Tenant UID loaded from DB: {} (from company UID: {}) for tenantId={}", 
+                                    tenantUid, companyUid, tenantId);
+                            }
+                        });
+                }
 
                 log.debug("JWT context set: userId={}, tenantId={}, path={}", 
                     userId, tenantId, request.getRequestURI());

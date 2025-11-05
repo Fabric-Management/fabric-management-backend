@@ -2,6 +2,7 @@ package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -41,12 +42,15 @@ import java.util.UUID;
 @Slf4j
 public class JwtService {
 
+    private final CompanyRepository companyRepository;
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
 
     public JwtService(
+            CompanyRepository companyRepository,
             @Value("${application.jwt.secret}") String secret,
             @Value("${application.jwt.expiration:900000}") long accessTokenExpiration) {
+        this.companyRepository = companyRepository;
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
         
@@ -61,9 +65,30 @@ public class JwtService {
 
         log.debug("Generating access token for user: {}", contactValue);
 
+        // Get tenant UID from Company entity (tenant_id = company_id for root tenant)
+        // ⚠️ CRITICAL: Company UID = Tenant UID (for root tenants)
+        // If Company UID is in format {TENANT_UID}-COMP-{UUID}, extract tenant UID
+        String tenantUid = companyRepository.findById(user.getTenantId())
+            .map(company -> {
+                String companyUid = company.getUid();
+                // Extract tenant UID from Company UID if it contains module code
+                // Format: {TENANT_UID}-COMP-{UUID} → {TENANT_UID}
+                if (companyUid != null && companyUid.contains("-COMP-")) {
+                    String[] parts = companyUid.split("-COMP-");
+                    return parts[0]; // First part is tenant UID
+                }
+                // If Company UID is already tenant UID format (e.g., "ACME-001"), use it directly
+                return companyUid;
+            })
+            .orElseGet(() -> {
+                // Fallback: Extract from user UID if company not found (should not happen)
+                log.warn("Company not found for tenantId={}, falling back to user UID extraction", user.getTenantId());
+                return extractTenantUid(user.getUid());
+            });
+
         Map<String, Object> claims = new HashMap<>();
         claims.put("tenant_id", user.getTenantId().toString());
-        claims.put("tenant_uid", extractTenantUid(user.getUid()));
+        claims.put("tenant_uid", tenantUid);
         claims.put("user_id", user.getId().toString());
         claims.put("user_uid", user.getUid());
         claims.put("company_id", user.getCompanyId().toString());
@@ -148,6 +173,11 @@ public class JwtService {
         Claims claims = extractClaims(token);
         String tenantId = claims.get("tenant_id", String.class);
         return UUID.fromString(tenantId);
+    }
+
+    public String getTenantUidFromToken(String token) {
+        Claims claims = extractClaims(token);
+        return claims.get("tenant_uid", String.class);
     }
 
     public UUID getUserIdFromToken(String token) {

@@ -9,6 +9,7 @@ import com.fabricmanagement.common.platform.company.domain.CompanyType;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.company.dto.CompanyTypeDto;
 import com.fabricmanagement.common.platform.company.dto.CreateCompanyRequest;
+import com.fabricmanagement.common.platform.company.dto.CreateCompanyWithContactRequest;
 import com.fabricmanagement.common.platform.company.dto.SubscriptionDto;
 import com.fabricmanagement.common.platform.company.dto.SubscriptionQuotaDto;
 import com.fabricmanagement.common.platform.company.dto.UpdateCompanyRequest;
@@ -39,6 +40,39 @@ public class CompanyController {
         CompanyDto created = companyService.createCompany(request);
 
         return ResponseEntity.ok(ApiResponse.success(created, "Company created successfully"));
+    }
+
+    /**
+     * Orchestration endpoint: Create company with contact and address in single transaction.
+     * 
+     * <p>This endpoint creates company, contact (email/phone), and address in one atomic operation.
+     * If any step fails, entire transaction rolls back.</p>
+     * 
+     * <p>Use this endpoint when you want to create company with communication information in one request.</p>
+     * 
+     * <p>Example request:
+     * <pre>
+     * {
+     *   "companyName": "ACME Corp",
+     *   "taxId": "1234567890",
+     *   "companyType": "MANUFACTURER",
+     *   "email": "info@acme.com",
+     *   "phoneNumber": "+905551234567",
+     *   "address": "Ataturk Cad. No:1",
+     *   "city": "Istanbul",
+     *   "country": "Turkey"
+     * }
+     * </pre>
+     */
+    @PostMapping("/with-contact")
+    public ResponseEntity<ApiResponse<CompanyDto>> createCompanyWithContact(
+            @Valid @RequestBody CreateCompanyWithContactRequest request) {
+        log.info("Creating company with contact/address: {}", request.getCompanyName());
+
+        CompanyDto created = companyService.createCompanyWithContact(request);
+
+        return ResponseEntity.ok(ApiResponse.success(created, 
+            "Company with contact and address created successfully"));
     }
 
     @GetMapping("/{id}")

@@ -140,5 +140,39 @@ public class Company extends BaseEntity {
     protected String getModuleCode() {
         return "COMP";
     }
+
+    /**
+     * Override UID generation for Company - Company UID = Tenant UID for root tenants.
+     * 
+     * <p><b>CRITICAL:</b> For root tenant companies (tenant_id = company_id),
+     * Company UID should equal Tenant UID (e.g., "ACME-001").
+     * 
+     * <p><b>Special Case:</b> Root tenant companies use company name-based UID generation.
+     * This is typically handled in TenantOnboardingService during tenant creation.
+     * 
+     * <p><b>Default Behavior:</b> If UID is not pre-set (via setUid() in service layer),
+     * falls back to standard BaseEntity pattern: {TENANT_UID}-COMP-{UUID_SUFFIX}
+     * 
+     * <p>This allows:
+     * <ul>
+     *   <li>Root tenant companies: Custom UID from company name (set via service)</li>
+     *   <li>Sub-companies: Standard pattern with COMP module code</li>
+     * </ul>
+     */
+    @Override
+    protected String generateUid() {
+        // ⚠️ CRITICAL: For root tenant companies, UID should be set BEFORE save
+        // (typically in TenantOnboardingService.createTenantCompany()).
+        // If not set, this method will be called by BaseEntity.onCreate().
+        
+        // For root tenants (tenant_id = id), we want format: {TENANT_UID}
+        // But we don't have company name here during entity creation.
+        // So we fall back to standard pattern for now.
+        // The service layer (TenantOnboardingService) should set UID explicitly.
+        
+        // Fallback: Use standard pattern
+        // This will be overridden by explicit setUid() call in service layer
+        return super.generateUid();
+    }
 }
 

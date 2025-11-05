@@ -29,10 +29,6 @@ public class FiberDto {
     private UUID fiberIsoCodeId;
     private String fiberName;
     private String fiberGrade;
-    private Double fineness;
-    private Double lengthMm;
-    private Double strengthCndTex;
-    private Double elongationPercent;
     private FiberStatus status;
     private String remarks;
     private Boolean isActive;
@@ -57,11 +53,8 @@ public class FiberDto {
             .fiberIsoCodeId(entity.getFiberIsoCodeId())
             .fiberName(entity.getFiberName())
             .fiberGrade(entity.getFiberGrade())
-            .fineness(entity.getFineness())
-            .lengthMm(entity.getLengthMm())
-            .strengthCndTex(entity.getStrengthCndTex())
-            .elongationPercent(entity.getElongationPercent())
             .status(entity.getStatus())
+            .composition(entity.getComposition())
             .remarks(entity.getRemarks())
             .isActive(entity.getIsActive())
             .createdAt(entity.getCreatedAt())

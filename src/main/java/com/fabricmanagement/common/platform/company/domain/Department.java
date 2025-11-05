@@ -63,6 +63,10 @@ public class Department extends BaseEntity {
     @Builder.Default
     private List<UserDepartment> userDepartments = new ArrayList<>();
 
+    @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, orphanRemoval = false)
+    @Builder.Default
+    private List<Position> positions = new ArrayList<>();
+
     public static Department create(UUID companyId, String departmentName, String description) {
         return Department.builder()
             .companyId(companyId)

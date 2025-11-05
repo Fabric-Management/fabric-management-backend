@@ -8,6 +8,7 @@ import com.fabricmanagement.common.platform.user.dto.RoleDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +24,13 @@ public class RoleController {
 
     private final RoleService roleService;
 
+    /**
+     * Get all roles for current tenant.
+     * 
+     * <p><b>Cached:</b> 5 minutes (tenant-scoped cache key)</p>
+     */
     @GetMapping
+    @Cacheable(value = "roles", key = "T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).getCurrentTenantId()")
     public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRoles() {
         log.debug("Getting all roles");
 

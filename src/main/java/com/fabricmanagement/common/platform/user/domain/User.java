@@ -58,7 +58,7 @@ public class User extends BaseEntity {
     private String displayName;
 
     @Column(name = "company_id", nullable = false)
-    private UUID companyId;
+    private UUID companyId;  // Required for all users - platform admin belongs to Platform System Company
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id")
@@ -75,6 +75,10 @@ public class User extends BaseEntity {
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @Builder.Default
     private List<com.fabricmanagement.common.platform.communication.domain.UserAddress> userAddresses = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<UserPosition> userPositions = new ArrayList<>();
 
     @Column(name = "last_active_at")
     private Instant lastActiveAt;

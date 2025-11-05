@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 public class FiberValidationService {
 
     private final FiberRepository fiberRepository;
-    private final FiberCompositionService compositionService;
 
     // =====================================================
     // VALIDATION RULES FOR BLENDED FIBERS
@@ -130,7 +129,8 @@ public class FiberValidationService {
             }
             
             // Check if base fiber itself has a composition (it's also a blend)
-            boolean isBlend = compositionService.getComposition(baseFiberId).size() > 0;
+            Fiber baseFiberEntity = fiberRepository.findById(baseFiberId).orElse(null);
+            boolean isBlend = baseFiberEntity != null && baseFiberEntity.isBlended();
             
             if (isBlend) {
                 throw new IllegalArgumentException(

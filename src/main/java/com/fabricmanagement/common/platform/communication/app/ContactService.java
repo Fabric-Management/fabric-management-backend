@@ -123,6 +123,18 @@ public class ContactService {
     }
 
     @Transactional
+    public Contact updateContact(Contact contact) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Updating contact: tenantId={}, contactId={}", tenantId, contact.getId());
+
+        if (!contact.getTenantId().equals(tenantId)) {
+            throw new IllegalArgumentException("Contact does not belong to current tenant");
+        }
+
+        return contactRepository.save(contact);
+    }
+
+    @Transactional
     public Contact setAsPrimary(UUID contactId) {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.info("Setting contact as primary: tenantId={}, contactId={}", tenantId, contactId);

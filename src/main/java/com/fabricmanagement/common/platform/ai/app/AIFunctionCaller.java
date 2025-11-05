@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade;
 import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade.StockInfo;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -50,9 +52,27 @@ public class AIFunctionCaller {
     private final InventoryFacade inventoryFacade;
     private final com.fabricmanagement.logistics.inventory.app.MaterialMatcher materialMatcher;
     private final FiberCategoryRepository fiberCategoryRepository;
+    
+    /**
+     * Function call result cache - reduces redundant database queries and token costs.
+     * 
+     * <p><b>Cache Key:</b> functionName:tenantId:normalizedParams</p>
+     * <p><b>TTL:</b> 60 seconds (short TTL for data freshness)</p>
+     * <p><b>Purpose:</b> Prevent same function call from executing multiple times in same conversation</p>
+     */
+    private final Map<String, CacheEntry> functionResultCache = new ConcurrentHashMap<>();
+    
+    private record CacheEntry(String result, long expiresAt) {
+        boolean isExpired() {
+            return System.currentTimeMillis() > expiresAt;
+        }
+    }
 
     /**
-     * Execute function call from AI.
+     * Execute function call from AI with result caching.
+     *
+     * <p><b>Performance:</b> Caches function results for 60 seconds to prevent redundant
+     * database queries and reduce token costs.</p>
      *
      * @param functionName function name (e.g., "check_material_stock")
      * @param parameters function parameters
@@ -60,10 +80,19 @@ public class AIFunctionCaller {
      */
     public String executeFunction(String functionName, Map<String, Object> parameters) {
         UUID tenantId = TenantContext.getCurrentTenantId();
+        
+        // ✅ Performance: Check cache first (prevents redundant DB queries)
+        String cacheKey = buildFunctionCacheKey(functionName, tenantId, parameters);
+        CacheEntry cached = functionResultCache.get(cacheKey);
+        if (cached != null && !cached.isExpired()) {
+            log.debug("Function call cache HIT: functionName={}, tenantId={}", functionName, tenantId);
+            return cached.result();
+        }
+        
         log.info("Executing AI function: functionName={}, parameters={}, tenantId={}", 
             functionName, parameters, tenantId);
 
-        return switch (functionName) {
+        String result = switch (functionName) {
             case "check_material_stock" -> checkMaterialStock(tenantId, parameters);
             case "search_materials" -> searchMaterials(tenantId, parameters);
             case "smart_search" -> smartSearch(tenantId, parameters);
@@ -75,6 +104,45 @@ public class AIFunctionCaller {
             case "create_fiber" -> createFiber(tenantId, parameters);
             default -> "Unknown function: " + functionName;
         };
+        
+        // ✅ Performance: Cache result (60 seconds TTL)
+        // Note: create_* functions are NOT cached (they modify state)
+        if (!functionName.startsWith("create_")) {
+            long expiresAt = System.currentTimeMillis() + 60_000; // 60 seconds
+            functionResultCache.put(cacheKey, new CacheEntry(result, expiresAt));
+            log.debug("Function call result cached: functionName={}, cacheKey={}", functionName, cacheKey);
+        }
+        
+        // Cleanup expired entries (simple cleanup)
+        if (functionResultCache.size() % 20 == 0) {
+            functionResultCache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Build cache key for function call result.
+     * 
+     * <p>Format: functionName:tenantId:normalizedParams</p>
+     */
+    private String buildFunctionCacheKey(String functionName, UUID tenantId, Map<String, Object> parameters) {
+        // Normalize parameters for cache key (sort keys, normalize values)
+        String normalizedParams = parameters.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(e -> e.getKey() + "=" + normalizeParameterValue(e.getValue()))
+            .collect(java.util.stream.Collectors.joining("&"));
+        
+        return String.format("%s:%s:%s", functionName, tenantId, normalizedParams);
+    }
+    
+    /**
+     * Normalize parameter value for cache key (lowercase, trim).
+     */
+    private String normalizeParameterValue(Object value) {
+        if (value == null) return "null";
+        String str = value.toString().toLowerCase().trim();
+        return str.length() > 100 ? str.substring(0, 100) : str; // Limit length
     }
 
     /**
@@ -207,48 +275,57 @@ public class AIFunctionCaller {
         
         boolean found = false;
         
+        // Improved matching: remove suffixes and try multiple strategies
+        String lowerQuery = query.toLowerCase();
+        String lowerNormalized = normalizedQuery.toLowerCase();
+        
+        // Clean query: remove common suffixes
+        String cleanedQuery = lowerQuery
+            .replace("elyaf", "")
+            .replace("elyafı", "")
+            .replace("fiber", "")
+            .replace("materyal", "")
+            .replace("materyali", "")
+            .replace("yun", "")
+            .replace("yün", "")
+            .replace("var mı", "")
+            .replace("var mi", "")
+            .trim();
+        String cleanedNormalized = lowerNormalized
+            .replace("fiber", "")
+            .replace("material", "")
+            .trim();
+        
         // Search based on detected type
         switch (entityType) {
             case FIBER -> {
-                // ✅ Performance: Limit fiber loading to prevent memory overflow in AI searches
-                // Get current tenant fibers (limited to AI_SEARCH_LIMIT)
-                List<FiberDto> tenantFibers = fiberFacade.findAll().stream()
-                    .limit(AI_SEARCH_LIMIT)
+                // ✅ Performance: Use filtered query instead of findAll (reduces DB load + token usage)
+                // Only load fibers matching the query, not all 75+ fibers
+                String searchQuery = cleanedQuery.isBlank() ? normalizedQuery : cleanedQuery;
+                if (searchQuery.isBlank()) {
+                    searchQuery = query; // Fallback to original query
+                }
+                
+                // Tenant fibers (filtered, max 50)
+                List<FiberDto> tenantFibers = fiberRepository
+                    .findByTenantIdAndFiberNameContainingIgnoreCase(tenantId, searchQuery)
+                    .stream()
+                    .limit(50)
+                    .map(FiberDto::from)
                     .toList();
                 
-                // Also search system tenant fibers (shared/global fibers available to all tenants)
-                // Limit system fibers as well to prevent excessive memory usage
+                // System tenant fibers (filtered, max 25)
                 UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-                List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
+                List<FiberDto> systemFibers = fiberRepository
+                    .findByTenantIdAndFiberNameContainingIgnoreCase(systemTenantId, searchQuery)
                     .stream()
-                    .limit(AI_SEARCH_LIMIT / 2) // System fibers get half the limit
+                    .limit(25)
                     .map(FiberDto::from)
                     .toList();
                 
                 // Combine both lists
                 List<FiberDto> allFibers = new java.util.ArrayList<>(tenantFibers);
                 allFibers.addAll(systemFibers);
-                
-                // Improved matching: remove suffixes and try multiple strategies
-                String lowerQuery = query.toLowerCase();
-                String lowerNormalized = normalizedQuery.toLowerCase();
-                
-                // Clean query: remove common suffixes
-                String cleanedQuery = lowerQuery
-                    .replace("elyaf", "")
-                    .replace("elyafı", "")
-                    .replace("fiber", "")
-                    .replace("materyal", "")
-                    .replace("materyali", "")
-                    .replace("yun", "")
-                    .replace("yün", "")
-                    .replace("var mı", "")
-                    .replace("var mi", "")
-                    .trim();
-                String cleanedNormalized = lowerNormalized
-                    .replace("fiber", "")
-                    .replace("material", "")
-                    .trim();
                 
                 // Debug log for troubleshooting
                 log.debug("FIBER search - query: '{}', normalized: '{}', cleaned: '{}', cleanedNormalized: '{}', totalFibers: {}", 
@@ -278,13 +355,15 @@ public class AIFunctionCaller {
                 
                 if (!matching.isEmpty()) {
                     found = true;
-                    result.append("✅ Fiber Bulundu:\n");
-                    for (FiberDto f : matching.size() > 5 ? matching.subList(0, 5) : matching) {
-                        result.append(String.format("- %s (UID: %s, Status: %s)\n", 
-                            f.getFiberName(), f.getUid(), f.getStatus()));
+                    // ✅ Performance: Limit to top 5 results to reduce token usage
+                    int limit = Math.min(5, matching.size());
+                    result.append(String.format("✅ %d fiber bulundu:\n", matching.size()));
+                    for (int i = 0; i < limit; i++) {
+                        FiberDto f = matching.get(i);
+                        result.append(String.format("- %s (%s)\n", f.getFiberName(), f.getUid()));
                     }
-                    if (matching.size() > 5) {
-                        result.append(String.format("\n(%d fiber bulundu, ilk 5 gösteriliyor)\n", matching.size()));
+                    if (matching.size() > limit) {
+                        result.append(String.format("(Top %d gösteriliyor, %d toplam)\n", limit, matching.size()));
                     }
                 }
             }
@@ -303,13 +382,15 @@ public class AIFunctionCaller {
                 
                 if (!matching.isEmpty()) {
                     found = true;
-                    result.append("✅ İplik (YARN) Bulundu:\n");
-                    for (MaterialDto m : matching.size() > 5 ? matching.subList(0, 5) : matching) {
-                        result.append(String.format("- %s (Type: %s, UID: %s)\n", 
-                            m.getUid(), m.getMaterialType(), m.getUid()));
+                    // ✅ Performance: Limit to top 5 results
+                    int limit = Math.min(5, matching.size());
+                    result.append(String.format("✅ %d iplik bulundu:\n", matching.size()));
+                    for (int i = 0; i < limit; i++) {
+                        MaterialDto m = matching.get(i);
+                        result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
                     }
-                    if (matching.size() > 5) {
-                        result.append(String.format("\n(%d iplik bulundu, ilk 5 gösteriliyor)\n", matching.size()));
+                    if (matching.size() > limit) {
+                        result.append(String.format("(Top %d gösteriliyor)\n", limit));
                     }
                 }
             }
@@ -328,13 +409,15 @@ public class AIFunctionCaller {
                 
                 if (!matching.isEmpty()) {
                     found = true;
-                    result.append("✅ Kumaş (FABRIC) Bulundu:\n");
-                    for (MaterialDto m : matching.size() > 5 ? matching.subList(0, 5) : matching) {
-                        result.append(String.format("- %s (Type: %s, UID: %s)\n", 
-                            m.getUid(), m.getMaterialType(), m.getUid()));
+                    // ✅ Performance: Limit to top 5 results
+                    int limit = Math.min(5, matching.size());
+                    result.append(String.format("✅ %d kumaş bulundu:\n", matching.size()));
+                    for (int i = 0; i < limit; i++) {
+                        MaterialDto m = matching.get(i);
+                        result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
                     }
-                    if (matching.size() > 5) {
-                        result.append(String.format("\n(%d kumaş bulundu, ilk 5 gösteriliyor)\n", matching.size()));
+                    if (matching.size() > limit) {
+                        result.append(String.format("(Top %d gösteriliyor)\n", limit));
                     }
                 }
             }
@@ -342,40 +425,32 @@ public class AIFunctionCaller {
                 // Try all entity types
                 result.append("⚠️ Tip belirsiz, tüm entity tiplerinde aranıyor...\n\n");
                 
-                // ✅ Performance: Limit fiber loading to prevent memory overflow
-                // Try FIBER (including system tenant)
-                List<FiberDto> tenantFibers = fiberFacade.findAll().stream()
-                    .limit(AI_SEARCH_LIMIT)
-                    .toList();
-                UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-                List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
+                // ✅ Performance: Use filtered query instead of findAll
+                String searchQuery = cleanedQuery.isBlank() ? normalizedQuery : cleanedQuery;
+                if (searchQuery.isBlank()) {
+                    searchQuery = query;
+                }
+                
+                // Try FIBER (filtered, max 50)
+                List<FiberDto> tenantFibers = fiberRepository
+                    .findByTenantIdAndFiberNameContainingIgnoreCase(tenantId, searchQuery)
                     .stream()
-                    .limit(AI_SEARCH_LIMIT / 2)
+                    .limit(50)
+                    .map(FiberDto::from)
+                    .toList();
+                
+                // System tenant fibers (filtered, max 25)
+                UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+                List<FiberDto> systemFibers = fiberRepository
+                    .findByTenantIdAndFiberNameContainingIgnoreCase(systemTenantId, searchQuery)
+                    .stream()
+                    .limit(25)
                     .map(FiberDto::from)
                     .toList();
                 List<FiberDto> allFibers = new java.util.ArrayList<>(tenantFibers);
                 allFibers.addAll(systemFibers);
                 
-                // Improved matching for UNKNOWN type
-                String lowerQuery = query.toLowerCase();
-                String lowerNormalized = normalizedQuery.toLowerCase();
-                
-                // Clean query: remove common suffixes and question words
-                String cleanedQuery = lowerQuery
-                    .replace("elyaf", "")
-                    .replace("elyafı", "")
-                    .replace("fiber", "")
-                    .replace("materyal", "")
-                    .replace("materyali", "")
-                    .replace("yun", "")
-                    .replace("yün", "")
-                    .replace("var mı", "")
-                    .replace("var mi", "")
-                    .trim();
-                String cleanedNormalized = lowerNormalized
-                    .replace("fiber", "")
-                    .replace("material", "")
-                    .trim();
+                // Use already-defined variables (lowerQuery, lowerNormalized, cleanedQuery, cleanedNormalized)
                 
                 List<FiberDto> matchingFibers = allFibers.stream()
                     .filter(f -> {
@@ -511,13 +586,84 @@ public class AIFunctionCaller {
 
         // Turkish-to-English translation for material/fiber names
         String normalizedQuery = normalizeFiberQuery(query);
+        String lowerQuery = query.toLowerCase();
+        String lowerNormalized = normalizedQuery.toLowerCase();
 
+        // ⚠️ CRITICAL FIX: Search in both Material UID AND related Fiber fiberName
+        // Problem: Material UID (e.g., "SYS-FIB-000068") doesn't contain "cotton"
+        // Solution: For Material type=FIBER, also search in Fiber.fiberName (e.g., "Cotton (100%)")
+        
+        // ✅ Performance: Batch load all FIBER-type materials' fibers in one SQL query
+        // Problem: Material UID'de "cotton" yok, Fiber fiberName'de var
+        // Solution: Material type=FIBER ise, ilişkili Fiber'ın fiberName'inde de ara
+        
+        List<MaterialDto> fiberMaterials = materials.stream()
+            .filter(m -> m.getMaterialType() == MaterialType.FIBER)
+            .collect(Collectors.toList());
+        
+        // ✅ Performance: Batch SQL query (NOT Java filtering)
+        // Flow: Repository method → SQL query → Database → Java filtering
+        // SQL: SELECT * FROM prod_fiber WHERE material_id IN (?, ?, ...)
+        // This is ONE database query, not N queries
+        Map<UUID, FiberDto> materialIdToFiber = new HashMap<>();
+        if (!fiberMaterials.isEmpty()) {
+            List<UUID> materialIds = fiberMaterials.stream()
+                .map(MaterialDto::getId)
+                .collect(Collectors.toList());
+            
+            // ✅ Step 1: SQL Query → Database (batch load current tenant)
+            // Repository method → SQL: SELECT f.* FROM prod_fiber f WHERE f.material_id IN (?, ?, ...)
+            // Database returns: List<Fiber> entities
+            List<Fiber> tenantFibers = fiberRepository.findByMaterialIdIn(materialIds);
+            
+            // ✅ Step 2: Also load system tenant fibers (shared/global fibers)
+            // System tenant fibers are available to all tenants
+            UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+            List<Fiber> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
+                .stream()
+                .filter(f -> f.getMaterial() != null && materialIds.contains(f.getMaterial().getId()))
+                .collect(Collectors.toList());
+            
+            // ✅ Step 3: Java processing (convert to DTO, build map)
+            // Combine tenant + system fibers, convert to DTO, build map
+            // This is in-memory processing, no additional DB queries
+            tenantFibers.stream()
+                .map(FiberDto::from)
+                .forEach(f -> materialIdToFiber.put(f.getMaterialId(), f));
+            
+            systemFibers.stream()
+                .map(FiberDto::from)
+                .forEach(f -> materialIdToFiber.put(f.getMaterialId(), f));
+            
+            log.debug("Loaded {} fibers for {} FIBER-type materials (tenant: {}, system: {})", 
+                materialIdToFiber.size(), materialIds.size(), tenantFibers.size(), systemFibers.size());
+        }
+        
+        // Now filter materials with both UID and Fiber fiberName search
         List<MaterialDto> matching = materials.stream()
             .filter(m -> {
                 if (m.getUid() == null) return false;
+                
+                // Search in Material UID
                 String uid = m.getUid().toLowerCase();
-                String searchTerm = normalizedQuery.toLowerCase();
-                return uid.contains(searchTerm) || uid.contains(query.toLowerCase());
+                boolean matchesUid = uid.contains(lowerNormalized) || uid.contains(lowerQuery);
+                
+                // If Material type=FIBER, also search in related Fiber fiberName
+                if (m.getMaterialType() == MaterialType.FIBER) {
+                    FiberDto fiber = materialIdToFiber.get(m.getId());
+                    if (fiber != null && fiber.getFiberName() != null) {
+                        String fiberName = fiber.getFiberName().toLowerCase();
+                        boolean matchesFiberName = fiberName.contains(lowerNormalized) || 
+                                                 fiberName.contains(lowerQuery);
+                        if (matchesFiberName) {
+                            log.debug("✅ Material match via Fiber: Material UID={}, Fiber Name={}, Query={}", 
+                                m.getUid(), fiber.getFiberName(), query);
+                            return true;
+                        }
+                    }
+                }
+                
+                return matchesUid;
             })
             .collect(Collectors.toList());
 
@@ -670,22 +816,6 @@ public class AIFunctionCaller {
         info.append(String.format("Durum: %s\n", f.getStatus() != null ? f.getStatus() : "N/A"));
         info.append(String.format("Grade: %s\n", f.getFiberGrade() != null ? f.getFiberGrade() : "N/A"));
         
-        if (f.getFineness() != null || f.getLengthMm() != null || 
-            f.getStrengthCndTex() != null || f.getElongationPercent() != null) {
-            info.append("\nTeknik Özellikler:\n");
-            if (f.getFineness() != null) {
-                info.append(String.format("  - İncelik: %.2f\n", f.getFineness()));
-            }
-            if (f.getLengthMm() != null) {
-                info.append(String.format("  - Uzunluk: %.2f mm\n", f.getLengthMm()));
-            }
-            if (f.getStrengthCndTex() != null) {
-                info.append(String.format("  - Dayanıklılık: %.2f cN/dtex\n", f.getStrengthCndTex()));
-            }
-            if (f.getElongationPercent() != null) {
-                info.append(String.format("  - Uzama: %.2f%%\n", f.getElongationPercent()));
-            }
-        }
 
         if (f.getComposition() != null && !f.getComposition().isEmpty()) {
             info.append("\nBileşim (Blended Fiber):\n");
@@ -711,111 +841,81 @@ public class AIFunctionCaller {
     private String searchFibers(UUID tenantId, Map<String, Object> parameters) {
         String query = (String) parameters.getOrDefault("query", "");
         
-        // ✅ Performance: Limit fiber loading to prevent memory overflow in AI searches
-        // Get current tenant fibers (limited to AI_SEARCH_LIMIT)
-        List<FiberDto> tenantFibers = fiberFacade.findAll().stream()
-            .limit(AI_SEARCH_LIMIT)
-            .toList();
-        
-        // Also include system tenant fibers (shared/global)
-        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-        List<FiberDto> systemFibers = fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId)
-            .stream()
-            .limit(AI_SEARCH_LIMIT / 2) // System fibers get half the limit
-            .map(FiberDto::from)
-            .toList();
-        
-        // Combine both
-        List<FiberDto> fibers = new java.util.ArrayList<>(tenantFibers);
-        fibers.addAll(systemFibers);
-        
         if (query.isBlank()) {
-            return String.format("Toplam fiber sayısı: %d", fibers.size());
+            long count = fiberFacade.findAll().size();
+            return String.format("Toplam fiber sayısı: %d", count);
         }
 
-        // Turkish-to-English translation for fiber names
+        // Turkish-to-English translation
         String normalizedQuery = normalizeFiberQuery(query);
-
-        // Improved matching: remove suffixes and try multiple strategies
         String lowerQuery = query.toLowerCase();
         String lowerNormalized = normalizedQuery.toLowerCase();
         
-        // Clean query: remove common suffixes and question words
+        // Clean query
         String cleanedQuery = lowerQuery
             .replace("elyaf", "")
-            .replace("elyafı", "")
             .replace("fiber", "")
             .replace("materyal", "")
-            .replace("materyali", "")
-            .replace("yun", "")
-            .replace("yün", "")
-            .replace("var mı", "")
-            .replace("var mi", "")
-            .trim();
-        String cleanedNormalized = lowerNormalized
-            .replace("fiber", "")
-            .replace("material", "")
             .trim();
         
-        log.debug("searchFibers - query: '{}', normalized: '{}', cleaned: '{}', cleanedNormalized: '{}'", 
-            query, normalizedQuery, cleanedQuery, cleanedNormalized);
+        // ✅ Performance: Use filtered query instead of findAll
+        String searchQuery = cleanedQuery.isBlank() ? normalizedQuery : cleanedQuery;
+        if (searchQuery.isBlank()) {
+            searchQuery = query;
+        }
         
-        List<FiberDto> matching = fibers.stream()
+        // Tenant fibers (filtered, max 50)
+        List<FiberDto> tenantFibers = fiberRepository
+            .findByTenantIdAndFiberNameContainingIgnoreCase(tenantId, searchQuery)
+            .stream()
+            .limit(50)
+            .map(FiberDto::from)
+            .toList();
+        
+        // System tenant fibers (filtered, max 25)
+        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+        List<FiberDto> systemFibers = fiberRepository
+            .findByTenantIdAndFiberNameContainingIgnoreCase(systemTenantId, searchQuery)
+            .stream()
+            .limit(25)
+            .map(FiberDto::from)
+            .toList();
+        
+        // Combine and filter
+        List<FiberDto> allFibers = new java.util.ArrayList<>(tenantFibers);
+        allFibers.addAll(systemFibers);
+        
+        List<FiberDto> matching = allFibers.stream()
             .filter(f -> {
                 if (f.getFiberName() == null) return false;
                 String fiberName = f.getFiberName().toLowerCase();
-                
-                // Multiple matching strategies for better results
-                boolean matches = fiberName.contains(lowerQuery) || 
+                return fiberName.contains(lowerQuery) || 
                        fiberName.contains(lowerNormalized) ||
-                       fiberName.contains(cleanedQuery) ||
-                       fiberName.contains(cleanedNormalized) ||
-                       fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedQuery) + "\\b.*") ||
-                       fiberName.matches(".*\\b" + java.util.regex.Pattern.quote(cleanedNormalized) + "\\b.*");
-                
-                if (matches) {
-                    log.debug("✅ Matched fiber: '{}' with query '{}'", fiberName, query);
-                }
-                
-                return matches;
+                       fiberName.contains(cleanedQuery);
             })
             .toList();
 
         if (matching.isEmpty()) {
-            // Try to suggest if it's a translation issue
             if (!normalizedQuery.equalsIgnoreCase(query)) {
-                return String.format("'%s' (veya '%s') için fiber bulunamadı. Lütfen fiber adını kontrol edin veya 'search_fibers' fonksiyonunu kullanın.", 
-                    query, normalizedQuery);
+                return String.format("'%s' (veya '%s') için fiber bulunamadı.", query, normalizedQuery);
             }
-            return String.format("'%s' için fiber bulunamadı. Material aramak için 'search_materials' kullanın.", query);
+            return String.format("'%s' için fiber bulunamadı.", query);
         }
 
-        // Summarize if too many results (reduce token usage)
-        // Aggressive summarization: limit to 5 results to save tokens
-        if (matching.size() > 5) {
-            return String.format(
-                "%d fiber bulundu, ilk 5 tanesi:\n\n%s\n\n(Devamı için daha spesifik bir arama yapın.)",
-                matching.size(),
-                formatFiberList(matching.subList(0, 5))
-            );
-        }
-
-        return String.format("%d fiber bulundu:\n\n%s", matching.size(), formatFiberList(matching));
-    }
-
-    /**
-     * Format fiber list (reusable, reduces duplication).
-     */
-    private String formatFiberList(List<FiberDto> fibers) {
+        // ✅ Performance: Limit to top 5 results
+        int limit = Math.min(5, matching.size());
         StringBuilder result = new StringBuilder();
-        for (FiberDto f : fibers) {
-            result.append(String.format("- %s (%s, %s)\n", 
-                f.getFiberName(), 
-                f.getStatus() != null ? f.getStatus() : "N/A",
-                f.getUid()));
+        result.append(String.format("✅ %d fiber bulundu:\n", matching.size()));
+        for (int i = 0; i < limit; i++) {
+            FiberDto f = matching.get(i);
+            result.append(String.format("- %s (%s)\n", f.getFiberName(), f.getUid()));
+        }
+        if (matching.size() > limit) {
+            result.append(String.format("(Top %d gösteriliyor)\n", limit));
         }
         return result.toString();
     }
+
 
     /**
      * List all active fiber categories.
@@ -899,7 +999,7 @@ public class AIFunctionCaller {
      * <p><b>USER-FRIENDLY:</b> Material can be auto-created if materialId is not provided.</p>
      * 
      * <p>Required: fiberCategoryId (UUID), fiberName, unit (if materialId is null)</p>
-     * <p>Optional: materialId (if provided, existing Material will be used), fiberGrade, fineness, lengthMm, strengthCndTex, elongationPercent, remarks</p>
+     * <p>Optional: materialId (if provided, existing Material will be used), fiberGrade, composition (for blended fibers), remarks</p>
      */
     private String createFiber(UUID tenantId, Map<String, Object> parameters) {
         try {
@@ -952,19 +1052,11 @@ public class AIFunctionCaller {
                 ? UUID.fromString(parameters.get("fiberIsoCodeId").toString())
                 : null;
             String fiberGrade = (String) parameters.get("fiberGrade");
-            Double fineness = parameters.get("fineness") != null 
-                ? Double.parseDouble(parameters.get("fineness").toString())
-                : null;
-            Double lengthMm = parameters.get("lengthMm") != null 
-                ? Double.parseDouble(parameters.get("lengthMm").toString())
-                : null;
-            Double strengthCndTex = parameters.get("strengthCndTex") != null 
-                ? Double.parseDouble(parameters.get("strengthCndTex").toString())
-                : null;
-            Double elongationPercent = parameters.get("elongationPercent") != null 
-                ? Double.parseDouble(parameters.get("elongationPercent").toString())
-                : null;
             String remarks = (String) parameters.get("remarks");
+            
+            // Composition for blended fibers (optional)
+            Map<UUID, BigDecimal> composition = null;
+            // Note: Composition parsing would need custom logic if provided via AI
 
             CreateFiberRequest request = CreateFiberRequest.builder()
                 .materialId(materialId)  // Optional - if null, Material will be auto-created
@@ -973,10 +1065,7 @@ public class AIFunctionCaller {
                 .fiberIsoCodeId(fiberIsoCodeId)
                 .fiberName(fiberName)
                 .fiberGrade(fiberGrade)
-                .fineness(fineness)
-                .lengthMm(lengthMm)
-                .strengthCndTex(strengthCndTex)
-                .elongationPercent(elongationPercent)
+                .composition(composition)
                 .remarks(remarks)
                 .build();
 
@@ -1003,7 +1092,20 @@ public class AIFunctionCaller {
 
     /**
      * Normalize fiber query by translating Turkish fiber names to English.
-     * This helps users search with Turkish names (e.g., "pamuk") and find English-named fibers (e.g., "Cotton").
+     * 
+     * <p><b>Purpose:</b> AI searches often use Turkish fiber names (e.g., "pamuk", "viskoz"),
+     * but database stores English names (e.g., "cotton", "viscose"). This method translates
+     * Turkish queries to English for better matching.</p>
+     * 
+     * <p><b>Examples:</b>
+     * <ul>
+     *   <li>"pamuk" → "cotton"</li>
+     *   <li>"viskoz" → "viscose"</li>
+     *   <li>"polyester pamuk karışımı" → "polyester cotton karışımı"</li>
+     * </ul>
+     * 
+     * @param query Original query (may contain Turkish fiber names)
+     * @return Normalized query (Turkish names replaced with English)
      */
     private String normalizeFiberQuery(String query) {
         if (query == null || query.isBlank()) {
@@ -1015,39 +1117,64 @@ public class AIFunctionCaller {
         // Turkish-to-English fiber name mapping
         // Using HashMap to avoid Map.of() 10-pair limit
         Map<String, String> translations = new HashMap<>();
+        
+        // Natural fibers
         translations.put("pamuk", "cotton");
+        translations.put("cotton", "cotton");
+        translations.put("yün", "wool");
+        translations.put("wool", "wool");
+        translations.put("keten", "linen");
+        translations.put("linen", "linen");
+        translations.put("ipek", "silk");
+        translations.put("silk", "silk");
+        translations.put("kenevir", "hemp");
+        translations.put("hemp", "hemp");
+        translations.put("bambu", "bamboo");
+        translations.put("bamboo", "bamboo");
+        translations.put("jüt", "jute");
+        translations.put("jute", "jute");
+        
+        // Synthetic fibers
         translations.put("polyester", "polyester");
         translations.put("poliester", "polyester");
-        translations.put("yün", "wool");
         translations.put("naylon", "nylon");
         translations.put("nylon", "nylon");
         translations.put("viscose", "viscose");
         translations.put("viskoz", "viscose");
         translations.put("viskon", "viscose");
+        translations.put("rayon", "rayon");
+        translations.put("modal", "modal");
+        translations.put("lyocell", "lyocell");
+        translations.put("tencel", "lyocell");
         translations.put("elastan", "elastane");
         translations.put("spandeks", "elastane");
         translations.put("elastane", "elastane");
         translations.put("polypropilen", "polypropylene");
         translations.put("polypropylene", "polypropylene");
-        translations.put("keten", "linen");
-        translations.put("linen", "linen");
-        translations.put("ipek", "silk");
-        translations.put("silk", "silk");
+        translations.put("polyetilen", "polyethylene");
+        translations.put("polyethylene", "polyethylene");
         translations.put("akrilik", "acrylic");
         translations.put("acrylic", "acrylic");
+        translations.put("polyamid", "polyamide");
+        translations.put("polyamide", "polyamide");
+        
+        // Generic terms
         translations.put("materyal", "material");
         translations.put("materyali", "material");
+        translations.put("elyaf", "fiber");
+        translations.put("fiber", "fiber");
         
-        // Check for exact matches first
+        // Check for exact matches first (longest match wins)
+        String result = lowerQuery;
         for (Map.Entry<String, String> entry : translations.entrySet()) {
-            if (lowerQuery.contains(entry.getKey())) {
+            if (result.contains(entry.getKey())) {
                 // Replace Turkish word with English, but keep other parts of query
-                return lowerQuery.replace(entry.getKey(), entry.getValue());
+                result = result.replace(entry.getKey(), entry.getValue());
             }
         }
         
-        // If no translation found, return original query
-        return query;
+        // If translation occurred, return normalized; otherwise return original
+        return result.equals(lowerQuery) ? query : result;
     }
 }
 

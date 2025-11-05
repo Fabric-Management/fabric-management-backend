@@ -63,5 +63,11 @@ public interface CompanyRepository extends JpaRepository<Company, UUID> {
     long countByTenantIdAndIsActiveTrue(UUID tenantId);
 
     long countByTenantIdAndCompanyType(UUID tenantId, CompanyType companyType);
+
+    /**
+     * Find company by UID (global lookup, not tenant-scoped).
+     * Used for tenant UID uniqueness checking during tenant onboarding.
+     */
+    Optional<Company> findByUid(String uid);
 }
 

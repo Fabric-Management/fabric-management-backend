@@ -5,6 +5,7 @@ import com.fabricmanagement.common.platform.communication.infra.client.WhatsAppC
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -46,7 +47,10 @@ public class VerificationService {
     private final WhatsAppClient whatsAppClient;
 
     /**
-     * Send verification code with smart channel selection.
+     * Send verification code with smart channel selection (async - doesn't block user response).
+     *
+     * <p><b>Performance:</b> Async execution ensures fast user responses.
+     * Email/SMS sending happens in background thread pool.</p>
      *
      * <p><b>For Phone Numbers:</b></p>
      * <ol>
@@ -65,6 +69,7 @@ public class VerificationService {
      * @param recipient Email or phone number (E.164 format)
      * @param code 6-digit verification code
      */
+    @Async
     public void sendVerificationCode(String recipient, String code) {
         log.info("Sending verification code to: {}", maskRecipient(recipient));
 

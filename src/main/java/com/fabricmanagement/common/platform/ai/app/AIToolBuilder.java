@@ -152,22 +152,6 @@ public class AIToolBuilder {
                             "type", "string",
                             "description", "Fiber grade (optional)"
                         ),
-                        "fineness", Map.of(
-                            "type", "number",
-                            "description", "Fineness value (optional)"
-                        ),
-                        "lengthMm", Map.of(
-                            "type", "number",
-                            "description", "Length in millimeters (optional)"
-                        ),
-                        "strengthCndTex", Map.of(
-                            "type", "number",
-                            "description", "Strength in cN/dtex (optional)"
-                        ),
-                        "elongationPercent", Map.of(
-                            "type", "number",
-                            "description", "Elongation percentage (optional)"
-                        ),
                         "remarks", Map.of(
                             "type", "string",
                             "description", "Additional remarks (optional)"
