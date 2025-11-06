@@ -8,6 +8,7 @@ import com.fabricmanagement.common.platform.communication.dto.AddressValidationR
 import com.fabricmanagement.common.platform.communication.dto.AutocompleteResponse;
 import com.fabricmanagement.common.platform.communication.dto.ValidateAddressRequest;
 import com.fabricmanagement.common.platform.communication.infra.client.GoogleMapsClient;
+import com.fabricmanagement.common.platform.communication.util.PostcodeValidator;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
