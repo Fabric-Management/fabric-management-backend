@@ -1,108 +1,109 @@
-# Address Input API Reference
+# Address Validation API Integration Guide
 
-**Last Updated:** 2025-01-XX  
-**Status:** Production-Ready  
-**Backend Endpoints:** `/api/common/addresses/validation/*`
-
----
-
-## Overview
-
-This document describes the backend API for address input using Google Maps Platform. The backend provides real-time address suggestions, validation, and normalization through Google Maps APIs.
-
-**Key Points:**
-
-- All address data comes from **Google Maps Platform** (not cached data)
-- Supports **global** postcode search (not limited to any specific country)
-- Country selection is **optional** (improves accuracy and speed when provided)
-- Uses Google Places Autocomplete API for suggestions
-- Uses Google Geocoding API for postcode search and validation
+**Last Updated:** 2025-01-29 14:30 UTC+3  
+**Purpose:**  
+This document provides a technical guide for frontend developers to correctly integrate with the backend address validation and creation endpoints powered by Google Maps Platform.
 
 ---
 
-## Endpoints
+## 1. Overview
 
-### 1. Postcode Search (Recommended Flow)
+The backend handles address search, validation, and persistence using **Google Maps APIs**.  
+All data returned by these endpoints comes directly from Google (no local caching).
 
-**Endpoint:** `GET /api/common/addresses/validation/search-by-postcode`
+**Key Features:**
+- Global coverage (no country restriction)
+- Postcode or text-based search
+- Google Places and Geocoding integration
+- Validation and persistence combined in single or separate steps
+- Real-time verification with `placeId`
 
-**Purpose:** Search addresses by postcode globally or within a specific country.
-
-**Parameters:**
-
-- `postcode` (required): Postal/ZIP code (e.g., "MK5 7GE", "34200", "34000")
-- `country` (optional): Country code (ISO 3166-1 alpha-2, e.g., "GB", "TR") or country name (e.g., "United Kingdom", "Turkey")
-
-**Request Examples:**
-
-```http
-# Global search (no country filter)
-GET /api/common/addresses/validation/search-by-postcode?postcode=MK5%207GE
-
-# Country-specific search (ISO code)
-GET /api/common/addresses/validation/search-by-postcode?postcode=34000&country=TR
-
-# Country-specific search (country name)
-GET /api/common/addresses/validation/search-by-postcode?postcode=MK5%207GE&country=United%20Kingdom
+**Base URL:**  
+```
+/api/common/addresses/validation
 ```
 
-**Response:**
 
+---
+
+## 2. Available Endpoints
+
+| Endpoint | Method | Description |
+|-----------|--------|-------------|
+| `/search-by-postcode` | `GET` | Searches address list by postcode (and optional country) |
+| `/autocomplete` | `GET` | Returns real-time address suggestions as user types |
+| `/validate` | `POST` | Validates address (without saving to database) |
+| `/validate-and-create` | `POST` | Validates and persists address in a single operation |
+| `/{addressId}/revalidate` | `POST` | Revalidates an existing address and updates with latest Google data |
+
+---
+
+## 3. Integration Flow
+
+### Step 1 — Search by Postcode (Preferred)
+
+**Endpoint:**  
+
+
+GET /api/common/addresses/validation/search-by-postcode
+
+
+**Parameters:**
+- `postcode` (required)
+- `country` (optional — ISO 3166-1 alpha-2 or country name)
+
+**Example Request:**
+
+
+GET /api/common/addresses/validation/search-by-postcode?postcode=MK5%207GE&country=GB
+
+
+**Response:**
 ```json
 {
   "success": true,
   "data": [
     {
+      "verificationStatus": "VERIFIED",
       "placeId": "ChIJ...",
       "formattedAddress": "123 Main Street, London, MK5 7GE, United Kingdom",
       "streetAddress": "123 Main Street",
       "city": "London",
       "state": "England",
-      "district": "Milton Keynes",
+      "district": "Westminster",
       "postalCode": "MK5 7GE",
       "country": "United Kingdom",
       "countryCode": "GB",
       "latitude": 52.0406,
       "longitude": -0.7594,
-      "verificationStatus": "VERIFIED"
+      "errorMessage": null
     }
   ]
 }
-```
 
-**Backend Behavior:**
 
-- If `country` is provided (ISO code): Uses `components=country:XX` and `region=xx` parameters for better accuracy
-- If `country` is provided (country name): Uses country name in query string
-- If `country` is omitted: Searches globally across all countries
+Usage Notes:
 
-**Country Selection Benefits:**
+Use this as the first call to fetch address candidates.
 
-- Faster results (filters to specific country)
-- More accurate (avoids duplicate postcodes across countries)
-- Better performance (fewer results to process)
+Always pass country if known for more accurate results.
 
----
+If the response array is empty, allow fallback to autocomplete.
 
-### 2. Address Autocomplete
+Step 2 — (Optional) Autocomplete Search
 
-**Endpoint:** `GET /api/common/addresses/validation/autocomplete`
+Endpoint:
 
-**Purpose:** Get address suggestions as user types (real-time autocomplete).
+GET /api/common/addresses/validation/autocomplete
 
-**Parameters:**
 
-- `input` (required): Address input text (user's typing)
-- `country` (optional): Country code (ISO 3166-1 alpha-2)
+Parameters:
 
-**Request Example:**
+input (required): free text typed by user
 
-```http
-GET /api/common/addresses/validation/autocomplete?input=Istanbul%20Taksim&country=TR
-```
+country (optional): ISO code (e.g., TR, GB)
 
-**Response:**
-
+**Response Example:**
 ```json
 {
   "success": true,
@@ -119,254 +120,304 @@ GET /api/common/addresses/validation/autocomplete?input=Istanbul%20Taksim&countr
 }
 ```
 
-**Note:** This endpoint uses Google Places Autocomplete API (New) and provides real-time suggestions.
 
----
+Usage Notes:
 
-### 3. Validate Address
+Use autocomplete when postcode search is insufficient (e.g., Turkey).
 
-**Endpoint:** `POST /api/common/addresses/validation/validate`
+Return list items contain placeId, which is required for validation in next steps.
 
-**Purpose:** Validate an address without persisting it to the database.
+Step 3 — Validate Address (Without Saving)
 
-**Request Body:**
+Endpoint:
 
-```json
+POST /api/common/addresses/validation/validate
+
+
+Body:
+
 {
   "placeId": "ChIJ...",
-  "addressType": "HOME"
+  "addressType": "WORK"
 }
-```
 
-**Response:**
 
+**Response Example:**
 ```json
 {
   "success": true,
   "data": {
+    "verificationStatus": "VERIFIED",
     "placeId": "ChIJ...",
     "formattedAddress": "123 Main Street, London, MK5 7GE, United Kingdom",
     "streetAddress": "123 Main Street",
     "city": "London",
     "state": "England",
-    "district": "Milton Keynes",
+    "district": "Westminster",
     "postalCode": "MK5 7GE",
     "country": "United Kingdom",
     "countryCode": "GB",
     "latitude": 52.0406,
     "longitude": -0.7594,
-    "verificationStatus": "VERIFIED"
-  }
+    "errorMessage": null
+  },
+  "message": "Address validated successfully"
 }
 ```
 
----
 
-### 4. Validate and Create Address
+Usage Notes:
 
-**Endpoint:** `POST /api/common/addresses/validation/validate-and-create`
+Use when the user wants to confirm an address before saving it.
 
-**Purpose:** Validate an address and persist it to the database in a single operation.
+Response contains standardized and verified address components.
 
-**Request Body:**
+Step 4 — Validate and Create Address
 
-```json
+Endpoint:
+
+POST /api/common/addresses/validation/validate-and-create
+
+
+Body:
+
 {
   "placeId": "ChIJ...",
   "addressType": "HOME",
   "label": "Home Address"
 }
-```
+
 
 **Response:**
-
 ```json
 {
   "success": true,
   "data": {
     "id": "uuid...",
-    "uid": "TENANT-UID-ADD-00001",
+    "tenantId": "uuid...",
+    "uid": "ADDR-...",
     "streetAddress": "123 Main Street",
     "city": "London",
     "state": "England",
-    "district": "Milton Keynes",
+    "district": "Westminster",
     "postalCode": "MK5 7GE",
     "country": "United Kingdom",
     "countryCode": "GB",
+    "addressType": "HOME",
+    "isPrimary": false,
+    "label": "Home Address",
+    "formattedAddress": "123 Main Street, London, MK5 7GE, United Kingdom",
     "placeId": "ChIJ...",
     "latitude": 52.0406,
     "longitude": -0.7594,
-    "addressType": "HOME",
-    "label": "Home Address"
+    "isActive": true,
+    "createdAt": "2025-01-29T14:30:00Z",
+    "updatedAt": "2025-01-29T14:30:00Z"
   },
   "message": "Address validated and created successfully"
 }
 ```
 
----
+**Note:** `addressType` is returned as enum string: `"HOME"`, `"WORK"`, `"HEADQUARTERS"`, `"BRANCH"`, `"WAREHOUSE"`, `"SHIPPING"`, `"BILLING"`.
 
-### 5. Revalidate Address
 
-**Endpoint:** `POST /api/common/addresses/validation/{addressId}/revalidate`
+Usage Notes:
 
-**Purpose:** Revalidate an existing address by its ID and update with latest data from Google Maps.
+This is the main endpoint for persisting validated addresses.
 
-**Request Example:**
+Use this endpoint when user finalizes address input.
 
-```http
+The backend handles validation via Google Maps before saving.
+
+The returned id must be stored for future revalidation or edits.
+
+Step 5 — Revalidate Existing Address
+
+Endpoint:
+
+POST /api/common/addresses/validation/{addressId}/revalidate
+
+
+Example:
+
 POST /api/common/addresses/validation/123e4567-e89b-12d3-a456-426614174000/revalidate
-```
 
-**Response:**
 
+**Response Example:**
 ```json
 {
   "success": true,
   "data": {
     "id": "uuid...",
+    "tenantId": "uuid...",
+    "uid": "ADDR-...",
     "streetAddress": "123 Main Street",
     "city": "London",
+    "state": "England",
+    "district": "Westminster",
     "postalCode": "MK5 7GE",
     "country": "United Kingdom",
+    "countryCode": "GB",
+    "addressType": "WORK",
+    "isPrimary": false,
+    "label": "Home Address",
+    "formattedAddress": "123 Main Street, London, MK5 7GE, United Kingdom",
     "placeId": "ChIJ...",
     "latitude": 52.0406,
-    "longitude": -0.7594
+    "longitude": -0.7594,
+    "isActive": true,
+    "createdAt": "2025-01-29T14:30:00Z",
+    "updatedAt": "2025-01-29T14:30:00Z"
   },
   "message": "Address revalidated successfully"
 }
 ```
 
----
 
-## Recommended Flow: Postcode-First Approach
+Usage Notes:
 
-**Step 1: User enters postcode (and optionally selects country)**
+Use this endpoint to refresh existing address data from Google.
 
-- Frontend calls: `GET /api/common/addresses/validation/search-by-postcode?postcode={postcode}&country={country}`
-- Backend queries Google Geocoding API with postcode and optional country filter
-- Returns list of addresses matching the postcode
+Recommended during profile or company address update.
 
-**Step 2: User selects an address from the list**
+4. Integration Rules
 
-- Frontend stores the selected `AddressValidationResponse` object (includes `placeId`, `streetAddress`, `city`, `state`, `postalCode`, `country`, `latitude`, `longitude`)
+To ensure correct backend usage:
 
-**Step 3: Frontend auto-fills form fields**
+Always store placeId
+Required for validation and revalidation.
 
-- Frontend uses the selected address data to populate form fields
-- User can edit fields if needed
+Prefer postcode-based flow
+Use autocomplete only when postal data is incomplete.
 
-**Step 4: Submit address**
+Include country if available
+Improves accuracy and performance.
 
-- Frontend calls: `POST /api/common/addresses/validation/validate-and-create`
-- Request body includes `placeId` from selected address
-- Backend validates and creates address entity
+Validate before saving
+Never persist unverified address data.
 
----
+Handle empty results gracefully
+If no results returned, allow manual entry.
 
-## Address Data Structure
+Respect backend error codes:
 
-### AddressValidationResponse
+| Error Code | HTTP Status | Meaning | Recommended Frontend Handling |
+|------------|-------------|---------|------------------------------|
+| `POSTCODE_REQUIRED` | 400 | Missing postcode parameter | Ask user to enter postcode |
+| `INPUT_REQUIRED` | 400 | Missing input parameter (autocomplete) | Prompt user to enter address text |
+| `VALIDATION_FAILED` | 400 | Address not found or invalid | Notify user, allow manual entry |
+| `GOOGLE_API_ERROR` | 500 | Google Maps API failed | Retry or log error, show fallback message |
 
-```typescript
-interface AddressValidationResponse {
-  placeId: string; // Google Places ID (required for validation)
-  formattedAddress: string; // Google's canonical format
-  streetAddress: string; // Street address
-  city: string; // City
-  state: string; // State/Province
-  district: string; // District/County
-  postalCode: string; // Postal/ZIP code
-  country: string; // Country name
-  countryCode: string; // ISO 3166-1 alpha-2 code
-  latitude: number; // Latitude coordinate
-  longitude: number; // Longitude coordinate
-  verificationStatus: "VERIFIED" | "PARTIAL" | "FAILED";
-  errorMessage?: string; // Error message (if failed)
-}
-```
+Do not cache Google data locally
+Always fetch fresh data from backend for accuracy.
 
-### AddressData (for User Creation)
+5. Example Minimal Flow Summary
+1. User provides postcode → call /search-by-postcode
+2. Backend returns list → user selects one
+3. Capture placeId → call /validate-and-create
+4. Backend validates and saves → returns ID
+5. Store returned ID for later revalidation
 
-When creating a user with addresses, use this structure:
+## 6. Error Handling Reference
 
-```typescript
-interface AddressData {
-  streetAddress: string; // Required
-  city: string; // Required
-  state?: string; // Optional
-  postalCode?: string; // Optional
-  country: string; // Required
-  placeId?: string; // Optional (recommended for validation)
-  addressType?: string; // "WORK" | "HOME" (default: "WORK")
-  label?: string; // Optional (e.g., "Head Office", "Home Address")
-  isPrimary?: boolean; // Optional (default: false, first address becomes primary)
-}
-```
+| Error Code | HTTP Status | Meaning | Recommended Frontend Handling |
+|------------|-------------|---------|------------------------------|
+| `POSTCODE_REQUIRED` | 400 | Missing postcode parameter | Ask user to enter postcode |
+| `INPUT_REQUIRED` | 400 | Missing input parameter (autocomplete) | Prompt user to enter address text |
+| `VALIDATION_FAILED` | 400 | Address not found or invalid | Notify user, allow manual entry |
+| `GOOGLE_API_ERROR` | 500 | Google Maps API failed | Retry or log error, show fallback message |
 
----
-
-## Google Maps Platform Integration
-
-**Important:** The backend uses **Google Maps Platform APIs** to provide address data. All address suggestions, validation, and normalization come from Google's servers, not from cached or local data.
-
-**APIs Used:**
-
-1. **Google Places Autocomplete API (New)** - For real-time address suggestions
-2. **Google Geocoding API** - For postcode search and address validation
-
-**Configuration:**
-
-- API key configured via `GOOGLE_MAPS_API_KEY` environment variable
-- Region bias configured via `GOOGLE_MAPS_REGION_BIAS` (comma-separated country codes)
-- Timeout configured via `GOOGLE_MAPS_TIMEOUT` (default: 10000ms)
-
----
-
-## Error Handling
-
-**Common Error Responses:**
-
+**Error Response Format:**
 ```json
 {
   "success": false,
-  "errorCode": "POSTCODE_REQUIRED",
-  "message": "Postcode parameter is required"
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Address validation failed: Address not found"
+  }
 }
 ```
+## 7. Response Field Reference
 
-```json
-{
-  "success": false,
-  "errorCode": "VALIDATION_FAILED",
-  "message": "Address validation failed: ZERO_RESULTS"
-}
-```
+### AddressValidationResponse Fields
 
-**Empty Results:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `verificationStatus` | Enum | Yes | `VERIFIED`, `PARTIAL`, or `FAILED` |
+| `placeId` | String | Yes | Google Places ID (required for validation) |
+| `formattedAddress` | String | Yes | Google's canonical formatted address |
+| `streetAddress` | String | Yes | Street address component |
+| `city` | String | Yes | City name |
+| `state` | String | No | State/Province/Region |
+| `district` | String | No | District/County/Sub-administrative area |
+| `postalCode` | String | No | Postal/ZIP code |
+| `country` | String | Yes | Country name (e.g., "United Kingdom") |
+| `countryCode` | String | No | ISO 3166-1 alpha-2 code (e.g., "GB", "TR") |
+| `latitude` | Double | No | Latitude coordinate |
+| `longitude` | Double | No | Longitude coordinate |
+| `errorMessage` | String | No | Error message (only if `verificationStatus` is `FAILED`) |
 
-- If no addresses found, backend returns empty array: `{"success": true, "data": []}`
-- Frontend should handle empty results gracefully (show message, allow manual entry)
+### AddressDto Fields (validate-and-create, revalidate)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | UUID | Yes | Address entity ID |
+| `tenantId` | UUID | Yes | Tenant ID (multi-tenant isolation) |
+| `uid` | String | Yes | Unique identifier (e.g., "ADDR-...") |
+| `streetAddress` | String | Yes | Street address |
+| `city` | String | Yes | City name |
+| `state` | String | No | State/Province |
+| `district` | String | No | District/County |
+| `postalCode` | String | No | Postal/ZIP code |
+| `country` | String | Yes | Country name |
+| `countryCode` | String | No | ISO 3166-1 alpha-2 code |
+| `addressType` | Enum String | Yes | `"HOME"`, `"WORK"`, `"HEADQUARTERS"`, `"BRANCH"`, `"WAREHOUSE"`, `"SHIPPING"`, `"BILLING"` |
+| `isPrimary` | Boolean | Yes | Whether this is the primary address |
+| `label` | String | No | Address label (e.g., "Home Address") |
+| `formattedAddress` | String | Yes | Google's formatted address |
+| `placeId` | String | Yes | Google Places ID |
+| `latitude` | Double | No | Latitude coordinate |
+| `longitude` | Double | No | Longitude coordinate |
+| `isActive` | Boolean | Yes | Whether address is active |
+| `createdAt` | ISO 8601 | Yes | Creation timestamp |
+| `updatedAt` | ISO 8601 | Yes | Last update timestamp |
+
+### AutocompleteResponse Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `predictions` | Array | Yes | List of address predictions |
+
+**AutocompletePrediction Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `placeId` | String | Yes | Google Places ID (required for validation) |
+| `description` | String | Yes | Full formatted address text |
+| `mainText` | String | Yes | Primary address component (first part) |
+| `secondaryText` | String | Yes | Secondary address component (city, postal code, etc.) |
+
+## 8. Backend Behavior Summary
+
+- ✅ Backend communicates with Google Places and Geocoding APIs directly
+- ✅ Validation ensures standardized address structure and verified geolocation
+- ✅ No address is stored unless it passes Google verification (`VERIFIED` or `PARTIAL` status)
+- ✅ API key and region bias are configured server-side
+- ✅ All addresses are tenant-isolated (multi-tenant architecture)
+- ✅ Address entities include full geolocation data (latitude/longitude)
+
+**Status:** ✅ Production-Ready
+
+**Frontend Responsibility:**  
+Ensure all address-related requests follow this documented flow and pass required parameters to fully utilize backend validation logic.
+
 
 ---
 
-## Best Practices
+Bu sürüm, frontend ekibinin:
+- **her endpoint’in ne zaman çağrılacağını**,  
+- **hangi parametreleri kullanması gerektiğini**,  
+- **hangi veriyle devam etmesi gerektiğini**,  
+net biçimde anlamasını sağlar.  
 
-1. **Use Postcode Search First:** Most efficient for users who know their postcode
-2. **Store placeId:** Always store `placeId` from selected address for future validation
-3. **Allow Country Selection:** Optional country selection improves accuracy and speed
-4. **Handle Empty Results:** Provide fallback to manual address entry if postcode search returns no results
-5. **Validate Before Submit:** Use `/validate` endpoint before submitting to ensure address is valid
-6. **Debounce Input:** Debounce postcode input (e.g., 500ms) to reduce API calls
-7. **Minimum Length:** Require minimum postcode length (e.g., 4 characters) before searching
-
----
-
-## Related Documentation
-
-- `docs/frontend/CREATE_USER.md` - User creation with addresses
-- `docs/phone-email-validation.md` - Phone and email validation
-
----
-
-**Status:** ✅ Production-Ready  
-**Last Updated:** 2025-01-XX
+UI katmanına hiç girmez, sadece **backend etkileşimini %100 doğru, eksiksiz ve verimli** anlatır.
