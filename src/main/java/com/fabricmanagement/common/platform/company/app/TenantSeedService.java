@@ -221,10 +221,17 @@ public class TenantSeedService {
                 TenantContext.getCurrentTenantId(), companyId, name).orElseThrow();
         }
 
-        Department department = Department.create(companyId, name, description);
+        String departmentCode = generateDepartmentCode(name);
+        Department department = Department.create(companyId, name, departmentCode, description);
         department.setDepartmentCategory(
             departmentCategoryRepository.findById(categoryId).orElse(null));
         return departmentRepository.save(department);
+    }
+
+    private String generateDepartmentCode(String departmentName) {
+        return departmentName.toUpperCase()
+            .replaceAll("[^A-Z0-9]", "")
+            .substring(0, Math.min(50, departmentName.replaceAll("[^A-Z0-9]", "").length()));
     }
 
     private Position createPosition(UUID departmentId, String name, String code, String description,
