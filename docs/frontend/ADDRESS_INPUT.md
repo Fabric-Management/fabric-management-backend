@@ -409,11 +409,11 @@ The frontend form should be logically divided into **functional sections**, matc
 
 **Purpose:** Retrieve address data from Google APIs through the backend — no data persistence yet.
 
-| Field | Related Backend | Description |
-|-------|----------------|-------------|
-| **Country Filter (optional)** | Query param in `/search-by-postcode` and `/autocomplete` | Limits search to specific country (improves accuracy and speed). |
-| **Postcode Search** | `GET /search-by-postcode` | Primary flow — fetch addresses by postcode. |
-| **Or Search by Address** | `GET /autocomplete` | Alternative flow — free-text search (e.g., "Selvi Sok Merter", "Broom Park Teddington"). |
+| Field                         | Related Backend                                          | Description                                                                              |
+| ----------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Country Filter (optional)** | Query param in `/search-by-postcode` and `/autocomplete` | Limits search to specific country (improves accuracy and speed).                         |
+| **Postcode Search**           | `GET /search-by-postcode`                                | Primary flow — fetch addresses by postcode.                                              |
+| **Or Search by Address**      | `GET /autocomplete`                                      | Alternative flow — free-text search (e.g., "Selvi Sok Merter", "Broom Park Teddington"). |
 
 **Behavior:**
 
@@ -429,12 +429,12 @@ The frontend form should be logically divided into **functional sections**, matc
 
 **Purpose:** Validate selected address before saving.
 
-| Field | Related Backend | Description |
-|-------|----------------|-------------|
-| **placeId** | Body param in `/validate` and `/validate-and-create` | Required for backend validation. |
-| **Address Type (Work / Home)** | Body param | Included in validation or creation request. |
-| **Label** | Body param | Optional label for address (e.g., "Head Office"). |
-| **Street Address, City, State, District, Postal Code, Country** | Auto-filled | Populated from backend response after validation. |
+| Field                                                           | Related Backend                                      | Description                                       |
+| --------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| **placeId**                                                     | Body param in `/validate` and `/validate-and-create` | Required for backend validation.                  |
+| **Address Type (Work / Home)**                                  | Body param                                           | Included in validation or creation request.       |
+| **Label**                                                       | Body param                                           | Optional label for address (e.g., "Head Office"). |
+| **Street Address, City, State, District, Postal Code, Country** | Auto-filled                                          | Populated from backend response after validation. |
 
 **Behavior:**
 
@@ -449,10 +449,10 @@ The frontend form should be logically divided into **functional sections**, matc
 
 **Purpose:** Handle final user actions and address lifecycle.
 
-| Action | Backend Endpoint | Description |
-|--------|------------------|-------------|
-| **Validate & Save** | `POST /validate-and-create` | Validates and persists the address. |
-| **Remove Address** | (Frontend / local) | Optional frontend-only removal before submission. |
+| Action                          | Backend Endpoint               | Description                                                    |
+| ------------------------------- | ------------------------------ | -------------------------------------------------------------- |
+| **Validate & Save**             | `POST /validate-and-create`    | Validates and persists the address.                            |
+| **Remove Address**              | (Frontend / local)             | Optional frontend-only removal before submission.              |
 | **Revalidate Existing Address** | `POST /{addressId}/revalidate` | Refreshes existing saved address with latest data from Google. |
 
 ---
@@ -471,6 +471,7 @@ The frontend form should be logically divided into **functional sections**, matc
 - Upon selection, store the full response (including `placeId`) and populate form fields.
 
 **Example Flow:**
+
 ```
 User types "MK5" → wait 500ms → call /search-by-postcode?postcode=MK5
 User continues typing "MK5 7GE" → wait 500ms → call /search-by-postcode?postcode=MK5%207GE
@@ -494,6 +495,7 @@ Dropdown shows matching addresses → user selects one → capture placeId
   - Proceed with `/validate` or `/validate-and-create`.
 
 **Example Flow:**
+
 ```
 Postcode search returns empty → switch to autocomplete mode
 User types "Taksim" → wait 500ms → call /autocomplete?input=Taksim
@@ -519,6 +521,7 @@ Capture placeId → proceed to validation
 - Store returned `id` for revalidation or update operations.
 
 **Request Body Example:**
+
 ```json
 {
   "placeId": "ChIJ...",
@@ -533,15 +536,15 @@ Capture placeId → proceed to validation
 
 ### 8.5 General Behavior Rules
 
-| Rule | Description |
-|------|-------------|
-| ✅ Always include `country` if selected | Improves precision and performance. |
-| ✅ Debounce input fields | Prevents redundant API calls (recommended: 500ms). |
-| ✅ Gracefully handle empty results | Allow manual entry if no matches found. |
-| ✅ Preserve `placeId` | Required for all validation and persistence actions. |
-| ✅ Do not cache Google data | Always fetch fresh data through backend. |
-| ⚠️ Never call Google APIs directly from frontend | All requests must go through backend endpoints. |
-| ✅ Handle errors gracefully | Show user-friendly messages for `POSTCODE_REQUIRED`, `INPUT_REQUIRED`, `VALIDATION_FAILED`. |
+| Rule                                             | Description                                                                                 |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| ✅ Always include `country` if selected          | Improves precision and performance.                                                         |
+| ✅ Debounce input fields                         | Prevents redundant API calls (recommended: 500ms).                                          |
+| ✅ Gracefully handle empty results               | Allow manual entry if no matches found.                                                     |
+| ✅ Preserve `placeId`                            | Required for all validation and persistence actions.                                        |
+| ✅ Do not cache Google data                      | Always fetch fresh data through backend.                                                    |
+| ⚠️ Never call Google APIs directly from frontend | All requests must go through backend endpoints.                                             |
+| ✅ Handle errors gracefully                      | Show user-friendly messages for `POSTCODE_REQUIRED`, `INPUT_REQUIRED`, `VALIDATION_FAILED`. |
 
 ---
 

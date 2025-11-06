@@ -56,9 +56,19 @@ public class AddressValidationController {
                 .body(ApiResponse.error("INPUT_REQUIRED", "Input parameter is required"));
         }
 
-        AutocompleteResponse response = googleMapsClient.autocomplete(input, country);
-
-        return ResponseEntity.ok(ApiResponse.success(response));
+        try {
+            AutocompleteResponse response = googleMapsClient.autocomplete(input, country);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (IllegalStateException e) {
+            // Handle Google Maps API configuration errors (REQUEST_DENIED, OVER_QUERY_LIMIT, etc.)
+            log.error("Google Maps API error: {}", e.getMessage());
+            return ResponseEntity.status(500)
+                .body(ApiResponse.error("GOOGLE_API_ERROR", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error during autocomplete: {}", e.getMessage(), e);
+            return ResponseEntity.status(500)
+                .body(ApiResponse.error("GOOGLE_API_ERROR", "Failed to search addresses. Please try again later."));
+        }
     }
 
     /**
@@ -160,9 +170,19 @@ public class AddressValidationController {
                 .body(ApiResponse.error("POSTCODE_REQUIRED", "Postcode parameter is required"));
         }
 
-        List<AddressValidationResponse> results = googleMapsClient.searchByPostcode(postcode, country);
-
-        return ResponseEntity.ok(ApiResponse.success(results));
+        try {
+            List<AddressValidationResponse> results = googleMapsClient.searchByPostcode(postcode, country);
+            return ResponseEntity.ok(ApiResponse.success(results));
+        } catch (IllegalStateException e) {
+            // Handle Google Maps API configuration errors (REQUEST_DENIED, OVER_QUERY_LIMIT, etc.)
+            log.error("Google Maps API error: {}", e.getMessage());
+            return ResponseEntity.status(500)
+                .body(ApiResponse.error("GOOGLE_API_ERROR", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error during postcode search: {}", e.getMessage(), e);
+            return ResponseEntity.status(500)
+                .body(ApiResponse.error("GOOGLE_API_ERROR", "Failed to search addresses. Please try again later."));
+        }
     }
 }
 

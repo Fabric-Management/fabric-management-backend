@@ -137,6 +137,10 @@ public class GoogleMapsClient {
 
         } catch (Exception e) {
             log.error("Error calling Google Places Autocomplete API: {}", e.getMessage(), e);
+            // Re-throw IllegalStateException for API configuration errors (REQUEST_DENIED, etc.)
+            if (e instanceof IllegalStateException) {
+                throw e;
+            }
             return AutocompleteResponse.builder()
                 .predictions(new ArrayList<>())
                 .build();
@@ -285,6 +289,21 @@ public class GoogleMapsClient {
                 } else if ("ZERO_RESULTS".equals(body.getStatus())) {
                     log.warn("No addresses found for postcode: {}, country: {} (ZERO_RESULTS)", 
                         normalizedPostcode, countryCode);
+                } else if ("REQUEST_DENIED".equals(body.getStatus())) {
+                    String errorMsg = "Google Maps API request denied. Please check API key configuration, enabled APIs (Geocoding API, Places API), and billing account.";
+                    log.error("❌ Google Geocoding API REQUEST_DENIED for postcode: {}, country: {}. {}", 
+                        normalizedPostcode, countryCode, errorMsg);
+                    throw new IllegalStateException(errorMsg);
+                } else if ("OVER_QUERY_LIMIT".equals(body.getStatus())) {
+                    String errorMsg = "Google Maps API quota exceeded. Please check billing account and quota limits.";
+                    log.error("❌ Google Geocoding API OVER_QUERY_LIMIT for postcode: {}, country: {}. {}", 
+                        normalizedPostcode, countryCode, errorMsg);
+                    throw new IllegalStateException(errorMsg);
+                } else if ("INVALID_REQUEST".equals(body.getStatus())) {
+                    String errorMsg = "Invalid request to Google Maps API. Please check postcode format.";
+                    log.warn("⚠️ Google Geocoding API INVALID_REQUEST for postcode: {}, country: {}", 
+                        normalizedPostcode, countryCode);
+                    // Don't throw, just return empty list (invalid postcode is not a system error)
                 } else {
                     log.warn("Google Geocoding API returned status: {} for postcode: {}, country: {}", 
                         body.getStatus(), normalizedPostcode, countryCode);
