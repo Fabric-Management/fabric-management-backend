@@ -234,16 +234,23 @@ BEGIN
     -- ========================================================================
     -- SEED: Roles
     -- ========================================================================
+    -- Platform-level system roles that serve as reference catalog
+    -- These roles are copied to new tenants during tenant seeding
     INSERT INTO common_company.common_role 
         (tenant_id, uid, role_name, role_code, description, department_category_id, is_system_role, display_order, is_active)
     VALUES
+        -- Production Roles
         (system_tenant_id, 'SYS-ROLE-001', 'Production Manager', 'PROD_MANAGER', 'Üretim yöneticisi', prod_cat_id, TRUE, 1, TRUE),
         (system_tenant_id, 'SYS-ROLE-002', 'Production Worker', 'PROD_WORKER', 'Üretim işçisi', prod_cat_id, TRUE, 2, TRUE),
         (system_tenant_id, 'SYS-ROLE-003', 'Quality Control', 'QC', 'Kalite kontrol', prod_cat_id, TRUE, 3, TRUE),
+        -- Administration Roles
         (system_tenant_id, 'SYS-ROLE-004', 'Administrator', 'ADMIN', 'Sistem yöneticisi', admin_cat_id, TRUE, 4, TRUE),
         (system_tenant_id, 'SYS-ROLE-005', 'HR Manager', 'HR_MANAGER', 'İnsan kaynakları yöneticisi', admin_cat_id, TRUE, 5, TRUE),
+        -- Logistics Roles
         (system_tenant_id, 'SYS-ROLE-006', 'Logistics Manager', 'LOG_MANAGER', 'Lojistik yöneticisi', logistics_cat_id, TRUE, 6, TRUE),
-        (system_tenant_id, 'SYS-ROLE-007', 'Warehouse Worker', 'WAREHOUSE_WORKER', 'Depo işçisi', logistics_cat_id, TRUE, 7, TRUE)
+        (system_tenant_id, 'SYS-ROLE-007', 'Warehouse Worker', 'WAREHOUSE_WORKER', 'Depo işçisi', logistics_cat_id, TRUE, 7, TRUE),
+        -- Platform Admin Role (special - system-wide access)
+        (system_tenant_id, 'SYS-ROLE-0001', 'Platform Administrator', 'PLATFORM_ADMIN', 'Full platform access - can create tenants, manage system settings, access all tenant data', NULL, TRUE, 0, TRUE)
     ON CONFLICT (uid) DO NOTHING;
 
     -- ========================================================================
