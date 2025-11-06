@@ -69,9 +69,12 @@ API key → **Application restrictions** → **HTTP referrers (web sites)** veya
 
 ```
 ✅ Allowed IP addresses:
-- Your backend server IP
-- Localhost (127.0.0.1) - development için
+- Your backend server IP (production)
+- Your development machine IP (e.g., 212.139.3.25) - development için
+- Localhost (127.0.0.1) - local development için
 ```
+
+**ÖNEMLİ:** Terminal'de `curl` ile test ederken, Google API'ye istek **senin bilgisayarının gerçek IP'sinden** gider. Bu yüzden development IP'ni de eklemelisin!
 
 **Alternatif:** HTTP referrers (domain bazlı)
 
