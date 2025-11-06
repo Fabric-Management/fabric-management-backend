@@ -92,9 +92,16 @@ app-build: ## Build Spring Boot application (Maven)
 	mvn clean package -DskipTests
 	@echo "$(GREEN)✅ Built → target/fabric-management-backend-1.0.0-SNAPSHOT.jar$(NC)"
 
-app-run: ## Run Spring Boot application (local profile)
+app-run: validate-env ## Run Spring Boot application (local profile)
 	@echo "$(YELLOW)🚀 Running application...$(NC)"
-	mvn spring-boot:run -Dspring-boot.run.profiles=local
+	@echo "$(YELLOW)📋 Loading environment variables from .env...$(NC)"
+	@if [ -f .env ]; then \
+		export $$(cat .env | grep -v '^#' | grep -v '^$$' | xargs) && \
+		mvn spring-boot:run -Dspring-boot.run.profiles=local; \
+	else \
+		echo "$(RED)❌ .env file not found! Run: make setup$(NC)"; \
+		exit 1; \
+	fi
 
 test: ## Run unit tests
 	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
