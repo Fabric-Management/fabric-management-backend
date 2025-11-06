@@ -5,6 +5,10 @@ import com.fabricmanagement.common.platform.communication.domain.EmailOutboxStat
 import com.fabricmanagement.common.platform.communication.domain.strategy.EmailStrategy;
 import com.fabricmanagement.common.platform.communication.infra.repository.EmailOutboxRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Counter;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,6 +38,7 @@ public class EmailOutboxService {
 
     private final EmailOutboxRepository emailOutboxRepository;
     private final EmailStrategy emailStrategy;
+    private final MeterRegistry meterRegistry;
 
     @org.springframework.beans.factory.annotation.Value("${application.email.dead-letter-alert-threshold:5}")
     private int deadLetterAlertThreshold;
@@ -41,6 +46,49 @@ public class EmailOutboxService {
     // Track last alert time to prevent spam
     private volatile long lastDeadLetterAlertTime = 0;
     private static final long DEAD_LETTER_ALERT_COOLDOWN_MS = 3600000; // 1 hour
+
+    // Metrics
+    private Counter emailSentCounter;
+    private Counter emailFailedCounter;
+    private Counter emailPermanentlyFailedCounter;
+
+    /**
+     * Register Prometheus metrics for email monitoring.
+     */
+    @PostConstruct
+    public void registerMetrics() {
+        // Gauge: Current failed email count (dead letter queue size)
+        Gauge.builder("email.outbox.failed.count", this, EmailOutboxService::getFailedEmailCount)
+            .description("Number of permanently failed emails in dead letter queue")
+            .tag("status", "failed")
+            .register(meterRegistry);
+
+        // Gauge: Current pending email count
+        Gauge.builder("email.outbox.pending.count", this, EmailOutboxService::getPendingEmailCount)
+            .description("Number of pending emails waiting to be sent")
+            .tag("status", "pending")
+            .register(meterRegistry);
+
+        // Counter: Total emails sent successfully
+        emailSentCounter = Counter.builder("email.outbox.sent.total")
+            .description("Total number of emails sent successfully")
+            .tag("status", "sent")
+            .register(meterRegistry);
+
+        // Counter: Total emails failed (transient failures)
+        emailFailedCounter = Counter.builder("email.outbox.failed.total")
+            .description("Total number of email send failures (transient)")
+            .tag("status", "failed_transient")
+            .register(meterRegistry);
+
+        // Counter: Total emails permanently failed (dead letter queue)
+        emailPermanentlyFailedCounter = Counter.builder("email.outbox.permanently_failed.total")
+            .description("Total number of emails permanently failed (max retries reached)")
+            .tag("status", "failed_permanent")
+            .register(meterRegistry);
+
+        log.info("✅ Email outbox metrics registered with Prometheus");
+    }
 
     /**
      * Background job: Process pending emails every 5 seconds.
@@ -100,6 +148,9 @@ public class EmailOutboxService {
             // Success - mark as sent
             email.markAsSent();
             emailOutboxRepository.save(email);
+            
+            // Record metric
+            emailSentCounter.increment();
 
             log.info("✅ Email sent successfully: recipient={}, retryCount={}", 
                 PiiMaskingUtil.maskEmail(email.getRecipient()), email.getRetryCount());
@@ -115,12 +166,18 @@ public class EmailOutboxService {
             emailOutboxRepository.save(email);
 
             if (email.isPermanentlyFailed()) {
+                // Record metric
+                emailPermanentlyFailedCounter.increment();
+                
                 log.error("❌ Email permanently failed (max retries reached): recipient={}, error={}", 
                     PiiMaskingUtil.maskEmail(email.getRecipient()), errorMsg);
                 
                 // Alert admin if dead letter queue threshold exceeded
                 checkAndAlertDeadLetterQueue();
             } else {
+                // Record metric (transient failure)
+                emailFailedCounter.increment();
+                
                 log.warn("⚠️ Email send failed, will retry: recipient={}, retryCount={}/{}, nextRetryAt={}, error={}", 
                     PiiMaskingUtil.maskEmail(email.getRecipient()), 
                     email.getRetryCount(), 
@@ -186,9 +243,7 @@ public class EmailOutboxService {
                 failedCount, deadLetterAlertThreshold);
             log.error("🚨 Action required: Check email configuration, SMTP settings, or network connectivity");
             log.error("🚨 Failed emails are stored in common_communication.communication_email_outbox WHERE status='FAILED'");
-            
-            // TODO: In production, integrate with monitoring system (Prometheus alert, Slack, etc.)
-            // For now, ERROR log is sufficient (monitoring systems can scrape logs)
+            log.error("🚨 Prometheus metric: email.outbox.failed.count = {} (alert rule: DeadLetterQueueThresholdExceeded)", failedCount);
         }
     }
 
