@@ -229,9 +229,8 @@ public class TenantSeedService {
     }
 
     private String generateDepartmentCode(String departmentName) {
-        return departmentName.toUpperCase()
-            .replaceAll("[^A-Z0-9]", "")
-            .substring(0, Math.min(50, departmentName.replaceAll("[^A-Z0-9]", "").length()));
+        String code = departmentName.toUpperCase().replaceAll("[^A-Z0-9]", "");
+        return code.substring(0, Math.min(50, code.length()));
     }
 
     private Position createPosition(UUID departmentId, String name, String code, String description,
