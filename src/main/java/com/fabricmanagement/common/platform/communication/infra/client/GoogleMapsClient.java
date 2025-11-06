@@ -312,6 +312,11 @@ public class GoogleMapsClient {
             log.debug("No addresses found for postcode: {} (global search)", normalizedPostcode);
             return new ArrayList<>();
 
+        } catch (IllegalStateException e) {
+            // Re-throw API configuration errors (REQUEST_DENIED, OVER_QUERY_LIMIT, etc.)
+            // These should be handled by controller and returned as proper error responses
+            log.error("Google Maps API configuration error: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("Error calling Google Geocoding API for postcode search: postcode={}, country={}, error={}", 
                 postcode, country, e.getMessage(), e);
