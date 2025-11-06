@@ -119,6 +119,31 @@ CREATE INDEX IF NOT EXISTS idx_user_role ON common_user.common_user(role_id);
 COMMENT ON COLUMN common_user.common_user.role_id IS 'User role assignment - references common_company.common_role';
 
 -- ============================================================================
+-- TABLE: common_user_department (Junction table)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS common_user.common_user_department (
+    user_id UUID NOT NULL,
+    department_id UUID NOT NULL,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    assigned_by UUID,
+    
+    PRIMARY KEY (user_id, department_id),
+    
+    CONSTRAINT fk_user_dept_user FOREIGN KEY (user_id) 
+        REFERENCES common_user.common_user(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_dept_department FOREIGN KEY (department_id) 
+        REFERENCES common_company.common_department(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_dept_user ON common_user.common_user_department(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_dept_dept ON common_user.common_user_department(department_id);
+CREATE INDEX IF NOT EXISTS idx_user_dept_primary ON common_user.common_user_department(user_id, is_primary) WHERE is_primary = TRUE;
+
+COMMENT ON TABLE common_user.common_user_department IS 'Many-to-Many relationship between User and Department';
+COMMENT ON COLUMN common_user.common_user_department.is_primary IS 'Primary department assignment (user can have multiple departments)';
+
+-- ============================================================================
 -- SEED DATA: Roles, Department Categories, and Departments
 -- ============================================================================
 -- Uses SYSTEM_TENANT_ID (00000000-0000-0000-0000-000000000000) for system-wide data
