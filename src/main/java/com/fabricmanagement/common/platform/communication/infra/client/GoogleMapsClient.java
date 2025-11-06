@@ -220,7 +220,6 @@ public class GoogleMapsClient {
             }
 
             // Normalize country: accept ISO code (e.g., "GB", "TR") or country name (e.g., "United Kingdom")
-            // Google API accepts both formats globally, no hardcoded mapping needed
             String normalizedCountry = country != null ? country.trim() : null;
             String countryCode = null;
             
@@ -228,18 +227,20 @@ public class GoogleMapsClient {
                 String upper = normalizedCountry.toUpperCase();
                 
                 // If it's a 2-letter code (ISO 3166-1 alpha-2), use it as country code
-                // This allows us to set components parameter for better accuracy
                 if (upper.length() == 2 && upper.matches("[A-Z]{2}")) {
                     countryCode = upper;
+                } else {
+                    // Map common country names to ISO codes for better Google API accuracy
+                    countryCode = mapCountryNameToIsoCode(upper);
                 }
-                // If it's a country name, use it as-is (Google API handles country names globally)
             }
 
-            // Build address query: postcode + country (if provided)
-            // Format: "postcode" (global) or "postcode, country" (country-specific)
+            // Build address query: postcode only (country handled via components parameter for better accuracy)
+            // If we have ISO code, use components parameter instead of adding country to address query
             String addressQuery = normalizedPostcode;
-            if (normalizedCountry != null && !normalizedCountry.isBlank()) {
-                // Use country as provided (could be code or name)
+            // Only add country to address query if we don't have ISO code (fallback)
+            if (normalizedCountry != null && !normalizedCountry.isBlank() && countryCode == null) {
+                // Fallback: use country name in address query if ISO code mapping failed
                 addressQuery = normalizedPostcode + ", " + normalizedCountry;
             }
 
@@ -501,6 +502,79 @@ public class GoogleMapsClient {
 
         @JsonProperty("lng")
         private Double lng;
+    }
+
+    /**
+     * Map common country names to ISO 3166-1 alpha-2 codes.
+     * 
+     * <p>Improves Google Geocoding API accuracy by using components parameter
+     * instead of country name in address query.</p>
+     * 
+     * @param countryName Country name (case-insensitive, will be uppercased)
+     * @return ISO 3166-1 alpha-2 code or null if not found
+     */
+    private String mapCountryNameToIsoCode(String countryName) {
+        if (countryName == null || countryName.isBlank()) {
+            return null;
+        }
+        
+        String upper = countryName.toUpperCase();
+        
+        // Common country name mappings (most frequently used in address forms)
+        return switch (upper) {
+            case "UNITED KINGDOM", "UK", "GREAT BRITAIN", "BRITAIN" -> "GB";
+            case "UNITED STATES", "USA", "US", "AMERICA" -> "US";
+            case "TURKEY", "TÜRKIYE", "TURKIYE" -> "TR";
+            case "GERMANY", "DEUTSCHLAND" -> "DE";
+            case "FRANCE" -> "FR";
+            case "ITALY", "ITALIA" -> "IT";
+            case "SPAIN", "ESPANA" -> "ES";
+            case "NETHERLANDS", "HOLLAND" -> "NL";
+            case "BELGIUM" -> "BE";
+            case "SWITZERLAND", "SUISSE", "SCHWEIZ" -> "CH";
+            case "AUSTRIA", "OSTERREICH" -> "AT";
+            case "POLAND", "POLSKA" -> "PL";
+            case "CZECH REPUBLIC", "CZECHIA" -> "CZ";
+            case "SWEDEN", "SVERIGE" -> "SE";
+            case "NORWAY", "NORGE" -> "NO";
+            case "DENMARK", "DANMARK" -> "DK";
+            case "FINLAND", "SUOMI" -> "FI";
+            case "PORTUGAL" -> "PT";
+            case "GREECE", "HELLAS" -> "GR";
+            case "ROMANIA" -> "RO";
+            case "BULGARIA" -> "BG";
+            case "HUNGARY", "MAGYARORSZAG" -> "HU";
+            case "CROATIA", "HRVATSKA" -> "HR";
+            case "SLOVAKIA", "SLOVENSKO" -> "SK";
+            case "SLOVENIA", "SLOVENIJA" -> "SI";
+            case "IRELAND", "EIRE" -> "IE";
+            case "AUSTRALIA" -> "AU";
+            case "CANADA" -> "CA";
+            case "NEW ZEALAND" -> "NZ";
+            case "SOUTH AFRICA" -> "ZA";
+            case "JAPAN", "NIHON" -> "JP";
+            case "CHINA", "PEOPLE'S REPUBLIC OF CHINA" -> "CN";
+            case "INDIA" -> "IN";
+            case "BRAZIL", "BRASIL" -> "BR";
+            case "MEXICO" -> "MX";
+            case "ARGENTINA" -> "AR";
+            case "CHILE" -> "CL";
+            case "COLOMBIA" -> "CO";
+            case "PERU" -> "PE";
+            case "RUSSIA", "RUSSIAN FEDERATION" -> "RU";
+            case "SOUTH KOREA", "KOREA", "REPUBLIC OF KOREA" -> "KR";
+            case "SINGAPORE" -> "SG";
+            case "MALAYSIA" -> "MY";
+            case "THAILAND" -> "TH";
+            case "INDONESIA" -> "ID";
+            case "PHILIPPINES" -> "PH";
+            case "VIETNAM", "VIET NAM" -> "VN";
+            case "ISRAEL" -> "IL";
+            case "SAUDI ARABIA" -> "SA";
+            case "UNITED ARAB EMIRATES", "UAE" -> "AE";
+            case "EGYPT" -> "EG";
+            default -> null; // Unknown country name, will use as-is in address query
+        };
     }
 
     @Data
