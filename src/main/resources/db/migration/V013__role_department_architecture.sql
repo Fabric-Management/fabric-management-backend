@@ -224,17 +224,18 @@ BEGIN
     -- ========================================================================
     -- SEED: Departments
     -- ========================================================================
+    -- For system tenant, company_id = tenant_id (root tenant pattern)
     INSERT INTO common_company.common_department 
-        (tenant_id, uid, department_name, department_code, description, department_category_id, is_system_department, display_order, is_active)
+        (tenant_id, uid, company_id, department_name, department_code, description, department_category_id, is_system_department, display_order, is_active)
     VALUES
-        (system_tenant_id, 'SYS-DEPT-001', 'Production', 'PROD', 'Ana üretim departmanı', prod_cat_id, TRUE, 1, TRUE),
-        (system_tenant_id, 'SYS-DEPT-002', 'Quality Control', 'QC', 'Kalite kontrol departmanı', prod_cat_id, TRUE, 2, TRUE),
-        (system_tenant_id, 'SYS-DEPT-003', 'Maintenance', 'MAINT', 'Bakım departmanı', util_cat_id, TRUE, 3, TRUE),
-        (system_tenant_id, 'SYS-DEPT-004', 'Administration', 'ADMIN', 'İdari departman', admin_cat_id, TRUE, 4, TRUE),
-        (system_tenant_id, 'SYS-DEPT-005', 'Human Resources', 'HR', 'İnsan kaynakları', admin_cat_id, TRUE, 5, TRUE),
-        (system_tenant_id, 'SYS-DEPT-006', 'Logistics', 'LOG', 'Lojistik departmanı', logistics_cat_id, TRUE, 6, TRUE),
-        (system_tenant_id, 'SYS-DEPT-007', 'Warehouse', 'WAREHOUSE', 'Depo departmanı', logistics_cat_id, TRUE, 7, TRUE),
-        (system_tenant_id, 'SYS-DEPT-008', 'IT Support', 'IT', 'IT destek departmanı', support_cat_id, TRUE, 8, TRUE)
+        (system_tenant_id, 'SYS-DEPT-001', system_tenant_id, 'Production', 'PROD', 'Ana üretim departmanı', prod_cat_id, TRUE, 1, TRUE),
+        (system_tenant_id, 'SYS-DEPT-002', system_tenant_id, 'Quality Control', 'QC', 'Kalite kontrol departmanı', prod_cat_id, TRUE, 2, TRUE),
+        (system_tenant_id, 'SYS-DEPT-003', system_tenant_id, 'Maintenance', 'MAINT', 'Bakım departmanı', util_cat_id, TRUE, 3, TRUE),
+        (system_tenant_id, 'SYS-DEPT-004', system_tenant_id, 'Administration', 'ADMIN', 'İdari departman', admin_cat_id, TRUE, 4, TRUE),
+        (system_tenant_id, 'SYS-DEPT-005', system_tenant_id, 'Human Resources', 'HR', 'İnsan kaynakları', admin_cat_id, TRUE, 5, TRUE),
+        (system_tenant_id, 'SYS-DEPT-006', system_tenant_id, 'Logistics', 'LOG', 'Lojistik departmanı', logistics_cat_id, TRUE, 6, TRUE),
+        (system_tenant_id, 'SYS-DEPT-007', system_tenant_id, 'Warehouse', 'WAREHOUSE', 'Depo departmanı', logistics_cat_id, TRUE, 7, TRUE),
+        (system_tenant_id, 'SYS-DEPT-008', system_tenant_id, 'IT Support', 'IT', 'IT destek departmanı', support_cat_id, TRUE, 8, TRUE)
     ON CONFLICT (uid) DO NOTHING;
 
 END $$;
