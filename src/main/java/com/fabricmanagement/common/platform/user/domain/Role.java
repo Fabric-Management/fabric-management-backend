@@ -41,7 +41,7 @@ import java.util.List;
  * }</pre>
  */
 @Entity
-@Table(name = "common_role", schema = "common_user",
+@Table(name = "common_role", schema = "common_company",
     indexes = {
         @Index(name = "idx_role_tenant", columnList = "tenant_id"),
         @Index(name = "idx_role_code", columnList = "role_code"),
