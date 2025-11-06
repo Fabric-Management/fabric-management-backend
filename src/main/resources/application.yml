@@ -131,6 +131,8 @@ application:
       url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
     # Transactional Outbox pattern: Save emails to DB before sending (ensures persistence and retry)
     use-outbox: ${EMAIL_USE_OUTBOX:true} # ✅ Enabled by default for reliable email delivery
+    # Dead letter queue alert threshold (alert admin when failed email count exceeds this)
+    dead-letter-alert-threshold: ${EMAIL_DEAD_LETTER_ALERT_THRESHOLD:5} # Alert when 5+ failed emails
 
   # AI Configuration
   ai:

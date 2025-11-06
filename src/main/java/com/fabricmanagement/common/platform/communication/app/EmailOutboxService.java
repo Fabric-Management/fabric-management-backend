@@ -35,6 +35,13 @@ public class EmailOutboxService {
     private final EmailOutboxRepository emailOutboxRepository;
     private final EmailStrategy emailStrategy;
 
+    @org.springframework.beans.factory.annotation.Value("${application.email.dead-letter-alert-threshold:5}")
+    private int deadLetterAlertThreshold;
+
+    // Track last alert time to prevent spam
+    private volatile long lastDeadLetterAlertTime = 0;
+    private static final long DEAD_LETTER_ALERT_COOLDOWN_MS = 3600000; // 1 hour
+
     /**
      * Background job: Process pending emails every 5 seconds.
      * 
@@ -110,7 +117,9 @@ public class EmailOutboxService {
             if (email.isPermanentlyFailed()) {
                 log.error("❌ Email permanently failed (max retries reached): recipient={}, error={}", 
                     PiiMaskingUtil.maskEmail(email.getRecipient()), errorMsg);
-                // TODO: Alert admin about dead letter queue
+                
+                // Alert admin if dead letter queue threshold exceeded
+                checkAndAlertDeadLetterQueue();
             } else {
                 log.warn("⚠️ Email send failed, will retry: recipient={}, retryCount={}/{}, nextRetryAt={}, error={}", 
                     PiiMaskingUtil.maskEmail(email.getRecipient()), 
@@ -153,6 +162,54 @@ public class EmailOutboxService {
     @Transactional(readOnly = true)
     public long getFailedEmailCount() {
         return emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.FAILED);
+    }
+
+    /**
+     * Check dead letter queue and alert admin if threshold exceeded.
+     * 
+     * <p>Prevents alert spam with cooldown period (1 hour).</p>
+     */
+    private void checkAndAlertDeadLetterQueue() {
+        long now = System.currentTimeMillis();
+        
+        // Cooldown check: Don't alert more than once per hour
+        if (now - lastDeadLetterAlertTime < DEAD_LETTER_ALERT_COOLDOWN_MS) {
+            return;
+        }
+
+        long failedCount = getFailedEmailCount();
+        
+        if (failedCount >= deadLetterAlertThreshold) {
+            lastDeadLetterAlertTime = now;
+            
+            log.error("🚨 DEAD LETTER QUEUE ALERT: {} failed email(s) in queue (threshold: {})", 
+                failedCount, deadLetterAlertThreshold);
+            log.error("🚨 Action required: Check email configuration, SMTP settings, or network connectivity");
+            log.error("🚨 Failed emails are stored in common_communication.communication_email_outbox WHERE status='FAILED'");
+            
+            // TODO: In production, integrate with monitoring system (Prometheus alert, Slack, etc.)
+            // For now, ERROR log is sufficient (monitoring systems can scrape logs)
+        }
+    }
+
+    /**
+     * Scheduled job: Check dead letter queue periodically (every hour).
+     * 
+     * <p>Proactive monitoring - alerts even if no new failures occur.</p>
+     */
+    @Scheduled(cron = "0 0 * * * ?") // Every hour
+    @Transactional(readOnly = true)
+    public void monitorDeadLetterQueue() {
+        long failedCount = getFailedEmailCount();
+        
+        if (failedCount >= deadLetterAlertThreshold) {
+            log.error("🚨 DEAD LETTER QUEUE MONITORING: {} failed email(s) in queue (threshold: {})", 
+                failedCount, deadLetterAlertThreshold);
+            log.error("🚨 Review failed emails and investigate root cause");
+        } else if (failedCount > 0) {
+            log.warn("⚠️ Dead letter queue has {} failed email(s) (below threshold: {})", 
+                failedCount, deadLetterAlertThreshold);
+        }
     }
 }
 
