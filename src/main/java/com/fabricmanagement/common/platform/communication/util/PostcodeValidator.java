@@ -61,7 +61,8 @@ public class PostcodeValidator {
             return false;
         }
 
-        String normalized = postcode.trim().replaceAll("\\s+", " "); // Normalize whitespace
+        // Normalize whitespace: multiple spaces to single space, preserve single space
+        String normalized = postcode.trim().replaceAll("\\s+", " ");
 
         if (countryCode == null || countryCode.isBlank()) {
             // No country specified - use minimum length check (at least 3 characters)
@@ -71,7 +72,13 @@ public class PostcodeValidator {
         String upperCountry = countryCode.toUpperCase();
 
         return switch (upperCountry) {
-            case "GB", "UK" -> UK_POSTCODE.matcher(normalized).matches() && normalized.length() >= 5;
+            case "GB", "UK" -> {
+                // UK postcode: accept with or without space (MK5 7GE or MK57GE)
+                // Remove space for validation, then check pattern
+                String withoutSpace = normalized.replaceAll("\\s", "");
+                yield UK_POSTCODE.matcher(normalized).matches() || 
+                       UK_POSTCODE.matcher(withoutSpace).matches() && normalized.length() >= 5;
+            }
             case "TR" -> TR_POSTCODE.matcher(normalized).matches() && normalized.length() == 5;
             case "US" -> US_ZIP.matcher(normalized).matches() && normalized.length() >= 5;
             case "CA" -> CA_POSTCODE.matcher(normalized).matches() && normalized.length() >= 6;

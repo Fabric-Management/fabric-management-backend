@@ -216,8 +216,9 @@ public class GoogleMapsClient {
         try {
             log.debug("Searching addresses by postcode (global): postcode={}, country={}", postcode, country);
 
-            // Normalize postcode: trim whitespace, preserve UK format (with space)
-            String normalizedPostcode = postcode != null ? postcode.trim() : "";
+            // Normalize postcode: trim whitespace, normalize multiple spaces to single space
+            // UK postcodes can have space (MK5 7GE) or no space (MK57GE) - normalize to single space
+            String normalizedPostcode = postcode != null ? postcode.trim().replaceAll("\\s+", " ") : "";
             if (normalizedPostcode.isBlank()) {
                 log.warn("Postcode is blank, returning empty list");
                 return new ArrayList<>();
@@ -432,10 +433,18 @@ public class GoogleMapsClient {
         boolean hasStreet = components.getStreetAddress() != null && !components.getStreetAddress().isBlank();
         boolean hasCity = components.getCity() != null && !components.getCity().isBlank();
         boolean hasCountry = components.getCountryCode() != null && !components.getCountryCode().isBlank();
+        boolean hasPostalCode = components.getPostalCode() != null && !components.getPostalCode().isBlank();
 
+        // For postcode searches, area-level results (neighborhood, city) are valid even without street address
+        // Street address is optional for postcode search results (user will select specific address from list)
         if (hasStreet && hasCity && hasCountry) {
             return AddressValidationResponse.VerificationStatus.VERIFIED;
         } else if (hasCity && hasCountry) {
+            // Partial: has city and country (postcode search area-level result)
+            // User can select this and then use autocomplete to find specific street addresses
+            return AddressValidationResponse.VerificationStatus.PARTIAL;
+        } else if (hasPostalCode && hasCountry) {
+            // Even partial: has postal code and country (minimal valid result)
             return AddressValidationResponse.VerificationStatus.PARTIAL;
         } else {
             return AddressValidationResponse.VerificationStatus.FAILED;
