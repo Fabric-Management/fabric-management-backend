@@ -32,7 +32,7 @@ import org.springframework.web.client.RestTemplate;
  * └─ util/             → Money, Unit, TimeHelper
  *
  * Business Modules:
- * ├─ production/       → masterdata, planning, execution, quality
+ * ├─ production/       → master data, planning, execution, quality
  * ├─ logistics/        → inventory, shipment, customs
  * ├─ finance/          → ar, ap, invoice, costing
  * ├─ human/            → employee, org, leave, payroll, performance
@@ -62,8 +62,11 @@ public class FabricManagementApplication {
      * 
      * <p>This prevents email sending from blocking if frontend is slow or down,
      * allowing fast fallback to backend templates.</p>
+     * 
+     * <p><b>Used by:</b> {@link com.fabricmanagement.common.platform.communication.app.FrontendEmailTemplateService}</p>
      */
     @Bean
+    @SuppressWarnings("unused") // Used by Spring dependency injection in FrontendEmailTemplateService
     public RestTemplate restTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(2000); // 2 seconds - fail fast if unreachable
