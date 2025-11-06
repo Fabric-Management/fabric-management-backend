@@ -68,7 +68,10 @@ COMMENT ON COLUMN common_company.common_role.is_system_role IS 'System roles can
 -- ============================================================================
 -- TABLE: common_department
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS common_company.common_department (
+-- Drop existing table from V002 to recreate with new structure
+DROP TABLE IF EXISTS common_company.common_department CASCADE;
+
+CREATE TABLE common_company.common_department (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
