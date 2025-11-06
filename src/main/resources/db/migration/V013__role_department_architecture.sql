@@ -76,9 +76,11 @@ CREATE TABLE common_company.common_department (
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
+    company_id UUID NOT NULL,
     department_name VARCHAR(100) NOT NULL,
     department_code VARCHAR(50) NOT NULL,
     description VARCHAR(500),
+    manager_id UUID,
     department_category_id UUID REFERENCES common_company.common_department_category(id),
     parent_department_id UUID REFERENCES common_company.common_department(id),
     is_system_department BOOLEAN NOT NULL DEFAULT FALSE,
@@ -91,10 +93,13 @@ CREATE TABLE common_company.common_department (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
+    CONSTRAINT fk_department_company FOREIGN KEY (company_id) 
+        REFERENCES common_company.common_company(id) ON DELETE CASCADE,
     CONSTRAINT uq_department_tenant_code UNIQUE (tenant_id, department_code)
 );
 
 CREATE INDEX IF NOT EXISTS idx_department_tenant ON common_company.common_department(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_department_company ON common_company.common_department(company_id);
 CREATE INDEX IF NOT EXISTS idx_department_category ON common_company.common_department(department_category_id);
 CREATE INDEX IF NOT EXISTS idx_department_parent ON common_company.common_department(parent_department_id);
 CREATE INDEX IF NOT EXISTS idx_department_code ON common_company.common_department(department_code);
