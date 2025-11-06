@@ -26,12 +26,17 @@ public class PositionController {
      * Get all positions for current tenant.
      * 
      * <p>Returns active positions only, ordered by display order and position name.</p>
+     * 
+     * <p><b>Hybrid Model:</b> Returns tenant-level positions only.
+     * Platform-level positions are reference catalog and are copied to tenants during seeding.
+     * Tenant-specific positions are what users interact with.</p>
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<PositionDto>>> getAllPositions() {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Getting all positions: tenantId={}", tenantId);
 
+        // Tenant-level positions only (platform-level positions are reference, not shown)
         List<PositionDto> positions = positionRepository.findByTenantId(tenantId)
             .stream()
             .map(PositionDto::from)

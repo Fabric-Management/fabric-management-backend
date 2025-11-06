@@ -26,15 +26,20 @@ public class DepartmentController {
      * Get all departments for current tenant.
      * 
      * <p>Returns active departments only, ordered by department name.</p>
+     * 
+     * <p><b>Hybrid Model:</b> Returns tenant-level departments only.
+     * Platform-level departments are reference catalog and are copied to tenants during seeding.
+     * Tenant-specific departments are what users interact with.</p>
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<DepartmentDto>>> getAllDepartments() {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Getting all departments: tenantId={}", tenantId);
 
-        List<DepartmentDto> departments = departmentRepository.findAll().stream()
-            .filter(dept -> dept.getTenantId().equals(tenantId))
-            .filter(dept -> Boolean.TRUE.equals(dept.getIsActive()))
+        // Tenant-level departments only (platform-level departments are reference, not shown)
+        List<DepartmentDto> departments = departmentRepository
+            .findByTenantIdAndIsActiveTrue(tenantId)
+            .stream()
             .map(DepartmentDto::from)
             .collect(Collectors.toList());
 

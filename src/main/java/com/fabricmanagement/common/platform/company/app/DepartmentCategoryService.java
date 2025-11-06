@@ -36,7 +36,19 @@ public class DepartmentCategoryService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding all department categories: tenantId={}", tenantId);
 
-        return categoryRepository.findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(tenantId);
+        // Hybrid model: Return platform-level (reference) + tenant-level categories
+        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+        List<DepartmentCategory> systemCategories = categoryRepository
+            .findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(systemTenantId);
+        List<DepartmentCategory> tenantCategories = categoryRepository
+            .findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(tenantId);
+        
+        // Combine: system categories (reference) + tenant-specific categories
+        List<DepartmentCategory> allCategories = new java.util.ArrayList<>();
+        allCategories.addAll(systemCategories);
+        allCategories.addAll(tenantCategories);
+        
+        return allCategories;
     }
 
     @Transactional(readOnly = true)
@@ -44,6 +56,12 @@ public class DepartmentCategoryService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding department category: tenantId={}, categoryId={}", tenantId, categoryId);
 
+        // Hybrid model: Check both platform-level and tenant-level
+        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+        Optional<DepartmentCategory> systemCategory = categoryRepository.findByTenantIdAndId(systemTenantId, categoryId);
+        if (systemCategory.isPresent()) {
+            return systemCategory;
+        }
         return categoryRepository.findByTenantIdAndId(tenantId, categoryId);
     }
 

@@ -36,7 +36,17 @@ public class RoleService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding all roles: tenantId={}", tenantId);
 
-        return roleRepository.findByTenantIdAndIsActiveTrue(tenantId);
+        // Hybrid model: Return platform-level (reference) + tenant-level roles
+        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+        List<Role> systemRoles = roleRepository.findByTenantIdAndIsActiveTrue(systemTenantId);
+        List<Role> tenantRoles = roleRepository.findByTenantIdAndIsActiveTrue(tenantId);
+        
+        // Combine: system roles (reference) + tenant-specific roles
+        List<Role> allRoles = new java.util.ArrayList<>();
+        allRoles.addAll(systemRoles);
+        allRoles.addAll(tenantRoles);
+        
+        return allRoles;
     }
 
     @Transactional(readOnly = true)
@@ -44,6 +54,12 @@ public class RoleService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding role: tenantId={}, roleId={}", tenantId, roleId);
 
+        // Hybrid model: Check both platform-level and tenant-level
+        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+        Optional<Role> systemRole = roleRepository.findByTenantIdAndId(systemTenantId, roleId);
+        if (systemRole.isPresent()) {
+            return systemRole;
+        }
         return roleRepository.findByTenantIdAndId(tenantId, roleId);
     }
 
@@ -52,6 +68,12 @@ public class RoleService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding role by code: tenantId={}, roleCode={}", tenantId, roleCode);
 
+        // Hybrid model: Check both platform-level and tenant-level
+        UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+        Optional<Role> systemRole = roleRepository.findByTenantIdAndRoleCode(systemTenantId, roleCode);
+        if (systemRole.isPresent()) {
+            return systemRole;
+        }
         return roleRepository.findByTenantIdAndRoleCode(tenantId, roleCode);
     }
 

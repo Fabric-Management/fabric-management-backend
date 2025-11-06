@@ -19,10 +19,15 @@ public class DepartmentDto {
     private String uid;
     private UUID companyId;
     private String departmentName;
+    private String departmentCode;
     private String description;
     private UUID managerId;
     private UUID departmentCategoryId;
     private String departmentCategoryName;
+    private UUID parentDepartmentId;
+    private String parentDepartmentName;
+    private Boolean isSystemDepartment;
+    private Integer displayOrder;
     private Boolean isActive;
 
     public static DepartmentDto from(Department department) {
@@ -32,10 +37,15 @@ public class DepartmentDto {
             .uid(department.getUid())
             .companyId(department.getCompanyId())
             .departmentName(department.getDepartmentName())
+            .departmentCode(department.getDepartmentCode())
             .description(department.getDescription())
             .managerId(department.getManagerId())
             .departmentCategoryId(department.getDepartmentCategory() != null ? department.getDepartmentCategory().getId() : null)
             .departmentCategoryName(department.getDepartmentCategory() != null ? department.getDepartmentCategory().getCategoryName() : null)
+            .parentDepartmentId(department.getParentDepartment() != null ? department.getParentDepartment().getId() : null)
+            .parentDepartmentName(department.getParentDepartment() != null ? department.getParentDepartment().getDepartmentName() : null)
+            .isSystemDepartment(department.getIsSystemDepartment())
+            .displayOrder(department.getDisplayOrder())
             .isActive(department.getIsActive())
             .build();
     }
