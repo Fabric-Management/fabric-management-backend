@@ -300,8 +300,7 @@ public class GoogleMapsClient {
                         normalizedPostcode, countryCode, errorMsg);
                     throw new IllegalStateException(errorMsg);
                 } else if ("INVALID_REQUEST".equals(body.getStatus())) {
-                    String errorMsg = "Invalid request to Google Maps API. Please check postcode format.";
-                    log.warn("⚠️ Google Geocoding API INVALID_REQUEST for postcode: {}, country: {}", 
+                    log.warn("⚠️ Google Geocoding API INVALID_REQUEST for postcode: {}, country: {} (invalid postcode format)", 
                         normalizedPostcode, countryCode);
                     // Don't throw, just return empty list (invalid postcode is not a system error)
                 } else {
