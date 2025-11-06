@@ -104,6 +104,16 @@ COMMENT ON TABLE common_company.common_department IS 'Organizational departments
 COMMENT ON COLUMN common_company.common_department.is_system_department IS 'System departments cannot be deleted or modified by users';
 
 -- ============================================================================
+-- ALTER: Add role_id to common_user table
+-- ============================================================================
+ALTER TABLE common_user.common_user
+ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES common_company.common_role(id);
+
+CREATE INDEX IF NOT EXISTS idx_user_role ON common_user.common_user(role_id);
+
+COMMENT ON COLUMN common_user.common_user.role_id IS 'User role assignment - references common_company.common_role';
+
+-- ============================================================================
 -- SEED DATA: Roles, Department Categories, and Departments
 -- ============================================================================
 -- Uses SYSTEM_TENANT_ID (00000000-0000-0000-0000-000000000000) for system-wide data
