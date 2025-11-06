@@ -40,18 +40,29 @@ public class EmailOutboxService {
      * 
      * <p>Fetches pending emails and attempts to send them.
      * Failed emails are retried with exponential backoff.</p>
+     * 
+     * <p><b>Performance:</b> Early return if no emails (minimal DB load).
+     * Query is optimized with indexes for fast execution.</p>
      */
     @Scheduled(fixedDelay = 5000) // Every 5 seconds
     @Transactional
     public void processEmailQueue() {
         try {
+            // Fast check: Count pending emails first (uses index)
+            long pendingCount = emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.PENDING);
+            if (pendingCount == 0) {
+                // No emails to process - early return (no log spam)
+                return;
+            }
+
+            // Fetch pending emails ready for sending
             List<EmailOutbox> pendingEmails = emailOutboxRepository.findPendingEmailsReadyForSending(
                 EmailOutboxStatus.PENDING,
                 Instant.now()
             );
 
             if (pendingEmails.isEmpty()) {
-                return; // No emails to process
+                return; // No emails ready yet (waiting for retry time)
             }
 
             log.debug("Processing {} pending email(s)", pendingEmails.size());
