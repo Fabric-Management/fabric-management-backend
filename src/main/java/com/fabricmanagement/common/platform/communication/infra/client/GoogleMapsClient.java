@@ -290,9 +290,13 @@ public class GoogleMapsClient {
                     log.warn("No addresses found for postcode: {}, country: {} (ZERO_RESULTS)", 
                         normalizedPostcode, countryCode);
                 } else if ("REQUEST_DENIED".equals(body.getStatus())) {
-                    String errorMsg = "Google Maps API request denied. Please check API key configuration, enabled APIs (Geocoding API, Places API), and billing account.";
-                    log.error("❌ Google Geocoding API REQUEST_DENIED for postcode: {}, country: {}. {}", 
-                        normalizedPostcode, countryCode, errorMsg);
+                    String errorDetails = body.getErrorMessage() != null ? body.getErrorMessage() : "No error details provided";
+                    String errorMsg = String.format(
+                        "Google Maps API request denied. Error: %s. Please check: 1) IP address restrictions (add your IP: 212.139.3.25), 2) API key configuration, 3) Enabled APIs (Geocoding API, Places API), 4) Billing account. Note: IP restriction changes may take up to 5 minutes to take effect.",
+                        errorDetails
+                    );
+                    log.error("❌ Google Geocoding API REQUEST_DENIED for postcode: {}, country: {}. Error details: {}", 
+                        normalizedPostcode, countryCode, errorDetails);
                     throw new IllegalStateException(errorMsg);
                 } else if ("OVER_QUERY_LIMIT".equals(body.getStatus())) {
                     String errorMsg = "Google Maps API quota exceeded. Please check billing account and quota limits.";
@@ -476,6 +480,9 @@ public class GoogleMapsClient {
     static class GeocodingResponse {
         @JsonProperty("status")
         private String status;
+
+        @JsonProperty("error_message")
+        private String errorMessage;
 
         @JsonProperty("results")
         private List<GeocodingResult> results;
