@@ -35,6 +35,7 @@ public class AddressValidationController {
 
     private final GoogleMapsClient googleMapsClient;
     private final AddressValidationService addressValidationService;
+    private final PostcodeValidator postcodeValidator;
 
     /**
      * Autocomplete endpoint - Get address suggestions as user types.
@@ -170,6 +171,28 @@ public class AddressValidationController {
                 .body(ApiResponse.error("POSTCODE_REQUIRED", "Postcode parameter is required"));
         }
 
+        // Extract country code from country parameter (if provided)
+        String countryCode = extractCountryCode(country);
+        
+        // Validate minimum length before making API call
+        if (!postcodeValidator.isLongEnoughToSearch(postcode, countryCode)) {
+            int minLength = postcodeValidator.getMinimumLength(countryCode);
+            String countryName = countryCode != null ? countryCode : "selected country";
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("POSTCODE_TOO_SHORT", 
+                    String.format("Postcode must be at least %d characters for %s. Please enter more characters.", 
+                        minLength, countryName)));
+        }
+
+        // Validate format if country is specified
+        if (countryCode != null && !countryCode.isBlank()) {
+            if (!postcodeValidator.isValidFormat(postcode, countryCode)) {
+                log.debug("Postcode format validation failed: postcode={}, country={}", postcode, countryCode);
+                // Don't reject - let Google API handle it (format might be valid but not match our regex)
+                // This is just a pre-check to reduce unnecessary API calls
+            }
+        }
+
         try {
             List<AddressValidationResponse> results = googleMapsClient.searchByPostcode(postcode, country);
             return ResponseEntity.ok(ApiResponse.success(results));
@@ -183,6 +206,39 @@ public class AddressValidationController {
             return ResponseEntity.status(500)
                 .body(ApiResponse.error("GOOGLE_API_ERROR", "Failed to search addresses. Please try again later."));
         }
+    }
+
+    /**
+     * Extracts ISO country code from country parameter.
+     * Handles both ISO codes ("GB", "TR") and country names ("United Kingdom", "Turkey").
+     */
+    private String extractCountryCode(String country) {
+        if (country == null || country.isBlank()) {
+            return null;
+        }
+
+        String normalized = country.trim();
+        
+        // If it's a 2-letter code (ISO 3166-1 alpha-2), use it directly
+        if (normalized.length() == 2 && normalized.matches("[A-Za-z]{2}")) {
+            return normalized.toUpperCase();
+        }
+
+        // Map common country names to ISO codes
+        String upper = normalized.toUpperCase();
+        return switch (upper) {
+            case "UNITED KINGDOM", "UK", "GREAT BRITAIN", "BRITAIN" -> "GB";
+            case "UNITED STATES", "USA", "US", "AMERICA" -> "US";
+            case "TURKEY", "TÜRKIYE", "TURKIYE" -> "TR";
+            case "GERMANY", "DEUTSCHLAND" -> "DE";
+            case "FRANCE" -> "FR";
+            case "ITALY", "ITALIA" -> "IT";
+            case "SPAIN", "ESPANA" -> "ES";
+            case "NETHERLANDS", "HOLLAND" -> "NL";
+            case "CANADA" -> "CA";
+            case "AUSTRALIA" -> "AU";
+            default -> null; // Unknown country name
+        };
     }
 }
 
