@@ -127,6 +127,8 @@ application:
       enabled: ${EMAIL_FRONTEND_ENABLED:false} # ✅ Disabled (frontend endpoint removed)
       timeout-ms: ${EMAIL_FRONTEND_TIMEOUT_MS:5000}
       url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
+    # Transactional Outbox pattern: Save emails to DB before sending (ensures persistence and retry)
+    use-outbox: ${EMAIL_USE_OUTBOX:true} # ✅ Enabled by default for reliable email delivery
 
   # AI Configuration
   ai:
