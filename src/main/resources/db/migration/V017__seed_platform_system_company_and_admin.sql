@@ -182,7 +182,7 @@ BEGIN
     -- STEP 7: Get or Create PLATFORM_ADMIN Role
     -- ========================================================================
     SELECT id INTO platform_role_id
-    FROM common_user.common_role
+    FROM common_company.common_role
     WHERE tenant_id = system_tenant_id
     AND role_code = 'PLATFORM_ADMIN'
     AND is_active = TRUE
@@ -192,7 +192,7 @@ BEGIN
         RAISE NOTICE 'PLATFORM_ADMIN role not found, creating...';
         platform_role_id := gen_random_uuid();
         
-        INSERT INTO common_user.common_role (
+        INSERT INTO common_company.common_role (
             id, tenant_id, uid,
             role_name, role_code, description,
             is_active,
