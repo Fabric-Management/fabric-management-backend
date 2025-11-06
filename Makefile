@@ -66,7 +66,7 @@ help: ## Show available commands
 # =============================================================================
 # SETUP
 # =============================================================================
-setup: ## Initial setup - create .env from template
+setup: ## Initial setup - create .env from template + git hooks
 	@echo "$(YELLOW)🔧 Setting up environment...$(NC)"
 	if [ ! -f .env ]; then \
 		cp .env.example .env; \
@@ -74,6 +74,8 @@ setup: ## Initial setup - create .env from template
 	else \
 		echo "$(YELLOW)⚠️  .env already exists.$(NC)"; \
 	fi
+	@echo "$(YELLOW)🔧 Setting up Git hooks...$(NC)"
+	@./scripts/setup-git-hooks.sh || echo "$(YELLOW)⚠️  Git hooks setup skipped (not in git repo?)$(NC)"
 
 validate-env: ## Validate .env file exists
 	@echo "$(YELLOW)🔍 Validating environment...$(NC)"
