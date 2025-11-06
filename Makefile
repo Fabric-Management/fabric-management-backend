@@ -10,6 +10,7 @@
         health metrics prometheus grafana swagger \
         db-shell db-migrate db-info db-validate db-clean db-tables db-schemas \
         db-view-companies db-view-users db-view-subscriptions db-view-tokens db-view-all \
+        show-tables \
         db-backup db-restore db-reset \
         kafka-topics kafka-describe kafka-consumer \
         clean clean-docker prune rebuild \
@@ -299,6 +300,50 @@ db-view-all: ## View summary tables (companies/users/subscriptions/tokens)
 	@$(MAKE) db-view-subscriptions
 	@echo ""
 	@$(MAKE) db-view-tokens
+
+show-tables: ## Show table contents (make show-tables TABLES="common_role common_department")
+	@if [ -z "$(TABLES)" ]; then \
+		echo "$(RED)❌ Usage: make show-tables TABLES=\"table1 table2 ...\"$(NC)"; \
+		echo "$(YELLOW)Example: make show-tables TABLES=\"common_role common_department_category common_department\"$(NC)"; \
+		exit 1; \
+	fi
+	@for table in $(TABLES); do \
+		echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"; \
+		echo "$(GREEN)📋 Table: $$table$(NC)"; \
+		echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"; \
+		schema=$$(echo $$table | cut -d'.' -f1); \
+		tablename=$$(echo $$table | cut -d'.' -f2); \
+		if [ "$$tablename" = "$$table" ]; then \
+			tablename=$$table; \
+			schema=""; \
+		fi; \
+		if [ -z "$$schema" ]; then \
+			docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_user -d fabric_management -c "\
+				SELECT * FROM $$tablename \
+				ORDER BY created_at DESC NULLS LAST \
+				LIMIT 50;" 2>/dev/null || \
+			docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_user -d fabric_management -c "\
+				SELECT * FROM common_company.$$tablename \
+				ORDER BY created_at DESC NULLS LAST \
+				LIMIT 50;" 2>/dev/null || \
+			docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_user -d fabric_management -c "\
+				SELECT * FROM common_user.$$tablename \
+				ORDER BY created_at DESC NULLS LAST \
+				LIMIT 50;" 2>/dev/null || \
+			docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_user -d fabric_management -c "\
+				SELECT * FROM production.$$tablename \
+				ORDER BY created_at DESC NULLS LAST \
+				LIMIT 50;" 2>/dev/null || \
+			echo "$(RED)❌ Table '$$tablename' not found in common schemas$(NC)"; \
+		else \
+			docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_user -d fabric_management -c "\
+				SELECT * FROM $$schema.$$tablename \
+				ORDER BY created_at DESC NULLS LAST \
+				LIMIT 50;" 2>/dev/null || \
+			echo "$(RED)❌ Table '$$schema.$$tablename' not found$(NC)"; \
+		fi; \
+		echo ""; \
+	done
 
 db-backup: ## Backup database to backups/ folder
 	@echo "$(YELLOW)💾 Backing up database...$(NC)"
