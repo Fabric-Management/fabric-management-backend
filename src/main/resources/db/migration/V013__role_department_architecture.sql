@@ -68,14 +68,19 @@ COMMENT ON COLUMN common_company.common_role.is_system_role IS 'System roles can
 -- ============================================================================
 -- TABLE: common_department
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS common_company.common_department (
+-- Drop existing table from V002 to recreate with new structure
+DROP TABLE IF EXISTS common_company.common_department CASCADE;
+
+CREATE TABLE common_company.common_department (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
+    company_id UUID NOT NULL,
     department_name VARCHAR(100) NOT NULL,
     department_code VARCHAR(50) NOT NULL,
     description VARCHAR(500),
+    manager_id UUID,
     department_category_id UUID REFERENCES common_company.common_department_category(id),
     parent_department_id UUID REFERENCES common_company.common_department(id),
     is_system_department BOOLEAN NOT NULL DEFAULT FALSE,
@@ -88,10 +93,13 @@ CREATE TABLE IF NOT EXISTS common_company.common_department (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     
+    CONSTRAINT fk_department_company FOREIGN KEY (company_id) 
+        REFERENCES common_company.common_company(id) ON DELETE CASCADE,
     CONSTRAINT uq_department_tenant_code UNIQUE (tenant_id, department_code)
 );
 
 CREATE INDEX IF NOT EXISTS idx_department_tenant ON common_company.common_department(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_department_company ON common_company.common_department(company_id);
 CREATE INDEX IF NOT EXISTS idx_department_category ON common_company.common_department(department_category_id);
 CREATE INDEX IF NOT EXISTS idx_department_parent ON common_company.common_department(parent_department_id);
 CREATE INDEX IF NOT EXISTS idx_department_code ON common_company.common_department(department_code);
@@ -99,6 +107,41 @@ CREATE INDEX IF NOT EXISTS idx_department_active ON common_company.common_depart
 
 COMMENT ON TABLE common_company.common_department IS 'Organizational departments (e.g., Production, Quality Control, etc.)';
 COMMENT ON COLUMN common_company.common_department.is_system_department IS 'System departments cannot be deleted or modified by users';
+
+-- ============================================================================
+-- ALTER: Add role_id to common_user table
+-- ============================================================================
+ALTER TABLE common_user.common_user
+ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES common_company.common_role(id);
+
+CREATE INDEX IF NOT EXISTS idx_user_role ON common_user.common_user(role_id);
+
+COMMENT ON COLUMN common_user.common_user.role_id IS 'User role assignment - references common_company.common_role';
+
+-- ============================================================================
+-- TABLE: common_user_department (Junction table)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS common_user.common_user_department (
+    user_id UUID NOT NULL,
+    department_id UUID NOT NULL,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    assigned_by UUID,
+    
+    PRIMARY KEY (user_id, department_id),
+    
+    CONSTRAINT fk_user_dept_user FOREIGN KEY (user_id) 
+        REFERENCES common_user.common_user(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_dept_department FOREIGN KEY (department_id) 
+        REFERENCES common_company.common_department(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_dept_user ON common_user.common_user_department(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_dept_dept ON common_user.common_user_department(department_id);
+CREATE INDEX IF NOT EXISTS idx_user_dept_primary ON common_user.common_user_department(user_id, is_primary) WHERE is_primary = TRUE;
+
+COMMENT ON TABLE common_user.common_user_department IS 'Many-to-Many relationship between User and Department';
+COMMENT ON COLUMN common_user.common_user_department.is_primary IS 'Primary department assignment (user can have multiple departments)';
 
 -- ============================================================================
 -- SEED DATA: Roles, Department Categories, and Departments
@@ -191,32 +234,29 @@ BEGIN
     -- ========================================================================
     -- SEED: Roles
     -- ========================================================================
+    -- Platform-level system roles that serve as reference catalog
+    -- These roles are copied to new tenants during tenant seeding
     INSERT INTO common_company.common_role 
         (tenant_id, uid, role_name, role_code, description, department_category_id, is_system_role, display_order, is_active)
     VALUES
+        -- Production Roles
         (system_tenant_id, 'SYS-ROLE-001', 'Production Manager', 'PROD_MANAGER', 'Üretim yöneticisi', prod_cat_id, TRUE, 1, TRUE),
         (system_tenant_id, 'SYS-ROLE-002', 'Production Worker', 'PROD_WORKER', 'Üretim işçisi', prod_cat_id, TRUE, 2, TRUE),
         (system_tenant_id, 'SYS-ROLE-003', 'Quality Control', 'QC', 'Kalite kontrol', prod_cat_id, TRUE, 3, TRUE),
+        -- Administration Roles
         (system_tenant_id, 'SYS-ROLE-004', 'Administrator', 'ADMIN', 'Sistem yöneticisi', admin_cat_id, TRUE, 4, TRUE),
         (system_tenant_id, 'SYS-ROLE-005', 'HR Manager', 'HR_MANAGER', 'İnsan kaynakları yöneticisi', admin_cat_id, TRUE, 5, TRUE),
+        -- Logistics Roles
         (system_tenant_id, 'SYS-ROLE-006', 'Logistics Manager', 'LOG_MANAGER', 'Lojistik yöneticisi', logistics_cat_id, TRUE, 6, TRUE),
-        (system_tenant_id, 'SYS-ROLE-007', 'Warehouse Worker', 'WAREHOUSE_WORKER', 'Depo işçisi', logistics_cat_id, TRUE, 7, TRUE)
+        (system_tenant_id, 'SYS-ROLE-007', 'Warehouse Worker', 'WAREHOUSE_WORKER', 'Depo işçisi', logistics_cat_id, TRUE, 7, TRUE),
+        -- Platform Admin Role (special - system-wide access)
+        (system_tenant_id, 'SYS-ROLE-0001', 'Platform Administrator', 'PLATFORM_ADMIN', 'Full platform access - can create tenants, manage system settings, access all tenant data', NULL, TRUE, 0, TRUE)
     ON CONFLICT (uid) DO NOTHING;
 
     -- ========================================================================
     -- SEED: Departments
     -- ========================================================================
-    INSERT INTO common_company.common_department 
-        (tenant_id, uid, department_name, department_code, description, department_category_id, is_system_department, display_order, is_active)
-    VALUES
-        (system_tenant_id, 'SYS-DEPT-001', 'Production', 'PROD', 'Ana üretim departmanı', prod_cat_id, TRUE, 1, TRUE),
-        (system_tenant_id, 'SYS-DEPT-002', 'Quality Control', 'QC', 'Kalite kontrol departmanı', prod_cat_id, TRUE, 2, TRUE),
-        (system_tenant_id, 'SYS-DEPT-003', 'Maintenance', 'MAINT', 'Bakım departmanı', util_cat_id, TRUE, 3, TRUE),
-        (system_tenant_id, 'SYS-DEPT-004', 'Administration', 'ADMIN', 'İdari departman', admin_cat_id, TRUE, 4, TRUE),
-        (system_tenant_id, 'SYS-DEPT-005', 'Human Resources', 'HR', 'İnsan kaynakları', admin_cat_id, TRUE, 5, TRUE),
-        (system_tenant_id, 'SYS-DEPT-006', 'Logistics', 'LOG', 'Lojistik departmanı', logistics_cat_id, TRUE, 6, TRUE),
-        (system_tenant_id, 'SYS-DEPT-007', 'Warehouse', 'WAREHOUSE', 'Depo departmanı', logistics_cat_id, TRUE, 7, TRUE),
-        (system_tenant_id, 'SYS-DEPT-008', 'IT Support', 'IT', 'IT destek departmanı', support_cat_id, TRUE, 8, TRUE)
-    ON CONFLICT (uid) DO NOTHING;
+    -- NOTE: Department seed data moved to V017 after Platform System Company is created
+    -- Departments require a valid company_id, which is created in V017
 
 END $$;

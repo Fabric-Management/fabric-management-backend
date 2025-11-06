@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS common_company.common_position (
         REFERENCES common_company.common_department(id) ON DELETE CASCADE,
     CONSTRAINT fk_position_role 
         FOREIGN KEY (default_role_id) 
-        REFERENCES common_user.common_role(id) ON DELETE SET NULL,
+        REFERENCES common_company.common_role(id) ON DELETE SET NULL,
     CONSTRAINT fk_position_parent 
         FOREIGN KEY (hierarchical_parent_id) 
         REFERENCES common_company.common_position(id) ON DELETE SET NULL,

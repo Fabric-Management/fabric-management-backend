@@ -31,6 +31,42 @@ DECLARE
     -- Check flags
     company_exists BOOLEAN := FALSE;
     user_exists BOOLEAN := FALSE;
+    
+    -- Department seeding variables
+    prod_cat_id UUID;
+    admin_cat_id UUID;
+    logistics_cat_id UUID;
+    util_cat_id UUID;
+    support_cat_id UUID;
+    
+    -- Department IDs (for platform-level seeding)
+    fiber_dept_id UUID;
+    yarn_dept_id UUID;
+    weaving_dept_id UUID;
+    dyeing_dept_id UUID;
+    quality_dept_id UUID;
+    hr_dept_id UUID;
+    finance_dept_id UUID;
+    admin_office_dept_id UUID;
+    mgmt_dept_id UUID;
+    warehouse_dept_id UUID;
+    procurement_dept_id UUID;
+    shipping_dept_id UUID;
+    maintenance_dept_id UUID;
+    energy_dept_id UUID;
+    kitchen_dept_id UUID;
+    it_dept_id UUID;
+    security_dept_id UUID;
+    cleaning_dept_id UUID;
+    
+    -- Role IDs (for platform-level seeding)
+    prod_mgr_role_id UUID;
+    prod_worker_role_id UUID;
+    qc_role_id UUID;
+    admin_role_id UUID;
+    hr_mgr_role_id UUID;
+    log_mgr_role_id UUID;
+    warehouse_worker_role_id UUID;
 BEGIN
     -- ========================================================================
     -- STEP 1: Create Platform System Company (if not exists)
@@ -182,7 +218,7 @@ BEGIN
     -- STEP 7: Get or Create PLATFORM_ADMIN Role
     -- ========================================================================
     SELECT id INTO platform_role_id
-    FROM common_user.common_role
+    FROM common_company.common_role
     WHERE tenant_id = system_tenant_id
     AND role_code = 'PLATFORM_ADMIN'
     AND is_active = TRUE
@@ -192,7 +228,7 @@ BEGIN
         RAISE NOTICE 'PLATFORM_ADMIN role not found, creating...';
         platform_role_id := gen_random_uuid();
         
-        INSERT INTO common_user.common_role (
+        INSERT INTO common_company.common_role (
             id, tenant_id, uid,
             role_name, role_code, description,
             is_active,
@@ -247,6 +283,339 @@ BEGIN
     );
 
     RAISE NOTICE '✅ AuthUser created: %', auth_user_id;
+
+    -- ========================================================================
+    -- STEP 10: Seed Platform-Level Departments and Positions
+    -- ========================================================================
+    -- Platform-level departments and positions serve as reference catalog
+    -- These are copied to new tenants during tenant seeding
+    RAISE NOTICE 'Seeding platform-level departments and positions...';
+    
+    -- Get category IDs
+    BEGIN
+        -- Get category IDs
+        SELECT id INTO prod_cat_id FROM common_company.common_department_category 
+            WHERE tenant_id = system_tenant_id AND uid = 'SYS-CAT-001';
+        SELECT id INTO admin_cat_id FROM common_company.common_department_category 
+            WHERE tenant_id = system_tenant_id AND uid = 'SYS-CAT-002';
+        SELECT id INTO logistics_cat_id FROM common_company.common_department_category 
+            WHERE tenant_id = system_tenant_id AND uid = 'SYS-CAT-004';
+        SELECT id INTO util_cat_id FROM common_company.common_department_category 
+            WHERE tenant_id = system_tenant_id AND uid = 'SYS-CAT-003';
+        SELECT id INTO support_cat_id FROM common_company.common_department_category 
+            WHERE tenant_id = system_tenant_id AND uid = 'SYS-CAT-005';
+        
+        -- Get role IDs
+        SELECT id INTO prod_mgr_role_id FROM common_company.common_role 
+            WHERE tenant_id = system_tenant_id AND role_code = 'PROD_MANAGER';
+        SELECT id INTO prod_worker_role_id FROM common_company.common_role 
+            WHERE tenant_id = system_tenant_id AND role_code = 'PROD_WORKER';
+        SELECT id INTO qc_role_id FROM common_company.common_role 
+            WHERE tenant_id = system_tenant_id AND role_code = 'QC';
+        SELECT id INTO admin_role_id FROM common_company.common_role 
+            WHERE tenant_id = system_tenant_id AND role_code = 'ADMIN';
+        SELECT id INTO hr_mgr_role_id FROM common_company.common_role 
+            WHERE tenant_id = system_tenant_id AND role_code = 'HR_MANAGER';
+        SELECT id INTO log_mgr_role_id FROM common_company.common_role 
+            WHERE tenant_id = system_tenant_id AND role_code = 'LOG_MANAGER';
+        SELECT id INTO warehouse_worker_role_id FROM common_company.common_role 
+            WHERE tenant_id = system_tenant_id AND role_code = 'WAREHOUSE_WORKER';
+        
+        -- ====================================================================
+        -- PRODUCTION DEPARTMENTS
+        -- ====================================================================
+        -- Fiber & Raw Material
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-001', platform_company_id, 
+             'Fiber & Raw Material', 'FIBERRAWMATERIAL', 
+             'Fiber procurement and raw material management', prod_cat_id, TRUE, 1, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO fiber_dept_id;
+        
+        IF fiber_dept_id IS NULL THEN
+            SELECT id INTO fiber_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-001';
+        END IF;
+        
+        -- Yarn Production
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-002', platform_company_id, 
+             'Yarn Production', 'YARNPRODUCTION', 
+             'Yarn manufacturing operations', prod_cat_id, TRUE, 2, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO yarn_dept_id;
+        
+        IF yarn_dept_id IS NULL THEN
+            SELECT id INTO yarn_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-002';
+        END IF;
+        
+        -- Weaving & Knitting
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-003', platform_company_id, 
+             'Weaving & Knitting', 'WEAVINGKNITTING', 
+             'Fabric weaving and knitting operations', prod_cat_id, TRUE, 3, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO weaving_dept_id;
+        
+        IF weaving_dept_id IS NULL THEN
+            SELECT id INTO weaving_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-003';
+        END IF;
+        
+        -- Dyeing & Finishing
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-004', platform_company_id, 
+             'Dyeing & Finishing', 'DYEINGFINISHING', 
+             'Fabric dyeing and finishing operations', prod_cat_id, TRUE, 4, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO dyeing_dept_id;
+        
+        IF dyeing_dept_id IS NULL THEN
+            SELECT id INTO dyeing_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-004';
+        END IF;
+        
+        -- Quality Control
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-005', platform_company_id, 
+             'Quality Control', 'QUALITYCONTROL', 
+             'Quality assurance and laboratory testing', prod_cat_id, TRUE, 5, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO quality_dept_id;
+        
+        IF quality_dept_id IS NULL THEN
+            SELECT id INTO quality_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-005';
+        END IF;
+        
+        -- ====================================================================
+        -- ADMINISTRATION DEPARTMENTS
+        -- ====================================================================
+        -- Human Resources
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-006', platform_company_id, 
+             'Human Resources', 'HUMANRESOURCES', 
+             'Human resources management', admin_cat_id, TRUE, 6, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO hr_dept_id;
+        
+        IF hr_dept_id IS NULL THEN
+            SELECT id INTO hr_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-006';
+        END IF;
+        
+        -- Finance & Accounting
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-007', platform_company_id, 
+             'Finance & Accounting', 'FINANCEACCOUNTING', 
+             'Financial management and accounting', admin_cat_id, TRUE, 7, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO finance_dept_id;
+        
+        IF finance_dept_id IS NULL THEN
+            SELECT id INTO finance_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-007';
+        END IF;
+        
+        -- Administration Office
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-008', platform_company_id, 
+             'Administration Office', 'ADMINISTRATIONOFFICE', 
+             'General administration and office management', admin_cat_id, TRUE, 8, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO admin_office_dept_id;
+        
+        IF admin_office_dept_id IS NULL THEN
+            SELECT id INTO admin_office_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-008';
+        END IF;
+        
+        -- Management & Planning
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-009', platform_company_id, 
+             'Management & Planning', 'MANAGEMENTPLANNING', 
+             'Executive management and strategic planning', admin_cat_id, TRUE, 9, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO mgmt_dept_id;
+        
+        IF mgmt_dept_id IS NULL THEN
+            SELECT id INTO mgmt_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-009';
+        END IF;
+        
+        -- ====================================================================
+        -- LOGISTICS DEPARTMENTS
+        -- ====================================================================
+        -- Warehouse
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-010', platform_company_id, 
+             'Warehouse', 'WAREHOUSE', 
+             'Warehouse management and storage', logistics_cat_id, TRUE, 10, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO warehouse_dept_id;
+        
+        IF warehouse_dept_id IS NULL THEN
+            SELECT id INTO warehouse_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-010';
+        END IF;
+        
+        -- Procurement & Supply
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-011', platform_company_id, 
+             'Procurement & Supply', 'PROCUREMENTSUPPLY', 
+             'Procurement and supply chain management', logistics_cat_id, TRUE, 11, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO procurement_dept_id;
+        
+        IF procurement_dept_id IS NULL THEN
+            SELECT id INTO procurement_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-011';
+        END IF;
+        
+        -- Shipping & Transport
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-012', platform_company_id, 
+             'Shipping & Transport', 'SHIPPINGTRANSPORT', 
+             'Shipping and transportation management', logistics_cat_id, TRUE, 12, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO shipping_dept_id;
+        
+        IF shipping_dept_id IS NULL THEN
+            SELECT id INTO shipping_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-012';
+        END IF;
+        
+        -- ====================================================================
+        -- UTILITY DEPARTMENTS
+        -- ====================================================================
+        -- Maintenance
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-013', platform_company_id, 
+             'Maintenance', 'MAINTENANCE', 
+             'Equipment maintenance and repair', util_cat_id, TRUE, 13, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO maintenance_dept_id;
+        
+        IF maintenance_dept_id IS NULL THEN
+            SELECT id INTO maintenance_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-013';
+        END IF;
+        
+        -- Energy & Facilities
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-014', platform_company_id, 
+             'Energy & Facilities', 'ENERGYFACILITIES', 
+             'Energy generation and facility operations', util_cat_id, TRUE, 14, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO energy_dept_id;
+        
+        IF energy_dept_id IS NULL THEN
+            SELECT id INTO energy_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-014';
+        END IF;
+        
+        -- Kitchen & Catering
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-015', platform_company_id, 
+             'Kitchen & Catering', 'KITCHENCATERING', 
+             'Kitchen and cafeteria services', util_cat_id, TRUE, 15, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO kitchen_dept_id;
+        
+        IF kitchen_dept_id IS NULL THEN
+            SELECT id INTO kitchen_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-015';
+        END IF;
+        
+        -- ====================================================================
+        -- SUPPORT DEPARTMENTS
+        -- ====================================================================
+        -- IT Services
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-016', platform_company_id, 
+             'IT Services', 'ITSERVICES', 
+             'IT support and system administration', support_cat_id, TRUE, 16, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO it_dept_id;
+        
+        IF it_dept_id IS NULL THEN
+            SELECT id INTO it_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-016';
+        END IF;
+        
+        -- Security
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-017', platform_company_id, 
+             'Security', 'SECURITY', 
+             'Security and access control', support_cat_id, TRUE, 17, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO security_dept_id;
+        
+        IF security_dept_id IS NULL THEN
+            SELECT id INTO security_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-017';
+        END IF;
+        
+        -- Cleaning Services
+        INSERT INTO common_company.common_department 
+            (id, tenant_id, uid, company_id, department_name, department_code, description, 
+             department_category_id, is_system_department, display_order, is_active)
+        VALUES 
+            (gen_random_uuid(), system_tenant_id, 'SYS-DEPT-018', platform_company_id, 
+             'Cleaning Services', 'CLEANINGSERVICES', 
+             'Cleaning and janitorial services', support_cat_id, TRUE, 18, TRUE)
+        ON CONFLICT (uid) DO UPDATE SET department_name = EXCLUDED.department_name
+        RETURNING id INTO cleaning_dept_id;
+        
+        IF cleaning_dept_id IS NULL THEN
+            SELECT id INTO cleaning_dept_id FROM common_company.common_department WHERE uid = 'SYS-DEPT-018';
+        END IF;
+        
+        RAISE NOTICE '✅ Platform-level departments seeded';
+        
+        -- NOTE: Position seeds will be added via TenantSeedService
+        -- Positions are too numerous to seed in migration files
+        -- They will be created during tenant seeding process
+        
+    EXCEPTION
+        WHEN OTHERS THEN
+            RAISE NOTICE 'Warning: Failed to seed platform-level departments: %', SQLERRM;
+    END;
 
     RAISE NOTICE '';
     RAISE NOTICE '═══════════════════════════════════════════════════════════════';

@@ -78,6 +78,7 @@ public class TenantSeedService {
             seedAdministrativeDepartments(companyId, categories, roles);
             seedLogisticsDepartments(companyId, categories, roles);
             seedUtilityDepartments(companyId, categories, roles);
+            seedSupportDepartments(companyId, categories, roles);
 
             log.info("✅ Seeded departments and positions for tenant: tenantId={}", tenantId);
         } finally {
@@ -160,34 +161,54 @@ public class TenantSeedService {
     }
 
     private void seedAdministrativeDepartments(UUID companyId, Map<String, DepartmentCategory> categories, Map<String, Role> roles) {
-        DepartmentCategory adminCategory = categories.get("Administrative");
+        DepartmentCategory adminCategory = categories.get("Administration");
         if (adminCategory == null) {
-            log.warn("Administrative category not found, skipping administrative departments");
+            log.warn("Administration category not found, skipping administrative departments");
             return;
         }
 
-        // Management Department
-        Department managementDept = createDepartment(companyId, "Management",
-            "Executive management and planning", adminCategory.getId());
-        createManagementPositions(managementDept.getId(), roles);
+        // Human Resources Department
+        Department hrDept = createDepartment(companyId, "Human Resources",
+            "Human resources management", adminCategory.getId());
+        createHRPositions(hrDept.getId(), roles);
 
-        // Sales Department
-        Department salesDept = createDepartment(companyId, "Sales",
-            "Sales and customer relations", adminCategory.getId());
-        createSalesPositions(salesDept.getId(), roles);
+        // Finance & Accounting Department
+        Department financeDept = createDepartment(companyId, "Finance & Accounting",
+            "Financial management and accounting", adminCategory.getId());
+        createFinancePositions(financeDept.getId(), roles);
+
+        // Administration Office Department
+        Department adminOfficeDept = createDepartment(companyId, "Administration Office",
+            "General administration and office management", adminCategory.getId());
+        createAdminOfficePositions(adminOfficeDept.getId(), roles);
+
+        // Management & Planning Department
+        Department mgmtDept = createDepartment(companyId, "Management & Planning",
+            "Executive management and strategic planning", adminCategory.getId());
+        createManagementPositions(mgmtDept.getId(), roles);
     }
 
     private void seedLogisticsDepartments(UUID companyId, Map<String, DepartmentCategory> categories, Map<String, Role> roles) {
-        DepartmentCategory logisticsCategory = categories.get("Logistics & Warehouse");
+        DepartmentCategory logisticsCategory = categories.get("Logistics");
         if (logisticsCategory == null) {
-            log.warn("Logistics & Warehouse category not found, skipping logistics departments");
+            log.warn("Logistics category not found, skipping logistics departments");
             return;
         }
 
-        // Warehouse & Logistics Department
-        Department warehouseDept = createDepartment(companyId, "Warehouse & Logistics",
-            "Warehouse management and logistics operations", logisticsCategory.getId());
+        // Warehouse Department
+        Department warehouseDept = createDepartment(companyId, "Warehouse",
+            "Warehouse management and storage", logisticsCategory.getId());
         createWarehousePositions(warehouseDept.getId(), roles);
+
+        // Procurement & Supply Department
+        Department procurementDept = createDepartment(companyId, "Procurement & Supply",
+            "Procurement and supply chain management", logisticsCategory.getId());
+        createProcurementPositions(procurementDept.getId(), roles);
+
+        // Shipping & Transport Department
+        Department shippingDept = createDepartment(companyId, "Shipping & Transport",
+            "Shipping and transportation management", logisticsCategory.getId());
+        createShippingPositions(shippingDept.getId(), roles);
     }
 
     private void seedUtilityDepartments(UUID companyId, Map<String, DepartmentCategory> categories, Map<String, Role> roles) {
@@ -221,10 +242,16 @@ public class TenantSeedService {
                 TenantContext.getCurrentTenantId(), companyId, name).orElseThrow();
         }
 
-        Department department = Department.create(companyId, name, description);
+        String departmentCode = generateDepartmentCode(name);
+        Department department = Department.create(companyId, name, departmentCode, description);
         department.setDepartmentCategory(
             departmentCategoryRepository.findById(categoryId).orElse(null));
         return departmentRepository.save(department);
+    }
+
+    private String generateDepartmentCode(String departmentName) {
+        String code = departmentName.toUpperCase().replaceAll("[^A-Z0-9]", "");
+        return code.substring(0, Math.min(50, code.length()));
     }
 
     private Position createPosition(UUID departmentId, String name, String code, String description,
@@ -246,232 +273,260 @@ public class TenantSeedService {
 
     // ========== Position Creation Methods ==========
 
-    private void createFiberPositions(UUID departmentId, Map<String, Role> roles) {
-        int order = 1;
-        createPosition(departmentId, "Fiber Procurement Supervisor", "FIBER-SUPV",
-            "Manages fiber procurement and raw material sourcing", roles.get("SUPERVISOR"), order++);
-        createPosition(departmentId, "Raw Material Procurement Specialist", "RAW-PROC",
-            "Handles raw material purchasing", roles.get("USER"), order++);
-        createPosition(departmentId, "Fiber Warehouse Clerk", "FIBER-WHC",
-            "Manages fiber warehouse operations", roles.get("USER"), order++);
-        createPosition(departmentId, "Fiber Quality Controller", "FIBER-QC",
-            "Performs quality control on fibers", roles.get("USER"), order++);
-        createPosition(departmentId, "Fiber Preparation Operator", "FIBER-PREP",
-            "Prepares fibers for processing", roles.get("USER"), order++);
-        createPosition(departmentId, "Blending Operator", "FIBER-BLEND",
-            "Operates fiber blending equipment", roles.get("USER"), order++);
-    }
-
     private void createYarnPositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Yarn Production Manager", "YARN-MGR",
-            "Manages yarn production department", roles.get("MANAGER"), order++);
-        createPosition(departmentId, "Yarn Production Supervisor", "YARN-SUPV",
-            "Supervises yarn production operations", roles.get("SUPERVISOR"), order++);
-        createPosition(departmentId, "Ring Operator", "YARN-RING",
-            "Operates ring spinning machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Open-End Operator", "YARN-OE",
-            "Operates open-end spinning machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Compact Operator", "YARN-COMP",
-            "Operates compact spinning machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Machine Setter", "YARN-SET",
-            "Sets up and adjusts spinning machines", roles.get("USER"), order++);
+            "Manages yarn production department", roles.get("PROD_MANAGER"), order++);
+        createPosition(departmentId, "Spinning Operator", "YARN-SPIN",
+            "Operates spinning machines", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Bobbin Winder", "YARN-WIND",
+            "Winds yarn onto bobbins", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Yarn Quality Controller", "YARN-QC",
-            "Performs quality control on yarn", roles.get("USER"), order++);
-        createPosition(departmentId, "Yarn Shift Supervisor", "YARN-SHIFT",
-            "Supervises yarn production shifts", roles.get("SUPERVISOR"), order++);
-        createPosition(departmentId, "Yarn Maintenance Technician", "YARN-MAINT",
-            "Maintains yarn production equipment", roles.get("USER"), order++);
+            "Performs quality control on yarn", roles.get("QC"), order++);
     }
 
     private void createWeavingPositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Weaving Manager", "WEAV-MGR",
-            "Manages weaving and knitting department", roles.get("MANAGER"), order++);
-        createPosition(departmentId, "Weaving Supervisor", "WEAV-SUPV",
-            "Supervises weaving operations", roles.get("SUPERVISOR"), order++);
-        createPosition(departmentId, "Weaving Planning Specialist", "WEAV-PLAN",
-            "Plans weaving operations", roles.get("USER"), order++);
-        createPosition(departmentId, "Weaving Machine Operator", "WEAV-OP",
-            "Operates weaving machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Warping Operator", "WEAV-WARP",
-            "Operates warping machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Sizing Operator", "WEAV-SIZE",
-            "Operates sizing machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Knitting Operator", "WEAV-KNIT",
-            "Operates knitting machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Weaving Quality Controller", "WEAV-QC",
-            "Performs quality control on woven fabrics", roles.get("USER"), order++);
-        createPosition(departmentId, "Weaving Shift Supervisor", "WEAV-SHIFT",
-            "Supervises weaving shifts", roles.get("SUPERVISOR"), order++);
+            "Manages weaving and knitting department", roles.get("PROD_MANAGER"), order++);
+        createPosition(departmentId, "Loom Operator", "WEAV-LOOM",
+            "Operates loom machines", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Knitting Machine Operator", "WEAV-KNIT",
+            "Operates knitting machines", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Weaving Maintenance Technician", "WEAV-MAINT",
-            "Maintains weaving equipment", roles.get("USER"), order++);
+            "Maintains weaving equipment", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Weaving Quality Controller", "WEAV-QC",
+            "Performs quality control on woven fabrics", roles.get("QC"), order++);
     }
 
     private void createDyeingPositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Dyeing Manager", "DYE-MGR",
-            "Manages dyeing operations", roles.get("MANAGER"), order++);
+            "Manages dyeing operations", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Dyeing Supervisor", "DYE-SUPV",
-            "Supervises dyeing operations", roles.get("SUPERVISOR"), order++);
+            "Supervises dyeing operations", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Dyeing Operator", "DYE-OP",
-            "Operates dyeing machines", roles.get("USER"), order++);
+            "Operates dyeing machines", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Chemical Preparation Supervisor", "DYE-CHEM",
-            "Manages chemical preparation", roles.get("SUPERVISOR"), order++);
+            "Manages chemical preparation", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Color Lab Technician", "DYE-LAB",
-            "Performs color matching and testing", roles.get("USER"), order++);
-        createPosition(departmentId, "Dyeing Quality Controller", "DYE-QC",
-            "Performs quality control on dyed fabrics", roles.get("USER"), order++);
+            "Performs color matching and testing", roles.get("QC"), order++);
         createPosition(departmentId, "Finishing Manager", "FIN-MGR",
-            "Manages finishing operations", roles.get("MANAGER"), order++);
+            "Manages finishing operations", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Finishing Operator", "FIN-OP",
-            "Operates finishing machines", roles.get("USER"), order++);
-        createPosition(departmentId, "Drying Machine Operator", "FIN-DRY",
-            "Operates drying machines", roles.get("USER"), order++);
+            "Operates finishing machines", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Finishing Quality Controller", "FIN-QC",
-            "Performs quality control on finished fabrics", roles.get("USER"), order++);
-        createPosition(departmentId, "Energy Operator", "DYE-ENERGY",
-            "Manages energy systems (steam/water/electricity)", roles.get("USER"), order++);
-        createPosition(departmentId, "Dyeing Maintenance Technician", "DYE-MAINT",
-            "Maintains dyeing and finishing equipment", roles.get("USER"), order++);
+            "Performs quality control on finished fabrics", roles.get("QC"), order++);
     }
 
     private void createQualityPositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Quality Manager", "QC-MGR",
-            "Manages quality assurance department", roles.get("MANAGER"), order++);
-        createPosition(departmentId, "Quality Assurance Specialist", "QC-QA",
-            "Performs quality assurance activities", roles.get("USER"), order++);
+            "Manages quality assurance department", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Laboratory Supervisor", "QC-LAB",
-            "Supervises laboratory operations", roles.get("SUPERVISOR"), order++);
+            "Supervises laboratory operations", roles.get("QC"), order++);
+        createPosition(departmentId, "Quality Assurance Specialist", "QC-QA",
+            "Performs quality assurance activities", roles.get("QC"), order++);
         createPosition(departmentId, "Test Specialist", "QC-TEST",
-            "Performs material testing", roles.get("USER"), order++);
-        createPosition(departmentId, "Sample Analysis Specialist", "QC-SAMPLE",
-            "Analyzes product samples", roles.get("USER"), order++);
+            "Performs material testing", roles.get("QC"), order++);
         createPosition(departmentId, "Measurement & Reporting Specialist", "QC-REPORT",
-            "Handles measurements and reporting", roles.get("USER"), order++);
+            "Handles measurements and reporting", roles.get("QC"), order++);
     }
 
-    private void createManagementPositions(UUID departmentId, Map<String, Role> roles) {
-        int order = 1;
-        createPosition(departmentId, "Production Director", "MGT-PROD-DIR",
-            "Directs production operations", roles.get("DIRECTOR"), order++);
-        createPosition(departmentId, "Production Planning Director", "MGT-PLAN-DIR",
-            "Directs production planning", roles.get("DIRECTOR"), order++);
-        createPosition(departmentId, "Factory Director", "MGT-FACT-DIR",
-            "Directs factory operations", roles.get("DIRECTOR"), order++);
-        createPosition(departmentId, "Shift Manager", "MGT-SHIFT-MGR",
-            "Manages production shifts", roles.get("MANAGER"), order++);
-        createPosition(departmentId, "Production Planning Specialist", "MGT-PLAN",
-            "Performs production planning", roles.get("USER"), order++);
-        createPosition(departmentId, "Process Improvement Specialist", "MGT-IMPROVE",
-            "Improves production processes", roles.get("USER"), order++);
-    }
-
-    private void createSalesPositions(UUID departmentId, Map<String, Role> roles) {
-        int order = 1;
-        createPosition(departmentId, "Sales Manager", "SALES-MGR",
-            "Manages sales department", roles.get("MANAGER"), order++);
-        createPosition(departmentId, "Sales Representative", "SALES-REP",
-            "Handles customer sales", roles.get("USER"), order++);
-        createPosition(departmentId, "Customer Relations Specialist", "SALES-CRM",
-            "Manages customer relationships", roles.get("USER"), order++);
-        createPosition(departmentId, "Sample Tracking Supervisor", "SALES-SAMPLE",
-            "Tracks customer samples", roles.get("USER"), order++);
-        createPosition(departmentId, "International Trade Specialist", "SALES-INTL",
-            "Handles international trade", roles.get("USER"), order++);
-        createPosition(departmentId, "Order Tracking Specialist", "SALES-ORDER",
-            "Tracks customer orders", roles.get("USER"), order++);
-    }
 
     private void createWarehousePositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Warehouse Manager", "WH-MGR",
-            "Manages warehouse operations", roles.get("MANAGER"), order++);
+            "Manages warehouse operations", roles.get("LOG_MANAGER"), order++);
         createPosition(departmentId, "Warehouse Supervisor", "WH-SUPV",
-            "Supervises warehouse operations", roles.get("SUPERVISOR"), order++);
-        createPosition(departmentId, "Forklift Operator", "WH-FORK",
-            "Operates forklift equipment", roles.get("USER"), order++);
-        createPosition(departmentId, "Receiving Clerk", "WH-REC",
-            "Handles material receiving", roles.get("USER"), order++);
-        createPosition(departmentId, "Inventory Specialist", "WH-INV",
-            "Manages inventory tracking", roles.get("USER"), order++);
-        createPosition(departmentId, "Shipping Supervisor", "WH-SHIP",
-            "Supervises shipping operations", roles.get("SUPERVISOR"), order++);
-        createPosition(departmentId, "Logistics Planning Specialist", "WH-LOG",
-            "Plans logistics operations", roles.get("USER"), order++);
-        createPosition(departmentId, "Delivery Driver", "WH-DRIVER",
-            "Drives delivery vehicles", roles.get("USER"), order++);
+            "Supervises warehouse operations", roles.get("LOG_MANAGER"), order++);
+        createPosition(departmentId, "Warehouse Worker", "WH-WORKER",
+            "Performs warehouse tasks", roles.get("WAREHOUSE_WORKER"), order++);
     }
 
     private void createMaintenancePositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Maintenance Manager", "MAINT-MGR",
-            "Manages maintenance operations", roles.get("MANAGER"), order++);
-        createPosition(departmentId, "Mechanical Technician", "MAINT-MECH",
-            "Performs mechanical maintenance", roles.get("USER"), order++);
+            "Manages maintenance operations", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Electrical Technician", "MAINT-ELEC",
-            "Performs electrical maintenance", roles.get("USER"), order++);
+            "Performs electrical maintenance", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Mechanical Technician", "MAINT-MECH",
+            "Performs mechanical maintenance", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Automation Technician", "MAINT-AUTO",
-            "Maintains automation systems", roles.get("USER"), order++);
-        createPosition(departmentId, "Technical Service Technician", "MAINT-SVC",
-            "Provides technical service", roles.get("USER"), order++);
+            "Maintains automation systems", roles.get("PROD_WORKER"), order++);
     }
 
     private void createEnergyPositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Energy Facility Operator", "ENERGY-OP",
-            "Operates energy facilities", roles.get("USER"), order++);
+            "Operates energy facilities", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Steam Boiler Operator", "ENERGY-STEAM",
-            "Operates steam boilers", roles.get("USER"), order++);
-        createPosition(departmentId, "Water Treatment Operator", "ENERGY-WATER",
-            "Operates water treatment systems", roles.get("USER"), order++);
-        createPosition(departmentId, "Compressor Operator", "ENERGY-COMP",
-            "Operates compressors", roles.get("USER"), order++);
-        createPosition(departmentId, "HVAC Technician", "ENERGY-HVAC",
-            "Maintains HVAC systems", roles.get("USER"), order++);
+            "Operates steam boilers", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Generator Operator", "ENERGY-GEN",
-            "Operates generators", roles.get("USER"), order++);
+            "Operates generators", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "HVAC Technician", "ENERGY-HVAC",
+            "Maintains HVAC systems", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Water Treatment Operator", "ENERGY-WATER",
+            "Operates water treatment systems", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Wastewater Treatment Operator", "ENERGY-WASTE",
-            "Operates wastewater treatment systems", roles.get("USER"), order++);
+            "Operates wastewater treatment systems", roles.get("PROD_WORKER"), order++);
     }
 
     private void createKitchenPositions(UUID departmentId, Map<String, Role> roles) {
         int order = 1;
         createPosition(departmentId, "Kitchen Manager", "KIT-MGR",
-            "Manages kitchen operations", roles.get("MANAGER"), order++);
+            "Manages kitchen operations", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Head Chef", "KIT-CHEF",
-            "Leads kitchen operations", roles.get("SUPERVISOR"), order++);
+            "Leads kitchen operations", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Cook", "KIT-COOK",
-            "Prepares meals", roles.get("USER"), order++);
+            "Prepares meals", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Assistant Cook", "KIT-ASST",
-            "Assists in meal preparation", roles.get("USER"), order++);
-        createPosition(departmentId, "Breakfast Preparation Clerk", "KIT-BREAK",
-            "Prepares breakfast items", roles.get("USER"), order++);
+            "Assists in meal preparation", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Baker", "KIT-BAKE",
-            "Prepares baked goods", roles.get("USER"), order++);
+            "Prepares baked goods", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Grill Cook", "KIT-GRILL",
-            "Operates grill equipment", roles.get("USER"), order++);
+            "Operates grill equipment", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Salad & Cold Meze Specialist", "KIT-SALAD",
-            "Prepares salads and cold meze", roles.get("USER"), order++);
+            "Prepares salads and cold meze", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Pastry Chef", "KIT-PAST",
-            "Prepares desserts and pastries", roles.get("USER"), order++);
+            "Prepares desserts and pastries", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Dishwasher", "KIT-WASH",
-            "Cleans dishes and utensils", roles.get("USER"), order++);
+            "Cleans dishes and utensils", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Service Staff", "KIT-SVC",
-            "Serves meals", roles.get("USER"), order++);
+            "Serves meals", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Cafeteria Supervisor", "KIT-CAFE",
-            "Supervises cafeteria operations", roles.get("SUPERVISOR"), order++);
+            "Supervises cafeteria operations", roles.get("PROD_MANAGER"), order++);
         createPosition(departmentId, "Cafeteria Clerk", "KIT-CAFE-CLK",
-            "Manages cafeteria", roles.get("USER"), order++);
-        createPosition(departmentId, "Food Warehouse Supervisor", "KIT-WH",
-            "Manages food warehouse", roles.get("SUPERVISOR"), order++);
+            "Manages cafeteria", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Food Hygiene Controller", "KIT-HYGIENE",
-            "Controls food hygiene", roles.get("USER"), order++);
+            "Controls food hygiene", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Food Distribution Staff", "KIT-DIST",
-            "Distributes meals", roles.get("USER"), order++);
+            "Distributes meals", roles.get("PROD_WORKER"), order++);
         createPosition(departmentId, "Tea & Beverage Server", "KIT-TEA",
-            "Serves tea and beverages", roles.get("USER"), order++);
+            "Serves tea and beverages", roles.get("PROD_WORKER"), order++);
+    }
+
+    private void seedSupportDepartments(UUID companyId, Map<String, DepartmentCategory> categories, Map<String, Role> roles) {
+        DepartmentCategory supportCategory = categories.get("Support");
+        if (supportCategory == null) {
+            log.warn("Support category not found, skipping support departments");
+            return;
+        }
+
+        // IT Services Department
+        Department itDept = createDepartment(companyId, "IT Services",
+            "IT support and system administration", supportCategory.getId());
+        createITPositions(itDept.getId(), roles);
+
+        // Security Department
+        Department securityDept = createDepartment(companyId, "Security",
+            "Security and access control", supportCategory.getId());
+        createSecurityPositions(securityDept.getId(), roles);
+
+        // Cleaning Services Department
+        Department cleaningDept = createDepartment(companyId, "Cleaning Services",
+            "Cleaning and janitorial services", supportCategory.getId());
+        createCleaningPositions(cleaningDept.getId(), roles);
+    }
+
+    private void createHRPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "HR Manager", "HR-MGR",
+            "Manages human resources department", roles.get("HR_MANAGER"), order++);
+        createPosition(departmentId, "HR Specialist", "HR-SPEC",
+            "Handles HR operations", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Payroll Clerk", "HR-PAYROLL",
+            "Manages payroll processing", roles.get("ADMIN"), order++);
+    }
+
+    private void createFinancePositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "Finance Manager", "FIN-MGR",
+            "Manages finance department", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Accountant", "FIN-ACC",
+            "Handles accounting operations", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Accounting Clerk", "FIN-CLERK",
+            "Performs accounting tasks", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Cashier", "FIN-CASH",
+            "Handles cash transactions", roles.get("ADMIN"), order++);
+    }
+
+    private void createAdminOfficePositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "Administrative Manager", "ADMIN-MGR",
+            "Manages administrative operations", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Office Clerk", "ADMIN-CLERK",
+            "Handles office tasks", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Receptionist", "ADMIN-RECEPT",
+            "Manages reception and front desk", roles.get("ADMIN"), order++);
+    }
+
+    private void createManagementPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "General Manager", "MGT-GM",
+            "Manages overall operations", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Production Planner", "MGT-PLANNER",
+            "Plans production schedules", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Project Coordinator", "MGT-COORD",
+            "Coordinates projects", roles.get("ADMIN"), order++);
+    }
+
+    private void createProcurementPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "Procurement Manager", "PROC-MGR",
+            "Manages procurement operations", roles.get("LOG_MANAGER"), order++);
+        createPosition(departmentId, "Purchasing Officer", "PROC-PURCH",
+            "Handles purchasing operations", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Inventory Controller", "PROC-INV",
+            "Controls inventory levels", roles.get("PROD_WORKER"), order++);
+    }
+
+    private void createShippingPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "Shipping Supervisor", "SHIP-SUPV",
+            "Supervises shipping operations", roles.get("LOG_MANAGER"), order++);
+        createPosition(departmentId, "Forklift Operator", "SHIP-FORK",
+            "Operates forklift equipment", roles.get("WAREHOUSE_WORKER"), order++);
+        createPosition(departmentId, "Driver", "SHIP-DRIVER",
+            "Drives delivery vehicles", roles.get("WAREHOUSE_WORKER"), order++);
+    }
+
+    private void createITPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "IT Manager", "IT-MGR",
+            "Manages IT department", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Network Administrator", "IT-NET",
+            "Manages network infrastructure", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "System Support Specialist", "IT-SUPPORT",
+            "Provides system support", roles.get("ADMIN"), order++);
+    }
+
+    private void createSecurityPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "Security Chief", "SEC-CHIEF",
+            "Manages security operations", roles.get("ADMIN"), order++);
+        createPosition(departmentId, "Security Guard", "SEC-GUARD",
+            "Provides security services", roles.get("PROD_WORKER"), order++);
+    }
+
+    private void createCleaningPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "Cleaning Supervisor", "CLEAN-SUPV",
+            "Supervises cleaning operations", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Cleaner", "CLEAN-WORKER",
+            "Performs cleaning tasks", roles.get("PROD_WORKER"), order++);
+    }
+
+    private void createFiberPositions(UUID departmentId, Map<String, Role> roles) {
+        int order = 1;
+        createPosition(departmentId, "Raw Material Manager", "FIBER-MGR",
+            "Manages raw material operations", roles.get("PROD_MANAGER"), order++);
+        createPosition(departmentId, "Fiber Quality Controller", "FIBER-QC",
+            "Performs quality control on fibers", roles.get("QC"), order++);
+        createPosition(departmentId, "Raw Material Clerk", "FIBER-CLERK",
+            "Handles raw material documentation", roles.get("PROD_WORKER"), order++);
+        createPosition(departmentId, "Forklift Operator", "FIBER-FORK",
+            "Operates forklift equipment", roles.get("PROD_WORKER"), order++);
     }
 }
 

@@ -49,6 +49,9 @@ public class Department extends BaseEntity {
     @Column(name = "department_name", nullable = false, length = 100)
     private String departmentName;
 
+    @Column(name = "department_code", nullable = false, length = 50)
+    private String departmentCode;
+
     @Column(name = "description", length = 500)
     private String description;
 
@@ -59,6 +62,17 @@ public class Department extends BaseEntity {
     @JoinColumn(name = "department_category_id")
     private DepartmentCategory departmentCategory;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_department_id")
+    private Department parentDepartment;
+
+    @Column(name = "is_system_department", nullable = false)
+    @Builder.Default
+    private Boolean isSystemDepartment = false;
+
+    @Column(name = "display_order")
+    private Integer displayOrder;
+
     @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, orphanRemoval = false)
     @Builder.Default
     private List<UserDepartment> userDepartments = new ArrayList<>();
@@ -67,10 +81,11 @@ public class Department extends BaseEntity {
     @Builder.Default
     private List<Position> positions = new ArrayList<>();
 
-    public static Department create(UUID companyId, String departmentName, String description) {
+    public static Department create(UUID companyId, String departmentName, String departmentCode, String description) {
         return Department.builder()
             .companyId(companyId)
             .departmentName(departmentName)
+            .departmentCode(departmentCode)
             .description(description)
             .build();
     }

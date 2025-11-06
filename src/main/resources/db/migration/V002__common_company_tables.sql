@@ -53,36 +53,6 @@ COMMENT ON COLUMN common_company.common_company.phone_number IS 'DEPRECATED: Use
 COMMENT ON COLUMN common_company.common_company.email IS 'DEPRECATED: Use CompanyContact junction table and Contact entity instead. Will be dropped in future migration.';
 
 -- ============================================================================
--- TABLE: common_department
--- ============================================================================
-CREATE TABLE common_company.common_department (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
-    uid VARCHAR(100) UNIQUE NOT NULL,
-    
-    company_id UUID NOT NULL,
-    department_name VARCHAR(100) NOT NULL,
-    description VARCHAR(500),
-    manager_id UUID,
-    
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID,
-    version BIGINT NOT NULL DEFAULT 0,
-    
-    CONSTRAINT fk_department_company FOREIGN KEY (company_id) 
-        REFERENCES common_company.common_company(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_department_tenant ON common_company.common_department(tenant_id);
-CREATE INDEX idx_department_company ON common_company.common_department(company_id);
-CREATE INDEX idx_department_name ON common_company.common_department(department_name);
-
-COMMENT ON TABLE common_company.common_department IS 'Organizational departments within companies';
-
--- ============================================================================
 -- TABLE: common_os_definition
 -- ============================================================================
 CREATE TABLE common_company.common_os_definition (

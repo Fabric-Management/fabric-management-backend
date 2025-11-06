@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# Pre-commit hook: Migration-Entity Consistency Check
+# Ensures migrations and entities stay in sync
+#
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Get staged files
+STAGED_MIGRATIONS=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'db/migration/.*\.sql$')
+STAGED_ENTITIES=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'src/main/java/.*/domain/.*\.java$')
+
+# Check if migrations are staged
+if [ -n "$STAGED_MIGRATIONS" ]; then
+    echo -e "${YELLOW}⚠️  Migration files staged:${NC}"
+    echo "$STAGED_MIGRATIONS" | sed 's/^/  - /'
+    echo ""
+    echo -e "${YELLOW}📋 Checklist before committing:${NC}"
+    echo "  ✓ Does migration CREATE TABLE match entity @Table schema/name?"
+    echo "  ✓ Are all NOT NULL columns present in entity?"
+    echo "  ✓ Are all entity @Column fields present in migration?"
+    echo "  ✓ Are foreign keys correctly defined in both?"
+    echo ""
+    echo -e "${YELLOW}💡 Tip: Run 'make show-tables TABLES=\"table_name\"' to verify${NC}"
+    echo ""
+fi
+
+# Check if entities are staged
+if [ -n "$STAGED_ENTITIES" ]; then
+    echo -e "${YELLOW}⚠️  Entity files staged:${NC}"
+    echo "$STAGED_ENTITIES" | sed 's/^/  - /'
+    echo ""
+    echo -e "${YELLOW}📋 Checklist before committing:${NC}"
+    echo "  ✓ Does entity @Table match migration CREATE TABLE?"
+    echo "  ✓ Are all @Column fields present in migration?"
+    echo "  ✓ Are nullable constraints consistent?"
+    echo "  ✓ Are foreign key relationships defined in migration?"
+    echo ""
+fi
+
+# If both migrations and entities are staged, warn about potential issues
+if [ -n "$STAGED_MIGRATIONS" ] && [ -n "$STAGED_ENTITIES" ]; then
+    echo -e "${GREEN}✅ Both migrations and entities staged - good!${NC}"
+    echo -e "${YELLOW}⚠️  Double-check schema consistency before committing.${NC}"
+    echo ""
+fi
+
+# Check for common mistakes
+ERRORS=0
+
+# Check migration files for common issues
+for file in $STAGED_MIGRATIONS; do
+    # Check for missing IF NOT EXISTS in CREATE TABLE
+    if grep -q "CREATE TABLE[^I]" "$file" 2>/dev/null; then
+        if ! grep -q "CREATE TABLE IF NOT EXISTS" "$file" 2>/dev/null; then
+            echo -e "${RED}❌ $file: Missing 'IF NOT EXISTS' in CREATE TABLE${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+    
+    # Check for missing IF NOT EXISTS in CREATE INDEX
+    if grep -q "CREATE INDEX[^I]" "$file" 2>/dev/null; then
+        if ! grep -q "CREATE INDEX IF NOT EXISTS" "$file" 2>/dev/null; then
+            echo -e "${YELLOW}⚠️  $file: Consider adding 'IF NOT EXISTS' to CREATE INDEX${NC}"
+        fi
+    fi
+done
+
+# Final check
+if [ $ERRORS -gt 0 ]; then
+    echo ""
+    echo -e "${RED}❌ Found $ERRORS error(s). Please fix before committing.${NC}"
+    echo -e "${YELLOW}💡 Use 'git commit --no-verify' to skip (not recommended)${NC}"
+    exit 1
+fi
+
+exit 0
+
