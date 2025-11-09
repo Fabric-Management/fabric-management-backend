@@ -44,12 +44,14 @@ public class UpdateUserProfileRequest {
      * Work email contact value (WORK_PROFILE).
      * Will be used to create/update work email contact.
      */
+    @Deprecated
     private String workEmail;
 
     /**
      * Work phone contact value (WORK_PROFILE).
      * Will be used to create/update work phone contact.
      */
+    @Deprecated
     private String workPhone;
 
     /**
@@ -72,6 +74,7 @@ public class UpdateUserProfileRequest {
     /**
      * Personal phone contact value (PERSONAL_PROFILE).
      */
+    @Deprecated
     private String personalPhone;
 
     /**

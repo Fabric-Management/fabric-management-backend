@@ -76,7 +76,7 @@ public class UserService implements UserFacade {
     private final com.fabricmanagement.common.platform.communication.infra.client.WhatsAppClient whatsAppClient;
     
     // HR/Employee management
-    private final com.fabricmanagement.human.employee.app.EmployeeService employeeService;
+    private final com.fabricmanagement.human.core.employee.application.EmployeeService employeeService;
 
     /**
      * Internal helper: Create user with basic information (shared logic for internal/external).
@@ -121,7 +121,7 @@ public class UserService implements UserFacade {
             saved.getId(),
             primaryContact.getId(),
             true,  // isDefault
-            true   // isForAuthentication
+            null   // Deprecated flag ignored
         );
 
         // Create additional contacts if provided
@@ -141,6 +141,7 @@ public class UserService implements UserFacade {
                 if (contactData.getIsWhatsApp() != null && 
                     contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.PHONE) {
                     additionalContact.setIsWhatsApp(contactData.getIsWhatsApp());
+                    additionalContact = contactService.updateContact(additionalContact);
                 }
 
                 // Assign contact to user (not for authentication, not default)
@@ -148,7 +149,7 @@ public class UserService implements UserFacade {
                     saved.getId(),
                     additionalContact.getId(),
                     false,  // isDefault
-                    false   // isForAuthentication
+                    null    // Deprecated flag ignored
                 );
             }
         }
@@ -160,6 +161,13 @@ public class UserService implements UserFacade {
                 com.fabricmanagement.common.platform.communication.domain.AddressType addressType = 
                     parseAddressType(addressData.getAddressType());
                 
+                // Determine label - WORK deprecated but kept for backward compatibility
+                @SuppressWarnings("deprecation")
+                boolean isWorkType = addressType == AddressType.OFFICE || addressType == AddressType.WORK;
+                String addressLabel = addressData.getLabel() != null 
+                    ? addressData.getLabel() 
+                    : (isWorkType ? "Work Address" : "Home Address");
+                
                 com.fabricmanagement.common.platform.communication.domain.Address address = 
                     addressService.createAddress(
                         addressData.getStreetAddress(),
@@ -168,13 +176,14 @@ public class UserService implements UserFacade {
                         addressData.getPostalCode(),
                         addressData.getCountry(),
                         addressType,
-                        addressData.getLabel() != null ? addressData.getLabel() : 
-                            (addressType == com.fabricmanagement.common.platform.communication.domain.AddressType.WORK ? "Work Address" : "Home Address")
+                        addressLabel
                     );
 
                 // Assign address to user
                 boolean isPrimary = isFirstAddress || Boolean.TRUE.equals(addressData.getIsPrimary());
-                boolean isWorkAddress = addressType == com.fabricmanagement.common.platform.communication.domain.AddressType.WORK;
+                // WORK deprecated but kept for backward compatibility
+                @SuppressWarnings("deprecation")
+                boolean isWorkAddress = addressType == AddressType.OFFICE || addressType == AddressType.WORK;
                 
                 userAddressService.assignAddress(
                     saved.getId(),
@@ -251,9 +260,9 @@ public class UserService implements UserFacade {
             employeeNumber != null || request.getHireDate() != null ||
             request.getEmergencyContact() != null) {
             
-            com.fabricmanagement.human.employee.domain.EmergencyContact emergencyContact = null;
+            com.fabricmanagement.human.core.employee.domain.EmergencyContact emergencyContact = null;
             if (request.getEmergencyContact() != null) {
-                emergencyContact = com.fabricmanagement.human.employee.domain.EmergencyContact.builder()
+                emergencyContact = com.fabricmanagement.human.core.employee.domain.EmergencyContact.builder()
                     .name(request.getEmergencyContact().getName())
                     .phone(request.getEmergencyContact().getPhone())
                     .relationship(request.getEmergencyContact().getRelationship())
@@ -349,11 +358,11 @@ public class UserService implements UserFacade {
      */
     private void checkAndTrackHrCompliance(UUID userId, String department) {
         try {
-            Optional<com.fabricmanagement.human.employee.domain.Employee> employeeOpt = 
+            Optional<com.fabricmanagement.human.core.employee.domain.Employee> employeeOpt =
                 employeeService.getEmployeeByUserId(userId);
             
             if (employeeOpt.isPresent()) {
-                com.fabricmanagement.human.employee.domain.Employee employee = employeeOpt.get();
+                com.fabricmanagement.human.core.employee.domain.Employee employee = employeeOpt.get();
                 List<String> missingFields = employeeService.checkAndUpdateCompliance(employee, department);
                 
                 if (!missingFields.isEmpty()) {
@@ -429,11 +438,11 @@ public class UserService implements UserFacade {
             );
 
         // Check WhatsApp capability for PHONE contacts
-        if (contactType == com.fabricmanagement.common.platform.communication.domain.ContactType.PHONE) {
+        if (contactType.isMobile()) {
             try {
                 boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(contactValue);
                 contact.setIsWhatsApp(hasWhatsApp);
-                contactService.updateContact(contact); // Save WhatsApp flag
+                contact = contactService.updateContact(contact); // Save WhatsApp flag
                 
                 if (hasWhatsApp) {
                     log.debug("✅ WhatsApp capability detected: phone={}, contactId={}", 
@@ -454,15 +463,15 @@ public class UserService implements UserFacade {
      */
     private com.fabricmanagement.common.platform.communication.domain.AddressType parseAddressType(String addressTypeStr) {
         if (addressTypeStr == null || addressTypeStr.isBlank()) {
-            return com.fabricmanagement.common.platform.communication.domain.AddressType.WORK;
+            return AddressType.OFFICE;
         }
         
         try {
-            return com.fabricmanagement.common.platform.communication.domain.AddressType.valueOf(
+            return AddressType.valueOf(
                 addressTypeStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid address type: {}, defaulting to WORK", addressTypeStr);
-            return com.fabricmanagement.common.platform.communication.domain.AddressType.WORK;
+            log.warn("Invalid address type: {}, defaulting to OFFICE", addressTypeStr);
+            return AddressType.OFFICE;
         }
     }
 
@@ -500,7 +509,7 @@ public class UserService implements UserFacade {
                         companyAddr.getState(),
                         companyAddr.getPostalCode(),
                         companyAddr.getCountry(),
-                        AddressType.WORK,
+                        AddressType.OFFICE,
                         "Work Address"
                     );
                 
@@ -531,7 +540,7 @@ public class UserService implements UserFacade {
             com.fabricmanagement.common.platform.user.domain.ContactType userContactType) {
         return switch (userContactType) {
             case EMAIL -> com.fabricmanagement.common.platform.communication.domain.ContactType.EMAIL;
-            case PHONE -> com.fabricmanagement.common.platform.communication.domain.ContactType.PHONE;
+            case PHONE -> com.fabricmanagement.common.platform.communication.domain.ContactType.MOBILE;
         };
     }
 
@@ -674,10 +683,9 @@ public class UserService implements UserFacade {
      * @return Updated user DTO
      */
     @Transactional
+    @SuppressWarnings("deprecation")
     public UserDto updateProfile(UUID userId, UpdateUserProfileRequest request, UUID requesterId) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        log.info("Updating user profile: tenantId={}, userId={}, requesterId={}", 
-            tenantId, userId, requesterId);
+        log.info("Updating user profile: userId={}, requesterId={}", userId, requesterId);
 
         // Validate request has updates
         if (!request.hasUpdates()) {
@@ -718,7 +726,7 @@ public class UserService implements UserFacade {
         }
 
         // Get user
-        User user = userRepository.findByTenantIdAndId(tenantId, userId)
+        User user = userRepository.findByTenantIdAndId(TenantContext.getCurrentTenantId(), userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         // Update work profile fields
@@ -737,7 +745,7 @@ public class UserService implements UserFacade {
 
         // Update work phone contact
         if (request.getWorkPhone() != null) {
-            updateWorkContact(userId, request.getWorkPhone(), ContactType.PHONE);
+            updateWorkContact(userId, request.getWorkPhone(), ContactType.MOBILE);
             log.debug("Work phone updated: userId={}, phone={}", userId, 
                 PiiMaskingUtil.maskPhone(request.getWorkPhone()));
         }
@@ -769,7 +777,7 @@ public class UserService implements UserFacade {
         }
 
         if (request.getPersonalPhone() != null) {
-            updatePersonalContact(userId, request.getPersonalPhone(), ContactType.PHONE);
+            updatePersonalContact(userId, request.getPersonalPhone(), ContactType.MOBILE);
             log.debug("Personal phone updated: userId={}", userId);
         }
 
@@ -868,7 +876,7 @@ public class UserService implements UserFacade {
             addressData.getState(),
             addressData.getPostalCode(),
             addressData.getCountry(),
-            AddressType.WORK,
+            AddressType.OFFICE,
             "Work Address"
         );
 

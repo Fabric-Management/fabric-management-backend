@@ -1,9 +1,11 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.infra.repository.ContactRepository;
+import com.fabricmanagement.common.util.PhoneValidationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Contact Service - Business logic for contact management.
@@ -31,42 +34,58 @@ import java.util.UUID;
 @Slf4j
 public class ContactService {
 
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXTENSION_PATTERN = Pattern.compile("^[0-9]{1,10}$");
+
     private final ContactRepository contactRepository;
 
     @Transactional
-    public Contact createContact(String contactValue, ContactType contactType, 
+    public Contact createContact(String contactValue, ContactType contactType,
                                  String label, Boolean isPersonal, UUID parentContactId) {
         UUID tenantId = TenantContext.getCurrentTenantId();
-        log.debug("Creating contact: tenantId={}, type={}, value={}", 
-            tenantId, contactType, maskContactValue(contactValue));
+        ContactType resolvedType = contactType != null ? contactType : inferContactType(contactValue);
+        String normalizedValue = normalizeContactValue(contactValue, resolvedType);
+        log.debug("Creating contact: tenantId={}, type={}, value={}",
+            tenantId, resolvedType, maskContactValue(normalizedValue));
 
-        // Validate extension
-        if (contactType == ContactType.PHONE_EXTENSION && parentContactId == null) {
-            throw new IllegalArgumentException("PHONE_EXTENSION requires parentContactId");
+        validateContactValue(normalizedValue, resolvedType);
+
+        if (resolvedType == ContactType.PHONE_EXTENSION && parentContactId == null) {
+            throw new DomainException("PHONE_EXTENSION requires parentContactId");
         }
 
-        if (contactType == ContactType.PHONE_EXTENSION) {
+        if (resolvedType == ContactType.PHONE_EXTENSION) {
             Contact parent = contactRepository.findById(parentContactId)
-                .orElseThrow(() -> new IllegalArgumentException("Parent contact not found"));
-            
-            if (parent.getContactType() != ContactType.PHONE) {
-                throw new IllegalArgumentException("Parent contact must be of type PHONE");
+                .orElseThrow(() -> new DomainException("Parent contact not found"));
+
+            if (!parent.getContactType().isLandline()) {
+                throw new DomainException("Parent contact must be of type LANDLINE");
             }
-            
+
             if (!parent.getTenantId().equals(tenantId)) {
-                throw new IllegalArgumentException("Parent contact must belong to same tenant");
+                throw new DomainException("Parent contact must belong to same tenant");
             }
+        }
+
+        Optional<Contact> existing = contactRepository
+            .findByTenantIdAndContactValueAndContactType(tenantId, normalizedValue, resolvedType);
+        if (existing.isPresent()) {
+            Contact existingContact = existing.get();
+            applyWhatsAppRules(existingContact);
+            return existingContact;
         }
 
         Contact contact = Contact.builder()
-            .contactValue(contactValue)
-            .contactType(contactType)
+            .contactValue(normalizedValue)
+            .contactType(resolvedType)
             .label(label)
             .isPersonal(isPersonal != null ? isPersonal : true)
             .parentContactId(parentContactId)
             .isVerified(false)
             .isPrimary(false)
             .build();
+
+        applyWhatsAppRules(contact);
 
         return contactRepository.save(contact);
     }
@@ -91,11 +110,20 @@ public class ContactService {
     @Transactional(readOnly = true)
     public Optional<Contact> findByValueAndType(String contactValue, ContactType contactType) {
         UUID tenantId = TenantContext.getCurrentTenantId();
-        log.trace("Finding contact by value and type: tenantId={}, type={}, value={}", 
-            tenantId, contactType, maskContactValue(contactValue));
+        String normalizedValue = normalizeContactValue(contactValue, contactType);
+        log.trace("Finding contact by value and type: tenantId={}, type={}, value={}",
+            tenantId, contactType, maskContactValue(normalizedValue));
 
         return contactRepository.findByTenantIdAndContactValueAndContactType(
-            tenantId, contactValue, contactType);
+            tenantId, normalizedValue, contactType);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Contact> findByValue(String contactValue) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        String normalizedValue = contactValue != null ? contactValue.trim() : null;
+        log.trace("Finding contact by value: tenantId={}, value={}", tenantId, maskContactValue(normalizedValue));
+        return contactRepository.findByTenantIdAndContactValue(tenantId, normalizedValue);
     }
 
     @Transactional(readOnly = true)
@@ -115,10 +143,14 @@ public class ContactService {
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
         if (!contact.getTenantId().equals(tenantId)) {
-            throw new IllegalArgumentException("Contact does not belong to current tenant");
+            throw new DomainException("Contact does not belong to current tenant");
         }
 
-        contact.verify();
+        String normalizedValue = normalizeContactValue(contact.getContactValue(), contact.getContactType());
+        validateContactValue(normalizedValue, contact.getContactType());
+        contact.setContactValue(normalizedValue);
+        applyWhatsAppRules(contact);
+
         return contactRepository.save(contact);
     }
 
@@ -128,7 +160,7 @@ public class ContactService {
         log.debug("Updating contact: tenantId={}, contactId={}", tenantId, contact.getId());
 
         if (!contact.getTenantId().equals(tenantId)) {
-            throw new IllegalArgumentException("Contact does not belong to current tenant");
+            throw new DomainException("Contact does not belong to current tenant");
         }
 
         return contactRepository.save(contact);
@@ -143,13 +175,13 @@ public class ContactService {
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
         if (!contact.getTenantId().equals(tenantId)) {
-            throw new IllegalArgumentException("Contact does not belong to current tenant");
+            throw new DomainException("Contact does not belong to current tenant");
         }
 
         // Remove primary flag from other contacts of same type
         List<Contact> sameTypeContacts = contactRepository.findByTenantIdAndContactType(
             tenantId, contact.getContactType());
-        
+
         sameTypeContacts.forEach(c -> {
             if (!c.getId().equals(contactId) && c.getIsPrimary()) {
                 c.removePrimary();
@@ -170,7 +202,7 @@ public class ContactService {
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
         if (!contact.getTenantId().equals(tenantId)) {
-            throw new IllegalArgumentException("Contact does not belong to current tenant");
+            throw new DomainException("Contact does not belong to current tenant");
         }
 
         contact.delete();
@@ -189,6 +221,98 @@ public class ContactService {
             return contactValue.substring(0, 4) + "***";
         }
         return contactValue.length() > 4 ? contactValue.substring(0, 2) + "***" : "***";
+    }
+
+    private void applyWhatsAppRules(Contact contact) {
+        if (contact.getContactType() == null) {
+            contact.setIsWhatsApp(false);
+            return;
+        }
+
+        if (!contact.getContactType().isMobile()) {
+            if (Boolean.TRUE.equals(contact.getIsWhatsApp())) {
+                throw new DomainException("WhatsApp is only supported for MOBILE contacts");
+            }
+            contact.setIsWhatsApp(false);
+            return;
+        }
+
+        if (contact.getIsWhatsApp() == null) {
+            contact.setIsWhatsApp(false);
+        }
+    }
+
+    private void validateContactValue(String contactValue, ContactType contactType) {
+        if (contactValue == null || contactValue.isBlank()) {
+            throw new DomainException("Contact value cannot be empty");
+        }
+        if (contactType == null) {
+            throw new DomainException("Contact type is required");
+        }
+        String trimmed = contactValue.trim();
+        switch (contactType) {
+            case EMAIL -> {
+                if (!EMAIL_PATTERN.matcher(trimmed).matches()) {
+                    throw new DomainException("Invalid email format");
+                }
+            }
+            case MOBILE -> {
+                PhoneValidationUtil.ValidationResult result = PhoneValidationUtil.validateMobile(trimmed);
+                if (!result.isValid()) {
+                    throw new DomainException(result.getErrorMessage());
+                }
+            }
+            case LANDLINE, FAX -> {
+                PhoneValidationUtil.ValidationResult result = PhoneValidationUtil.validateLandline(trimmed);
+                if (!result.isValid()) {
+                    throw new DomainException(result.getErrorMessage());
+                }
+            }
+            case PHONE_EXTENSION -> {
+                if (!EXTENSION_PATTERN.matcher(trimmed).matches()) {
+                    throw new DomainException("Phone extension must be 1-10 digits");
+                }
+            }
+            default -> {
+                // WEBSITE, SOCIAL_MEDIA left for future specialized validation
+            }
+        }
+    }
+
+    private String normalizeContactValue(String contactValue, ContactType contactType) {
+        if (contactValue == null) {
+            return null;
+        }
+        String trimmed = contactValue.trim();
+        if (contactType != null && contactType.isPhone()) {
+            String normalized = trimmed
+                .replace(" ", "")
+                .replace("-", "")
+                .replace("(", "")
+                .replace(")", "");
+            return normalized;
+        }
+        if (contactType == ContactType.WEBSITE) {
+            return trimmed.toLowerCase();
+        }
+        return trimmed;
+    }
+
+    private ContactType inferContactType(String contactValue) {
+        if (contactValue == null || contactValue.isBlank()) {
+            throw new DomainException("Unable to infer contact type from empty value");
+        }
+        String trimmed = contactValue.trim();
+        if (EMAIL_PATTERN.matcher(trimmed).matches()) {
+            return ContactType.EMAIL;
+        }
+        if (PhoneValidationUtil.validateMobile(trimmed).isValid()) {
+            return ContactType.MOBILE;
+        }
+        if (PhoneValidationUtil.validateLandline(trimmed).isValid()) {
+            return ContactType.LANDLINE;
+        }
+        throw new DomainException("Unable to infer contact type from value");
     }
 }
 

@@ -27,6 +27,11 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
             @Param("contactValue") String contactValue,
             @Param("contactType") ContactType contactType);
 
+    @Query("SELECT c FROM Contact c WHERE c.tenantId = :tenantId AND c.contactValue = :contactValue")
+    Optional<Contact> findByTenantIdAndContactValue(
+            @Param("tenantId") UUID tenantId,
+            @Param("contactValue") String contactValue);
+
     /**
      * Find all contacts by type within tenant.
      */

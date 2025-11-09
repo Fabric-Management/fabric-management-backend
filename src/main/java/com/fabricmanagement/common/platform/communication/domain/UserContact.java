@@ -73,9 +73,10 @@ public class UserContact extends BaseJunctionEntity {
 
     /**
      * Authentication contact flag
-     * <p>true = this contact can be used for login/authentication</p>
-     * <p>CRITICAL: Only verified EMAIL or PHONE contacts should have this = true</p>
+     * <p><b>Deprecated:</b> Authentication relies on verified contacts list.</p>
+     * <p>Historically used to mark login contact.</p>
      */
+    @Deprecated
     @Column(name = "is_for_authentication", nullable = false)
     @Builder.Default
     private Boolean isForAuthentication = false;
@@ -90,6 +91,7 @@ public class UserContact extends BaseJunctionEntity {
     /**
      * Enable for authentication
      */
+    @Deprecated
     public void enableForAuthentication() {
         this.isForAuthentication = true;
     }
@@ -97,6 +99,7 @@ public class UserContact extends BaseJunctionEntity {
     /**
      * Disable for authentication
      */
+    @Deprecated
     public void disableForAuthentication() {
         this.isForAuthentication = false;
     }

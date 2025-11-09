@@ -96,7 +96,7 @@ public class ContactSuggestionService {
     private PhoneSuggestion extractPhoneSuggestion(List<CompanyContact> companyContacts) {
         return companyContacts.stream()
             .filter(cc -> cc.getContact() != null)
-            .filter(cc -> cc.getContact().getContactType() == ContactType.PHONE)
+            .filter(cc -> cc.getContact().getContactType() != null && cc.getContact().getContactType().isPhone())
             .filter(cc -> Boolean.TRUE.equals(cc.getIsDefault()))
             .findFirst()
             .map(cc -> PhoneSuggestion.builder()

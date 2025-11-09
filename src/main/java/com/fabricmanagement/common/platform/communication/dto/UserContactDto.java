@@ -21,22 +21,24 @@ public class UserContactDto {
     private UUID contactId;
     private ContactDto contact;
     private Boolean isDefault;
+    @Deprecated
     private Boolean isForAuthentication;
+    private Boolean isWhatsApp;
 
     public static UserContactDto from(UserContact userContact) {
         if (userContact == null) {
             return null;
         }
 
+        ContactDto contactDto = userContact.getContact() != null ? ContactDto.from(userContact.getContact()) : null;
         return UserContactDto.builder()
             .uid(userContact.getUid())
             .userId(userContact.getUserId())
             .contactId(userContact.getContactId())
-            .contact(userContact.getContact() != null 
-                ? ContactDto.from(userContact.getContact()) 
-                : null)
+            .contact(contactDto)
             .isDefault(userContact.getIsDefault())
-            .isForAuthentication(userContact.getIsForAuthentication())
+            .isForAuthentication(null)
+            .isWhatsApp(contactDto != null ? contactDto.getIsWhatsApp() : null)
             .build();
     }
 }
