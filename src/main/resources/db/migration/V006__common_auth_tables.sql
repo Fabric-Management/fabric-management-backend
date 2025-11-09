@@ -48,7 +48,7 @@ COMMENT ON COLUMN common_auth.common_auth_user.failed_login_attempts IS 'Locks a
 -- ============================================================================
 -- TABLE: common_refresh_token
 -- ============================================================================
-CREATE TABLE common_auth.common_refresh_token (
+CREATE TABLE IF NOT EXISTS common_auth.common_refresh_token (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
@@ -68,9 +68,9 @@ CREATE TABLE common_auth.common_refresh_token (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE UNIQUE INDEX idx_refresh_token ON common_auth.common_refresh_token(token);
-CREATE INDEX idx_refresh_user ON common_auth.common_refresh_token(user_id);
-CREATE INDEX idx_refresh_expires ON common_auth.common_refresh_token(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_refresh_token ON common_auth.common_refresh_token(token);
+CREATE INDEX IF NOT EXISTS idx_refresh_user ON common_auth.common_refresh_token(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_expires ON common_auth.common_refresh_token(expires_at);
 
 COMMENT ON TABLE common_auth.common_refresh_token IS 'Refresh tokens for JWT token refresh flow';
 COMMENT ON COLUMN common_auth.common_refresh_token.expires_at IS 'Default: 7 days';
@@ -78,7 +78,7 @@ COMMENT ON COLUMN common_auth.common_refresh_token.expires_at IS 'Default: 7 day
 -- ============================================================================
 -- TABLE: common_verification_code
 -- ============================================================================
-CREATE TABLE common_auth.common_verification_code (
+CREATE TABLE IF NOT EXISTS common_auth.common_verification_code (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
@@ -100,9 +100,9 @@ CREATE TABLE common_auth.common_verification_code (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_verification_contact ON common_auth.common_verification_code(contact_value);
-CREATE INDEX idx_verification_contact_type ON common_auth.common_verification_code(tenant_id, contact_value, type);
-CREATE INDEX idx_verification_expires ON common_auth.common_verification_code(expires_at);
+CREATE INDEX IF NOT EXISTS idx_verification_contact ON common_auth.common_verification_code(contact_value);
+CREATE INDEX IF NOT EXISTS idx_verification_contact_type ON common_auth.common_verification_code(tenant_id, contact_value, type);
+CREATE INDEX IF NOT EXISTS idx_verification_expires ON common_auth.common_verification_code(expires_at);
 
 COMMENT ON TABLE common_auth.common_verification_code IS 'Verification codes for registration, password reset';
 COMMENT ON COLUMN common_auth.common_verification_code.code_hash IS 'BCrypt hash of verification code (single use)';
