@@ -139,10 +139,10 @@ public class User extends BaseEntity {
      */
     public Optional<com.fabricmanagement.common.platform.communication.domain.Contact> getPrimaryContact() {
         return userContacts.stream()
-            .filter(uc -> Boolean.TRUE.equals(uc.getIsForAuthentication()))
-            .filter(uc -> uc.getContact() != null && Boolean.TRUE.equals(uc.getContact().getIsVerified()))
-            .findFirst()
-            .map(com.fabricmanagement.common.platform.communication.domain.UserContact::getContact);
+            .filter(uc -> uc.getContact() != null)
+            .map(com.fabricmanagement.common.platform.communication.domain.UserContact::getContact)
+            .filter(contact -> Boolean.TRUE.equals(contact.getIsVerified()))
+            .findFirst();
     }
 
     /**

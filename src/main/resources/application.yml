@@ -93,6 +93,8 @@ logging:
     org.springframework.security: DEBUG
     org.hibernate.SQL: WARN
     org.hibernate.type.descriptor.sql.BasicBinder: OFF
+    # Reduce log noise from background jobs
+    com.fabricmanagement.common.platform.communication.app.EmailOutboxService: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -127,6 +129,10 @@ application:
       enabled: ${EMAIL_FRONTEND_ENABLED:false} # ✅ Disabled (frontend endpoint removed)
       timeout-ms: ${EMAIL_FRONTEND_TIMEOUT_MS:5000}
       url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
+    # Transactional Outbox pattern: Save emails to DB before sending (ensures persistence and retry)
+    use-outbox: ${EMAIL_USE_OUTBOX:true} # ✅ Enabled by default for reliable email delivery
+    # Dead letter queue alert threshold (alert admin when failed email count exceeds this)
+    dead-letter-alert-threshold: ${EMAIL_DEAD_LETTER_ALERT_THRESHOLD:5} # Alert when 5+ failed emails
 
   # AI Configuration
   ai:
@@ -168,6 +174,7 @@ application:
       enabled: ${GOOGLE_MAPS_ENABLED:true}
       timeout: ${GOOGLE_MAPS_TIMEOUT:10000}
       region-bias: ${GOOGLE_MAPS_REGION_BIAS:TR,GB,DE,FR,IT,ES}
+      max-result-count: ${GOOGLE_MAPS_MAX_RESULT_COUNT:20} # what3words-style: show all matching addresses (1-20)
 
   # WhatsApp Business API Configuration
   whatsapp:

@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS common_communication.common_contact (
     
     CONSTRAINT fk_contact_parent FOREIGN KEY (parent_contact_id) 
         REFERENCES common_communication.common_contact(id) ON DELETE SET NULL,
-    CONSTRAINT chk_contact_type CHECK (contact_type IN ('EMAIL', 'PHONE', 'PHONE_EXTENSION', 'FAX', 'WEBSITE', 'WHATSAPP', 'SOCIAL_MEDIA'))
+    CONSTRAINT chk_contact_type CHECK (contact_type IN ('EMAIL', 'PHONE', 'PHONE_EXTENSION', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'))
 );
 
 CREATE INDEX idx_contact_value ON common_communication.common_contact(contact_value);
@@ -58,7 +58,7 @@ CREATE INDEX idx_contact_phone_whatsapp ON common_communication.common_contact(c
 
 COMMENT ON TABLE common_communication.common_contact IS 'Generic contact information (email, phone, WhatsApp, etc.) for User and Company';
 COMMENT ON COLUMN common_communication.common_contact.contact_value IS 'Contact value: email address, phone number (E.164), extension number, URL, etc.';
-COMMENT ON COLUMN common_communication.common_contact.contact_type IS 'Contact type: EMAIL, PHONE, PHONE_EXTENSION, FAX, WEBSITE, WHATSAPP, SOCIAL_MEDIA';
+COMMENT ON COLUMN common_communication.common_contact.contact_type IS 'Contact type: EMAIL, PHONE, PHONE_EXTENSION, FAX, WEBSITE, SOCIAL_MEDIA. WhatsApp capability is indicated via isWhatsApp flag on PHONE contacts.';
 COMMENT ON COLUMN common_communication.common_contact.parent_contact_id IS 'For PHONE_EXTENSION: references parent PHONE contact';
 COMMENT ON COLUMN common_communication.common_contact.is_personal IS 'true = User personal contact, false = Company-provided contact';
 COMMENT ON COLUMN common_communication.common_contact.is_whatsapp IS 'True if phone number has WhatsApp capability. Used for verification codes and notifications priority.';

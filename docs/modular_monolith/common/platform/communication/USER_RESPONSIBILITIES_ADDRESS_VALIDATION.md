@@ -65,29 +65,83 @@ Address Validation ve Standardization özelliği için **Google Maps Platform** 
 
 API key → **Application restrictions** → **HTTP referrers (web sites)** veya **IP addresses**
 
-**Önerilen:** IP addresses (backend sunucunun IP'si)
+**⚠️ IP ADRESİ SÜREKLI DEĞİŞİYORSA:**
 
-```
-✅ Allowed IP addresses:
-- Your backend server IP
-- Localhost (127.0.0.1) - development için
-```
+**Seçenek 1: Don't restrict key (Development için - GEÇİCİ) ⭐ ÖNERİLEN**
 
-**Alternatif:** HTTP referrers (domain bazlı)
+- ✅ Development için en pratik çözüm
+- ⚠️ **GÜVENLİK RİSKİ:** API key herkes tarafından kullanılabilir
+- ✅ Sadece development için kullan, production'da mutlaka restriction ekle
+- ✅ IP değişikliği sorunu yok
+- ✅ **ŞU AN YAP:** Application restrictions → "Don't restrict key" seç
+
+**Seçenek 2: HTTP Referrers (Önerilen - Development + Production)**
 
 ```
 ✅ Allowed referrers:
-- https://yourdomain.com/*
 - http://localhost:* (development için)
+- http://127.0.0.1:* (development için)
+- https://yourdomain.com/* (production için)
+- https://*.yourdomain.com/* (subdomain'ler için)
 ```
 
-**4.2 API Restriction (Zorunlu)**
+- ✅ IP değişikliği sorunu yok
+- ✅ Güvenli (sadece belirtilen domain'lerden kullanılabilir)
+- ⚠️ Backend'den çağrı yapıyorsan referrer gönderilmeyebilir (browser'dan çağrı yapıyorsan çalışır)
 
-API key → **API restrictions** → **Restrict key**
+**Seçenek 3: IP Addresses (Production için)**
+
+```
+✅ Allowed IP addresses:
+- Your backend server IP (production) - SABİT IP
+- Localhost (127.0.0.1) - local development için
+```
+
+- ✅ En güvenli (sadece belirtilen IP'lerden kullanılabilir)
+- ⚠️ IP değişiyorsa her seferinde eklemek gerekir
+- ✅ Production sunucu IP'si genelde sabit kalır
+
+**ÖNERİ:**
+
+1. **Development:** "Don't restrict key" veya HTTP referrers (localhost)
+2. **Production:** IP addresses (sabit sunucu IP'si) veya HTTP referrers (domain)
+
+**4.2 API Restriction (ÖNEMLİ)**
+
+API key → **API restrictions**
+
+**⚠️ "Don't restrict key" seçtiysen ama hala REQUEST_DENIED alıyorsan:**
+
+1. **API restrictions kontrolü:**
+
+   - "Don't restrict key" seçili olmalı (hem Application hem API restrictions)
+   - Eğer "Restrict key" seçiliyse, şu API'lerin **ENABLED** olması gerekir:
+     - ✅ **Places API (New)**
+     - ✅ **Geocoding API**
+   - **Öneri:** Development için "Don't restrict key" seç (her iki yerde de)
+
+2. **Enabled APIs kontrolü:**
+
+   - Google Cloud Console → **APIs & Services** → **Enabled APIs**
+   - Şu API'lerin **ENABLED** olması gerekir:
+     - ✅ **Places API (New)** - Autocomplete için
+     - ✅ **Geocoding API** - Address validation için
+
+3. **Billing kontrolü:**
+
+   - Google Cloud Console → **Billing**
+   - Billing hesabı **aktif** olmalı
+   - Google Maps API ücretli servis, billing olmadan çalışmaz
+
+4. **Değişikliklerin yayılması:**
+   - Restriction değişiklikleri **5 dakika** içinde yayılır
+   - API key'i yeniden kontrol et
+
+**✅ Production için:** Mutlaka "Restrict key" seç ve sadece gerekli API'leri etkinleştir:
 
 **Seçilecek API'ler:**
 
-- ✅ Places API
+- ✅ Places API (New)
 - ✅ Geocoding API
 - ✅ Address Validation API (eğer kullanılıyorsa)
 

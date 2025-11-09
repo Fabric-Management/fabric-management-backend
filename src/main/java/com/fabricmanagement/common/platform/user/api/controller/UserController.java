@@ -41,7 +41,7 @@ public class UserController {
     private final ContactSuggestionService contactSuggestionService;
     private final UserContactService userContactService;
     private final UserAddressService userAddressService;
-    private final com.fabricmanagement.human.employee.app.EmployeeService employeeService;
+    private final com.fabricmanagement.human.core.employee.application.EmployeeService employeeService;
     private final com.fabricmanagement.common.platform.company.app.UserCreationOptionsService userCreationOptionsService;
 
     /**

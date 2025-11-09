@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.platform.user.dto;
 
-import com.fabricmanagement.human.employee.domain.Gender;
-import com.fabricmanagement.human.employee.domain.Title;
+import com.fabricmanagement.human.core.employee.domain.Gender;
+import com.fabricmanagement.human.core.employee.domain.Title;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

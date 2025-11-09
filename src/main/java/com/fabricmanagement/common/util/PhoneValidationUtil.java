@@ -27,7 +27,9 @@ import java.util.regex.Pattern;
 public class PhoneValidationUtil {
 
     // E.164 base pattern (international format)
-    private static final Pattern E164_PATTERN = Pattern.compile("^\\+[1-9]\\d{1,14}$");
+    private static final Pattern E164_PATTERN = Pattern.compile("^\\+[1-9]\\d{7,14}$");
+
+    private static final Pattern LANDLINE_PATTERN = Pattern.compile("^\\+?[0-9\\-()\\s]{6,20}$");
 
     // Country-specific phone patterns
     private static final Map<String, PhoneFormat> COUNTRY_PATTERNS = new HashMap<>();
@@ -67,6 +69,29 @@ public class PhoneValidationUtil {
             return false;
         }
         return E164_PATTERN.matcher(phone.trim()).matches();
+    }
+
+    public static ValidationResult validateMobile(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return ValidationResult.invalid("Mobile number cannot be empty");
+        }
+        if (!isValidE164(phone)) {
+            return ValidationResult.invalid(
+                "Invalid mobile format. Must be E.164 (e.g., +905551234567)"
+            );
+        }
+        return ValidationResult.valid();
+    }
+
+    public static ValidationResult validateLandline(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return ValidationResult.invalid("Landline number cannot be empty");
+        }
+        String trimmed = phone.trim();
+        if (!LANDLINE_PATTERN.matcher(trimmed).matches()) {
+            return ValidationResult.invalid("Invalid landline format. Example: +44 20 7123 4567");
+        }
+        return ValidationResult.valid();
     }
 
     /**

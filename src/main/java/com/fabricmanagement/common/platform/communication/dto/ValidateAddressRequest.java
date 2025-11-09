@@ -27,6 +27,13 @@ public class ValidateAddressRequest {
     private String address;
 
     /**
+     * Original input from autocomplete (optional).
+     * Used to extract flat numbers when Google normalizes them away (e.g., "20/34" -> "No:20").
+     * Example: "20/34 selvi sokak", "13/2A welsummer grove"
+     */
+    private String originalInput;
+
+    /**
      * Address type for context (HOME, WORK, HEADQUARTERS, etc.)
      */
     private String addressType;

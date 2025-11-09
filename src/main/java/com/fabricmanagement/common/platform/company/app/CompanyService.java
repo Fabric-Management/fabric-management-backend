@@ -363,7 +363,7 @@ public class CompanyService implements CompanyFacade {
                 com.fabricmanagement.common.platform.communication.domain.Contact phoneContact = 
                     contactService.createContact(
                         request.getPhoneNumber(),
-                        ContactType.PHONE,
+                        ContactType.LANDLINE,
                         "Main Phone",
                         false, // isPersonal (company contact)
                         null   // parentContactId

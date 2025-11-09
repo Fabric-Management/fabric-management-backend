@@ -3,7 +3,6 @@ package com.fabricmanagement.common.platform.auth.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.platform.auth.domain.AuthUser;
 import com.fabricmanagement.common.platform.auth.domain.RefreshToken;
-import com.fabricmanagement.common.platform.auth.domain.VerificationCode;
 import com.fabricmanagement.common.platform.auth.domain.VerificationType;
 import com.fabricmanagement.common.platform.auth.domain.event.UserLoginEvent;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
@@ -13,15 +12,15 @@ import com.fabricmanagement.common.platform.auth.dto.PasswordResetVerifyRequest;
 import com.fabricmanagement.common.platform.auth.dto.UserContactInfoResponse;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
-import com.fabricmanagement.common.platform.auth.infra.repository.VerificationCodeRepository;
+import com.fabricmanagement.common.platform.auth.app.VerificationCodeManager.IssuedVerificationCode;
 import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.app.VerificationService;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.domain.ContactType;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
-import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +33,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 import java.util.UUID;
 
 /**
@@ -66,7 +64,7 @@ import java.util.UUID;
 public class PasswordResetService {
 
     private final AuthUserRepository authUserRepository;
-    private final VerificationCodeRepository verificationCodeRepository;
+    private final VerificationCodeManager verificationCodeManager;
     private final RefreshTokenRepository refreshTokenRepository;
     private final ContactService contactService;
     private final UserRepository userRepository;
@@ -76,12 +74,6 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
-
-    @Value("${application.verification.code-length:6}")
-    private int codeLength;
-
-    @Value("${application.verification.code-expiry-minutes:10}")
-    private int codeExpiryMinutes;
 
     @Value("${application.jwt.refresh-expiration:604800000}")
     private long refreshTokenExpiration;
@@ -197,27 +189,21 @@ public class PasswordResetService {
             throw new IllegalArgumentException("Contact type mismatch");
         }
 
-        // Generate verification code
-        String code = generateVerificationCode();
-
-        // Delete any existing password reset codes for this contact
-        verificationCodeRepository.deleteByContactValueAndType(
-            authUser.getContactValue(),
-            VerificationType.PASSWORD_RESET
-        );
-
-        // Save new verification code to database
-        VerificationCode verificationCode = VerificationCode.create(
-            authUser.getContactValue(),
-            code,
-            VerificationType.PASSWORD_RESET,
-            codeExpiryMinutes
-        );
-        verificationCodeRepository.save(verificationCode);
+        IssuedVerificationCode issuedCode;
+        try {
+            issuedCode = verificationCodeManager.issueCode(
+                authUser.getContactValue(),
+                VerificationType.PASSWORD_RESET
+            );
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            log.warn("Password reset verification throttled: contactValue={}, reason={}",
+                PiiMaskingUtil.maskEmail(authUser.getContactValue()), ex.getMessage());
+            throw createContextAwarePasswordResetException(authUser.getContactValue(), ex.getMessage());
+        }
 
         // Send verification code via multi-channel (WhatsApp → Email → SMS)
         try {
-            verificationService.sendVerificationCode(authUser.getContactValue(), code);
+            verificationService.sendVerificationCode(authUser.getContactValue(), issuedCode.code());
             log.info("✅ Password reset code sent successfully to: {}", 
                 PiiMaskingUtil.maskEmail(authUser.getContactValue()));
         } catch (Exception e) {
@@ -261,33 +247,11 @@ public class PasswordResetService {
             throw new IllegalArgumentException("Contact is not verified");
         }
 
-        // Verify verification code
-        VerificationCode verificationCode = verificationCodeRepository
-            .findByContactValueAndCodeAndType(
-                authUser.getContactValue(),
-                request.getCode(),
-                VerificationType.PASSWORD_RESET
-            )
-            .orElseThrow(() -> {
-                log.warn("Invalid verification code for password reset: contactValue={}",
-                    PiiMaskingUtil.maskEmail(authUser.getContactValue()));
-                return new IllegalArgumentException("Invalid verification code");
-            });
-
-        // Check code validity (expiry, attempts, already used)
-        if (!verificationCode.isValid()) {
-            if (verificationCode.isExpired()) {
-                log.warn("Expired verification code for password reset: contactValue={}",
-                    PiiMaskingUtil.maskEmail(authUser.getContactValue()));
-                throw new IllegalArgumentException("Verification code has expired. Please request a new one.");
-            }
-            if (verificationCode.getAttemptCount() >= 3) {
-                log.warn("Too many attempts for verification code: contactValue={}",
-                    PiiMaskingUtil.maskEmail(authUser.getContactValue()));
-                throw new IllegalArgumentException("Too many verification attempts. Please request a new code.");
-            }
-            throw new IllegalArgumentException("Verification code is invalid");
-        }
+        verificationCodeManager.validateAndConsume(
+            authUser.getContactValue(),
+            VerificationType.PASSWORD_RESET,
+            request.getCode()
+        );
 
         // Check if new password is same as old password
         if (passwordEncoder.matches(request.getNewPassword(), authUser.getPasswordHash())) {
@@ -295,11 +259,6 @@ public class PasswordResetService {
                 PiiMaskingUtil.maskEmail(authUser.getContactValue()));
             throw new IllegalArgumentException("New password must be different from your current password");
         }
-
-        // Increment attempt count (before marking as used)
-        verificationCode.incrementAttempt();
-        verificationCode.markAsUsed();
-        verificationCodeRepository.save(verificationCode);
 
         // Update password
         String newPasswordHash = passwordEncoder.encode(request.getNewPassword());
@@ -428,21 +387,9 @@ public class PasswordResetService {
             com.fabricmanagement.common.platform.communication.domain.ContactType commType) {
         return switch (commType) {
             case EMAIL -> ContactType.EMAIL;
-            case PHONE -> ContactType.PHONE;
-            default -> ContactType.EMAIL; // Default fallback
+            case MOBILE, LANDLINE, PHONE_EXTENSION -> ContactType.PHONE;
+            default -> ContactType.EMAIL;
         };
-    }
-
-    /**
-     * Generate random verification code.
-     * 
-     * <p>Generates a secure random code with configurable length.</p>
-     */
-    private String generateVerificationCode() {
-        Random random = new Random();
-        int min = (int) Math.pow(10, codeLength - 1);
-        int max = (int) Math.pow(10, codeLength) - 1;
-        return String.format("%0" + codeLength + "d", random.nextInt(max - min + 1) + min);
     }
 }
 

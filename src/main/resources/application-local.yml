@@ -86,3 +86,11 @@ application:
   mail:
     from-email: ${MAIL_FROM_EMAIL:info@storeandsale.shop}
     from-name: ${MAIL_FROM_NAME:Fabricode}
+
+  # Google Maps Platform Configuration
+  google:
+    maps:
+      api-key: ${GOOGLE_MAPS_API_KEY:}
+      enabled: ${GOOGLE_MAPS_ENABLED:true}
+      timeout: ${GOOGLE_MAPS_TIMEOUT:10000}
+      region-bias: ${GOOGLE_MAPS_REGION_BIAS:TR,GB,DE,FR,IT,ES}

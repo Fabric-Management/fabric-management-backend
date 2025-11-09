@@ -26,6 +26,7 @@ public class ContactDto {
     private String label;
     private UUID parentContactId;
     private Boolean isPersonal;
+    private Boolean isWhatsApp;
     private Boolean isActive;
     private Instant createdAt;
     private Instant updatedAt;
@@ -42,6 +43,7 @@ public class ContactDto {
             .label(contact.getLabel())
             .parentContactId(contact.getParentContactId())
             .isPersonal(contact.getIsPersonal())
+            .isWhatsApp(contact.getIsWhatsApp())
             .isActive(contact.getIsActive())
             .createdAt(contact.getCreatedAt())
             .updatedAt(contact.getUpdatedAt())

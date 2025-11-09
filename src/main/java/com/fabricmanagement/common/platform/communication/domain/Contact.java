@@ -14,19 +14,20 @@ import java.util.UUID;
  *
  * <h2>Key Features:</h2>
  * <ul>
- *   <li>✅ Multi-channel support (EMAIL, PHONE, WHATSAPP, FAX, WEBSITE, etc.)</li>
+ *   <li>✅ Multi-channel support (EMAIL, PHONE, FAX, WEBSITE, SOCIAL_MEDIA, etc.)</li>
  *   <li>✅ Verification status tracking</li>
  *   <li>✅ Primary contact flag</li>
  *   <li>✅ Label for categorization (e.g., "Home", "Work", "Mobile")</li>
  *   <li>✅ Parent contact link for extensions</li>
  *   <li>✅ Personal vs. company-provided distinction</li>
+ *   <li>✅ WhatsApp capability flag (for PHONE contacts)</li>
  * </ul>
  *
  * <h2>Special Cases:</h2>
  * <ul>
  *   <li><b>PHONE_EXTENSION:</b> contactValue = extension number (e.g., "101"),
  *       parentContactId must reference a PHONE contact</li>
- *   <li><b>WHATSAPP:</b> Used for Priority 1 verification and notifications</li>
+ *   <li><b>PHONE + isWhatsApp:</b> Used for Priority 1 verification and notifications via WhatsApp</li>
  * </ul>
  *
  * <h2>Usage Example:</h2>
@@ -71,10 +72,10 @@ public class Contact extends BaseEntity {
      * <p>Format depends on contactType:
      * <ul>
      *   <li>EMAIL: "user@example.com"</li>
-     *   <li>PHONE: "+905551234567" (E.164)</li>
+     *   <li>PHONE: "+905551234567" (E.164) - WhatsApp capability via isWhatsApp flag</li>
      *   <li>PHONE_EXTENSION: "101" (extension number)</li>
      *   <li>WEBSITE: "https://www.example.com"</li>
-     *   <li>WHATSAPP: "+905551234567" (E.164)</li>
+     *   <li>SOCIAL_MEDIA: "@username"</li>
      * </ul>
      */
     @Column(name = "contact_value", nullable = false, length = 255)
@@ -171,8 +172,8 @@ public class Contact extends BaseEntity {
      * Check if this is verified and can be used for authentication
      */
     public boolean canBeUsedForAuthentication() {
-        return this.isVerified && (ContactType.EMAIL.equals(this.contactType) || 
-                                   ContactType.PHONE.equals(this.contactType));
+        return this.isVerified && (ContactType.EMAIL.equals(this.contactType) ||
+                                   (this.contactType != null && this.contactType.isPhone()));
     }
 
     @Override

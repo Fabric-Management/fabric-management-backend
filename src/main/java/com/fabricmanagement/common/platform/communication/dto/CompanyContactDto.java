@@ -18,7 +18,7 @@ public class CompanyContactDto {
     private UUID contactId;
     private ContactDto contact;
     private Boolean isDefault;
-    private String department;
+    private Boolean isWhatsApp;
 
     public static CompanyContactDto from(CompanyContact companyContact) {
         return CompanyContactDto.builder()
@@ -26,7 +26,7 @@ public class CompanyContactDto {
             .contactId(companyContact.getContactId())
             .contact(companyContact.getContact() != null ? ContactDto.from(companyContact.getContact()) : null)
             .isDefault(companyContact.getIsDefault())
-            .department(companyContact.getDepartment())
+            .isWhatsApp(companyContact.getContact() != null ? companyContact.getContact().getIsWhatsApp() : null)
             .build();
     }
 }

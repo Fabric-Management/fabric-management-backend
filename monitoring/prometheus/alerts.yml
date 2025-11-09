@@ -247,3 +247,46 @@ groups:
           summary: "High failed login rate"
           description: "{{ $value }}/sec failed logins - possible brute force attack"
           action: "Review security logs and consider rate limiting"
+
+  # ===================================================
+  # EMAIL RELIABILITY ALERTS
+  # ===================================================
+  - name: email_reliability
+    interval: 30s
+    rules:
+      # Dead Letter Queue Threshold Exceeded
+      - alert: DeadLetterQueueThresholdExceeded
+        expr: email_outbox_failed_count{status="failed"} >= 5
+        for: 2m
+        labels:
+          severity: critical
+          category: email
+        annotations:
+          summary: "Dead letter queue threshold exceeded"
+          description: "{{ $value }} failed email(s) in dead letter queue (threshold: 5)"
+          action: "Check email configuration, SMTP settings, or network connectivity. Review failed emails in common_communication.communication_email_outbox WHERE status='FAILED'"
+          runbook: "https://github.com/Fabric-Management/fabric-management-backend/blob/main/docs/troubleshooting/EMAIL_TROUBLESHOOTING.md"
+
+      # High Email Failure Rate
+      - alert: HighEmailFailureRate
+        expr: rate(email_outbox_permanently_failed_total{status="failed_permanent"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: email
+        annotations:
+          summary: "High email permanent failure rate"
+          description: "{{ $value }}/sec emails permanently failing (max retries reached)"
+          action: "Investigate SMTP connectivity, authentication, or email provider issues"
+
+      # Email Queue Backlog
+      - alert: EmailQueueBacklog
+        expr: email_outbox_pending_count{status="pending"} > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: email
+        annotations:
+          summary: "Email queue backlog detected"
+          description: "{{ $value }} pending email(s) in queue - email processing may be slow"
+          action: "Check email sending performance and SMTP server response times"

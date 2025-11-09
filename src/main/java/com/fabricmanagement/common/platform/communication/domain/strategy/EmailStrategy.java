@@ -1,13 +1,17 @@
 package com.fabricmanagement.common.platform.communication.domain.strategy;
 
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -56,11 +60,19 @@ public class EmailStrategy implements VerificationStrategy {
      * 
      * <p><b>SECURITY:</b> Email addresses are masked in logs. This method is called by
      * NotificationService which already logs at INFO level with masking.</p>
+     * 
+     * <p><b>RETRY:</b> Automatically retries on transient failures (network, SMTP timeout).
+     * Uses exponential backoff: 1s, 2s, 4s (max 3 attempts).</p>
      *
      * @param recipient Email address
      * @param subject Email subject
      * @param htmlBody Email body (HTML content - rendered from template)
      */
+    @Retryable(
+        value = {MailException.class, MessagingException.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
     public void sendEmail(String recipient, String subject, String htmlBody) {
         // ✅ SECURITY: Use DEBUG level to avoid duplicate logs (NotificationService logs at INFO with masking)
         log.debug("Sending custom email to: {}", PiiMaskingUtil.maskEmail(recipient));

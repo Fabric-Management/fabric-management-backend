@@ -316,7 +316,7 @@ public class TenantOnboardingService {
                 com.fabricmanagement.common.platform.communication.domain.Contact phoneContact = 
                     contactService.createContact(
                         phoneNumber,
-                        com.fabricmanagement.common.platform.communication.domain.ContactType.PHONE,
+                        com.fabricmanagement.common.platform.communication.domain.ContactType.LANDLINE,
                         "Main Phone",
                         false, // isPersonal (company contact)
                         null   // parentContactId
@@ -459,7 +459,7 @@ public class TenantOnboardingService {
                 saved.getId(),
                 contact.getId(),
                 true,  // isDefault
-                true   // isForAuthentication
+                null
             );
 
             // Assign department if provided (new system)

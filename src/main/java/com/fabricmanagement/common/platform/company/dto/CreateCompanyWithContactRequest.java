@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.platform.company.dto;
 
 import com.fabricmanagement.common.platform.company.domain.CompanyType;
-import com.fabricmanagement.common.util.validation.PhoneNumber;
+import com.fabricmanagement.common.util.validation.LandlineNumber;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -29,14 +29,14 @@ public class CreateCompanyWithContactRequest {
 
     private UUID parentCompanyId;
 
-    @Email(message = "Invalid email format", regexp = "^$|^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+    @Email(message = "Invalid email format", regexp = "^$|^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
     private String email;
 
     /**
      * Phone number in E.164 format (e.g., +905551234567).
      * If country is provided, validates against country-specific format.
      */
-    @PhoneNumber(message = "Invalid phone number format. Must be E.164 format (e.g., +905551234567)")
+    @LandlineNumber(message = "Invalid landline number format. Example: +44 20 7123 4567")
     private String phoneNumber;
 
     private String address;

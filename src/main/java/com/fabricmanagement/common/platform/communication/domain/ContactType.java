@@ -3,25 +3,12 @@ package com.fabricmanagement.common.platform.communication.domain;
 /**
  * Contact type enumeration for all communication channels.
  *
- * <p>Supports modern communication channels including WhatsApp, phone extensions,
+ * <p>Supports modern communication channels including phone extensions,
  * and traditional email/phone. Used by both User and Company entities.</p>
  *
- * <h2>Usage:</h2>
- * <ul>
- *   <li><b>EMAIL:</b> Email address (e.g., "john.doe@acme.com")</li>
- *   <li><b>PHONE:</b> Phone number in E.164 format (e.g., "+905551234567")</li>
- *   <li><b>PHONE_EXTENSION:</b> Extension number linked to parent phone (e.g., "101", "102")</li>
- *   <li><b>FAX:</b> Fax number</li>
- *   <li><b>WEBSITE:</b> Website URL</li>
- *   <li><b>WHATSAPP:</b> WhatsApp Business number (can be same as PHONE or separate)</li>
- *   <li><b>SOCIAL_MEDIA:</b> Social media handle (Twitter, LinkedIn, etc.)</li>
- * </ul>
- *
- * <h2>Special Cases:</h2>
- * <ul>
- *   <li><b>PHONE_EXTENSION:</b> Must have parentContactId pointing to a PHONE contact</li>
- *   <li><b>WHATSAPP:</b> Used for verification and notifications (Priority 1 channel)</li>
- * </ul>
+ * <p><b>WhatsApp Support:</b> WhatsApp capability is indicated via {@code isWhatsApp} flag
+ * on {@link #MOBILE} contacts, not as a separate contact type. This simplifies the model since
+ * WhatsApp uses the same phone number as regular phone calls.</p>
  */
 public enum ContactType {
 
@@ -34,19 +21,24 @@ public enum ContactType {
     EMAIL,
 
     /**
-     * Phone number (mobile or landline)
+     * Mobile phone number
      * <p>Format: E.164 (+905551234567)</p>
      * <p>Verification: WhatsApp → SMS</p>
      * <p>Used for: Authentication, notifications, voice calls</p>
      */
-    PHONE,
+    MOBILE,
+
+    /**
+     * Landline phone number
+     * <p>Format: Country/area specific (normalized to E.164 where possible)</p>
+     * <p>Used for: Office phones, switchboards, fax-over-voice gateways</p>
+     */
+    LANDLINE,
 
     /**
      * Phone extension (internal)
      * <p>Format: Extension number (e.g., "101", "102")</p>
-     * <p>Links to parent phone via parentContactId</p>
-     * <p>Used for: Company phone extensions (e.g., "+90-212-123-4567 ext. 101")</p>
-     * <p><b>CRITICAL:</b> parentContactId must reference a PHONE contact</p>
+     * <p>Links to parent landline via parentContactId</p>
      */
     PHONE_EXTENSION,
 
@@ -65,19 +57,31 @@ public enum ContactType {
     WEBSITE,
 
     /**
-     * WhatsApp Business number
-     * <p>Format: E.164 (+905551234567)</p>
-     * <p>Verification: WhatsApp Business API</p>
-     * <p>Used for: Priority 1 verification channel, instant notifications</p>
-     * <p><b>NOTE:</b> Can be same as PHONE or a separate number</p>
-     */
-    WHATSAPP,
-
-    /**
      * Social media handle
      * <p>Format: @username or platform-specific identifier</p>
      * <p>Used for: LinkedIn, Twitter, Instagram, etc.</p>
      */
-    SOCIAL_MEDIA
+    SOCIAL_MEDIA;
+
+    /**
+     * @return true if this type represents a phone number (mobile or landline).
+     */
+    public boolean isPhone() {
+        return this == MOBILE || this == LANDLINE;
+    }
+
+    /**
+     * @return true if this type represents a mobile number.
+     */
+    public boolean isMobile() {
+        return this == MOBILE;
+    }
+
+    /**
+     * @return true if this type represents a landline number.
+     */
+    public boolean isLandline() {
+        return this == LANDLINE;
+    }
 }
 

@@ -104,23 +104,15 @@ public class UserContactService {
         }
 
         // Set authentication: remove auth flag from other contacts
-        if (Boolean.TRUE.equals(isForAuthentication)) {
-            if (!contact.canBeUsedForAuthentication()) {
-                throw new IllegalArgumentException("Contact must be verified EMAIL or PHONE for authentication");
-            }
-
-            userContactRepository.findAuthenticationContactByUserId(userId)
-                .ifPresent(existing -> {
-                    existing.setIsForAuthentication(false);
-                    userContactRepository.save(existing);
-                });
+        boolean forAuth = Boolean.TRUE.equals(isForAuthentication);
+        if (forAuth) {
+            log.warn("isForAuthentication flag is deprecated and ignored. userId={}, contactId={}", userId, contactId);
         }
 
         UserContact userContact = UserContact.builder()
             .userId(userId)
             .contactId(contactId)
             .isDefault(isDefault != null ? isDefault : false)
-            .isForAuthentication(isForAuthentication != null ? isForAuthentication : false)
             .build();
 
         return userContactRepository.save(userContact);
@@ -133,6 +125,23 @@ public class UserContactService {
 
         UserContact userContact = userContactRepository.findByUserIdAndContactId(userId, contactId)
             .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+
+        Contact contact = contactRepository.findById(contactId)
+            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
+
+        if (Boolean.TRUE.equals(contact.getIsVerified())) {
+            long verifiedCount = userContactRepository.findByTenantIdAndUserId(tenantId, userId).stream()
+                .map(uc -> contactRepository.findById(uc.getContactId()))
+                .flatMap(Optional::stream)
+                .filter(Contact::getIsVerified)
+                .count();
+
+            if (verifiedCount <= 1) {
+                log.warn("Attempt to remove last verified contact prevented: tenantId={}, userId={}, contactId={}",
+                    tenantId, userId, contactId);
+                throw new IllegalStateException("Cannot remove the last verified contact. Add another verified contact first.");
+            }
+        }
 
         userContactRepository.delete(userContact);
     }
@@ -159,32 +168,11 @@ public class UserContactService {
     }
 
     @Transactional
+    @Deprecated
     public UserContact enableForAuthentication(UUID userId, UUID contactId) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        log.info("Enabling contact for authentication: tenantId={}, userId={}, contactId={}", 
-            tenantId, userId, contactId);
-
-        UserContact userContact = userContactRepository.findByUserIdAndContactId(userId, contactId)
+        log.warn("enableForAuthentication is deprecated. userId={}, contactId={}", userId, contactId);
+        return userContactRepository.findByUserIdAndContactId(userId, contactId)
             .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
-
-        Contact contact = contactRepository.findById(contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
-
-        if (!contact.canBeUsedForAuthentication()) {
-            throw new IllegalArgumentException("Contact must be verified EMAIL or PHONE for authentication");
-        }
-
-        // Remove auth from others
-        userContactRepository.findAuthenticationContactByUserId(userId)
-            .ifPresent(existing -> {
-                if (!existing.getContactId().equals(contactId)) {
-                    existing.disableForAuthentication();
-                    userContactRepository.save(existing);
-                }
-            });
-
-        userContact.enableForAuthentication();
-        return userContactRepository.save(userContact);
     }
 }
 
