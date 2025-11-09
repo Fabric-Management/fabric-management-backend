@@ -71,6 +71,12 @@ public final class TenantContext {
     private static final ThreadLocal<UUID> CURRENT_USER_ID = new InheritableThreadLocal<>();
 
     /**
+     * ThreadLocal storage for current tenant primary country code (ISO 3166-1 alpha-2).
+     * <p>Optional - defaults to {@code null} when not provided.</p>
+     */
+    private static final ThreadLocal<String> CURRENT_TENANT_COUNTRY = new InheritableThreadLocal<>();
+
+    /**
      * Private constructor to prevent instantiation
      */
     private TenantContext() {
@@ -99,6 +105,21 @@ public final class TenantContext {
     public static void setCurrentTenantUid(String tenantUid) {
         CURRENT_TENANT_UID.set(tenantUid);
         log.trace("Set tenant UID: {} for thread: {}", tenantUid, Thread.currentThread().getName());
+    }
+
+    /**
+     * Sets the current tenant primary country code.
+     *
+     * @param countryCode ISO 3166-1 alpha-2 code (e.g. "US", "TR"). Null clears the value.
+     */
+    public static void setCurrentTenantCountry(String countryCode) {
+        if (countryCode == null || countryCode.isBlank()) {
+            CURRENT_TENANT_COUNTRY.remove();
+            log.trace("Cleared tenant country for thread: {}", Thread.currentThread().getName());
+            return;
+        }
+        CURRENT_TENANT_COUNTRY.set(countryCode.toUpperCase());
+        log.trace("Set tenant country: {} for thread: {}", countryCode, Thread.currentThread().getName());
     }
 
     /**
@@ -144,6 +165,15 @@ public final class TenantContext {
     }
 
     /**
+     * Gets the current tenant primary country code.
+     *
+     * @return ISO 3166-1 alpha-2 code or null if not set
+     */
+    public static String getCurrentTenantCountry() {
+        return CURRENT_TENANT_COUNTRY.get();
+    }
+
+    /**
      * Gets the current user ID for this thread
      *
      * @return the current user ID, or null if not set
@@ -183,6 +213,7 @@ public final class TenantContext {
         CURRENT_TENANT_ID.remove();
         CURRENT_TENANT_UID.remove();
         CURRENT_USER_ID.remove();
+        CURRENT_TENANT_COUNTRY.remove();
     }
 
     /**
