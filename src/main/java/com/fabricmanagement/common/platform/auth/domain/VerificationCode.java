@@ -40,8 +40,8 @@ public class VerificationCode extends BaseEntity {
     @Column(name = "contact_value", nullable = false, length = 255)
     private String contactValue;
 
-    @Column(name = "code", nullable = false, length = 10)
-    private String code;
+    @Column(name = "code_hash", nullable = false, length = 255)
+    private String codeHash;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 30)
@@ -61,15 +61,27 @@ public class VerificationCode extends BaseEntity {
     @Builder.Default
     private Integer attemptCount = 0;
 
-    public static VerificationCode create(String contactValue, String code, VerificationType type, int expiryMinutes) {
+    public static VerificationCode create(String contactValue, String codeHash, VerificationType type, int expiryMinutes) {
         return VerificationCode.builder()
             .contactValue(contactValue)
-            .code(code)
+            .codeHash(codeHash)
             .type(type)
             .expiresAt(Instant.now().plusSeconds(expiryMinutes * 60L))
             .isUsed(false)
             .attemptCount(0)
             .build();
+    }
+
+    public boolean matches(String rawCode, org.springframework.security.crypto.password.PasswordEncoder encoder) {
+        return encoder.matches(rawCode, this.codeHash);
+    }
+
+    public void replaceWithNewHash(String newHash, int expiryMinutes) {
+        this.codeHash = newHash;
+        this.expiresAt = Instant.now().plusSeconds(expiryMinutes * 60L);
+        this.isUsed = false;
+        this.usedAt = null;
+        this.attemptCount = 0;
     }
 
     public boolean isExpired() {

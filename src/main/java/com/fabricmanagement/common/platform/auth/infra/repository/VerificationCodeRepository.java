@@ -15,13 +15,18 @@ import java.util.UUID;
 @Repository
 public interface VerificationCodeRepository extends JpaRepository<VerificationCode, UUID> {
 
-    Optional<VerificationCode> findByContactValueAndCodeAndType(
-        String contactValue, String code, VerificationType type);
+    Optional<VerificationCode> findTopByTenantIdAndContactValueAndTypeOrderByCreatedAtDesc(
+        UUID tenantId, String contactValue, VerificationType type);
 
-    Optional<VerificationCode> findTopByContactValueAndTypeOrderByCreatedAtDesc(
-        String contactValue, VerificationType type);
+    long countByTenantIdAndContactValueAndTypeAndCreatedAtAfter(
+        UUID tenantId, String contactValue, VerificationType type, Instant createdAfter);
 
-    void deleteByContactValueAndType(String contactValue, VerificationType type);
+    long countByTenantIdAndTypeAndCreatedAtAfter(
+        UUID tenantId, VerificationType type, Instant createdAfter);
+
+    long countByCreatedAtAfter(Instant createdAfter);
+
+    void deleteByTenantIdAndContactValueAndType(UUID tenantId, String contactValue, VerificationType type);
 
     void deleteByExpiresAtBefore(Instant expiryThreshold);
 }

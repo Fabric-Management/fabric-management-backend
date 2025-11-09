@@ -84,7 +84,7 @@ CREATE TABLE common_auth.common_verification_code (
     uid VARCHAR(100) UNIQUE NOT NULL,
     
     contact_value VARCHAR(255) NOT NULL,
-    code VARCHAR(10) NOT NULL,
+    code_hash VARCHAR(255) NOT NULL,
     type VARCHAR(30) NOT NULL,
     
     expires_at TIMESTAMP NOT NULL,
@@ -101,11 +101,11 @@ CREATE TABLE common_auth.common_verification_code (
 );
 
 CREATE INDEX idx_verification_contact ON common_auth.common_verification_code(contact_value);
-CREATE INDEX idx_verification_code ON common_auth.common_verification_code(code);
+CREATE INDEX idx_verification_contact_type ON common_auth.common_verification_code(tenant_id, contact_value, type);
 CREATE INDEX idx_verification_expires ON common_auth.common_verification_code(expires_at);
 
 COMMENT ON TABLE common_auth.common_verification_code IS 'Verification codes for registration, password reset';
-COMMENT ON COLUMN common_auth.common_verification_code.code IS '6-digit code';
+COMMENT ON COLUMN common_auth.common_verification_code.code_hash IS 'BCrypt hash of verification code (single use)';
 COMMENT ON COLUMN common_auth.common_verification_code.type IS 'REGISTRATION, PASSWORD_RESET, EMAIL_VERIFICATION, PHONE_VERIFICATION';
 COMMENT ON COLUMN common_auth.common_verification_code.expires_at IS 'Default: 10 minutes';
 COMMENT ON COLUMN common_auth.common_verification_code.attempt_count IS 'Max 3 attempts';
