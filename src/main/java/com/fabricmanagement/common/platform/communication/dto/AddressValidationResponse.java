@@ -37,12 +37,19 @@ public class AddressValidationResponse {
     private String formattedAddress;
 
     /**
-     * Street address
+     * Street address (street number + route + premise)
      */
     private String streetAddress;
 
     /**
+     * Flat/Apartment number (subpremise)
+     * <p>Examples: "34", "Apt 5B", "Flat 12"</p>
+     */
+    private String flatNumber;
+
+    /**
      * City
+     * <p>Mapped from: locality → administrative_area_level_2 → sublocality (fallback chain)</p>
      */
     private String city;
 

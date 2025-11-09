@@ -1,11 +1,14 @@
 package com.fabricmanagement.common.platform.communication.infra.client;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fabricmanagement.common.platform.communication.config.GoogleMapsProperties;
 import com.fabricmanagement.common.platform.communication.dto.AddressValidationResponse;
 import com.fabricmanagement.common.platform.communication.dto.AutocompleteResponse;
-import lombok.Data;
+import com.fabricmanagement.common.platform.communication.infra.client.googlemaps.response.AddressComponents;
+import com.fabricmanagement.common.platform.communication.infra.client.googlemaps.response.GeocodingResponse;
+import com.fabricmanagement.common.platform.communication.infra.client.googlemaps.response.PlaceDetailsResponse;
+import com.fabricmanagement.common.platform.communication.infra.client.googlemaps.response.PlacesAutocompleteResponse;
+import com.fabricmanagement.common.platform.communication.util.AddressComponentMapper;
+import com.fabricmanagement.common.platform.communication.util.CountryCodeMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -39,14 +42,17 @@ import java.util.Map;
 public class GoogleMapsClient {
 
     private static final String PLACES_AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete";
+    private static final String PLACES_DETAILS_URL = "https://places.googleapis.com/v1/places/"; // {placeId}
     private static final String GEOCODING_API_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 
     private final GoogleMapsProperties properties;
     private final RestTemplate restTemplate;
+    private final AddressComponentMapper addressComponentMapper;
 
     public GoogleMapsClient(GoogleMapsProperties properties) {
         this.properties = properties;
         this.restTemplate = createRestTemplate();
+        this.addressComponentMapper = new AddressComponentMapper();
     }
 
     private RestTemplate createRestTemplate() {
@@ -58,6 +64,12 @@ public class GoogleMapsClient {
 
     /**
      * Get autocomplete suggestions from Google Places API.
+     * 
+     * <p>User-friendly: No country filter - Google's smart relevance handles country detection automatically.
+     * This allows users to search globally without restrictions (e.g., "Akkayalar London" works from anywhere).</p>
+     * 
+     * @param input Address input text (required)
+     * @param country Optional country code (deprecated - not used, kept for backward compatibility)
      */
     public AutocompleteResponse autocomplete(String input, String country) {
         if (!properties.getEnabled()) {
@@ -75,46 +87,81 @@ public class GoogleMapsClient {
         }
 
         try {
-            log.debug("Requesting autocomplete: input={}, country={}", input, country);
+            log.debug("Requesting autocomplete: input={}", input);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("X-Goog-Api-Key", properties.getApiKey());
+            // FieldMask: Request only the fields we need (required for New API v1)
             headers.set("X-Goog-FieldMask", "suggestions.placePrediction.placeId,suggestions.placePrediction.text");
 
             Map<String, Object> requestBody = new java.util.HashMap<>();
             requestBody.put("input", input);
 
-            // Region bias
+            // Note: Google Places API (New) v1 doesn't support maxResultCount parameter
+            // API returns results based on relevance (typically 5-10 suggestions)
+            // For what3words-style behavior, we rely on API's default result set
+
+            // Region bias (from properties) - soft preference, doesn't restrict results
+            // Google's smart relevance will still return relevant results from other regions
             if (properties.getRegionBias() != null && !properties.getRegionBias().isBlank()) {
                 requestBody.put("includedRegionCodes", List.of(properties.getRegionBias().split(",")));
             }
 
-            // Component restrictions
-            if (country != null && !country.isBlank()) {
-                Map<String, List<String>> components = new java.util.HashMap<>();
-                components.put("country", List.of(country.toUpperCase()));
-                requestBody.put("includedPrimaryTypes", List.of("street_address", "premise", "subpremise"));
-            }
+            // Note: Country filter removed - Google's smart relevance handles country detection automatically
+            // This allows users to search globally (e.g., "Akkayalar London" works from anywhere)
+            
+            // Include comprehensive address types: buildings, businesses, streets, landmarks
+            // Google API limit: Maximum 5 included_primary_types
+            // This captures: street addresses, building names, businesses, POIs, routes, establishments
+            // While filtering out: countries, continents, overly general results
+            requestBody.put("includedPrimaryTypes", List.of(
+                "street_address",      // Normal addresses (e.g., 10 Downing St)
+                "premise",              // Building or apartment names (e.g., Akkayalar Plaza) - includes subpremise
+                "point_of_interest",    // Known businesses or landmarks (e.g., Starbucks, Big Ben)
+                "route",                // Street or avenue names
+                "establishment"         // General business or building category
+            ));
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
 
-            ResponseEntity<PlacesAutocompleteResponse> response = restTemplate.exchange(
+            ResponseEntity<String> rawResponse = restTemplate.exchange(
                 PLACES_AUTOCOMPLETE_URL,
                 HttpMethod.POST,
                 request,
-                PlacesAutocompleteResponse.class
+                String.class
             );
 
-            PlacesAutocompleteResponse body = response.getBody();
-            if (body != null && body.getSuggestions() != null) {
+            // Parse JSON response
+            PlacesAutocompleteResponse body = null;
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                body = mapper.readValue(rawResponse.getBody(), PlacesAutocompleteResponse.class);
+            } catch (Exception e) {
+                log.error("Failed to parse Google Places API response: {}", e.getMessage(), e);
+                return AutocompleteResponse.builder()
+                    .predictions(new ArrayList<>())
+                    .build();
+            }
+            
+            if (body == null || body.getSuggestions() == null || body.getSuggestions().isEmpty()) {
+                return AutocompleteResponse.builder()
+                    .predictions(new ArrayList<>())
+                    .build();
+            }
+            
+            if (!body.getSuggestions().isEmpty()) {
                 List<AutocompleteResponse.AutocompletePrediction> predictions = body
                     .getSuggestions()
                     .stream()
                     .filter(s -> s.getPlacePrediction() != null)
+                    .filter(s -> {
+                        PlacesAutocompleteResponse.PlacePrediction pred = s.getPlacePrediction();
+                        return pred.getText() != null && pred.getText().getFullText() != null;
+                    })
                     .map(s -> {
-                        PlacePrediction pred = s.getPlacePrediction();
-                        String fullText = pred.getText() != null ? pred.getText().getFullText() : "";
+                        PlacesAutocompleteResponse.PlacePrediction pred = s.getPlacePrediction();
+                        String fullText = pred.getText().getFullText();
                         String[] parts = fullText.split(",", 2);
                         return AutocompleteResponse.AutocompletePrediction.builder()
                             .placeId(pred.getPlaceId())
@@ -125,7 +172,6 @@ public class GoogleMapsClient {
                     })
                     .toList();
 
-                log.debug("Autocomplete returned {} suggestions", predictions.size());
                 return AutocompleteResponse.builder()
                     .predictions(predictions)
                     .build();
@@ -148,9 +194,15 @@ public class GoogleMapsClient {
     }
 
     /**
-     * Validate address using Google Geocoding API by placeId (recommended).
+     * Validate address using Google Places API (New) v1 Place Details API by placeId (recommended).
+     * 
+     * <p>Uses the new Places API (New) v1 which provides more detailed address information
+     * including flat numbers, apartment names, and better structured address components.</p>
+     * 
+     * @param placeId Google Places ID
+     * @param originalInput Original input from autocomplete (optional, used for flat number extraction)
      */
-    public AddressValidationResponse validateByPlaceId(String placeId) {
+    public AddressValidationResponse validateByPlaceId(String placeId, String originalInput) {
         if (!properties.getEnabled()) {
             throw new IllegalStateException("Google Maps features are disabled");
         }
@@ -160,30 +212,95 @@ public class GoogleMapsClient {
         }
 
         try {
-            log.debug("Validating address by placeId: placeId={}", placeId);
+            log.debug("Validating address by placeId using Places API (New) v1: placeId={}", placeId);
 
-            UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(GEOCODING_API_URL)
-                .queryParam("place_id", placeId)
-                .queryParam("key", properties.getApiKey());
+            // New Places API (New) v1 Place Details endpoint
+            String url = PLACES_DETAILS_URL + placeId;
 
-            ResponseEntity<GeocodingResponse> response = restTemplate.getForEntity(
-                uriBuilder.toUriString(),
-                GeocodingResponse.class
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Goog-Api-Key", properties.getApiKey());
+            // Request detailed address components, formatted address, location (lat/lng), and place ID
+            // Note: Google Places API (New) v1 uses "location" directly (not "geometry.location")
+            headers.set("X-Goog-FieldMask", "id,formattedAddress,addressComponents,location.latitude,location.longitude");
+
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+
+            ResponseEntity<String> rawResponse = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                request,
+                String.class
             );
 
-            GeocodingResponse body = response.getBody();
-            if (body != null && "OK".equals(body.getStatus()) && body.getResults() != null && !body.getResults().isEmpty()) {
-                GeocodingResult result = body.getResults().get(0);
-                return mapToValidationResponse(result);
+            // Parse JSON response
+            PlaceDetailsResponse placeDetails = null;
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                placeDetails = mapper.readValue(rawResponse.getBody(), PlaceDetailsResponse.class);
+                
+                // Debug: Log raw Google API response for field mapping verification
+                log.debug("🔍 Google Places API (New) v1 Raw Response:");
+                log.debug("  - placeId: {}", placeDetails.getId());
+                log.debug("  - formattedAddress: {}", placeDetails.getFormattedAddress());
+                if (placeDetails.getAddressComponents() != null) {
+                    log.debug("  - addressComponents count: {}", placeDetails.getAddressComponents().size());
+                    for (PlaceDetailsResponse.PlaceAddressComponent comp : placeDetails.getAddressComponents()) {
+                        log.debug("    → types: {}, longText: '{}', shortText: '{}'", 
+                            comp.getTypes(), comp.getLongText(), comp.getShortText());
+                    }
+                }
+                if (placeDetails.getLocation() != null) {
+                    log.debug("  - location: lat={}, lng={}", 
+                        placeDetails.getLocation().getLatitude(), 
+                        placeDetails.getLocation().getLongitude());
+                }
+            } catch (Exception e) {
+                log.error("Failed to parse Places API (New) v1 response: {}", e.getMessage(), e);
+                return AddressValidationResponse.builder()
+                    .verificationStatus(AddressValidationResponse.VerificationStatus.FAILED)
+                    .errorMessage("Failed to parse address details: " + e.getMessage())
+                    .build();
+            }
+
+            // placeDetails cannot be null here - Jackson readValue either throws exception or returns object
+            AddressValidationResponse response = mapPlaceDetailsToValidationResponse(placeDetails, originalInput);
+            
+            // Debug: Log mapped response for domain field verification
+            log.debug("🔍 Mapped AddressValidationResponse → Domain Fields:");
+            log.debug("  - streetAddress: '{}' → Address.streetAddress", response.getStreetAddress());
+            log.debug("  - flatNumber: '{}' → (not in domain, only in DTO)", response.getFlatNumber());
+            log.debug("  - city: '{}' → Address.city", response.getCity());
+            log.debug("  - state: '{}' → Address.state", response.getState());
+            log.debug("  - district: '{}' → Address.district", response.getDistrict());
+            log.debug("  - postalCode: '{}' → Address.postalCode", response.getPostalCode());
+            log.debug("  - country: '{}' → Address.country", response.getCountry());
+            log.debug("  - countryCode: '{}' → Address.countryCode", response.getCountryCode());
+            log.debug("  - latitude: {} → Address.latitude", response.getLatitude());
+            log.debug("  - longitude: {} → Address.longitude", response.getLongitude());
+            log.debug("  - placeId: '{}' → Address.placeId", response.getPlaceId());
+            log.debug("  - formattedAddress: '{}' → Address.formattedAddress", response.getFormattedAddress());
+            
+            return response;
+
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.error("Error calling Google Places API (New) v1: status={}, body={}", e.getStatusCode(), e.getResponseBodyAsString());
+            
+            // Handle API errors
+            if (e.getStatusCode().value() == 400) {
+                return AddressValidationResponse.builder()
+                    .verificationStatus(AddressValidationResponse.VerificationStatus.FAILED)
+                    .errorMessage("Invalid placeId: " + placeId)
+                    .build();
+            } else if (e.getStatusCode().value() == 403) {
+                throw new IllegalStateException("Google Places API access denied. Please check API key configuration and enabled APIs.");
             }
 
             return AddressValidationResponse.builder()
                 .verificationStatus(AddressValidationResponse.VerificationStatus.FAILED)
-                .errorMessage("Geocoding failed: " + (body != null ? body.getStatus() : "Unknown error"))
+                .errorMessage("Places API error: " + e.getMessage())
                 .build();
-
         } catch (Exception e) {
-            log.error("Error calling Google Geocoding API: {}", e.getMessage(), e);
+            log.error("Error calling Google Places API (New) v1: {}", e.getMessage(), e);
             return AddressValidationResponse.builder()
                 .verificationStatus(AddressValidationResponse.VerificationStatus.FAILED)
                 .errorMessage("Validation error: " + e.getMessage())
@@ -194,6 +311,9 @@ public class GoogleMapsClient {
     /**
      * Search addresses by postcode using Google Geocoding API (Global).
      * 
+     * <p><b>DEPRECATED:</b> This method is not used in the main user flow (autocomplete handles all searches).
+     * Kept for potential future use cases (bulk postcode validation, data import, etc.).</p>
+     * 
      * <p>Returns all addresses matching the postcode globally or in specified country.</p>
      * <p><b>Global Search:</b> If country is not provided, searches globally across all countries.</p>
      * 
@@ -201,7 +321,9 @@ public class GoogleMapsClient {
      * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "TR", "GB", "US"). 
      *                If null, searches globally.
      * @return List of addresses matching the postcode
+     * @deprecated Not used in main user flow - autocomplete handles all address searches
      */
+    @Deprecated
     public List<AddressValidationResponse> searchByPostcode(String postcode, String country) {
         if (!properties.getEnabled()) {
             log.warn("Google Maps features are disabled");
@@ -236,7 +358,7 @@ public class GoogleMapsClient {
                     countryCode = upper;
                 } else {
                     // Map common country names to ISO codes for better Google API accuracy
-                    countryCode = mapCountryNameToIsoCode(upper);
+                    countryCode = CountryCodeMapper.mapToIsoCode(upper);
                 }
             }
 
@@ -331,7 +453,10 @@ public class GoogleMapsClient {
 
 
     /**
-     * Validate address using Google Geocoding API by address string (fallback).
+     * Validate address using Google Geocoding API by address string (fallback only).
+     * 
+     * <p><b>FALLBACK METHOD:</b> Only used when placeId is not available (e.g., manual address entry).
+     * Main flow uses validateByPlaceId() with Places API (New) v1 for better accuracy.</p>
      */
     public AddressValidationResponse validateByAddress(String address) {
         if (!properties.getEnabled()) {
@@ -360,8 +485,39 @@ public class GoogleMapsClient {
             );
 
             GeocodingResponse body = response.getBody();
+            
+            // Handle API errors (REQUEST_DENIED, OVER_QUERY_LIMIT, etc.)
+            if (body != null && body.getStatus() != null && !"OK".equals(body.getStatus())) {
+                String status = body.getStatus();
+                String errorMessage = body.getErrorMessage() != null ? body.getErrorMessage() : status;
+                
+                // Critical configuration errors should throw IllegalStateException
+                if ("REQUEST_DENIED".equals(status)) {
+                    String detailedMessage = String.format(
+                        "Google Maps API request denied. Error: %s. Please check: 1) IP address restrictions (add your IP: 212.139.3.25), 2) API key configuration, 3) Enabled APIs (Geocoding API, Places API), 4) Billing account. Note: IP restriction changes may take up to 5 minutes to take effect.",
+                        errorMessage
+                    );
+                    log.error("❌ Google Geocoding API REQUEST_DENIED: {}", errorMessage);
+                    throw new IllegalStateException(detailedMessage);
+                }
+                
+                if ("OVER_QUERY_LIMIT".equals(status)) {
+                    throw new IllegalStateException("Google Maps API quota exceeded. Please check your billing account or upgrade your plan.");
+                }
+                
+                if ("INVALID_REQUEST".equals(status)) {
+                    throw new IllegalStateException("Invalid Google Maps API request: " + errorMessage);
+                }
+                
+                // Other errors return FAILED status
+                return AddressValidationResponse.builder()
+                    .verificationStatus(AddressValidationResponse.VerificationStatus.FAILED)
+                    .errorMessage("Geocoding failed: " + status + (errorMessage != null ? " - " + errorMessage : ""))
+                    .build();
+            }
+            
             if (body != null && "OK".equals(body.getStatus()) && body.getResults() != null && !body.getResults().isEmpty()) {
-                GeocodingResult result = body.getResults().get(0);
+                GeocodingResponse.GeocodingResult result = body.getResults().get(0);
                 return mapToValidationResponse(result);
             }
 
@@ -370,6 +526,10 @@ public class GoogleMapsClient {
                 .errorMessage("Geocoding failed: " + (body != null ? body.getStatus() : "Unknown error"))
                 .build();
 
+        } catch (IllegalStateException e) {
+            // Re-throw API configuration errors
+            log.error("Google Maps API configuration error: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("Error calling Google Geocoding API: {}", e.getMessage(), e);
             return AddressValidationResponse.builder()
@@ -379,8 +539,46 @@ public class GoogleMapsClient {
         }
     }
 
-    private AddressValidationResponse mapToValidationResponse(GeocodingResult result) {
-        AddressComponents components = extractAddressComponents(result);
+    /**
+     * Map Places API (New) v1 Place Details response to AddressValidationResponse.
+     * 
+     * <p>Extracts detailed address components including flat numbers, apartment names, etc.
+     * Uses region-based mapping strategy for accurate address component mapping.</p>
+     * 
+     * @param placeDetails Place details response from Google
+     * @param originalInput Original input from autocomplete (optional, used for flat number extraction)
+     */
+    private AddressValidationResponse mapPlaceDetailsToValidationResponse(PlaceDetailsResponse placeDetails, String originalInput) {
+        AddressComponents components = addressComponentMapper.map(placeDetails, originalInput);
+
+        AddressValidationResponse.VerificationStatus status = determineVerificationStatus(components);
+
+        return AddressValidationResponse.builder()
+            .verificationStatus(status)
+            .placeId(placeDetails.getId())
+            .formattedAddress(placeDetails.getFormattedAddress())
+            .streetAddress(components.getStreetAddress())
+            .flatNumber(components.getFlatNumber())
+            .city(components.getCity())
+            .state(components.getState())
+            .district(components.getDistrict())
+            .postalCode(components.getPostalCode())
+            .country(components.getCountry())
+            .countryCode(components.getCountryCode())
+            .latitude(placeDetails.getLocation() != null 
+                ? placeDetails.getLocation().getLatitude() : null)
+            .longitude(placeDetails.getLocation() != null 
+                ? placeDetails.getLocation().getLongitude() : null)
+            .build();
+    }
+
+
+    /**
+     * Map old Geocoding API response to AddressValidationResponse (for backward compatibility).
+     * Uses region-based mapping strategy for accurate address component mapping.
+     */
+    private AddressValidationResponse mapToValidationResponse(GeocodingResponse.GeocodingResult result) {
+        AddressComponents components = addressComponentMapper.map(result);
 
         AddressValidationResponse.VerificationStatus status = determineVerificationStatus(components);
 
@@ -389,6 +587,7 @@ public class GoogleMapsClient {
             .placeId(result.getPlaceId())
             .formattedAddress(result.getFormattedAddress())
             .streetAddress(components.getStreetAddress())
+            .flatNumber(components.getFlatNumber())
             .city(components.getCity())
             .state(components.getState())
             .district(components.getDistrict())
@@ -400,34 +599,6 @@ public class GoogleMapsClient {
             .build();
     }
 
-    private AddressComponents extractAddressComponents(GeocodingResult result) {
-        AddressComponents components = new AddressComponents();
-
-        for (AddressComponent comp : result.getAddressComponents()) {
-            List<String> types = comp.getTypes();
-
-            if (types.contains("street_number")) {
-                String streetNumber = components.getStreetAddress() != null ? components.getStreetAddress() : "";
-                components.setStreetAddress((streetNumber + " " + comp.getLongName()).trim());
-            } else if (types.contains("route")) {
-                String streetAddress = components.getStreetAddress() != null ? components.getStreetAddress() : "";
-                components.setStreetAddress((streetAddress + " " + comp.getLongName()).trim());
-            } else if (types.contains("locality")) {
-                components.setCity(comp.getLongName());
-            } else if (types.contains("administrative_area_level_1")) {
-                components.setState(comp.getShortName());
-            } else if (types.contains("administrative_area_level_2")) {
-                components.setDistrict(comp.getLongName());
-            } else if (types.contains("postal_code")) {
-                components.setPostalCode(comp.getLongName());
-            } else if (types.contains("country")) {
-                components.setCountry(comp.getLongName());
-                components.setCountryCode(comp.getShortName());
-            }
-        }
-
-        return components;
-    }
 
     private AddressValidationResponse.VerificationStatus determineVerificationStatus(AddressComponents components) {
         boolean hasStreet = components.getStreetAddress() != null && !components.getStreetAddress().isBlank();
@@ -451,180 +622,4 @@ public class GoogleMapsClient {
         }
     }
 
-    // Google API Response DTOs
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class PlacesAutocompleteResponse {
-        @JsonProperty("suggestions")
-        private List<Suggestion> suggestions;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Suggestion {
-        @JsonProperty("placePrediction")
-        private PlacePrediction placePrediction;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class PlacePrediction {
-        @JsonProperty("placeId")
-        private String placeId;
-
-        @JsonProperty("text")
-        private Text text;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Text {
-        @JsonProperty("fullText")
-        private String fullText;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class GeocodingResponse {
-        @JsonProperty("status")
-        private String status;
-
-        @JsonProperty("error_message")
-        private String errorMessage;
-
-        @JsonProperty("results")
-        private List<GeocodingResult> results;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class GeocodingResult {
-        @JsonProperty("place_id")
-        private String placeId;
-
-        @JsonProperty("formatted_address")
-        private String formattedAddress;
-
-        @JsonProperty("address_components")
-        private List<AddressComponent> addressComponents;
-
-        @JsonProperty("geometry")
-        private Geometry geometry;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class AddressComponent {
-        @JsonProperty("long_name")
-        private String longName;
-
-        @JsonProperty("short_name")
-        private String shortName;
-
-        @JsonProperty("types")
-        private List<String> types;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Geometry {
-        @JsonProperty("location")
-        private Location location;
-    }
-
-    @Data
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Location {
-        @JsonProperty("lat")
-        private Double lat;
-
-        @JsonProperty("lng")
-        private Double lng;
-    }
-
-    /**
-     * Map common country names to ISO 3166-1 alpha-2 codes.
-     * 
-     * <p>Improves Google Geocoding API accuracy by using components parameter
-     * instead of country name in address query.</p>
-     * 
-     * @param countryName Country name (case-insensitive, will be uppercased)
-     * @return ISO 3166-1 alpha-2 code or null if not found
-     */
-    private String mapCountryNameToIsoCode(String countryName) {
-        if (countryName == null || countryName.isBlank()) {
-            return null;
-        }
-        
-        String upper = countryName.toUpperCase();
-        
-        // Common country name mappings (most frequently used in address forms)
-        return switch (upper) {
-            case "UNITED KINGDOM", "UK", "GREAT BRITAIN", "BRITAIN" -> "GB";
-            case "UNITED STATES", "USA", "US", "AMERICA" -> "US";
-            case "TURKEY", "TÜRKIYE", "TURKIYE" -> "TR";
-            case "GERMANY", "DEUTSCHLAND" -> "DE";
-            case "FRANCE" -> "FR";
-            case "ITALY", "ITALIA" -> "IT";
-            case "SPAIN", "ESPANA" -> "ES";
-            case "NETHERLANDS", "HOLLAND" -> "NL";
-            case "BELGIUM" -> "BE";
-            case "SWITZERLAND", "SUISSE", "SCHWEIZ" -> "CH";
-            case "AUSTRIA", "OSTERREICH" -> "AT";
-            case "POLAND", "POLSKA" -> "PL";
-            case "CZECH REPUBLIC", "CZECHIA" -> "CZ";
-            case "SWEDEN", "SVERIGE" -> "SE";
-            case "NORWAY", "NORGE" -> "NO";
-            case "DENMARK", "DANMARK" -> "DK";
-            case "FINLAND", "SUOMI" -> "FI";
-            case "PORTUGAL" -> "PT";
-            case "GREECE", "HELLAS" -> "GR";
-            case "ROMANIA" -> "RO";
-            case "BULGARIA" -> "BG";
-            case "HUNGARY", "MAGYARORSZAG" -> "HU";
-            case "CROATIA", "HRVATSKA" -> "HR";
-            case "SLOVAKIA", "SLOVENSKO" -> "SK";
-            case "SLOVENIA", "SLOVENIJA" -> "SI";
-            case "IRELAND", "EIRE" -> "IE";
-            case "AUSTRALIA" -> "AU";
-            case "CANADA" -> "CA";
-            case "NEW ZEALAND" -> "NZ";
-            case "SOUTH AFRICA" -> "ZA";
-            case "JAPAN", "NIHON" -> "JP";
-            case "CHINA", "PEOPLE'S REPUBLIC OF CHINA" -> "CN";
-            case "INDIA" -> "IN";
-            case "BRAZIL", "BRASIL" -> "BR";
-            case "MEXICO" -> "MX";
-            case "ARGENTINA" -> "AR";
-            case "CHILE" -> "CL";
-            case "COLOMBIA" -> "CO";
-            case "PERU" -> "PE";
-            case "RUSSIA", "RUSSIAN FEDERATION" -> "RU";
-            case "SOUTH KOREA", "KOREA", "REPUBLIC OF KOREA" -> "KR";
-            case "SINGAPORE" -> "SG";
-            case "MALAYSIA" -> "MY";
-            case "THAILAND" -> "TH";
-            case "INDONESIA" -> "ID";
-            case "PHILIPPINES" -> "PH";
-            case "VIETNAM", "VIET NAM" -> "VN";
-            case "ISRAEL" -> "IL";
-            case "SAUDI ARABIA" -> "SA";
-            case "UNITED ARAB EMIRATES", "UAE" -> "AE";
-            case "EGYPT" -> "EG";
-            default -> null; // Unknown country name, will use as-is in address query
-        };
-    }
-
-    @Data
-    static class AddressComponents {
-        private String streetAddress;
-        private String city;
-        private String state;
-        private String district;
-        private String postalCode;
-        private String country;
-        private String countryCode;
-    }
 }
-

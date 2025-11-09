@@ -45,7 +45,7 @@ public class AddressValidationService {
 
         if (request.getPlaceId() != null && !request.getPlaceId().isBlank()) {
             // Recommended: validate by placeId
-            validationResponse = googleMapsClient.validateByPlaceId(request.getPlaceId());
+            validationResponse = googleMapsClient.validateByPlaceId(request.getPlaceId(), request.getOriginalInput());
         } else if (request.getAddress() != null && !request.getAddress().isBlank()) {
             // Fallback: validate by address string
             validationResponse = googleMapsClient.validateByAddress(request.getAddress());
@@ -121,7 +121,7 @@ public class AddressValidationService {
             throw new IllegalArgumentException("Address does not have placeId for revalidation");
         }
 
-        AddressValidationResponse validation = googleMapsClient.validateByPlaceId(address.getPlaceId());
+        AddressValidationResponse validation = googleMapsClient.validateByPlaceId(address.getPlaceId(), null);
 
         if (validation.getVerificationStatus() == AddressValidationResponse.VerificationStatus.FAILED) {
             throw new IllegalArgumentException("Address revalidation failed: " + validation.getErrorMessage());

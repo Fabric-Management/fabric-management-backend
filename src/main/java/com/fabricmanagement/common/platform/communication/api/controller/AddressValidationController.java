@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.communication.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.InternalEndpoint;
 import com.fabricmanagement.common.platform.communication.app.AddressValidationService;
 import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.dto.AddressDto;
@@ -133,6 +134,8 @@ public class AddressValidationController {
     /**
      * Search addresses by postcode endpoint (Global).
      *
+     * <p><b>NOTE:</b> This endpoint uses deprecated Geocoding API method. Main flow uses autocomplete.</p>
+     * 
      * <p>Uses Google Geocoding API to find all addresses matching a postcode globally.</p>
      * 
      * <p><b>Country Parameter (Optional):</b></p>
@@ -162,6 +165,7 @@ public class AddressValidationController {
      * @return List of addresses matching the postcode
      */
     @GetMapping("/search-by-postcode")
+    @SuppressWarnings("deprecation")
     public ResponseEntity<ApiResponse<List<AddressValidationResponse>>> searchByPostcode(
             @RequestParam String postcode,
             @RequestParam(required = false) String country) {
@@ -240,6 +244,73 @@ public class AddressValidationController {
             case "AUSTRALIA" -> "AU";
             default -> null; // Unknown country name
         };
+    }
+
+    /**
+     * Simple address search endpoint - House number + Postcode.
+     *
+     * <p>Simplified flow: User enters house number/street name + postcode, gets complete address.</p>
+     * <p>Example: "1 MK5 7GE" or "Welsummer Grove MK5 7GE" → Returns full address with all fields.</p>
+     *
+     * @param houseNumber House number or street name (optional, can be combined with postcode)
+     * @param postcode Postal/ZIP code (required)
+     * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "GB", "TR")
+     * @return Complete address with all fields filled
+     */
+    @InternalEndpoint(description = "Simple address lookup by house number and postcode", calledBy = {"frontend-web"})
+    @GetMapping("/search-address")
+    public ResponseEntity<ApiResponse<AddressValidationResponse>> searchAddress(
+            @RequestParam(required = false) String houseNumber,
+            @RequestParam String postcode,
+            @RequestParam(required = false) String country) {
+        log.debug("Simple address search: houseNumber={}, postcode={}, country={}", houseNumber, postcode, country);
+
+        if (postcode == null || postcode.isBlank()) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("POSTCODE_REQUIRED", "Postcode parameter is required"));
+        }
+
+        try {
+            // Build address query: "houseNumber postcode" or just "postcode"
+            String addressQuery;
+            if (houseNumber != null && !houseNumber.trim().isBlank()) {
+                String normalizedHouseNumber = houseNumber.trim();
+                String normalizedPostcode = postcode.trim().replaceAll("\\s+", " ");
+                addressQuery = normalizedHouseNumber + " " + normalizedPostcode;
+            } else {
+                addressQuery = postcode.trim().replaceAll("\\s+", " ");
+            }
+
+            // Add country to query if provided (for better accuracy)
+            if (country != null && !country.isBlank()) {
+                String countryCode = extractCountryCode(country);
+                if (countryCode != null) {
+                    // Use validateByAddress with country context
+                    // Google API will use country for better results
+                    addressQuery = addressQuery + ", " + (countryCode.length() == 2 ? countryCode : country);
+                }
+            }
+
+            // Use validateByAddress to get complete address
+            AddressValidationResponse result = googleMapsClient.validateByAddress(addressQuery);
+
+            if (result.getVerificationStatus() == AddressValidationResponse.VerificationStatus.FAILED) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("ADDRESS_NOT_FOUND", 
+                        result.getErrorMessage() != null ? result.getErrorMessage() : "Address not found. Please check house number and postcode."));
+            }
+
+            return ResponseEntity.ok(ApiResponse.success(result));
+
+        } catch (IllegalStateException e) {
+            log.error("Google Maps API error: {}", e.getMessage());
+            return ResponseEntity.status(500)
+                .body(ApiResponse.error("GOOGLE_API_ERROR", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error during address search: {}", e.getMessage(), e);
+            return ResponseEntity.status(500)
+                .body(ApiResponse.error("SEARCH_ERROR", "Failed to search address. Please try again later."));
+        }
     }
 }
 

@@ -46,5 +46,10 @@ public class GoogleMapsProperties {
      * Component restrictions (country codes for Places API)
      */
     private String componentRestrictions;
+
+    /**
+     * Maximum number of autocomplete results to return (1-20, default: 20)
+     */
+    private Integer maxResultCount = 20;
 }
 

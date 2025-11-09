@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.communication.app;
 
+import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.strategy.VerificationStrategy;
 import com.fabricmanagement.common.platform.communication.infra.client.WhatsAppClient;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
@@ -45,6 +46,7 @@ public class VerificationService {
 
     private final List<VerificationStrategy> strategies;
     private final WhatsAppClient whatsAppClient;
+    private final ContactService contactService;
 
     /**
      * Send verification code with smart channel selection (async - doesn't block user response).
@@ -72,6 +74,18 @@ public class VerificationService {
     @Async
     public void sendVerificationCode(String recipient, String code) {
         log.info("Sending verification code to: {}", maskRecipient(recipient));
+
+        Contact cachedContact = contactService.findByValue(recipient).orElse(null);
+        if (cachedContact != null && cachedContact.getContactType() != null && cachedContact.getContactType().isMobile()) {
+            if (Boolean.TRUE.equals(cachedContact.getIsWhatsApp())) {
+                sendViaStrategy("WhatsApp", recipient, code);
+                return;
+            }
+            log.debug("Contact does not have WhatsApp capability flag, using SMS: {}",
+                maskRecipient(recipient));
+            sendViaStrategy("SMS", recipient, code);
+            return;
+        }
 
         // Smart phone number detection and WhatsApp check
         if (isPhoneNumber(recipient)) {
