@@ -130,7 +130,7 @@ public class EmailOutboxService {
                 return; // No emails ready yet (waiting for retry time)
             }
 
-            log.debug("Processing {} pending email(s)", pendingEmails.size());
+            log.info("📧 Processing {} pending email(s)", pendingEmails.size());
 
             for (EmailOutbox email : pendingEmails) {
                 processEmail(email);
@@ -149,7 +149,7 @@ public class EmailOutboxService {
             email.markAsSending();
             emailOutboxRepository.save(email);
 
-            log.debug("Sending email: recipient={}, retryCount={}", 
+            log.info("📧 Sending email: recipient={}, retryCount={}", 
                 PiiMaskingUtil.maskEmail(email.getRecipient()), email.getRetryCount());
 
             // Send email via EmailStrategy
