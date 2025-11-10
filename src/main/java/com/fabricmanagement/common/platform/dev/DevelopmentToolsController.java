@@ -7,9 +7,9 @@ import com.fabricmanagement.common.platform.auth.infra.repository.VerificationCo
 import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.common.platform.policy.infra.repository.PolicyRepository;
-import com.fabricmanagement.common.platform.communication.app.EmailOutboxService;
 import com.fabricmanagement.common.platform.communication.domain.EmailOutboxStatus;
 import com.fabricmanagement.common.platform.communication.infra.repository.EmailOutboxRepository;
+import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -52,7 +52,6 @@ public class DevelopmentToolsController {
     private final RegistrationTokenRepository tokenRepository;
     private final VerificationCodeRepository verificationCodeRepository;
     private final EmailOutboxRepository emailOutboxRepository;
-    private final EmailOutboxService emailOutboxService;
 
     /**
      * ⚠️ DANGER: Reset ALL data in database.
