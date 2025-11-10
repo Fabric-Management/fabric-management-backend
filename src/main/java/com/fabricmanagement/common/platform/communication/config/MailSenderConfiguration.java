@@ -11,11 +11,13 @@ import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Properties;
 
 @Configuration
 @EnableConfigurationProperties(MailProperties.class)
+@Slf4j
 public class MailSenderConfiguration {
 
     private final MailProperties mailProperties;
@@ -38,16 +40,18 @@ public class MailSenderConfiguration {
             Properties javaMailProperties = sender.getJavaMailProperties();
             javaMailProperties.putAll(mailProperties.getProperties());
             
-            // Set envelope from address (SMTP MAIL FROM)
-            String envelopeFrom = environment.getProperty("spring.mail.properties.mail.smtp.from");
-            if (StringUtils.hasText(envelopeFrom)) {
+            // Set envelope from address (SMTP MAIL FROM) - critical for SPF/DKIM validation
+            // Priority: 1) mail.smtp.from property, 2) MAIL_FROM_EMAIL env, 3) username
+            String envelopeFrom = mailProperties.getProperties().get("mail.smtp.from");
+            if (envelopeFrom == null || envelopeFrom.isEmpty()) {
+                envelopeFrom = environment.getProperty("MAIL_FROM_EMAIL");
+            }
+            if (envelopeFrom == null || envelopeFrom.isEmpty()) {
+                envelopeFrom = mailProperties.getUsername();
+            }
+            if (envelopeFrom != null && !envelopeFrom.isEmpty()) {
                 javaMailProperties.put("mail.smtp.from", envelopeFrom);
-            } else {
-                // Fallback to username if from not set
-                String username = mailProperties.getUsername();
-                if (StringUtils.hasText(username)) {
-                    javaMailProperties.put("mail.smtp.from", username);
-                }
+                log.info("✅ SMTP envelope from address set to: {}", envelopeFrom);
             }
 
             if (StringUtils.hasText(environment.getProperty("spring.mail.default-encoding"))) {
