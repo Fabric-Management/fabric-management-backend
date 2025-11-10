@@ -39,12 +39,13 @@ spring:
     port: ${MAIL_PORT:465}
     username: ${MAIL_USERNAME:info@storeandsale.shop}
     password: ${MAIL_PASSWORD:Akk789987@}
+    protocol: ${MAIL_PROTOCOL:smtps}
     properties:
       mail:
         smtp:
           auth: ${MAIL_SMTP_AUTH:true}
           starttls:
-            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
             required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
           ssl:
             enable: ${MAIL_SMTP_SSL_ENABLE:true}
