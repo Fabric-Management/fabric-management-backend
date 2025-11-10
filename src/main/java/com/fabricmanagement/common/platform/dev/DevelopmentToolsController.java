@@ -173,16 +173,59 @@ public class DevelopmentToolsController {
         long sent = emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.SENT);
         long failed = emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.FAILED);
 
+        // Get failed email details
+        var failedEmails = emailOutboxRepository.findByStatusAndIsActiveTrueOrderByCreatedAtDesc(EmailOutboxStatus.FAILED);
+        var failedDetails = failedEmails.stream()
+            .limit(5)
+            .map(e -> Map.of(
+                "id", e.getId().toString(),
+                "recipient", e.getRecipient(),
+                "retryCount", e.getRetryCount(),
+                "maxRetries", e.getMaxRetries(),
+                "lastError", e.getLastError() != null ? e.getLastError().substring(0, Math.min(200, e.getLastError().length())) : "N/A",
+                "createdAt", e.getCreatedAt().toString()
+            ))
+            .toList();
+
         Map<String, Object> stats = Map.of(
             "pending", pending,
             "sending", sending,
             "sent", sent,
             "failed", failed,
             "total", pending + sending + sent + failed,
+            "failedDetails", failedDetails,
             "timestamp", Instant.now().toString()
         );
 
         return ResponseEntity.ok(ApiResponse.success(stats, "Email outbox status"));
+    }
+
+    /**
+     * Retry failed emails (reset to PENDING).
+     *
+     * @return Retry summary
+     */
+    @PostMapping("/email-outbox/retry-failed")
+    @Transactional
+    public ResponseEntity<ApiResponse<String>> retryFailedEmails() {
+        log.info("Retrying failed emails...");
+
+        var failedEmails = emailOutboxRepository.findByStatusAndIsActiveTrueOrderByCreatedAtDesc(EmailOutboxStatus.FAILED);
+        int count = 0;
+        
+        for (var email : failedEmails) {
+            email.setStatus(EmailOutboxStatus.PENDING);
+            email.setRetryCount(0);
+            email.setNextRetryAt(null);
+            email.setLastError(null);
+            emailOutboxRepository.save(email);
+            count++;
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(
+            "Failed emails reset to PENDING",
+            String.format("Reset %d failed email(s) to PENDING status", count)
+        ));
     }
 
     /**
