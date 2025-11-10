@@ -460,8 +460,7 @@ public class TenantOnboardingService {
             userContactService.assignContact(
                 saved.getId(),
                 contact.getId(),
-                true,  // isDefault
-                null
+                true  // isDefault
             );
 
             // Assign department if provided (new system)

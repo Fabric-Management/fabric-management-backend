@@ -19,10 +19,6 @@ public class AssignContactRequest {
 
     @Builder.Default
     private Boolean isDefault = false;
-
-    @Deprecated
-    @Builder.Default
-    private Boolean isForAuthentication = false;  // Deprecated: Authentication relies on verified contacts
     private String department;            // For CompanyContact only
 }
 

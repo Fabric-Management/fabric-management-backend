@@ -68,8 +68,7 @@ public class UserContactController {
         UserContact userContact = userContactService.assignContact(
             userId,
             request.getContactId(),
-            request.getIsDefault(),
-            null
+            request.getIsDefault()
         );
 
         return ResponseEntity.ok(ApiResponse.success(
@@ -82,8 +81,7 @@ public class UserContactController {
     public ResponseEntity<ApiResponse<UserContactDto>> createAndAssignContact(
             @PathVariable UUID userId,
             @Valid @RequestBody CreateContactRequest createRequest,
-            @RequestParam(defaultValue = "false") Boolean isDefault,
-            @RequestParam(required = false) Boolean isForAuthentication) {
+            @RequestParam(defaultValue = "false") Boolean isDefault) {
         log.info("Creating and assigning contact to user: userId={}, type={}", 
             userId, createRequest.getContactType());
 
@@ -100,8 +98,7 @@ public class UserContactController {
         UserContact userContact = userContactService.assignContact(
             userId,
             contact.getId(),
-            isDefault,
-            isForAuthentication
+            isDefault
         );
 
         return ResponseEntity.ok(ApiResponse.success(
@@ -130,7 +127,7 @@ public class UserContactController {
             @PathVariable UUID userId,
             @PathVariable UUID contactId) {
         log.warn("/enable-auth endpoint is deprecated. userId={}, contactId={}", userId, contactId);
-        UserContact userContact = userContactService.assignContact(userId, contactId, false, null);
+        UserContact userContact = userContactService.assignContact(userId, contactId, false);
 
         return ResponseEntity.ok(ApiResponse.success(
             UserContactDto.from(userContact),

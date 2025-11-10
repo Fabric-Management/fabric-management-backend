@@ -53,8 +53,8 @@ public class UserContactService {
 
     @Transactional(readOnly = true)
     public Optional<UserContact> getAuthenticationContact(UUID userId) {
-        log.trace("Finding authentication contact: userId={}", userId);
-        return userContactRepository.findAuthenticationContactByUserId(userId);
+        log.trace("Finding preferred authentication contact: userId={}", userId);
+        return userContactRepository.findPreferredContactByUserId(userId);
     }
 
     /**
@@ -74,10 +74,10 @@ public class UserContactService {
     }
 
     @Transactional
-    public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault, Boolean isForAuthentication) {
+    public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault) {
         UUID tenantId = TenantContext.getCurrentTenantId();
-        log.info("Assigning contact to user: tenantId={}, userId={}, contactId={}, isDefault={}, isForAuth={}",
-            tenantId, userId, contactId, isDefault, isForAuthentication);
+        log.info("Assigning contact to user: tenantId={}, userId={}, contactId={}, isDefault={}",
+            tenantId, userId, contactId, isDefault);
 
         // Validate user exists
         userRepository.findByTenantIdAndId(tenantId, userId)
@@ -101,12 +101,6 @@ public class UserContactService {
                     existing.setIsDefault(false);
                     userContactRepository.save(existing);
                 });
-        }
-
-        // Set authentication: remove auth flag from other contacts
-        boolean forAuth = Boolean.TRUE.equals(isForAuthentication);
-        if (forAuth) {
-            log.warn("isForAuthentication flag is deprecated and ignored. userId={}, contactId={}", userId, contactId);
         }
 
         UserContact userContact = UserContact.builder()

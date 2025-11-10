@@ -42,13 +42,12 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
     /**
      * Find preferred contact for authentication (default fallback).
      *
-     * <p>Orders by authentication flag first (legacy support), then default flag,
-     * finally creation time for deterministic behaviour.</p>
+     * <p>Orders by default flag first, then creation time for deterministic behaviour.</p>
      */
     @Query("SELECT uc FROM UserContact uc " +
            "WHERE uc.userId = :userId " +
-           "ORDER BY uc.isForAuthentication DESC, uc.isDefault DESC, uc.createdAt ASC")
-    Optional<UserContact> findAuthenticationContactByUserId(@Param("userId") UUID userId);
+           "ORDER BY uc.isDefault DESC, uc.createdAt ASC")
+    Optional<UserContact> findPreferredContactByUserId(@Param("userId") UUID userId);
 
     /**
      * Check if user-contact assignment exists.
