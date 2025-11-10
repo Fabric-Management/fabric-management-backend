@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -45,6 +46,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class JwtContextInterceptor implements HandlerInterceptor {
+
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
+    private static final String[] OPTIONAL_TENANT_PATHS = {
+        "/api/common/companies/types/**"
+    };
 
     private final JwtService jwtService;
     private final CompanyRepository companyRepository;
@@ -120,8 +126,12 @@ public class JwtContextInterceptor implements HandlerInterceptor {
 
         // Diagnostic log: Warn if tenant context not set (only for non-public endpoints)
         if (TenantContext.getCurrentTenantIdOrNull() == null) {
-            log.warn("No tenant context found for request {} (missing or invalid JWT token)", 
-                request.getRequestURI());
+            if (isOptionalTenantRequest(request)) {
+                log.debug("Tenant context not required for request {}", request.getRequestURI());
+            } else {
+                log.warn("No tenant context found for request {} (missing or invalid JWT token)", 
+                    request.getRequestURI());
+            }
         }
 
         return true; // Always continue with request processing
@@ -153,6 +163,19 @@ public class JwtContextInterceptor implements HandlerInterceptor {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    private boolean isOptionalTenantRequest(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        for (String pattern : OPTIONAL_TENANT_PATHS) {
+            if (PATH_MATCHER.match(pattern, path)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

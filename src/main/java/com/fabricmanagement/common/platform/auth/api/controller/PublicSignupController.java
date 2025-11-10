@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.auth.api.controller;
 
+import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.common.platform.auth.dto.SelfSignupRequest;
@@ -51,6 +52,7 @@ public class PublicSignupController {
     private final TenantOnboardingService onboardingService;
     private final NotificationService notificationService;
     private final EmailTemplateRenderer emailTemplateRenderer;
+    private final FrontendUrlProvider frontendUrlProvider;
 
     /**
      * Self-service signup - Creates new tenant from public website.
@@ -90,7 +92,7 @@ public class PublicSignupController {
      * Verification codes are only used for unverified contacts during login flows.</p>
      */
     private void sendSelfServiceWelcomeEmail(String email, String firstName, String companyName, String token) {
-        String setupUrl = generateSetupUrl(token);
+        String setupUrl = frontendUrlProvider.buildUrl("/setup?token=" + token);
         String subject = "Complete Your FabricOS Registration";
         
         // Smart renderer: Uses frontend templates with backend fallback
@@ -101,20 +103,6 @@ public class PublicSignupController {
         notificationService.sendNotification(email, subject, message);
     }
     
-    /**
-     * Generate setup URL using configured frontend URL.
-     */
-    private String generateSetupUrl(String token) {
-        String baseUrl = System.getenv("FRONTEND_URL");
-        if (baseUrl == null || baseUrl.isEmpty()) {
-            baseUrl = System.getenv("APP_BASE_URL");
-        }
-        if (baseUrl == null || baseUrl.isEmpty()) {
-            // Fallback for local development only
-            baseUrl = "http://localhost:3000";
-            log.warn("⚠️ Using hardcoded frontend URL for setup link. Set FRONTEND_URL or APP_BASE_URL env var.");
-        }
-        return baseUrl + "/setup?token=" + token;
-    }    
+    
 }
 

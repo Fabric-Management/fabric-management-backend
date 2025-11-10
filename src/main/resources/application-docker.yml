@@ -64,6 +64,10 @@ spring:
         order_inserts: ${HIBERNATE_ORDER_INSERTS:true}
         order_updates: ${HIBERNATE_ORDER_UPDATES:true}
 
+application:
+  frontend:
+    base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
+
 logging:
   level:
     root: INFO

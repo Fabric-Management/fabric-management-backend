@@ -144,6 +144,9 @@ application:
       dead-letter-monitor-enabled: ${EMAIL_OUTBOX_DEAD_LETTER_MONITOR_ENABLED:true}
       dead-letter-cron: ${EMAIL_OUTBOX_DEAD_LETTER_CRON:0 0 * * * ?}
 
+  frontend:
+    base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
+
   # AI Configuration
   ai:
     enabled: ${AI_ENABLED:true}

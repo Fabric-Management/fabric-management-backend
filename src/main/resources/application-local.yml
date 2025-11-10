@@ -94,6 +94,9 @@ application:
       poll-interval-ms: ${EMAIL_OUTBOX_POLL_INTERVAL_MS:15000}
       dead-letter-monitor-enabled: ${EMAIL_OUTBOX_DEAD_LETTER_MONITOR_ENABLED:false}
 
+  frontend:
+    base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
+
   # Google Maps Platform Configuration
   google:
     maps:

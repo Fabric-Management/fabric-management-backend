@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.auth.domain.RegistrationToken;
 import com.fabricmanagement.common.platform.auth.domain.RegistrationTokenType;
@@ -77,6 +78,7 @@ public class TenantOnboardingService {
     private final EmailTemplateRenderer emailTemplateRenderer;
     private final ContactService contactService;
     private final UserContactService userContactService;
+    private final FrontendUrlProvider frontendUrlProvider;
     private final CompanyContactService companyContactService;
     private final AddressService addressService;
     private final CompanyAddressService companyAddressService;
@@ -583,16 +585,7 @@ public class TenantOnboardingService {
      * <p>Priority: FRONTEND_URL → APP_BASE_URL → localhost fallback (dev only)</p>
      */
     private String generateSetupUrl(String token) {
-        String baseUrl = System.getenv("FRONTEND_URL");
-        if (baseUrl == null || baseUrl.isEmpty()) {
-            baseUrl = System.getenv("APP_BASE_URL");
-        }
-        if (baseUrl == null || baseUrl.isEmpty()) {
-            // Fallback for local development only
-            baseUrl = "http://localhost:3000";
-            log.warn("⚠️ Using hardcoded frontend URL for setup link. Set FRONTEND_URL or APP_BASE_URL env var.");
-        }
-        return baseUrl + "/setup?token=" + token;
+        return frontendUrlProvider.buildUrl("/setup?token=" + token);
     }
 
     /**
