@@ -11,6 +11,8 @@ import com.fabricmanagement.common.platform.auth.infra.repository.RegistrationTo
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.communication.app.UserContactService;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
+import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +51,7 @@ public class PasswordSetupService {
     private final UserFacade userFacade;
     private final UserRepository userRepository;
     private final UserContactService userContactService;
+    private final ContactService contactService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
@@ -103,7 +106,7 @@ public class PasswordSetupService {
         // Get primary authentication contact
         UUID contactId = userContactService.getAuthenticationContact(userEntity.getId())
             .map(uc -> uc.getContactId())
-            .orElseThrow(() -> new IllegalStateException("User has no authentication contact"));
+            .orElseGet(() -> ensureAuthenticationContact(userEntity.getId(), token.getContactValue()));
 
         // Check if AuthUser already exists for this contact
         if (authUserRepository.existsByContactId(contactId)) {
@@ -152,6 +155,33 @@ public class PasswordSetupService {
             .user(freshUser)
             .needsOnboarding(!user.getHasCompletedOnboarding())
             .build();
+    }
+
+    private UUID ensureAuthenticationContact(UUID userId, String contactValue) {
+        log.warn("No authentication contact found for userId={}, attempting recovery", userId);
+
+        Contact contact = contactService.findByValue(contactValue)
+            .orElseGet(() -> {
+                log.info("Creating contact for {}", PiiMaskingUtil.maskEmail(contactValue));
+                return contactService.createContact(
+                    contactValue,
+                    null,
+                    "Primary",
+                    true,
+                    null
+                );
+            });
+
+        contactService.verifyContact(contact.getId());
+
+        if (!userContactService.existsUserContact(userId, contact.getId())) {
+            userContactService.assignContact(userId, contact.getId(), true);
+        } else {
+            userContactService.setAsDefault(userId, contact.getId());
+        }
+
+        log.info("Recovered authentication contact: userId={}, contactId={}", userId, contact.getId());
+        return contact.getId();
     }
 }
 
