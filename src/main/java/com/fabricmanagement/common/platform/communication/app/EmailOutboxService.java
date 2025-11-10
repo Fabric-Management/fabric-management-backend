@@ -127,10 +127,11 @@ public class EmailOutboxService {
             );
 
             if (pendingEmails.isEmpty()) {
+                log.debug("📧 Found {} pending email(s) but none ready for sending yet (waiting for retry time)", pendingCount);
                 return; // No emails ready yet (waiting for retry time)
             }
 
-            log.info("📧 Processing {} pending email(s)", pendingEmails.size());
+            log.info("📧 Processing {} pending email(s) (total pending: {})", pendingEmails.size(), pendingCount);
 
             for (EmailOutbox email : pendingEmails) {
                 processEmail(email);
