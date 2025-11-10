@@ -28,7 +28,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "LEFT JOIN FETCH u.role " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id " +
-           "WHERE c.contactValue = :contactValue AND uc.isForAuthentication = true")
+           "WHERE c.contactValue = :contactValue")
     Optional<User> findByContactValue(@Param("contactValue") String contactValue);
 
     /**
@@ -48,7 +48,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "LEFT JOIN FETCH u.role " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id " +
-           "WHERE u.tenantId = :tenantId AND c.contactValue = :contactValue AND uc.isForAuthentication = true")
+           "WHERE u.tenantId = :tenantId AND c.contactValue = :contactValue")
     Optional<User> findByTenantIdAndContactValue(@Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
     /**
@@ -79,7 +79,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT COUNT(u) > 0 FROM User u " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id " +
-           "WHERE c.contactValue = :contactValue AND uc.isForAuthentication = true")
+           "WHERE c.contactValue = :contactValue")
     boolean existsByContactValue(@Param("contactValue") String contactValue);
 
     /**
