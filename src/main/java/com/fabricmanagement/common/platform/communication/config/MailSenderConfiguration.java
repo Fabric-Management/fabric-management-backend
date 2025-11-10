@@ -37,6 +37,18 @@ public class MailSenderConfiguration {
 
             Properties javaMailProperties = sender.getJavaMailProperties();
             javaMailProperties.putAll(mailProperties.getProperties());
+            
+            // Set envelope from address (SMTP MAIL FROM)
+            String envelopeFrom = environment.getProperty("spring.mail.properties.mail.smtp.from");
+            if (StringUtils.hasText(envelopeFrom)) {
+                javaMailProperties.put("mail.smtp.from", envelopeFrom);
+            } else {
+                // Fallback to username if from not set
+                String username = mailProperties.getUsername();
+                if (StringUtils.hasText(username)) {
+                    javaMailProperties.put("mail.smtp.from", username);
+                }
+            }
 
             if (StringUtils.hasText(environment.getProperty("spring.mail.default-encoding"))) {
                 sender.setDefaultEncoding(environment.getProperty("spring.mail.default-encoding"));
