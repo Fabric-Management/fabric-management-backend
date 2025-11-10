@@ -59,6 +59,9 @@ public class PasswordSetupService {
     @Value("${application.jwt.refresh-expiration:604800000}")
     private long refreshTokenExpiration;
 
+    @Value("${application.jwt.expiration:900000}")
+    private long accessTokenExpiration;
+
     /**
      * Complete password setup using secure token.
      *
@@ -155,7 +158,7 @@ public class PasswordSetupService {
         return LoginResponse.builder()
             .accessToken(accessToken)
             .refreshToken(refreshToken)
-            .expiresIn(900L)
+            .expiresIn(accessTokenExpiration / 1000) // Convert ms to seconds
             .user(freshUser)
             .needsOnboarding(!user.getHasCompletedOnboarding())
             .build();
