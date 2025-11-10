@@ -47,6 +47,9 @@ spring:
             required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
           ssl:
             enable: ${MAIL_SMTP_SSL_ENABLE:true}
+            trust: ${MAIL_SMTP_SSL_TRUST:smtp.hostinger.com}
+          from: ${MAIL_SMTP_FROM:${MAIL_FROM_EMAIL:${MAIL_USERNAME:}}}
+          "auth.mechanisms": ${MAIL_SMTP_AUTH_MECHANISMS:LOGIN PLAIN}
           connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
           timeout: ${MAIL_SMTP_TIMEOUT:5000}
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
@@ -79,4 +82,3 @@ logging:
 
 server:
   port: ${SERVER_PORT:8080}
-
