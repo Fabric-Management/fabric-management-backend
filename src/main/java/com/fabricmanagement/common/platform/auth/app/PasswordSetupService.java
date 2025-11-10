@@ -124,9 +124,13 @@ public class PasswordSetupService {
         tokenRepository.save(token);
 
         // Reload User entity with contacts/departments for JWT generation
+        // Use contactValue-based query to ensure contacts are loaded
         com.fabricmanagement.common.platform.user.domain.User freshUserEntity = 
-            userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            userRepository.findByTenantIdAndContactValue(user.getTenantId(), token.getContactValue())
+                .orElseGet(() -> 
+                    userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
+                        .orElseThrow(() -> new IllegalArgumentException("User not found"))
+                );
 
         String accessToken = jwtService.generateAccessToken(freshUserEntity);
         String refreshToken = jwtService.generateRefreshToken(freshUserEntity);

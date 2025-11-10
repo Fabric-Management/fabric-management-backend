@@ -42,12 +42,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /**
      * Find user by tenant and contact value via Contact entity (new system).
      * <p>Uses UserContact junction table and Contact entity.</p>
-     * <p>Eagerly fetches Role to avoid lazy loading issues.</p>
+     * <p>Eagerly fetches Role and UserContacts to avoid lazy loading issues.</p>
      */
     @Query("SELECT DISTINCT u FROM User u " +
            "LEFT JOIN FETCH u.role " +
-           "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId " +
-           "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id " +
+           "LEFT JOIN FETCH u.userContacts uc " +
+           "LEFT JOIN FETCH uc.contact " +
+           "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact ucFilter ON u.id = ucFilter.userId " +
+           "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON ucFilter.contactId = c.id " +
            "WHERE u.tenantId = :tenantId AND c.contactValue = :contactValue")
     Optional<User> findByTenantIdAndContactValue(@Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
