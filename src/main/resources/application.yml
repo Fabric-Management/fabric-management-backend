@@ -31,6 +31,11 @@ spring:
     caffeine:
       spec: maximumSize=${CACHE_MAX_SIZE:10000},expireAfterWrite=${CACHE_EXPIRE_SECONDS:300}s
 
+  data:
+    redis:
+      repositories:
+        enabled: ${REDIS_REPOSITORIES_ENABLED:false}
+
   servlet:
     multipart:
       enabled: true
@@ -133,6 +138,11 @@ application:
     use-outbox: ${EMAIL_USE_OUTBOX:true} # ✅ Enabled by default for reliable email delivery
     # Dead letter queue alert threshold (alert admin when failed email count exceeds this)
     dead-letter-alert-threshold: ${EMAIL_DEAD_LETTER_ALERT_THRESHOLD:5} # Alert when 5+ failed emails
+    outbox:
+      worker-enabled: ${EMAIL_OUTBOX_WORKER_ENABLED:true}
+      poll-interval-ms: ${EMAIL_OUTBOX_POLL_INTERVAL_MS:5000}
+      dead-letter-monitor-enabled: ${EMAIL_OUTBOX_DEAD_LETTER_MONITOR_ENABLED:true}
+      dead-letter-cron: ${EMAIL_OUTBOX_DEAD_LETTER_CRON:0 0 * * * ?}
 
   # AI Configuration
   ai:
