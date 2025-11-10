@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS human.human_pay_period (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT uq_pay_period UNIQUE (tenant_id, period_code)
 );
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS human.human_pay_run (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_pay_run_period FOREIGN KEY (pay_period_id)
         REFERENCES human.human_pay_period(id) ON DELETE CASCADE
@@ -84,6 +86,7 @@ CREATE TABLE IF NOT EXISTS human.human_pay_run_entry (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_pay_run_entry_run FOREIGN KEY (pay_run_id)
         REFERENCES human.human_pay_run(id) ON DELETE CASCADE
@@ -113,6 +116,7 @@ CREATE TABLE IF NOT EXISTS human.human_pay_run_payout (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_pay_run_payout_run FOREIGN KEY (pay_run_id)
         REFERENCES human.human_pay_run(id) ON DELETE CASCADE
@@ -140,6 +144,7 @@ CREATE TABLE IF NOT EXISTS human.human_pay_run_audit_log (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_pay_run_audit FOREIGN KEY (pay_run_id)
         REFERENCES human.human_pay_run(id) ON DELETE CASCADE

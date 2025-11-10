@@ -4,6 +4,7 @@
 CREATE TABLE IF NOT EXISTS human.human_hr_policy_pack (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE NOT NULL,
     pack_code VARCHAR(100) NOT NULL,
     country_code VARCHAR(8) NOT NULL,
     name VARCHAR(150) NOT NULL,
@@ -15,7 +16,11 @@ CREATE TABLE IF NOT EXISTS human.human_hr_policy_pack (
     payload JSONB,
     checksum VARCHAR(128),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_by UUID,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    version BIGINT NOT NULL DEFAULT 0
 );
 
 COMMENT ON TABLE human.human_hr_policy_pack IS 'HR localization policy packs per tenant and country.';

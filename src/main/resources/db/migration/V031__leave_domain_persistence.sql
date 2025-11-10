@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS human.human_leave_balance (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT uq_leave_balance UNIQUE (tenant_id, employee_id, leave_type_id),
     CONSTRAINT fk_leave_balance_type FOREIGN KEY (leave_type_id)
@@ -86,6 +87,7 @@ CREATE TABLE IF NOT EXISTS human.human_leave_accrual_log (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_leave_accrual_type FOREIGN KEY (leave_type_id)
         REFERENCES human.human_leave_type(id) ON DELETE CASCADE
@@ -111,6 +113,7 @@ CREATE TABLE IF NOT EXISTS human.human_holiday_calendar (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT uq_holiday_calendar UNIQUE (tenant_id, country_code, calendar_year)
 );

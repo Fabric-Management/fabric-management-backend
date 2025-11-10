@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS human.human_hr_country_pack_mapping (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT uq_country_pack UNIQUE (tenant_id, country_code),
     CONSTRAINT fk_country_pack_policy FOREIGN KEY (pack_id)

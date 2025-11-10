@@ -15,14 +15,14 @@ public interface LeaveTypeRepository extends JpaRepository<LeaveType, UUID> {
         select lt from LeaveType lt
         where lt.tenantId = :tenantId
           and lt.code = :code
-          and lt.active = true
+          and lt.isActive = true
         """)
     Optional<LeaveType> findActiveByCode(@Param("tenantId") UUID tenantId, @Param("code") String code);
 
     @Query("""
         select lt from LeaveType lt
         where lt.tenantId = :tenantId
-          and lt.active = true
+          and lt.isActive = true
           and (lt.countryCode is null or lt.countryCode = :countryCode)
         """)
     List<LeaveType> findActiveForCountry(@Param("tenantId") UUID tenantId, @Param("countryCode") String countryCode);
