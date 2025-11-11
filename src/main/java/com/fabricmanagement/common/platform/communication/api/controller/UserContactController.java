@@ -51,10 +51,10 @@ public class UserContactController {
 
     @GetMapping("/authentication")
     public ResponseEntity<ApiResponse<UserContactDto>> getAuthenticationContact(@PathVariable UUID userId) {
-        log.debug("Getting authentication contact: userId={}", userId);
+        log.debug("Getting verified contact for authentication: userId={}", userId);
 
         UserContact authContact = userContactService.getAuthenticationContact(userId)
-            .orElseThrow(() -> new IllegalArgumentException("No authentication contact found"));
+            .orElseThrow(() -> new IllegalArgumentException("No verified contact found"));
 
         return ResponseEntity.ok(ApiResponse.success(UserContactDto.from(authContact)));
     }

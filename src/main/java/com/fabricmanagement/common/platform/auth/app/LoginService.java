@@ -115,7 +115,7 @@ public class LoginService {
         authUserRepository.save(authUser);
 
         // Get contact value from Contact entity
-        String contactValue = userEntity.getPrimaryContact()
+        String contactValue = userEntity.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
             .orElse(request.getContactValue());
 

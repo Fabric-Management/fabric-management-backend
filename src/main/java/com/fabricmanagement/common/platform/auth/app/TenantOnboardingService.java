@@ -142,6 +142,7 @@ public class TenantOnboardingService {
         // Seed default departments and positions for new tenant
         tenantSeedService.seedDepartmentsAndPositions(company.getTenantId(), company.getId());
 
+        // Send welcome email AFTER transaction commit (use sync to ensure email is queued)
         sendWelcomeEmail(
             request.getAdminContact(),
             request.getAdminFirstName(),
@@ -151,7 +152,7 @@ public class TenantOnboardingService {
         );
 
         // Get admin contact value from Contact entity
-        String adminContact = adminUser.getPrimaryContact()
+        String adminContact = adminUser.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
             .orElse(request.getAdminContact());
 
@@ -234,7 +235,7 @@ public class TenantOnboardingService {
         // Verification codes are only needed for unverified contacts during login
 
         // Get admin contact value from Contact entity
-        String adminContact = adminUser.getPrimaryContact()
+        String adminContact = adminUser.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
             .orElse(request.getEmail());
 
@@ -589,6 +590,9 @@ public class TenantOnboardingService {
 
     /**
      * Send welcome email with registration link.
+     * 
+     * <p>Uses sync method to ensure email is queued before transaction commit.
+     * This prevents async timing issues where email might not be queued.</p>
      */
     private void sendWelcomeEmail(String email, String firstName, String companyName,
                                  String token, List<Subscription> subscriptions) {
@@ -604,7 +608,8 @@ public class TenantOnboardingService {
         // Frontend templates prioritized for better UX (design system consistency)
         String message = emailTemplateRenderer.renderWelcome(firstName, companyName, osList, setupUrl);
 
-        notificationService.sendNotification(email, subject, message);
+        // Use sync to ensure email is queued in same transaction
+        notificationService.sendNotificationSync(email, subject, message);
     }
 
     /**

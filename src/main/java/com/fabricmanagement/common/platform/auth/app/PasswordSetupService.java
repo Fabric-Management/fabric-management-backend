@@ -13,8 +13,10 @@ import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.communication.app.UserContactService;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,6 +57,7 @@ public class PasswordSetupService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
+    private final EntityManager entityManager;
 
     @Value("${application.jwt.refresh-expiration:604800000}")
     private long refreshTokenExpiration;
@@ -101,15 +104,40 @@ public class PasswordSetupService {
             throw new IllegalArgumentException("User already has password set");
         }
 
-        // Get User entity to find authentication contact
+        // Reload User entity with contacts for verified contact check
         com.fabricmanagement.common.platform.user.domain.User userEntity = 
-            userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
-                .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
+            userRepository.findByTenantIdAndContactValue(user.getTenantId(), token.getContactValue())
+                .orElseGet(() -> 
+                    userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
+                        .orElseThrow(() -> new IllegalArgumentException("User entity not found"))
+                );
 
-        // Get primary authentication contact
-        UUID contactId = userContactService.getAuthenticationContact(userEntity.getId())
-            .map(uc -> uc.getContactId())
-            .orElseGet(() -> ensureAuthenticationContact(userEntity.getId(), token.getContactValue()));
+        // Get any verified contact (any verified contact = authentication contact)
+        UUID contactId;
+        boolean contactWasRecovered = false;
+        com.fabricmanagement.common.platform.user.domain.User userEntityForJwt = userEntity;
+        
+        if (userEntity.getAnyVerifiedContact().isPresent()) {
+            contactId = userEntity.getAnyVerifiedContact().get().getId();
+        } else {
+            contactId = ensureAuthenticationContact(
+                userEntity.getTenantId(), 
+                userEntity.getId(), 
+                token.getContactValue()
+            );
+            contactWasRecovered = true;
+            // Flush to persist changes and clear cache to force fresh load
+            userRepository.flush();
+            entityManager.clear(); // Clear entire persistence context
+            // Reload user entity after contact recovery to get updated contacts
+            userEntityForJwt = userRepository.findByTenantIdAndContactValue(
+                userEntity.getTenantId(), 
+                token.getContactValue()
+            ).orElseGet(() -> 
+                userRepository.findByTenantIdAndId(userEntity.getTenantId(), userEntity.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("User entity not found"))
+            );
+        }
 
         // Check if AuthUser already exists for this contact
         if (authUserRepository.existsByContactId(contactId)) {
@@ -127,9 +155,10 @@ public class PasswordSetupService {
         tokenRepository.save(token);
 
         // Reload User entity with contacts/departments for JWT generation
-        // Use contactValue-based query to ensure contacts are loaded
-        com.fabricmanagement.common.platform.user.domain.User freshUserEntity = 
-            userRepository.findByTenantIdAndContactValue(user.getTenantId(), token.getContactValue())
+        // If contact was recovered, userEntityForJwt already has fresh data
+        com.fabricmanagement.common.platform.user.domain.User freshUserEntity = contactWasRecovered 
+            ? userEntityForJwt  // Already reloaded after recovery
+            : userRepository.findByTenantIdAndContactValue(user.getTenantId(), token.getContactValue())
                 .orElseGet(() -> 
                     userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
                         .orElseThrow(() -> new IllegalArgumentException("User not found"))
@@ -139,7 +168,7 @@ public class PasswordSetupService {
         String refreshToken = jwtService.generateRefreshToken(freshUserEntity);
 
         // Get contact value for event
-        String contactValue = freshUserEntity.getPrimaryContact()
+        String contactValue = freshUserEntity.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
             .orElse(token.getContactValue());
 
@@ -164,31 +193,39 @@ public class PasswordSetupService {
             .build();
     }
 
-    private UUID ensureAuthenticationContact(UUID userId, String contactValue) {
-        log.warn("No authentication contact found for userId={}, attempting recovery", userId);
+    /**
+     * Ensure user has a verified contact for authentication.
+     * 
+     * <p>Creates and verifies contact if missing, then assigns to user.
+     * Must run within correct tenant context.</p>
+     */
+    private UUID ensureAuthenticationContact(UUID tenantId, UUID userId, String contactValue) {
+        log.warn("No verified contact found for userId={}, attempting recovery", userId);
 
-        Contact contact = contactService.findByValue(contactValue)
-            .orElseGet(() -> {
-                log.info("Creating contact for {}", PiiMaskingUtil.maskEmail(contactValue));
-                return contactService.createContact(
-                    contactValue,
-                    null,
-                    "Primary",
-                    true,
-                    null
-                );
-            });
+        return TenantContext.executeInTenantContext(tenantId, () -> {
+            Contact contact = contactService.findByValue(contactValue)
+                .orElseGet(() -> {
+                    log.info("Creating contact for {}", PiiMaskingUtil.maskEmail(contactValue));
+                    return contactService.createContact(
+                        contactValue,
+                        null,
+                        "Primary",
+                        true,
+                        null
+                    );
+                });
 
-        contactService.verifyContact(contact.getId());
+            contactService.verifyContact(contact.getId());
 
-        if (!userContactService.existsUserContact(userId, contact.getId())) {
-            userContactService.assignContact(userId, contact.getId(), true);
-        } else {
-            userContactService.setAsDefault(userId, contact.getId());
-        }
+            if (!userContactService.existsUserContact(userId, contact.getId())) {
+                userContactService.assignContact(userId, contact.getId(), true);
+            } else {
+                userContactService.setAsDefault(userId, contact.getId());
+            }
 
-        log.info("Recovered authentication contact: userId={}, contactId={}", userId, contact.getId());
-        return contact.getId();
+            log.info("Recovered verified contact: userId={}, contactId={}", userId, contact.getId());
+            return contact.getId();
+        });
     }
 }
 

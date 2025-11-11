@@ -99,8 +99,8 @@ public class PublicSignupController {
         // Frontend templates prioritized for better UX (design system consistency)
         String message = emailTemplateRenderer.renderSetupPassword(firstName, companyName, email, setupUrl);
         
-        // Async email sending - don't block user response
-        notificationService.sendNotification(email, subject, message);
+        // Use sync to ensure email is queued before response (transaction commit)
+        notificationService.sendNotificationSync(email, subject, message);
     }
     
     

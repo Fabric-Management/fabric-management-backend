@@ -25,7 +25,7 @@ import java.util.UUID;
  *   <li>Assign contacts to users</li>
  *   <li>Remove user-contact assignments</li>
  *   <li>Manage default contact for notifications</li>
- *   <li>Manage authentication contact</li>
+ *   <li>Get verified contact for authentication (any verified contact)</li>
  * </ul>
  */
 @Service
@@ -51,9 +51,15 @@ public class UserContactService {
         return userContactRepository.findDefaultByUserId(userId);
     }
 
+    /**
+     * Get verified contact for authentication.
+     * 
+     * <p>Any verified contact can be used for authentication.
+     * Returns preferred verified contact (default first, then by creation time).</p>
+     */
     @Transactional(readOnly = true)
     public Optional<UserContact> getAuthenticationContact(UUID userId) {
-        log.trace("Finding preferred authentication contact: userId={}", userId);
+        log.trace("Finding verified contact for authentication: userId={}", userId);
         return userContactRepository.findPreferredContactByUserId(userId);
     }
 

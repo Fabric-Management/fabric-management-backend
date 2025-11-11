@@ -165,7 +165,7 @@ public class RegistrationService {
             .filter(c -> c.getContactValue().equals(contactValue))
             .findFirst()
             .or(() -> contactService.findByValue(contactValue))
-            .orElseThrow(() -> new IllegalStateException("Authentication contact not found for user"));
+            .orElseThrow(() -> new IllegalStateException("Verified contact not found for user"));
     }
 
 }
