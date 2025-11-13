@@ -126,20 +126,29 @@ public class UserService implements UserFacade {
         // Create additional contacts if provided
         if (additionalContacts != null && !additionalContacts.isEmpty()) {
             for (com.fabricmanagement.common.platform.user.dto.ContactData contactData : additionalContacts) {
+                // ✅ Map ContactData to communication domain ContactType (supports MOBILE/LANDLINE)
+                com.fabricmanagement.common.platform.communication.domain.ContactType mappedType = 
+                    mapContactType(contactData);
+                
                 com.fabricmanagement.common.platform.communication.domain.Contact additionalContact = 
                     createContactWithWhatsAppCheck(
                         contactData.getContactValue(),
-                        mapContactType(contactData.getContactType()),
+                        mappedType,
                         contactData.getLabel() != null ? contactData.getLabel() : 
-                            (contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL ? "Email" : "Phone"),
+                            (contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL ? "Email" : 
+                             mappedType == com.fabricmanagement.common.platform.communication.domain.ContactType.LANDLINE ? "Landline" : "Mobile"),
                         contactData.getIsPersonal() != null ? contactData.getIsPersonal() : true,
                         null  // parentContactId
                     );
                 
-                // Set WhatsApp flag if explicitly provided
+                // ✅ Set WhatsApp flag only for MOBILE phones (LANDLINE cannot have WhatsApp)
                 if (contactData.getIsWhatsApp() != null && 
-                    contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.PHONE) {
+                    mappedType == com.fabricmanagement.common.platform.communication.domain.ContactType.MOBILE) {
                     additionalContact.setIsWhatsApp(contactData.getIsWhatsApp());
+                    additionalContact = contactService.updateContact(additionalContact);
+                } else if (mappedType == com.fabricmanagement.common.platform.communication.domain.ContactType.LANDLINE) {
+                    // ✅ LANDLINE phones cannot have WhatsApp - explicitly set to false
+                    additionalContact.setIsWhatsApp(false);
                     additionalContact = contactService.updateContact(additionalContact);
                 }
 
@@ -534,12 +543,43 @@ public class UserService implements UserFacade {
     /**
      * Map User module ContactType to Communication module ContactType.
      */
+    /**
+     * Map user domain ContactType to communication domain ContactType.
+     * For PHONE, defaults to MOBILE (backward compatibility).
+     */
     private com.fabricmanagement.common.platform.communication.domain.ContactType mapContactType(
             com.fabricmanagement.common.platform.user.domain.ContactType userContactType) {
         return switch (userContactType) {
             case EMAIL -> com.fabricmanagement.common.platform.communication.domain.ContactType.EMAIL;
             case PHONE -> com.fabricmanagement.common.platform.communication.domain.ContactType.MOBILE;
         };
+    }
+
+    /**
+     * Map ContactData to communication domain ContactType.
+     * Supports MOBILE/LANDLINE distinction for PHONE contacts.
+     * 
+     * @param contactData ContactData with optional phoneType field
+     * @return Communication domain ContactType (EMAIL, MOBILE, or LANDLINE)
+     */
+    private com.fabricmanagement.common.platform.communication.domain.ContactType mapContactType(
+            com.fabricmanagement.common.platform.user.dto.ContactData contactData) {
+        if (contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL) {
+            return com.fabricmanagement.common.platform.communication.domain.ContactType.EMAIL;
+        }
+        
+        // PHONE contact - check phoneType field
+        if (contactData.getContactType() == com.fabricmanagement.common.platform.user.domain.ContactType.PHONE) {
+            String phoneType = contactData.getPhoneType();
+            if ("LANDLINE".equalsIgnoreCase(phoneType)) {
+                return com.fabricmanagement.common.platform.communication.domain.ContactType.LANDLINE;
+            }
+            // Default to MOBILE (backward compatibility)
+            return com.fabricmanagement.common.platform.communication.domain.ContactType.MOBILE;
+        }
+        
+        // Fallback (should not happen)
+        return com.fabricmanagement.common.platform.communication.domain.ContactType.MOBILE;
     }
 
     @Override

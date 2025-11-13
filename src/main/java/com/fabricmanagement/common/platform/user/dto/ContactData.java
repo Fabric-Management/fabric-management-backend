@@ -40,7 +40,18 @@ public class ContactData {
      * Whether this contact has WhatsApp capability (for PHONE contacts only).
      * If null, system will check automatically via WhatsApp API.
      * If true, verification codes and notifications will prioritize WhatsApp.
+     * Note: Only applicable for MOBILE phones, not LANDLINE.
      */
     private Boolean isWhatsApp;
+
+    /**
+     * Phone type (for PHONE contacts only).
+     * If null, defaults to MOBILE for backward compatibility.
+     * Allowed values: "MOBILE", "LANDLINE"
+     * 
+     * <p>WhatsApp capability is only checked for MOBILE phones.
+     * LANDLINE phones cannot have WhatsApp.</p>
+     */
+    private String phoneType; // "MOBILE" or "LANDLINE"
 }
 
