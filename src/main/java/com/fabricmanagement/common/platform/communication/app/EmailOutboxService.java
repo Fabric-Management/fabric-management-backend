@@ -43,6 +43,12 @@ public class EmailOutboxService {
     @org.springframework.beans.factory.annotation.Value("${application.email.dead-letter-alert-threshold:5}")
     private int deadLetterAlertThreshold;
 
+    @org.springframework.beans.factory.annotation.Value("${application.email.outbox.worker-enabled:true}")
+    private boolean emailOutboxWorkerEnabled;
+
+    @org.springframework.beans.factory.annotation.Value("${application.email.outbox.dead-letter-monitor-enabled:true}")
+    private boolean deadLetterMonitorEnabled;
+
     // Track last alert time to prevent spam
     private volatile long lastDeadLetterAlertTime = 0;
     private static final long DEAD_LETTER_ALERT_COOLDOWN_MS = 3600000; // 1 hour
@@ -99,9 +105,13 @@ public class EmailOutboxService {
      * <p><b>Performance:</b> Early return if no emails (minimal DB load).
      * Query is optimized with indexes for fast execution.</p>
      */
-    @Scheduled(fixedDelay = 5000) // Every 5 seconds
+    @Scheduled(fixedDelayString = "${application.email.outbox.poll-interval-ms:5000}")
     @Transactional
     public void processEmailQueue() {
+        if (!emailOutboxWorkerEnabled) {
+            log.trace("Email outbox worker disabled; skipping queue processing.");
+            return;
+        }
         try {
             // Fast check: Count pending emails first (uses index)
             long pendingCount = emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.PENDING);
@@ -117,10 +127,11 @@ public class EmailOutboxService {
             );
 
             if (pendingEmails.isEmpty()) {
+                log.debug("📧 Found {} pending email(s) but none ready for sending yet (waiting for retry time)", pendingCount);
                 return; // No emails ready yet (waiting for retry time)
             }
 
-            log.debug("Processing {} pending email(s)", pendingEmails.size());
+            log.info("📧 Processing {} pending email(s) (total pending: {})", pendingEmails.size(), pendingCount);
 
             for (EmailOutbox email : pendingEmails) {
                 processEmail(email);
@@ -139,7 +150,7 @@ public class EmailOutboxService {
             email.markAsSending();
             emailOutboxRepository.save(email);
 
-            log.debug("Sending email: recipient={}, retryCount={}", 
+            log.info("📧 Sending email: recipient={}, retryCount={}", 
                 PiiMaskingUtil.maskEmail(email.getRecipient()), email.getRetryCount());
 
             // Send email via EmailStrategy
@@ -252,9 +263,13 @@ public class EmailOutboxService {
      * 
      * <p>Proactive monitoring - alerts even if no new failures occur.</p>
      */
-    @Scheduled(cron = "0 0 * * * ?") // Every hour
+    @Scheduled(cron = "${application.email.outbox.dead-letter-cron:0 0 * * * ?}")
     @Transactional(readOnly = true)
     public void monitorDeadLetterQueue() {
+        if (!deadLetterMonitorEnabled) {
+            log.trace("Email outbox dead letter monitor disabled; skipping check.");
+            return;
+        }
         long failedCount = getFailedEmailCount();
         
         if (failedCount >= deadLetterAlertThreshold) {

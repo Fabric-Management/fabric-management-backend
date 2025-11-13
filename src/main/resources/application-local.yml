@@ -39,15 +39,19 @@ spring:
     port: ${MAIL_PORT:465}
     username: ${MAIL_USERNAME:info@storeandsale.shop}
     password: ${MAIL_PASSWORD:Akk789987@}
+    protocol: ${MAIL_PROTOCOL:smtps}
     properties:
       mail:
         smtp:
           auth: ${MAIL_SMTP_AUTH:true}
           starttls:
-            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
             required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
           ssl:
             enable: ${MAIL_SMTP_SSL_ENABLE:true}
+            trust: ${MAIL_SMTP_SSL_TRUST:smtp.hostinger.com}
+          from: ${MAIL_SMTP_FROM:${MAIL_FROM_EMAIL:${MAIL_USERNAME:}}}
+          "auth.mechanisms": ${MAIL_SMTP_AUTH_MECHANISMS:LOGIN PLAIN}
           connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
           timeout: ${MAIL_SMTP_TIMEOUT:5000}
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
@@ -75,7 +79,7 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${LOCAL_SERVER_PORT:8081}
 
 application:
   jwt:
@@ -86,6 +90,15 @@ application:
   mail:
     from-email: ${MAIL_FROM_EMAIL:info@storeandsale.shop}
     from-name: ${MAIL_FROM_NAME:Fabricode}
+
+  email:
+    outbox:
+      worker-enabled: ${EMAIL_OUTBOX_WORKER_ENABLED:true}
+      poll-interval-ms: ${EMAIL_OUTBOX_POLL_INTERVAL_MS:15000}
+      dead-letter-monitor-enabled: ${EMAIL_OUTBOX_DEAD_LETTER_MONITOR_ENABLED:false}
+
+  frontend:
+    base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
   # Google Maps Platform Configuration
   google:

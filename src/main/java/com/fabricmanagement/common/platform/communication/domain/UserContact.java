@@ -72,36 +72,10 @@ public class UserContact extends BaseJunctionEntity {
     private Boolean isDefault = false;
 
     /**
-     * Authentication contact flag
-     * <p><b>Deprecated:</b> Authentication relies on verified contacts list.</p>
-     * <p>Historically used to mark login contact.</p>
-     */
-    @Deprecated
-    @Column(name = "is_for_authentication", nullable = false)
-    @Builder.Default
-    private Boolean isForAuthentication = false;
-
-    /**
      * Set as default contact for notifications
      */
     public void setAsDefault() {
         this.isDefault = true;
-    }
-
-    /**
-     * Enable for authentication
-     */
-    @Deprecated
-    public void enableForAuthentication() {
-        this.isForAuthentication = true;
-    }
-
-    /**
-     * Disable for authentication
-     */
-    @Deprecated
-    public void disableForAuthentication() {
-        this.isForAuthentication = false;
     }
 
     @Override

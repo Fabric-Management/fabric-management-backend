@@ -22,7 +22,6 @@ public class UserContactDto {
     private ContactDto contact;
     private Boolean isDefault;
     @Deprecated
-    private Boolean isForAuthentication;
     private Boolean isWhatsApp;
 
     public static UserContactDto from(UserContact userContact) {
@@ -37,7 +36,6 @@ public class UserContactDto {
             .contactId(userContact.getContactId())
             .contact(contactDto)
             .isDefault(userContact.getIsDefault())
-            .isForAuthentication(null)
             .isWhatsApp(contactDto != null ? contactDto.getIsWhatsApp() : null)
             .build();
     }

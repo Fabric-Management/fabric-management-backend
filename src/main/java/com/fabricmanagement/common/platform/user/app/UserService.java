@@ -120,8 +120,7 @@ public class UserService implements UserFacade {
         userContactService.assignContact(
             saved.getId(),
             primaryContact.getId(),
-            true,  // isDefault
-            null   // Deprecated flag ignored
+            true   // isDefault
         );
 
         // Create additional contacts if provided
@@ -148,8 +147,7 @@ public class UserService implements UserFacade {
                 userContactService.assignContact(
                     saved.getId(),
                     additionalContact.getId(),
-                    false,  // isDefault
-                    null    // Deprecated flag ignored
+                    false  // isDefault
                 );
             }
         }
@@ -828,7 +826,7 @@ public class UserService implements UserFacade {
         }
 
         // Assign contact to user (work contact, not for authentication, can be default)
-        userContactService.assignContact(userId, contact.getId(), false, false);
+        userContactService.assignContact(userId, contact.getId(), false);
         log.debug("Work contact assigned: userId={}, contactId={}, type={}", userId, contact.getId(), contactType);
     }
 
@@ -860,7 +858,7 @@ public class UserService implements UserFacade {
         }
 
         // Assign contact to user (personal contact, not for authentication, not default)
-        userContactService.assignContact(userId, contact.getId(), false, false);
+        userContactService.assignContact(userId, contact.getId(), false);
         log.debug("Personal contact assigned: userId={}, contactId={}, type={}", userId, contact.getId(), contactType);
     }
 

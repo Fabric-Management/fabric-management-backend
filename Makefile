@@ -147,7 +147,7 @@ down: ## Stop all Docker services
 	docker compose down
 	@echo "$(GREEN)✅ Services stopped$(NC)"
 
-down-clean: ## Stop services + remove volumes (DESTRUCTIVE!)
+down-clean: validate-env ## Stop services + remove volumes (DESTRUCTIVE!)
 	@echo "$(RED)⚠️  Stopping & removing volumes...$(NC)"
 	docker compose down -v
 	@echo "$(GREEN)✅ Services stopped, volumes removed$(NC)"
@@ -401,12 +401,12 @@ prune: ## Docker system prune
 	docker system prune -f
 	@echo "$(GREEN)✅ Docker system pruned$(NC)"
 
-rebuild: ## Full rebuild (down-clean → clean → build → up-all)
-	@echo "$(YELLOW)🧹 Full clean rebuild...$(NC)"
-	$(MAKE) down-clean
-	$(MAKE) clean
-	$(MAKE) app-build
-	$(MAKE) up-all
+rebuild: validate-env ## Rebuild Docker images + restart core stack
+	@echo "$(YELLOW)🧹 Rebuilding containers...$(NC)"
+	docker compose down
+	docker compose up -d --build app $(POSTGRES_SERVICE) $(REDIS_SERVICE)
+	@sleep 5
+	@$(MAKE) status
 	@echo "$(GREEN)✅ Rebuild completed$(NC)"
 
 # =============================================================================

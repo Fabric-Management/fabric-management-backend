@@ -27,3 +27,4 @@ ALTER TABLE common_communication.common_contact
 CREATE INDEX IF NOT EXISTS idx_contact_phone_whatsapp
     ON common_communication.common_contact (tenant_id)
     WHERE contact_type = 'PHONE' AND is_whatsapp = TRUE;
+

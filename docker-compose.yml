@@ -26,6 +26,55 @@ volumes:
 
 services:
   # ==============================================
+  # APPLICATION - Fabric Management Backend
+  # ==============================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+    container_name: fabric-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      POSTGRES_DB: ${POSTGRES_DB:?error}
+      POSTGRES_USER: ${POSTGRES_USER:?error}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?error}
+      POSTGRES_HOST: ${POSTGRES_CONTAINER_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_CONTAINER_PORT:-5432}
+      DATABASE_URL: ${DATABASE_URL_CONTAINER:-jdbc:postgresql://${POSTGRES_CONTAINER_HOST:-postgres}:${POSTGRES_CONTAINER_PORT:-5432}/${POSTGRES_DB:?error}}
+      REDIS_HOST: ${REDIS_CONTAINER_HOST:-redis}
+      REDIS_PORT: ${REDIS_CONTAINER_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      MAIL_HOST: ${MAIL_HOST:-smtp.hostinger.com}
+      MAIL_PORT: ${MAIL_PORT:-465}
+      MAIL_USERNAME: ${MAIL_USERNAME:?error}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?error}
+      MAIL_PROTOCOL: ${MAIL_PROTOCOL:-smtps}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS_ENABLE: ${MAIL_SMTP_STARTTLS_ENABLE:-false}
+      MAIL_SMTP_STARTTLS_REQUIRED: ${MAIL_SMTP_STARTTLS_REQUIRED:-false}
+      MAIL_SMTP_SSL_ENABLE: ${MAIL_SMTP_SSL_ENABLE:-true}
+      MAIL_SMTP_SSL_TRUST: ${MAIL_SMTP_SSL_TRUST:-smtp.hostinger.com}
+      MAIL_SMTP_FROM: ${MAIL_SMTP_FROM:-}
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Fabricode}
+      MAIL_SMTP_AUTH_MECHANISMS: ${MAIL_SMTP_AUTH_MECHANISMS:-LOGIN PLAIN}
+      MAIL_SMTP_CONNECTION_TIMEOUT: ${MAIL_SMTP_CONNECTION_TIMEOUT:-5000}
+      MAIL_SMTP_TIMEOUT: ${MAIL_SMTP_TIMEOUT:-5000}
+      MAIL_SMTP_WRITE_TIMEOUT: ${MAIL_SMTP_WRITE_TIMEOUT:-5000}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks:
+      - fabric-network
+    logging: *default-logging
+
+  # ==============================================
   # DATABASE - PostgreSQL 15
   # ==============================================
   postgres:
@@ -38,7 +87,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?error}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

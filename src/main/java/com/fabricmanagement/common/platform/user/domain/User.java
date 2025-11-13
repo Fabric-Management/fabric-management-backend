@@ -134,10 +134,10 @@ public class User extends BaseEntity {
     }
 
     /**
-     * Get primary contact for authentication.
-     * <p>Returns verified contact that is enabled for authentication.</p>
+     * Get any verified contact for authentication.
+     * <p>Returns first verified contact found (any verified contact = authentication contact).</p>
      */
-    public Optional<com.fabricmanagement.common.platform.communication.domain.Contact> getPrimaryContact() {
+    public Optional<com.fabricmanagement.common.platform.communication.domain.Contact> getAnyVerifiedContact() {
         return userContacts.stream()
             .filter(uc -> uc.getContact() != null)
             .map(com.fabricmanagement.common.platform.communication.domain.UserContact::getContact)

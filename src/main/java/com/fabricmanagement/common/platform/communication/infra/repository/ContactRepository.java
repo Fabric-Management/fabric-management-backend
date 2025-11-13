@@ -66,5 +66,17 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
     List<Contact> findVerifiedByTenantIdAndContactType(
             @Param("tenantId") UUID tenantId,
             @Param("contactType") ContactType contactType);
+
+    /**
+     * Check if any contact exists with the given email domain.
+     * Used for providing context-aware error messages during login.
+     * 
+     * @param domain Email domain (e.g., "gmail.com", "company.com")
+     * @return true if any contact with this domain exists
+     */
+    @Query("SELECT COUNT(c) > 0 FROM Contact c " +
+           "WHERE c.contactType = 'EMAIL' " +
+           "AND c.contactValue LIKE CONCAT('%@', :domain)")
+    boolean existsByEmailDomain(@Param("domain") String domain);
 }
 

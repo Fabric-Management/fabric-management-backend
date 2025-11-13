@@ -58,10 +58,10 @@ public class JwtService {
     }
 
     public String generateAccessToken(User user) {
-        // Get primary contact for JWT subject
-        String contactValue = user.getPrimaryContact()
+        // Get any verified contact for JWT subject (any verified contact = authentication contact)
+        String contactValue = user.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User has no authentication contact"));
+            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
 
         log.debug("Generating access token for user: {}", contactValue);
 
@@ -118,9 +118,9 @@ public class JwtService {
     }
 
     public String generateRefreshToken(User user) {
-        String contactValue = user.getPrimaryContact()
+        String contactValue = user.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User has no authentication contact"));
+            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
 
         log.debug("Generating refresh token for user: {}", contactValue);
 
@@ -159,7 +159,7 @@ public class JwtService {
                 .parseSignedClaims(token);
             return true;
         } catch (Exception e) {
-            log.warn("Invalid JWT token: {}", e.getMessage());
+            log.trace("Invalid JWT token: {}", e.getMessage());
             return false;
         }
     }

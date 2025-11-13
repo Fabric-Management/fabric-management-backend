@@ -25,7 +25,7 @@ import java.util.UUID;
  *   <li>Assign contacts to users</li>
  *   <li>Remove user-contact assignments</li>
  *   <li>Manage default contact for notifications</li>
- *   <li>Manage authentication contact</li>
+ *   <li>Get verified contact for authentication (any verified contact)</li>
  * </ul>
  */
 @Service
@@ -51,10 +51,16 @@ public class UserContactService {
         return userContactRepository.findDefaultByUserId(userId);
     }
 
+    /**
+     * Get verified contact for authentication.
+     * 
+     * <p>Any verified contact can be used for authentication.
+     * Returns preferred verified contact (default first, then by creation time).</p>
+     */
     @Transactional(readOnly = true)
     public Optional<UserContact> getAuthenticationContact(UUID userId) {
-        log.trace("Finding authentication contact: userId={}", userId);
-        return userContactRepository.findAuthenticationContactByUserId(userId);
+        log.trace("Finding verified contact for authentication: userId={}", userId);
+        return userContactRepository.findPreferredContactByUserId(userId);
     }
 
     /**
@@ -74,10 +80,10 @@ public class UserContactService {
     }
 
     @Transactional
-    public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault, Boolean isForAuthentication) {
+    public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault) {
         UUID tenantId = TenantContext.getCurrentTenantId();
-        log.info("Assigning contact to user: tenantId={}, userId={}, contactId={}, isDefault={}, isForAuth={}",
-            tenantId, userId, contactId, isDefault, isForAuthentication);
+        log.info("Assigning contact to user: tenantId={}, userId={}, contactId={}, isDefault={}",
+            tenantId, userId, contactId, isDefault);
 
         // Validate user exists
         userRepository.findByTenantIdAndId(tenantId, userId)
@@ -101,12 +107,6 @@ public class UserContactService {
                     existing.setIsDefault(false);
                     userContactRepository.save(existing);
                 });
-        }
-
-        // Set authentication: remove auth flag from other contacts
-        boolean forAuth = Boolean.TRUE.equals(isForAuthentication);
-        if (forAuth) {
-            log.warn("isForAuthentication flag is deprecated and ignored. userId={}, contactId={}", userId, contactId);
         }
 
         UserContact userContact = UserContact.builder()

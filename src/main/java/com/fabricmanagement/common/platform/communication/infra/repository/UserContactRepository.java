@@ -40,10 +40,16 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
     Optional<UserContact> findDefaultByUserId(@Param("userId") UUID userId);
 
     /**
-     * Find authentication contact for user.
+     * Find preferred verified contact for authentication.
+     *
+     * <p>Returns verified contact (any verified contact = authentication contact).
+     * Orders by default flag first, then creation time for deterministic behaviour.</p>
      */
-    @Query("SELECT uc FROM UserContact uc WHERE uc.userId = :userId AND uc.isForAuthentication = true")
-    Optional<UserContact> findAuthenticationContactByUserId(@Param("userId") UUID userId);
+    @Query("SELECT uc FROM UserContact uc " +
+           "JOIN Contact c ON uc.contactId = c.id " +
+           "WHERE uc.userId = :userId AND c.isVerified = true " +
+           "ORDER BY uc.isDefault DESC, uc.createdAt ASC")
+    Optional<UserContact> findPreferredContactByUserId(@Param("userId") UUID userId);
 
     /**
      * Check if user-contact assignment exists.

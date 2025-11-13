@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.auth.domain.RegistrationToken;
 import com.fabricmanagement.common.platform.auth.domain.RegistrationTokenType;
@@ -77,6 +78,7 @@ public class TenantOnboardingService {
     private final EmailTemplateRenderer emailTemplateRenderer;
     private final ContactService contactService;
     private final UserContactService userContactService;
+    private final FrontendUrlProvider frontendUrlProvider;
     private final CompanyContactService companyContactService;
     private final AddressService addressService;
     private final CompanyAddressService companyAddressService;
@@ -140,6 +142,7 @@ public class TenantOnboardingService {
         // Seed default departments and positions for new tenant
         tenantSeedService.seedDepartmentsAndPositions(company.getTenantId(), company.getId());
 
+        // Send welcome email AFTER transaction commit (use sync to ensure email is queued)
         sendWelcomeEmail(
             request.getAdminContact(),
             request.getAdminFirstName(),
@@ -149,7 +152,7 @@ public class TenantOnboardingService {
         );
 
         // Get admin contact value from Contact entity
-        String adminContact = adminUser.getPrimaryContact()
+        String adminContact = adminUser.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
             .orElse(request.getAdminContact());
 
@@ -232,7 +235,7 @@ public class TenantOnboardingService {
         // Verification codes are only needed for unverified contacts during login
 
         // Get admin contact value from Contact entity
-        String adminContact = adminUser.getPrimaryContact()
+        String adminContact = adminUser.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
             .orElse(request.getEmail());
 
@@ -458,8 +461,7 @@ public class TenantOnboardingService {
             userContactService.assignContact(
                 saved.getId(),
                 contact.getId(),
-                true,  // isDefault
-                null
+                true  // isDefault
             );
 
             // Assign department if provided (new system)
@@ -583,20 +585,14 @@ public class TenantOnboardingService {
      * <p>Priority: FRONTEND_URL → APP_BASE_URL → localhost fallback (dev only)</p>
      */
     private String generateSetupUrl(String token) {
-        String baseUrl = System.getenv("FRONTEND_URL");
-        if (baseUrl == null || baseUrl.isEmpty()) {
-            baseUrl = System.getenv("APP_BASE_URL");
-        }
-        if (baseUrl == null || baseUrl.isEmpty()) {
-            // Fallback for local development only
-            baseUrl = "http://localhost:3000";
-            log.warn("⚠️ Using hardcoded frontend URL for setup link. Set FRONTEND_URL or APP_BASE_URL env var.");
-        }
-        return baseUrl + "/setup?token=" + token;
+        return frontendUrlProvider.buildUrl("/setup?token=" + token);
     }
 
     /**
      * Send welcome email with registration link.
+     * 
+     * <p>Uses sync method to ensure email is queued before transaction commit.
+     * This prevents async timing issues where email might not be queued.</p>
      */
     private void sendWelcomeEmail(String email, String firstName, String companyName,
                                  String token, List<Subscription> subscriptions) {
@@ -612,7 +608,8 @@ public class TenantOnboardingService {
         // Frontend templates prioritized for better UX (design system consistency)
         String message = emailTemplateRenderer.renderWelcome(firstName, companyName, osList, setupUrl);
 
-        notificationService.sendNotification(email, subject, message);
+        // Use sync to ensure email is queued in same transaction
+        notificationService.sendNotificationSync(email, subject, message);
     }
 
     /**

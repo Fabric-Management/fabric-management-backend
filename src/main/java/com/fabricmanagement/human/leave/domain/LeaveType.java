@@ -50,9 +50,6 @@ public class LeaveType extends BaseEntity {
     @Column(name = "attributes", columnDefinition = "jsonb")
     private String attributes;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean active = true;
-
     @Builder
     public LeaveType(String code,
                      String name,
@@ -73,11 +70,11 @@ public class LeaveType extends BaseEntity {
         this.defaultAccrualRate = defaultAccrualRate;
         this.maxCarryOver = maxCarryOver;
         this.attributes = attributes;
-        this.active = active;
+        this.setIsActive(active);
     }
 
     public void deactivate() {
-        this.active = false;
+        this.setIsActive(false);
     }
 
     public boolean appliesToCountry(String country) {
@@ -90,6 +87,10 @@ public class LeaveType extends BaseEntity {
     @Override
     protected String getModuleCode() {
         return "LVT";
+    }
+
+    public boolean isActive() {
+        return Boolean.TRUE.equals(getIsActive());
     }
 }
 
