@@ -43,6 +43,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -481,23 +482,16 @@ public class TenantOnboardingService {
                 });
             }
 
-            // Assign ADMIN role to first user (tenant admin)
-            // If roles don't exist for this tenant, create default roles first
-            UUID currentTenantId = TenantContext.getCurrentTenantId();
-            Role adminRole = roleRepository.findByTenantIdAndRoleCode(currentTenantId, "ADMIN")
-                .orElseGet(() -> {
-                    // Create default roles for new tenant if they don't exist
-                    log.info("Creating default roles for new tenant: tenantId={}", currentTenantId);
-                    seedDefaultRolesForTenant(currentTenantId);
-                    return roleRepository.findByTenantIdAndRoleCode(currentTenantId, "ADMIN")
-                        .orElseThrow(() -> new IllegalStateException(
-                            "Failed to create ADMIN role for tenant: " + currentTenantId));
-                });
-
-            saved.setRole(adminRole);
+            // ✅ Assign ADMIN role from platform (system tenant) - TENANT ADMIN ONLY
+            // ⚠️ IMPORTANT: This method is ONLY for tenant onboarding admin users.
+            // Regular users created by admins will get roles from request (UserService.createInternalUser).
+            UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+            Role assignedRole = assignTenantAdminRole(saved, systemTenantId, tenantId);
+            
+            saved.setRole(assignedRole);
             userRepository.save(saved);
-            log.info("✅ Admin role assigned to user: userId={}, roleCode={}", 
-                saved.getId(), adminRole.getRoleCode());
+            log.info("✅ Tenant admin role assigned from platform: userId={}, roleCode={}, roleId={}", 
+                saved.getId(), assignedRole.getRoleCode(), assignedRole.getId());
 
             String savedContactValue = contact.getContactValue();
             eventPublisher.publish(new UserCreatedEvent(
@@ -613,59 +607,107 @@ public class TenantOnboardingService {
     }
 
     /**
-     * Seed default roles for a new tenant.
+     * Assign tenant admin role to the first user created during tenant onboarding.
      * 
-     * <p>Creates standard roles (ADMIN, DIRECTOR, MANAGER, etc.) when tenant is first created.</p>
+     * <p><b>⚠️ IMPORTANT: This method is ONLY for tenant onboarding admin users.</b></p>
+     * <p><b>Regular users created by admins will get roles from request via UserService.createInternalUser().</b></p>
+     * 
+     * <p><b>Role Assignment Strategy:</b></p>
+     * <ol>
+     *   <li><b>ADMIN role</b> (required for tenant admin) - Primary choice</li>
+     *   <li><b>Fallback roles</b> (only if ADMIN missing) - PROD_MANAGER → HR_MANAGER → Any active role</li>
+     *   <li><b>Exception</b> if no roles exist (system configuration error)</li>
+     * </ol>
+     * 
+     * <p><b>Why fallback?</b></p>
+     * <ul>
+     *   <li>✅ Ensures tenant onboarding succeeds even if ADMIN role temporarily missing</li>
+     *   <li>✅ User always has a role (security requirement)</li>
+     *   <li>✅ Mail sending is guaranteed (user created successfully)</li>
+     *   <li>⚠️ Fallback roles are logged as warnings for admin review</li>
+     * </ul>
+     * 
+     * <p><b>Security Note:</b></p>
+     * <ul>
+     *   <li>✅ Only called during tenant onboarding (createAdminUser)</li>
+     *   <li>✅ Regular users get roles from request (UserService handles this)</li>
+     *   <li>✅ Admin users cannot assign ADMIN role to others via this method</li>
+     * </ul>
+     * 
+     * @param user User entity to assign role to (tenant admin user)
+     * @param systemTenantId System tenant ID (where platform roles are stored)
+     * @param tenantId Current tenant ID (for logging)
+     * @return Assigned role (never null - throws exception if no roles found)
+     * @throws IllegalStateException if no platform roles exist (system configuration error)
      */
-    private void seedDefaultRolesForTenant(UUID tenantId) {
-        log.debug("Seeding default roles for tenant: tenantId={}", tenantId);
-
-        // System tenant roles are seeded via migration (V014)
-        // For new tenants, we copy roles from system tenant or create default ones
-        UUID systemTenantId = UUID.fromString("00000000-0000-0000-0000-000000000000");
-
-        // Copy roles from system tenant if they exist
-        List<Role> systemRoles = roleRepository.findByTenantIdAndIsActiveTrue(systemTenantId);
-        
-        if (systemRoles.isEmpty()) {
-            // Fallback: Create default roles if system tenant roles don't exist
-            createDefaultRole(tenantId, "Administrator", "ADMIN", "Full system access");
-            createDefaultRole(tenantId, "Director", "DIRECTOR", "Üst yönetim erişimi");
-            createDefaultRole(tenantId, "Manager", "MANAGER", "Departman yönetimi");
-            createDefaultRole(tenantId, "Supervisor", "SUPERVISOR", "Vardiya / ekip lideri");
-            createDefaultRole(tenantId, "User", "USER", "Standart çalışan");
-            createDefaultRole(tenantId, "Intern", "INTERN", "Stajyer erişimi");
-            createDefaultRole(tenantId, "Viewer", "VIEWER", "Sadece okuma yetkisi");
-        } else {
-            // Copy roles from system tenant
-            for (Role systemRole : systemRoles) {
-                if (!roleRepository.existsByTenantIdAndRoleCode(tenantId, systemRole.getRoleCode())) {
-                    Role tenantRole = Role.create(
-                        systemRole.getRoleName(),
-                        systemRole.getRoleCode(),
-                        systemRole.getDescription()
-                    );
-                    tenantRole.setTenantId(tenantId);
-                    roleRepository.save(tenantRole);
-                    log.debug("Copied role to tenant: roleCode={}, tenantId={}", 
-                        systemRole.getRoleCode(), tenantId);
-                }
-            }
+    private Role assignTenantAdminRole(User user, UUID systemTenantId, UUID tenantId) {
+        // Priority 1: ADMIN role (REQUIRED for tenant admin users)
+        Optional<Role> adminRole = roleRepository.findByTenantIdAndRoleCode(systemTenantId, "ADMIN");
+        if (adminRole.isPresent()) {
+            log.debug("✅ ADMIN role assigned to tenant admin: userId={}, tenantId={}", 
+                user.getId(), tenantId);
+            return adminRole.get();
         }
-
-        log.info("✅ Default roles seeded for tenant: tenantId={}", tenantId);
+        
+        log.warn("⚠️ ADMIN role not found in platform. Using fallback role for tenant admin... tenantId={}", tenantId);
+        
+        // Priority 2: PROD_MANAGER (has management capabilities - acceptable fallback)
+        Optional<Role> prodManagerRole = roleRepository.findByTenantIdAndRoleCode(systemTenantId, "PROD_MANAGER");
+        if (prodManagerRole.isPresent()) {
+            log.warn("⚠️ ADMIN role not found, assigned PROD_MANAGER as fallback for tenant admin: " +
+                "userId={}, tenantId={}. Please ensure ADMIN role exists in platform.", 
+                user.getId(), tenantId);
+            return prodManagerRole.get();
+        }
+        
+        // Priority 3: HR_MANAGER (administrative role - acceptable fallback)
+        Optional<Role> hrManagerRole = roleRepository.findByTenantIdAndRoleCode(systemTenantId, "HR_MANAGER");
+        if (hrManagerRole.isPresent()) {
+            log.warn("⚠️ ADMIN and PROD_MANAGER roles not found, assigned HR_MANAGER as fallback for tenant admin: " +
+                "userId={}, tenantId={}. Please ensure ADMIN role exists in platform.", 
+                user.getId(), tenantId);
+            return hrManagerRole.get();
+        }
+        
+        // Priority 4: Any active role (last resort - not ideal but better than no role)
+        List<Role> allRoles = roleRepository.findByTenantIdAndIsActiveTrue(systemTenantId);
+        if (!allRoles.isEmpty()) {
+            Role fallbackRole = allRoles.get(0);
+            log.error("❌ ADMIN role not found, assigned '{}' as fallback for tenant admin: " +
+                "userId={}, tenantId={}. This is a configuration issue - ADMIN role should exist in platform.",
+                fallbackRole.getRoleCode(), user.getId(), tenantId);
+            return fallbackRole;
+        }
+        
+        // ❌ CRITICAL: No roles found - this is a system configuration error
+        // Tenant cannot be created without platform roles
+        log.error("❌ CRITICAL: No platform roles found in system tenant. " +
+            "Migration V013 must be executed before tenant creation. tenantId={}", tenantId);
+        throw new IllegalStateException(
+            "Platform roles not initialized. Please ensure migration V013 has been executed. " +
+            "This is a system configuration error that must be resolved before tenant creation."
+        );
     }
 
     /**
-     * Create a default role for tenant.
+     * @deprecated Role seeding is no longer used. All tenants use platform-level roles from system tenant.
+     * Roles are seeded via migration V013 and are shared across all tenants.
      */
+    @Deprecated
+    private void seedDefaultRolesForTenant(UUID tenantId) {
+        log.warn("⚠️ seedDefaultRolesForTenant() is deprecated and should not be called. " +
+            "All tenants use platform-level roles from system tenant.");
+        // Method kept for backward compatibility but does nothing
+    }
+
+    /**
+     * @deprecated Role seeding is no longer used. All tenants use platform-level roles from system tenant.
+     */
+    @Deprecated
     private void createDefaultRole(UUID tenantId, String roleName, String roleCode, String description) {
-        if (!roleRepository.existsByTenantIdAndRoleCode(tenantId, roleCode)) {
-            Role role = Role.create(roleName, roleCode, description);
-            role.setTenantId(tenantId);
-            roleRepository.save(role);
-            log.debug("Created default role: roleCode={}, tenantId={}", roleCode, tenantId);
-        }
+        log.warn("⚠️ createDefaultRole() is deprecated and should not be called. " +
+            "All tenants use platform-level roles from system tenant.");
+        // Method kept for backward compatibility but does nothing
     }
 
     /**

@@ -2,8 +2,9 @@
 -- V6: Auth Module Tables
 -- ============================================================================
 -- Authentication, verification codes, refresh tokens
--- Includes contact_id for new communication system integration
--- Last Updated: 2025-01-27 (Consolidated contact integration from V018)
+-- User-based authentication (one AuthUser per User)
+-- Multi-contact login supported via UserContact junction
+-- Last Updated: 2025-11-13 (User-based authentication refactor)
 -- ============================================================================
 
 -- ============================================================================
@@ -14,11 +15,14 @@ CREATE TABLE common_auth.common_auth_user (
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
     
+    -- User-based authentication (one AuthUser per User)
+    user_id UUID NOT NULL UNIQUE,
+    
     -- Deprecated fields (kept for backward compatibility, will be removed in future)
-    -- Use Contact entity via contact_id instead
     contact_value VARCHAR(255),
     contact_type VARCHAR(20),
-    contact_id UUID,  -- References Contact entity (new communication system)
+    contact_id UUID,  -- DEPRECATED: Kept for backward compatibility
+    
     password_hash VARCHAR(255) NOT NULL,
     
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -31,17 +35,26 @@ CREATE TABLE common_auth.common_auth_user (
     created_by UUID,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_by UUID,
-    version BIGINT NOT NULL DEFAULT 0
+    version BIGINT NOT NULL DEFAULT 0,
+    
+    CONSTRAINT fk_auth_user_user 
+        FOREIGN KEY (user_id) 
+        REFERENCES common_user.common_user(id) 
+        ON DELETE CASCADE
 );
 
 CREATE INDEX idx_auth_verified ON common_auth.common_auth_user(is_verified) WHERE is_verified = TRUE;
 CREATE INDEX idx_auth_locked ON common_auth.common_auth_user(locked_until) WHERE locked_until IS NOT NULL;
-CREATE INDEX idx_auth_user_contact_id ON common_auth.common_auth_user(contact_id);
+CREATE INDEX idx_auth_user_id ON common_auth.common_auth_user(user_id);
+CREATE INDEX idx_auth_contact_id ON common_auth.common_auth_user(contact_id);
 
-COMMENT ON TABLE common_auth.common_auth_user IS 'Authentication credentials - BCrypt password hashing';
-COMMENT ON COLUMN common_auth.common_auth_user.contact_value IS 'DEPRECATED: Use contact_id and Contact entity instead. Will be dropped in future migration.';
-COMMENT ON COLUMN common_auth.common_auth_user.contact_type IS 'DEPRECATED: Use contact_id and Contact entity instead. Will be dropped in future migration.';
-COMMENT ON COLUMN common_auth.common_auth_user.contact_id IS 'References Contact entity (new communication system). NULL allowed during migration period.';
+COMMENT ON TABLE common_auth.common_auth_user IS 
+    'Authentication credentials - User-based (one AuthUser per User). Multi-contact login supported via UserContact junction.';
+COMMENT ON COLUMN common_auth.common_auth_user.user_id IS 
+    'References User entity. One AuthUser per User. Any verified contact of this User can be used for login.';
+COMMENT ON COLUMN common_auth.common_auth_user.contact_value IS 'DEPRECATED: Use user_id and UserContact junction instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_auth.common_auth_user.contact_type IS 'DEPRECATED: Use user_id and UserContact junction instead. Will be dropped in future migration.';
+COMMENT ON COLUMN common_auth.common_auth_user.contact_id IS 'DEPRECATED: Kept for backward compatibility. Use user_id instead. Will be removed in future migration.';
 COMMENT ON COLUMN common_auth.common_auth_user.password_hash IS 'BCrypt hash (strength 10)';
 COMMENT ON COLUMN common_auth.common_auth_user.failed_login_attempts IS 'Locks account after 5 attempts for 30 minutes';
 
@@ -109,4 +122,41 @@ COMMENT ON COLUMN common_auth.common_verification_code.code_hash IS 'BCrypt hash
 COMMENT ON COLUMN common_auth.common_verification_code.type IS 'REGISTRATION, PASSWORD_RESET, EMAIL_VERIFICATION, PHONE_VERIFICATION';
 COMMENT ON COLUMN common_auth.common_verification_code.expires_at IS 'Default: 10 minutes';
 COMMENT ON COLUMN common_auth.common_verification_code.attempt_count IS 'Max 3 attempts';
+
+-- ============================================================================
+-- TABLE: common_registration_token
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS common_auth.common_registration_token (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE NOT NULL,
+    
+    token VARCHAR(36) UNIQUE NOT NULL,
+    contact_value VARCHAR(255) NOT NULL,
+    token_type VARCHAR(20) NOT NULL CHECK (token_type IN ('SALES_LED', 'SELF_SERVICE')),
+    
+    expires_at TIMESTAMP NOT NULL,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    used_at TIMESTAMP,
+    
+    user_id UUID,
+    company_id UUID,
+    
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_registration_token_token ON common_auth.common_registration_token(token);
+CREATE INDEX IF NOT EXISTS idx_registration_token_contact ON common_auth.common_registration_token(contact_value);
+CREATE INDEX IF NOT EXISTS idx_registration_token_valid ON common_auth.common_registration_token(is_used, expires_at)
+    WHERE is_used = FALSE;
+
+COMMENT ON TABLE common_auth.common_registration_token IS 'Secure tokens for email-based registration flows';
+COMMENT ON COLUMN common_auth.common_registration_token.token IS 'UUID token sent via email';
+COMMENT ON COLUMN common_auth.common_registration_token.token_type IS 'SALES_LED (token only) or SELF_SERVICE (token + code)';
+COMMENT ON COLUMN common_auth.common_registration_token.expires_at IS '24-hour expiry for security';
 

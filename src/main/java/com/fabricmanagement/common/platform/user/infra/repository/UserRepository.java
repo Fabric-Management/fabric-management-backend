@@ -23,12 +23,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * Find user by contact value via Contact entity (new system - recommended).
      * <p>Uses UserContact junction table and Contact entity.</p>
      * <p>Eagerly fetches Role to avoid lazy loading issues.</p>
+     * <p><b>CRITICAL:</b> Tenant isolation enforced via Contact's tenant_id.</p>
      */
     @Query("SELECT DISTINCT u FROM User u " +
            "LEFT JOIN FETCH u.role " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id " +
-           "WHERE c.contactValue = :contactValue")
+           "WHERE c.contactValue = :contactValue " +
+           "AND u.tenantId = c.tenantId")
     Optional<User> findByContactValue(@Param("contactValue") String contactValue);
 
     /**
@@ -77,11 +79,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /**
      * Check if contact value exists via Contact entity (new system).
      * <p>Uses UserContact junction table and Contact entity.</p>
+     * <p><b>CRITICAL:</b> Tenant isolation enforced via Contact's tenant_id.</p>
      */
     @Query("SELECT COUNT(u) > 0 FROM User u " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId " +
            "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id " +
-           "WHERE c.contactValue = :contactValue")
+           "WHERE c.contactValue = :contactValue " +
+           "AND u.tenantId = c.tenantId")
     boolean existsByContactValue(@Param("contactValue") String contactValue);
 
     /**

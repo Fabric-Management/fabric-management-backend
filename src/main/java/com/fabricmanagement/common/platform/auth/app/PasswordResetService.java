@@ -16,6 +16,7 @@ import com.fabricmanagement.common.platform.auth.app.VerificationCodeManager.Iss
 import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
+import com.fabricmanagement.common.platform.communication.app.UserContactService;
 import com.fabricmanagement.common.platform.communication.app.VerificationService;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.domain.ContactType;
@@ -67,6 +68,7 @@ public class PasswordResetService {
     private final VerificationCodeManager verificationCodeManager;
     private final RefreshTokenRepository refreshTokenRepository;
     private final ContactService contactService;
+    private final UserContactService userContactService;
     private final UserRepository userRepository;
     private final UserFacade userFacade;
     private final CompanyFacade companyFacade;
@@ -111,34 +113,35 @@ public class PasswordResetService {
         
         List<MaskedContactInfo> maskedContacts = new ArrayList<>();
         
-        // Find all verified AuthUsers that might belong to this user
-        // Strategy: Find AuthUsers with same contactValue or related patterns
-        // Primary: The exact contactValue used for login
-        Optional<AuthUser> primaryAuthUser = authUserRepository.findByContactValue(contactValue);
-        if (primaryAuthUser.isPresent() && primaryAuthUser.get().getIsVerified()) {
-            AuthUser authUser = primaryAuthUser.get();
-            // Get Contact entity to determine contact type
-            com.fabricmanagement.common.platform.communication.domain.Contact contact = 
-                contactService.findById(authUser.getContactId())
-                    .orElse(null);
+        // ✅ Find AuthUser by contact value (user-based authentication)
+        // This finds User via Contact → UserContact → User, then returns User's AuthUser
+        Optional<AuthUser> authUserOpt = authUserRepository.findByContactValue(contactValue);
+        if (authUserOpt.isPresent() && authUserOpt.get().getIsVerified()) {
+            AuthUser authUser = authUserOpt.get();
+            UUID userId = authUser.getUserId();
             
-            if (contact != null) {
-                // Map Communication ContactType to User ContactType
-                ContactType userContactType = mapToUserContactType(contact.getContactType());
-                maskedContacts.add(createMaskedContact(
-                    authUser.getId(),
-                    contactValue,
-                    userContactType
-                ));
+            // ✅ Get User's verified contacts (user-based authentication)
+            // All verified contacts can be used for password reset
+            List<com.fabricmanagement.common.platform.communication.domain.UserContact> userContacts = 
+                userContactService.getUserContacts(userId);
+            
+            // Get all verified contacts for this user
+            for (com.fabricmanagement.common.platform.communication.domain.UserContact userContact : userContacts) {
+                com.fabricmanagement.common.platform.communication.domain.Contact contact = 
+                    contactService.findById(userContact.getContactId())
+                        .orElse(null);
+                
+                if (contact != null && Boolean.TRUE.equals(contact.getIsVerified())) {
+                    // Map Communication ContactType to User ContactType
+                    ContactType userContactType = mapToUserContactType(contact.getContactType());
+                    maskedContacts.add(createMaskedContact(
+                        authUser.getId(),
+                        contact.getContactValue(),
+                        userContactType
+                    ));
+                }
             }
         }
-        
-        // Future enhancement: Find other verified contacts for the same user
-        // For now, we return at least the primary contact
-        // In future, we could:
-        // 1. Store user_id FK in AuthUser
-        // 2. Query by tenant_id + company_id patterns
-        // 3. Maintain UserContact join table
         
         log.info("Found {} verified contacts for user", maskedContacts.size());
         
@@ -161,54 +164,68 @@ public class PasswordResetService {
             request.getAuthUserId(),
             request.getContactType());
 
-        // Direct lookup by authUserId (performance optimization)
+        // ✅ Direct lookup by authUserId (user-based authentication)
         AuthUser authUser = authUserRepository.findById(request.getAuthUserId())
             .orElseThrow(() -> createContextAwarePasswordResetException(
                 "Contact not found. Please try again or contact support."
             ));
 
         if (!authUser.getIsVerified()) {
-            String contactValue = authUser.getContactValue();
             throw createContextAwarePasswordResetException(
-                contactValue,
-                "Contact is not verified. Please verify your contact information first."
+                "Account is not verified. Please verify your account first."
             );
         }
 
-        // Get Contact entity to validate contact type
-        com.fabricmanagement.common.platform.communication.domain.Contact contact = 
-            contactService.findById(authUser.getContactId())
-                .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
-
-        // Validate contact type matches
+        // ✅ Get User's verified contacts (user-based authentication)
+        UUID userId = authUser.getUserId();
+        List<com.fabricmanagement.common.platform.communication.domain.UserContact> userContacts = 
+            userContactService.getUserContacts(userId);
+        
+        // Find contact matching requested type
         ContactType requestedType = ContactType.valueOf(request.getContactType());
-        ContactType actualType = mapToUserContactType(contact.getContactType());
-        if (actualType != requestedType) {
-            log.warn("Contact type mismatch: authUserId={}, expected={}, actual={}",
-                request.getAuthUserId(), requestedType, actualType);
-            throw new IllegalArgumentException("Contact type mismatch");
+        com.fabricmanagement.common.platform.communication.domain.Contact selectedContact = null;
+        
+        for (com.fabricmanagement.common.platform.communication.domain.UserContact userContact : userContacts) {
+            com.fabricmanagement.common.platform.communication.domain.Contact contact = 
+                contactService.findById(userContact.getContactId())
+                    .orElse(null);
+            
+            if (contact != null && 
+                Boolean.TRUE.equals(contact.getIsVerified()) &&
+                mapToUserContactType(contact.getContactType()) == requestedType) {
+                selectedContact = contact;
+                break;
+            }
         }
+        
+        if (selectedContact == null) {
+            throw new IllegalArgumentException(
+                "No verified " + request.getContactType().toLowerCase() + " contact found for this account."
+            );
+        }
+
+        String contactValue = selectedContact.getContactValue();
 
         IssuedVerificationCode issuedCode;
         try {
             issuedCode = verificationCodeManager.issueCode(
-                authUser.getContactValue(),
+                contactValue,
                 VerificationType.PASSWORD_RESET
             );
         } catch (IllegalArgumentException | IllegalStateException ex) {
             log.warn("Password reset verification throttled: contactValue={}, reason={}",
-                PiiMaskingUtil.maskEmail(authUser.getContactValue()), ex.getMessage());
-            throw createContextAwarePasswordResetException(authUser.getContactValue(), ex.getMessage());
+                PiiMaskingUtil.maskEmail(contactValue), ex.getMessage());
+            throw createContextAwarePasswordResetException(contactValue, ex.getMessage());
         }
 
         // Send verification code via multi-channel (WhatsApp → Email → SMS)
         try {
-            verificationService.sendVerificationCode(authUser.getContactValue(), issuedCode.code());
+            verificationService.sendVerificationCode(contactValue, issuedCode.code());
             log.info("✅ Password reset code sent successfully to: {}", 
-                PiiMaskingUtil.maskEmail(authUser.getContactValue()));
+                PiiMaskingUtil.maskEmail(contactValue));
         } catch (Exception e) {
             log.error("❌ Failed to send password reset code to: {}", 
-                PiiMaskingUtil.maskEmail(authUser.getContactValue()), e);
+                PiiMaskingUtil.maskEmail(contactValue), e);
             // Continue anyway - code is in database, user can try again
         }
 
@@ -239,24 +256,46 @@ public class PasswordResetService {
             request.getAuthUserId(),
             "******"); // Never log verification codes
 
-        // Find AuthUser by ID
+        // ✅ Find AuthUser by ID (user-based authentication)
         AuthUser authUser = authUserRepository.findById(request.getAuthUserId())
             .orElseThrow(() -> new IllegalArgumentException("Invalid authentication information"));
 
         if (!authUser.getIsVerified()) {
-            throw new IllegalArgumentException("Contact is not verified");
+            throw new IllegalArgumentException("Account is not verified");
+        }
+
+        // ✅ Get User's verified contacts to find contactValue for verification code validation
+        UUID userId = authUser.getUserId();
+        List<com.fabricmanagement.common.platform.communication.domain.UserContact> userContacts = 
+            userContactService.getUserContacts(userId);
+        
+        // Find any verified contact for verification code validation
+        String contactValue = null;
+        for (com.fabricmanagement.common.platform.communication.domain.UserContact userContact : userContacts) {
+            com.fabricmanagement.common.platform.communication.domain.Contact contact = 
+                contactService.findById(userContact.getContactId())
+                    .orElse(null);
+            
+            if (contact != null && Boolean.TRUE.equals(contact.getIsVerified())) {
+                contactValue = contact.getContactValue();
+                break; // Use first verified contact for verification code validation
+            }
+        }
+        
+        if (contactValue == null) {
+            throw new IllegalArgumentException("No verified contact found for verification code validation");
         }
 
         verificationCodeManager.validateAndConsume(
-            authUser.getContactValue(),
+            contactValue,
             VerificationType.PASSWORD_RESET,
             request.getCode()
         );
 
         // Check if new password is same as old password
         if (passwordEncoder.matches(request.getNewPassword(), authUser.getPasswordHash())) {
-            log.warn("New password same as old password: contactValue={}",
-                PiiMaskingUtil.maskEmail(authUser.getContactValue()));
+            log.warn("New password same as old password: userId={}",
+                userId);
             throw new IllegalArgumentException("New password must be different from your current password");
         }
 
@@ -268,12 +307,9 @@ public class PasswordResetService {
         authUser.unlock();
         
         authUserRepository.save(authUser);
-
-        // Get contact value from Contact entity
-        String contactValue = authUser.getContactValue();
         
-        // Get User DTO for token generation
-        UserDto user = userFacade.findByContactValue(contactValue)
+        // ✅ Get User DTO (user-based authentication)
+        UserDto user = userFacade.findById(authUser.getTenantId(), userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (!user.getIsActive()) {

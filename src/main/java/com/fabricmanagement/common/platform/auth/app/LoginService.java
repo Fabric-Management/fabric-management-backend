@@ -12,7 +12,6 @@ import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
-import com.fabricmanagement.common.platform.communication.app.UserContactService;
 import com.fabricmanagement.common.platform.communication.app.VerificationService;
 import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
@@ -28,7 +27,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,7 +55,6 @@ public class LoginService {
     private final JwtService jwtService;
     private final DomainEventPublisher eventPublisher;
     private final ContactService contactService;
-    private final UserContactService userContactService;
     private final VerificationService verificationService;
     private final VerificationCodeManager verificationCodeManager;
 
@@ -68,34 +65,39 @@ public class LoginService {
     public LoginResponse login(LoginRequest request, String ipAddress) {
         log.info("Login attempt: contactValue={}", 
             PiiMaskingUtil.maskEmail(request.getContactValue()));
+        
+        // Debug: Log actual email (only in local/dev profiles)
+        if (!PiiMaskingUtil.isMaskingEnabled()) {
+            log.debug("Login attempt (unmasked): contactValue={}", request.getContactValue());
+        }
 
-        // ✅ Check if contact exists and belongs to a user
+        // ✅ Find AuthUser by contact value (user-based authentication)
+        // This query finds User via Contact → UserContact → User, then returns User's AuthUser
         Optional<AuthUser> authUserOpt = authUserRepository.findByContactValue(request.getContactValue());
         
         // ✅ If AuthUser doesn't exist, check if contact belongs to user with password
         if (authUserOpt.isEmpty()) {
+            log.debug("AuthUser not found for contactValue={}, checking if user exists", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
+            
             Optional<UserDto> userOpt = userFacade.findByContactValue(request.getContactValue());
             if (userOpt.isPresent()) {
                 UserDto user = userOpt.get();
+                log.debug("User found: userId={}, tenantId={}, checking for password", 
+                    user.getId(), user.getTenantId());
                 
-                // ✅ Set tenant context for user's tenant before querying contacts
-                UUID originalTenantId = TenantContext.getCurrentTenantIdOrNull();
-                try {
-                    TenantContext.setCurrentTenantId(user.getTenantId());
-                    
-                    // ✅ Batch check: Check if user has any AuthUser (password exists) in one query
-                    List<com.fabricmanagement.common.platform.communication.domain.UserContact> userContacts = 
-                        userContactService.getUserContacts(user.getId());
-                    
-                    List<UUID> userContactIds = userContacts.stream()
-                        .map(com.fabricmanagement.common.platform.communication.domain.UserContact::getContactId)
-                        .toList();
-                    
-                    boolean userHasPassword = !userContactIds.isEmpty() && 
-                        !authUserRepository.findContactIdsByContactIds(userContactIds).isEmpty();
-                    
-                    if (userHasPassword) {
-                        // User has password but this contact is not verified
+                // ✅ Check if user has AuthUser (password exists) - simple user-based check
+                boolean userHasPassword = authUserRepository.existsByUserId(user.getId());
+                
+                log.debug("User has password: {}", userHasPassword);
+                
+                if (userHasPassword) {
+                    // User has password but this contact is not verified
+                    // Set tenant context for user's tenant before querying contact
+                    UUID originalTenantId = TenantContext.getCurrentTenantIdOrNull();
+                    try {
+                        TenantContext.setCurrentTenantId(user.getTenantId());
+                        
                         com.fabricmanagement.common.platform.communication.domain.Contact contact = 
                             contactService.findByValue(request.getContactValue())
                                 .orElse(null);
@@ -130,18 +132,20 @@ public class LoginService {
                                 );
                             }
                         }
-                    }
-                } finally {
-                    // Restore original tenant context
-                    if (originalTenantId != null) {
-                        TenantContext.setCurrentTenantId(originalTenantId);
-                    } else {
-                        TenantContext.clear();
+                    } finally {
+                        // Restore original tenant context
+                        if (originalTenantId != null) {
+                            TenantContext.setCurrentTenantId(originalTenantId);
+                        } else {
+                            TenantContext.clear();
+                        }
                     }
                 }
             }
             
             // Contact doesn't exist or user doesn't have password
+            log.warn("Login failed: User not found or has no password. contactValue={}", 
+                PiiMaskingUtil.maskEmail(request.getContactValue()));
             throw createContextAwareNotFoundException(request.getContactValue());
         }
         
@@ -176,7 +180,10 @@ public class LoginService {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
-        UserDto user = userFacade.findByContactValue(request.getContactValue())
+        // ✅ Get User from AuthUser (user-based authentication)
+        // AuthUser.user is already loaded via LEFT JOIN FETCH in repository query
+        UUID userId = authUser.getUserId();
+        UserDto user = userFacade.findById(authUser.getTenantId(), userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (!user.getIsActive()) {

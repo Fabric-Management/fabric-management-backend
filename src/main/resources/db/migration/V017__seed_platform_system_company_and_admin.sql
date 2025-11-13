@@ -196,7 +196,7 @@ BEGIN
     INSERT INTO common_communication.common_user_contact (
         tenant_id, uid,
         user_id, contact_id,
-        is_default, is_for_authentication,
+        is_default,
         is_active,
         created_at, updated_at, version
     ) VALUES (
@@ -205,7 +205,6 @@ BEGIN
         user_id,
         contact_id,
         TRUE,  -- Default contact
-        TRUE,  -- For authentication
         TRUE,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP,
@@ -263,9 +262,10 @@ BEGIN
     -- ========================================================================
     -- STEP 9: Create AuthUser (for password authentication)
     -- ========================================================================
+    -- ✅ User-based authentication: AuthUser references User, not Contact
     INSERT INTO common_auth.common_auth_user (
         id, tenant_id, uid,
-        contact_id,
+        user_id,  -- ✅ User-based authentication (one AuthUser per User)
         password_hash,
         is_verified, is_active,
         created_at, updated_at, version
@@ -273,7 +273,7 @@ BEGIN
         auth_user_id,
         system_tenant_id,
         'SYS-AUTH-0001',
-        contact_id,
+        user_id,  -- ✅ References User entity
         platform_admin_password_hash,  -- ⚠️ Pre-hashed BCrypt password
         TRUE,  -- Pre-verified
         TRUE,
@@ -282,13 +282,14 @@ BEGIN
         0
     );
 
-    RAISE NOTICE '✅ AuthUser created: %', auth_user_id;
+    RAISE NOTICE '✅ AuthUser created: % (user_id: %)', auth_user_id, user_id;
 
     -- ========================================================================
     -- STEP 10: Seed Platform-Level Departments and Positions
     -- ========================================================================
-    -- Platform-level departments and positions serve as reference catalog
-    -- These are copied to new tenants during tenant seeding
+    -- ✅ Platform-level departments serve as reference catalog
+    -- These are copied to new tenants during tenant seeding (via TenantSeedService)
+    -- ✅ Platform-level roles are NOT copied - all tenants use the same platform roles
     RAISE NOTICE 'Seeding platform-level departments and positions...';
     
     -- Get category IDs
