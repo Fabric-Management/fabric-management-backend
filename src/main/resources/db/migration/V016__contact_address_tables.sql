@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS common_communication.common_contact (
     
     CONSTRAINT fk_contact_parent FOREIGN KEY (parent_contact_id) 
         REFERENCES common_communication.common_contact(id) ON DELETE SET NULL,
-    CONSTRAINT chk_contact_type CHECK (contact_type IN ('EMAIL', 'PHONE', 'PHONE_EXTENSION', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA'))
+    CONSTRAINT chk_contact_type CHECK (contact_type IN ('EMAIL', 'MOBILE', 'LANDLINE', 'PHONE_EXTENSION', 'FAX', 'WEBSITE', 'SOCIAL_MEDIA')),
+    CONSTRAINT chk_contact_whatsapp_mobile CHECK (is_whatsapp = FALSE OR contact_type = 'MOBILE')
 );
 
 CREATE INDEX idx_contact_value ON common_communication.common_contact(contact_value);
@@ -54,11 +55,12 @@ CREATE INDEX idx_contact_tenant ON common_communication.common_contact(tenant_id
 CREATE INDEX idx_contact_verified ON common_communication.common_contact(is_verified) WHERE is_verified = TRUE;
 CREATE INDEX idx_contact_primary ON common_communication.common_contact(is_primary) WHERE is_primary = TRUE;
 CREATE INDEX idx_contact_whatsapp ON common_communication.common_contact(is_whatsapp) WHERE is_whatsapp = TRUE;
-CREATE INDEX idx_contact_phone_whatsapp ON common_communication.common_contact(contact_type, is_whatsapp) WHERE contact_type = 'PHONE' AND is_whatsapp = TRUE;
+CREATE INDEX idx_contact_mobile_whatsapp ON common_communication.common_contact(tenant_id)
+    WHERE contact_type = 'MOBILE' AND is_whatsapp = TRUE;
 
 COMMENT ON TABLE common_communication.common_contact IS 'Generic contact information (email, phone, WhatsApp, etc.) for User and Company';
 COMMENT ON COLUMN common_communication.common_contact.contact_value IS 'Contact value: email address, phone number (E.164), extension number, URL, etc.';
-COMMENT ON COLUMN common_communication.common_contact.contact_type IS 'Contact type: EMAIL, PHONE, PHONE_EXTENSION, FAX, WEBSITE, SOCIAL_MEDIA. WhatsApp capability is indicated via isWhatsApp flag on PHONE contacts.';
+COMMENT ON COLUMN common_communication.common_contact.contact_type IS 'Contact type: EMAIL, MOBILE, LANDLINE, PHONE_EXTENSION, FAX, WEBSITE, SOCIAL_MEDIA. WhatsApp capability is indicated via isWhatsApp flag on MOBILE contacts only.';
 COMMENT ON COLUMN common_communication.common_contact.parent_contact_id IS 'For PHONE_EXTENSION: references parent PHONE contact';
 COMMENT ON COLUMN common_communication.common_contact.is_personal IS 'true = User personal contact, false = Company-provided contact';
 COMMENT ON COLUMN common_communication.common_contact.is_whatsapp IS 'True if phone number has WhatsApp capability. Used for verification codes and notifications priority.';
@@ -146,7 +148,6 @@ CREATE TABLE IF NOT EXISTS common_communication.common_user_contact (
     contact_id UUID NOT NULL,
     
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
-    is_for_authentication BOOLEAN NOT NULL DEFAULT FALSE,
     
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -165,10 +166,7 @@ CREATE TABLE IF NOT EXISTS common_communication.common_user_contact (
 CREATE INDEX idx_user_contact_user ON common_communication.common_user_contact(user_id);
 CREATE INDEX idx_user_contact_contact ON common_communication.common_user_contact(contact_id);
 CREATE INDEX idx_user_contact_tenant ON common_communication.common_user_contact(tenant_id);
-CREATE INDEX idx_user_contact_auth ON common_communication.common_user_contact(is_for_authentication) WHERE is_for_authentication = TRUE;
-
-COMMENT ON TABLE common_communication.common_user_contact IS 'Junction table: User ↔ Contact relationship';
-COMMENT ON COLUMN common_communication.common_user_contact.is_for_authentication IS 'true = this contact can be used for login/authentication';
+COMMENT ON TABLE common_communication.common_user_contact IS 'Junction table: User ↔ Contact relationship. Authentication uses any verified contact.';
 
 -- ============================================================================
 -- TABLE: common_company_contact (Junction table - Composite Primary Key)

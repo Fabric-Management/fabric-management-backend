@@ -1,7 +1,6 @@
 package com.fabricmanagement.common.infrastructure.config;
 
 import com.fabricmanagement.human.compliance.localization.domain.HrLocalizationCacheNames;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,20 +18,50 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
 @Configuration
+@EnableConfigurationProperties(RedisProperties.class)
+@ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis", matchIfMissing = false)
+@Slf4j
 public class RedisConfig {
 
     @Bean
-    public LettuceConnectionFactory redisConnectionFactory(
-        @Value("${REDIS_HOST:localhost}") String host,
-        @Value("${REDIS_PORT:6379}") int port,
-        @Value("${REDIS_PASSWORD:}") String password
-    ) {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, port);
-        if (password != null && !password.isBlank()) {
+    public LettuceConnectionFactory redisConnectionFactory(RedisProperties redisProperties) {
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(
+            redisProperties.getHost(),
+            redisProperties.getPort()
+        );
+
+        // Only set password if it's provided and not blank
+        String password = redisProperties.getPassword();
+        boolean hasPassword = password != null && !password.isBlank() && !password.isEmpty();
+        
+        if (hasPassword) {
             config.setPassword(RedisPassword.of(password));
+            log.info("✅ Redis connection configured: host={}, port={}, db={}, password=*** (length={})",
+                redisProperties.getHost(), redisProperties.getPort(), config.getDatabase(), 
+                password != null ? password.length() : 0);
+        } else {
+            log.warn("⚠️ Redis connection configured WITHOUT password: host={}, port={}, db={}. " +
+                    "If Redis requires password, connection will fail. Check REDIS_PASSWORD environment variable. " +
+                    "Current password value: '{}'",
+                redisProperties.getHost(), redisProperties.getPort(), config.getDatabase(), 
+                password != null ? "(empty)" : "(null)");
         }
-        return new LettuceConnectionFactory(config);
+
+        config.setDatabase(redisProperties.getDatabase());
+
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(config);
+        // ✅ Lazy connection: Don't validate on startup, validate on first use
+        // This prevents startup failure if Redis is temporarily unavailable
+        factory.setValidateConnection(false);
+        
+        return factory;
     }
 
     @Bean

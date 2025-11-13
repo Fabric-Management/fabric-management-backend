@@ -7,6 +7,7 @@ import com.fabricmanagement.common.platform.auth.infra.repository.VerificationCo
 import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.common.platform.policy.infra.repository.PolicyRepository;
+import com.fabricmanagement.common.platform.communication.app.EmailDiagnosticService;
 import com.fabricmanagement.common.platform.communication.domain.EmailOutboxStatus;
 import com.fabricmanagement.common.platform.communication.infra.repository.EmailOutboxRepository;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
@@ -52,6 +53,7 @@ public class DevelopmentToolsController {
     private final RegistrationTokenRepository tokenRepository;
     private final VerificationCodeRepository verificationCodeRepository;
     private final EmailOutboxRepository emailOutboxRepository;
+    private final EmailDiagnosticService emailDiagnosticService;
 
     /**
      * ⚠️ DANGER: Reset ALL data in database.
@@ -226,6 +228,22 @@ public class DevelopmentToolsController {
             "Failed emails reset to PENDING",
             String.format("Reset %d failed email(s) to PENDING status", count)
         ));
+    }
+
+    /**
+     * Comprehensive email system diagnostics.
+     * 
+     * <p>Provides systematic analysis of email delivery system health.</p>
+     * 
+     * @return Comprehensive email diagnostic report
+     */
+    @GetMapping("/email-diagnostics")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getEmailDiagnostics() {
+        log.info("Running comprehensive email system diagnostics...");
+        
+        Map<String, Object> diagnostics = emailDiagnosticService.diagnoseEmailSystem();
+        
+        return ResponseEntity.ok(ApiResponse.success(diagnostics, "Email system diagnostics"));
     }
 
     /**

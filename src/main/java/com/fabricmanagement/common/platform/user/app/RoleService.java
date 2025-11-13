@@ -36,17 +36,15 @@ public class RoleService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding all roles: tenantId={}", tenantId);
 
-        // Hybrid model: Return platform-level (reference) + tenant-level roles
+        // ✅ Platform-level roles only: All tenants use the same platform roles
+        // Tenant-specific roles are not returned (they can be created but are not shown in standard lists)
         UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
         List<Role> systemRoles = roleRepository.findByTenantIdAndIsActiveTrue(systemTenantId);
-        List<Role> tenantRoles = roleRepository.findByTenantIdAndIsActiveTrue(tenantId);
         
-        // Combine: system roles (reference) + tenant-specific roles
-        List<Role> allRoles = new java.util.ArrayList<>();
-        allRoles.addAll(systemRoles);
-        allRoles.addAll(tenantRoles);
-        
-        return allRoles;
+        // ✅ Log clarification: Platform roles come from SYSTEM_TENANT_ID, not from current tenant
+        log.debug("Found {} platform roles (from SYSTEM_TENANT_ID) for current tenant context: tenantId={}", 
+            systemRoles.size(), tenantId);
+        return systemRoles;
     }
 
     @Transactional(readOnly = true)
@@ -54,12 +52,15 @@ public class RoleService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding role: tenantId={}, roleId={}", tenantId, roleId);
 
-        // Hybrid model: Check both platform-level and tenant-level
+        // ✅ Platform-level roles only: Check system tenant first
         UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
         Optional<Role> systemRole = roleRepository.findByTenantIdAndId(systemTenantId, roleId);
         if (systemRole.isPresent()) {
             return systemRole;
         }
+        
+        // Fallback: Check tenant-specific roles (for backward compatibility)
+        // Note: Tenant-specific roles are not shown in findAll() but can be queried by ID
         return roleRepository.findByTenantIdAndId(tenantId, roleId);
     }
 
@@ -68,12 +69,15 @@ public class RoleService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         log.debug("Finding role by code: tenantId={}, roleCode={}", tenantId, roleCode);
 
-        // Hybrid model: Check both platform-level and tenant-level
+        // ✅ Platform-level roles only: Check system tenant first
         UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
         Optional<Role> systemRole = roleRepository.findByTenantIdAndRoleCode(systemTenantId, roleCode);
         if (systemRole.isPresent()) {
             return systemRole;
         }
+        
+        // Fallback: Check tenant-specific roles (for backward compatibility)
+        // Note: Tenant-specific roles are not shown in findAll() but can be queried by code
         return roleRepository.findByTenantIdAndRoleCode(tenantId, roleCode);
     }
 

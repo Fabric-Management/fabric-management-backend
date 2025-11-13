@@ -9,7 +9,7 @@
 -- ============================================================================
 -- TABLE: common_user
 -- ============================================================================
-CREATE TABLE common_user.common_user (
+CREATE TABLE IF NOT EXISTS common_user.common_user (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
@@ -29,7 +29,11 @@ CREATE TABLE common_user.common_user (
     department VARCHAR(100),
     last_active_at TIMESTAMP,
     
-    -- NOTE: role_id added in V013, onboarding_completed_at added in V004
+    -- Role assignment (references common_company.common_role - table created in V013)
+    role_id UUID,
+    
+    -- Onboarding tracking
+    onboarding_completed_at TIMESTAMP,
     
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -42,12 +46,15 @@ CREATE TABLE common_user.common_user (
         REFERENCES common_company.common_company(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_user_tenant_company ON common_user.common_user(tenant_id, company_id);
-CREATE INDEX idx_user_active ON common_user.common_user(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_user_tenant_company ON common_user.common_user(tenant_id, company_id);
+CREATE INDEX IF NOT EXISTS idx_user_active ON common_user.common_user(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_user_role ON common_user.common_user(role_id);
 
 COMMENT ON TABLE common_user.common_user IS 'Platform users - NO username! Use Contact entity via UserContact junction';
 COMMENT ON COLUMN common_user.common_user.contact_value IS 'DEPRECATED: Use Contact entity via UserContact junction instead. Will be dropped in future migration.';
 COMMENT ON COLUMN common_user.common_user.contact_type IS 'DEPRECATED: Use Contact entity via UserContact junction instead. Will be dropped in future migration.';
 COMMENT ON COLUMN common_user.common_user.department IS 'DEPRECATED: Use UserDepartment junction table instead (created in V013). Will be dropped in future migration.';
+COMMENT ON COLUMN common_user.common_user.role_id IS 'User role assignment - references common_company.common_role';
+COMMENT ON COLUMN common_user.common_user.onboarding_completed_at IS 'Timestamp when user completed onboarding wizard';
 COMMENT ON COLUMN common_user.common_user.display_name IS 'Auto-generated: firstName + lastName';
 

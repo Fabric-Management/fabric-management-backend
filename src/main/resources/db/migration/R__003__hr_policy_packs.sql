@@ -1,9 +1,13 @@
 -- ============================================================================
--- V034: Seed Global/EU Rule Packs and Country Mappings
--- ----------------------------------------------------------------------------
+-- R003: Seed Global/EU HR Policy Packs (Repeatable)
+-- ============================================================================
 -- Inserts baseline data for GLOBAL-BASE, EU-BASELINE, and country-specific
 -- packs with inheritance relationships.
--- Last Updated: 2025-11-09
+-- 
+-- Repeatable Migration: Runs every time Flyway checks migrations
+-- If content changes, Flyway will re-execute this script
+-- 
+-- Last Updated: 2025-11-13
 -- ============================================================================
 
 WITH tenant_ids AS (
@@ -19,7 +23,10 @@ SELECT gen_random_uuid(),
     '{"leave":{"default":{"annualLeaveDays":20,"carryOverDays":5}},"payroll":{"taxBrackets":[],"currency":"USD"}}'::jsonb,
     null, 'FULL'
 FROM tenant_ids t
-ON CONFLICT (tenant_id, pack_code, pack_version) DO NOTHING;
+ON CONFLICT (tenant_id, pack_code, pack_version) DO UPDATE SET
+    name = EXCLUDED.name,
+    payload = EXCLUDED.payload,
+    status = EXCLUDED.status;
 
 WITH tenant_ids AS (
     SELECT DISTINCT tenant_id FROM human.human_hr_policy_pack
@@ -36,7 +43,12 @@ SELECT gen_random_uuid(),
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'GLOBAL-BASE' ORDER BY pack_version DESC LIMIT 1),
     'GLOBAL-BASE', 'EU'
 FROM tenant_ids t
-ON CONFLICT (tenant_id, pack_code, pack_version) DO NOTHING;
+ON CONFLICT (tenant_id, pack_code, pack_version) DO UPDATE SET
+    name = EXCLUDED.name,
+    payload = EXCLUDED.payload,
+    status = EXCLUDED.status,
+    parent_pack_id = EXCLUDED.parent_pack_id,
+    parent_pack_code = EXCLUDED.parent_pack_code;
 
 -- Country-specific packs inheriting from EU baseline
 WITH tenant_ids AS (
@@ -61,7 +73,12 @@ CROSS JOIN (
         ('ES', 'ES', 'Spain Localization Pack', '{"leave":{"annual":{"carryOverDays":12}},"payroll":{"benefits":{"vacationBonus":0.05}}}'),
         ('UK', 'UK', 'United Kingdom Localization Pack', '{"leave":{"annual":{"annualLeaveDays":28,"bankHolidaysIncluded":true}},"payroll":{"currency":"GBP","nationalInsurance":{"employee":0.132,"employer":0.138}}}')
 ) AS c(country_code, pack_code, name, payload)
-ON CONFLICT (tenant_id, pack_code, pack_version) DO NOTHING;
+ON CONFLICT (tenant_id, pack_code, pack_version) DO UPDATE SET
+    name = EXCLUDED.name,
+    payload = EXCLUDED.payload,
+    status = EXCLUDED.status,
+    parent_pack_id = EXCLUDED.parent_pack_id,
+    parent_pack_code = EXCLUDED.parent_pack_code;
 
 -- Direct country packs inheriting from GLOBAL
 WITH tenant_ids AS (
@@ -83,7 +100,12 @@ CROSS JOIN (
         ('TR', 'TR', 'Turkey Localization Pack', '{"leave":{"annual":{"probationDays":60}},"payroll":{"currency":"TRY","socialContributions":{"sgkEmployee":0.14,"sgkEmployer":0.205}}}'),
         ('US', 'US', 'United States Localization Pack', '{"leave":{"annual":{"federalHolidaysIncluded":false}},"payroll":{"currency":"USD","federalTax":{"defaultBracket":"2025"}}}')
 ) AS c(country_code, pack_code, name, payload)
-ON CONFLICT (tenant_id, pack_code, pack_version) DO NOTHING;
+ON CONFLICT (tenant_id, pack_code, pack_version) DO UPDATE SET
+    name = EXCLUDED.name,
+    payload = EXCLUDED.payload,
+    status = EXCLUDED.status,
+    parent_pack_id = EXCLUDED.parent_pack_id,
+    parent_pack_code = EXCLUDED.parent_pack_code;
 
 -- Update parent IDs post insert
 DO $$
@@ -114,7 +136,9 @@ INSERT INTO human.human_hr_country_pack_mapping (id, tenant_id, uid, country_cod
 SELECT gen_random_uuid(), t.tenant_id, concat(t.tenant_id::text,'-TR'), 'TR', 'TR',
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'TR' ORDER BY pack_version DESC LIMIT 1)
 FROM tenant_ids t
-ON CONFLICT (tenant_id, country_code) DO NOTHING;
+ON CONFLICT (tenant_id, country_code) DO UPDATE SET
+    pack_code = EXCLUDED.pack_code,
+    pack_id = EXCLUDED.pack_id;
 
 WITH tenant_ids AS (
     SELECT DISTINCT tenant_id FROM human.human_hr_policy_pack
@@ -125,7 +149,9 @@ INSERT INTO human.human_hr_country_pack_mapping (id, tenant_id, uid, country_cod
 SELECT gen_random_uuid(), t.tenant_id, concat(t.tenant_id::text,'-US'), 'US', 'US',
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'US' ORDER BY pack_version DESC LIMIT 1)
 FROM tenant_ids t
-ON CONFLICT (tenant_id, country_code) DO NOTHING;
+ON CONFLICT (tenant_id, country_code) DO UPDATE SET
+    pack_code = EXCLUDED.pack_code,
+    pack_id = EXCLUDED.pack_id;
 
 WITH tenant_ids AS (
     SELECT DISTINCT tenant_id FROM human.human_hr_policy_pack
@@ -136,7 +162,9 @@ INSERT INTO human.human_hr_country_pack_mapping (id, tenant_id, uid, country_cod
 SELECT gen_random_uuid(), t.tenant_id, concat(t.tenant_id::text,'-UK'), 'UK', 'UK',
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'UK' ORDER BY pack_version DESC LIMIT 1)
 FROM tenant_ids t
-ON CONFLICT (tenant_id, country_code) DO NOTHING;
+ON CONFLICT (tenant_id, country_code) DO UPDATE SET
+    pack_code = EXCLUDED.pack_code,
+    pack_id = EXCLUDED.pack_id;
 
 WITH tenant_ids AS (
     SELECT DISTINCT tenant_id FROM human.human_hr_policy_pack
@@ -147,7 +175,9 @@ INSERT INTO human.human_hr_country_pack_mapping (id, tenant_id, uid, country_cod
 SELECT gen_random_uuid(), t.tenant_id, concat(t.tenant_id::text,'-FR'), 'FR', 'FR',
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'FR' ORDER BY pack_version DESC LIMIT 1)
 FROM tenant_ids t
-ON CONFLICT (tenant_id, country_code) DO NOTHING;
+ON CONFLICT (tenant_id, country_code) DO UPDATE SET
+    pack_code = EXCLUDED.pack_code,
+    pack_id = EXCLUDED.pack_id;
 
 WITH tenant_ids AS (
     SELECT DISTINCT tenant_id FROM human.human_hr_policy_pack
@@ -158,7 +188,9 @@ INSERT INTO human.human_hr_country_pack_mapping (id, tenant_id, uid, country_cod
 SELECT gen_random_uuid(), t.tenant_id, concat(t.tenant_id::text,'-DE'), 'DE', 'DE',
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'DE' ORDER BY pack_version DESC LIMIT 1)
 FROM tenant_ids t
-ON CONFLICT (tenant_id, country_code) DO NOTHING;
+ON CONFLICT (tenant_id, country_code) DO UPDATE SET
+    pack_code = EXCLUDED.pack_code,
+    pack_id = EXCLUDED.pack_id;
 
 WITH tenant_ids AS (
     SELECT DISTINCT tenant_id FROM human.human_hr_policy_pack
@@ -169,7 +201,9 @@ INSERT INTO human.human_hr_country_pack_mapping (id, tenant_id, uid, country_cod
 SELECT gen_random_uuid(), t.tenant_id, concat(t.tenant_id::text,'-ES'), 'ES', 'ES',
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'ES' ORDER BY pack_version DESC LIMIT 1)
 FROM tenant_ids t
-ON CONFLICT (tenant_id, country_code) DO NOTHING;
+ON CONFLICT (tenant_id, country_code) DO UPDATE SET
+    pack_code = EXCLUDED.pack_code,
+    pack_id = EXCLUDED.pack_id;
 
 WITH tenant_ids AS (
     SELECT DISTINCT tenant_id FROM human.human_hr_policy_pack
@@ -180,5 +214,7 @@ INSERT INTO human.human_hr_country_pack_mapping (id, tenant_id, uid, country_cod
 SELECT gen_random_uuid(), t.tenant_id, concat(t.tenant_id::text,'-IT'), 'IT', 'IT',
     (SELECT id FROM human.human_hr_policy_pack WHERE tenant_id = t.tenant_id AND pack_code = 'IT' ORDER BY pack_version DESC LIMIT 1)
 FROM tenant_ids t
-ON CONFLICT (tenant_id, country_code) DO NOTHING;
+ON CONFLICT (tenant_id, country_code) DO UPDATE SET
+    pack_code = EXCLUDED.pack_code,
+    pack_id = EXCLUDED.pack_id;
 

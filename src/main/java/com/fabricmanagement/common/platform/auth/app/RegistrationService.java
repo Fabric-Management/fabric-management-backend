@@ -76,9 +76,10 @@ public class RegistrationService {
             return "Your information is not registered. Our representative will contact you.";
         }
 
-        if (authUserRepository.existsByContactValue(request.getContactValue())) {
-            log.warn("Contact already registered: {}",
-                PiiMaskingUtil.maskEmail(request.getContactValue()));
+        // ✅ Check if user already has AuthUser (user-based authentication)
+        if (authUserRepository.existsByUserId(user.getId())) {
+            log.warn("User already registered: userId={}",
+                user.getId());
             return "This account is already registered. Please login.";
         }
 
@@ -124,8 +125,10 @@ public class RegistrationService {
 
         String passwordHash = passwordEncoder.encode(request.getPassword());
 
+        // ✅ Create AuthUser for User (user-based authentication)
+        // Multi-contact login supported: Any verified contact of this User can be used for login
         AuthUser authUser = AuthUser.create(
-            contact.getId(),
+            user.getId(),
             passwordHash
         );
         authUser.setTenantId(user.getTenantId());

@@ -100,11 +100,12 @@ public class PasswordSetupService {
         UserDto user = userFacade.findByContactValue(token.getContactValue())
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        if (authUserRepository.existsByContactValue(token.getContactValue())) {
+        // ✅ Check if user already has AuthUser (user-based authentication)
+        if (authUserRepository.existsByUserId(user.getId())) {
             throw new IllegalArgumentException("User already has password set");
         }
 
-        // Reload User entity with contacts for verified contact check
+        // Reload User entity with contacts/departments for JWT generation
         com.fabricmanagement.common.platform.user.domain.User userEntity = 
             userRepository.findByTenantIdAndContactValue(user.getTenantId(), token.getContactValue())
                 .orElseGet(() -> 
@@ -112,57 +113,46 @@ public class PasswordSetupService {
                         .orElseThrow(() -> new IllegalArgumentException("User entity not found"))
                 );
 
-        // Get any verified contact (any verified contact = authentication contact)
-        UUID contactId;
-        boolean contactWasRecovered = false;
-        com.fabricmanagement.common.platform.user.domain.User userEntityForJwt = userEntity;
+        // ✅ Ensure user has at least one verified contact (for multi-contact login support)
+        // Any verified contact can be used for login with user-based AuthUser
+        UUID userEntityTenantId = userEntity.getTenantId();
+        UUID userEntityId = userEntity.getId();
         
-        if (userEntity.getAnyVerifiedContact().isPresent()) {
-            contactId = userEntity.getAnyVerifiedContact().get().getId();
-        } else {
-            contactId = ensureAuthenticationContact(
-                userEntity.getTenantId(), 
-                userEntity.getId(), 
+        if (userEntity.getAnyVerifiedContact().isEmpty()) {
+            ensureAuthenticationContact(
+                userEntityTenantId, 
+                userEntityId, 
                 token.getContactValue()
             );
-            contactWasRecovered = true;
-            // Flush to persist changes and clear cache to force fresh load
-            userRepository.flush();
-            entityManager.clear(); // Clear entire persistence context
-            // Reload user entity after contact recovery to get updated contacts
-            userEntityForJwt = userRepository.findByTenantIdAndContactValue(
-                userEntity.getTenantId(), 
+            // Reload user entity after contact recovery
+            entityManager.clear();
+            userEntity = userRepository.findByTenantIdAndContactValue(
+                userEntityTenantId, 
                 token.getContactValue()
             ).orElseGet(() -> 
-                userRepository.findByTenantIdAndId(userEntity.getTenantId(), userEntity.getId())
+                userRepository.findByTenantIdAndId(userEntityTenantId, userEntityId)
                     .orElseThrow(() -> new IllegalArgumentException("User entity not found"))
             );
         }
 
-        // Check if AuthUser already exists for this contact
-        if (authUserRepository.existsByContactId(contactId)) {
-            throw new IllegalArgumentException("User already has password set");
-        }
-
-        // Create AuthUser with Contact entity (new system)
+        // ✅ Create single AuthUser for User (user-based authentication)
+        // Multi-contact login supported: Any verified contact of this User can be used for login
         String passwordHash = passwordEncoder.encode(request.getPassword());
-        AuthUser authUser = AuthUser.create(contactId, passwordHash);
+        
+        // ✅ Create AuthUser for User (one AuthUser per User)
+        AuthUser authUser = AuthUser.create(user.getId(), passwordHash);
         authUser.setTenantId(user.getTenantId());
         authUser.verify();
+        
         authUserRepository.save(authUser);
+        log.info("✅ Password setup: Created AuthUser for user: userId={}", user.getId());
 
         token.markAsUsed();
         tokenRepository.save(token);
 
-        // Reload User entity with contacts/departments for JWT generation
-        // If contact was recovered, userEntityForJwt already has fresh data
-        com.fabricmanagement.common.platform.user.domain.User freshUserEntity = contactWasRecovered 
-            ? userEntityForJwt  // Already reloaded after recovery
-            : userRepository.findByTenantIdAndContactValue(user.getTenantId(), token.getContactValue())
-                .orElseGet(() -> 
-                    userRepository.findByTenantIdAndId(user.getTenantId(), user.getId())
-                        .orElseThrow(() -> new IllegalArgumentException("User not found"))
-                );
+        // User entity already loaded with contacts/departments for JWT generation
+        // If contact was recovered, userEntity was reloaded above
+        com.fabricmanagement.common.platform.user.domain.User freshUserEntity = userEntity;
 
         String accessToken = jwtService.generateAccessToken(freshUserEntity);
         String refreshToken = jwtService.generateRefreshToken(freshUserEntity);
