@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.communication.domain.EmailOutbox;
 import com.fabricmanagement.common.platform.communication.domain.EmailOutboxStatus;
 import com.fabricmanagement.common.platform.communication.domain.strategy.EmailStrategy;
@@ -11,6 +12,7 @@ import io.micrometer.core.instrument.Counter;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -134,7 +136,12 @@ public class EmailOutboxService {
             log.info("📧 Processing {} pending email(s) (total pending: {})", pendingEmails.size(), pendingCount);
 
             for (EmailOutbox email : pendingEmails) {
-                processEmail(email);
+                var tenantId = email.getTenantId();
+                try {
+                    TenantContext.executeInTenantContext(tenantId, () -> processEmail(email));
+                } catch (ObjectOptimisticLockingFailureException optimisticLockException) {
+                    log.warn("⚠️ Skipping email due to concurrent update: emailId={}", email.getId());
+                }
             }
 
         } catch (Exception e) {
@@ -166,6 +173,8 @@ public class EmailOutboxService {
             log.info("✅ Email sent successfully: recipient={}, retryCount={}", 
                 PiiMaskingUtil.maskEmail(email.getRecipient()), email.getRetryCount());
 
+        } catch (ObjectOptimisticLockingFailureException optimisticLockException) {
+            log.warn("⚠️ Concurrent update detected while processing email: emailId={}", email.getId());
         } catch (Exception e) {
             // Failure - mark as failed and schedule retry
             String errorMsg = e.getMessage();

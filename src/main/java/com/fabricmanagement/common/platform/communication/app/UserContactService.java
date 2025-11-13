@@ -174,5 +174,18 @@ public class UserContactService {
         return userContactRepository.findByUserIdAndContactId(userId, contactId)
             .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
     }
+
+    /**
+     * Get all user contacts for a specific contact ID (find users who have this contact).
+     * 
+     * @param contactId Contact ID
+     * @return List of UserContact assignments
+     */
+    @Transactional(readOnly = true)
+    public List<UserContact> getUserContactsByContactId(UUID contactId) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Finding user contacts by contactId: tenantId={}, contactId={}", tenantId, contactId);
+        return userContactRepository.findByTenantIdAndContactId(tenantId, contactId);
+    }
 }
 

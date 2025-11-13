@@ -5,7 +5,9 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.mail.MailProperties;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -13,6 +15,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 /**
  * Email verification strategy - Priority 2.
@@ -25,12 +28,32 @@ import org.springframework.stereotype.Component;
 public class EmailStrategy implements VerificationStrategy {
 
     private final JavaMailSender mailSender;
+    private final MailProperties mailProperties;
 
     @Value("${application.mail.from-email}")
     private String fromEmail;
 
     @Value("${application.mail.from-name}")
     private String fromName;
+
+    @PostConstruct
+    void initializeFromAddress() {
+        // Priority: 1) application.mail.from-email, 2) mail.smtp.from, 3) mail.username
+        if (!StringUtils.hasText(fromEmail)) {
+            fromEmail = mailProperties.getProperties().getOrDefault("mail.smtp.from", mailProperties.getUsername());
+        }
+        if (!StringUtils.hasText(fromEmail)) {
+            fromEmail = mailProperties.getUsername();
+        }
+        if (!StringUtils.hasText(fromEmail)) {
+            throw new IllegalStateException("❌ CRITICAL: Mail from email is not configured. Set MAIL_FROM_EMAIL or MAIL_USERNAME in environment.");
+        }
+        if (!StringUtils.hasText(fromName)) {
+            fromName = "Fabric Management";
+        }
+        log.info("✅ EmailStrategy initialized → From: {} <{}> | SMTP: {}:{}", 
+            fromName, fromEmail, mailProperties.getHost(), mailProperties.getPort());
+    }
 
     @Override
     public void sendVerificationCode(String recipient, String code) {
@@ -79,7 +102,8 @@ public class EmailStrategy implements VerificationStrategy {
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            // ✅ CRITICAL: multipart=false (no attachments) - prevents multipart/related encoding issues
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, "UTF-8");
             
             helper.setFrom(String.format("%s <%s>", fromName, fromEmail));
             helper.setTo(recipient);
@@ -89,18 +113,21 @@ public class EmailStrategy implements VerificationStrategy {
             // ✅ Reply-to header (Hotmail/Outlook requirement)
             helper.setReplyTo(fromEmail, fromName + " Support");
             
-            // ✅ Spam prevention headers for better deliverability (especially Hotmail/Outlook)
+            // ✅ Deliverability headers (prevent spam folder)
+            mimeMessage.setHeader("X-Mailer", "FabricOS");
+            mimeMessage.setHeader("X-Priority", "1"); // High priority (transactional)
+            mimeMessage.setHeader("Importance", "High");
+            mimeMessage.setHeader("Message-ID", generateMessageId());
+            
+            // ✅ Anti-spam headers (Gmail/Outlook requirement)
             mimeMessage.setHeader("List-Unsubscribe", "<mailto:" + fromEmail + "?subject=Unsubscribe>");
             mimeMessage.setHeader("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
-            mimeMessage.setHeader("X-Auto-Response-Suppress", "All");
-            mimeMessage.setHeader("Precedence", "bulk");
             
-            // ✅ Priority header (High = transactional emails)
-            mimeMessage.setHeader("X-Priority", "1");
-            mimeMessage.setHeader("Importance", "High");
+            // ✅ Auto-Submitted header (prevents auto-replies and marks as transactional)
+            mimeMessage.setHeader("Auto-Submitted", "auto-generated");
             
-            // ✅ Message-ID for tracking
-            mimeMessage.setHeader("Message-ID", generateMessageId());
+            // ✅ Return-Path header (for bounce handling - SMTP server will set this, but we set it explicitly)
+            mimeMessage.setHeader("Return-Path", fromEmail);
 
             mailSender.send(mimeMessage);
 
