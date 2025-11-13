@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.company.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.util.DuplicateValidator;
 import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.domain.Department;
 import com.fabricmanagement.common.platform.company.domain.DepartmentCategory;
@@ -21,7 +22,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -88,10 +91,15 @@ public class UserCreationOptionsService {
         List<DepartmentCategory> tenantCategories = departmentCategoryRepository
             .findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(tenantId);
         
+        log.debug("Department categories: system={}, tenant={}", 
+            systemCategories.size(), tenantCategories.size());
+        
         // Combine: system categories (reference) + tenant-specific categories
         List<DepartmentCategory> allCategories = new java.util.ArrayList<>();
         allCategories.addAll(systemCategories);
         allCategories.addAll(tenantCategories);
+        
+        log.debug("Total categories after merge: {}", allCategories.size());
         
         // Get departments by tenant (optimized query)
         List<Department> departments = departmentRepository.findByTenantIdAndIsActiveTrue(tenantId);
@@ -117,6 +125,26 @@ public class UserCreationOptionsService {
 
         log.debug("User creation options: roles={}, categories={}, departments={}, positions={}", 
             roleDtos.size(), categoryDtos.size(), departmentDtos.size(), positionDtos.size());
+
+        // ✅ Validate for duplicates (non-blocking, logs warnings)
+        // Note: Positions can have the same name across different departments (e.g., "Forklift Operator" 
+        // in both Shipping and Fiber departments), so we validate by (departmentId + positionName) combination
+        Map<String, Boolean> validations = new HashMap<>();
+        validations.put("roles", DuplicateValidator.validateAndLog(roleDtos, 
+            role -> role.getRoleName() != null ? role.getRoleName() : "", "roles"));
+        validations.put("departmentCategories", DuplicateValidator.validateAndLog(categoryDtos, 
+            cat -> cat.getCategoryName() != null ? cat.getCategoryName() : "", "departmentCategories"));
+        validations.put("departments", DuplicateValidator.validateAndLog(departmentDtos, 
+            dept -> dept.getDepartmentName() != null ? dept.getDepartmentName() : "", "departments"));
+        validations.put("positions", DuplicateValidator.validateAndLog(positionDtos, 
+            pos -> {
+                // Use (departmentId + positionName) as key to allow same position name in different departments
+                String deptId = pos.getDepartmentId() != null ? pos.getDepartmentId().toString() : "null";
+                String posName = pos.getPositionName() != null ? pos.getPositionName() : "";
+                return deptId + "::" + posName;
+            }, "positions"));
+        
+        DuplicateValidator.validateAll(validations);
 
         return UserCreationOptionsDto.builder()
             .roles(roleDtos)
