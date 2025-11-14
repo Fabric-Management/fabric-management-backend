@@ -1,10 +1,14 @@
 package com.fabricmanagement.common.platform.communication.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.platform.communication.app.AddressContactService;
 import com.fabricmanagement.common.platform.communication.app.AddressService;
 import com.fabricmanagement.common.platform.communication.app.CompanyAddressService;
 import com.fabricmanagement.common.platform.communication.domain.Address;
+import com.fabricmanagement.common.platform.communication.domain.AddressContact;
 import com.fabricmanagement.common.platform.communication.domain.CompanyAddress;
+import com.fabricmanagement.common.platform.communication.dto.AddressContactDto;
+import com.fabricmanagement.common.platform.communication.dto.AssignAddressContactRequest;
 import com.fabricmanagement.common.platform.communication.dto.AssignAddressRequest;
 import com.fabricmanagement.common.platform.communication.dto.CompanyAddressDto;
 import com.fabricmanagement.common.platform.communication.dto.CreateAddressRequest;
@@ -26,6 +30,7 @@ public class CompanyAddressController {
 
     private final CompanyAddressService companyAddressService;
     private final AddressService addressService;
+    private final AddressContactService addressContactService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<CompanyAddressDto>>> getCompanyAddresses(@PathVariable UUID companyId) {
@@ -150,6 +155,103 @@ public class CompanyAddressController {
         companyAddressService.removeAddress(companyId, addressId);
 
         return ResponseEntity.ok(ApiResponse.success(null, "Address removed successfully"));
+    }
+
+    // =========================================================================
+    // ADDRESS CONTACT ENDPOINTS
+    // =========================================================================
+
+    @GetMapping("/{addressId}/contacts")
+    public ResponseEntity<ApiResponse<List<AddressContactDto>>> getAddressContacts(
+            @PathVariable UUID companyId,
+            @PathVariable UUID addressId) {
+        log.debug("Getting contacts for company address: companyId={}, addressId={}", companyId, addressId);
+
+        List<AddressContactDto> contacts = companyAddressService.getAddressContacts(companyId, addressId)
+            .stream()
+            .map(AddressContactDto::from)
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.success(contacts));
+    }
+
+    @GetMapping("/{addressId}/contacts/primary")
+    public ResponseEntity<ApiResponse<AddressContactDto>> getPrimaryContact(
+            @PathVariable UUID companyId,
+            @PathVariable UUID addressId) {
+        log.debug("Getting primary contact for company address: companyId={}, addressId={}", companyId, addressId);
+
+        AddressContact primaryContact = companyAddressService.getPrimaryContact(companyId, addressId)
+            .orElseThrow(() -> new IllegalArgumentException("No primary contact found for this address"));
+
+        return ResponseEntity.ok(ApiResponse.success(AddressContactDto.from(primaryContact)));
+    }
+
+    @PostMapping("/{addressId}/contacts")
+    public ResponseEntity<ApiResponse<AddressContactDto>> assignContact(
+            @PathVariable UUID companyId,
+            @PathVariable UUID addressId,
+            @Valid @RequestBody AssignAddressContactRequest request) {
+        log.info("Assigning contact to company address: companyId={}, addressId={}, contactId={}, isPrimary={}",
+            companyId, addressId, request.getContactId(), request.getIsPrimary());
+
+        // Verify address belongs to company
+        companyAddressService.getCompanyAddresses(companyId).stream()
+            .filter(ca -> ca.getAddressId().equals(addressId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Address is not assigned to this company"));
+
+        AddressContact addressContact = addressContactService.assignContact(
+            addressId,
+            request.getContactId(),
+            request.getIsPrimary(),
+            request.getLabel()
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(
+            AddressContactDto.from(addressContact),
+            "Contact assigned to address successfully"
+        ));
+    }
+
+    @PutMapping("/{addressId}/contacts/{contactId}/primary")
+    public ResponseEntity<ApiResponse<AddressContactDto>> setContactAsPrimary(
+            @PathVariable UUID companyId,
+            @PathVariable UUID addressId,
+            @PathVariable UUID contactId) {
+        log.info("Setting primary contact: companyId={}, addressId={}, contactId={}", companyId, addressId, contactId);
+
+        // Verify address belongs to company
+        companyAddressService.getCompanyAddresses(companyId).stream()
+            .filter(ca -> ca.getAddressId().equals(addressId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Address is not assigned to this company"));
+
+        AddressContact addressContact = addressContactService.setAsPrimary(addressId, contactId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+            AddressContactDto.from(addressContact),
+            "Primary contact set successfully"
+        ));
+    }
+
+    @DeleteMapping("/{addressId}/contacts/{contactId}")
+    public ResponseEntity<ApiResponse<Void>> removeContact(
+            @PathVariable UUID companyId,
+            @PathVariable UUID addressId,
+            @PathVariable UUID contactId) {
+        log.info("Removing contact from company address: companyId={}, addressId={}, contactId={}", 
+            companyId, addressId, contactId);
+
+        // Verify address belongs to company
+        companyAddressService.getCompanyAddresses(companyId).stream()
+            .filter(ca -> ca.getAddressId().equals(addressId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Address is not assigned to this company"));
+
+        addressContactService.removeContact(addressId, contactId);
+
+        return ResponseEntity.ok(ApiResponse.success(null, "Contact removed from address successfully"));
     }
 }
 

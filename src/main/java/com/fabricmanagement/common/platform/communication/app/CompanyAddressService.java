@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.platform.communication.domain.AddressContact;
 import com.fabricmanagement.common.platform.communication.domain.CompanyAddress;
 import com.fabricmanagement.common.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.common.platform.communication.infra.repository.CompanyAddressRepository;
@@ -35,6 +36,7 @@ public class CompanyAddressService {
     private final CompanyRepository companyRepository;
     private final AddressRepository addressRepository;
     private final CompanyAddressRepository companyAddressRepository;
+    private final AddressContactService addressContactService;
 
     @Transactional(readOnly = true)
     public List<CompanyAddress> getCompanyAddresses(UUID companyId) {
@@ -157,6 +159,38 @@ public class CompanyAddressService {
 
         companyAddress.setAsHeadquarters();
         return companyAddressRepository.save(companyAddress);
+    }
+
+    /**
+     * Get contacts for a company address.
+     */
+    @Transactional(readOnly = true)
+    public List<AddressContact> getAddressContacts(UUID companyId, UUID addressId) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Finding contacts for company address: tenantId={}, companyId={}, addressId={}", 
+            tenantId, companyId, addressId);
+
+        // Verify address belongs to company
+        companyAddressRepository.findByCompanyIdAndAddressId(companyId, addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Address is not assigned to this company"));
+
+        return addressContactService.getAddressContacts(addressId);
+    }
+
+    /**
+     * Get primary contact for a company address.
+     */
+    @Transactional(readOnly = true)
+    public Optional<AddressContact> getPrimaryContact(UUID companyId, UUID addressId) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.trace("Finding primary contact for company address: tenantId={}, companyId={}, addressId={}", 
+            tenantId, companyId, addressId);
+
+        // Verify address belongs to company
+        companyAddressRepository.findByCompanyIdAndAddressId(companyId, addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Address is not assigned to this company"));
+
+        return addressContactService.getPrimaryContact(addressId);
     }
 }
 
