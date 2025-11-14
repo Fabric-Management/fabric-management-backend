@@ -690,27 +690,6 @@ public class TenantOnboardingService {
     }
 
     /**
-     * @deprecated Role seeding is no longer used. All tenants use platform-level roles from system tenant.
-     * Roles are seeded via migration V013 and are shared across all tenants.
-     */
-    @Deprecated
-    private void seedDefaultRolesForTenant(UUID tenantId) {
-        log.warn("⚠️ seedDefaultRolesForTenant() is deprecated and should not be called. " +
-            "All tenants use platform-level roles from system tenant.");
-        // Method kept for backward compatibility but does nothing
-    }
-
-    /**
-     * @deprecated Role seeding is no longer used. All tenants use platform-level roles from system tenant.
-     */
-    @Deprecated
-    private void createDefaultRole(UUID tenantId, String roleName, String roleCode, String description) {
-        log.warn("⚠️ createDefaultRole() is deprecated and should not be called. " +
-            "All tenants use platform-level roles from system tenant.");
-        // Method kept for backward compatibility but does nothing
-    }
-
-    /**
      * Get OS display name.
      */
     private String getOsName(String osCode) {

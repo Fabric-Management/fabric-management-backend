@@ -111,10 +111,22 @@ COMMENT ON COLUMN common_company.common_department.is_system_department IS 'Syst
 -- ============================================================================
 -- ALTER: Add foreign key constraint for role_id (column already exists in V003)
 -- ============================================================================
-ALTER TABLE common_user.common_user
-ADD CONSTRAINT IF NOT EXISTS fk_user_role 
-    FOREIGN KEY (role_id) 
-    REFERENCES common_company.common_role(id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        JOIN pg_namespace n ON t.relnamespace = n.oid
+        WHERE c.conname = 'fk_user_role'
+        AND n.nspname = 'common_user'
+        AND t.relname = 'common_user'
+    ) THEN
+        ALTER TABLE common_user.common_user
+        ADD CONSTRAINT fk_user_role 
+            FOREIGN KEY (role_id) 
+            REFERENCES common_company.common_role(id);
+    END IF;
+END $$;
 
 -- ============================================================================
 -- TABLE: common_user_department (Junction table)

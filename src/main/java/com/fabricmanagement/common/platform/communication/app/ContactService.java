@@ -5,8 +5,6 @@ import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.infra.repository.ContactRepository;
-import com.fabricmanagement.common.platform.auth.domain.AuthUser;
-import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.util.PhoneValidationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,8 +38,6 @@ public class ContactService {
     private static final Pattern EXTENSION_PATTERN = Pattern.compile("^[0-9]{1,10}$");
 
     private final ContactRepository contactRepository;
-    private final UserContactService userContactService;
-    private final AuthUserRepository authUserRepository;
 
     @Transactional
     public Contact createContact(String contactValue, ContactType contactType,
@@ -180,8 +176,8 @@ public class ContactService {
         contact.verify();
         Contact savedContact = contactRepository.save(contact);
         
-        // ✅ If user has password, create AuthUser for this verified contact (multi-contact login support)
-        createAuthUserForVerifiedContactIfUserHasPassword(savedContact);
+        // Note: With user-based authentication, AuthUser is linked to User, not Contact.
+        // All verified contacts of a user can login using the user's AuthUser.
         
         return savedContact;
     }
@@ -345,68 +341,6 @@ public class ContactService {
             return ContactType.LANDLINE;
         }
         throw new DomainException("Unable to infer contact type from value: " + trimmed);
-    }
-
-    /**
-     * Create AuthUser for verified contact if user has password (multi-contact login support).
-     * 
-     * <p>When a contact is verified, if the user already has a password (any AuthUser exists),
-     * create AuthUser for this contact so user can login with any verified contact.</p>
-     * 
-     * <p>Same password is used for all contacts (password hash is copied from existing AuthUser).</p>
-     */
-    private void createAuthUserForVerifiedContactIfUserHasPassword(Contact contact) {
-        try {
-            // Find user who owns this contact
-            List<com.fabricmanagement.common.platform.communication.domain.UserContact> userContacts = 
-                userContactService.getUserContactsByContactId(contact.getId());
-            
-            if (userContacts.isEmpty()) {
-                log.debug("Contact not assigned to any user, skipping AuthUser creation: contactId={}", 
-                    contact.getId());
-                return;
-            }
-            
-            UUID userId = userContacts.get(0).getUserId();
-            
-            // ✅ Batch check: Get all user contact IDs and check if any have AuthUser
-            List<com.fabricmanagement.common.platform.communication.domain.UserContact> allUserContacts = 
-                userContactService.getUserContacts(userId);
-            
-            List<UUID> allContactIds = allUserContacts.stream()
-                .map(com.fabricmanagement.common.platform.communication.domain.UserContact::getContactId)
-                .toList();
-            
-            // ✅ Batch load: Get first existing AuthUser (if any) to copy password hash
-            Optional<AuthUser> existingAuthUser = allContactIds.isEmpty()
-                ? Optional.empty()
-                : authUserRepository.findAllByContactIdIn(allContactIds).stream()
-                    .findFirst();
-            
-            if (existingAuthUser.isPresent()) {
-                // User has password - create AuthUser for this verified contact
-                if (!authUserRepository.existsByContactId(contact.getId())) {
-                    AuthUser newAuthUser = AuthUser.create(
-                        contact.getId(),
-                        existingAuthUser.get().getPasswordHash() // Same password hash
-                    );
-                    newAuthUser.setTenantId(contact.getTenantId());
-                    newAuthUser.verify(); // Contact is verified, so AuthUser is verified
-                    authUserRepository.save(newAuthUser);
-                    
-                    log.info("✅ AuthUser created for verified contact (multi-contact login): " +
-                        "contactId={}, contactValue={}, userId={}",
-                        contact.getId(), maskContactValue(contact.getContactValue()), userId);
-                }
-            } else {
-                log.debug("User has no password yet, skipping AuthUser creation: userId={}, contactId={}", 
-                    userId, contact.getId());
-            }
-        } catch (Exception e) {
-            // Don't fail contact verification if AuthUser creation fails
-            log.warn("Failed to create AuthUser for verified contact: contactId={}, error={}", 
-                contact.getId(), e.getMessage());
-        }
     }
 
     /**
