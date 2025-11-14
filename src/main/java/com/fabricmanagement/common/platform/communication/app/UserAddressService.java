@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.platform.communication.domain.AddressContact;
 import com.fabricmanagement.common.platform.communication.domain.UserAddress;
 import com.fabricmanagement.common.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.common.platform.communication.infra.repository.UserAddressRepository;
@@ -35,6 +36,7 @@ public class UserAddressService {
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private final UserAddressRepository userAddressRepository;
+    private final AddressContactService addressContactService;
 
     @Transactional(readOnly = true)
     public List<UserAddress> getUserAddresses(UUID userId) {
@@ -126,6 +128,38 @@ public class UserAddressService {
 
         userAddress.setAsPrimary();
         return userAddressRepository.save(userAddress);
+    }
+
+    /**
+     * Get contacts for a user address.
+     */
+    @Transactional(readOnly = true)
+    public List<AddressContact> getAddressContacts(UUID userId, UUID addressId) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.debug("Finding contacts for user address: tenantId={}, userId={}, addressId={}", 
+            tenantId, userId, addressId);
+
+        // Verify address belongs to user
+        userAddressRepository.findByUserIdAndAddressId(userId, addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Address is not assigned to this user"));
+
+        return addressContactService.getAddressContacts(addressId);
+    }
+
+    /**
+     * Get primary contact for a user address.
+     */
+    @Transactional(readOnly = true)
+    public Optional<AddressContact> getPrimaryContact(UUID userId, UUID addressId) {
+        UUID tenantId = TenantContext.getCurrentTenantId();
+        log.trace("Finding primary contact for user address: tenantId={}, userId={}, addressId={}", 
+            tenantId, userId, addressId);
+
+        // Verify address belongs to user
+        userAddressRepository.findByUserIdAndAddressId(userId, addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Address is not assigned to this user"));
+
+        return addressContactService.getPrimaryContact(addressId);
     }
 }
 

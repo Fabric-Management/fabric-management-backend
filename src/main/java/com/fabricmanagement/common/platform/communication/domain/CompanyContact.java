@@ -13,6 +13,16 @@ import java.util.UUID;
  * <p>Represents the relationship between a Company and their Contact information.
  * Supports multiple contacts per company (main phone, fax, email, website, etc.).</p>
  *
+ * <p><b>⚠️ IMPORTANT:</b> This is for <b>company-wide and department-specific contacts</b>.
+ * For <b>address-specific contacts</b> (e.g., warehouse phone, branch office email),
+ * use {@link AddressContact} instead.</p>
+ *
+ * <h2>When to Use CompanyContact vs AddressContact:</h2>
+ * <ul>
+ *   <li><b>CompanyContact:</b> Company-wide default contact, department contacts (Sales, Support)</li>
+ *   <li><b>AddressContact:</b> Location-specific contacts tied to a physical address</li>
+ * </ul>
+ *
  * <h2>Key Features:</h2>
  * <ul>
  *   <li>✅ Multiple contacts per company</li>

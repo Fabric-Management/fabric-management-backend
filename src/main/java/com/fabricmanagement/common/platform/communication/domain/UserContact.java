@@ -13,11 +13,21 @@ import java.util.UUID;
  * <p>Represents the relationship between a User and their Contact information.
  * Supports multiple contacts per user (personal email, work email, phone, etc.).</p>
  *
+ * <p><b>⚠️ IMPORTANT:</b> This is for <b>user-level contacts</b> (authentication, notifications).
+ * For <b>address-specific contacts</b> (e.g., warehouse phone, branch office email),
+ * use {@link AddressContact} instead.</p>
+ *
+ * <h2>When to Use UserContact vs AddressContact:</h2>
+ * <ul>
+ *   <li><b>UserContact:</b> User's personal/work contacts for authentication and notifications</li>
+ *   <li><b>AddressContact:</b> Location-specific contacts tied to a physical address</li>
+ * </ul>
+ *
  * <h2>Key Features:</h2>
  * <ul>
  *   <li>✅ Multiple contacts per user</li>
  *   <li>✅ Default contact for notifications</li>
- *   <li>✅ Authentication contact flag</li>
+ *   <li>✅ Authentication contact (any verified contact can be used for login)</li>
  *   <li>✅ Personal vs. company-provided distinction</li>
  * </ul>
  *
