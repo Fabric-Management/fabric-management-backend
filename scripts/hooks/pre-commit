@@ -1,17 +1,22 @@
 #!/bin/bash
+# =============================================================================
+# PRE-COMMIT HOOK: Migration-Entity Consistency Check
+# =============================================================================
+# Ensures migrations and entities stay in sync before commit
 #
-# Pre-commit hook: Migration-Entity Consistency Check
-# Ensures migrations and entities stay in sync
-#
+# Last Updated: 2025-01-27
 
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-GREEN='\033[0;32m'
-NC='\033[0m'
+set -euo pipefail
+
+# Colors
+readonly RED='\033[0;31m'
+readonly YELLOW='\033[1;33m'
+readonly GREEN='\033[0;32m'
+readonly NC='\033[0m'
 
 # Get staged files
-STAGED_MIGRATIONS=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'db/migration/.*\.sql$')
-STAGED_ENTITIES=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'src/main/java/.*/domain/.*\.java$')
+readonly STAGED_MIGRATIONS=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'db/migration/.*\.sql$' || true)
+readonly STAGED_ENTITIES=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'src/main/java/.*/domain/.*\.java$' || true)
 
 # Check if migrations are staged
 if [ -n "$STAGED_MIGRATIONS" ]; then
