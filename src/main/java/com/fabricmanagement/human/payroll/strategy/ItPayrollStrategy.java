@@ -8,9 +8,8 @@ import org.springframework.stereotype.Component;
 @Order(Ordered.LOWEST_PRECEDENCE - 102)
 public class ItPayrollStrategy extends EuPayrollStrategy {
 
-    @Override
-    public boolean supports(String countryCode) {
-        return "IT".equalsIgnoreCase(countryCode);
-    }
+  @Override
+  public boolean supports(String countryCode) {
+    return "IT".equalsIgnoreCase(countryCode);
+  }
 }
-

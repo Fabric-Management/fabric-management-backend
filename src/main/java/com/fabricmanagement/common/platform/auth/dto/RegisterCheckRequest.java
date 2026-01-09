@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RegisterCheckRequest {
 
-    @NotBlank(message = "Contact value is required")
-    private String contactValue;
+  @NotBlank(message = "Contact value is required")
+  private String contactValue;
 }
-

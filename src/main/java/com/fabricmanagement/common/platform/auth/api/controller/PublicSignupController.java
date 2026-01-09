@@ -17,92 +17,92 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-    /**
-     * Public Signup Controller - Self-service tenant registration.
-     *
-     * <p><b>Public endpoints</b> - No authentication required</p>
-     *
-     * <p>Used by users signing up from the website.</p>
-     *
-     * <h2>Flow:</h2>
-     * <pre>
-     * 1. POST /api/public/signup
-     *    → Creates tenant + company + admin user
-     *    → Sends email with setup link (token only)
-     *
-     * 2. User clicks email link
-     *    → Redirects to /setup?token=xyz
-     *    → Email verified by click (no verification code needed)
-     *
-     * 3. User sets password
-     *    → POST /api/auth/setup-password (token + password only)
-     *    → Auto-login → Dashboard (onboarding wizard if needed)
-     * </pre>
-     *
-     * <p><b>Note:</b> Verification codes are NOT used in self-service signup.
-     * Email link click = email verified. Verification codes are only used
-     * for unverified contacts during login flows.</p>
-     */
+/**
+ * Public Signup Controller - Self-service tenant registration.
+ *
+ * <p><b>Public endpoints</b> - No authentication required
+ *
+ * <p>Used by users signing up from the website.
+ *
+ * <h2>Flow:</h2>
+ *
+ * <pre>
+ * 1. POST /api/public/signup
+ *    → Creates tenant + company + admin user
+ *    → Sends email with setup link (token only)
+ *
+ * 2. User clicks email link
+ *    → Redirects to /setup?token=xyz
+ *    → Email verified by click (no verification code needed)
+ *
+ * 3. User sets password
+ *    → POST /api/auth/setup-password (token + password only)
+ *    → Auto-login → Dashboard (onboarding wizard if needed)
+ * </pre>
+ *
+ * <p><b>Note:</b> Verification codes are NOT used in self-service signup. Email link click = email
+ * verified. Verification codes are only used for unverified contacts during login flows.
+ */
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
 @Slf4j
 public class PublicSignupController {
 
-    private final TenantOnboardingService onboardingService;
-    private final NotificationService notificationService;
-    private final EmailTemplateRenderer emailTemplateRenderer;
-    private final FrontendUrlProvider frontendUrlProvider;
+  private final TenantOnboardingService onboardingService;
+  private final NotificationService notificationService;
+  private final EmailTemplateRenderer emailTemplateRenderer;
+  private final FrontendUrlProvider frontendUrlProvider;
 
-    /**
-     * Self-service signup - Creates new tenant from public website.
-     *
-     * @param request Self signup request
-     * @return Onboarding response (without sensitive data)
-     */
-    @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<String>> signup(@Valid @RequestBody SelfSignupRequest request) {
-        
-        log.info("Public signup request: company={}, email={}",
-            request.getCompanyName(),
-            PiiMaskingUtil.maskEmail(request.getEmail()));
+  /**
+   * Self-service signup - Creates new tenant from public website.
+   *
+   * @param request Self signup request
+   * @return Onboarding response (without sensitive data)
+   */
+  @PostMapping("/signup")
+  public ResponseEntity<ApiResponse<String>> signup(@Valid @RequestBody SelfSignupRequest request) {
 
-        TenantOnboardingResponse response = onboardingService.createSelfServiceTenant(request);
+    log.info(
+        "Public signup request: company={}, email={}",
+        request.getCompanyName(),
+        PiiMaskingUtil.maskEmail(request.getEmail()));
 
-        sendSelfServiceWelcomeEmail(
-            request.getEmail(),
-            request.getFirstName(),
-            response.getCompanyName(),
-            response.getRegistrationToken()
-        );
+    TenantOnboardingResponse response = onboardingService.createSelfServiceTenant(request);
 
-        log.info("✅ Self-service signup completed: companyUid={}, email sent with setup link",
-            response.getCompanyUid());
+    sendSelfServiceWelcomeEmail(
+        request.getEmail(),
+        request.getFirstName(),
+        response.getCompanyName(),
+        response.getRegistrationToken());
 
-        return ResponseEntity.ok(ApiResponse.success(
+    log.info(
+        "✅ Self-service signup completed: companyUid={}, email sent with setup link",
+        response.getCompanyUid());
+
+    return ResponseEntity.ok(
+        ApiResponse.success(
             "Welcome! Check your email to complete registration.",
-            "Registration initiated successfully"
-        ));
-    }
+            "Registration initiated successfully"));
+  }
 
-    /**
-     * Send self-service welcome email with setup link.
-     * 
-     * <p>Note: No verification code needed - email link click is sufficient verification.
-     * Verification codes are only used for unverified contacts during login flows.</p>
-     */
-    private void sendSelfServiceWelcomeEmail(String email, String firstName, String companyName, String token) {
-        String setupUrl = frontendUrlProvider.buildUrl("/setup?token=" + token);
-        String subject = "Complete Your FabricOS Registration";
-        
-        // Smart renderer: Uses frontend templates with backend fallback
-        // Frontend templates prioritized for better UX (design system consistency)
-        String message = emailTemplateRenderer.renderSetupPassword(firstName, companyName, email, setupUrl);
-        
-        // Use sync to ensure email is queued before response (transaction commit)
-        notificationService.sendNotificationSync(email, subject, message);
-    }
-    
-    
+  /**
+   * Send self-service welcome email with setup link.
+   *
+   * <p>Note: No verification code needed - email link click is sufficient verification.
+   * Verification codes are only used for unverified contacts during login flows.
+   */
+  private void sendSelfServiceWelcomeEmail(
+      String email, String firstName, String companyName, String token) {
+    String setupUrl = frontendUrlProvider.buildUrl("/setup?token=" + token);
+    String subject = "Complete Your FabricOS Registration";
+
+    // Smart renderer: Uses frontend templates with backend fallback
+    // Frontend templates prioritized for better UX (design system consistency)
+    String message =
+        emailTemplateRenderer.renderSetupPassword(firstName, companyName, email, setupUrl);
+
+    // Use sync to ensure email is queued before response (transaction commit)
+    notificationService.sendNotificationSync(email, subject, message);
+  }
 }
-

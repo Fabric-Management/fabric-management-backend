@@ -3,25 +3,24 @@ package com.fabricmanagement.production.masterdata.material.domain;
 /**
  * Material types in textile production.
  *
- * <p>Categories:</p>
+ * <p>Categories:
+ *
  * <ul>
- *   <li>FIBER - Raw fibers (cotton, polyester, wool)</li>
- *   <li>YARN - Spun yarns</li>
- *   <li>FABRIC - Woven or knitted fabrics</li>
- *   <li>CHEMICAL - Dyes, auxiliaries</li>
- *   <li>CONSUMABLE - Oils, needles, machine parts</li>
+ *   <li>FIBER - Raw fibers (cotton, polyester, wool)
+ *   <li>YARN - Spun yarns
+ *   <li>FABRIC - Woven or knitted fabrics
+ *   <li>CHEMICAL - Dyes, auxiliaries
+ *   <li>CONSUMABLE - Oils, needles, machine parts
  * </ul>
  */
 public enum MaterialType {
+  FIBER,
 
-    FIBER,
- 
-    YARN,
- 
-    FABRIC,
- 
-    CHEMICAL,
- 
-    CONSUMABLE
+  YARN,
+
+  FABRIC,
+
+  CHEMICAL,
+
+  CONSUMABLE
 }
-

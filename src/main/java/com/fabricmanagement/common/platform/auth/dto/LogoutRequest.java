@@ -6,16 +6,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Request DTO for logout endpoint.
- */
+/** Request DTO for logout endpoint. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class LogoutRequest {
 
-    @NotBlank(message = "Refresh token is required")
-    private String refreshToken;
+  @NotBlank(message = "Refresh token is required")
+  private String refreshToken;
 }
-

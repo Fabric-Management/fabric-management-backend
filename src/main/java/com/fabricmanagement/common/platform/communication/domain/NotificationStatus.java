@@ -1,33 +1,20 @@
 package com.fabricmanagement.common.platform.communication.domain;
 
-/**
- * Notification delivery status.
- */
+/** Notification delivery status. */
 public enum NotificationStatus {
 
-    /**
-     * Waiting to be sent
-     */
-    PENDING,
+  /** Waiting to be sent */
+  PENDING,
 
-    /**
-     * Currently being sent
-     */
-    SENDING,
+  /** Currently being sent */
+  SENDING,
 
-    /**
-     * Successfully sent
-     */
-    SENT,
+  /** Successfully sent */
+  SENT,
 
-    /**
-     * Failed to send
-     */
-    FAILED,
+  /** Failed to send */
+  FAILED,
 
-    /**
-     * Retrying after failure
-     */
-    RETRYING
+  /** Retrying after failure */
+  RETRYING
 }
-

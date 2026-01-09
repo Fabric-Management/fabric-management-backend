@@ -1,22 +1,13 @@
 package com.fabricmanagement.common.platform.user.domain.value;
 
-/**
- * Status of a profile update request.
- */
+/** Status of a profile update request. */
 public enum ProfileUpdateRequestStatus {
-    /**
-     * Request submitted, awaiting HR/Admin approval.
-     */
-    PENDING,
+  /** Request submitted, awaiting HR/Admin approval. */
+  PENDING,
 
-    /**
-     * Request approved by HR/Admin, profile updated.
-     */
-    APPROVED,
+  /** Request approved by HR/Admin, profile updated. */
+  APPROVED,
 
-    /**
-     * Request rejected by HR/Admin.
-     */
-    REJECTED
+  /** Request rejected by HR/Admin. */
+  REJECTED
 }
-

@@ -2,7 +2,6 @@ package com.fabricmanagement.human.compliance.localization.dto;
 
 import com.fabricmanagement.human.compliance.localization.domain.HrPolicyPackStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,7 +23,4 @@ public record HrPolicyPackResponse(
     HrInheritanceModeDto inheritanceMode,
     Instant updatedAt,
     List<PolicyBindingDto> bindings,
-    List<RuleVersionDto> ruleVersions
-) {
-}
-
+    List<RuleVersionDto> ruleVersions) {}

@@ -1,26 +1,26 @@
 package com.fabricmanagement.common.platform.user.dto;
 
 import com.fabricmanagement.common.platform.user.domain.value.ProfileCategory;
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-
 /**
  * Request DTO for comprehensive user profile updates.
- * 
+ *
  * <p>Separates fields into categories for permission checks:
+ *
  * <ul>
- *   <li>WORK_PROFILE: firstName, lastName, workEmail, workPhone, workAddress, departmentId</li>
- *   <li>PERSONAL_PROFILE: homeAddress, personalPhone, birthDate, emergencyContact</li>
+ *   <li>WORK_PROFILE: firstName, lastName, workEmail, workPhone, workAddress, departmentId
+ *   <li>PERSONAL_PROFILE: homeAddress, personalPhone, birthDate, emergencyContact
  * </ul>
- * 
- * <p><b>Security:</b> Self-update is NOT allowed. Only Admin/HR/Dept Manager can update.</p>
+ *
+ * <p><b>Security:</b> Self-update is NOT allowed. Only Admin/HR/Dept Manager can update.
  */
 @Data
 @Builder
@@ -28,120 +28,101 @@ import java.util.UUID;
 @AllArgsConstructor
 public class UpdateUserProfileRequest {
 
-    // ========== WORK_PROFILE Fields ==========
-    
-    /**
-     * First name (WORK_PROFILE).
-     */
-    private String firstName;
+  // ========== WORK_PROFILE Fields ==========
 
-    /**
-     * Last name (WORK_PROFILE).
-     */
-    private String lastName;
+  /** First name (WORK_PROFILE). */
+  private String firstName;
 
-    /**
-     * Work email contact value (WORK_PROFILE).
-     * Will be used to create/update work email contact.
-     */
-    @Deprecated
-    private String workEmail;
+  /** Last name (WORK_PROFILE). */
+  private String lastName;
 
-    /**
-     * Work phone contact value (WORK_PROFILE).
-     * Will be used to create/update work phone contact.
-     */
-    @Deprecated
-    private String workPhone;
+  /** Work email contact value (WORK_PROFILE). Will be used to create/update work email contact. */
+  @Deprecated private String workEmail;
 
-    /**
-     * Work address data (WORK_PROFILE).
-     */
-    private AddressData workAddress;
+  /** Work phone contact value (WORK_PROFILE). Will be used to create/update work phone contact. */
+  @Deprecated private String workPhone;
 
-    /**
-     * Department ID (WORK_PROFILE).
-     */
-    private UUID departmentId;
+  /** Work address data (WORK_PROFILE). */
+  private AddressData workAddress;
 
-    // ========== PERSONAL_PROFILE Fields ==========
+  /** Department ID (WORK_PROFILE). */
+  private UUID departmentId;
 
-    /**
-     * Home address data (PERSONAL_PROFILE).
-     */
-    private AddressData homeAddress;
+  // ========== PERSONAL_PROFILE Fields ==========
 
-    /**
-     * Personal phone contact value (PERSONAL_PROFILE).
-     */
-    @Deprecated
-    private String personalPhone;
+  /** Home address data (PERSONAL_PROFILE). */
+  private AddressData homeAddress;
 
-    /**
-     * Birth date (PERSONAL_PROFILE).
-     */
-    private LocalDate birthDate;
+  /** Personal phone contact value (PERSONAL_PROFILE). */
+  @Deprecated private String personalPhone;
 
-    /**
-     * Emergency contact data (PERSONAL_PROFILE).
-     */
-    private EmergencyContactData emergencyContact;
+  /** Birth date (PERSONAL_PROFILE). */
+  private LocalDate birthDate;
 
-    /**
-     * Determine which categories are being updated.
-     * Used for permission checks.
-     */
-    public Set<ProfileCategory> getUpdatedCategories() {
-        Set<ProfileCategory> categories = new HashSet<>();
-        
-        // Check WORK_PROFILE fields
-        if (firstName != null || lastName != null || workEmail != null || 
-            workPhone != null || workAddress != null || departmentId != null) {
-            categories.add(ProfileCategory.WORK_PROFILE);
-        }
-        
-        // Check PERSONAL_PROFILE fields
-        if (homeAddress != null || personalPhone != null || 
-            birthDate != null || emergencyContact != null) {
-            categories.add(ProfileCategory.PERSONAL_PROFILE);
-        }
-        
-        return categories;
+  /** Emergency contact data (PERSONAL_PROFILE). */
+  private EmergencyContactData emergencyContact;
+
+  /** Determine which categories are being updated. Used for permission checks. */
+  public Set<ProfileCategory> getUpdatedCategories() {
+    Set<ProfileCategory> categories = new HashSet<>();
+
+    // Check WORK_PROFILE fields
+    if (firstName != null
+        || lastName != null
+        || workEmail != null
+        || workPhone != null
+        || workAddress != null
+        || departmentId != null) {
+      categories.add(ProfileCategory.WORK_PROFILE);
     }
 
-    /**
-     * Check if any fields are being updated.
-     */
-    public boolean hasUpdates() {
-        return firstName != null || lastName != null || workEmail != null ||
-               workPhone != null || workAddress != null || departmentId != null ||
-               homeAddress != null || personalPhone != null || 
-               birthDate != null || emergencyContact != null;
+    // Check PERSONAL_PROFILE fields
+    if (homeAddress != null
+        || personalPhone != null
+        || birthDate != null
+        || emergencyContact != null) {
+      categories.add(ProfileCategory.PERSONAL_PROFILE);
     }
 
-    // ========== Nested DTOs ==========
+    return categories;
+  }
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AddressData {
-        private String streetAddress;
-        private String city;
-        private String state;
-        private String postalCode;
-        private String country;
-        private String placeId; // Google Maps Place ID for validation
-    }
+  /** Check if any fields are being updated. */
+  public boolean hasUpdates() {
+    return firstName != null
+        || lastName != null
+        || workEmail != null
+        || workPhone != null
+        || workAddress != null
+        || departmentId != null
+        || homeAddress != null
+        || personalPhone != null
+        || birthDate != null
+        || emergencyContact != null;
+  }
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class EmergencyContactData {
-        private String name;
-        private String phone;
-        private String relationship;
-    }
+  // ========== Nested DTOs ==========
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class AddressData {
+    private String streetAddress;
+    private String city;
+    private String state;
+    private String postalCode;
+    private String country;
+    private String placeId; // Google Maps Place ID for validation
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class EmergencyContactData {
+    private String name;
+    private String phone;
+    private String relationship;
+  }
 }
-

@@ -16,11 +16,12 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Tenant Onboarding Controller - Internal admin endpoints for tenant creation.
  *
- * <p><b>Security:</b> These endpoints should be protected with PLATFORM_ADMIN role</p>
+ * <p><b>Security:</b> These endpoints should be protected with PLATFORM_ADMIN role
  *
- * <p>Used by sales team to onboard new enterprise customers.</p>
+ * <p>Used by sales team to onboard new enterprise customers.
  *
  * <h2>Endpoint:</h2>
+ *
  * <pre>
  * POST /api/admin/onboarding/tenant
  * Authorization: Bearer {admin-token}
@@ -41,36 +42,37 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class TenantOnboardingController {
 
-    private final TenantOnboardingService onboardingService;
+  private final TenantOnboardingService onboardingService;
 
-    /**
-     * Create new tenant company with admin user (sales-led flow).
-     *
-     * <p><b>Security:</b> Requires PLATFORM_ADMIN role in production</p>
-     * <p><b>Development:</b> Bypassed in local/dev profiles for testing</p>
-     *
-     * @param request Tenant onboarding request
-     * @return Onboarding response with setup details
-     */
-    @PostMapping("/tenant")
-    // @PreAuthorize("hasRole('PLATFORM_ADMIN')")  // Enable in production after creating first platform admin
-    public ResponseEntity<ApiResponse<TenantOnboardingResponse>> createTenant(
-            @Valid @RequestBody TenantOnboardingRequest request) {
-        
-        log.info("Admin onboarding request: company={}, admin={}",
-            request.getCompanyName(),
-            request.getAdminContact());
+  /**
+   * Create new tenant company with admin user (sales-led flow).
+   *
+   * <p><b>Security:</b> Requires PLATFORM_ADMIN role in production
+   *
+   * <p><b>Development:</b> Bypassed in local/dev profiles for testing
+   *
+   * @param request Tenant onboarding request
+   * @return Onboarding response with setup details
+   */
+  @PostMapping("/tenant")
+  // @PreAuthorize("hasRole('PLATFORM_ADMIN')")  // Enable in production after creating first
+  // platform admin
+  public ResponseEntity<ApiResponse<TenantOnboardingResponse>> createTenant(
+      @Valid @RequestBody TenantOnboardingRequest request) {
 
-        TenantOnboardingResponse response = onboardingService.createSalesLedTenant(request);
+    log.info(
+        "Admin onboarding request: company={}, admin={}",
+        request.getCompanyName(),
+        request.getAdminContact());
 
-        log.info("✅ Tenant onboarded successfully: companyUid={}, setupUrl={}",
-            response.getCompanyUid(),
-            response.getSetupUrl());
+    TenantOnboardingResponse response = onboardingService.createSalesLedTenant(request);
 
-        return ResponseEntity.ok(ApiResponse.success(
-            response,
-            "Tenant created successfully. Welcome email sent to admin."
-        ));
-    }
+    log.info(
+        "✅ Tenant onboarded successfully: companyUid={}, setupUrl={}",
+        response.getCompanyUid(),
+        response.getSetupUrl());
+
+    return ResponseEntity.ok(
+        ApiResponse.success(response, "Tenant created successfully. Welcome email sent to admin."));
+  }
 }
-

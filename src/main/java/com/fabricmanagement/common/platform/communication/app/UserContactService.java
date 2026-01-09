@@ -6,26 +6,26 @@ import com.fabricmanagement.common.platform.communication.domain.UserContact;
 import com.fabricmanagement.common.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.common.platform.communication.infra.repository.UserContactRepository;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 /**
  * User Contact Service - Business logic for user-contact assignments.
  *
- * <p>Handles Many-to-Many relationship between User and Contact.</p>
+ * <p>Handles Many-to-Many relationship between User and Contact.
  *
  * <p>Key responsibilities:
+ *
  * <ul>
- *   <li>Assign contacts to users</li>
- *   <li>Remove user-contact assignments</li>
- *   <li>Manage default contact for notifications</li>
- *   <li>Get verified contact for authentication (any verified contact)</li>
+ *   <li>Assign contacts to users
+ *   <li>Remove user-contact assignments
+ *   <li>Manage default contact for notifications
+ *   <li>Get verified contact for authentication (any verified contact)
  * </ul>
  */
 @Service
@@ -33,159 +33,191 @@ import java.util.UUID;
 @Slf4j
 public class UserContactService {
 
-    private final UserRepository userRepository;
-    private final ContactRepository contactRepository;
-    private final UserContactRepository userContactRepository;
+  private final UserRepository userRepository;
+  private final ContactRepository contactRepository;
+  private final UserContactRepository userContactRepository;
 
-    @Transactional(readOnly = true)
-    public List<UserContact> getUserContacts(UUID userId) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        log.debug("Finding user contacts: tenantId={}, userId={}", tenantId, userId);
+  @Transactional(readOnly = true)
+  public List<UserContact> getUserContacts(UUID userId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.debug("Finding user contacts: tenantId={}, userId={}", tenantId, userId);
 
-        return userContactRepository.findByTenantIdAndUserId(tenantId, userId);
-    }
+    return userContactRepository.findByTenantIdAndUserId(tenantId, userId);
+  }
 
-    @Transactional(readOnly = true)
-    public Optional<UserContact> getDefaultContact(UUID userId) {
-        log.trace("Finding default contact: userId={}", userId);
-        return userContactRepository.findDefaultByUserId(userId);
-    }
+  @Transactional(readOnly = true)
+  public Optional<UserContact> getDefaultContact(UUID userId) {
+    log.trace("Finding default contact: userId={}", userId);
+    return userContactRepository.findDefaultByUserId(userId);
+  }
 
-    /**
-     * Get verified contact for authentication.
-     * 
-     * <p>Any verified contact can be used for authentication.
-     * Returns preferred verified contact (default first, then by creation time).</p>
-     */
-    @Transactional(readOnly = true)
-    public Optional<UserContact> getAuthenticationContact(UUID userId) {
-        log.trace("Finding verified contact for authentication: userId={}", userId);
-        return userContactRepository.findPreferredContactByUserId(userId);
-    }
+  /**
+   * Get verified contact for authentication.
+   *
+   * <p>Any verified contact can be used for authentication. Returns preferred verified contact
+   * (default first, then by creation time).
+   */
+  @Transactional(readOnly = true)
+  public Optional<UserContact> getAuthenticationContact(UUID userId) {
+    log.trace("Finding verified contact for authentication: userId={}", userId);
+    return userContactRepository.findPreferredContactByUserId(userId);
+  }
 
-    /**
-     * Check if user-contact assignment exists.
-     * 
-     * <p><b>Performance:</b> Uses EXISTS query instead of loading all contacts.
-     * This prevents N+1 problems when checking assignment status.</p>
-     * 
-     * @param userId the user ID
-     * @param contactId the contact ID
-     * @return true if contact is assigned to user
-     */
-    @Transactional(readOnly = true)
-    public boolean existsUserContact(UUID userId, UUID contactId) {
-        log.trace("Checking if user-contact assignment exists: userId={}, contactId={}", userId, contactId);
-        return userContactRepository.existsByUserIdAndContactId(userId, contactId);
-    }
+  /**
+   * Check if user-contact assignment exists.
+   *
+   * <p><b>Performance:</b> Uses EXISTS query instead of loading all contacts. This prevents N+1
+   * problems when checking assignment status.
+   *
+   * @param userId the user ID
+   * @param contactId the contact ID
+   * @return true if contact is assigned to user
+   */
+  @Transactional(readOnly = true)
+  public boolean existsUserContact(UUID userId, UUID contactId) {
+    log.trace(
+        "Checking if user-contact assignment exists: userId={}, contactId={}", userId, contactId);
+    return userContactRepository.existsByUserIdAndContactId(userId, contactId);
+  }
 
-    @Transactional
-    public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        log.info("Assigning contact to user: tenantId={}, userId={}, contactId={}, isDefault={}",
-            tenantId, userId, contactId, isDefault);
+  @Transactional
+  public UserContact assignContact(UUID userId, UUID contactId, Boolean isDefault) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info(
+        "Assigning contact to user: tenantId={}, userId={}, contactId={}, isDefault={}",
+        tenantId,
+        userId,
+        contactId,
+        isDefault);
 
-        // Validate user exists
-        userRepository.findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    // Validate user exists
+    userRepository
+        .findByTenantIdAndId(tenantId, userId)
+        .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        Contact contact = contactRepository.findById(contactId)
+    Contact contact =
+        contactRepository
+            .findById(contactId)
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
-        if (!contact.getTenantId().equals(tenantId)) {
-            throw new IllegalArgumentException("Contact does not belong to current tenant");
-        }
+    if (!contact.getTenantId().equals(tenantId)) {
+      throw new IllegalArgumentException("Contact does not belong to current tenant");
+    }
 
-        if (userContactRepository.findByUserIdAndContactId(userId, contactId).isPresent()) {
-            throw new IllegalArgumentException("Contact is already assigned to this user");
-        }
+    if (userContactRepository.findByUserIdAndContactId(userId, contactId).isPresent()) {
+      throw new IllegalArgumentException("Contact is already assigned to this user");
+    }
 
-        // Set default: remove default flag from other contacts
-        if (Boolean.TRUE.equals(isDefault)) {
-            userContactRepository.findDefaultByUserId(userId)
-                .ifPresent(existing -> {
-                    existing.setIsDefault(false);
-                    userContactRepository.save(existing);
-                });
-        }
+    // Set default: remove default flag from other contacts
+    if (Boolean.TRUE.equals(isDefault)) {
+      userContactRepository
+          .findDefaultByUserId(userId)
+          .ifPresent(
+              existing -> {
+                existing.setIsDefault(false);
+                userContactRepository.save(existing);
+              });
+    }
 
-        UserContact userContact = UserContact.builder()
+    UserContact userContact =
+        UserContact.builder()
             .userId(userId)
             .contactId(contactId)
             .isDefault(isDefault != null ? isDefault : false)
             .build();
 
-        return userContactRepository.save(userContact);
-    }
+    return userContactRepository.save(userContact);
+  }
 
-    @Transactional
-    public void removeContact(UUID userId, UUID contactId) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        log.info("Removing contact from user: tenantId={}, userId={}, contactId={}", tenantId, userId, contactId);
+  @Transactional
+  public void removeContact(UUID userId, UUID contactId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info(
+        "Removing contact from user: tenantId={}, userId={}, contactId={}",
+        tenantId,
+        userId,
+        contactId);
 
-        UserContact userContact = userContactRepository.findByUserIdAndContactId(userId, contactId)
+    UserContact userContact =
+        userContactRepository
+            .findByUserIdAndContactId(userId, contactId)
             .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
 
-        Contact contact = contactRepository.findById(contactId)
+    Contact contact =
+        contactRepository
+            .findById(contactId)
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
-        if (Boolean.TRUE.equals(contact.getIsVerified())) {
-            long verifiedCount = userContactRepository.findByTenantIdAndUserId(tenantId, userId).stream()
-                .map(uc -> contactRepository.findById(uc.getContactId()))
-                .flatMap(Optional::stream)
-                .filter(Contact::getIsVerified)
-                .count();
+    if (Boolean.TRUE.equals(contact.getIsVerified())) {
+      long verifiedCount =
+          userContactRepository.findByTenantIdAndUserId(tenantId, userId).stream()
+              .map(uc -> contactRepository.findById(uc.getContactId()))
+              .flatMap(Optional::stream)
+              .filter(Contact::getIsVerified)
+              .count();
 
-            if (verifiedCount <= 1) {
-                log.warn("Attempt to remove last verified contact prevented: tenantId={}, userId={}, contactId={}",
-                    tenantId, userId, contactId);
-                throw new IllegalStateException("Cannot remove the last verified contact. Add another verified contact first.");
-            }
-        }
-
-        userContactRepository.delete(userContact);
+      if (verifiedCount <= 1) {
+        log.warn(
+            "Attempt to remove last verified contact prevented: tenantId={}, userId={}, contactId={}",
+            tenantId,
+            userId,
+            contactId);
+        throw new IllegalStateException(
+            "Cannot remove the last verified contact. Add another verified contact first.");
+      }
     }
 
-    @Transactional
-    public UserContact setAsDefault(UUID userId, UUID contactId) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        log.info("Setting default contact: tenantId={}, userId={}, contactId={}", tenantId, userId, contactId);
+    userContactRepository.delete(userContact);
+  }
 
-        UserContact userContact = userContactRepository.findByUserIdAndContactId(userId, contactId)
+  @Transactional
+  public UserContact setAsDefault(UUID userId, UUID contactId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info(
+        "Setting default contact: tenantId={}, userId={}, contactId={}",
+        tenantId,
+        userId,
+        contactId);
+
+    UserContact userContact =
+        userContactRepository
+            .findByUserIdAndContactId(userId, contactId)
             .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
 
-        // Remove default from others
-        userContactRepository.findDefaultByUserId(userId)
-            .ifPresent(existing -> {
-                if (!existing.getContactId().equals(contactId)) {
-                    existing.setIsDefault(false);
-                    userContactRepository.save(existing);
-                }
+    // Remove default from others
+    userContactRepository
+        .findDefaultByUserId(userId)
+        .ifPresent(
+            existing -> {
+              if (!existing.getContactId().equals(contactId)) {
+                existing.setIsDefault(false);
+                userContactRepository.save(existing);
+              }
             });
 
-        userContact.setAsDefault();
-        return userContactRepository.save(userContact);
-    }
+    userContact.setAsDefault();
+    return userContactRepository.save(userContact);
+  }
 
-    @Transactional
-    @Deprecated
-    public UserContact enableForAuthentication(UUID userId, UUID contactId) {
-        log.warn("enableForAuthentication is deprecated. userId={}, contactId={}", userId, contactId);
-        return userContactRepository.findByUserIdAndContactId(userId, contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
-    }
+  @Transactional
+  @Deprecated
+  public UserContact enableForAuthentication(UUID userId, UUID contactId) {
+    log.warn("enableForAuthentication is deprecated. userId={}, contactId={}", userId, contactId);
+    return userContactRepository
+        .findByUserIdAndContactId(userId, contactId)
+        .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+  }
 
-    /**
-     * Get all user contacts for a specific contact ID (find users who have this contact).
-     * 
-     * @param contactId Contact ID
-     * @return List of UserContact assignments
-     */
-    @Transactional(readOnly = true)
-    public List<UserContact> getUserContactsByContactId(UUID contactId) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        log.debug("Finding user contacts by contactId: tenantId={}, contactId={}", tenantId, contactId);
-        return userContactRepository.findByTenantIdAndContactId(tenantId, contactId);
-    }
+  /**
+   * Get all user contacts for a specific contact ID (find users who have this contact).
+   *
+   * @param contactId Contact ID
+   * @return List of UserContact assignments
+   */
+  @Transactional(readOnly = true)
+  public List<UserContact> getUserContactsByContactId(UUID contactId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.debug("Finding user contacts by contactId: tenantId={}, contactId={}", tenantId, contactId);
+    return userContactRepository.findByTenantIdAndContactId(tenantId, contactId);
+  }
 }
-

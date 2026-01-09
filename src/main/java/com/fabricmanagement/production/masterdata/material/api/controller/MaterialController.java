@@ -7,71 +7,70 @@ import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
 import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.UUID;
-
-/**
- * Material Controller - REST endpoints for material management.
- */
+/** Material Controller - REST endpoints for material management. */
 @RestController
 @RequestMapping("/api/production/materials")
 @RequiredArgsConstructor
 @Slf4j
 public class MaterialController {
 
-    private final MaterialService materialService;
+  private final MaterialService materialService;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<MaterialDto>> createMaterial(
-            @Valid @RequestBody CreateMaterialRequest request) {
-        
-        log.info("Creating material: type={}", request.getMaterialType());
+  @PostMapping
+  public ResponseEntity<ApiResponse<MaterialDto>> createMaterial(
+      @Valid @RequestBody CreateMaterialRequest request) {
 
-        MaterialDto created = materialService.createMaterial(request);
+    log.info("Creating material: type={}", request.getMaterialType());
 
-        return ResponseEntity.ok(ApiResponse.success(created, "Material created successfully"));
-    }
+    MaterialDto created = materialService.createMaterial(request);
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<MaterialDto>> getMaterial(@PathVariable UUID id) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
-        MaterialDto material = materialService.findById(tenantId, id)
+    return ResponseEntity.ok(ApiResponse.success(created, "Material created successfully"));
+  }
+
+  @GetMapping("/{id}")
+  public ResponseEntity<ApiResponse<MaterialDto>> getMaterial(@PathVariable UUID id) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    MaterialDto material =
+        materialService
+            .findById(tenantId, id)
             .orElseThrow(() -> new IllegalArgumentException("Material not found"));
 
-        return ResponseEntity.ok(ApiResponse.success(material));
-    }
+    return ResponseEntity.ok(ApiResponse.success(material));
+  }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<MaterialDto>>> getAllMaterials() {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
-        List<MaterialDto> materials = materialService.findByTenant(tenantId);
+  @GetMapping
+  public ResponseEntity<ApiResponse<List<MaterialDto>>> getAllMaterials() {
+    UUID tenantId = TenantContext.getCurrentTenantId();
 
-        return ResponseEntity.ok(ApiResponse.success(materials));
-    }
+    List<MaterialDto> materials = materialService.findByTenant(tenantId);
 
-    @GetMapping("/type/{type}")
-    public ResponseEntity<ApiResponse<List<MaterialDto>>> getMaterialsByType(@PathVariable MaterialType type) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
-        List<MaterialDto> materials = materialService.findByType(tenantId, type);
+    return ResponseEntity.ok(ApiResponse.success(materials));
+  }
 
-        return ResponseEntity.ok(ApiResponse.success(materials));
-    }
+  @GetMapping("/type/{type}")
+  public ResponseEntity<ApiResponse<List<MaterialDto>>> getMaterialsByType(
+      @PathVariable MaterialType type) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deactivateMaterial(@PathVariable UUID id) {
-        log.info("Deactivating material: id={}", id);
+    List<MaterialDto> materials = materialService.findByType(tenantId, type);
 
-        materialService.deactivateMaterial(id);
+    return ResponseEntity.ok(ApiResponse.success(materials));
+  }
 
-        return ResponseEntity.ok(ApiResponse.success(null, "Material deactivated successfully"));
-    }
+  @DeleteMapping("/{id}")
+  public ResponseEntity<ApiResponse<Void>> deactivateMaterial(@PathVariable UUID id) {
+    log.info("Deactivating material: id={}", id);
+
+    materialService.deactivateMaterial(id);
+
+    return ResponseEntity.ok(ApiResponse.success(null, "Material deactivated successfully"));
+  }
 }
-

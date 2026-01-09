@@ -9,107 +9,96 @@ import com.fabricmanagement.production.masterdata.material.domain.event.Material
 import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
 import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
 import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 /**
  * Material Service - Business logic for material management.
  *
- * <p>Implements MaterialFacade for cross-module communication.</p>
+ * <p>Implements MaterialFacade for cross-module communication.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class MaterialService implements MaterialFacade {
 
-    private final MaterialRepository materialRepository;
-    private final DomainEventPublisher eventPublisher;
+  private final MaterialRepository materialRepository;
+  private final DomainEventPublisher eventPublisher;
 
-    /**
-     * Create material (internal method).
-     */
-    @Transactional
-    public MaterialDto createMaterialInternal(CreateMaterialRequest request) {
-        log.info("Creating material: type={}", request.getMaterialType());
+  /** Create material (internal method). */
+  @Transactional
+  public MaterialDto createMaterialInternal(CreateMaterialRequest request) {
+    log.info("Creating material: type={}", request.getMaterialType());
 
-        Material material = Material.create(
-            request.getMaterialType(),
-            request.getUnit()
-        );
+    Material material = Material.create(request.getMaterialType(), request.getUnit());
 
-        Material saved = materialRepository.save(material);
+    Material saved = materialRepository.save(material);
 
-        eventPublisher.publish(new MaterialCreatedEvent(
-            saved.getTenantId(),
-            saved.getId(),
-            saved.getMaterialType()
-        ));
+    eventPublisher.publish(
+        new MaterialCreatedEvent(saved.getTenantId(), saved.getId(), saved.getMaterialType()));
 
-        log.info("✅ Material created: id={}, uid={}", saved.getId(), saved.getUid());
+    log.info("✅ Material created: id={}, uid={}", saved.getId(), saved.getUid());
 
-        return MaterialDto.from(saved);
-    }
+    return MaterialDto.from(saved);
+  }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<MaterialDto> findById(UUID tenantId, UUID id) {
-        log.debug("Finding material: tenantId={}, id={}", tenantId, id);
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<MaterialDto> findById(UUID tenantId, UUID id) {
+    log.debug("Finding material: tenantId={}, id={}", tenantId, id);
 
-        return materialRepository.findByTenantIdAndId(tenantId, id)
-            .map(MaterialDto::from);
-    }
+    return materialRepository.findByTenantIdAndId(tenantId, id).map(MaterialDto::from);
+  }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<MaterialDto> findByTenant(UUID tenantId) {
-        log.debug("Finding all materials: tenantId={}", tenantId);
+  @Override
+  @Transactional(readOnly = true)
+  public List<MaterialDto> findByTenant(UUID tenantId) {
+    log.debug("Finding all materials: tenantId={}", tenantId);
 
-        return materialRepository.findByTenantIdAndIsActiveTrue(tenantId)
-            .stream()
-            .map(MaterialDto::from)
-            .toList();
-    }
+    return materialRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+        .map(MaterialDto::from)
+        .toList();
+  }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<MaterialDto> findByType(UUID tenantId, MaterialType type) {
-        log.debug("Finding materials by type: tenantId={}, type={}", tenantId, type);
+  @Override
+  @Transactional(readOnly = true)
+  public List<MaterialDto> findByType(UUID tenantId, MaterialType type) {
+    log.debug("Finding materials by type: tenantId={}, type={}", tenantId, type);
 
-        return materialRepository.findByTenantIdAndMaterialTypeAndIsActiveTrue(tenantId, type)
-            .stream()
-            .map(MaterialDto::from)
-            .toList();
-    }
+    return materialRepository.findByTenantIdAndMaterialTypeAndIsActiveTrue(tenantId, type).stream()
+        .map(MaterialDto::from)
+        .toList();
+  }
 
-    @Override
-    @Transactional(readOnly = true)
-    public boolean exists(UUID tenantId, UUID id) {
-        return materialRepository.existsByTenantIdAndId(tenantId, id);
-    }
+  @Override
+  @Transactional(readOnly = true)
+  public boolean exists(UUID tenantId, UUID id) {
+    return materialRepository.existsByTenantIdAndId(tenantId, id);
+  }
 
-    @Transactional
-    public void deactivateMaterial(UUID id) {
-        UUID tenantId = TenantContext.getCurrentTenantId();
-        
-        Material material = materialRepository.findByTenantIdAndId(tenantId, id)
+  @Transactional
+  public void deactivateMaterial(UUID id) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    Material material =
+        materialRepository
+            .findByTenantIdAndId(tenantId, id)
             .orElseThrow(() -> new IllegalArgumentException("Material not found"));
 
-        material.delete();
-        materialRepository.save(material);
+    material.delete();
+    materialRepository.save(material);
 
-        log.info("✅ Material deactivated: id={}", id);
-    }
+    log.info("✅ Material deactivated: id={}", id);
+  }
 
-    @Override
-    @Transactional
-    public MaterialDto createMaterial(CreateMaterialRequest request) {
-        return createMaterialInternal(request);
-    }
+  @Override
+  @Transactional
+  public MaterialDto createMaterial(CreateMaterialRequest request) {
+    return createMaterialInternal(request);
+  }
 }
-

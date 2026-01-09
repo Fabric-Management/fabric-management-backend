@@ -8,19 +8,16 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Request for creating new material.
- */
+/** Request for creating new material. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateMaterialRequest {
 
-    @NotNull(message = "Material type is required")
-    private MaterialType materialType;
+  @NotNull(message = "Material type is required")
+  private MaterialType materialType;
 
-    @NotBlank(message = "Unit is required")
-    private String unit;
+  @NotBlank(message = "Unit is required")
+  private String unit;
 }
-

@@ -3,20 +3,22 @@ package com.fabricmanagement.common.infrastructure.cqrs;
 /**
  * Marker interface for all commands in the system.
  *
- * <p>Commands represent write operations (Create, Update, Delete) that
- * change the state of the system. They follow the Command pattern and
- * CQRS (Command Query Responsibility Segregation) principle.</p>
+ * <p>Commands represent write operations (Create, Update, Delete) that change the state of the
+ * system. They follow the Command pattern and CQRS (Command Query Responsibility Segregation)
+ * principle.
  *
  * <h2>Characteristics:</h2>
+ *
  * <ul>
- *   <li>Represents an intention to change state</li>
- *   <li>Has a clear name in imperative form (CreateMaterial, UpdateUser)</li>
- *   <li>Contains all data needed to execute the operation</li>
- *   <li>Should be immutable (use @Value or final fields)</li>
- *   <li>Validated before execution</li>
+ *   <li>Represents an intention to change state
+ *   <li>Has a clear name in imperative form (CreateMaterial, UpdateUser)
+ *   <li>Contains all data needed to execute the operation
+ *   <li>Should be immutable (use @Value or final fields)
+ *   <li>Validated before execution
  * </ul>
  *
  * <h2>Usage Example:</h2>
+ *
  * <pre>{@code
  * @Value
  * public class CreateMaterialCommand implements Command {
@@ -42,6 +44,4 @@ package com.fabricmanagement.common.infrastructure.cqrs;
  * @see CommandHandler
  * @see Query
  */
-public interface Command {
-}
-
+public interface Command {}

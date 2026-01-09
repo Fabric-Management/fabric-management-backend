@@ -4,21 +4,21 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.human.payroll.domain.PayRun;
 import com.fabricmanagement.human.payroll.domain.PayRunAuditLog;
 import com.fabricmanagement.human.payroll.infra.repository.PayRunAuditLogRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
 import java.time.Clock;
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class PayRunAuditService {
 
-    private final PayRunAuditLogRepository auditLogRepository;
-    private final Clock clock;
+  private final PayRunAuditLogRepository auditLogRepository;
+  private final Clock clock;
 
-    public void record(PayRun payRun, String action, String message, String payloadJson) {
-        PayRunAuditLog logEntry = PayRunAuditLog.builder()
+  public void record(PayRun payRun, String action, String message, String payloadJson) {
+    PayRunAuditLog logEntry =
+        PayRunAuditLog.builder()
             .payRun(payRun)
             .action(action)
             .actorId(TenantContext.getCurrentUserId())
@@ -26,8 +26,7 @@ public class PayRunAuditService {
             .payload(payloadJson)
             .occurredAt(Instant.now(clock))
             .build();
-        logEntry.setTenantId(payRun.getTenantId());
-        auditLogRepository.save(logEntry);
-    }
+    logEntry.setTenantId(payRun.getTenantId());
+    auditLogRepository.save(logEntry);
+  }
 }
-

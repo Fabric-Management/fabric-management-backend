@@ -2,65 +2,62 @@ package com.fabricmanagement.common.platform.communication.infra.repository;
 
 import com.fabricmanagement.common.platform.communication.domain.CompanyContact;
 import com.fabricmanagement.common.platform.communication.domain.CompanyContactId;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-/**
- * Repository for CompanyContact junction entity.
- */
+/** Repository for CompanyContact junction entity. */
 @Repository
 public interface CompanyContactRepository extends JpaRepository<CompanyContact, CompanyContactId> {
 
-    /**
-     * Find all contacts for a company within tenant.
-     * 
-     * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entities.</p>
-     */
-    @Query("SELECT cc FROM CompanyContact cc " +
-           "LEFT JOIN FETCH cc.contact " +
-           "WHERE cc.tenantId = :tenantId AND cc.companyId = :companyId")
-    List<CompanyContact> findByTenantIdAndCompanyId(
-            @Param("tenantId") UUID tenantId,
-            @Param("companyId") UUID companyId);
+  /**
+   * Find all contacts for a company within tenant.
+   *
+   * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entities.
+   */
+  @Query(
+      "SELECT cc FROM CompanyContact cc "
+          + "LEFT JOIN FETCH cc.contact "
+          + "WHERE cc.tenantId = :tenantId AND cc.companyId = :companyId")
+  List<CompanyContact> findByTenantIdAndCompanyId(
+      @Param("tenantId") UUID tenantId, @Param("companyId") UUID companyId);
 
-    /**
-     * Find specific company-contact assignment.
-     * 
-     * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entity.</p>
-     */
-    @Query("SELECT cc FROM CompanyContact cc " +
-           "LEFT JOIN FETCH cc.contact " +
-           "WHERE cc.companyId = :companyId AND cc.contactId = :contactId")
-    Optional<CompanyContact> findByCompanyIdAndContactId(
-            @Param("companyId") UUID companyId,
-            @Param("contactId") UUID contactId);
+  /**
+   * Find specific company-contact assignment.
+   *
+   * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entity.
+   */
+  @Query(
+      "SELECT cc FROM CompanyContact cc "
+          + "LEFT JOIN FETCH cc.contact "
+          + "WHERE cc.companyId = :companyId AND cc.contactId = :contactId")
+  Optional<CompanyContact> findByCompanyIdAndContactId(
+      @Param("companyId") UUID companyId, @Param("contactId") UUID contactId);
 
-    /**
-     * Find default contact for company.
-     * 
-     * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entity.</p>
-     */
-    @Query("SELECT cc FROM CompanyContact cc " +
-           "LEFT JOIN FETCH cc.contact " +
-           "WHERE cc.companyId = :companyId AND cc.isDefault = true")
-    Optional<CompanyContact> findDefaultByCompanyId(@Param("companyId") UUID companyId);
+  /**
+   * Find default contact for company.
+   *
+   * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entity.
+   */
+  @Query(
+      "SELECT cc FROM CompanyContact cc "
+          + "LEFT JOIN FETCH cc.contact "
+          + "WHERE cc.companyId = :companyId AND cc.isDefault = true")
+  Optional<CompanyContact> findDefaultByCompanyId(@Param("companyId") UUID companyId);
 
-    /**
-     * Find department-specific contacts for company.
-     * 
-     * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entities.</p>
-     */
-    @Query("SELECT cc FROM CompanyContact cc " +
-           "LEFT JOIN FETCH cc.contact " +
-           "WHERE cc.companyId = :companyId AND cc.department = :department")
-    List<CompanyContact> findByCompanyIdAndDepartment(
-            @Param("companyId") UUID companyId,
-            @Param("department") String department);
+  /**
+   * Find department-specific contacts for company.
+   *
+   * <p>Uses JOIN FETCH to avoid N+1 query problem when accessing Contact entities.
+   */
+  @Query(
+      "SELECT cc FROM CompanyContact cc "
+          + "LEFT JOIN FETCH cc.contact "
+          + "WHERE cc.companyId = :companyId AND cc.department = :department")
+  List<CompanyContact> findByCompanyIdAndDepartment(
+      @Param("companyId") UUID companyId, @Param("department") String department);
 }
-
