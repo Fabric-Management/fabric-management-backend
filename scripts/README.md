@@ -71,11 +71,40 @@ git commit --no-verify
 **⚠️ DO NOT RUN MANUALLY** - This script is used by Docker containers.
 
 **What it does:**
-- Waits for dependencies (PostgreSQL, Redis, Kafka)
+- Waits for dependencies (PostgreSQL, Kafka)
 - Configures JVM options
 - Starts Spring Boot application
 
 **Usage:** Automatically executed by Docker when container starts.
+
+### GitHub Actions Cleanup
+
+Clean all workflow runs from GitHub Actions (useful for cleaning up old runs):
+
+```bash
+./scripts/cleanup-github-actions.sh          # Actually delete runs
+./scripts/cleanup-github-actions.sh --dry-run # Preview what would be deleted
+```
+
+Or via Makefile:
+
+```bash
+make github-cleanup-dry-run    # Preview
+make github-cleanup            # Actually delete (with confirmation)
+```
+
+**Prerequisites:**
+- GitHub CLI (gh) installed: `brew install gh`
+- Authenticated: `gh auth login`
+- Repository access to `Fabric-Management/fabric-management-backend`
+
+**What it does:**
+1. Lists all workflows in the repository
+2. Fetches all runs for each workflow
+3. Deletes all runs (or previews in dry-run mode)
+4. Shows summary of deleted runs
+
+**⚠️ Warning:** This permanently deletes all workflow run history. Use `--dry-run` first to preview.
 
 ## 🔧 Development
 

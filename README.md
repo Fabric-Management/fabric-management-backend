@@ -42,7 +42,7 @@ make setup           # Create .env file
 # Edit .env with your values
 
 # Start infrastructure
-make dev             # Start PostgreSQL + Redis
+make dev             # Start PostgreSQL
 
 # Run application
 make app-run         # Run Spring Boot app
@@ -61,7 +61,6 @@ fabric-management-backend/
 
 - **Backend**: Java 21, Spring Boot 3.5.5
 - **Database**: PostgreSQL 15, Flyway migrations
-- **Caching**: Redis 7
 - **Messaging**: Apache Kafka (optional)
 - **Containerization**: Docker, Docker Compose
 - **Build**: Maven
@@ -84,7 +83,7 @@ fabric-management-backend/
 
 ```bash
 # Infrastructure
-make dev             # Start PostgreSQL + Redis
+make dev             # Start PostgreSQL
 make up              # Start all infrastructure
 make down            # Stop all services
 
@@ -113,7 +112,7 @@ See `make help` for all available commands.
 
 - **JWT Authentication**: Token-based authentication
 - **Rate Limiting**: Endpoint-specific throttling
-- **Brute Force Protection**: Redis-based login attempt tracking
+- **Brute Force Protection**: Login attempt tracking
 - **UUID Type Safety**: 100% compliance, no String IDs
 - **No Hardcoded Values**: All via environment variables
 
