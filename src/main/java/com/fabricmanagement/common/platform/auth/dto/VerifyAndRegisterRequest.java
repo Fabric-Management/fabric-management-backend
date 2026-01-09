@@ -13,15 +13,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class VerifyAndRegisterRequest {
 
-    @NotBlank(message = "Contact value is required")
-    private String contactValue;
+  @NotBlank(message = "Contact value is required")
+  private String contactValue;
 
-    @NotBlank(message = "Verification code is required")
-    @Size(min = 6, max = 6, message = "Code must be 6 digits")
-    private String code;
+  @NotBlank(message = "Verification code is required")
+  @Size(min = 6, max = 6, message = "Code must be 6 digits")
+  private String code;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 8, message = "Password must be at least 8 characters")
-    private String password;
+  @NotBlank(message = "Password is required")
+  @Size(min = 8, message = "Password must be at least 8 characters")
+  private String password;
 }
-

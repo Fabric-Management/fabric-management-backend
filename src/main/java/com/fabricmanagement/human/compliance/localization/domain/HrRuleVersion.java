@@ -18,22 +18,21 @@ import lombok.Setter;
 @NoArgsConstructor
 public class HrRuleVersion extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "policy_pack_id", nullable = false)
-    private HrPolicyPack policyPack;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "policy_pack_id", nullable = false)
+  private HrPolicyPack policyPack;
 
-    @Column(name = "rule_type", nullable = false, length = 150)
-    private String ruleType;
+  @Column(name = "rule_type", nullable = false, length = 150)
+  private String ruleType;
 
-    @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
-    private String payload;
+  @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
+  private String payload;
 
-    @Column(name = "payload_hash", nullable = false, length = 128)
-    private String payloadHash;
+  @Column(name = "payload_hash", nullable = false, length = 128)
+  private String payloadHash;
 
-    @Override
-    protected String getModuleCode() {
-        return "HRV";
-    }
+  @Override
+  protected String getModuleCode() {
+    return "HRV";
+  }
 }
-

@@ -2,35 +2,37 @@ package com.fabricmanagement.common.platform.communication.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 /**
  * Contact entity - Generic contact information for User and Company.
  *
- * <p>Represents any communication channel (email, phone, WhatsApp, etc.)
- * that can be associated with either a User or a Company.</p>
+ * <p>Represents any communication channel (email, phone, WhatsApp, etc.) that can be associated
+ * with either a User or a Company.
  *
  * <h2>Key Features:</h2>
+ *
  * <ul>
- *   <li>✅ Multi-channel support (EMAIL, PHONE, FAX, WEBSITE, SOCIAL_MEDIA, etc.)</li>
- *   <li>✅ Verification status tracking</li>
- *   <li>✅ Primary contact flag</li>
- *   <li>✅ Label for categorization (e.g., "Home", "Work", "Mobile")</li>
- *   <li>✅ Parent contact link for extensions</li>
- *   <li>✅ Personal vs. company-provided distinction</li>
- *   <li>✅ WhatsApp capability flag (for PHONE contacts)</li>
+ *   <li>✅ Multi-channel support (EMAIL, PHONE, FAX, WEBSITE, SOCIAL_MEDIA, etc.)
+ *   <li>✅ Verification status tracking
+ *   <li>✅ Primary contact flag
+ *   <li>✅ Label for categorization (e.g., "Home", "Work", "Mobile")
+ *   <li>✅ Parent contact link for extensions
+ *   <li>✅ Personal vs. company-provided distinction
+ *   <li>✅ WhatsApp capability flag (for PHONE contacts)
  * </ul>
  *
  * <h2>Special Cases:</h2>
+ *
  * <ul>
- *   <li><b>PHONE_EXTENSION:</b> contactValue = extension number (e.g., "101"),
- *       parentContactId must reference a PHONE contact</li>
- *   <li><b>PHONE + isWhatsApp:</b> Used for Priority 1 verification and notifications via WhatsApp</li>
+ *   <li><b>PHONE_EXTENSION:</b> contactValue = extension number (e.g., "101"), parentContactId must
+ *       reference a PHONE contact
+ *   <li><b>PHONE + isWhatsApp:</b> Used for Priority 1 verification and notifications via WhatsApp
  * </ul>
  *
  * <h2>Usage Example:</h2>
+ *
  * <pre>{@code
  * // User's personal email
  * Contact personalEmail = Contact.builder()
@@ -53,12 +55,14 @@ import java.util.UUID;
  * }</pre>
  */
 @Entity
-@Table(name = "common_contact", schema = "common_communication",
+@Table(
+    name = "common_contact",
+    schema = "common_communication",
     indexes = {
-        @Index(name = "idx_contact_value", columnList = "contact_value"),
-        @Index(name = "idx_contact_type", columnList = "contact_type"),
-        @Index(name = "idx_contact_parent", columnList = "parent_contact_id"),
-        @Index(name = "idx_contact_tenant", columnList = "tenant_id")
+      @Index(name = "idx_contact_value", columnList = "contact_value"),
+      @Index(name = "idx_contact_type", columnList = "contact_type"),
+      @Index(name = "idx_contact_parent", columnList = "parent_contact_id"),
+      @Index(name = "idx_contact_tenant", columnList = "tenant_id")
     })
 @Getter
 @Setter
@@ -67,118 +71,120 @@ import java.util.UUID;
 @AllArgsConstructor
 public class Contact extends BaseEntity {
 
-    /**
-     * Contact value (email address, phone number, URL, etc.)
-     * <p>Format depends on contactType:
-     * <ul>
-     *   <li>EMAIL: "user@example.com"</li>
-     *   <li>PHONE: "+905551234567" (E.164) - WhatsApp capability via isWhatsApp flag</li>
-     *   <li>PHONE_EXTENSION: "101" (extension number)</li>
-     *   <li>WEBSITE: "https://www.example.com"</li>
-     *   <li>SOCIAL_MEDIA: "@username"</li>
-     * </ul>
-     */
-    @Column(name = "contact_value", nullable = false, length = 255)
-    private String contactValue;
+  /**
+   * Contact value (email address, phone number, URL, etc.)
+   *
+   * <p>Format depends on contactType:
+   *
+   * <ul>
+   *   <li>EMAIL: "user@example.com"
+   *   <li>PHONE: "+905551234567" (E.164) - WhatsApp capability via isWhatsApp flag
+   *   <li>PHONE_EXTENSION: "101" (extension number)
+   *   <li>WEBSITE: "https://www.example.com"
+   *   <li>SOCIAL_MEDIA: "@username"
+   * </ul>
+   */
+  @Column(name = "contact_value", nullable = false, length = 255)
+  private String contactValue;
 
-    /**
-     * Contact type (EMAIL, PHONE, PHONE_EXTENSION, etc.)
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "contact_type", nullable = false, length = 50)
-    private ContactType contactType;
+  /** Contact type (EMAIL, PHONE, PHONE_EXTENSION, etc.) */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "contact_type", nullable = false, length = 50)
+  private ContactType contactType;
 
-    /**
-     * Verification status
-     * <p>true = contact has been verified (e.g., email confirmation, SMS code)</p>
-     * <p>false = contact not yet verified</p>
-     */
-    @Column(name = "is_verified", nullable = false)
-    @Builder.Default
-    private Boolean isVerified = false;
+  /**
+   * Verification status
+   *
+   * <p>true = contact has been verified (e.g., email confirmation, SMS code)
+   *
+   * <p>false = contact not yet verified
+   */
+  @Column(name = "is_verified", nullable = false)
+  @Builder.Default
+  private Boolean isVerified = false;
 
-    /**
-     * Primary contact flag
-     * <p>true = primary contact for this owner (User or Company)</p>
-     * <p>Multiple contacts can have isPrimary = true (one per type)</p>
-     */
-    @Column(name = "is_primary", nullable = false)
-    @Builder.Default
-    private Boolean isPrimary = false;
+  /**
+   * Primary contact flag
+   *
+   * <p>true = primary contact for this owner (User or Company)
+   *
+   * <p>Multiple contacts can have isPrimary = true (one per type)
+   */
+  @Column(name = "is_primary", nullable = false)
+  @Builder.Default
+  private Boolean isPrimary = false;
 
-    /**
-     * Label for categorization
-     * <p>Examples: "Home", "Work", "Mobile", "Extension 101", "Main Office"</p>
-     */
-    @Column(name = "label", length = 100)
-    private String label;
+  /**
+   * Label for categorization
+   *
+   * <p>Examples: "Home", "Work", "Mobile", "Extension 101", "Main Office"
+   */
+  @Column(name = "label", length = 100)
+  private String label;
 
-    /**
-     * Parent contact ID (for PHONE_EXTENSION)
-     * <p>For PHONE_EXTENSION type, this references the parent PHONE contact</p>
-     * <p>Example: Extension "101" → parentContactId = company's main phone contact ID</p>
-     */
-    @Column(name = "parent_contact_id")
-    private UUID parentContactId;
+  /**
+   * Parent contact ID (for PHONE_EXTENSION)
+   *
+   * <p>For PHONE_EXTENSION type, this references the parent PHONE contact
+   *
+   * <p>Example: Extension "101" → parentContactId = company's main phone contact ID
+   */
+  @Column(name = "parent_contact_id")
+  private UUID parentContactId;
 
-    /**
-     * Personal vs. company-provided flag
-     * <p>true = User's personal contact (owned by user)</p>
-     * <p>false = Company-provided contact (e.g., work email, company phone extension)</p>
-     */
-    @Column(name = "is_personal", nullable = false)
-    @Builder.Default
-    private Boolean isPersonal = true;
+  /**
+   * Personal vs. company-provided flag
+   *
+   * <p>true = User's personal contact (owned by user)
+   *
+   * <p>false = Company-provided contact (e.g., work email, company phone extension)
+   */
+  @Column(name = "is_personal", nullable = false)
+  @Builder.Default
+  private Boolean isPersonal = true;
 
-    /**
-     * WhatsApp capability flag (for PHONE contacts only)
-     * <p>true = Phone number has WhatsApp capability</p>
-     * <p>false = Phone number does not have WhatsApp or not checked yet</p>
-     * <p>Used for verification code and notification priority (WhatsApp > SMS)</p>
-     */
-    @Column(name = "is_whatsapp", nullable = false)
-    @Builder.Default
-    private Boolean isWhatsApp = false;
+  /**
+   * WhatsApp capability flag (for PHONE contacts only)
+   *
+   * <p>true = Phone number has WhatsApp capability
+   *
+   * <p>false = Phone number does not have WhatsApp or not checked yet
+   *
+   * <p>Used for verification code and notification priority (WhatsApp > SMS)
+   */
+  @Column(name = "is_whatsapp", nullable = false)
+  @Builder.Default
+  private Boolean isWhatsApp = false;
 
-    /**
-     * Mark contact as verified
-     */
-    public void verify() {
-        this.isVerified = true;
-    }
+  /** Mark contact as verified */
+  public void verify() {
+    this.isVerified = true;
+  }
 
-    /**
-     * Mark contact as primary
-     */
-    public void setAsPrimary() {
-        this.isPrimary = true;
-    }
+  /** Mark contact as primary */
+  public void setAsPrimary() {
+    this.isPrimary = true;
+  }
 
-    /**
-     * Remove primary flag
-     */
-    public void removePrimary() {
-        this.isPrimary = false;
-    }
+  /** Remove primary flag */
+  public void removePrimary() {
+    this.isPrimary = false;
+  }
 
-    /**
-     * Check if this is a phone extension
-     */
-    public boolean isExtension() {
-        return ContactType.PHONE_EXTENSION.equals(this.contactType);
-    }
+  /** Check if this is a phone extension */
+  public boolean isExtension() {
+    return ContactType.PHONE_EXTENSION.equals(this.contactType);
+  }
 
-    /**
-     * Check if this is verified and can be used for authentication
-     */
-    public boolean canBeUsedForAuthentication() {
-        return this.isVerified && (ContactType.EMAIL.equals(this.contactType) ||
-                                   (this.contactType != null && this.contactType.isPhone()));
-    }
+  /** Check if this is verified and can be used for authentication */
+  public boolean canBeUsedForAuthentication() {
+    return this.isVerified
+        && (ContactType.EMAIL.equals(this.contactType)
+            || (this.contactType != null && this.contactType.isPhone()));
+  }
 
-    @Override
-    protected String getModuleCode() {
-        return "CONT";
-    }
+  @Override
+  protected String getModuleCode() {
+    return "CONT";
+  }
 }
-

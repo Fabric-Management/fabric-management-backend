@@ -5,16 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO for phone suggestion.
- */
+/** DTO for phone suggestion. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class PhoneSuggestion {
-    private String value;
-    private String source;
-    private String label;
+  private String value;
+  private String source;
+  private String label;
 }
-

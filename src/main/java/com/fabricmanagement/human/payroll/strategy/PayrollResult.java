@@ -5,7 +5,4 @@ import java.util.Map;
 
 public record PayrollResult(
     Map<java.util.UUID, BigDecimal> netAmounts,
-    Map<java.util.UUID, Map<String, Object>> metadata
-) {
-}
-
+    Map<java.util.UUID, Map<String, Object>> metadata) {}

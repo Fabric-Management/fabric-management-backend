@@ -31,11 +31,6 @@ spring:
     caffeine:
       spec: maximumSize=${CACHE_MAX_SIZE:10000},expireAfterWrite=${CACHE_EXPIRE_SECONDS:300}s
 
-  data:
-    redis:
-      repositories:
-        enabled: ${REDIS_REPOSITORIES_ENABLED:false}
-
   servlet:
     multipart:
       enabled: true

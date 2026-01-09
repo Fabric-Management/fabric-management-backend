@@ -9,15 +9,16 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class LeaveComplianceService {
 
-    public void validateAgainstPolicyPack(LeaveType leaveType, HrPolicyPack policyPack) {
-        if (policyPack == null) {
-            throw new IllegalStateException("No active HR policy pack available for leave accrual.");
-        }
-        if (!leaveType.appliesToCountry(policyPack.getCountryCode())
-            && !policyPack.getCountryCode().equalsIgnoreCase("GLOBAL")) {
-            log.warn("Leave type {} not configured for policy pack country {}",
-                leaveType.getCode(), policyPack.getCountryCode());
-        }
+  public void validateAgainstPolicyPack(LeaveType leaveType, HrPolicyPack policyPack) {
+    if (policyPack == null) {
+      throw new IllegalStateException("No active HR policy pack available for leave accrual.");
     }
+    if (!leaveType.appliesToCountry(policyPack.getCountryCode())
+        && !policyPack.getCountryCode().equalsIgnoreCase("GLOBAL")) {
+      log.warn(
+          "Leave type {} not configured for policy pack country {}",
+          leaveType.getCode(),
+          policyPack.getCountryCode());
+    }
+  }
 }
-

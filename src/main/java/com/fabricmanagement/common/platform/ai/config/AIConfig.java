@@ -12,28 +12,30 @@ import org.springframework.context.annotation.Configuration;
 /**
  * AI Configuration - LLM Client Bean Selection.
  *
- * <p>Selects appropriate LLM client based on application.ai.provider configuration.</p>
+ * <p>Selects appropriate LLM client based on application.ai.provider configuration.
  */
 @Configuration
 @RequiredArgsConstructor
 @Slf4j
 public class AIConfig {
 
-    private final AIProperties aiProperties;
-    private final ObjectMapper objectMapper;
+  private final AIProperties aiProperties;
+  private final ObjectMapper objectMapper;
 
-    @Bean
-    @ConditionalOnProperty(name = "application.ai.provider", havingValue = "openai", matchIfMissing = true)
-    public LLMClient openAIClient() {
-        log.info("Configuring OpenAI client: model={}", aiProperties.getModel());
-        return new OpenAIClient(aiProperties, objectMapper);
-    }
+  @Bean
+  @ConditionalOnProperty(
+      name = "application.ai.provider",
+      havingValue = "openai",
+      matchIfMissing = true)
+  public LLMClient openAIClient() {
+    log.info("Configuring OpenAI client: model={}", aiProperties.getModel());
+    return new OpenAIClient(aiProperties, objectMapper);
+  }
 
-    // Future: AnthropicClient, LocalLLMClient beans can be added here
-    // @Bean
-    // @ConditionalOnProperty(name = "application.ai.provider", havingValue = "anthropic")
-    // public LLMClient anthropicClient() {
-    //     return new AnthropicClient(aiProperties, objectMapper);
-    // }
+  // Future: AnthropicClient, LocalLLMClient beans can be added here
+  // @Bean
+  // @ConditionalOnProperty(name = "application.ai.provider", havingValue = "anthropic")
+  // public LLMClient anthropicClient() {
+  //     return new AnthropicClient(aiProperties, objectMapper);
+  // }
 }
-

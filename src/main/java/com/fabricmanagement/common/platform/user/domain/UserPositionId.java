@@ -1,21 +1,17 @@
 package com.fabricmanagement.common.platform.user.domain;
 
+import java.io.Serializable;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import java.io.Serializable;
-import java.util.UUID;
-
-/**
- * Composite primary key for UserPosition junction table.
- */
+/** Composite primary key for UserPosition junction table. */
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
 public class UserPositionId implements Serializable {
 
-    private UUID userId;
-    private UUID positionId;
+  private UUID userId;
+  private UUID positionId;
 }
-

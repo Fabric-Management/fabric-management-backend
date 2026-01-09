@@ -7,9 +7,11 @@ import org.springframework.stereotype.Component;
 /**
  * AI Configuration Properties.
  *
- * <p>Externalizes all AI-related configuration values from application.yml and environment variables.</p>
+ * <p>Externalizes all AI-related configuration values from application.yml and environment
+ * variables.
  *
- * <p><b>Usage:</b></p>
+ * <p><b>Usage:</b>
+ *
  * <pre>{@code
  * @Autowired
  * private AIProperties aiProperties;
@@ -22,54 +24,33 @@ import org.springframework.stereotype.Component;
 @Data
 public class AIProperties {
 
-    /**
-     * LLM provider: openai, anthropic, or local (Ollama)
-     */
-    private String provider = "openai";
+  /** LLM provider: openai, anthropic, or local (Ollama) */
+  private String provider = "openai";
 
-    /**
-     * API key for LLM provider (from .env)
-     */
-    private String apiKey;
+  /** API key for LLM provider (from .env) */
+  private String apiKey;
 
-    /**
-     * Model name (e.g., gpt-4o-mini, claude-3-haiku)
-     */
-    private String model = "gpt-4o-mini";
+  /** Model name (e.g., gpt-4o-mini, claude-3-haiku) */
+  private String model = "gpt-4o-mini";
 
-    /**
-     * Temperature for response generation (0.0-2.0)
-     */
-    private Double temperature = 0.7;
+  /** Temperature for response generation (0.0-2.0) */
+  private Double temperature = 0.7;
 
-    /**
-     * Maximum tokens in response
-     */
-    private Integer maxTokens = 1000;
+  /** Maximum tokens in response */
+  private Integer maxTokens = 1000;
 
-    /**
-     * Request timeout in milliseconds
-     */
-    private Integer timeout = 30000;
+  /** Request timeout in milliseconds */
+  private Integer timeout = 30000;
 
-    /**
-     * Enable/disable AI features
-     */
-    private Boolean enabled = true;
+  /** Enable/disable AI features */
+  private Boolean enabled = true;
 
-    /**
-     * Enable response caching (reduces costs)
-     */
-    private Boolean cacheEnabled = true;
+  /** Enable response caching (reduces costs) */
+  private Boolean cacheEnabled = true;
 
-    /**
-     * Cache TTL in seconds (default: 5 minutes)
-     */
-    private Integer cacheTtlSeconds = 300;
+  /** Cache TTL in seconds (default: 5 minutes) */
+  private Integer cacheTtlSeconds = 300;
 
-    /**
-     * Max context tokens for conversation history (default: 2000)
-     */
-    private Integer maxContextTokens = 2000;
+  /** Max context tokens for conversation history (default: 2000) */
+  private Integer maxContextTokens = 2000;
 }
-

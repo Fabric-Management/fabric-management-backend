@@ -20,6 +20,4 @@ public record LeavePolicyRequest(
     Map<String, Object> policyAttributes,
     String policyPackCode,
     Integer policyPackVersion,
-    String countryCode) {
-}
-
+    String countryCode) {}

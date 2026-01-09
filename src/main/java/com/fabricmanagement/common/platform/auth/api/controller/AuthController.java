@@ -21,27 +21,27 @@ import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
-
 /**
  * Auth Controller - Authentication endpoints.
  *
  * <p>Endpoints:
+ *
  * <ul>
- *   <li>POST /api/auth/register/check - Check eligibility & send verification</li>
- *   <li>POST /api/auth/register/verify - Verify code & complete registration</li>
- *   <li>POST /api/auth/login - Login with credentials</li>
- *   <li>GET /api/auth/user/{contactValue}/masked-contacts - Get masked contacts for password reset</li>
- *   <li>POST /api/auth/password-reset/request - Request password reset (send verification code)</li>
- *   <li>POST /api/auth/password-reset/verify - Verify code & reset password (complete flow)</li>
- *   <li>POST /api/auth/setup-password - Setup password with token</li>
- *   <li>POST /api/auth/logout - Logout (revoke tokens)</li>
- *   <li>POST /api/auth/refresh - Refresh access token</li>
+ *   <li>POST /api/auth/register/check - Check eligibility & send verification
+ *   <li>POST /api/auth/register/verify - Verify code & complete registration
+ *   <li>POST /api/auth/login - Login with credentials
+ *   <li>GET /api/auth/user/{contactValue}/masked-contacts - Get masked contacts for password reset
+ *   <li>POST /api/auth/password-reset/request - Request password reset (send verification code)
+ *   <li>POST /api/auth/password-reset/verify - Verify code & reset password (complete flow)
+ *   <li>POST /api/auth/setup-password - Setup password with token
+ *   <li>POST /api/auth/logout - Logout (revoke tokens)
+ *   <li>POST /api/auth/refresh - Refresh access token
  * </ul>
  */
 @RestController
@@ -50,157 +50,152 @@ import java.util.UUID;
 @Slf4j
 public class AuthController {
 
-    private final LoginService loginService;
-    private final RegistrationService registrationService;
-    private final PasswordSetupService passwordSetupService;
-    private final PasswordResetService passwordResetService;
-    private final LogoutService logoutService;
-    private final RefreshTokenService refreshTokenService;
-    private final JwtService jwtService;
+  private final LoginService loginService;
+  private final RegistrationService registrationService;
+  private final PasswordSetupService passwordSetupService;
+  private final PasswordResetService passwordResetService;
+  private final LogoutService logoutService;
+  private final RefreshTokenService refreshTokenService;
+  private final JwtService jwtService;
 
-    @PostMapping("/register/check")
-    public ResponseEntity<ApiResponse<String>> checkRegistrationEligibility(
-            @Valid @RequestBody RegisterCheckRequest request) {
-        log.info("Registration eligibility check: contactValue={}", 
-            PiiMaskingUtil.maskEmail(request.getContactValue()));
+  @PostMapping("/register/check")
+  public ResponseEntity<ApiResponse<String>> checkRegistrationEligibility(
+      @Valid @RequestBody RegisterCheckRequest request) {
+    log.info(
+        "Registration eligibility check: contactValue={}",
+        PiiMaskingUtil.maskEmail(request.getContactValue()));
 
-        String message = registrationService.checkEligibilityAndSendCode(request);
+    String message = registrationService.checkEligibilityAndSendCode(request);
 
-        return ResponseEntity.ok(ApiResponse.success(message));
-    }
+    return ResponseEntity.ok(ApiResponse.success(message));
+  }
 
-    @PostMapping("/register/verify")
-    public ResponseEntity<ApiResponse<LoginResponse>> verifyAndRegister(
-            @Valid @RequestBody VerifyAndRegisterRequest request) {
-        log.info("Verify and register: contactValue={}", 
-            PiiMaskingUtil.maskEmail(request.getContactValue()));
+  @PostMapping("/register/verify")
+  public ResponseEntity<ApiResponse<LoginResponse>> verifyAndRegister(
+      @Valid @RequestBody VerifyAndRegisterRequest request) {
+    log.info(
+        "Verify and register: contactValue={}",
+        PiiMaskingUtil.maskEmail(request.getContactValue()));
 
-        LoginResponse response = registrationService.verifyAndRegister(request);
+    LoginResponse response = registrationService.verifyAndRegister(request);
 
-        return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
-    }
+    return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
+  }
 
-    @PostMapping("/setup-password")
-    public ResponseEntity<ApiResponse<LoginResponse>> setupPassword(
-            @Valid @RequestBody PasswordSetupRequest request) {
-        
-        log.info("Password setup request: token={}...", 
-            request.getToken().substring(0, 8));
+  @PostMapping("/setup-password")
+  public ResponseEntity<ApiResponse<LoginResponse>> setupPassword(
+      @Valid @RequestBody PasswordSetupRequest request) {
 
-        LoginResponse response = passwordSetupService.setupPassword(request);
+    log.info("Password setup request: token={}...", request.getToken().substring(0, 8));
 
-        log.info("✅ Password setup successful, needsOnboarding={}", 
-            response.getNeedsOnboarding());
+    LoginResponse response = passwordSetupService.setupPassword(request);
 
-        return ResponseEntity.ok(ApiResponse.success(
+    log.info("✅ Password setup successful, needsOnboarding={}", response.getNeedsOnboarding());
+
+    return ResponseEntity.ok(
+        ApiResponse.success(
             response,
             response.getNeedsOnboarding()
                 ? "Welcome! Complete your profile to get started."
-                : "Welcome back! You're all set."
-        ));
+                : "Welcome back! You're all set."));
+  }
+
+  @PostMapping("/login")
+  public ResponseEntity<ApiResponse<LoginResponse>> login(
+      @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    log.info("Login request: contactValue={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
+
+    String ipAddress = getClientIpAddress(httpRequest);
+    LoginResponse response = loginService.login(request, ipAddress);
+
+    return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
+  }
+
+  @GetMapping("/user/{contactValue}/masked-contacts")
+  public ResponseEntity<ApiResponse<UserContactInfoResponse>> getMaskedContacts(
+      @PathVariable String contactValue) {
+    log.info("Getting masked contacts: contactValue={}", PiiMaskingUtil.maskEmail(contactValue));
+
+    UserContactInfoResponse response = passwordResetService.getMaskedContacts(contactValue);
+
+    return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
+  @PostMapping("/password-reset/request")
+  public ResponseEntity<ApiResponse<String>> requestPasswordReset(
+      @Valid @RequestBody PasswordResetRequest request) {
+    log.info(
+        "Password reset request: authUserId={}, contactType={}",
+        request.getAuthUserId(),
+        request.getContactType());
+
+    String message = passwordResetService.requestPasswordReset(request);
+
+    return ResponseEntity.ok(ApiResponse.success(message));
+  }
+
+  @PostMapping("/password-reset/verify")
+  public ResponseEntity<ApiResponse<LoginResponse>> verifyPasswordReset(
+      @Valid @RequestBody PasswordResetVerifyRequest request) {
+    log.info(
+        "Password reset verification: authUserId={}, code={}***",
+        request.getAuthUserId(),
+        request.getCode().substring(0, Math.min(2, request.getCode().length())));
+
+    LoginResponse response = passwordResetService.verifyAndResetPassword(request);
+
+    log.info(
+        "✅ Password reset completed successfully: userId={}, needsOnboarding={}",
+        response.getUser().getId(),
+        response.getNeedsOnboarding());
+
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            response, "Password reset successful! You have been automatically logged in."));
+  }
+
+  @PostMapping("/logout")
+  public ResponseEntity<ApiResponse<Void>> logout(
+      @Valid @RequestBody LogoutRequest request, HttpServletRequest httpRequest) {
+    log.info("Logout request");
+
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    logoutService.logout(request.getRefreshToken(), userId);
+
+    return ResponseEntity.ok(ApiResponse.success(null, "Logged out successfully"));
+  }
+
+  @PostMapping("/refresh")
+  public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(
+      @Valid @RequestBody RefreshTokenRequest request) {
+    log.info("Refresh token request");
+
+    LoginResponse response = refreshTokenService.refreshAccessToken(request.getRefreshToken());
+
+    return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
+  }
+
+  /** Extract user ID from JWT token in Authorization header. */
+  private UUID extractUserIdFromRequest(HttpServletRequest request) {
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      throw new IllegalArgumentException("Authorization header missing or invalid");
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(
-            @Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest) {
-        log.info("Login request: contactValue={}", 
-            PiiMaskingUtil.maskEmail(request.getContactValue()));
-
-        String ipAddress = getClientIpAddress(httpRequest);
-        LoginResponse response = loginService.login(request, ipAddress);
-
-        return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
+    String token = authHeader.substring(7);
+    try {
+      return jwtService.getUserIdFromToken(token);
+    } catch (Exception e) {
+      log.warn("Failed to extract userId from token: {}", e.getMessage());
+      throw new IllegalArgumentException("Invalid token");
     }
+  }
 
-    @GetMapping("/user/{contactValue}/masked-contacts")
-    public ResponseEntity<ApiResponse<UserContactInfoResponse>> getMaskedContacts(
-            @PathVariable String contactValue) {
-        log.info("Getting masked contacts: contactValue={}",
-            PiiMaskingUtil.maskEmail(contactValue));
-
-        UserContactInfoResponse response = passwordResetService.getMaskedContacts(contactValue);
-
-        return ResponseEntity.ok(ApiResponse.success(response));
+  private String getClientIpAddress(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+      return xForwardedFor.split(",")[0].trim();
     }
-
-    @PostMapping("/password-reset/request")
-    public ResponseEntity<ApiResponse<String>> requestPasswordReset(
-            @Valid @RequestBody PasswordResetRequest request) {
-        log.info("Password reset request: authUserId={}, contactType={}",
-            request.getAuthUserId(),
-            request.getContactType());
-
-        String message = passwordResetService.requestPasswordReset(request);
-
-        return ResponseEntity.ok(ApiResponse.success(message));
-    }
-
-    @PostMapping("/password-reset/verify")
-    public ResponseEntity<ApiResponse<LoginResponse>> verifyPasswordReset(
-            @Valid @RequestBody PasswordResetVerifyRequest request) {
-        log.info("Password reset verification: authUserId={}, code={}***",
-            request.getAuthUserId(),
-            request.getCode().substring(0, Math.min(2, request.getCode().length())));
-
-        LoginResponse response = passwordResetService.verifyAndResetPassword(request);
-
-        log.info("✅ Password reset completed successfully: userId={}, needsOnboarding={}",
-            response.getUser().getId(),
-            response.getNeedsOnboarding());
-
-        return ResponseEntity.ok(ApiResponse.success(
-            response,
-            "Password reset successful! You have been automatically logged in."
-        ));
-    }
-
-    @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(
-            @Valid @RequestBody LogoutRequest request,
-            HttpServletRequest httpRequest) {
-        log.info("Logout request");
-
-        UUID userId = extractUserIdFromRequest(httpRequest);
-        logoutService.logout(request.getRefreshToken(), userId);
-
-        return ResponseEntity.ok(ApiResponse.success(null, "Logged out successfully"));
-    }
-
-    @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(
-            @Valid @RequestBody RefreshTokenRequest request) {
-        log.info("Refresh token request");
-
-        LoginResponse response = refreshTokenService.refreshAccessToken(request.getRefreshToken());
-
-        return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
-    }
-
-    /**
-     * Extract user ID from JWT token in Authorization header.
-     */
-    private UUID extractUserIdFromRequest(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("Authorization header missing or invalid");
-        }
-
-        String token = authHeader.substring(7);
-        try {
-            return jwtService.getUserIdFromToken(token);
-        } catch (Exception e) {
-            log.warn("Failed to extract userId from token: {}", e.getMessage());
-            throw new IllegalArgumentException("Invalid token");
-        }
-    }
-
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
+    return request.getRemoteAddr();
+  }
 }
-

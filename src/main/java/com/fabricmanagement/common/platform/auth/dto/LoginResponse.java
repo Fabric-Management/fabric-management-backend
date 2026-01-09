@@ -12,12 +12,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LoginResponse {
 
-    private String accessToken;
-    private String refreshToken;
-    private Long expiresIn;
-    private UserDto user;
-    
-    @Builder.Default
-    private Boolean needsOnboarding = false;
-}
+  private String accessToken;
+  private String refreshToken;
+  private Long expiresIn;
+  private UserDto user;
 
+  @Builder.Default private Boolean needsOnboarding = false;
+}

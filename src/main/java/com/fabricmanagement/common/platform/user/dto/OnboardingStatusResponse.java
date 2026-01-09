@@ -5,15 +5,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Response DTO for onboarding status check.
- */
+/** Response DTO for onboarding status check. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class OnboardingStatusResponse {
 
-    private Boolean hasCompletedOnboarding;
+  private Boolean hasCompletedOnboarding;
 }
-

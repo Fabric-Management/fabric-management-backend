@@ -14,7 +14,4 @@ public record PayrollContext(
     String policyPackCode,
     Integer policyPackVersion,
     List<UUID> employeeIds,
-    Map<String, Object> policyParameters
-) {
-}
-
+    Map<String, Object> policyParameters) {}

@@ -10,19 +10,21 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Fabric Management System - Modular Monolith Application
  *
- * <p>A comprehensive multi-tenant fabric management system built with
- * Domain-Driven Design (DDD) and Modular Monolith architecture.</p>
+ * <p>A comprehensive multi-tenant fabric management system built with Domain-Driven Design (DDD)
+ * and Modular Monolith architecture.
  *
  * <h2>Architecture Principles:</h2>
+ *
  * <ul>
- *   <li><b>Modular Monolith:</b> Clean domain boundaries, in-process communication</li>
- *   <li><b>Multi-Tenant:</b> Row-Level Security (RLS) with tenant_id isolation</li>
- *   <li><b>Event-Driven:</b> Domain events for loose coupling between modules</li>
- *   <li><b>Policy-Controlled:</b> 5-layer policy engine for authorization</li>
- *   <li><b>Self-Healing:</b> Degraded mode support (Kafka, Redis optional)</li>
+ *   <li><b>Modular Monolith:</b> Clean domain boundaries, in-process communication
+ *   <li><b>Multi-Tenant:</b> Row-Level Security (RLS) with tenant_id isolation
+ *   <li><b>Event-Driven:</b> Domain events for loose coupling between modules
+ *   <li><b>Policy-Controlled:</b> 5-layer policy engine for authorization
+ *   <li><b>Self-Healing:</b> Degraded mode support (Kafka optional)
  * </ul>
  *
  * <h2>Module Structure:</h2>
+ *
  * <pre>
  * common/
  * ├─ platform/         → auth, user, company, policy, audit, communication
@@ -48,8 +50,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableRetry
 public class FabricManagementApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(FabricManagementApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(FabricManagementApplication.class, args);
+  }
 }
-

@@ -18,22 +18,21 @@ import lombok.Setter;
 @NoArgsConstructor
 public class HrPolicyBinding extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "policy_pack_id", nullable = false)
-    private HrPolicyPack policyPack;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "policy_pack_id", nullable = false)
+  private HrPolicyPack policyPack;
 
-    @Column(name = "policy_interface", nullable = false, length = 150)
-    private String policyInterface;
+  @Column(name = "policy_interface", nullable = false, length = 150)
+  private String policyInterface;
 
-    @Column(name = "strategy_bean", nullable = false, length = 150)
-    private String strategyBean;
+  @Column(name = "strategy_bean", nullable = false, length = 150)
+  private String strategyBean;
 
-    @Column(name = "config_reference", columnDefinition = "jsonb")
-    private String configReference;
+  @Column(name = "config_reference", columnDefinition = "jsonb")
+  private String configReference;
 
-    @Override
-    protected String getModuleCode() {
-        return "HRB";
-    }
+  @Override
+  protected String getModuleCode() {
+    return "HRB";
+  }
 }
-

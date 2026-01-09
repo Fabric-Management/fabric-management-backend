@@ -14,19 +14,18 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class EmergencyContact {
 
-    @Column(name = "emergency_contact_name", length = 100)
-    private String name;
+  @Column(name = "emergency_contact_name", length = 100)
+  private String name;
 
-    @Column(name = "emergency_contact_phone", length = 50)
-    private String phone;
+  @Column(name = "emergency_contact_phone", length = 50)
+  private String phone;
 
-    @Column(name = "emergency_contact_relationship", length = 50)
-    private String relationship;
+  @Column(name = "emergency_contact_relationship", length = 50)
+  private String relationship;
 
-    public boolean isEmpty() {
-        return (name == null || name.isBlank())
-            && (phone == null || phone.isBlank())
-            && (relationship == null || relationship.isBlank());
-    }
+  public boolean isEmpty() {
+    return (name == null || name.isBlank())
+        && (phone == null || phone.isBlank())
+        && (relationship == null || relationship.isBlank());
+  }
 }
-

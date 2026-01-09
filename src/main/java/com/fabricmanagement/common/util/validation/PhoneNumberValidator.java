@@ -7,34 +7,34 @@ import jakarta.validation.ConstraintValidatorContext;
 /**
  * Phone number validator implementation.
  *
- * <p>Validates phone numbers using PhoneValidationUtil.</p>
+ * <p>Validates phone numbers using PhoneValidationUtil.
  */
 public class PhoneNumberValidator implements ConstraintValidator<PhoneNumber, String> {
 
-    private String countryCode;
+  private String countryCode;
 
-    @Override
-    public void initialize(PhoneNumber constraintAnnotation) {
-        this.countryCode = constraintAnnotation.country();
+  @Override
+  public void initialize(PhoneNumber constraintAnnotation) {
+    this.countryCode = constraintAnnotation.country();
+  }
+
+  @Override
+  public boolean isValid(String phone, ConstraintValidatorContext context) {
+    if (phone == null || phone.isBlank()) {
+      // Let @NotNull or @NotBlank handle null/blank validation
+      return true;
     }
 
-    @Override
-    public boolean isValid(String phone, ConstraintValidatorContext context) {
-        if (phone == null || phone.isBlank()) {
-            // Let @NotNull or @NotBlank handle null/blank validation
-            return true;
-        }
+    PhoneValidationUtil.ValidationResult result = PhoneValidationUtil.validate(phone, countryCode);
 
-        PhoneValidationUtil.ValidationResult result = PhoneValidationUtil.validate(phone, countryCode);
-
-        if (!result.isValid()) {
-            context.disableDefaultConstraintViolation();
-            context.buildConstraintViolationWithTemplate(result.getErrorMessage())
-                .addConstraintViolation();
-            return false;
-        }
-
-        return true;
+    if (!result.isValid()) {
+      context.disableDefaultConstraintViolation();
+      context
+          .buildConstraintViolationWithTemplate(result.getErrorMessage())
+          .addConstraintViolation();
+      return false;
     }
+
+    return true;
+  }
 }
-

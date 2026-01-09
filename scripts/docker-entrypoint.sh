@@ -3,8 +3,11 @@
 # FABRIC MANAGEMENT - DOCKER ENTRYPOINT SCRIPT
 # =============================================================================
 # Smart entrypoint with dependency checking and health monitoring
+# Usage: Used as Docker ENTRYPOINT - DO NOT RUN MANUALLY
+#
+# Last Updated: 2025-01-27
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -24,42 +27,43 @@ wait_for_service() {
     local host=$1
     local port=$2
     local service=$3
-    local max_attempts=60
+    local max_attempts=${4:-60}
     local attempt=0
     
-    echo "${YELLOW}⏳ Waiting for $service at $host:$port...${NC}"
+    echo "${YELLOW}⏳ Waiting for ${service} at ${host}:${port}...${NC}"
+    
+    # Check if nc (netcat) is available
+    if ! command -v nc >/dev/null 2>&1; then
+        echo "${RED}❌ ERROR: 'nc' (netcat) command not found. Cannot check service availability.${NC}"
+        return 1
+    fi
     
     while [ $attempt -lt $max_attempts ]; do
-        if nc -z "$host" "$port" 2>/dev/null; then
-            echo "${GREEN}✅ $service is ready!${NC}"
+        if nc -z "${host}" "${port}" 2>/dev/null; then
+            echo "${GREEN}✅ ${service} is ready!${NC}"
             return 0
         fi
         
         attempt=$((attempt + 1))
-        echo "   Attempt $attempt/$max_attempts..."
+        echo "   Attempt ${attempt}/${max_attempts}..."
         sleep 2
     done
     
-    echo "${RED}❌ ERROR: $service is not available after $max_attempts attempts${NC}"
+    echo "${RED}❌ ERROR: ${service} is not available after ${max_attempts} attempts${NC}"
     return 1
 }
 
 # Wait for PostgreSQL
-if [ -n "$POSTGRES_HOST" ]; then
+if [ -n "${POSTGRES_HOST:-}" ]; then
     wait_for_service "${POSTGRES_HOST}" "${POSTGRES_PORT:-5432}" "PostgreSQL" || exit 1
 fi
 
-# Wait for Redis
-if [ -n "$REDIS_HOST" ]; then
-    wait_for_service "${REDIS_HOST}" "${REDIS_PORT:-6379}" "Redis" || exit 1
-fi
-
 # Wait for Kafka (if using Docker network)
-if [ -n "$KAFKA_BOOTSTRAP_SERVERS" ] && [ "$SPRING_PROFILES_ACTIVE" = "docker" ]; then
+if [ -n "${KAFKA_BOOTSTRAP_SERVERS:-}" ] && [ "${SPRING_PROFILES_ACTIVE:-}" = "docker" ]; then
     # Extract kafka host and port from bootstrap servers
-    KAFKA_HOST=$(echo "$KAFKA_BOOTSTRAP_SERVERS" | cut -d: -f1)
-    KAFKA_PORT=$(echo "$KAFKA_BOOTSTRAP_SERVERS" | cut -d: -f2)
-    wait_for_service "$KAFKA_HOST" "$KAFKA_PORT" "Kafka" || exit 1
+    KAFKA_HOST=$(echo "${KAFKA_BOOTSTRAP_SERVERS}" | cut -d: -f1)
+    KAFKA_PORT=$(echo "${KAFKA_BOOTSTRAP_SERVERS}" | cut -d: -f2)
+    wait_for_service "${KAFKA_HOST}" "${KAFKA_PORT}" "Kafka" || exit 1
 fi
 
 # =============================================================================
@@ -70,7 +74,7 @@ fi
 JMX_PORT="${JMX_PORT:-9010}"
 
 # Set default JVM options if not provided
-if [ -z "$JAVA_OPTS" ]; then
+if [ -z "${JAVA_OPTS:-}" ]; then
     JAVA_OPTS="-XX:MaxRAMPercentage=75.0 \
                -XX:InitialRAMPercentage=50.0 \
                -XX:+UseG1GC \
@@ -83,7 +87,7 @@ if [ -z "$JAVA_OPTS" ]; then
 fi
 
 # Add monitoring JVM options with configurable port
-JAVA_OPTS="$JAVA_OPTS \
+JAVA_OPTS="${JAVA_OPTS} \
            -Dcom.sun.management.jmxremote \
            -Dcom.sun.management.jmxremote.authenticate=false \
            -Dcom.sun.management.jmxremote.ssl=false \
@@ -103,10 +107,12 @@ echo "   JMX: Enabled on port 9010"
 
 echo ""
 echo "${GREEN}🚀 Starting Application...${NC}"
-echo "   Service: ${SPRING_APPLICATION_NAME:-Unknown}"
+echo "   Service: ${SPRING_APPLICATION_NAME:-fabric-management-backend}"
 echo "   Profile: ${SPRING_PROFILES_ACTIVE:-default}"
 echo "   Java Version: $(java -version 2>&1 | head -n 1)"
-echo "   Available Memory: $(free -m 2>/dev/null | grep Mem | awk '{print $2}' || echo 'N/A')MB"
+if command -v free >/dev/null 2>&1; then
+    echo "   Available Memory: $(free -m | grep Mem | awk '{print $2}')MB"
+fi
 echo ""
 
 # =============================================================================
@@ -114,5 +120,5 @@ echo ""
 # =============================================================================
 
 # Execute the main command
-exec java $JAVA_OPTS -jar /app/app.jar "$@"
+exec java ${JAVA_OPTS} -jar /app/app.jar "$@"
 

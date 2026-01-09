@@ -8,10 +8,11 @@ import org.springframework.stereotype.Component;
 /**
  * Publisher for domain events.
  *
- * <p>Wraps Spring's ApplicationEventPublisher with domain-specific logging
- * and eventual consistency support via Spring Modulith event publication.</p>
+ * <p>Wraps Spring's ApplicationEventPublisher with domain-specific logging and eventual consistency
+ * support via Spring Modulith event publication.
  *
  * <h2>Usage Example:</h2>
+ *
  * <pre>{@code
  * @Service
  * @RequiredArgsConstructor
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Component;
  *
  *     public void createMaterial(CreateMaterialRequest request) {
  *         Material material = materialRepository.save(Material.create(request));
- *         
+ *
  *         eventPublisher.publish(new MaterialCreatedEvent(
  *             TenantContext.getCurrentTenantId(),
  *             material.getId(),
@@ -35,27 +36,26 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class DomainEventPublisher {
 
-    private final ApplicationEventPublisher applicationEventPublisher;
+  private final ApplicationEventPublisher applicationEventPublisher;
 
-    /**
-     * Publishes a domain event to all interested listeners.
-     *
-     * @param event the domain event to publish
-     */
-    public void publish(DomainEvent event) {
-        log.debug("Publishing domain event: {}", event);
-        applicationEventPublisher.publishEvent(event);
-    }
+  /**
+   * Publishes a domain event to all interested listeners.
+   *
+   * @param event the domain event to publish
+   */
+  public void publish(DomainEvent event) {
+    log.debug("Publishing domain event: {}", event);
+    applicationEventPublisher.publishEvent(event);
+  }
 
-    /**
-     * Publishes multiple domain events.
-     *
-     * @param events the domain events to publish
-     */
-    public void publishAll(DomainEvent... events) {
-        for (DomainEvent event : events) {
-            publish(event);
-        }
+  /**
+   * Publishes multiple domain events.
+   *
+   * @param events the domain events to publish
+   */
+  public void publishAll(DomainEvent... events) {
+    for (DomainEvent event : events) {
+      publish(event);
     }
+  }
 }
-

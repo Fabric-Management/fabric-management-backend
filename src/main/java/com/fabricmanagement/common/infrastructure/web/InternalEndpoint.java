@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 public @interface InternalEndpoint {
-    String description() default "";
-    String[] calledBy() default {};
-}
+  String description() default "";
 
+  String[] calledBy() default {};
+}

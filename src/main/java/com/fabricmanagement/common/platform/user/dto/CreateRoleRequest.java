@@ -13,15 +13,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateRoleRequest {
 
-    @NotBlank(message = "Role name is required")
-    @Size(max = 100, message = "Role name must not exceed 100 characters")
-    private String roleName;
+  @NotBlank(message = "Role name is required")
+  @Size(max = 100, message = "Role name must not exceed 100 characters")
+  private String roleName;
 
-    @NotBlank(message = "Role code is required")
-    @Size(max = 50, message = "Role code must not exceed 50 characters")
-    private String roleCode;
+  @NotBlank(message = "Role code is required")
+  @Size(max = 50, message = "Role code must not exceed 50 characters")
+  private String roleCode;
 
-    @Size(max = 500, message = "Description must not exceed 500 characters")
-    private String description;
+  @Size(max = 500, message = "Description must not exceed 500 characters")
+  private String description;
 }
-

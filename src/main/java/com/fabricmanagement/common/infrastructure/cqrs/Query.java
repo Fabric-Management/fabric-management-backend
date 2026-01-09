@@ -3,19 +3,21 @@ package com.fabricmanagement.common.infrastructure.cqrs;
 /**
  * Marker interface for all queries in the system.
  *
- * <p>Queries represent read operations that return data without modifying state.
- * They follow the CQRS (Command Query Responsibility Segregation) principle.</p>
+ * <p>Queries represent read operations that return data without modifying state. They follow the
+ * CQRS (Command Query Responsibility Segregation) principle.
  *
  * <h2>Characteristics:</h2>
+ *
  * <ul>
- *   <li>Represents a request for data</li>
- *   <li>Has a clear name (GetMaterialQuery, SearchUsersQuery)</li>
- *   <li>Contains criteria/filters for data retrieval</li>
- *   <li>Should be immutable (use @Value or final fields)</li>
- *   <li>Does NOT modify system state</li>
+ *   <li>Represents a request for data
+ *   <li>Has a clear name (GetMaterialQuery, SearchUsersQuery)
+ *   <li>Contains criteria/filters for data retrieval
+ *   <li>Should be immutable (use @Value or final fields)
+ *   <li>Does NOT modify system state
  * </ul>
  *
  * <h2>Usage Example:</h2>
+ *
  * <pre>{@code
  * @Value
  * public class GetMaterialQuery implements Query<MaterialDto> {
@@ -41,6 +43,4 @@ package com.fabricmanagement.common.infrastructure.cqrs;
  * @see QueryHandler
  * @see Command
  */
-public interface Query<R> {
-}
-
+public interface Query<R> {}

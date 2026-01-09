@@ -9,6 +9,4 @@ public record LeaveAccrualResult(
     Instant calculatedAt,
     String policyPackCode,
     Integer policyPackVersion,
-    String metadata) {
-}
-
+    String metadata) {}

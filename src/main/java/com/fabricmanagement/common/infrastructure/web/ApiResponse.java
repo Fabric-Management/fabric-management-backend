@@ -1,20 +1,20 @@
 package com.fabricmanagement.common.infrastructure.web;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
 /**
  * Standard API response wrapper for all REST endpoints.
  *
- * <p>Provides consistent response structure across the entire API surface.
- * All endpoints should return data wrapped in ApiResponse for uniformity.</p>
+ * <p>Provides consistent response structure across the entire API surface. All endpoints should
+ * return data wrapped in ApiResponse for uniformity.
  *
  * <h2>Success Response Example:</h2>
+ *
  * <pre>{@code
  * {
  *   "success": true,
@@ -25,6 +25,7 @@ import java.time.Instant;
  * }</pre>
  *
  * <h2>Error Response Example:</h2>
+ *
  * <pre>{@code
  * {
  *   "success": false,
@@ -37,6 +38,7 @@ import java.time.Instant;
  * }</pre>
  *
  * <h2>Usage in Controllers:</h2>
+ *
  * <pre>{@code
  * @PostMapping
  * public ResponseEntity<ApiResponse<MaterialDto>> create(@RequestBody CreateMaterialRequest request) {
@@ -54,60 +56,51 @@ import java.time.Instant;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
 
-    private boolean success;
-    private T data;
+  private boolean success;
+  private T data;
+  private String message;
+  private ErrorDetail error;
+
+  @Builder.Default private Instant timestamp = Instant.now();
+
+  public static <T> ApiResponse<T> success(T data) {
+    return ApiResponse.<T>builder().success(true).data(data).timestamp(Instant.now()).build();
+  }
+
+  public static <T> ApiResponse<T> success(T data, String message) {
+    return ApiResponse.<T>builder()
+        .success(true)
+        .data(data)
+        .message(message)
+        .timestamp(Instant.now())
+        .build();
+  }
+
+  public static <T> ApiResponse<T> error(String code, String message) {
+    return ApiResponse.<T>builder()
+        .success(false)
+        .error(ErrorDetail.builder().code(code).message(message).build())
+        .timestamp(Instant.now())
+        .build();
+  }
+
+  public static <T> ApiResponse<T> error(ErrorDetail errorDetail) {
+    return ApiResponse.<T>builder()
+        .success(false)
+        .error(errorDetail)
+        .timestamp(Instant.now())
+        .build();
+  }
+
+  @Data
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public static class ErrorDetail {
+    private String code;
     private String message;
-    private ErrorDetail error;
-    
-    @Builder.Default
-    private Instant timestamp = Instant.now();
-
-    public static <T> ApiResponse<T> success(T data) {
-        return ApiResponse.<T>builder()
-            .success(true)
-            .data(data)
-            .timestamp(Instant.now())
-            .build();
-    }
-
-    public static <T> ApiResponse<T> success(T data, String message) {
-        return ApiResponse.<T>builder()
-            .success(true)
-            .data(data)
-            .message(message)
-            .timestamp(Instant.now())
-            .build();
-    }
-
-    public static <T> ApiResponse<T> error(String code, String message) {
-        return ApiResponse.<T>builder()
-            .success(false)
-            .error(ErrorDetail.builder()
-                .code(code)
-                .message(message)
-                .build())
-            .timestamp(Instant.now())
-            .build();
-    }
-
-    public static <T> ApiResponse<T> error(ErrorDetail errorDetail) {
-        return ApiResponse.<T>builder()
-            .success(false)
-            .error(errorDetail)
-            .timestamp(Instant.now())
-            .build();
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    public static class ErrorDetail {
-        private String code;
-        private String message;
-        private String field;
-        private Object rejectedValue;
-    }
+    private String field;
+    private Object rejectedValue;
+  }
 }
-

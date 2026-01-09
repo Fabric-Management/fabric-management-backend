@@ -1,12 +1,11 @@
 package com.fabricmanagement.common.platform.user.dto;
 
 import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.UUID;
 
 @Data
 @Builder
@@ -14,10 +13,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AssignDepartmentRequest {
 
-    @NotNull(message = "Department ID is required")
-    private UUID departmentId;
+  @NotNull(message = "Department ID is required")
+  private UUID departmentId;
 
-    @Builder.Default
-    private Boolean isPrimary = false;
+  @Builder.Default private Boolean isPrimary = false;
 }
-
