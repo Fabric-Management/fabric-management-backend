@@ -7,16 +7,16 @@
 .ONESHELL:
 .PHONY: help setup validate-env app-build app-run test test-integration coverage \
         dev up up-all down down-clean restart restart-db status ps logs logs-db logs-redis logs-errors \
-        health metrics prometheus grafana swagger \
+        health metrics swagger \
         db-shell db-migrate db-info db-validate db-clean db-tables db-schemas \
         db-view-companies db-view-users db-view-subscriptions db-view-tokens db-view-all \
         show-tables \
         db-backup db-restore db-reset \
         kafka-topics kafka-describe kafka-consumer \
         clean clean-docker prune rebuild \
-        lint format \
-        quick-test full-cycle dev-workflow dev-reset dev-clean-tokens dev-clean-codes dev-stats dev-tools-health \
-        git-status git-branch git-diff info endpoints
+        lint format checkstyle spotbugs code-quality \
+        quick-test dev-reset dev-clean-tokens dev-clean-codes dev-stats dev-tools-health \
+        info
 
 .DEFAULT_GOAL := help
 
@@ -32,16 +32,12 @@ NC := \033[0m
 
 # Ports & URLs
 APP_PORT ?= 8080
-PROM_PORT ?= 9090
-GRAFANA_PORT ?= 3000
 BASE_URL := http://localhost:$(APP_PORT)
 
 # Containers & services (Docker Compose service names)
 POSTGRES_SERVICE := postgres
 REDIS_SERVICE := redis
 KAFKA_SERVICE := kafka
-PROM_SERVICE := prometheus
-GRAFANA_SERVICE := grafana
 
 # Explicit container names if set in docker-compose
 POSTGRES_CONTAINER := fabric-postgres
@@ -116,10 +112,23 @@ lint: ## Check code quality (verify without tests)
 	mvn verify -DskipTests
 	@echo "$(GREEN)✅ Code quality check completed$(NC)"
 
-format: ## Format code (Spotless if configured)
+format: ## Format code (Google Java Format)
 	@echo "$(YELLOW)💅 Formatting code...$(NC)"
-	mvn spotless:apply 2>/dev/null || echo "$(YELLOW)⚠️  Spotless not configured$(NC)"
+	mvn fmt:format
 	@echo "$(GREEN)✅ Code formatted$(NC)"
+
+checkstyle: ## Run Checkstyle code style checks
+	@echo "$(YELLOW)🔍 Running Checkstyle...$(NC)"
+	mvn checkstyle:check
+	@echo "$(GREEN)✅ Checkstyle completed$(NC)"
+
+spotbugs: ## Run SpotBugs bug detection
+	@echo "$(YELLOW)🐛 Running SpotBugs...$(NC)"
+	mvn spotbugs:check
+	@echo "$(GREEN)✅ SpotBugs completed$(NC)"
+
+code-quality: format checkstyle spotbugs ## Run all code quality checks
+	@echo "$(GREEN)✅ All code quality checks completed!$(NC)"
 
 # =============================================================================
 # DOCKER INFRASTRUCTURE
@@ -130,9 +139,9 @@ dev: validate-env ## Start PostgreSQL + Redis (fast dev mode)
 	@sleep 3
 	@$(MAKE) status
 
-up: validate-env ## Start core + Kafka + Monitoring (commonly used)
-	@echo "$(YELLOW)🚀 Starting core infra (Postgres, Redis, Kafka, Prometheus, Grafana)...$(NC)"
-	docker compose up -d $(POSTGRES_SERVICE) $(REDIS_SERVICE) $(KAFKA_SERVICE) $(PROM_SERVICE) $(GRAFANA_SERVICE)
+up: validate-env ## Start core infra (Postgres, Redis, Kafka)
+	@echo "$(YELLOW)🚀 Starting core infra (Postgres, Redis, Kafka)...$(NC)"
+	docker compose up -d $(POSTGRES_SERVICE) $(REDIS_SERVICE) $(KAFKA_SERVICE)
 	@sleep 5
 	@$(MAKE) status
 
@@ -198,14 +207,6 @@ health: ## Check application + infra health
 metrics: ## Show actuator metrics index
 	@echo "$(YELLOW)📊 Application Metrics:$(NC)"
 	curl -s $(BASE_URL)/actuator/metrics | jq . 2>/dev/null || echo "$(RED)❌ Metrics not available$(NC)"
-
-prometheus: ## Open Prometheus UI
-	@echo "$(BLUE)📊 Opening Prometheus...$(NC)"
-	open http://localhost:$(PROM_PORT) || xdg-open http://localhost:$(PROM_PORT) 2>/dev/null || echo "Visit: http://localhost:$(PROM_PORT)"
-
-grafana: ## Open Grafana UI
-	@echo "$(BLUE)📊 Opening Grafana...$(NC)"
-	open http://localhost:$(GRAFANA_PORT) || xdg-open http://localhost:$(GRAFANA_PORT) 2>/dev/null || echo "Visit: http://localhost:$(GRAFANA_PORT) (admin/admin)"
 
 swagger: ## Open Swagger UI
 	@echo "$(BLUE)📖 Opening Swagger UI...$(NC)"
@@ -452,72 +453,9 @@ quick-test: ## Quick test (stats → reset → stats)
 	$(MAKE) dev-stats
 	echo ""; echo "$(GREEN)✅ Ready for fresh testing!$(NC)"
 
-full-cycle: ## Full test cycle (reset → onboard → login → next steps)
-	@echo "$(BLUE)🚀 Full Test Cycle:$(NC)"
-	echo ""; echo "$(YELLOW)1️⃣ Resetting database...$(NC)"
-	curl -s -X POST $(BASE_URL)/api/dev/reset-all | jq -r '.message' 2>/dev/null || true
-	echo ""; echo "$(YELLOW)2️⃣ Creating tenant (Akkayalar Tekstil)...$(NC)"
-	curl -s -X POST $(BASE_URL)/api/admin/onboarding/tenant \
-	  -H "Content-Type: application/json" \
-	  -d '{"companyName":"Akkayalar Tekstil Dokuma San. Tic. Ltd.Sti","taxId":"4420543162","companyType":"WEAVER","adminFirstName":"Fatih","adminLastName":"Akkaya","adminContact":"fatih@akkayalartekstil.com.tr","selectedOS":["LoomOS","AccountOS"],"trialDays":90}' \
-	  | jq -r '"Company: " + .data.companyName + "\nSetup URL: " + .data.setupUrl + "\nToken: " + .data.registrationToken' 2>/dev/null || true
-	echo ""; echo "$(GREEN)✅ Tenant created! Use token above for password setup.$(NC)"
-	echo "$(YELLOW)Next: Run password setup in Postman with the token$(NC)"
-
-dev-workflow: ## Dev workflow reminders
-	@echo "$(BLUE)📚 Development Workflow:$(NC)"
-	echo ""; echo "$(YELLOW)1) Infra$(NC) : make dev  (or: make up)"
-	echo "$(YELLOW)2) App$(NC)   : make app-run"
-	echo "$(YELLOW)3) Health$(NC) : make health"
-	echo "$(YELLOW)4) Stats$(NC)  : make dev-stats"
-	echo "$(YELLOW)5) Postman$(NC): import postman collection"
-	echo "$(YELLOW)6) Reset$(NC)  : make dev-reset"
-	echo ""; echo "$(GREEN)💡 Tip: 'make quick-test' for rapid reset$(NC)"
-
-# =============================================================================
-# GIT HELPERS / INFO
-# =============================================================================
-git-status: ## Show detailed git status
-	git status
-	echo "\n$(YELLOW)Recent commits:$(NC)"
-	git log --oneline -5
-
-git-branch: ## Show current branch
-	git branch --show-current
-
-git-diff: ## Show unstaged changes
-	git diff
-
 info: ## Show system info
 	@echo "$(BLUE)📋 System Information:$(NC)"
 	@echo "$(YELLOW)Java Version:$(NC)";  java -version 2>&1 | head -1
 	@echo "$(YELLOW)Maven Version:$(NC)"; mvn -version | head -1
 	@echo "$(YELLOW)Docker Version:$(NC)"; docker --version
 	@echo "$(YELLOW)Docker Compose:$(NC)"; docker compose version
-
-endpoints: ## Show available API endpoints (quick list)
-	@echo "$(BLUE)📡 API Endpoints:$(NC)"
-	echo ""; echo "$(YELLOW)Health & Monitoring:$(NC)"
-	echo "  $(BASE_URL)/api/health"
-	echo "  $(BASE_URL)/api/info"
-	echo "  $(BASE_URL)/actuator/health"
-	echo "  $(BASE_URL)/swagger-ui.html"
-	echo ""; echo "$(YELLOW)Onboarding:$(NC)"
-	echo "  POST $(BASE_URL)/api/admin/onboarding/tenant"
-	echo "  POST $(BASE_URL)/api/public/signup"
-	echo "  POST $(BASE_URL)/api/auth/setup-password"
-	echo ""; echo "$(YELLOW)Auth:$(NC)"
-	echo "  POST $(BASE_URL)/api/auth/login"
-	echo "  POST $(BASE_URL)/api/auth/register/check"
-	echo "  POST $(BASE_URL)/api/auth/register/verify"
-	echo ""; echo "$(YELLOW)Companies:$(NC)"
-	echo "  GET/POST $(BASE_URL)/api/common/companies"
-	echo ""; echo "$(YELLOW)Users:$(NC)"
-	echo "  GET/POST $(BASE_URL)/api/common/users"
-	echo ""; echo "$(YELLOW)Dev Tools (local):$(NC)"
-	echo "  POST $(BASE_URL)/api/dev/reset-all"
-	echo "  POST $(BASE_URL)/api/dev/clean-tokens"
-	echo "  GET  $(BASE_URL)/api/dev/stats"
-	echo ""; echo "$(YELLOW)Monitoring:$(NC)"
-	echo "  Prometheus: http://localhost:$(PROM_PORT)"
-	echo "  Grafana   : http://localhost:$(GRAFANA_PORT) (admin/admin)"

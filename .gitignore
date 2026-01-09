@@ -60,6 +60,7 @@ tmp/
 *.pid
 *.seed
 *.pid.lock
+hs_err_pid*.log
 
 # Database Files
 # ==========================================
@@ -134,12 +135,6 @@ credentials/
 /downloads/
 *.pid
 
-# Monitoring Data (Prometheus, Grafana, Alertmanager)
-# ==========================================
-# Keep configs, ignore runtime data
-monitoring/prometheus/data/
-monitoring/grafana/data/
-monitoring/alertmanager/data/
 
 # Reports (keep only in docs/analysis)
 # ==========================================
