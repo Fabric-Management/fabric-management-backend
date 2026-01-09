@@ -12,19 +12,6 @@ spring:
       max-lifetime: ${DB_MAX_LIFETIME:1800000}
       leak-detection-threshold: ${DB_LEAK_DETECTION_THRESHOLD:60000}
 
-  data:
-    redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD}
-      timeout: ${REDIS_TIMEOUT:2000}ms
-      ssl: ${REDIS_SSL:true}
-      lettuce:
-        pool:
-          max-active: ${REDIS_POOL_MAX_ACTIVE:20}
-          max-idle: ${REDIS_POOL_MAX_IDLE:10}
-          min-idle: ${REDIS_POOL_MIN_IDLE:5}
-
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:

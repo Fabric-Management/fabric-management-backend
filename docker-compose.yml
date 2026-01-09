@@ -17,7 +17,6 @@ networks:
 
 volumes:
   postgres_data:
-  redis_data:
   kafka_data:
   zookeeper_data:
 
@@ -34,8 +33,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: ${SERVER_PORT:-8080}
@@ -45,9 +42,6 @@ services:
       POSTGRES_HOST: ${POSTGRES_CONTAINER_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_CONTAINER_PORT:-5432}
       DATABASE_URL: ${DATABASE_URL_CONTAINER:-jdbc:postgresql://${POSTGRES_CONTAINER_HOST:-postgres}:${POSTGRES_CONTAINER_PORT:-5432}/${POSTGRES_DB:?error}}
-      REDIS_HOST: ${REDIS_CONTAINER_HOST:-redis}
-      REDIS_PORT: ${REDIS_CONTAINER_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       MAIL_HOST: ${MAIL_HOST:-smtp.hostinger.com}
       MAIL_PORT: ${MAIL_PORT:-465}
       MAIL_USERNAME: ${MAIL_USERNAME:?error}
@@ -95,38 +89,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    logging: *default-logging
-
-  # ==============================================
-  # CACHE - Redis 7
-  # ==============================================
-  redis:
-    image: redis:7-alpine
-    container_name: fabric-redis
-    restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_MAX_MEMORY: ${REDIS_MAX_MEMORY:-256mb}
-    command: >
-      sh -c '
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --maxmemory $$REDIS_MAX_MEMORY --maxmemory-policy allkeys-lru;
-        else
-          redis-server --appendonly yes --maxmemory $$REDIS_MAX_MEMORY --maxmemory-policy allkeys-lru;
-        fi
-      '
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - fabric-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     logging: *default-logging
 
   # ==============================================
