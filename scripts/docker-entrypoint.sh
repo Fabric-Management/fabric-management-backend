@@ -58,11 +58,6 @@ if [ -n "${POSTGRES_HOST:-}" ]; then
     wait_for_service "${POSTGRES_HOST}" "${POSTGRES_PORT:-5432}" "PostgreSQL" || exit 1
 fi
 
-# Wait for Redis
-if [ -n "${REDIS_HOST:-}" ]; then
-    wait_for_service "${REDIS_HOST}" "${REDIS_PORT:-6379}" "Redis" || exit 1
-fi
-
 # Wait for Kafka (if using Docker network)
 if [ -n "${KAFKA_BOOTSTRAP_SERVERS:-}" ] && [ "${SPRING_PROFILES_ACTIVE:-}" = "docker" ]; then
     # Extract kafka host and port from bootstrap servers

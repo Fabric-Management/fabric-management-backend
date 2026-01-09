@@ -20,7 +20,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *   <li><b>Multi-Tenant:</b> Row-Level Security (RLS) with tenant_id isolation
  *   <li><b>Event-Driven:</b> Domain events for loose coupling between modules
  *   <li><b>Policy-Controlled:</b> 5-layer policy engine for authorization
- *   <li><b>Self-Healing:</b> Degraded mode support (Kafka, Redis optional)
+ *   <li><b>Self-Healing:</b> Degraded mode support (Kafka optional)
  * </ul>
  *
  * <h2>Module Structure:</h2>

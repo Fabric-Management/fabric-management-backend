@@ -6,7 +6,7 @@
 .SHELLFLAGS := -eu -o pipefail -c
 .ONESHELL:
 .PHONY: help setup validate-env app-build app-run test test-integration coverage \
-        dev up up-all down down-clean restart restart-db status ps logs logs-db logs-redis logs-errors \
+        dev up up-all down down-clean restart restart-db status ps logs logs-db logs-errors \
         health metrics swagger \
         db-shell db-migrate db-info db-validate db-clean db-tables db-schemas \
         db-view-companies db-view-users db-view-subscriptions db-view-tokens db-view-all \
@@ -16,7 +16,7 @@
         clean clean-docker prune rebuild \
         lint format checkstyle spotbugs code-quality \
         quick-test dev-reset dev-clean-tokens dev-clean-codes dev-stats dev-tools-health \
-        info
+        github-cleanup github-cleanup-dry-run info
 
 .DEFAULT_GOAL := help
 
@@ -36,7 +36,6 @@ BASE_URL := http://localhost:$(APP_PORT)
 
 # Containers & services (Docker Compose service names)
 POSTGRES_SERVICE := postgres
-REDIS_SERVICE := redis
 KAFKA_SERVICE := kafka
 
 # Explicit container names if set in docker-compose
@@ -55,7 +54,7 @@ help: ## Show available commands
 	| awk 'BEGIN {FS = ":.*?## "}; {printf "$(BLUE)%-25s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(YELLOW)Quick Start:$(NC)"
-	@echo "  make dev          # Start PostgreSQL + Redis"
+	@echo "  make dev          # Start PostgreSQL"
 	@echo "  make app-run      # Run Spring Boot app"
 	@echo "  make health       # Check application health"
 
@@ -133,15 +132,15 @@ code-quality: format checkstyle spotbugs ## Run all code quality checks
 # =============================================================================
 # DOCKER INFRASTRUCTURE
 # =============================================================================
-dev: validate-env ## Start PostgreSQL + Redis (fast dev mode)
-	@echo "$(YELLOW)🚀 Starting development infra (Postgres + Redis)...$(NC)"
-	docker compose up -d $(POSTGRES_SERVICE) $(REDIS_SERVICE)
+dev: validate-env ## Start PostgreSQL (fast dev mode)
+	@echo "$(YELLOW)🚀 Starting development infra (Postgres)...$(NC)"
+	docker compose up -d $(POSTGRES_SERVICE)
 	@sleep 3
 	@$(MAKE) status
 
-up: validate-env ## Start core infra (Postgres, Redis, Kafka)
-	@echo "$(YELLOW)🚀 Starting core infra (Postgres, Redis, Kafka)...$(NC)"
-	docker compose up -d $(POSTGRES_SERVICE) $(REDIS_SERVICE) $(KAFKA_SERVICE)
+up: validate-env ## Start core infra (Postgres, Kafka)
+	@echo "$(YELLOW)🚀 Starting core infra (Postgres, Kafka)...$(NC)"
+	docker compose up -d $(POSTGRES_SERVICE) $(KAFKA_SERVICE)
 	@sleep 5
 	@$(MAKE) status
 
@@ -184,9 +183,6 @@ logs: ## Tail logs from all services
 logs-db: ## Tail PostgreSQL logs
 	docker compose logs -f --tail=100 $(POSTGRES_SERVICE)
 
-logs-redis: ## Tail Redis logs
-	docker compose logs -f --tail=100 $(REDIS_SERVICE)
-
 logs-errors: ## Grep ERROR/EXCEPTION in last 200 lines
 	docker compose logs --tail=200 | grep -iE "error|exception|failed" || echo "$(GREEN)✅ No errors$(NC)"
 
@@ -201,8 +197,6 @@ health: ## Check application + infra health
 	curl -s $(BASE_URL)/actuator/health | jq . 2>/dev/null || echo "$(RED)❌ Actuator not responding$(NC)"
 	echo "\n$(YELLOW)PostgreSQL:$(NC)"
 	docker compose ps $(POSTGRES_SERVICE) | grep -q "(healthy)" && echo "$(GREEN)✅ Healthy$(NC)" || echo "$(RED)❌ Unhealthy$(NC)"
-	echo "\n$(YELLOW)Redis:$(NC)"
-	docker compose ps $(REDIS_SERVICE) | grep -q "(healthy)" && echo "$(GREEN)✅ Healthy$(NC)" || echo "$(RED)❌ Unhealthy$(NC)"
 
 metrics: ## Show actuator metrics index
 	@echo "$(YELLOW)📊 Application Metrics:$(NC)"
@@ -405,7 +399,7 @@ prune: ## Docker system prune
 rebuild: validate-env ## Rebuild Docker images + restart core stack
 	@echo "$(YELLOW)🧹 Rebuilding containers...$(NC)"
 	docker compose down
-	docker compose up -d --build app $(POSTGRES_SERVICE) $(REDIS_SERVICE)
+	docker compose up -d --build app $(POSTGRES_SERVICE)
 	@sleep 5
 	@$(MAKE) status
 	@echo "$(GREEN)✅ Rebuild completed$(NC)"
@@ -452,6 +446,18 @@ quick-test: ## Quick test (stats → reset → stats)
 	echo ""; echo "$(YELLOW)3️⃣ Clean Stats:$(NC)"
 	$(MAKE) dev-stats
 	echo ""; echo "$(GREEN)✅ Ready for fresh testing!$(NC)"
+
+github-cleanup: ## 🧹 Clean all GitHub Actions workflow runs
+	@echo "$(RED)⚠️  This will DELETE ALL workflow runs!$(NC)"
+	read -p "Type 'yes' to confirm: " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
+	  echo "$(YELLOW)🧹 Cleaning GitHub Actions runs...$(NC)"; \
+	  ./scripts/cleanup-github-actions.sh; \
+	else echo "$(YELLOW)Cancelled$(NC)"; fi
+
+github-cleanup-dry-run: ## 🔍 Preview GitHub Actions cleanup (dry-run)
+	@echo "$(BLUE)🔍 Previewing GitHub Actions cleanup...$(NC)"
+	./scripts/cleanup-github-actions.sh --dry-run
 
 info: ## Show system info
 	@echo "$(BLUE)📋 System Information:$(NC)"
