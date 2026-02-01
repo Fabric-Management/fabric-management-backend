@@ -104,9 +104,10 @@ coverage: ## Generate test coverage report (JaCoCo)
 	$(MVN) jacoco:report
 	@echo "$(GREEN)✅ Coverage: target/site/jacoco/index.html$(NC)"
 
-lint: ## Check code quality (verify without tests)
+lint: ## Check code quality (format, compile, checkstyle, spotbugs — no tests/coverage)
 	@echo "$(YELLOW)🔍 Checking code quality...$(NC)"
-	$(MVN) verify -DskipTests
+	$(MVN) fmt:check
+	$(MVN) compile checkstyle:check spotbugs:check
 	@echo "$(GREEN)✅ Code quality check completed$(NC)"
 
 format: ## Format code (Google Java Format)
