@@ -44,7 +44,13 @@ import lombok.*;
  * }</pre>
  */
 @Entity
-@Table(name = "common_company", schema = "common_company")
+@Table(
+    name = "common_company",
+    schema = "common_company",
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uk_company_tenant_tax_id",
+            columnNames = {"tenant_id", "tax_id"}))
 @AttributeOverride(
     name = "tenantId",
     column = @Column(name = "tenant_id", nullable = false, updatable = true))
@@ -58,7 +64,7 @@ public class Company extends BaseEntity {
   @Column(name = "company_name", nullable = false, length = 255)
   private String companyName;
 
-  @Column(name = "tax_id", nullable = false, unique = true, length = 50)
+  @Column(name = "tax_id", nullable = false, length = 50)
   private String taxId;
 
   @Enumerated(EnumType.STRING)
@@ -71,13 +77,11 @@ public class Company extends BaseEntity {
 
   @OneToMany(mappedBy = "company", fetch = FetchType.LAZY)
   @Builder.Default
-  private List<com.fabricmanagement.common.platform.communication.domain.CompanyContact>
-      companyContacts = new ArrayList<>();
+  private List<CompanyContact> companyContacts = new ArrayList<>();
 
   @OneToMany(mappedBy = "company", fetch = FetchType.LAZY)
   @Builder.Default
-  private List<com.fabricmanagement.common.platform.communication.domain.CompanyAddress>
-      companyAddresses = new ArrayList<>();
+  private List<CompanyAddress> companyAddresses = new ArrayList<>();
 
   /** Get default contact for business communication. */
   public Optional<com.fabricmanagement.common.platform.communication.domain.Contact>
@@ -85,7 +89,7 @@ public class Company extends BaseEntity {
     return companyContacts.stream()
         .filter(cc -> Boolean.TRUE.equals(cc.getIsDefault()))
         .findFirst()
-        .map(com.fabricmanagement.common.platform.communication.domain.CompanyContact::getContact);
+        .map(CompanyContact::getContact);
   }
 
   /** Get headquarters address. */
@@ -94,7 +98,7 @@ public class Company extends BaseEntity {
     return companyAddresses.stream()
         .filter(ca -> Boolean.TRUE.equals(ca.getIsHeadquarters()))
         .findFirst()
-        .map(com.fabricmanagement.common.platform.communication.domain.CompanyAddress::getAddress);
+        .map(CompanyAddress::getAddress);
   }
 
   /** Get primary address. */
@@ -103,7 +107,7 @@ public class Company extends BaseEntity {
     return companyAddresses.stream()
         .filter(ca -> Boolean.TRUE.equals(ca.getIsPrimary()))
         .findFirst()
-        .map(com.fabricmanagement.common.platform.communication.domain.CompanyAddress::getAddress);
+        .map(CompanyAddress::getAddress);
   }
 
   public CompanyCategory getCategory() {
