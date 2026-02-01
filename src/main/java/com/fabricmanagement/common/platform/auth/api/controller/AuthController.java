@@ -4,20 +4,11 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.JwtService;
 import com.fabricmanagement.common.platform.auth.app.LoginService;
 import com.fabricmanagement.common.platform.auth.app.LogoutService;
-import com.fabricmanagement.common.platform.auth.app.PasswordResetService;
-import com.fabricmanagement.common.platform.auth.app.PasswordSetupService;
 import com.fabricmanagement.common.platform.auth.app.RefreshTokenService;
-import com.fabricmanagement.common.platform.auth.app.RegistrationService;
 import com.fabricmanagement.common.platform.auth.dto.LoginRequest;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.common.platform.auth.dto.LogoutRequest;
-import com.fabricmanagement.common.platform.auth.dto.PasswordResetRequest;
-import com.fabricmanagement.common.platform.auth.dto.PasswordResetVerifyRequest;
-import com.fabricmanagement.common.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.common.platform.auth.dto.RefreshTokenRequest;
-import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
-import com.fabricmanagement.common.platform.auth.dto.UserContactInfoResponse;
-import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -28,21 +19,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Auth Controller - Authentication endpoints.
+ * Auth session: login, logout, refresh token.
  *
- * <p>Endpoints:
- *
- * <ul>
- *   <li>POST /api/auth/register/check - Check eligibility & send verification
- *   <li>POST /api/auth/register/verify - Verify code & complete registration
- *   <li>POST /api/auth/login - Login with credentials
- *   <li>GET /api/auth/user/{contactValue}/masked-contacts - Get masked contacts for password reset
- *   <li>POST /api/auth/password-reset/request - Request password reset (send verification code)
- *   <li>POST /api/auth/password-reset/verify - Verify code & reset password (complete flow)
- *   <li>POST /api/auth/setup-password - Setup password with token
- *   <li>POST /api/auth/logout - Logout (revoke tokens)
- *   <li>POST /api/auth/refresh - Refresh access token
- * </ul>
+ * <p>Base path: /api/auth. Registration and password endpoints are in RegistrationController and
+ * PasswordController.
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -51,117 +31,25 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
   private final LoginService loginService;
-  private final RegistrationService registrationService;
-  private final PasswordSetupService passwordSetupService;
-  private final PasswordResetService passwordResetService;
   private final LogoutService logoutService;
   private final RefreshTokenService refreshTokenService;
   private final JwtService jwtService;
-
-  @PostMapping("/register/check")
-  public ResponseEntity<ApiResponse<String>> checkRegistrationEligibility(
-      @Valid @RequestBody RegisterCheckRequest request) {
-    log.info(
-        "Registration eligibility check: contactValue={}",
-        PiiMaskingUtil.maskEmail(request.getContactValue()));
-
-    String message = registrationService.checkEligibilityAndSendCode(request);
-
-    return ResponseEntity.ok(ApiResponse.success(message));
-  }
-
-  @PostMapping("/register/verify")
-  public ResponseEntity<ApiResponse<LoginResponse>> verifyAndRegister(
-      @Valid @RequestBody VerifyAndRegisterRequest request) {
-    log.info(
-        "Verify and register: contactValue={}",
-        PiiMaskingUtil.maskEmail(request.getContactValue()));
-
-    LoginResponse response = registrationService.verifyAndRegister(request);
-
-    return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
-  }
-
-  @PostMapping("/setup-password")
-  public ResponseEntity<ApiResponse<LoginResponse>> setupPassword(
-      @Valid @RequestBody PasswordSetupRequest request) {
-
-    log.info("Password setup request: token={}...", request.getToken().substring(0, 8));
-
-    LoginResponse response = passwordSetupService.setupPassword(request);
-
-    log.info("✅ Password setup successful, needsOnboarding={}", response.getNeedsOnboarding());
-
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            response,
-            response.getNeedsOnboarding()
-                ? "Welcome! Complete your profile to get started."
-                : "Welcome back! You're all set."));
-  }
 
   @PostMapping("/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(
       @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
     log.info("Login request: contactValue={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
-
     String ipAddress = getClientIpAddress(httpRequest);
     LoginResponse response = loginService.login(request, ipAddress);
-
     return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
-  }
-
-  @GetMapping("/user/{contactValue}/masked-contacts")
-  public ResponseEntity<ApiResponse<UserContactInfoResponse>> getMaskedContacts(
-      @PathVariable String contactValue) {
-    log.info("Getting masked contacts: contactValue={}", PiiMaskingUtil.maskEmail(contactValue));
-
-    UserContactInfoResponse response = passwordResetService.getMaskedContacts(contactValue);
-
-    return ResponseEntity.ok(ApiResponse.success(response));
-  }
-
-  @PostMapping("/password-reset/request")
-  public ResponseEntity<ApiResponse<String>> requestPasswordReset(
-      @Valid @RequestBody PasswordResetRequest request) {
-    log.info(
-        "Password reset request: authUserId={}, contactType={}",
-        request.getAuthUserId(),
-        request.getContactType());
-
-    String message = passwordResetService.requestPasswordReset(request);
-
-    return ResponseEntity.ok(ApiResponse.success(message));
-  }
-
-  @PostMapping("/password-reset/verify")
-  public ResponseEntity<ApiResponse<LoginResponse>> verifyPasswordReset(
-      @Valid @RequestBody PasswordResetVerifyRequest request) {
-    log.info(
-        "Password reset verification: authUserId={}, code={}***",
-        request.getAuthUserId(),
-        request.getCode().substring(0, Math.min(2, request.getCode().length())));
-
-    LoginResponse response = passwordResetService.verifyAndResetPassword(request);
-
-    log.info(
-        "✅ Password reset completed successfully: userId={}, needsOnboarding={}",
-        response.getUser().getId(),
-        response.getNeedsOnboarding());
-
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            response, "Password reset successful! You have been automatically logged in."));
   }
 
   @PostMapping("/logout")
   public ResponseEntity<ApiResponse<Void>> logout(
       @Valid @RequestBody LogoutRequest request, HttpServletRequest httpRequest) {
     log.info("Logout request");
-
     UUID userId = extractUserIdFromRequest(httpRequest);
     logoutService.logout(request.getRefreshToken(), userId);
-
     return ResponseEntity.ok(ApiResponse.success(null, "Logged out successfully"));
   }
 
@@ -169,19 +57,15 @@ public class AuthController {
   public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(
       @Valid @RequestBody RefreshTokenRequest request) {
     log.info("Refresh token request");
-
     LoginResponse response = refreshTokenService.refreshAccessToken(request.getRefreshToken());
-
     return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
   }
 
-  /** Extract user ID from JWT token in Authorization header. */
   private UUID extractUserIdFromRequest(HttpServletRequest request) {
     String authHeader = request.getHeader("Authorization");
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
       throw new IllegalArgumentException("Authorization header missing or invalid");
     }
-
     String token = authHeader.substring(7);
     try {
       return jwtService.getUserIdFromToken(token);

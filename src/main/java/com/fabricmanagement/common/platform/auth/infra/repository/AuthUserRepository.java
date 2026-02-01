@@ -49,7 +49,7 @@ public interface AuthUserRepository extends JpaRepository<AuthUser, UUID> {
       "SELECT au FROM AuthUser au "
           + "LEFT JOIN FETCH au.user "
           + "JOIN com.fabricmanagement.common.platform.user.domain.User u ON au.userId = u.id "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId "
+          + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
           + "WHERE c.contactValue = :contactValue "
           + "AND au.tenantId = c.tenantId "
@@ -67,29 +67,12 @@ public interface AuthUserRepository extends JpaRepository<AuthUser, UUID> {
   @Query(
       "SELECT COUNT(au) > 0 FROM AuthUser au "
           + "JOIN com.fabricmanagement.common.platform.user.domain.User u ON au.userId = u.id "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId "
+          + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
           + "WHERE c.contactValue = :contactValue "
           + "AND au.tenantId = c.tenantId "
           + "AND u.tenantId = c.tenantId")
   boolean existsByContactValue(@Param("contactValue") String contactValue);
-
-  /**
-   * Find AuthUser by Contact entity ID (DEPRECATED - for backward compatibility).
-   *
-   * @deprecated Use {@link #findByUserId(UUID)} or {@link #findByContactValue(String)} instead
-   */
-  @Deprecated
-  @Query("SELECT au FROM AuthUser au LEFT JOIN FETCH au.contact WHERE au.contactId = :contactId")
-  Optional<AuthUser> findByContactId(@Param("contactId") UUID contactId);
-
-  /**
-   * Check if AuthUser exists by Contact ID (DEPRECATED).
-   *
-   * @deprecated Use {@link #existsByUserId(UUID)} instead
-   */
-  @Deprecated
-  boolean existsByContactId(UUID contactId);
 
   /**
    * Check if User has AuthUser (password exists) by checking User's contact IDs.
@@ -138,33 +121,4 @@ public interface AuthUserRepository extends JpaRepository<AuthUser, UUID> {
           + "WHERE au.userId IN :userIds "
           + "AND au.tenantId = u.tenantId")
   java.util.List<AuthUser> findAllByUserIdIn(@Param("userIds") java.util.List<UUID> userIds);
-
-  /**
-   * Find all contact IDs that have AuthUser (DEPRECATED - for backward compatibility).
-   *
-   * @deprecated Use {@link #findUserIdsByUserIds(java.util.List)} instead
-   */
-  @Deprecated
-  @Query(
-      "SELECT au.contactId FROM AuthUser au "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON au.contactId = c.id "
-          + "WHERE au.contactId IN :contactIds "
-          + "AND au.tenantId = c.tenantId")
-  java.util.Set<UUID> findContactIdsByContactIds(
-      @Param("contactIds") java.util.List<UUID> contactIds);
-
-  /**
-   * Find all AuthUsers by contact IDs (DEPRECATED - for backward compatibility).
-   *
-   * @deprecated Use {@link #findAllByUserIdIn(java.util.List)} instead
-   */
-  @Deprecated
-  @Query(
-      "SELECT au FROM AuthUser au "
-          + "LEFT JOIN FETCH au.contact "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON au.contactId = c.id "
-          + "WHERE au.contactId IN :contactIds "
-          + "AND au.tenantId = c.tenantId")
-  java.util.List<AuthUser> findAllByContactIdIn(
-      @Param("contactIds") java.util.List<UUID> contactIds);
 }

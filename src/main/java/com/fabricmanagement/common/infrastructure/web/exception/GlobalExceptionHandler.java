@@ -36,6 +36,48 @@ public class GlobalExceptionHandler {
         400, "Bad Request", "DOMAIN_RULE_VIOLATION", ex.getMessage(), req.getRequestURI());
   }
 
+  @ExceptionHandler(TaxIdAlreadyExistsException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiError handleTaxIdAlreadyExists(TaxIdAlreadyExistsException ex, HttpServletRequest req) {
+    log.warn("Signup conflict (tax ID): {}", ex.getMessage());
+    return ApiError.of(
+        400, "Bad Request", "TAX_ID_ALREADY_EXISTS", ex.getMessage(), req.getRequestURI());
+  }
+
+  @ExceptionHandler(
+      com.fabricmanagement.common.platform.company.domain.exception.HierarchyDepthExceededException
+          .class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiError handleHierarchyDepth(
+      com.fabricmanagement.common.platform.company.domain.exception.HierarchyDepthExceededException
+          ex,
+      HttpServletRequest req) {
+    log.warn("Hierarchy depth exceeded: {}", ex.getMessage());
+    return ApiError.of(
+        400, "Bad Request", "HIERARCHY_DEPTH_EXCEEDED", ex.getMessage(), req.getRequestURI());
+  }
+
+  @ExceptionHandler(
+      com.fabricmanagement.common.platform.company.domain.exception.CircularHierarchyException
+          .class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiError handleCircularHierarchy(
+      com.fabricmanagement.common.platform.company.domain.exception.CircularHierarchyException ex,
+      HttpServletRequest req) {
+    log.warn("Circular hierarchy: {}", ex.getMessage());
+    return ApiError.of(
+        400, "Bad Request", "CIRCULAR_HIERARCHY", ex.getMessage(), req.getRequestURI());
+  }
+
+  @ExceptionHandler(ContactAlreadyRegisteredException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiError handleContactAlreadyRegistered(
+      ContactAlreadyRegisteredException ex, HttpServletRequest req) {
+    log.warn("Signup conflict (contact): {}", ex.getMessage());
+    return ApiError.of(
+        400, "Bad Request", "CONTACT_ALREADY_REGISTERED", ex.getMessage(), req.getRequestURI());
+  }
+
   @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiError handleIllegal(RuntimeException ex, HttpServletRequest req) {
@@ -108,6 +150,14 @@ public class GlobalExceptionHandler {
         "OPTIMISTIC_LOCK",
         "Resource was updated by another transaction. Please retry.",
         req.getRequestURI());
+  }
+
+  @ExceptionHandler(TooManyRequestsException.class)
+  @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+  public ApiError handleTooManyRequests(TooManyRequestsException ex, HttpServletRequest req) {
+    log.warn("Rate limit exceeded: {}", ex.getMessage());
+    return ApiError.of(
+        429, "Too Many Requests", "RATE_LIMIT_EXCEEDED", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler(DataIntegrityViolationException.class)

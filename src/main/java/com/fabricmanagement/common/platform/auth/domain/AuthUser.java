@@ -42,12 +42,7 @@ import lombok.*;
 @Table(
     name = "common_auth_user",
     schema = "common_auth",
-    indexes = {
-      @Index(name = "idx_auth_user", columnList = "user_id", unique = true),
-      @Index(
-          name = "idx_auth_contact",
-          columnList = "contact_id") // Non-unique for backward compatibility
-    })
+    indexes = {@Index(name = "idx_auth_user", columnList = "user_id", unique = true)})
 @Getter
 @Setter
 @Builder
@@ -66,22 +61,6 @@ public class AuthUser extends BaseEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", insertable = false, updatable = false)
   private com.fabricmanagement.common.platform.user.domain.User user;
-
-  /**
-   * Contact entity reference (DEPRECATED - kept for backward compatibility).
-   *
-   * <p>This field is deprecated. Use userId instead.
-   *
-   * <p>Will be removed in future migration.
-   */
-  @Deprecated
-  @Column(name = "contact_id")
-  private UUID contactId;
-
-  @Deprecated
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "contact_id", insertable = false, updatable = false)
-  private com.fabricmanagement.common.platform.communication.domain.Contact contact;
 
   @Column(name = "password_hash", nullable = false, length = 255)
   private String passwordHash;
@@ -114,31 +93,6 @@ public class AuthUser extends BaseEntity {
         .isVerified(false)
         .failedLoginAttempts(0)
         .build();
-  }
-
-  /**
-   * Create AuthUser with Contact entity (DEPRECATED - for backward compatibility).
-   *
-   * @deprecated Use {@link #create(UUID, String)} with userId instead
-   */
-  @Deprecated
-  public static AuthUser createWithContact(UUID contactId, String passwordHash) {
-    return AuthUser.builder()
-        .contactId(contactId)
-        .passwordHash(passwordHash)
-        .isVerified(false)
-        .failedLoginAttempts(0)
-        .build();
-  }
-
-  /**
-   * Get contact value from Contact entity (DEPRECATED).
-   *
-   * @deprecated Use User's contacts via UserContactService instead
-   */
-  @Deprecated
-  public String getContactValue() {
-    return contact != null ? contact.getContactValue() : null;
   }
 
   public void verify() {

@@ -86,7 +86,7 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/public/**")
                     .permitAll() // Public signup
-                    .requestMatchers("/api/common/companies/types/**")
+                    .requestMatchers("/api/common/company-types/**")
                     .permitAll() // Company types (for signup forms)
                     .requestMatchers(
                         "/api/auth/login", "/api/auth/register/**", "/api/auth/setup-password")

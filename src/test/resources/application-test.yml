@@ -1,0 +1,32 @@
+# Test profile - used by integration tests.
+# Datasource URL is overridden by Testcontainers in test class when needed.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  cache:
+    type: none
+  mail:
+    host: localhost
+    port: 3025
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      auto-startup: false
+    listener:
+      auto-startup: false
+
+# Reduce noise in tests
+logging:
+  level:
+    root: WARN
+    com.fabricmanagement: INFO
+    org.springframework.security: WARN
+
+# Disable async for predictable tests
+spring.task:
+  execution:
+    pool:
+      core-size: 1

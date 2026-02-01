@@ -22,8 +22,6 @@ HOOKS_DIR="${PROJECT_ROOT}/.git/hooks"
 SOURCE_HOOK="${SCRIPT_DIR}/hooks/pre-commit"
 TARGET_HOOK="${HOOKS_DIR}/pre-commit"
 
-echo -e "${GREEN}🔧 Setting up Git hooks...${NC}"
-
 # Validate git repository
 if [ ! -d "${PROJECT_ROOT}/.git" ]; then
     echo -e "${RED}❌ .git directory not found. Are you in a git repository?${NC}"
@@ -45,6 +43,6 @@ chmod +x "${TARGET_HOOK}"
 
 echo -e "${GREEN}✅ Pre-commit hook installed: ${TARGET_HOOK}${NC}"
 echo ""
-echo -e "${YELLOW}💡 The hook will check migration-entity consistency before each commit.${NC}"
+echo -e "${YELLOW}💡 The hook checks: Java format (when .java staged) + migration-entity consistency.${NC}"
 echo -e "${YELLOW}💡 To skip (not recommended): git commit --no-verify${NC}"
 

@@ -7,39 +7,28 @@ Utility scripts for development, deployment, and maintenance.
 ```
 scripts/
 ├── README.md                  # This file
+├── help.awk                   # Groups make help by section (used by make help)
 ├── docker-entrypoint.sh       # Docker container entrypoint (DO NOT RUN MANUALLY)
 ├── setup-git-hooks.sh         # Install Git pre-commit hooks
+├── cleanup-github-actions.sh  # Clean GitHub Actions workflow runs
 └── hooks/
-    └── pre-commit             # Pre-commit hook (migration-entity consistency)
+    └── pre-commit             # Pre-commit hook (Java format + migration-entity consistency)
 ```
 
 ## 🚀 Usage
 
-### Code Quality Analysis
-
-Run all code quality checks (Format → Checkstyle → SpotBugs):
+### Code Quality (via Makefile)
 
 ```bash
-./scripts/code-quality.sh
+make code-quality         # Format + Checkstyle + SpotBugs (reports only, no fail)
+make code-quality-strict  # Same, but fail on any violation
+make format               # Format code only
+make format-check         # Verify format only (no changes)
+make checkstyle           # Checkstyle only
+make spotbugs             # SpotBugs only
 ```
 
-Or via Makefile:
-
-```bash
-make code-quality    # Run all checks
-make format          # Format code only
-make checkstyle      # Checkstyle only
-make spotbugs        # SpotBugs only
-```
-
-**What it does:**
-1. Formats code with Google Java Format
-2. Runs Checkstyle (Google Style compliance)
-3. Runs SpotBugs (bug detection + security)
-
-**Reports:**
-- Checkstyle: `target/checkstyle-result.xml`
-- SpotBugs: `target/spotbugsXml.xml`
+See [docs/CODE_QUALITY.md](../docs/CODE_QUALITY.md) for full details.
 
 ### Setup Git Hooks
 
@@ -56,12 +45,14 @@ make setup
 ```
 
 **What it does:**
+
 - Copies `scripts/hooks/pre-commit` to `.git/hooks/pre-commit`
 - Makes it executable
-- Checks migration files for common issues (IF NOT EXISTS, etc.)
-- Warns about entity-migration mismatches
+- **Java:** When `.java` files are staged, runs `mvn fmt:check`; commit blocked if format fails
+- **Migration/Entity:** Checks migration files (IF NOT EXISTS, etc.), warns about entity-migration mismatches
 
 **Skip hook (not recommended):**
+
 ```bash
 git commit --no-verify
 ```
@@ -71,6 +62,7 @@ git commit --no-verify
 **⚠️ DO NOT RUN MANUALLY** - This script is used by Docker containers.
 
 **What it does:**
+
 - Waits for dependencies (PostgreSQL, Kafka)
 - Configures JVM options
 - Starts Spring Boot application
@@ -94,11 +86,13 @@ make github-cleanup            # Actually delete (with confirmation)
 ```
 
 **Prerequisites:**
+
 - GitHub CLI (gh) installed: `brew install gh`
 - Authenticated: `gh auth login`
 - Repository access to `Fabric-Management/fabric-management-backend`
 
 **What it does:**
+
 1. Lists all workflows in the repository
 2. Fetches all runs for each workflow
 3. Deletes all runs (or previews in dry-run mode)
@@ -138,9 +132,11 @@ readonly NC='\033[0m'  # No Color
 ## 📚 Related Documentation
 
 - [Makefile](../Makefile) - Main development commands
+- [docs/CODE_QUALITY.md](../docs/CODE_QUALITY.md) - Code quality & automatic error detection overview
+- [docs/LOCAL_SETUP.md](../docs/LOCAL_SETUP.md) - Local setup without Docker
 - [Dockerfile.service](../Dockerfile.service) - Docker build configuration
 - [CI/CD Workflows](../.github/workflows/) - GitHub Actions workflows
 
 ---
 
-**Last Updated:** 2025-01-27
+**Last Updated:** 2025-01-28

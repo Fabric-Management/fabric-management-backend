@@ -14,7 +14,7 @@
         db-backup db-restore db-reset \
         kafka-topics kafka-describe kafka-consumer \
         clean clean-docker prune rebuild \
-        lint format checkstyle spotbugs code-quality \
+        lint format format-check checkstyle spotbugs code-quality code-quality-strict \
         quick-test dev-reset dev-clean-tokens dev-clean-codes dev-stats dev-tools-health \
         github-cleanup github-cleanup-dry-run info
 
@@ -42,28 +42,24 @@ KAFKA_SERVICE := kafka
 POSTGRES_CONTAINER := fabric-postgres
 KAFKA_CONTAINER := fabric-kafka
 
+# Maven: use wrapper if present (./mvnw), else system mvn
+MVN := $(if $(wildcard mvnw),./mvnw,mvn)
+
 # =============================================================================
 # HELP
 # =============================================================================
-help: ## Show available commands
+help: ## Show available commands (grouped by section)
 	@echo "$(GREEN)============================================$(NC)"
 	@echo "$(GREEN)  Fabric Management - Modular Monolith$(NC)"
 	@echo "$(GREEN)============================================$(NC)"
-	@echo ""
-	@grep -E '^[a-zA-Z0-9._-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort \
-	| awk 'BEGIN {FS = ":.*?## "}; {printf "$(BLUE)%-25s$(NC) %s\n", $$1, $$2}'
-	@echo ""
-	@echo "$(YELLOW)Quick Start:$(NC)"
-	@echo "  make dev          # Start PostgreSQL"
-	@echo "  make app-run      # Run Spring Boot app"
-	@echo "  make health       # Check application health"
+	@awk -f scripts/help.awk $(firstword $(MAKEFILE_LIST))
 
 # =============================================================================
 # SETUP
 # =============================================================================
 setup: ## Initial setup - create .env from template + git hooks
 	@echo "$(YELLOW)🔧 Setting up environment...$(NC)"
-	if [ ! -f .env ]; then \
+	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
 		echo "$(GREEN)✅ .env created. Update with your values.$(NC)"; \
 	else \
@@ -74,7 +70,7 @@ setup: ## Initial setup - create .env from template + git hooks
 
 validate-env: ## Validate .env file exists
 	@echo "$(YELLOW)🔍 Validating environment...$(NC)"
-	if [ ! -f .env ]; then \
+	@if [ ! -f .env ]; then \
 		echo "$(RED)❌ .env not found! Run: make setup$(NC)"; exit 1; \
 	fi
 	@echo "$(GREEN)✅ Environment valid$(NC)"
@@ -84,50 +80,65 @@ validate-env: ## Validate .env file exists
 # =============================================================================
 app-build: ## Build Spring Boot application (Maven)
 	@echo "$(YELLOW)🏗️  Building application...$(NC)"
-	mvn clean package -DskipTests
+	$(MVN) clean package -DskipTests
 	@echo "$(GREEN)✅ Built → target/fabric-management-backend-1.0.0-SNAPSHOT.jar$(NC)"
 
-app-run: ## Run Spring Boot application (local profile)
+app-run: ## Run Spring Boot application (local profile - uses local PostgreSQL)
 	@echo "$(YELLOW)🚀 Running application...$(NC)"
-	mvn spring-boot:run -Dspring-boot.run.profiles=local
+	@echo "$(YELLOW)ℹ️  Using local PostgreSQL (localhost:5432)$(NC)"
+	@echo "$(YELLOW)ℹ️  Make sure PostgreSQL is running and fabric_management database exists$(NC)"
+	$(MVN) spring-boot:run -Dspring-boot.run.profiles=local
 
 test: ## Run unit tests
 	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
-	mvn test
+	$(MVN) test
 	@echo "$(GREEN)✅ Unit tests completed$(NC)"
 
 test-integration: ## Run integration tests
 	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
-	mvn verify
+	$(MVN) verify
 	@echo "$(GREEN)✅ Integration tests completed$(NC)"
 
 coverage: ## Generate test coverage report (JaCoCo)
 	@echo "$(YELLOW)📊 Generating coverage report...$(NC)"
-	mvn jacoco:report
+	$(MVN) jacoco:report
 	@echo "$(GREEN)✅ Coverage: target/site/jacoco/index.html$(NC)"
 
-lint: ## Check code quality (verify without tests)
+lint: ## Check code quality (format, compile, checkstyle, spotbugs — no tests/coverage)
 	@echo "$(YELLOW)🔍 Checking code quality...$(NC)"
-	mvn verify -DskipTests
+	$(MVN) fmt:check
+	$(MVN) compile checkstyle:check spotbugs:check
 	@echo "$(GREEN)✅ Code quality check completed$(NC)"
 
 format: ## Format code (Google Java Format)
 	@echo "$(YELLOW)💅 Formatting code...$(NC)"
-	mvn fmt:format
+	$(MVN) fmt:format
 	@echo "$(GREEN)✅ Code formatted$(NC)"
+
+format-check: ## Verify format only (no changes). Used by pre-commit.
+	@echo "$(YELLOW)🔍 Checking Java format...$(NC)"
+	$(MVN) -q fmt:check
+	@echo "$(GREEN)✅ Format OK$(NC)"
 
 checkstyle: ## Run Checkstyle code style checks
 	@echo "$(YELLOW)🔍 Running Checkstyle...$(NC)"
-	mvn checkstyle:check
+	$(MVN) checkstyle:check
 	@echo "$(GREEN)✅ Checkstyle completed$(NC)"
 
 spotbugs: ## Run SpotBugs bug detection
 	@echo "$(YELLOW)🐛 Running SpotBugs...$(NC)"
-	mvn spotbugs:check
+	$(MVN) spotbugs:check
 	@echo "$(GREEN)✅ SpotBugs completed$(NC)"
 
-code-quality: format checkstyle spotbugs ## Run all code quality checks
+code-quality: format checkstyle spotbugs ## Run all code quality checks (reports only, no fail)
 	@echo "$(GREEN)✅ All code quality checks completed!$(NC)"
+
+code-quality-strict: ## Run format + checkstyle + spotbugs; FAIL on any violation (CI-style)
+	@echo "$(YELLOW)🔒 Strict code quality (fail on violation)...$(NC)"
+	$(MVN) fmt:format
+	$(MVN) checkstyle:check -Dcheckstyle.failsOnError=true
+	$(MVN) spotbugs:check -Dspotbugs.failOnError=true
+	@echo "$(GREEN)✅ Strict checks passed!$(NC)"
 
 # =============================================================================
 # DOCKER INFRASTRUCTURE
@@ -138,9 +149,10 @@ dev: validate-env ## Start PostgreSQL (fast dev mode)
 	@sleep 3
 	@$(MAKE) status
 
-up: validate-env ## Start core infra (Postgres, Kafka)
-	@echo "$(YELLOW)🚀 Starting core infra (Postgres, Kafka)...$(NC)"
-	docker compose up -d $(POSTGRES_SERVICE) $(KAFKA_SERVICE)
+up: validate-env ## Start core infra (Postgres only - Kafka is commented out in docker-compose.yml)
+	@echo "$(YELLOW)🚀 Starting core infra (Postgres)...$(NC)"
+	@echo "$(YELLOW)ℹ️  Note: Kafka is currently disabled in docker-compose.yml$(NC)"
+	docker compose up -d $(POSTGRES_SERVICE)
 	@sleep 5
 	@$(MAKE) status
 
@@ -214,23 +226,23 @@ db-shell: ## Open PostgreSQL shell
 
 db-migrate: ## Run Flyway migrations
 	@echo "$(YELLOW)🗄️  Running database migrations...$(NC)"
-	mvn flyway:migrate
+	$(MVN) flyway:migrate
 	@echo "$(GREEN)✅ Migrations completed$(NC)"
 
 db-info: ## Show Flyway migration status
 	@echo "$(YELLOW)📊 Migration Status:$(NC)"
-	mvn flyway:info
+	$(MVN) flyway:info
 
 db-validate: ## Validate migrations
 	@echo "$(YELLOW)🔍 Validating migrations...$(NC)"
-	mvn flyway:validate
+	$(MVN) flyway:validate
 	@echo "$(GREEN)✅ Migrations valid$(NC)"
 
 db-clean: ## Clean database (DESTRUCTIVE! Drops all objects)
 	@echo "$(RED)⚠️  This will drop ALL DB objects!$(NC)"
 	read -p "Are you sure? (yes/no): " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
-		mvn flyway:clean; \
+		$(MVN) flyway:clean; \
 		echo "$(GREEN)✅ Database cleaned$(NC)"; \
 	else \
 		echo "$(YELLOW)Cancelled$(NC)"; \
@@ -383,7 +395,7 @@ kafka-consumer: ## Consume from topic (make kafka-consumer TOPIC=name)
 # =============================================================================
 clean: ## Clean Maven build artifacts
 	@echo "$(YELLOW)🧹 Cleaning build artifacts...$(NC)"
-	mvn clean
+	$(MVN) clean
 	@echo "$(GREEN)✅ Clean completed$(NC)"
 
 clean-docker: ## Remove Docker images (DESTRUCTIVE!)
@@ -462,6 +474,6 @@ github-cleanup-dry-run: ## 🔍 Preview GitHub Actions cleanup (dry-run)
 info: ## Show system info
 	@echo "$(BLUE)📋 System Information:$(NC)"
 	@echo "$(YELLOW)Java Version:$(NC)";  java -version 2>&1 | head -1
-	@echo "$(YELLOW)Maven Version:$(NC)"; mvn -version | head -1
+	@echo "$(YELLOW)Maven Version:$(NC)"; $(MVN) -version | head -1
 	@echo "$(YELLOW)Docker Version:$(NC)"; docker --version
 	@echo "$(YELLOW)Docker Compose:$(NC)"; docker compose version

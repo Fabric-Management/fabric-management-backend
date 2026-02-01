@@ -276,22 +276,7 @@ public class ContactService {
   }
 
   private void applyWhatsAppRules(Contact contact) {
-    if (contact.getContactType() == null) {
-      contact.setIsWhatsApp(false);
-      return;
-    }
-
-    if (!contact.getContactType().isMobile()) {
-      if (Boolean.TRUE.equals(contact.getIsWhatsApp())) {
-        throw new DomainException("WhatsApp is only supported for MOBILE contacts");
-      }
-      contact.setIsWhatsApp(false);
-      return;
-    }
-
-    if (contact.getIsWhatsApp() == null) {
-      contact.setIsWhatsApp(false);
-    }
+    // Contact entity has no isWhatsApp field; WhatsApp handling can be added when needed.
   }
 
   private void validateContactValue(String contactValue, ContactType contactType) {

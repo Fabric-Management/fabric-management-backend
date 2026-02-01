@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter xmlns="https://github.com/spotbugs/filter/4.0.0">
+    <!--
+      Exclude classes that trigger FindSecBugs SpringEntityLeakDetector bug:
+      generic return types (Map<String,Object>, ApiResponse<Map<...>>) cause
+      IllegalArgumentException in the detector; build still succeeds but log is noisy.
+    -->
+    <Match>
+        <Class name="com.fabricmanagement.common.infrastructure.web.HealthController"/>
+    </Match>
+    <Match>
+        <Class name="com.fabricmanagement.common.platform.dev.DevelopmentToolsController"/>
+    </Match>
+</FindBugsFilter>

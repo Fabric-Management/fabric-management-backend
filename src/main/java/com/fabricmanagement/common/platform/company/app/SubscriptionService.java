@@ -6,11 +6,15 @@ import com.fabricmanagement.common.platform.company.domain.Subscription;
 import com.fabricmanagement.common.platform.company.domain.SubscriptionStatus;
 import com.fabricmanagement.common.platform.company.domain.event.SubscriptionActivatedEvent;
 import com.fabricmanagement.common.platform.company.domain.event.SubscriptionExpiredEvent;
+import com.fabricmanagement.common.platform.company.dto.CreateInitialSubscriptionsResult;
 import com.fabricmanagement.common.platform.company.dto.SubscriptionDto;
 import com.fabricmanagement.common.platform.company.dto.UpdateSubscriptionRequest;
 import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +48,69 @@ public class SubscriptionService {
 
   private final SubscriptionRepository subscriptionRepository;
   private final DomainEventPublisher eventPublisher;
+
+  /**
+   * Create initial OS subscriptions during tenant onboarding. Used only by Auth module via
+   * CompanyFacade.
+   *
+   * @param tenantId tenant ID
+   * @param selectedOS list of OS codes (e.g. FabricOS, YarnOS); default FabricOS if empty
+   * @param trialDays trial period in days
+   * @return result with os codes and first subscription trial end
+   */
+  @Transactional
+  public CreateInitialSubscriptionsResult createInitialSubscriptions(
+      UUID tenantId, List<String> selectedOS, int trialDays) {
+    log.debug("Creating initial subscriptions: tenantId={}, trialDays={}", tenantId, trialDays);
+
+    List<String> osList =
+        selectedOS != null && !selectedOS.isEmpty() ? selectedOS : List.of("FabricOS");
+
+    List<Subscription> saved =
+        TenantContext.executeInTenantContext(
+            tenantId,
+            () -> {
+              List<Subscription> list = new ArrayList<>();
+              for (String osCode : osList) {
+                Subscription sub =
+                    Subscription.builder()
+                        .osCode(osCode)
+                        .osName(getOsName(osCode))
+                        .status(SubscriptionStatus.TRIAL)
+                        .startDate(Instant.now())
+                        .trialEndsAt(Instant.now().plus(trialDays, ChronoUnit.DAYS))
+                        .features(Map.of())
+                        .build();
+                sub.setTenantId(tenantId);
+                list.add(subscriptionRepository.save(sub));
+              }
+              return list;
+            });
+
+    Instant trialEndsAt = saved.isEmpty() ? null : saved.get(0).getTrialEndsAt();
+    List<String> osCodes = saved.stream().map(Subscription::getOsCode).toList();
+    log.info("Created {} initial subscriptions: {}", saved.size(), osCodes);
+    return CreateInitialSubscriptionsResult.builder()
+        .osCodes(osCodes)
+        .trialEndsAt(trialEndsAt)
+        .build();
+  }
+
+  private static String getOsName(String osCode) {
+    return switch (osCode) {
+      case "FabricOS" -> "Fabric Management Base Platform";
+      case "YarnOS" -> "Yarn Production OS";
+      case "LoomOS" -> "Weaving Production OS";
+      case "KnitOS" -> "Knitting Production OS";
+      case "DyeOS" -> "Dyeing & Finishing OS";
+      case "AnalyticsOS" -> "Analytics & Reporting OS";
+      case "IntelligenceOS" -> "AI & Intelligence OS";
+      case "EdgeOS" -> "IoT & Edge Computing OS";
+      case "AccountOS" -> "Accounting OS";
+      case "CustomOS" -> "Custom Integration OS";
+      default -> osCode;
+    };
+  }
 
   /**
    * Check if tenant has ACTIVE subscription to given OS.

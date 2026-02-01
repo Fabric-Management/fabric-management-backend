@@ -1,18 +1,19 @@
 package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.common.platform.auth.app.VerificationCodeManager.IssuedVerificationCode;
 import com.fabricmanagement.common.platform.auth.domain.AuthUser;
 import com.fabricmanagement.common.platform.auth.domain.VerificationType;
 import com.fabricmanagement.common.platform.auth.domain.event.UserRegisteredEvent;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
+import com.fabricmanagement.common.platform.auth.dto.OnboardingPrefillDto;
 import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
-import com.fabricmanagement.common.platform.communication.app.UserContactService;
-import com.fabricmanagement.common.platform.communication.app.VerificationService;
+import com.fabricmanagement.common.platform.company.domain.Company;
+import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
+import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <pre>
  * Step 1: Check Eligibility
- *   ├─ Contact MUST exist in User table (pre-approved)
- *   ├─ Contact NOT already verified
+ *   ├─ Contact MUST exist in User table (pre-approved / invited user)
+ *   ├─ User MUST NOT already have AuthUser (not yet registered)
  *   └─ Generate & send verification code
  *
  * Step 2: Verify & Register
@@ -40,7 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   ├─ Hash password (BCrypt)
  *   ├─ Create AuthUser
  *   ├─ Generate JWT tokens
- *   └─ Publish UserRegisteredEvent
+ *   ├─ Publish UserRegisteredEvent
+ *   └─ Return needsOnboarding and onboardingPrefill when applicable
  * </pre>
  *
  * <h2>Multi-Channel Verification:</h2>
@@ -58,10 +61,15 @@ public class RegistrationService {
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
-  private final VerificationService verificationService;
   private final ContactService contactService;
-  private final UserContactService userContactService;
+  private final UserContactAssignmentService userContactAssignmentService;
   private final VerificationCodeManager verificationCodeManager;
+  private final CompanyRepository companyRepository;
+
+  // VerificationService no longer injected - VerificationCodeManager.issueCode sends via dispatcher
+
+  @Value("${application.jwt.expiration:900000}")
+  private long accessTokenExpirationMs;
 
   @Transactional
   public String checkEligibilityAndSendCode(RegisterCheckRequest request) {
@@ -83,11 +91,8 @@ public class RegistrationService {
       return "This account is already registered. Please login.";
     }
 
-    IssuedVerificationCode issuedCode;
     try {
-      issuedCode =
-          verificationCodeManager.issueCode(
-              request.getContactValue(), VerificationType.REGISTRATION);
+      verificationCodeManager.issueCode(request.getContactValue(), VerificationType.REGISTRATION);
     } catch (IllegalArgumentException | IllegalStateException ex) {
       log.warn(
           "Verification code issuance throttled: contactValue={}, reason={}",
@@ -96,7 +101,6 @@ public class RegistrationService {
       return ex.getMessage();
     }
 
-    verificationService.sendVerificationCode(request.getContactValue(), issuedCode.code());
     log.info(
         "Verification code queued for sending (async) to: {}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
@@ -145,17 +149,36 @@ public class RegistrationService {
 
     log.info("User registered successfully: userId={}, uid={}", user.getId(), user.getUid());
 
+    boolean needsOnboarding = !Boolean.TRUE.equals(user.getHasCompletedOnboarding());
+    OnboardingPrefillDto onboardingPrefill = null;
+    if (needsOnboarding) {
+      onboardingPrefill = buildOnboardingPrefill(user, contactValue);
+    }
+
     return LoginResponse.builder()
         .accessToken(accessToken)
         .refreshToken(refreshToken)
-        .expiresIn(900L)
+        .expiresIn(accessTokenExpirationMs / 1000)
         .user(user)
+        .needsOnboarding(needsOnboarding)
+        .onboardingPrefill(onboardingPrefill)
+        .build();
+  }
+
+  private OnboardingPrefillDto buildOnboardingPrefill(UserDto user, String primaryEmail) {
+    Optional<Company> companyOpt =
+        companyRepository.findByTenantIdAndId(user.getTenantId(), user.getCompanyId());
+    return OnboardingPrefillDto.builder()
+        .primaryEmail(primaryEmail)
+        .companyName(companyOpt.map(Company::getCompanyName).orElse(null))
+        .taxId(companyOpt.map(Company::getTaxId).orElse(null))
+        .companyType(companyOpt.map(c -> c.getCompanyType().name()).orElse(null))
         .build();
   }
 
   private com.fabricmanagement.common.platform.communication.domain.Contact findUserContactByValue(
       UUID userId, String contactValue) {
-    return userContactService.getUserContacts(userId).stream()
+    return userContactAssignmentService.getUserContacts(userId).stream()
         .map(uc -> contactService.findById(uc.getContactId()))
         .flatMap(Optional::stream)
         .filter(c -> c.getContactValue().equals(contactValue))

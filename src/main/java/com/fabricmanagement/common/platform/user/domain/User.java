@@ -73,13 +73,11 @@ public class User extends BaseEntity {
 
   @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
   @Builder.Default
-  private List<com.fabricmanagement.common.platform.communication.domain.UserContact> userContacts =
-      new ArrayList<>();
+  private List<UserContact> userContacts = new ArrayList<>();
 
   @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
   @Builder.Default
-  private List<com.fabricmanagement.common.platform.communication.domain.UserAddress>
-      userAddresses = new ArrayList<>();
+  private List<UserAddress> userAddresses = new ArrayList<>();
 
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   @Builder.Default
@@ -142,7 +140,7 @@ public class User extends BaseEntity {
       getAnyVerifiedContact() {
     return userContacts.stream()
         .filter(uc -> uc.getContact() != null)
-        .map(com.fabricmanagement.common.platform.communication.domain.UserContact::getContact)
+        .map(UserContact::getContact)
         .filter(contact -> Boolean.TRUE.equals(contact.getIsVerified()))
         .findFirst();
   }
@@ -153,7 +151,7 @@ public class User extends BaseEntity {
     return userContacts.stream()
         .filter(uc -> Boolean.TRUE.equals(uc.getIsDefault()))
         .findFirst()
-        .map(com.fabricmanagement.common.platform.communication.domain.UserContact::getContact);
+        .map(UserContact::getContact);
   }
 
   /** Get primary address. */
@@ -162,7 +160,7 @@ public class User extends BaseEntity {
     return userAddresses.stream()
         .filter(ua -> Boolean.TRUE.equals(ua.getIsPrimary()))
         .findFirst()
-        .map(com.fabricmanagement.common.platform.communication.domain.UserAddress::getAddress);
+        .map(UserAddress::getAddress);
   }
 
   @Override

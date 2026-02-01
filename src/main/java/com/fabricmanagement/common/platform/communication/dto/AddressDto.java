@@ -28,6 +28,9 @@ public class AddressDto {
   private AddressType addressType;
   private Boolean isPrimary;
   private String label;
+  private String contactPhone;
+  private String contactEmail;
+  private String contactPerson;
   private String formattedAddress;
   private String placeId;
   private Double latitude;
@@ -51,6 +54,9 @@ public class AddressDto {
         .addressType(address.getAddressType())
         .isPrimary(address.getIsPrimary())
         .label(address.getLabel())
+        .contactPhone(address.getContactPhone())
+        .contactEmail(address.getContactEmail())
+        .contactPerson(address.getContactPerson())
         .formattedAddress(address.getFormattedAddress())
         .placeId(address.getPlaceId())
         .latitude(address.getLatitude())

@@ -99,6 +99,21 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
+# Auth module configuration (lockout, verification, JWT)
+auth:
+  lockout:
+    max-attempts: ${AUTH_LOCKOUT_MAX_ATTEMPTS:5}
+    lock-duration: ${AUTH_LOCKOUT_DURATION:30m}
+  verification:
+    code-length: ${AUTH_VERIFICATION_CODE_LENGTH:6}
+    code-expiry: ${AUTH_VERIFICATION_CODE_EXPIRY:10m}
+    max-attempts: ${AUTH_VERIFICATION_MAX_ATTEMPTS:3}
+  jwt:
+    access-token-expiry: ${AUTH_JWT_ACCESS_EXPIRY:15m}
+    refresh-token-expiry: ${AUTH_JWT_REFRESH_EXPIRY:7d}
+  password:
+    bcrypt-strength: ${AUTH_BCRYPT_STRENGTH:10}
+
 # Application Properties
 application:
   name: Fabric Management System

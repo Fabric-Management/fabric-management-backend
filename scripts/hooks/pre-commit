@@ -1,10 +1,11 @@
 #!/bin/bash
 # =============================================================================
-# PRE-COMMIT HOOK: Migration-Entity Consistency Check
+# PRE-COMMIT HOOK: Code Quality & Migration-Entity Consistency
 # =============================================================================
-# Ensures migrations and entities stay in sync before commit
+# - Java: format check (fmt:check) when .java files are staged
+# - Migration/Entity: consistency checks when SQL or entity files are staged
 #
-# Last Updated: 2025-01-27
+# Last Updated: 2025-01-28
 
 set -euo pipefail
 
@@ -14,9 +15,29 @@ readonly YELLOW='\033[1;33m'
 readonly GREEN='\033[0;32m'
 readonly NC='\033[0m'
 
+# Project root (git repo root)
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+readonly PROJECT_ROOT
+
 # Get staged files
+readonly STAGED_JAVA=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.java$' || true)
 readonly STAGED_MIGRATIONS=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'db/migration/.*\.sql$' || true)
 readonly STAGED_ENTITIES=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'src/main/java/.*/domain/.*\.java$' || true)
+
+# -----------------------------------------------------------------------------
+# 1. Java format check (Google Java Format) - only when .java files staged
+# -----------------------------------------------------------------------------
+if [ -n "$STAGED_JAVA" ]; then
+    echo -e "${YELLOW}🔍 Checking Java format (Google Java Format)...${NC}"
+    if ! (cd "${PROJECT_ROOT}" && mvn -q fmt:check); then
+        echo -e "${RED}❌ Format check failed. Some .java files are not formatted.${NC}"
+        echo -e "${YELLOW}   Run: make format   or   mvn fmt:format${NC}"
+        echo -e "${YELLOW}   Then stage the changes and commit again.${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✅ Java format OK${NC}"
+    echo ""
+fi
 
 # Check if migrations are staged
 if [ -n "$STAGED_MIGRATIONS" ]; then

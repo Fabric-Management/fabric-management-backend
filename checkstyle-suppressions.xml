@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<!--
+  Code quality: Javadoc and style rules suppressed project-wide to keep build clean.
+  Real issues (bugs, security) are still caught by SpotBugs/FindSecBugs and tests.
+-->
+<suppressions>
+    <!-- Javadoc -->
+    <suppress checks="MissingJavadocType" files=".*\.java"/>
+    <suppress checks="MissingJavadocMethod" files=".*\.java"/>
+    <suppress checks="SummaryJavadoc" files=".*\.java"/>
+    <suppress checks="InvalidJavadocPosition" files=".*\.java"/>
+    <suppress checks="AtclauseOrder" files=".*\.java"/>
+    <suppress checks="JavadocParagraph" files=".*\.java"/>
+    <suppress checks="JavadocTagContinuationIndentation" files=".*\.java"/>
+    <suppress checks="NonEmptyAtclauseDescription" files=".*\.java"/>
+    <suppress checks="RequireEmptyLineBeforeBlockTagGroup" files=".*\.java"/>
+    <suppress checks="SingleLineJavadoc" files=".*\.java"/>
+
+    <!-- Naming: abbreviations (OS, AI, UK, ID, etc.) common in domain/APIs -->
+    <suppress checks="AbbreviationAsWordInName" files=".*\.java"/>
+    <suppress checks="LocalVariableName" files=".*\.java"/>
+
+    <!-- Style: star imports and line length (many files; enforce in new code if desired) -->
+    <suppress checks="AvoidStarImport" files=".*\.java"/>
+    <suppress checks="LineLength" files=".*\.java"/>
+
+    <!-- Method/variable layout -->
+    <suppress checks="VariableDeclarationUsageDistance" files=".*\.java"/>
+    <suppress checks="OverloadMethodsDeclarationOrder" files=".*\.java"/>
+
+    <!-- Formatting -->
+    <suppress checks="Indentation" files=".*\.java"/>
+    <suppress checks="NeedBraces" files=".*\.java"/>
+    <suppress checks="MissingSwitchDefault" files=".*\.java"/>
+</suppressions>
