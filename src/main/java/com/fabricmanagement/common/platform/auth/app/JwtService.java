@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.auth.app;
 
+import com.fabricmanagement.common.platform.company.domain.Company;
 import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
@@ -8,9 +9,12 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import lombok.extern.slf4j.Slf4j;
@@ -67,32 +71,22 @@ public class JwtService {
 
     log.debug("Generating access token for user: {}", contactValue);
 
-    // Get tenant UID from Company entity (tenant_id = company_id for root tenant)
-    // ⚠️ CRITICAL: Company UID = Tenant UID (for root tenants)
-    // If Company UID is in format {TENANT_UID}-COMP-{UUID}, extract tenant UID
+    // Load company once for tenant UID and company_category
+    Optional<Company> companyOpt = companyRepository.findById(user.getTenantId());
     String tenantUid =
-        companyRepository
-            .findById(user.getTenantId())
+        companyOpt
             .map(
                 company -> {
                   String companyUid = company.getUid();
-                  // Extract tenant UID from Company UID if it contains module code
-                  // Format: {TENANT_UID}-COMP-{UUID} → {TENANT_UID}
                   if (companyUid != null && companyUid.contains("-COMP-")) {
                     String[] parts = companyUid.split("-COMP-");
-                    return parts[0]; // First part is tenant UID
+                    return parts[0];
                   }
-                  // If Company UID is already tenant UID format (e.g., "ACME-001"), use it directly
                   return companyUid;
                 })
-            .orElseGet(
-                () -> {
-                  // Fallback: Extract from user UID if company not found (should not happen)
-                  log.warn(
-                      "Company not found for tenantId={}, falling back to user UID extraction",
-                      user.getTenantId());
-                  return extractTenantUid(user.getUid());
-                });
+            .orElseGet(() -> extractTenantUid(user.getUid()));
+    String companyCategory =
+        companyOpt.map(c -> c.getCompanyType().getCategory().name()).orElse(null);
 
     Map<String, Object> claims = new HashMap<>();
     claims.put("tenant_id", user.getTenantId().toString());
@@ -100,21 +94,36 @@ public class JwtService {
     claims.put("user_id", user.getId().toString());
     claims.put("user_uid", user.getUid());
     claims.put("company_id", user.getCompanyId().toString());
-    // Add first and last name
     claims.put("firstName", user.getFirstName());
     claims.put("lastName", user.getLastName());
-    // Get primary department from UserDepartment junction
-    String department =
-        user.getUserDepartments().stream()
-            .filter(ud -> Boolean.TRUE.equals(ud.getIsPrimary()))
-            .findFirst()
-            .map(ud -> ud.getDepartment().getDepartmentName())
-            .orElse(null);
+    if (companyCategory != null) {
+      claims.put("company_category", companyCategory);
+    }
+    // Department: primary name (backward compat) + department_codes list + primary_department code
+    List<String> departmentCodes = new ArrayList<>();
+    String primaryDepartmentCode = null;
+    String department = null;
+    for (var ud : user.getUserDepartments()) {
+      String code = ud.getDepartment().getDepartmentCode();
+      if (code != null) {
+        departmentCodes.add(code);
+      }
+      if (Boolean.TRUE.equals(ud.getIsPrimary())) {
+        primaryDepartmentCode = ud.getDepartment().getDepartmentCode();
+        department = ud.getDepartment().getDepartmentName();
+      }
+    }
     claims.put("department", department);
-    // Add role_id to JWT
+    if (!departmentCodes.isEmpty()) {
+      claims.put("department_codes", departmentCodes);
+    }
+    if (primaryDepartmentCode != null) {
+      claims.put("primary_department", primaryDepartmentCode);
+    }
     if (user.getRole() != null) {
       claims.put("role_id", user.getRole().getId().toString());
       claims.put("role", user.getRole().getRoleName());
+      claims.put("role_code", user.getRole().getRoleCode());
     }
 
     return Jwts.builder()

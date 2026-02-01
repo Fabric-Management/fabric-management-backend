@@ -6,13 +6,16 @@ import com.fabricmanagement.common.platform.auth.domain.AuthUser;
 import com.fabricmanagement.common.platform.auth.domain.RegistrationToken;
 import com.fabricmanagement.common.platform.auth.domain.event.UserRegisteredEvent;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
+import com.fabricmanagement.common.platform.auth.dto.OnboardingPrefillDto;
 import com.fabricmanagement.common.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RegistrationTokenRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
-import com.fabricmanagement.common.platform.communication.app.UserContactService;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
+import com.fabricmanagement.common.platform.company.domain.Company;
+import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
+import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
@@ -31,8 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <h2>Two Flows:</h2>
  *
  * <ul>
- *   <li><b>Sales-led:</b> Token only (email verified by click)
- *   <li><b>Self-service:</b> Token + verification code (double security)
+ *   <li><b>Sales-led:</b> Token only (email verified by link click)
+ *   <li><b>Self-service:</b> Token only (email verified by link click)
  * </ul>
  *
  * <p>Both flows result in:
@@ -41,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Password set
  *   <li>User verified
  *   <li>Auto-login (JWT tokens returned)
- *   <li>Onboarding status check
+ *   <li>Onboarding status and prefill for onboarding form
  * </ul>
  */
 @Service
@@ -53,12 +56,13 @@ public class PasswordSetupService {
   private final AuthUserRepository authUserRepository;
   private final UserFacade userFacade;
   private final UserRepository userRepository;
-  private final UserContactService userContactService;
+  private final UserContactAssignmentService userContactAssignmentService;
   private final ContactService contactService;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
   private final EntityManager entityManager;
+  private final CompanyRepository companyRepository;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
@@ -69,15 +73,10 @@ public class PasswordSetupService {
   /**
    * Complete password setup using secure token.
    *
-   * <p><b>Two flows supported:</b>
-   *
-   * <ul>
-   *   <li><b>Sales-led:</b> Token only (email verified by click)
-   *   <li><b>Self-service:</b> Token + verification code (double security)
-   * </ul>
+   * <p><b>Both flows:</b> Token only (email verified by link click). No verification code.
    *
    * @param request Password setup request
-   * @return Login response with tokens and onboarding status
+   * @return Login response with tokens, onboarding status and onboardingPrefill when needed
    */
   @Transactional
   public LoginResponse setupPassword(PasswordSetupRequest request) {
@@ -98,9 +97,8 @@ public class PasswordSetupService {
 
     log.debug("Token type: {}", token.getTokenType());
 
-    // Both SALES_LED and SELF_SERVICE tokens work the same way:
-    // Email link click = email verified (no verification code needed)
-    // Verification codes are only needed for unverified contacts during login flows
+    // Email is verified when user completes password setup (link click + password set).
+    // ensureAuthenticationContact below verifies the contact for this flow.
 
     UserDto user =
         userFacade
@@ -122,8 +120,8 @@ public class PasswordSetupService {
                         .findByTenantIdAndId(user.getTenantId(), user.getId())
                         .orElseThrow(() -> new IllegalArgumentException("User entity not found")));
 
-    // ✅ Ensure user has at least one verified contact (for multi-contact login support)
-    // Any verified contact can be used for login with user-based AuthUser
+    // ✅ Verify contact when user completes password setup (link click = email ownership proof).
+    // Ensures user has at least one verified contact for multi-contact login support.
     UUID userEntityTenantId = userEntity.getTenantId();
     UUID userEntityId = userEntity.getId();
 
@@ -175,17 +173,32 @@ public class PasswordSetupService {
 
     UserDto freshUser = UserDto.from(freshUserEntity);
 
+    boolean needsOnboarding = !Boolean.TRUE.equals(user.getHasCompletedOnboarding());
+    OnboardingPrefillDto onboardingPrefill = null;
+    if (needsOnboarding) {
+      var companyOpt =
+          companyRepository.findByTenantIdAndId(user.getTenantId(), user.getCompanyId());
+      onboardingPrefill =
+          OnboardingPrefillDto.builder()
+              .primaryEmail(contactValue)
+              .companyName(companyOpt.map(Company::getCompanyName).orElse(null))
+              .taxId(companyOpt.map(Company::getTaxId).orElse(null))
+              .companyType(companyOpt.map(c -> c.getCompanyType().name()).orElse(null))
+              .build();
+    }
+
     log.info(
         "✅ Password setup completed: user={}, needsOnboarding={}",
         PiiMaskingUtil.maskEmail(contactValue),
-        !user.getHasCompletedOnboarding());
+        needsOnboarding);
 
     return LoginResponse.builder()
         .accessToken(accessToken)
         .refreshToken(refreshToken)
         .expiresIn(accessTokenExpiration / 1000) // Convert ms to seconds
         .user(freshUser)
-        .needsOnboarding(!user.getHasCompletedOnboarding())
+        .needsOnboarding(needsOnboarding)
+        .onboardingPrefill(onboardingPrefill)
         .build();
   }
 
@@ -213,10 +226,10 @@ public class PasswordSetupService {
 
           contactService.verifyContact(contact.getId());
 
-          if (!userContactService.existsUserContact(userId, contact.getId())) {
-            userContactService.assignContact(userId, contact.getId(), true);
+          if (!userContactAssignmentService.existsUserContact(userId, contact.getId())) {
+            userContactAssignmentService.assignContact(userId, contact.getId(), true);
           } else {
-            userContactService.setAsDefault(userId, contact.getId());
+            userContactAssignmentService.setAsDefault(userId, contact.getId());
           }
 
           log.info("Recovered verified contact: userId={}, contactId={}", userId, contact.getId());

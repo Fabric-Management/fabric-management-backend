@@ -4,6 +4,10 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,20 +44,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/onboarding")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(
+    name = "Tenant Onboarding (Admin)",
+    description =
+        "Sales-led tenant creation. Creates tenant company, admin user, subscriptions, and sends welcome email with setup link. Requires platform admin in production.")
 public class TenantOnboardingController {
 
   private final TenantOnboardingService onboardingService;
 
-  /**
-   * Create new tenant company with admin user (sales-led flow).
-   *
-   * <p><b>Security:</b> Requires PLATFORM_ADMIN role in production
-   *
-   * <p><b>Development:</b> Bypassed in local/dev profiles for testing
-   *
-   * @param request Tenant onboarding request
-   * @return Onboarding response with setup details
-   */
+  @Operation(
+      summary = "Create tenant (sales-led)",
+      description =
+          "Creates a new tenant company with tenant_id = company_id, admin user, selected OS subscriptions (trial), and registration token. Sends welcome email to admin with setup link. In production this endpoint should be protected with PLATFORM_ADMIN role.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "200",
+      description = "Tenant created successfully; welcome email sent to admin",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = TenantOnboardingResponse.class)))
   @PostMapping("/tenant")
   // @PreAuthorize("hasRole('PLATFORM_ADMIN')")  // Enable in production after creating first
   // platform admin

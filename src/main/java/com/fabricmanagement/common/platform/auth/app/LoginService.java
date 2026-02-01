@@ -2,7 +2,6 @@ package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.auth.app.VerificationCodeManager.IssuedVerificationCode;
 import com.fabricmanagement.common.platform.auth.domain.AuthUser;
 import com.fabricmanagement.common.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.common.platform.auth.domain.VerificationType;
@@ -12,7 +11,6 @@ import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
-import com.fabricmanagement.common.platform.communication.app.VerificationService;
 import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.dto.CompanyDto;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
@@ -47,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LoginService {
 
   private final AuthUserRepository authUserRepository;
+  private final AuthUserResolutionService resolutionService;
   private final RefreshTokenRepository refreshTokenRepository;
   private final UserFacade userFacade;
   private final UserRepository userRepository;
@@ -55,7 +54,6 @@ public class LoginService {
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
   private final ContactService contactService;
-  private final VerificationService verificationService;
   private final VerificationCodeManager verificationCodeManager;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
@@ -71,9 +69,7 @@ public class LoginService {
     }
 
     // ✅ Find AuthUser by contact value (user-based authentication)
-    // This query finds User via Contact → UserContact → User, then returns User's AuthUser
-    Optional<AuthUser> authUserOpt =
-        authUserRepository.findByContactValue(request.getContactValue());
+    Optional<AuthUser> authUserOpt = resolutionService.resolveByContact(request.getContactValue());
 
     // ✅ If AuthUser doesn't exist, check if contact belongs to user with password
     if (authUserOpt.isEmpty()) {
@@ -90,7 +86,7 @@ public class LoginService {
             user.getTenantId());
 
         // ✅ Check if user has AuthUser (password exists) - simple user-based check
-        boolean userHasPassword = authUserRepository.existsByUserId(user.getId());
+        boolean userHasPassword = resolutionService.existsByUserId(user.getId());
 
         log.debug("User has password: {}", userHasPassword);
 
@@ -117,10 +113,7 @@ public class LoginService {
                         ? VerificationType.PHONE_VERIFICATION
                         : VerificationType.EMAIL_VERIFICATION;
 
-                IssuedVerificationCode issuedCode =
-                    verificationCodeManager.issueCode(request.getContactValue(), verificationType);
-                verificationService.sendVerificationCode(
-                    request.getContactValue(), issuedCode.code());
+                verificationCodeManager.issueCode(request.getContactValue(), verificationType);
                 throw new IllegalArgumentException(
                     "Contact not verified. Verification code sent to "
                         + PiiMaskingUtil.maskEmail(request.getContactValue())
@@ -153,37 +146,25 @@ public class LoginService {
 
     AuthUser authUser = authUserOpt.get();
 
-    if (authUser.isLocked()) {
+    AuthValidationResult validation = resolutionService.validate(authUser);
+    if (!validation.isValid()) {
       log.warn(
-          "Account locked: contactValue={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
-      throw new IllegalArgumentException("Account is temporarily locked. Try again later.");
-    }
-
-    if (!authUser.getIsVerified()) {
-      log.warn(
-          "Account not verified: contactValue={}",
-          PiiMaskingUtil.maskEmail(request.getContactValue()));
-      throw new IllegalArgumentException("Account not verified. Please complete registration.");
-    }
-
-    if (!authUser.getIsActive()) {
-      log.warn(
-          "Account not active: contactValue={}",
-          PiiMaskingUtil.maskEmail(request.getContactValue()));
-      throw new IllegalArgumentException("Account is deactivated");
+          "Auth validation failed: contactValue={}, reason={}",
+          PiiMaskingUtil.maskEmail(request.getContactValue()),
+          validation.getReason());
+      throw new IllegalArgumentException(validation.getReason());
     }
 
     if (!passwordEncoder.matches(request.getPassword(), authUser.getPasswordHash())) {
-      authUser.recordFailedLogin();
-      authUserRepository.save(authUser);
-
+      resolutionService.recordFailedAttempt(authUser);
       log.warn(
           "Invalid password: contactValue={}, attempts={}",
           PiiMaskingUtil.maskEmail(request.getContactValue()),
           authUser.getFailedLoginAttempts());
-
       throw new IllegalArgumentException("Invalid credentials");
     }
+
+    resolutionService.resetFailedAttempts(authUser);
 
     // ✅ Get User from AuthUser (user-based authentication)
     // AuthUser.user is already loaded via LEFT JOIN FETCH in repository query
@@ -211,9 +192,6 @@ public class LoginService {
             user.getId(), refreshToken, Instant.now().plusMillis(refreshTokenExpiration));
     refreshTokenRepository.save(refreshTokenEntity);
 
-    authUser.recordSuccessfulLogin();
-    authUserRepository.save(authUser);
-
     // Get contact value from Contact entity
     String contactValue =
         userEntity
@@ -231,6 +209,7 @@ public class LoginService {
         .refreshToken(refreshToken)
         .expiresIn(900L) // 15 minutes in seconds
         .user(user)
+        .needsOnboarding(!Boolean.TRUE.equals(user.getHasCompletedOnboarding()))
         .build();
   }
 

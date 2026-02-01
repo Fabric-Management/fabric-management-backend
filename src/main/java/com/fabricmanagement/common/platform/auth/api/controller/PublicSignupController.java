@@ -8,6 +8,9 @@ import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingResponse;
 import com.fabricmanagement.common.platform.communication.app.EmailTemplateRenderer;
 import com.fabricmanagement.common.platform.communication.app.NotificationService;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +50,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(
+    name = "Public Signup",
+    description =
+        "Self-service tenant registration. No authentication required. Creates tenant, company, admin user, FabricOS trial, and sends setup link by email. Email link click = email verified.")
 public class PublicSignupController {
 
   private final TenantOnboardingService onboardingService;
@@ -54,12 +61,14 @@ public class PublicSignupController {
   private final EmailTemplateRenderer emailTemplateRenderer;
   private final FrontendUrlProvider frontendUrlProvider;
 
-  /**
-   * Self-service signup - Creates new tenant from public website.
-   *
-   * @param request Self signup request
-   * @return Onboarding response (without sensitive data)
-   */
+  @Operation(
+      summary = "Self-service signup",
+      description =
+          "Creates a new tenant from the public website. Company, admin user, and FabricOS trial are created; user receives an email with a setup link to set password. Terms must be accepted.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "200",
+      description = "Registration initiated; user should check email for setup link",
+      content = @Content(mediaType = "application/json"))
   @PostMapping("/signup")
   public ResponseEntity<ApiResponse<String>> signup(@Valid @RequestBody SelfSignupRequest request) {
 
