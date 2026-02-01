@@ -30,6 +30,8 @@ Fabric Management System is a comprehensive platform for fabric manufacturing, i
 - Docker & Docker Compose
 - PostgreSQL 15+ (via Docker)
 
+> **Local setup without Docker:** See [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
+
 ### Installation
 
 ```bash
@@ -52,6 +54,7 @@ make app-run         # Run Spring Boot app
 
 ```
 fabric-management-backend/
+├── docs/                    # 📚 Documentation
 ├── scripts/                 # 🛠️ Utility scripts
 ├── src/                     # 📦 Source code (modular monolith)
 └── docker-compose.yml       # 🐳 Docker infrastructure
@@ -100,13 +103,16 @@ make db-migrate      # Run migrations
 make db-shell        # Open PostgreSQL shell
 
 # Development
-make health          # Check application health
-make logs            # View logs
-make format          # Format code
-make lint            # Code quality checks
+make health               # Check application health
+make logs                 # View logs
+make format               # Format code
+make format-check         # Verify format only (no changes)
+make code-quality         # Format + Checkstyle + SpotBugs (reports)
+make code-quality-strict  # Same, but fail on any violation
+make lint                 # Code quality checks (verify, no tests)
 ```
 
-See `make help` for all available commands.
+See `make help` for all available commands. **Code quality & automatic error detection:** [docs/CODE_QUALITY.md](docs/CODE_QUALITY.md).
 
 ## 🔐 Security Features
 
@@ -125,6 +131,10 @@ make test
 # Run with coverage
 make coverage
 ```
+
+## 🔍 Code Quality & Error Detection
+
+Format, Checkstyle, SpotBugs, OWASP dependency check, and pre-commit hooks run automatically. See **[docs/CODE_QUALITY.md](docs/CODE_QUALITY.md)** for details.
 
 ## 📝 License
 
