@@ -25,7 +25,7 @@ public class MaterialMatcher {
 
   // TODO: Add YarnFacade and FabricFacade when available
 
-  /** Material name synonyms/translations (Turkish ↔ English) */
+  /** Material name synonyms/translations (Turkish ↔ English). */
   private static final Map<String, List<String>> MATERIAL_SYNONYMS =
       Map.of(
           "cotton", List.of("pamuk", "cotton fiber", "cotton fibre"),
@@ -75,7 +75,9 @@ public class MaterialMatcher {
     List<MatchResult> matches = new ArrayList<>();
 
     for (MaterialDto material : materials) {
-      if (material.getUid() == null) continue;
+      if (material.getUid() == null) {
+        continue;
+      }
 
       String materialUid = material.getUid().toLowerCase();
 
@@ -312,9 +314,8 @@ public class MaterialMatcher {
         score += 40;
       } else if (baseName.equals(term)) {
         score += 38;
-      }
-      // Contains match
-      else if (materialUid.contains(term)) {
+      } else if (materialUid.contains(term)) {
+        // Contains match
         score += 20;
       } else if (baseName.contains(term)) {
         score += 18;
@@ -398,7 +399,9 @@ public class MaterialMatcher {
     // Filter out common prefixes and short parts
     List<String> meaningfulParts = new ArrayList<>();
     for (String part : parts) {
-      if (!part.matches("^[a-z]+$") || part.length() < 2) continue;
+      if (!part.matches("^[a-z]+$") || part.length() < 2) {
+        continue;
+      }
       // Skip common prefixes like "mat", "fiber", "fibre" and very short parts
       if (!part.equals("mat")
           && !part.equals("fiber")
