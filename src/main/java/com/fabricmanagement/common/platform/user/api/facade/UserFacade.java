@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.user.api.facade;
 
+import com.fabricmanagement.common.platform.user.dto.CreateAdminUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import java.util.List;
 import java.util.Optional;
@@ -78,4 +79,14 @@ public interface UserFacade {
    * @return true if exists
    */
   boolean contactExists(String contactValue);
+
+  /**
+   * Create tenant admin user during onboarding. Used only by Auth module
+   * (TenantOnboardingOrchestrator).
+   *
+   * @param request admin user creation request (companyId, tenantId, names, contactValue, optional
+   *     department)
+   * @return created user DTO
+   */
+  UserDto createAdminUser(CreateAdminUserRequest request);
 }

@@ -31,7 +31,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       "SELECT DISTINCT u FROM User u "
           + "LEFT JOIN FETCH u.role "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId "
+          + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
           + "WHERE c.contactValue = :contactValue "
           + "AND u.tenantId = c.tenantId")
@@ -59,7 +59,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + "LEFT JOIN FETCH u.role "
           + "LEFT JOIN FETCH u.userContacts uc "
           + "LEFT JOIN FETCH uc.contact "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact ucFilter ON u.id = ucFilter.userId "
+          + "JOIN UserContact ucFilter ON u.id = ucFilter.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON ucFilter.contactId = c.id "
           + "WHERE u.tenantId = :tenantId AND c.contactValue = :contactValue")
   Optional<User> findByTenantIdAndContactValue(
@@ -103,7 +103,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @Query(
       "SELECT COUNT(u) > 0 FROM User u "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId "
+          + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
           + "WHERE c.contactValue = :contactValue "
           + "AND u.tenantId = c.tenantId")
@@ -111,6 +111,21 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /** Check if user exists in tenant. */
   boolean existsByTenantIdAndId(UUID tenantId, UUID id);
+
+  /**
+   * Check if contact value exists in tenant (for enumeration protection — tenant-scoped only).
+   *
+   * @param tenantId Tenant ID
+   * @param contactValue Contact value (email or phone)
+   * @return true if any user in tenant has this contact value
+   */
+  @Query(
+      "SELECT COUNT(u) > 0 FROM User u "
+          + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
+          + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
+          + "WHERE u.tenantId = :tenantId AND c.contactValue = :contactValue")
+  boolean existsByTenantIdAndContactValue(
+      @Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
   /**
    * Search users by name.
@@ -140,7 +155,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       "SELECT DISTINCT u FROM User u "
           + "LEFT JOIN FETCH u.role "
-          + "JOIN com.fabricmanagement.common.platform.communication.domain.UserContact uc ON u.id = uc.userId "
+          + "JOIN UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
           + "WHERE c.contactType = 'EMAIL' "
           + "AND c.contactValue LIKE CONCAT('%@', :domain) "

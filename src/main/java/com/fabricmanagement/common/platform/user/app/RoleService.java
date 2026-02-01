@@ -84,6 +84,47 @@ public class RoleService {
     return roleRepository.findByTenantIdAndRoleCode(tenantId, roleCode);
   }
 
+  /**
+   * Resolve tenant admin role (ADMIN or fallback) from platform. Used only during tenant
+   * onboarding.
+   *
+   * @return ADMIN role, or PROD_MANAGER/HR_MANAGER/any active as fallback
+   * @throws IllegalStateException if no platform roles exist
+   */
+  @Transactional(readOnly = true)
+  public Role findTenantAdminRoleOrThrow(UUID forTenantIdLogging) {
+    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
+    Optional<Role> admin = roleRepository.findByTenantIdAndRoleCode(systemTenantId, "ADMIN");
+    if (admin.isPresent()) {
+      return admin.get();
+    }
+    Optional<Role> prodManager =
+        roleRepository.findByTenantIdAndRoleCode(systemTenantId, "PROD_MANAGER");
+    if (prodManager.isPresent()) {
+      log.warn(
+          "ADMIN role not found, using PROD_MANAGER for tenant admin: tenantId={}",
+          forTenantIdLogging);
+      return prodManager.get();
+    }
+    Optional<Role> hrManager =
+        roleRepository.findByTenantIdAndRoleCode(systemTenantId, "HR_MANAGER");
+    if (hrManager.isPresent()) {
+      log.warn(
+          "ADMIN/PROD_MANAGER not found, using HR_MANAGER for tenant admin: tenantId={}",
+          forTenantIdLogging);
+      return hrManager.get();
+    }
+    List<Role> any = roleRepository.findByTenantIdAndIsActiveTrue(systemTenantId);
+    if (!any.isEmpty()) {
+      log.error(
+          "ADMIN role not found, using first active role for tenant admin: tenantId={}",
+          forTenantIdLogging);
+      return any.get(0);
+    }
+    throw new IllegalStateException(
+        "Platform roles not initialized. Ensure migration V013 has been executed.");
+  }
+
   @Transactional
   public Role create(String roleName, String roleCode, String description) {
     UUID tenantId = TenantContext.getCurrentTenantId();
