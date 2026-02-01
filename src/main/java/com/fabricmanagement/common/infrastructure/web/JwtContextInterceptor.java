@@ -49,7 +49,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class JwtContextInterceptor implements HandlerInterceptor {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
-  private static final String[] OPTIONAL_TENANT_PATHS = {"/api/common/companies/types/**"};
+  private static final String[] OPTIONAL_TENANT_PATHS = {"/api/common/company-types/**"};
 
   private final JwtService jwtService;
   private final CompanyRepository companyRepository;
