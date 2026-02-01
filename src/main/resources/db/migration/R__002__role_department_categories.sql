@@ -114,7 +114,7 @@ BEGIN
     -- ✅ Platform-level system roles that are shared by ALL tenants
     -- These roles are NOT copied to tenants - all tenants use the same platform roles
     -- Tenant-specific roles can be created but are not shown in standard role lists
-    INSERT INTO common_company.common_role 
+    INSERT INTO common_user.common_role 
         (tenant_id, uid, role_name, role_code, description, department_category_id, is_system_role, display_order, is_active)
     VALUES
         -- Production Roles
