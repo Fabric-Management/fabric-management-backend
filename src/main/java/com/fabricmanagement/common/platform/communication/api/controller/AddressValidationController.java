@@ -157,7 +157,7 @@ public class AddressValidationController {
    *   <li>User doesn't know country: Skip country → Global search, may find multiple countries
    * </ul>
    *
-   * <p><b>Examples:
+   * <p><b>Examples:</b>
    *
    * <ul>
    *   <li>Global: <code>GET /search-by-postcode?postcode=34000</code> (searches worldwide)

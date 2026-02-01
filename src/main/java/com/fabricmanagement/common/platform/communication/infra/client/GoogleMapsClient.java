@@ -123,7 +123,7 @@ public class GoogleMapsClient {
           List.of(
               "street_address", // Normal addresses (e.g., 10 Downing St)
               "premise", // Building or apartment names (e.g., Akkayalar Plaza) - includes
-                         // subpremise
+              // subpremise
               "point_of_interest", // Known businesses or landmarks (e.g., Starbucks, Big Ben)
               "route", // Street or avenue names
               "establishment" // General business or building category

@@ -21,7 +21,6 @@ package com.fabricmanagement.common.platform.communication.domain;
  *
  * <ul>
  *   <li><b>OFFICE:</b> Office building where user works
- *   <li><b>WORK:</b> User's work/office address (legacy, use OFFICE for new addresses)
  *   <li><b>HEADQUARTERS:</b> Company's main headquarters location
  *   <li><b>BRANCH:</b> Company branch office location
  *   <li><b>WAREHOUSE:</b> Warehouse, production or storage facility
@@ -96,20 +95,6 @@ public enum AddressType {
    * <p>Used for: Employee office location tracking, corporate office addresses
    */
   OFFICE,
-
-  /**
-   * Work address (Legacy)
-   *
-   * <p>User's work/office address (independent from company's address)
-   *
-   * <p>Used for: Employee office location tracking
-   *
-   * <p><b>Note:</b> For new addresses, prefer {@link #OFFICE} instead
-   *
-   * @deprecated Use {@link #OFFICE} for new addresses. Kept for backward compatibility.
-   */
-  @Deprecated
-  WORK,
 
   /**
    * Company headquarters
@@ -197,7 +182,7 @@ public enum AddressType {
    */
   public boolean isCorporate() {
     return switch (this) {
-      case OFFICE, WORK, HEADQUARTERS, BRANCH, WAREHOUSE, FACTORY, SHIPPING -> true;
+      case OFFICE, HEADQUARTERS, BRANCH, WAREHOUSE, FACTORY, SHIPPING -> true;
       case BILLING -> true; // BILLING can be both personal and corporate
       default -> false;
     };
@@ -241,7 +226,7 @@ public enum AddressType {
    * @return true if valid for user addresses
    */
   public boolean isValidForUser() {
-    return isPersonal() || this == OFFICE || this == WORK || isField();
+    return isPersonal() || this == OFFICE || isField();
   }
 
   /**

@@ -143,19 +143,6 @@ public class Contact extends BaseEntity {
   @Builder.Default
   private Boolean isPersonal = true;
 
-  /**
-   * WhatsApp capability flag (for PHONE contacts only)
-   *
-   * <p>true = Phone number has WhatsApp capability
-   *
-   * <p>false = Phone number does not have WhatsApp or not checked yet
-   *
-   * <p>Used for verification code and notification priority (WhatsApp > SMS)
-   */
-  @Column(name = "is_whatsapp", nullable = false)
-  @Builder.Default
-  private Boolean isWhatsApp = false;
-
   /** Mark contact as verified */
   public void verify() {
     this.isVerified = true;

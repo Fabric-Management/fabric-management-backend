@@ -1,10 +1,11 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.communication.domain.CompanyContact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.dto.ContactSuggestionsDto;
 import com.fabricmanagement.common.platform.communication.dto.PhoneSuggestion;
+import com.fabricmanagement.common.platform.company.app.CompanyContactAssignmentService;
+import com.fabricmanagement.common.platform.company.domain.CompanyContact;
 import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class ContactSuggestionService {
 
-  private final CompanyContactService companyContactService;
+  private final CompanyContactAssignmentService companyContactAssignmentService;
   private final CompanyRepository companyRepository;
 
   /**
@@ -80,7 +81,8 @@ public class ContactSuggestionService {
         .findByTenantIdAndId(tenantId, companyId)
         .orElseThrow(() -> new IllegalArgumentException("Company not found"));
 
-    List<CompanyContact> companyContacts = companyContactService.getCompanyContacts(companyId);
+    List<CompanyContact> companyContacts =
+        companyContactAssignmentService.getCompanyContacts(companyId);
 
     ContactSuggestionsDto suggestions =
         ContactSuggestionsDto.builder()

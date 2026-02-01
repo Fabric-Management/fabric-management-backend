@@ -155,6 +155,22 @@ public class Address extends BaseEntity {
   private String label;
 
   /**
+   * Optional location contact: depo/şube telefonu.
+   *
+   * <p>Replaces AddressContact junction for simple address-level contact (YAGNI).
+   */
+  @Column(name = "contact_phone", length = 50)
+  private String contactPhone;
+
+  /** Optional location contact: depo/şube email. */
+  @Column(name = "contact_email", length = 255)
+  private String contactEmail;
+
+  /** Optional contact person: irtibat kişisi. */
+  @Column(name = "contact_person", length = 100)
+  private String contactPerson;
+
+  /**
    * Google's formatted address (canonical format)
    *
    * <p>Stored separately for UI display and consistency
