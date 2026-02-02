@@ -20,7 +20,7 @@ public class UserDto {
   private String firstName;
   private String lastName;
   private String displayName;
-  private UUID companyId;
+  private UUID organizationId;
   private UUID roleId;
   private String role; // Role name for display
   private Boolean isActive;
@@ -30,6 +30,22 @@ public class UserDto {
   private Instant createdAt;
   private Instant updatedAt;
 
+  /**
+   * @deprecated Use {@link #getOrganizationId()} instead.
+   */
+  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
+  public UUID getCompanyId() {
+    return organizationId;
+  }
+
+  /**
+   * @deprecated Use {@link #setOrganizationId(UUID)} instead.
+   */
+  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
+  public void setCompanyId(UUID companyId) {
+    this.organizationId = companyId;
+  }
+
   public static UserDto from(User user) {
     return UserDto.builder()
         .id(user.getId())
@@ -38,7 +54,7 @@ public class UserDto {
         .firstName(user.getFirstName())
         .lastName(user.getLastName())
         .displayName(user.getDisplayName())
-        .companyId(user.getCompanyId())
+        .organizationId(user.getOrganizationId())
         .roleId(user.getRole() != null ? user.getRole().getId() : null)
         .role(user.getRole() != null ? user.getRole().getRoleName() : null)
         .isActive(user.getIsActive())

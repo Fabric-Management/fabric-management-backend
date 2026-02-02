@@ -2,7 +2,7 @@ package com.fabricmanagement.common.infrastructure.web;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.auth.app.JwtService;
-import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
+import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
@@ -42,6 +42,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
  *
  * <p><b>Public endpoints:</b> This interceptor should be excluded for public endpoints (e.g.,
  * /api/public/**, /api/auth/**). See WebMvcConfig for exclusion patterns.
+ *
+ * <h2>Migration Note (Faz 3):</h2>
+ *
+ * <p>Uses TenantRepository instead of deprecated CompanyRepository. Tenant UID is now stored
+ * directly in common_tenant table.
  */
 @Component
 @RequiredArgsConstructor
@@ -52,7 +57,7 @@ public class JwtContextInterceptor implements HandlerInterceptor {
   private static final String[] OPTIONAL_TENANT_PATHS = {"/api/common/company-types/**"};
 
   private final JwtService jwtService;
-  private final CompanyRepository companyRepository;
+  private final TenantRepository tenantRepository;
 
   /** Extract JWT token and set TenantContext before handler execution. */
   @Override
@@ -78,19 +83,17 @@ public class JwtContextInterceptor implements HandlerInterceptor {
 
         // Load tenant UID from JWT token (no DB query needed)
         // ⚠️ Performance: JWT already contains tenant_uid claim, no need for DB query
-        // ⚠️ CRITICAL: Extract tenant UID if JWT contains Company UID format (backward
-        // compatibility)
         try {
           String tenantUidFromJwt = jwtService.getTenantUidFromToken(token);
           if (tenantUidFromJwt != null) {
-            // Extract tenant UID from Company UID if it contains module code
-            // Format: {TENANT_UID}-COMP-{UUID} → {TENANT_UID}
+            // After Faz 3: tenant_uid is stored directly, no need to extract from company UID
+            // Backward compat: Handle old tokens with Company UID format
             String tenantUid = tenantUidFromJwt;
             if (tenantUidFromJwt.contains("-COMP-")) {
               String[] parts = tenantUidFromJwt.split("-COMP-");
               tenantUid = parts[0]; // First part is tenant UID
               log.debug(
-                  "Extracted tenant UID from JWT Company UID: {} → {}",
+                  "Extracted tenant UID from legacy JWT format: {} → {}",
                   tenantUidFromJwt,
                   tenantUid);
             }
@@ -99,25 +102,17 @@ public class JwtContextInterceptor implements HandlerInterceptor {
           }
         } catch (Exception e) {
           // Fallback: Load from DB if JWT claim missing (backward compatibility)
-          log.debug("Tenant UID not in JWT, loading from DB: tenantId={}", tenantId);
-          companyRepository
+          log.debug("Tenant UID not in JWT, loading from Tenant table: tenantId={}", tenantId);
+          tenantRepository
               .findById(tenantId)
               .ifPresent(
-                  company -> {
-                    String companyUid = company.getUid();
-                    if (companyUid != null) {
-                      // Extract tenant UID from Company UID if it contains module code
-                      // Format: {TENANT_UID}-COMP-{UUID} → {TENANT_UID}
-                      String tenantUid = companyUid;
-                      if (companyUid.contains("-COMP-")) {
-                        String[] parts = companyUid.split("-COMP-");
-                        tenantUid = parts[0]; // First part is tenant UID
-                      }
+                  tenant -> {
+                    String tenantUid = tenant.getUid();
+                    if (tenantUid != null) {
                       TenantContext.setCurrentTenantUid(tenantUid);
                       log.debug(
-                          "Tenant UID loaded from DB: {} (from company UID: {}) for tenantId={}",
+                          "Tenant UID loaded from Tenant table: {} for tenantId={}",
                           tenantUid,
-                          companyUid,
                           tenantId);
                     }
                   });

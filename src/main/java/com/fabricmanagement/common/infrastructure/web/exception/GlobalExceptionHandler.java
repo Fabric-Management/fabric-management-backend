@@ -44,31 +44,6 @@ public class GlobalExceptionHandler {
         400, "Bad Request", "TAX_ID_ALREADY_EXISTS", ex.getMessage(), req.getRequestURI());
   }
 
-  @ExceptionHandler(
-      com.fabricmanagement.common.platform.company.domain.exception.HierarchyDepthExceededException
-          .class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public ApiError handleHierarchyDepth(
-      com.fabricmanagement.common.platform.company.domain.exception.HierarchyDepthExceededException
-          ex,
-      HttpServletRequest req) {
-    log.warn("Hierarchy depth exceeded: {}", ex.getMessage());
-    return ApiError.of(
-        400, "Bad Request", "HIERARCHY_DEPTH_EXCEEDED", ex.getMessage(), req.getRequestURI());
-  }
-
-  @ExceptionHandler(
-      com.fabricmanagement.common.platform.company.domain.exception.CircularHierarchyException
-          .class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public ApiError handleCircularHierarchy(
-      com.fabricmanagement.common.platform.company.domain.exception.CircularHierarchyException ex,
-      HttpServletRequest req) {
-    log.warn("Circular hierarchy: {}", ex.getMessage());
-    return ApiError.of(
-        400, "Bad Request", "CIRCULAR_HIERARCHY", ex.getMessage(), req.getRequestURI());
-  }
-
   @ExceptionHandler(ContactAlreadyRegisteredException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiError handleContactAlreadyRegistered(

@@ -11,8 +11,8 @@ import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
-import com.fabricmanagement.common.platform.company.dto.CompanyDto;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
@@ -49,7 +49,7 @@ public class LoginService {
   private final RefreshTokenRepository refreshTokenRepository;
   private final UserFacade userFacade;
   private final UserRepository userRepository;
-  private final CompanyFacade companyFacade;
+  private final OrganizationFacade organizationFacade;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
@@ -257,21 +257,23 @@ public class LoginService {
 
       if (anyUserWithDomain.isPresent()) {
         UserDto existingUser = anyUserWithDomain.get();
-        Optional<CompanyDto> company =
-            companyFacade.findById(existingUser.getTenantId(), existingUser.getCompanyId());
+        Optional<OrganizationDto> organization =
+            organizationFacade.findById(
+                existingUser.getTenantId(), existingUser.getOrganizationId());
 
-        if (company.isPresent()) {
-          CompanyDto companyDto = company.get();
+        if (organization.isPresent()) {
+          OrganizationDto orgDto = organization.get();
 
-          if (companyDto.getIsTenant()) {
+          // Root organization (no parent) is the tenant's main organization
+          if (orgDto.getParentOrganizationId() == null) {
             return new IllegalArgumentException(
                 "User not found. If you're a "
-                    + companyDto.getCompanyName()
+                    + orgDto.getName()
                     + " employee, please contact your IT team or manager to add you to the system.");
           } else {
             return new IllegalArgumentException(
                 "User not found. Please contact your customer representative at "
-                    + companyDto.getCompanyName()
+                    + orgDto.getName()
                     + " to add you to the system.");
           }
         }

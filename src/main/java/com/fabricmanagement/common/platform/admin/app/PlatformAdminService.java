@@ -2,10 +2,13 @@ package com.fabricmanagement.common.platform.admin.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.admin.dto.TenantStatistics;
-import com.fabricmanagement.common.platform.company.domain.Company;
-import com.fabricmanagement.common.platform.company.dto.CompanyDto;
-import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
 import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
+import com.fabricmanagement.common.platform.organization.domain.Organization;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.common.platform.tenant.domain.Tenant;
+import com.fabricmanagement.common.platform.tenant.dto.TenantDto;
+import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
@@ -43,51 +46,45 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class PlatformAdminService {
 
-  private final CompanyRepository companyRepository;
+  private final TenantRepository tenantRepository;
+  private final OrganizationRepository organizationRepository;
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
 
   /**
-   * Get all tenant companies in the system.
+   * Get all tenants in the system.
    *
    * <p><b>Platform Admin Only:</b> Returns all tenants regardless of tenant context.
    *
-   * <p><b>Performance Optimization:</b> Uses database query instead of loading all companies into
-   * memory and filtering in Java. This prevents system crashes when there are thousands of
-   * companies.
-   *
-   * @return List of all tenant companies
+   * @return List of all tenants
    */
   @Transactional(readOnly = true)
-  public List<CompanyDto> getAllTenants() {
+  public List<TenantDto> getAllTenants() {
     log.info("Platform admin: Listing all tenants in system");
 
-    // ✅ Query directly for root tenants instead of findAll() + filter
-    List<Company> tenants = companyRepository.findRootTenants();
+    List<Tenant> tenants = tenantRepository.findAllActive();
 
     log.info("Found {} tenants in system", tenants.size());
 
-    return tenants.stream().map(CompanyDto::from).collect(Collectors.toList());
+    return tenants.stream().map(TenantDto::from).collect(Collectors.toList());
   }
 
   /**
    * Get tenant by ID (platform admin can access any tenant).
    *
    * @param tenantId The tenant ID to access
-   * @return CompanyDto for the tenant
+   * @return TenantDto for the tenant
    */
   @Transactional(readOnly = true)
-  public CompanyDto getTenant(UUID tenantId) {
+  public TenantDto getTenant(UUID tenantId) {
     log.info("Platform admin: Accessing tenant: {}", tenantId);
 
-    Company tenant =
-        companyRepository
+    Tenant tenant =
+        tenantRepository
             .findById(tenantId)
-            .filter(company -> company.getId().equals(company.getTenantId())) // Must be root tenant
-            .filter(Company::isTenant)
             .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
 
-    return CompanyDto.from(tenant);
+    return TenantDto.from(tenant);
   }
 
   /**
@@ -114,23 +111,23 @@ public class PlatformAdminService {
   }
 
   /**
-   * Get all companies in a specific tenant (platform admin access).
+   * Get all organizations in a specific tenant (platform admin access).
    *
    * @param tenantId The tenant ID to query
-   * @return List of companies in that tenant
+   * @return List of organizations in that tenant
    */
   @Transactional(readOnly = true)
-  public List<CompanyDto> getTenantCompanies(UUID tenantId) {
-    log.info("Platform admin: Getting companies for tenant: {}", tenantId);
+  public List<OrganizationDto> getTenantOrganizations(UUID tenantId) {
+    log.info("Platform admin: Getting organizations for tenant: {}", tenantId);
 
     return TenantContext.executeInTenantContext(
         tenantId,
         () -> {
-          List<Company> companies = companyRepository.findByTenantIdAndIsActiveTrue(tenantId);
+          List<Organization> orgs = organizationRepository.findByTenantIdAndIsActiveTrue(tenantId);
 
-          log.debug("Found {} companies in tenant {}", companies.size(), tenantId);
+          log.debug("Found {} organizations in tenant {}", orgs.size(), tenantId);
 
-          return companies.stream().map(CompanyDto::from).collect(Collectors.toList());
+          return orgs.stream().map(OrganizationDto::from).collect(Collectors.toList());
         });
   }
 
@@ -161,29 +158,30 @@ public class PlatformAdminService {
   }
 
   /**
-   * Get company from any tenant (platform admin access).
+   * Get organization from any tenant (platform admin access).
    *
    * @param tenantId The tenant ID
-   * @param companyId The company ID
-   * @return CompanyDto
+   * @param organizationId The organization ID
+   * @return OrganizationDto
    */
   @Transactional(readOnly = true)
-  public CompanyDto getTenantCompany(UUID tenantId, UUID companyId) {
-    log.info("Platform admin: Getting company {} from tenant {}", companyId, tenantId);
+  public OrganizationDto getTenantOrganization(UUID tenantId, UUID organizationId) {
+    log.info("Platform admin: Getting organization {} from tenant {}", organizationId, tenantId);
 
     return TenantContext.executeInTenantContext(
         tenantId,
         () -> {
-          Company company =
-              companyRepository
-                  .findByTenantIdAndId(tenantId, companyId)
+          Organization org =
+              organizationRepository
+                  .findByTenantIdAndId(tenantId, organizationId)
                   .orElseThrow(
                       () ->
                           new IllegalArgumentException(
                               String.format(
-                                  "Company %s not found in tenant %s", companyId, tenantId)));
+                                  "Organization %s not found in tenant %s",
+                                  organizationId, tenantId)));
 
-          return CompanyDto.from(company);
+          return OrganizationDto.from(org);
         });
   }
 
@@ -212,33 +210,30 @@ public class PlatformAdminService {
   public TenantStatistics getTenantStatistics(UUID tenantId) {
     log.info("Platform admin: Getting statistics for tenant: {}", tenantId);
 
-    // Get tenant company info first
-    Company tenantCompany =
-        companyRepository
+    // Get tenant info first
+    Tenant tenant =
+        tenantRepository
             .findById(tenantId)
-            .filter(company -> company.getId().equals(company.getTenantId()))
-            .filter(Company::isTenant)
             .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
 
     return TenantContext.executeInTenantContext(
         tenantId,
         () -> {
           long userCount = userRepository.countByTenantIdAndIsActiveTrue(tenantId);
-          long companyCount = companyRepository.countByTenantIdAndIsActiveTrue(tenantId);
+          long organizationCount = organizationRepository.countByTenantIdAndIsActiveTrue(tenantId);
 
-          // ✅ Performance: Use database-level count query instead of loading all subscriptions
-          // This implements the same logic as Subscription.isActive() but at database level
+          // Performance: Use database-level count query
           long subscriptionCount =
               subscriptionRepository.countActiveSubscriptionsByTenantId(tenantId, Instant.now());
 
           return TenantStatistics.builder()
               .tenantId(tenantId)
-              .tenantUid(tenantCompany.getUid())
-              .companyName(tenantCompany.getCompanyName())
+              .tenantUid(tenant.getUid())
+              .companyName(tenant.getName())
               .userCount(userCount)
-              .companyCount(companyCount)
+              .companyCount(organizationCount) // Now organization count
               .subscriptionCount(subscriptionCount)
-              .isActive(tenantCompany.getIsActive())
+              .isActive(tenant.getIsActive())
               .build();
         });
   }

@@ -42,7 +42,10 @@ import lombok.*;
 @Table(
     name = "common_user",
     schema = "common_user",
-    indexes = {@Index(name = "idx_user_tenant_company", columnList = "tenant_id,company_id")})
+    indexes = {
+      @Index(name = "idx_user_organization", columnList = "organization_id"),
+      @Index(name = "idx_user_tenant", columnList = "tenant_id")
+    })
 @Getter
 @Setter
 @Builder
@@ -59,9 +62,32 @@ public class User extends BaseEntity {
   @Column(name = "display_name", nullable = false, length = 255)
   private String displayName;
 
-  @Column(name = "company_id", nullable = false)
-  private UUID
-      companyId; // Required for all users - platform admin belongs to Platform System Company
+  /**
+   * The organization this user belongs to.
+   *
+   * <p><b>V046 Migration:</b> Renamed from company_id to organization_id. FK now references
+   * common_organization instead of common_company.
+   */
+  @Column(name = "organization_id", nullable = false)
+  private UUID organizationId;
+
+  /**
+   * @deprecated Use {@link #getOrganizationId()} instead. This method is provided for backward
+   *     compatibility during migration.
+   */
+  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
+  public UUID getCompanyId() {
+    return organizationId;
+  }
+
+  /**
+   * @deprecated Use {@link #setOrganizationId(UUID)} instead. This method is provided for backward
+   *     compatibility during migration.
+   */
+  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
+  public void setCompanyId(UUID companyId) {
+    this.organizationId = companyId;
+  }
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "role_id")
@@ -110,8 +136,28 @@ public class User extends BaseEntity {
     return this.firstName + " " + this.lastName;
   }
 
-  public static User create(String firstName, String lastName, UUID companyId) {
-    return User.builder().firstName(firstName).lastName(lastName).companyId(companyId).build();
+  /**
+   * Create a new user.
+   *
+   * @param firstName First name
+   * @param lastName Last name
+   * @param organizationId Organization the user belongs to
+   * @return new User
+   */
+  public static User create(String firstName, String lastName, UUID organizationId) {
+    return User.builder()
+        .firstName(firstName)
+        .lastName(lastName)
+        .organizationId(organizationId)
+        .build();
+  }
+
+  /**
+   * @deprecated Use {@link #create(String, String, UUID)} with organizationId instead.
+   */
+  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
+  public static User createWithCompanyId(String firstName, String lastName, UUID companyId) {
+    return create(firstName, lastName, companyId);
   }
 
   public void updateProfile(String firstName, String lastName) {

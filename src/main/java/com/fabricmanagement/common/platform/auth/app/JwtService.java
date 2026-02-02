@@ -1,7 +1,9 @@
 package com.fabricmanagement.common.platform.auth.app;
 
-import com.fabricmanagement.common.platform.company.domain.Company;
-import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
+import com.fabricmanagement.common.platform.organization.domain.Organization;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.common.platform.tenant.domain.Tenant;
+import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import io.jsonwebtoken.Claims;
@@ -28,34 +30,41 @@ import org.springframework.stereotype.Service;
  *
  * <ul>
  *   <li>sub: contactValue (email/phone)
- *   <li>tenant_id: UUID
+ *   <li>tenant_id: UUID (references common_tenant)
  *   <li>tenant_uid: Human-readable
  *   <li>user_id: UUID
  *   <li>user_uid: Human-readable
- *   <li>company_id: UUID
+ *   <li>organization_id: UUID (references common_organization)
  *   <li>department: String
  * </ul>
  *
  * <h2>Token Types:</h2>
  *
  * <ul>
- *   <li>Access aux: 15 minutes (configurable)
+ *   <li>Access Token: 15 minutes (configurable)
  *   <li>Refresh Token: 7 days (configurable)
  * </ul>
+ *
+ * <h2>Migration Note (Faz 3):</h2>
+ *
+ * <p>Uses TenantRepository and OrganizationRepository instead of deprecated CompanyRepository.
  */
 @Service
 @Slf4j
 public class JwtService {
 
-  private final CompanyRepository companyRepository;
+  private final TenantRepository tenantRepository;
+  private final OrganizationRepository organizationRepository;
   private final SecretKey secretKey;
   private final long accessTokenExpiration;
 
   public JwtService(
-      CompanyRepository companyRepository,
+      TenantRepository tenantRepository,
+      OrganizationRepository organizationRepository,
       @Value("${application.jwt.secret}") String secret,
       @Value("${application.jwt.expiration:900000}") long accessTokenExpiration) {
-    this.companyRepository = companyRepository;
+    this.tenantRepository = tenantRepository;
+    this.organizationRepository = organizationRepository;
     this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     this.accessTokenExpiration = accessTokenExpiration;
 
@@ -71,33 +80,29 @@ public class JwtService {
 
     log.debug("Generating access token for user: {}", contactValue);
 
-    // Load company once for tenant UID and company_category
-    Optional<Company> companyOpt = companyRepository.findById(user.getTenantId());
+    // Load tenant for tenant_uid
+    Optional<Tenant> tenantOpt = tenantRepository.findById(user.getTenantId());
     String tenantUid =
-        companyOpt
-            .map(
-                company -> {
-                  String companyUid = company.getUid();
-                  if (companyUid != null && companyUid.contains("-COMP-")) {
-                    String[] parts = companyUid.split("-COMP-");
-                    return parts[0];
-                  }
-                  return companyUid;
-                })
-            .orElseGet(() -> extractTenantUid(user.getUid()));
-    String companyCategory =
-        companyOpt.map(c -> c.getCompanyType().getCategory().name()).orElse(null);
+        tenantOpt.map(Tenant::getUid).orElseGet(() -> extractTenantUid(user.getUid()));
+
+    // Load organization for organization_type (category equivalent)
+    Optional<Organization> orgOpt =
+        organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
+    String organizationType = orgOpt.map(o -> o.getOrganizationType().name()).orElse(null);
 
     Map<String, Object> claims = new HashMap<>();
     claims.put("tenant_id", user.getTenantId().toString());
     claims.put("tenant_uid", tenantUid);
     claims.put("user_id", user.getId().toString());
     claims.put("user_uid", user.getUid());
-    claims.put("company_id", user.getCompanyId().toString());
+    // Use organization_id (new), keep company_id for backward compatibility
+    claims.put("organization_id", user.getOrganizationId().toString());
+    claims.put("company_id", user.getOrganizationId().toString()); // Backward compat
     claims.put("firstName", user.getFirstName());
     claims.put("lastName", user.getLastName());
-    if (companyCategory != null) {
-      claims.put("company_category", companyCategory);
+    if (organizationType != null) {
+      claims.put("organization_type", organizationType);
+      claims.put("company_category", organizationType); // Backward compat
     }
     // Department: primary name (backward compat) + department_codes list + primary_department code
     List<String> departmentCodes = new ArrayList<>();
@@ -209,10 +214,28 @@ public class JwtService {
     return claims.get("user_uid", String.class);
   }
 
-  public UUID getCompanyIdFromToken(String token) {
+  /**
+   * Get organization ID from JWT token.
+   *
+   * @param token JWT token
+   * @return Organization UUID
+   */
+  public UUID getOrganizationIdFromToken(String token) {
     Claims claims = extractClaims(token);
-    String companyId = claims.get("company_id", String.class);
-    return UUID.fromString(companyId);
+    // Try new claim first, fall back to old claim
+    String orgId = claims.get("organization_id", String.class);
+    if (orgId == null) {
+      orgId = claims.get("company_id", String.class);
+    }
+    return UUID.fromString(orgId);
+  }
+
+  /**
+   * @deprecated Use {@link #getOrganizationIdFromToken(String)} instead.
+   */
+  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
+  public UUID getCompanyIdFromToken(String token) {
+    return getOrganizationIdFromToken(token);
   }
 
   public String getDepartmentFromToken(String token) {
