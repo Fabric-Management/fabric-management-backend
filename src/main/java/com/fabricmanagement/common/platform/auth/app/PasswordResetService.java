@@ -14,8 +14,8 @@ import com.fabricmanagement.common.platform.auth.dto.UserContactInfoResponse;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
-import com.fabricmanagement.common.platform.company.dto.CompanyDto;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.common.platform.user.domain.ContactType;
@@ -71,7 +71,7 @@ public class PasswordResetService {
   private final UserContactAssignmentService userContactAssignmentService;
   private final UserRepository userRepository;
   private final UserFacade userFacade;
-  private final CompanyFacade companyFacade;
+  private final OrganizationFacade organizationFacade;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
@@ -394,23 +394,24 @@ public class PasswordResetService {
     }
 
     UserDto user = userOpt.get();
-    Optional<CompanyDto> companyOpt =
-        companyFacade.findById(user.getTenantId(), user.getCompanyId());
+    Optional<OrganizationDto> orgOpt =
+        organizationFacade.findById(user.getTenantId(), user.getOrganizationId());
 
-    if (companyOpt.isPresent()) {
-      CompanyDto company = companyOpt.get();
+    if (orgOpt.isPresent()) {
+      OrganizationDto org = orgOpt.get();
 
-      if (company.getIsTenant()) {
+      // Root organization (no parent) is the tenant's main organization
+      if (org.getParentOrganizationId() == null) {
         return new IllegalArgumentException(
             defaultMessage
                 + " If you're a "
-                + company.getCompanyName()
+                + org.getName()
                 + " employee, please contact your IT team for assistance.");
       } else {
         return new IllegalArgumentException(
             defaultMessage
                 + " Please contact your customer representative at "
-                + company.getCompanyName()
+                + org.getName()
                 + " for assistance.");
       }
     }

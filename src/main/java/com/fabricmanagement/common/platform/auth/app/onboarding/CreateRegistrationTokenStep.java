@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Order(6)
+@Order(7) // After SeedOrganizationStep (6)
 @Component
 @RequiredArgsConstructor
 @Slf4j

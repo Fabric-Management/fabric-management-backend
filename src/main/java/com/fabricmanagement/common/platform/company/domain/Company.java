@@ -9,51 +9,45 @@ import java.util.UUID;
 import lombok.*;
 
 /**
- * Company entity representing a tenant in the multi-tenant system.
+ * Company entity - DEPRECATED, use {@link
+ * com.fabricmanagement.common.platform.organization.domain.Organization} instead.
  *
- * <p>Company is the primary tenant boundary. Each company:
+ * <p><b>MIGRATION NOTICE:</b> This entity is deprecated as of Faz 3 migration. The Company concept
+ * has been split into:
  *
  * <ul>
- *   <li>Has its own data isolation via tenant_id
- *   <li>Can have multiple OS subscriptions
- *   <li>Can have departments and users
- *   <li>Can have parent-child relationships
- *   <li>Can have commercial relationships (fason agreements)
+ *   <li>{@link com.fabricmanagement.common.platform.tenant.domain.Tenant} - Platform-level
+ *       subscription boundary
+ *   <li>{@link com.fabricmanagement.common.platform.organization.domain.Organization} - Internal
+ *       organizational structure
+ *   <li>{@link TradingPartner} - External business partners (suppliers, customers)
  * </ul>
  *
- * <h2>Multi-Tenancy:</h2>
+ * <h2>Migration Path:</h2>
  *
- * <p>Company itself IS the tenant. The tenant_id field represents the company's UUID. For
- * hierarchical tenants (parent-child), both share same tenant_id but have different company IDs.
+ * <ol>
+ *   <li>Replace CompanyRepository with OrganizationRepository
+ *   <li>Replace CompanyService with OrganizationService
+ *   <li>Use TenantService for tenant-level operations
+ *   <li>Use TradingPartnerService for external partners
+ * </ol>
  *
- * <h2>Special Case - ROOT Tenant:</h2>
- *
- * <p><b>CRITICAL:</b> For ROOT tenant companies, tenant_id = company_id (self-referencing). This is
- * the ONLY entity where tenant_id is updatable.
- *
- * <h2>Example:</h2>
- *
- * <pre>{@code
- * Company acme = Company.builder()
- *     .companyName("ACME Corporation")
- *     .taxId("1234567890")
- *     .companyType(CompanyType.MANUFACTURER)
- *     .build();
- * // tenantId = auto-set to company's UUID
- * // uid = "ACME-001" (auto-generated)
- * }</pre>
+ * @deprecated Use {@link com.fabricmanagement.common.platform.organization.domain.Organization} for
+ *     internal structure, {@link com.fabricmanagement.common.platform.tenant.domain.Tenant} for
+ *     tenant operations, or {@link TradingPartner} for external partners.
  */
+@Deprecated(since = "Faz 3 Migration", forRemoval = true)
 @Entity
 @Table(
-    name = "common_company",
+    name = "common_organization", // Points to renamed table for backward compatibility
     schema = "common_company",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "uk_company_tenant_tax_id",
+            name = "uk_organization_tenant_tax_id",
             columnNames = {"tenant_id", "tax_id"}))
 @AttributeOverride(
     name = "tenantId",
-    column = @Column(name = "tenant_id", nullable = false, updatable = true))
+    column = @Column(name = "tenant_id", nullable = false, updatable = false))
 @Getter
 @Setter
 @Builder
@@ -61,18 +55,21 @@ import lombok.*;
 @AllArgsConstructor
 public class Company extends BaseEntity {
 
-  @Column(name = "company_name", nullable = false, length = 255)
+  // Column renamed from company_name → name in V046
+  @Column(name = "name", nullable = false, length = 255)
   private String companyName;
 
   @Column(name = "tax_id", nullable = false, length = 50)
   private String taxId;
 
+  // Column renamed from company_type → organization_type in V046
   @Enumerated(EnumType.STRING)
-  @Column(name = "company_type", nullable = false)
+  @Column(name = "organization_type", nullable = false)
   @Builder.Default
   private CompanyType companyType = CompanyType.VERTICAL_MILL;
 
-  @Column(name = "parent_company_id")
+  // Column renamed from parent_company_id → parent_organization_id in V046
+  @Column(name = "parent_organization_id")
   private UUID parentCompanyId;
 
   @OneToMany(mappedBy = "company", fetch = FetchType.LAZY)

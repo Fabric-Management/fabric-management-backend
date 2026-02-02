@@ -50,8 +50,8 @@ public class SubscriptionService {
   private final DomainEventPublisher eventPublisher;
 
   /**
-   * Create initial OS subscriptions during tenant onboarding. Used only by Auth module via
-   * CompanyFacade.
+   * Create initial OS subscriptions during tenant onboarding. Used by Auth module
+   * (CreateSubscriptionsStep).
    *
    * @param tenantId tenant ID
    * @param selectedOS list of OS codes (e.g. FabricOS, YarnOS); default FabricOS if empty

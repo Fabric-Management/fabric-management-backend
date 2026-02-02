@@ -7,7 +7,7 @@ import com.fabricmanagement.common.platform.auth.app.onboarding.TenantOnboarding
 import com.fabricmanagement.common.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingResponse;
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Tenant Onboarding Service — entry point for sales-led and self-service tenant creation.
  *
- * <p>Delegates to {@link TenantOnboardingOrchestrator} and uses only {@link CompanyFacade} and
+ * <p>Delegates to {@link TenantOnboardingOrchestrator} and uses only {@link OrganizationFacade} and
  * {@link UserFacade} for validation. All creation logic lives in ordered {@link
  * com.fabricmanagement.common.platform.auth.app.onboarding.OnboardingStep} implementations.
  */
@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TenantOnboardingService {
 
   private final TenantOnboardingOrchestrator orchestrator;
-  private final CompanyFacade companyFacade;
+  private final OrganizationFacade organizationFacade;
   private final UserFacade userFacade;
 
   /**
@@ -97,8 +97,8 @@ public class TenantOnboardingService {
   }
 
   private void validateTenantCreation(String taxId, String contactValue) {
-    if (companyFacade.existsByTaxId(taxId)) {
-      throw new TaxIdAlreadyExistsException("Company with this tax ID already exists");
+    if (organizationFacade.existsByTaxId(taxId)) {
+      throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
     if (userFacade.contactExists(contactValue)) {
       throw new ContactAlreadyRegisteredException("Contact value already registered");

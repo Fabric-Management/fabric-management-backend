@@ -12,8 +12,8 @@ import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserReposi
 import com.fabricmanagement.common.platform.auth.infra.repository.RegistrationTokenRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
-import com.fabricmanagement.common.platform.company.domain.Company;
-import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
+import com.fabricmanagement.common.platform.organization.domain.Organization;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
@@ -62,7 +62,7 @@ public class PasswordSetupService {
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
   private final EntityManager entityManager;
-  private final CompanyRepository companyRepository;
+  private final OrganizationRepository organizationRepository;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
@@ -176,14 +176,15 @@ public class PasswordSetupService {
     boolean needsOnboarding = !Boolean.TRUE.equals(user.getHasCompletedOnboarding());
     OnboardingPrefillDto onboardingPrefill = null;
     if (needsOnboarding) {
-      var companyOpt =
-          companyRepository.findByTenantIdAndId(user.getTenantId(), user.getCompanyId());
+      // Get organization for onboarding prefill (User.organizationId)
+      var orgOpt =
+          organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
       onboardingPrefill =
           OnboardingPrefillDto.builder()
               .primaryEmail(contactValue)
-              .companyName(companyOpt.map(Company::getCompanyName).orElse(null))
-              .taxId(companyOpt.map(Company::getTaxId).orElse(null))
-              .companyType(companyOpt.map(c -> c.getCompanyType().name()).orElse(null))
+              .companyName(orgOpt.map(Organization::getName).orElse(null))
+              .taxId(orgOpt.map(Organization::getTaxId).orElse(null))
+              .companyType(orgOpt.map(o -> o.getOrganizationType().name()).orElse(null))
               .build();
     }
 

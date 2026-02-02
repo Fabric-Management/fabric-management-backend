@@ -3,7 +3,8 @@ package com.fabricmanagement.common.platform.admin.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.admin.app.PlatformAdminService;
 import com.fabricmanagement.common.platform.admin.dto.TenantStatistics;
-import com.fabricmanagement.common.platform.company.dto.CompanyDto;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
+import com.fabricmanagement.common.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import java.util.List;
 import java.util.UUID;
@@ -50,14 +51,14 @@ public class PlatformAdminController {
    *
    * <p><b>Security:</b> PLATFORM_ADMIN role required
    *
-   * @return List of all tenant companies
+   * @return List of all tenants
    */
   @GetMapping("/tenants")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-  public ResponseEntity<ApiResponse<List<CompanyDto>>> getAllTenants() {
+  public ResponseEntity<ApiResponse<List<TenantDto>>> getAllTenants() {
     log.info("Platform admin: Listing all tenants");
 
-    List<CompanyDto> tenants = platformAdminService.getAllTenants();
+    List<TenantDto> tenants = platformAdminService.getAllTenants();
 
     return ResponseEntity.ok(
         ApiResponse.success(tenants, String.format("Found %d tenants", tenants.size())));
@@ -69,14 +70,14 @@ public class PlatformAdminController {
    * <p><b>Security:</b> PLATFORM_ADMIN role required
    *
    * @param tenantId The tenant ID
-   * @return Tenant company details
+   * @return Tenant details
    */
   @GetMapping("/tenants/{tenantId}")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-  public ResponseEntity<ApiResponse<CompanyDto>> getTenant(@PathVariable UUID tenantId) {
+  public ResponseEntity<ApiResponse<TenantDto>> getTenant(@PathVariable UUID tenantId) {
     log.info("Platform admin: Getting tenant: {}", tenantId);
 
-    CompanyDto tenant = platformAdminService.getTenant(tenantId);
+    TenantDto tenant = platformAdminService.getTenant(tenantId);
 
     return ResponseEntity.ok(ApiResponse.success(tenant));
   }
@@ -103,24 +104,25 @@ public class PlatformAdminController {
   }
 
   /**
-   * Get all companies in a specific tenant.
+   * Get all organizations in a specific tenant.
    *
    * <p><b>Security:</b> PLATFORM_ADMIN role required
    *
    * @param tenantId The tenant ID to query
-   * @return List of companies in that tenant
+   * @return List of organizations in that tenant
    */
   @GetMapping("/tenants/{tenantId}/companies")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-  public ResponseEntity<ApiResponse<List<CompanyDto>>> getTenantCompanies(
+  public ResponseEntity<ApiResponse<List<OrganizationDto>>> getTenantCompanies(
       @PathVariable UUID tenantId) {
-    log.info("Platform admin: Getting companies for tenant: {}", tenantId);
+    log.info("Platform admin: Getting organizations for tenant: {}", tenantId);
 
-    List<CompanyDto> companies = platformAdminService.getTenantCompanies(tenantId);
+    List<OrganizationDto> organizations = platformAdminService.getTenantOrganizations(tenantId);
 
     return ResponseEntity.ok(
         ApiResponse.success(
-            companies, String.format("Found %d companies in tenant", companies.size())));
+            organizations,
+            String.format("Found %d organizations in tenant", organizations.size())));
   }
 
   /**
@@ -144,23 +146,23 @@ public class PlatformAdminController {
   }
 
   /**
-   * Get specific company from a tenant.
+   * Get specific organization from a tenant.
    *
    * <p><b>Security:</b> PLATFORM_ADMIN role required
    *
    * @param tenantId The tenant ID
-   * @param companyId The company ID
-   * @return Company details
+   * @param companyId The organization ID (path kept as companyId for backward compat)
+   * @return Organization details
    */
   @GetMapping("/tenants/{tenantId}/companies/{companyId}")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-  public ResponseEntity<ApiResponse<CompanyDto>> getTenantCompany(
+  public ResponseEntity<ApiResponse<OrganizationDto>> getTenantCompany(
       @PathVariable UUID tenantId, @PathVariable UUID companyId) {
-    log.info("Platform admin: Getting company {} from tenant {}", companyId, tenantId);
+    log.info("Platform admin: Getting organization {} from tenant {}", companyId, tenantId);
 
-    CompanyDto company = platformAdminService.getTenantCompany(tenantId, companyId);
+    OrganizationDto organization = platformAdminService.getTenantOrganization(tenantId, companyId);
 
-    return ResponseEntity.ok(ApiResponse.success(company));
+    return ResponseEntity.ok(ApiResponse.success(organization));
   }
 
   /**

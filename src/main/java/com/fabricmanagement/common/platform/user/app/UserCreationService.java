@@ -8,7 +8,7 @@ import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.common.platform.user.domain.Role;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserCreationService {
 
   private final UserRepository userRepository;
-  private final CompanyFacade companyFacade;
+  private final OrganizationFacade organizationFacade;
   private final ContactService contactService;
   private final UserContactAssignmentService userContactAssignmentService;
   private final AddressService addressService;
@@ -200,14 +200,14 @@ public class UserCreationService {
           userContactAssignmentService.assignContact(saved.getId(), contact.getId(), true);
           contactService.verifyContact(contact.getId());
 
+          // TODO(BACKLOG): Department assignment by name - add findDepartmentIdByName to
+          // OrganizationFacade or DepartmentService when needed
           if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
-            companyFacade
-                .findDepartmentIdByName(
-                    request.getTenantId(), request.getCompanyId(), request.getDepartment())
-                .ifPresent(
-                    deptId ->
-                        userDepartmentService.assignDepartment(
-                            saved.getId(), deptId, true, TenantContext.getCurrentUserId()));
+            log.debug(
+                "Department by name skipped (no resolver): tenant={}, org={}, department={}",
+                request.getTenantId(),
+                request.getCompanyId(),
+                request.getDepartment());
           }
 
           com.fabricmanagement.common.platform.user.domain.Role role =
@@ -243,8 +243,8 @@ public class UserCreationService {
     if (userRepository.existsByContactValue(contactValue)) {
       throw new IllegalArgumentException("Contact value already registered");
     }
-    if (!companyFacade.exists(tenantId, companyId)) {
-      throw new IllegalArgumentException("Company not found");
+    if (!organizationFacade.exists(tenantId, companyId)) {
+      throw new IllegalArgumentException("Organization not found");
     }
 
     User user = User.create(firstName, lastName, companyId);
