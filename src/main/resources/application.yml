@@ -208,6 +208,13 @@ application:
     verification-template-name: ${WHATSAPP_VERIFICATION_TEMPLATE:verification_code}
     timeout: ${WHATSAPP_TIMEOUT:5000}
 
+# Feature Flags
+feature:
+  trading-partner:
+    # Legacy Company fallback - disabled after Faz 3 migration
+    # All partner data now in TradingPartner table
+    legacy-fallback: ${FEATURE_TRADING_PARTNER_LEGACY_FALLBACK:false}
+
 # OpenAPI / Swagger
 springdoc:
   api-docs:

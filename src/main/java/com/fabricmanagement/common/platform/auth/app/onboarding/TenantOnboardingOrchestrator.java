@@ -12,8 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
  * org.springframework.core.annotation.Order}; each step reads and updates {@link
  * OnboardingContext}.
  *
- * <p>Auth module uses only facades (CompanyFacade, UserFacade) from this orchestrator; steps
- * delegate to facades and auth-only services (token, email).
+ * <p>Auth module uses facades (OrganizationFacade, TenantFacade, UserFacade) from this
+ * orchestrator; steps delegate to facades and auth-only services (token, email).
  */
 @Service
 @RequiredArgsConstructor

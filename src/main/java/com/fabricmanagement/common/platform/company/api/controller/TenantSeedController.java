@@ -2,8 +2,8 @@ package com.fabricmanagement.common.platform.company.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.app.TenantSeedService;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 public class TenantSeedController {
 
   private final TenantSeedService tenantSeedService;
-  private final CompanyFacade companyFacade;
+  private final OrganizationFacade organizationFacade;
 
   /**
    * Seed departments and positions for current tenant.
@@ -38,23 +38,23 @@ public class TenantSeedController {
   @PostMapping("/departments-and-positions")
   public ResponseEntity<ApiResponse<String>> seedDepartmentsAndPositions() {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    UUID companyId =
-        companyFacade
-            .findById(tenantId, tenantId)
-            .map(c -> c.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Company not found for tenant"));
+    UUID organizationId =
+        organizationFacade
+            .getRootOrganization()
+            .map(o -> o.getId())
+            .orElseThrow(() -> new IllegalArgumentException("Organization not found for tenant"));
 
-    log.info("Manual seed request: tenantId={}, companyId={}", tenantId, companyId);
+    log.info("Manual seed request: tenantId={}, organizationId={}", tenantId, organizationId);
 
     // Check if already seeded
-    if (tenantSeedService.isTenantSeeded(tenantId, companyId)) {
+    if (tenantSeedService.isTenantSeeded(tenantId, organizationId)) {
       log.info("Tenant already seeded, skipping");
       return ResponseEntity.ok(
           ApiResponse.success("Tenant already has departments. No action taken."));
     }
 
     // Seed departments and positions
-    tenantSeedService.seedDepartmentsAndPositions(tenantId, companyId);
+    tenantSeedService.seedDepartmentsAndPositions(tenantId, organizationId);
 
     return ResponseEntity.ok(ApiResponse.success("Departments and positions seeded successfully"));
   }
@@ -67,13 +67,13 @@ public class TenantSeedController {
   @GetMapping("/check")
   public ResponseEntity<ApiResponse<Boolean>> checkIfSeeded() {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    UUID companyId =
-        companyFacade
-            .findById(tenantId, tenantId)
-            .map(c -> c.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Company not found for tenant"));
+    UUID organizationId =
+        organizationFacade
+            .getRootOrganization()
+            .map(o -> o.getId())
+            .orElseThrow(() -> new IllegalArgumentException("Organization not found for tenant"));
 
-    boolean isSeeded = tenantSeedService.isTenantSeeded(tenantId, companyId);
+    boolean isSeeded = tenantSeedService.isTenantSeeded(tenantId, organizationId);
 
     return ResponseEntity.ok(ApiResponse.success(isSeeded));
   }

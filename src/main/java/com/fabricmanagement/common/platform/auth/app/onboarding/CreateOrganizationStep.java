@@ -1,0 +1,82 @@
+package com.fabricmanagement.common.platform.auth.app.onboarding;
+
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.common.platform.organization.domain.OrganizationType;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+/**
+ * Step 2: Create root Organization for the tenant.
+ *
+ * <p>Creates the internal organizational structure:
+ *
+ * <ul>
+ *   <li>Root organization with tax ID
+ *   <li>Organization type for OS recommendations
+ *   <li>Basis for departments and hierarchy
+ * </ul>
+ *
+ * <p>Requires tenantId from CreateTenantStep (Order 1).
+ */
+@Order(2)
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class CreateOrganizationStep implements OnboardingStep {
+
+  private final OrganizationFacade organizationFacade;
+
+  @Override
+  public void execute(OnboardingContext context) {
+    log.debug("CreateOrganizationStep: Creating organization for tenant {}", context.getTenantId());
+
+    if (context.getTenantId() == null) {
+      throw new IllegalStateException("Tenant must be created before organization");
+    }
+
+    // Map CompanyType to OrganizationType (they have same values for tenant types)
+    OrganizationType organizationType = mapCompanyTypeToOrganizationType(context.getCompanyType());
+
+    OrganizationDto organization =
+        organizationFacade.createRootOrganization(
+            context.getTenantId(), context.getCompanyName(), context.getTaxId(), organizationType);
+
+    // Set organization context for subsequent steps
+    context.setOrganizationId(organization.getId());
+    context.setOrganizationUid(organization.getUid());
+
+    // For backward compatibility, also set companyId/companyUid
+    context.setCompanyId(organization.getId());
+    context.setCompanyUid(organization.getUid());
+
+    log.debug(
+        "CreateOrganizationStep: organizationId={}, organizationUid={}",
+        organization.getId(),
+        organization.getUid());
+  }
+
+  /**
+   * Map CompanyType enum to OrganizationType enum.
+   *
+   * <p>During transition, OnboardingContext still uses CompanyType. This maps it to the new
+   * OrganizationType.
+   */
+  private OrganizationType mapCompanyTypeToOrganizationType(
+      com.fabricmanagement.common.platform.company.domain.CompanyType companyType) {
+    if (companyType == null) {
+      return OrganizationType.VERTICAL_MILL;
+    }
+    return switch (companyType) {
+      case SPINNER -> OrganizationType.SPINNER;
+      case WEAVER -> OrganizationType.WEAVER;
+      case KNITTER -> OrganizationType.KNITTER;
+      case DYER_FINISHER -> OrganizationType.DYER_FINISHER;
+      case VERTICAL_MILL -> OrganizationType.VERTICAL_MILL;
+      case GARMENT_MANUFACTURER -> OrganizationType.GARMENT_MANUFACTURER;
+      default -> OrganizationType.VERTICAL_MILL; // Safe default for partner types
+    };
+  }
+}

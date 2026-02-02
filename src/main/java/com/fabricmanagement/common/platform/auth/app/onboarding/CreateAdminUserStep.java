@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Order(2)
+@Order(3) // After CreateTenantStep (1) and CreateOrganizationStep (2)
 @Component
 @RequiredArgsConstructor
 @Slf4j

@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 /**
  * Result of creating initial OS subscriptions during tenant onboarding.
  *
- * <p>Used by Auth module (TenantOnboardingOrchestrator) via CompanyFacade.
+ * <p>Used by Auth module (CreateSubscriptionsStep) via SubscriptionService.
  */
 @Data
 @Builder

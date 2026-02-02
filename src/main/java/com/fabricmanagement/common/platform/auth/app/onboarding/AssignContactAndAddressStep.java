@@ -1,38 +1,76 @@
 package com.fabricmanagement.common.platform.auth.app.onboarding;
 
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
+import com.fabricmanagement.common.platform.communication.app.AddressService;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
+import com.fabricmanagement.common.platform.communication.domain.AddressType;
+import com.fabricmanagement.common.platform.communication.domain.ContactType;
+import com.fabricmanagement.common.platform.company.app.CompanyAddressAssignmentService;
+import com.fabricmanagement.common.platform.company.app.CompanyContactAssignmentService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Order(3)
+/**
+ * Step 4: Assign contact and address to organization (sales-led only).
+ *
+ * <p>Creates address/contact via Communication module, then assigns to organization using
+ * CompanyAddressAssignmentService and CompanyContactAssignmentService (common_organization table).
+ */
+@Order(4) // After CreateAdminUserStep (3)
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class AssignContactAndAddressStep implements OnboardingStep {
 
-  private final CompanyFacade companyFacade;
+  private final AddressService addressService;
+  private final ContactService contactService;
+  private final CompanyAddressAssignmentService addressAssignmentService;
+  private final CompanyContactAssignmentService contactAssignmentService;
 
   @Override
   public void execute(OnboardingContext context) {
     if (!context.isSalesLed()) {
       return;
     }
-    UUID companyId = context.getCompanyId();
+    UUID organizationId = context.getOrganizationId();
     UUID tenantId = context.getTenantId();
-    if (companyId == null || tenantId == null) {
-      return;
+    if (organizationId == null || tenantId == null) {
+      organizationId = context.getCompanyId();
+      if (organizationId == null) {
+        return;
+      }
     }
-    companyFacade.assignCompanyAddressAndContact(
-        companyId,
-        tenantId,
-        context.getAddress(),
-        context.getCity(),
-        context.getCountry(),
-        context.getPhoneNumber(),
-        context.getCompanyEmail());
-    log.debug("AssignContactAndAddressStep: companyId={}", companyId);
+
+    // Create and assign address if provided
+    if (context.getAddress() != null || context.getCity() != null || context.getCountry() != null) {
+      var address =
+          addressService.createAddress(
+              context.getAddress() != null ? context.getAddress() : "",
+              context.getCity() != null ? context.getCity() : "",
+              null,
+              null,
+              context.getCountry() != null ? context.getCountry() : "",
+              AddressType.HEADQUARTERS,
+              "Organization");
+      addressAssignmentService.assignAddress(organizationId, address.getId(), true, false);
+    }
+
+    // Create and assign contact if provided (email or phone)
+    if (context.getCompanyEmail() != null && !context.getCompanyEmail().isBlank()) {
+      var contact =
+          contactService.createContact(
+              context.getCompanyEmail(), ContactType.EMAIL, "Organization", false, null);
+      contactAssignmentService.assignContact(organizationId, contact.getId(), true, null);
+    }
+    if (context.getPhoneNumber() != null && !context.getPhoneNumber().isBlank()) {
+      var contact =
+          contactService.createContact(
+              context.getPhoneNumber(), ContactType.MOBILE, "Organization", false, null);
+      contactAssignmentService.assignContact(organizationId, contact.getId(), false, null);
+    }
+
+    log.debug("AssignContactAndAddressStep: organizationId={}", organizationId);
   }
 }

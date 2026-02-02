@@ -2,7 +2,6 @@ package com.fabricmanagement.common.platform.company.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.util.DuplicateValidator;
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
 import com.fabricmanagement.common.platform.company.domain.Department;
 import com.fabricmanagement.common.platform.company.domain.DepartmentCategory;
 import com.fabricmanagement.common.platform.company.domain.Position;
@@ -13,6 +12,7 @@ import com.fabricmanagement.common.platform.company.dto.UserCreationOptionsDto;
 import com.fabricmanagement.common.platform.company.infra.repository.DepartmentCategoryRepository;
 import com.fabricmanagement.common.platform.company.infra.repository.DepartmentRepository;
 import com.fabricmanagement.common.platform.company.infra.repository.PositionRepository;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.common.platform.user.app.RoleService;
 import com.fabricmanagement.common.platform.user.domain.Role;
 import com.fabricmanagement.common.platform.user.dto.RoleDto;
@@ -52,7 +52,7 @@ public class UserCreationOptionsService {
   private final DepartmentRepository departmentRepository;
   private final PositionRepository positionRepository;
   private final TenantSeedService tenantSeedService;
-  private final CompanyFacade companyFacade;
+  private final OrganizationFacade organizationFacade;
 
   /**
    * Get all options needed for user creation form.
@@ -73,17 +73,17 @@ public class UserCreationOptionsService {
     UUID tenantId = TenantContext.getCurrentTenantId();
     log.debug("Getting user creation options: tenantId={}", tenantId);
 
-    // Get company ID (tenant_id = company_id for root tenant)
-    UUID companyId =
-        companyFacade
-            .findById(tenantId, tenantId)
-            .map(c -> c.getId())
-            .orElse(tenantId); // Fallback to tenantId if company not found
+    // Get root organization ID for this tenant
+    UUID organizationId =
+        organizationFacade
+            .getRootOrganization()
+            .map(o -> o.getId())
+            .orElse(tenantId); // Fallback to tenantId if organization not found
 
     // Auto-seed if tenant has no departments (lazy initialization)
-    if (!tenantSeedService.isTenantSeeded(tenantId, companyId)) {
+    if (!tenantSeedService.isTenantSeeded(tenantId, organizationId)) {
       log.info("Tenant not seeded, auto-seeding departments and positions: tenantId={}", tenantId);
-      tenantSeedService.seedDepartmentsAndPositions(tenantId, companyId);
+      tenantSeedService.seedDepartmentsAndPositions(tenantId, organizationId);
     }
 
     // Fetch all data in single transaction (efficient)

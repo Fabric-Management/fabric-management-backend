@@ -1,28 +1,36 @@
 package com.fabricmanagement.common.platform.auth.app.onboarding;
 
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
+import com.fabricmanagement.common.platform.company.app.TenantSeedService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Order(5)
+/**
+ * Step 6: Seed default departments and positions for the organization.
+ *
+ * <p>Uses TenantSeedService directly for seeding organizational structure.
+ */
+@Order(6) // After CreateSubscriptionsStep (5)
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class SeedOrganizationStep implements OnboardingStep {
 
-  private final CompanyFacade companyFacade;
+  private final TenantSeedService tenantSeedService;
 
   @Override
   public void execute(OnboardingContext context) {
     UUID tenantId = context.getTenantId();
-    UUID companyId = context.getCompanyId();
-    if (tenantId == null || companyId == null) {
+    UUID organizationId = context.getOrganizationId();
+    if (organizationId == null) {
+      organizationId = context.getCompanyId(); // Backward compat
+    }
+    if (tenantId == null || organizationId == null) {
       return;
     }
-    companyFacade.seedDepartmentsAndPositions(tenantId, companyId);
-    log.debug("SeedOrganizationStep: tenantId={}, companyId={}", tenantId, companyId);
+    tenantSeedService.seedDepartmentsAndPositions(tenantId, organizationId);
+    log.debug("SeedOrganizationStep: tenantId={}, organizationId={}", tenantId, organizationId);
   }
 }
