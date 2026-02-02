@@ -11,7 +11,7 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
-import com.fabricmanagement.common.platform.company.api.facade.CompanyFacade;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.common.platform.user.dto.CreateExternalUserRequest;
@@ -40,7 +40,7 @@ class UserCreationServiceTest {
   private static final String CONTACT_VALUE = "external@example.com";
 
   @Mock private UserRepository userRepository;
-  @Mock private CompanyFacade companyFacade;
+  @Mock private OrganizationFacade organizationFacade;
 
   @Mock
   private com.fabricmanagement.common.platform.communication.app.ContactService contactService;
@@ -99,9 +99,9 @@ class UserCreationServiceTest {
     }
 
     @Test
-    void throwsWhenCompanyNotFound() {
+    void throwsWhenOrganizationNotFound() {
       when(userRepository.existsByContactValue(CONTACT_VALUE)).thenReturn(false);
-      when(companyFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(false);
+      when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(false);
 
       assertThatThrownBy(
               () ->
@@ -115,13 +115,13 @@ class UserCreationServiceTest {
                       null,
                       null))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("Company not found");
+          .hasMessageContaining("Organization not found");
     }
 
     @Test
     void createsUserAndContactAndAssignsWhenNoAddressesThenCopiesCompanyPrimaryAndPublishesEvent() {
       when(userRepository.existsByContactValue(CONTACT_VALUE)).thenReturn(false);
-      when(companyFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
+      when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
       User savedUser = User.create("First", "Last", COMPANY_ID);
       savedUser.setId(USER_ID);
       savedUser.setTenantId(TENANT_ID);
@@ -159,7 +159,7 @@ class UserCreationServiceTest {
       assertThat(event.getUserId()).isEqualTo(USER_ID);
       assertThat(event.getCompanyId()).isEqualTo(COMPANY_ID);
       assertThat(result.getId()).isEqualTo(USER_ID);
-      assertThat(result.getCompanyId()).isEqualTo(COMPANY_ID);
+      assertThat(result.getOrganizationId()).isEqualTo(COMPANY_ID);
     }
   }
 
@@ -179,7 +179,7 @@ class UserCreationServiceTest {
               .build();
 
       when(userRepository.existsByContactValue(CONTACT_VALUE)).thenReturn(false);
-      when(companyFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
+      when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
       User savedUser = User.create("External", "User", COMPANY_ID);
       savedUser.setId(USER_ID);
       savedUser.setTenantId(TENANT_ID);

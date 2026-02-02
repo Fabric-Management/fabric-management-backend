@@ -3,8 +3,6 @@ package com.fabricmanagement.common.platform.auth.app.onboarding;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingResponse;
-import com.fabricmanagement.common.platform.company.domain.CompanyType;
-import com.fabricmanagement.common.platform.company.dto.CreateTenantCompanyRequest;
 import com.fabricmanagement.common.platform.user.dto.CreateAdminUserRequest;
 import java.time.Instant;
 import java.util.List;
@@ -14,20 +12,6 @@ import org.junit.jupiter.api.Test;
 
 @DisplayName("OnboardingContext")
 class OnboardingContextTest {
-
-  @Test
-  void toCreateTenantCompanyRequest_buildsFromContext() {
-    OnboardingContext context = new OnboardingContext();
-    context.setCompanyName("Acme Corp");
-    context.setTaxId("1234567890");
-    context.setCompanyType(CompanyType.SPINNER);
-
-    CreateTenantCompanyRequest request = context.toCreateTenantCompanyRequest();
-
-    assertThat(request.getCompanyName()).isEqualTo("Acme Corp");
-    assertThat(request.getTaxId()).isEqualTo("1234567890");
-    assertThat(request.getCompanyType()).isEqualTo(CompanyType.SPINNER);
-  }
 
   @Test
   void toCreateAdminUserRequest_buildsFromContext() {

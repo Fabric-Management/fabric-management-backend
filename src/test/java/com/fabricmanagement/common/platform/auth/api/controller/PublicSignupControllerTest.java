@@ -31,6 +31,11 @@ class PublicSignupControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockBean private CompanyRepository companyRepository;
+
+  @MockBean
+  private com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository
+      tenantRepository;
+
   @MockBean private JwtService jwtService;
   @MockBean private TenantOnboardingService onboardingService;
 
