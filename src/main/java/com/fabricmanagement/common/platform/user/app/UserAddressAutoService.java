@@ -72,8 +72,9 @@ public class UserAddressAutoService {
 
       log.info("User work address copied from company: userId={}, companyId={}", userId, companyId);
     } catch (Exception e) {
-      log.warn(
-          "Failed to copy company primary address: userId={}, companyId={}, error={}",
+      log.error(
+          "Failed to copy company primary address: userId={}, companyId={}. "
+              + "User created without default work address. Error: {}",
           userId,
           companyId,
           e.getMessage());

@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.user.domain;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.organization.domain.Department;
 import jakarta.persistence.*;
 import java.time.Instant;
@@ -17,19 +18,9 @@ import lombok.*;
  * <ul>
  *   <li>Many-to-Many relationship between User and Department
  *   <li>Primary department flag (isPrimary) - one department can be marked as primary
+ *   <li>Tenant isolation via tenant_id
  *   <li>Audit trail - tracks when and who assigned the relationship
  * </ul>
- *
- * <h2>Example:</h2>
- *
- * <pre>{@code
- * UserDepartment assignment = UserDepartment.builder()
- *     .user(user)
- *     .department(department)
- *     .isPrimary(true)
- *     .assignedBy(adminUserId)
- *     .build();
- * }</pre>
  */
 @Entity
 @Table(
@@ -38,7 +29,9 @@ import lombok.*;
     indexes = {
       @Index(name = "idx_user_dept_user", columnList = "user_id"),
       @Index(name = "idx_user_dept_dept", columnList = "department_id"),
-      @Index(name = "idx_user_dept_primary", columnList = "user_id,is_primary")
+      @Index(name = "idx_user_dept_primary", columnList = "user_id,is_primary"),
+      @Index(name = "idx_user_dept_tenant", columnList = "tenant_id"),
+      @Index(name = "idx_user_dept_tenant_user", columnList = "tenant_id,user_id")
     })
 @Getter
 @Setter
@@ -56,6 +49,9 @@ public class UserDepartment {
   @Column(name = "department_id", nullable = false)
   private UUID departmentId;
 
+  @Column(name = "tenant_id", nullable = false)
+  private UUID tenantId;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", insertable = false, updatable = false)
   private User user;
@@ -68,6 +64,10 @@ public class UserDepartment {
   @Builder.Default
   private Boolean isPrimary = false;
 
+  @Column(name = "is_active", nullable = false)
+  @Builder.Default
+  private Boolean isActive = true;
+
   @Column(name = "assigned_at", nullable = false)
   @Builder.Default
   private Instant assignedAt = Instant.now();
@@ -75,11 +75,20 @@ public class UserDepartment {
   @Column(name = "assigned_by")
   private UUID assignedBy;
 
+  @Column(name = "created_at", nullable = false, updatable = false)
+  @Builder.Default
+  private Instant createdAt = Instant.now();
+
+  @Column(name = "updated_at", nullable = false)
+  @Builder.Default
+  private Instant updatedAt = Instant.now();
+
   public static UserDepartment create(
       User user, Department department, boolean isPrimary, UUID assignedBy) {
     return UserDepartment.builder()
         .userId(user.getId())
         .departmentId(department.getId())
+        .tenantId(TenantContext.getCurrentTenantId())
         .user(user)
         .department(department)
         .isPrimary(isPrimary)
@@ -94,5 +103,10 @@ public class UserDepartment {
 
   public void markAsSecondary() {
     this.isPrimary = false;
+  }
+
+  @PreUpdate
+  protected void onUpdate() {
+    this.updatedAt = Instant.now();
   }
 }

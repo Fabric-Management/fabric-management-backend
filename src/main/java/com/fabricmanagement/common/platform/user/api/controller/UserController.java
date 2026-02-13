@@ -48,6 +48,7 @@ public class UserController {
    * <p><b>Includes:</b> Title, gender, birth date, nationality, emergency contact, employee number,
    * hire date.
    */
+  @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER')")
   @PostMapping("/internal")
   public ResponseEntity<ApiResponse<UserDto>> createInternalUser(
       @Valid @RequestBody CreateInternalUserRequest request) {
@@ -69,6 +70,7 @@ public class UserController {
    *
    * <p><b>Includes:</b> Only basic user information (no HR data).
    */
+  @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER')")
   @PostMapping("/external")
   public ResponseEntity<ApiResponse<UserDto>> createExternalUser(
       @Valid @RequestBody CreateExternalUserRequest request) {
@@ -130,6 +132,7 @@ public class UserController {
     return ResponseEntity.ok(ApiResponse.success(users));
   }
 
+  @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER')")
   @PutMapping("/{id}")
   public ResponseEntity<ApiResponse<UserDto>> updateUser(
       @PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
@@ -140,6 +143,7 @@ public class UserController {
     return ResponseEntity.ok(ApiResponse.success(updated, "User updated successfully"));
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable UUID id) {
     log.info("Deactivating user: id={}", id);

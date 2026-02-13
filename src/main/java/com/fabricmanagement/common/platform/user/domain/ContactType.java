@@ -1,34 +1,28 @@
 package com.fabricmanagement.common.platform.user.domain;
 
 /**
- * Contact type for user identification.
+ * Simplified contact type for user creation API.
  *
- * <p>Users are identified by their contact value (email or phone), NOT by username. This simplifies
- * authentication and verification flows.
+ * <p>This is an <b>API-facing</b> enum used in user creation DTOs. It provides a simplified view
+ * (EMAIL/PHONE) that the frontend uses. The system maps this to the full {@link
+ * com.fabricmanagement.common.platform.communication.domain.ContactType} enum internally:
  *
- * <h2>CRITICAL RULE:</h2>
+ * <ul>
+ *   <li>{@code EMAIL} → {@code ContactType.EMAIL}
+ *   <li>{@code PHONE} → {@code ContactType.MOBILE} (default) or {@code ContactType.LANDLINE} (via
+ *       phoneType field in {@link com.fabricmanagement.common.platform.user.dto.ContactData})
+ * </ul>
  *
- * <p>❌ NO separate username field!
- *
- * <p>✅ Use contactValue (email or phone) as the identifier
+ * <p><b>Note:</b> For domain-level operations, use {@link
+ * com.fabricmanagement.common.platform.communication.domain.ContactType} directly.
  */
 public enum ContactType {
-
-  /**
-   * Email address
-   *
-   * <p>Format: user@example.com
-   *
-   * <p>Verification: Email with code
-   */
+  /** Email address. Maps to Communication module's ContactType.EMAIL. */
   EMAIL,
 
   /**
-   * Phone number
-   *
-   * <p>Format: E.164 (+905551234567)
-   *
-   * <p>Verification: WhatsApp → SMS
+   * Phone number. Maps to Communication module's ContactType.MOBILE by default, or LANDLINE when
+   * phoneType="LANDLINE" is specified.
    */
   PHONE
 }
