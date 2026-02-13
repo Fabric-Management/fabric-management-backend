@@ -48,7 +48,22 @@ public enum OrganizationType {
   VERTICAL_MILL,
 
   /** Garment/apparel manufacturer - GarmentOS */
-  GARMENT_MANUFACTURER;
+  GARMENT_MANUFACTURER,
+
+  // ========================================
+  // EXTERNAL PARTNER TYPE
+  // ========================================
+
+  /**
+   * External trading partner organization.
+   *
+   * <p>Auto-created when a TradingPartner is registered. Used to link external partner users to the
+   * Organization hierarchy without mixing with internal organization types.
+   *
+   * <p>No OS subscription suggested — external partners use the platform via their own tenant or
+   * limited portal access.
+   */
+  EXTERNAL_PARTNER;
 
   /**
    * Get suggested OS codes for this organization type.
@@ -63,16 +78,27 @@ public enum OrganizationType {
       case DYER_FINISHER -> new String[] {"DyeOS", "FinishOS"};
       case VERTICAL_MILL -> new String[] {"FabricOS"};
       case GARMENT_MANUFACTURER -> new String[] {"GarmentOS"};
+      case EXTERNAL_PARTNER -> new String[] {};
     };
   }
 
   /**
    * Get default OS code for this organization type.
    *
-   * @return default OS code
+   * @return default OS code, or null for EXTERNAL_PARTNER
    */
   public String getDefaultOS() {
-    return getSuggestedOS()[0];
+    String[] suggested = getSuggestedOS();
+    return suggested.length > 0 ? suggested[0] : null;
+  }
+
+  /**
+   * Check if this type represents an external partner organization.
+   *
+   * @return true if external partner
+   */
+  public boolean isExternalPartner() {
+    return this == EXTERNAL_PARTNER;
   }
 
   /**

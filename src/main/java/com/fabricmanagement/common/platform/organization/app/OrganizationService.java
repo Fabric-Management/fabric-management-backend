@@ -263,6 +263,66 @@ public class OrganizationService {
   }
 
   // ========================================
+  // PARTNER ORGANIZATION
+  // ========================================
+
+  /**
+   * Create a partner organization for a trading partner.
+   *
+   * <p>Auto-created when a TradingPartner is registered. This organization serves as the anchor for
+   * external users associated with this partner. Uses {@link OrganizationType#EXTERNAL_PARTNER} to
+   * distinguish from internal organizations.
+   *
+   * <p><b>Tax ID handling:</b> If the partner has no tax_id (foreign/unregistered), a generated
+   * placeholder is used (TP-{partnerUid}).
+   *
+   * @param name Partner display name
+   * @param taxId Partner tax ID (nullable — placeholder will be generated)
+   * @param partnerUid Partner UID for placeholder generation
+   * @return Created organization DTO
+   */
+  @Transactional
+  public OrganizationDto createPartnerOrganization(String name, String taxId, String partnerUid) {
+    UUID tenantId = TenantContext.getCurrentTenantIdOrNull();
+    if (tenantId == null) {
+      throw new IllegalStateException(
+          "Tenant context must be set to create a partner organization");
+    }
+
+    // Use placeholder tax ID for partners without one (foreign/unregistered)
+    String effectiveTaxId = (taxId != null && !taxId.isBlank()) ? taxId : "TP-" + partnerUid;
+
+    // Check if an organization with this tax ID already exists within the tenant
+    Optional<Organization> existing =
+        organizationRepository.findByTenantIdAndTaxId(tenantId, effectiveTaxId);
+    if (existing.isPresent()) {
+      log.debug(
+          "Partner organization already exists for taxId={}, returning existing: id={}",
+          effectiveTaxId,
+          existing.get().getId());
+      return OrganizationDto.from(existing.get());
+    }
+
+    Organization organization =
+        Organization.create(name, effectiveTaxId, OrganizationType.EXTERNAL_PARTNER);
+
+    Organization saved = organizationRepository.save(organization);
+
+    eventPublisher.publish(
+        new OrganizationCreatedEvent(
+            saved.getTenantId(), saved.getId(), saved.getName(), saved.getOrganizationType()));
+
+    log.info(
+        "Partner organization created: id={}, uid={}, name={}, tenantId={}",
+        saved.getId(),
+        saved.getUid(),
+        saved.getName(),
+        saved.getTenantId());
+
+    return OrganizationDto.from(saved);
+  }
+
+  // ========================================
   // UTILITY
   // ========================================
 

@@ -118,6 +118,25 @@ public class OrganizationFacade {
   }
 
   // ========================================
+  // PARTNER ORGANIZATION
+  // ========================================
+
+  /**
+   * Create a partner organization for a trading partner.
+   *
+   * <p>Called by TradingPartnerService when creating a new partner. The organization serves as user
+   * anchor for external partner users.
+   *
+   * @param name Partner display name
+   * @param taxId Partner tax ID (nullable)
+   * @param partnerUid Partner UID for placeholder generation
+   * @return Created organization
+   */
+  public OrganizationDto createPartnerOrganization(String name, String taxId, String partnerUid) {
+    return organizationService.createPartnerOrganization(name, taxId, partnerUid);
+  }
+
+  // ========================================
   // ADDITIONAL METHODS
   // ========================================
 

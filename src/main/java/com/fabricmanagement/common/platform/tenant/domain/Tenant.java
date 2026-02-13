@@ -204,18 +204,11 @@ public class Tenant implements Serializable {
    * @return new Tenant in TRIAL status
    */
   public static Tenant create(String name, String uid) {
-    String slug = generateSlug(name);
-    return Tenant.builder()
-        .name(name)
-        .uid(uid)
-        .slug(slug)
-        .status(TenantStatus.TRIAL)
-        .settings(TenantSettings.defaults())
-        .build();
+    return create(name, uid, generateSlug(name), TenantSettings.defaults());
   }
 
   /**
-   * Create a new tenant with custom settings.
+   * Create a new tenant with custom settings. Slug is auto-generated from name.
    *
    * @param name Display name
    * @param uid Human-readable UID
@@ -223,7 +216,19 @@ public class Tenant implements Serializable {
    * @return new Tenant in TRIAL status
    */
   public static Tenant create(String name, String uid, TenantSettings settings) {
-    String slug = generateSlug(name);
+    return create(name, uid, generateSlug(name), settings);
+  }
+
+  /**
+   * Create a new tenant with explicit slug (collision-safe, provided by service layer).
+   *
+   * @param name Display name
+   * @param uid Human-readable UID
+   * @param slug URL-friendly slug (pre-validated for uniqueness)
+   * @param settings Custom settings
+   * @return new Tenant in TRIAL status
+   */
+  public static Tenant create(String name, String uid, String slug, TenantSettings settings) {
     return Tenant.builder()
         .name(name)
         .uid(uid)
