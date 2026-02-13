@@ -1,6 +1,6 @@
 package com.fabricmanagement.common.platform.auth.app.onboarding;
 
-import com.fabricmanagement.common.platform.company.app.TenantSeedService;
+import com.fabricmanagement.common.platform.subscription.app.TenantSeedService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -37,8 +37,11 @@ public class CreateOrganizationStep implements OnboardingStep {
       throw new IllegalStateException("Tenant must be created before organization");
     }
 
-    // Map CompanyType to OrganizationType (they have same values for tenant types)
-    OrganizationType organizationType = mapCompanyTypeToOrganizationType(context.getCompanyType());
+    // Context already holds OrganizationType directly
+    OrganizationType organizationType =
+        context.getCompanyType() != null
+            ? context.getCompanyType()
+            : OrganizationType.VERTICAL_MILL;
 
     OrganizationDto organization =
         organizationFacade.createRootOrganization(
@@ -56,27 +59,5 @@ public class CreateOrganizationStep implements OnboardingStep {
         "CreateOrganizationStep: organizationId={}, organizationUid={}",
         organization.getId(),
         organization.getUid());
-  }
-
-  /**
-   * Map CompanyType enum to OrganizationType enum.
-   *
-   * <p>During transition, OnboardingContext still uses CompanyType. This maps it to the new
-   * OrganizationType.
-   */
-  private OrganizationType mapCompanyTypeToOrganizationType(
-      com.fabricmanagement.common.platform.company.domain.CompanyType companyType) {
-    if (companyType == null) {
-      return OrganizationType.VERTICAL_MILL;
-    }
-    return switch (companyType) {
-      case SPINNER -> OrganizationType.SPINNER;
-      case WEAVER -> OrganizationType.WEAVER;
-      case KNITTER -> OrganizationType.KNITTER;
-      case DYER_FINISHER -> OrganizationType.DYER_FINISHER;
-      case VERTICAL_MILL -> OrganizationType.VERTICAL_MILL;
-      case GARMENT_MANUFACTURER -> OrganizationType.GARMENT_MANUFACTURER;
-      default -> OrganizationType.VERTICAL_MILL; // Safe default for partner types
-    };
   }
 }

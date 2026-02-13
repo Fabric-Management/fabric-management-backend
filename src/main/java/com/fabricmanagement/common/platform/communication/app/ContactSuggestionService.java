@@ -4,9 +4,9 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.dto.ContactSuggestionsDto;
 import com.fabricmanagement.common.platform.communication.dto.PhoneSuggestion;
-import com.fabricmanagement.common.platform.company.app.CompanyContactAssignmentService;
-import com.fabricmanagement.common.platform.company.domain.CompanyContact;
-import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
+import com.fabricmanagement.common.platform.organization.app.OrganizationContactAssignmentService;
+import com.fabricmanagement.common.platform.organization.domain.OrganizationContact;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -46,8 +46,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class ContactSuggestionService {
 
-  private final CompanyContactAssignmentService companyContactAssignmentService;
-  private final CompanyRepository companyRepository;
+  private final OrganizationContactAssignmentService organizationContactAssignmentService;
+  private final OrganizationRepository organizationRepository;
 
   /**
    * Generate contact suggestions from company.
@@ -76,13 +76,13 @@ public class ContactSuggestionService {
         firstName,
         lastName);
 
-    // Validate company exists and belongs to tenant
-    companyRepository
+    // Validate organization exists and belongs to tenant
+    organizationRepository
         .findByTenantIdAndId(tenantId, companyId)
-        .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+        .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
 
-    List<CompanyContact> companyContacts =
-        companyContactAssignmentService.getCompanyContacts(companyId);
+    List<OrganizationContact> companyContacts =
+        organizationContactAssignmentService.getOrganizationContacts(companyId);
 
     ContactSuggestionsDto suggestions =
         ContactSuggestionsDto.builder()
@@ -106,7 +106,7 @@ public class ContactSuggestionService {
    * @param companyContacts List of company contacts
    * @return Phone suggestion or null if not available
    */
-  private PhoneSuggestion extractPhoneSuggestion(List<CompanyContact> companyContacts) {
+  private PhoneSuggestion extractPhoneSuggestion(List<OrganizationContact> companyContacts) {
     return companyContacts.stream()
         .filter(cc -> cc.getContact() != null)
         .filter(
@@ -143,7 +143,7 @@ public class ContactSuggestionService {
    * @return List of email suggestions (ordered by commonality)
    */
   private List<String> generateEmailSuggestions(
-      String firstName, String lastName, List<CompanyContact> companyContacts) {
+      String firstName, String lastName, List<OrganizationContact> companyContacts) {
     if (firstName == null || firstName.isBlank() || lastName == null || lastName.isBlank()) {
       log.debug("Missing name information for email suggestions");
       return Collections.emptyList();

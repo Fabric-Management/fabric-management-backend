@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.platform.policy.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.company.app.EnhancedSubscriptionService;
+import com.fabricmanagement.common.platform.subscription.app.EnhancedSubscriptionService;
 import com.fabricmanagement.common.platform.policy.domain.PolicyCheck;
 import com.fabricmanagement.common.platform.policy.domain.value.PolicyDecision;
 import java.util.HashMap;

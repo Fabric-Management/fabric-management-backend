@@ -4,8 +4,8 @@ import com.fabricmanagement.common.platform.communication.app.AddressService;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
-import com.fabricmanagement.common.platform.company.app.CompanyAddressAssignmentService;
-import com.fabricmanagement.common.platform.company.app.CompanyContactAssignmentService;
+import com.fabricmanagement.common.platform.organization.app.OrganizationAddressAssignmentService;
+import com.fabricmanagement.common.platform.organization.app.OrganizationContactAssignmentService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +26,8 @@ public class AssignContactAndAddressStep implements OnboardingStep {
 
   private final AddressService addressService;
   private final ContactService contactService;
-  private final CompanyAddressAssignmentService addressAssignmentService;
-  private final CompanyContactAssignmentService contactAssignmentService;
+  private final OrganizationAddressAssignmentService addressAssignmentService;
+  private final OrganizationContactAssignmentService contactAssignmentService;
 
   @Override
   public void execute(OnboardingContext context) {

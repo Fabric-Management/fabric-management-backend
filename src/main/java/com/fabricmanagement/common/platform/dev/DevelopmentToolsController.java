@@ -7,8 +7,8 @@ import com.fabricmanagement.common.platform.auth.infra.repository.VerificationCo
 import com.fabricmanagement.common.platform.communication.app.EmailDiagnosticService;
 import com.fabricmanagement.common.platform.communication.domain.EmailOutboxStatus;
 import com.fabricmanagement.common.platform.communication.infra.repository.EmailOutboxRepository;
-import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
-import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.common.platform.subscription.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.common.platform.policy.infra.repository.PolicyRepository;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import java.time.Instant;
@@ -46,7 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("local") // ⚠️ ONLY in local profile
 public class DevelopmentToolsController {
 
-  private final CompanyRepository companyRepository;
+  private final OrganizationRepository organizationRepository;
   private final UserRepository userRepository;
   private final AuthUserRepository authUserRepository;
   private final SubscriptionRepository subscriptionRepository;
@@ -73,7 +73,7 @@ public class DevelopmentToolsController {
     long verificationCodes = verificationCodeRepository.count();
     long subscriptions = subscriptionRepository.count();
     long users = userRepository.count();
-    long companies = companyRepository.count();
+    long companies = organizationRepository.count();
     long policies = policyRepository.count();
 
     authUserRepository.deleteAll();
@@ -81,7 +81,7 @@ public class DevelopmentToolsController {
     verificationCodeRepository.deleteAll();
     subscriptionRepository.deleteAll();
     userRepository.deleteAll();
-    companyRepository.deleteAll();
+    organizationRepository.deleteAll();
     policyRepository.deleteAll();
 
     String summary =
@@ -147,7 +147,7 @@ public class DevelopmentToolsController {
 
     Map<String, Object> stats =
         Map.of(
-            "companies", companyRepository.count(),
+            "companies", organizationRepository.count(),
             "users", userRepository.count(),
             "authUsers", authUserRepository.count(),
             "subscriptions", subscriptionRepository.count(),

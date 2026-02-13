@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.platform.auth.app.onboarding;
 
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingResponse;
-import com.fabricmanagement.common.platform.company.domain.CompanyType;
+import com.fabricmanagement.common.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.common.platform.user.dto.CreateAdminUserRequest;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +31,7 @@ public class OnboardingContext {
   // ========================================
   private String companyName;
   private String taxId;
-  private CompanyType companyType;
+  private OrganizationType companyType;
   private String address;
   private String city;
   private String country;

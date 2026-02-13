@@ -2,7 +2,7 @@ package com.fabricmanagement.common.platform.admin.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.admin.dto.TenantStatistics;
-import com.fabricmanagement.common.platform.company.infra.repository.SubscriptionRepository;
+import com.fabricmanagement.common.platform.subscription.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.common.platform.organization.domain.Organization;
 import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
