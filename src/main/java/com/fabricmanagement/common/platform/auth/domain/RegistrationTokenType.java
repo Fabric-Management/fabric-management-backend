@@ -39,5 +39,20 @@ public enum RegistrationTokenType {
    * <p><b>Note:</b> No verification code needed - email link click verifies ownership. Verification
    * codes are only used for unverified contacts during login flows.
    */
-  SELF_SERVICE
+  SELF_SERVICE,
+
+  /**
+   * Invited user registration token.
+   *
+   * <p>Flow:
+   *
+   * <pre>
+   * Admin creates user → Invitation email sent with token
+   * → User clicks link → Password setup (email verified by click)
+   * → Auto-login
+   * </pre>
+   *
+   * <p>Created automatically when a user is added via the internal/external user creation flow.
+   */
+  INVITED_USER
 }

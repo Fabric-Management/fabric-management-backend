@@ -9,6 +9,7 @@ import com.fabricmanagement.common.platform.auth.dto.PasswordResetVerifyRequest;
 import com.fabricmanagement.common.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.common.platform.auth.dto.UserContactInfoResponse;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,11 +32,12 @@ public class PasswordController {
 
   @PostMapping("/setup-password")
   public ResponseEntity<ApiResponse<LoginResponse>> setupPassword(
-      @Valid @RequestBody PasswordSetupRequest request) {
+      @Valid @RequestBody PasswordSetupRequest request, HttpServletRequest httpRequest) {
     log.info(
         "Password setup request: token={}...",
         request.getToken().substring(0, Math.min(8, request.getToken().length())));
-    LoginResponse response = passwordSetupService.setupPassword(request);
+    String ipAddress = getClientIpAddress(httpRequest);
+    LoginResponse response = passwordSetupService.setupPassword(request, ipAddress);
     return ResponseEntity.ok(
         ApiResponse.success(
             response,
@@ -65,11 +67,20 @@ public class PasswordController {
 
   @PostMapping("/password-reset/verify")
   public ResponseEntity<ApiResponse<LoginResponse>> verifyPasswordReset(
-      @Valid @RequestBody PasswordResetVerifyRequest request) {
+      @Valid @RequestBody PasswordResetVerifyRequest request, HttpServletRequest httpRequest) {
     log.info("Password reset verification: authUserId={}, code=***", request.getAuthUserId());
-    LoginResponse response = passwordResetService.verifyAndResetPassword(request);
+    String ipAddress = getClientIpAddress(httpRequest);
+    LoginResponse response = passwordResetService.verifyAndResetPassword(request, ipAddress);
     return ResponseEntity.ok(
         ApiResponse.success(
             response, "Password reset successful! You have been automatically logged in."));
+  }
+
+  private String getClientIpAddress(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+      return xForwardedFor.split(",")[0].trim();
+    }
+    return request.getRemoteAddr();
   }
 }

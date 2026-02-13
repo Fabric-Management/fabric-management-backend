@@ -3,7 +3,6 @@ package com.fabricmanagement.common.platform.auth.app;
 import com.fabricmanagement.common.platform.auth.config.AuthProperties;
 import com.fabricmanagement.common.platform.auth.domain.AuthUser;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -69,15 +68,13 @@ public class AuthUserResolutionService {
   /** Record a failed login attempt; lock account if max attempts reached. */
   @Transactional
   public void recordFailedAttempt(AuthUser authUser) {
-    int attempts =
-        (authUser.getFailedLoginAttempts() != null ? authUser.getFailedLoginAttempts() : 0) + 1;
-    authUser.setFailedLoginAttempts(attempts);
-    if (attempts >= maxAttempts()) {
-      authUser.setLockedUntil(Instant.now().plusSeconds(lockDurationSeconds()));
+    authUser.recordFailedLogin(maxAttempts(), lockDurationSeconds());
+
+    if (authUser.isLocked()) {
       log.warn(
           "Account locked: userId={}, attempts={}, until={}",
           authUser.getUserId(),
-          attempts,
+          authUser.getFailedLoginAttempts(),
           authUser.getLockedUntil());
     }
     authUserRepository.save(authUser);

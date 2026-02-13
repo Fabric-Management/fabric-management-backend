@@ -1,12 +1,9 @@
 package com.fabricmanagement.common.platform.auth.api.controller;
 
-import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.common.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingResponse;
-import com.fabricmanagement.common.platform.communication.app.EmailTemplateRenderer;
-import com.fabricmanagement.common.platform.communication.app.NotificationService;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -32,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <pre>
  * 1. POST /api/public/signup
  *    → Creates tenant + company + admin user
- *    → Sends email with setup link (token only)
+ *    → Sends email with setup link (via SendWelcomeEmailStep in orchestrator)
  *
  * 2. User clicks email link
  *    → Redirects to /setup?token=xyz
@@ -57,9 +54,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicSignupController {
 
   private final TenantOnboardingService onboardingService;
-  private final NotificationService notificationService;
-  private final EmailTemplateRenderer emailTemplateRenderer;
-  private final FrontendUrlProvider frontendUrlProvider;
 
   @Operation(
       summary = "Self-service signup",
@@ -77,41 +71,17 @@ public class PublicSignupController {
         request.getCompanyName(),
         PiiMaskingUtil.maskEmail(request.getEmail()));
 
+    // Orchestrator handles everything: tenant, org, user, subscriptions, token, and email
     TenantOnboardingResponse response = onboardingService.createSelfServiceTenant(request);
 
-    sendSelfServiceWelcomeEmail(
-        request.getEmail(),
-        request.getFirstName(),
-        response.getCompanyName(),
-        response.getRegistrationToken());
-
     log.info(
-        "✅ Self-service signup completed: companyUid={}, email sent with setup link",
-        response.getCompanyUid());
+        "Self-service signup completed: companyUid={}, setupUrl={}",
+        response.getCompanyUid(),
+        response.getSetupUrl());
 
     return ResponseEntity.ok(
         ApiResponse.success(
             "Welcome! Check your email to complete registration.",
             "Registration initiated successfully"));
-  }
-
-  /**
-   * Send self-service welcome email with setup link.
-   *
-   * <p>Note: No verification code needed - email link click is sufficient verification.
-   * Verification codes are only used for unverified contacts during login flows.
-   */
-  private void sendSelfServiceWelcomeEmail(
-      String email, String firstName, String companyName, String token) {
-    String setupUrl = frontendUrlProvider.buildUrl("/setup?token=" + token);
-    String subject = "Complete Your FabricOS Registration";
-
-    // Smart renderer: Uses frontend templates with backend fallback
-    // Frontend templates prioritized for better UX (design system consistency)
-    String message =
-        emailTemplateRenderer.renderSetupPassword(firstName, companyName, email, setupUrl);
-
-    // Use sync to ensure email is queued before response (transaction commit)
-    notificationService.sendNotificationSync(email, subject, message);
   }
 }

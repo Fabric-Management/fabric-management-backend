@@ -76,6 +76,9 @@ public class PasswordResetService {
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
 
+  @Value("${application.jwt.expiration:900000}")
+  private long accessTokenExpiration;
+
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
 
@@ -249,7 +252,7 @@ public class PasswordResetService {
    * @return Login response with tokens (auto-login after password reset)
    */
   @Transactional
-  public LoginResponse verifyAndResetPassword(PasswordResetVerifyRequest request) {
+  public LoginResponse verifyAndResetPassword(PasswordResetVerifyRequest request, String ipAddress) {
     log.info(
         "Password reset verification: authUserId={}, code={}",
         request.getAuthUserId(),
@@ -338,12 +341,7 @@ public class PasswordResetService {
 
     // Publish login event (password reset is considered successful login)
     eventPublisher.publish(
-        new UserLoginEvent(
-            user.getTenantId(),
-            user.getId(),
-            contactValue,
-            "password-reset" // IP address placeholder
-            ));
+        new UserLoginEvent(user.getTenantId(), user.getId(), contactValue, ipAddress));
 
     log.info(
         "✅ Password reset completed successfully: userId={}, uid={}", user.getId(), user.getUid());
@@ -351,7 +349,7 @@ public class PasswordResetService {
     return LoginResponse.builder()
         .accessToken(accessToken)
         .refreshToken(refreshToken)
-        .expiresIn(900L) // 15 minutes in seconds
+        .expiresIn(accessTokenExpiration / 1000)
         .user(user)
         .needsOnboarding(!user.getHasCompletedOnboarding())
         .build();

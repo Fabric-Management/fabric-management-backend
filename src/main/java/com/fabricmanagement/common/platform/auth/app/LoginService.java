@@ -56,6 +56,9 @@ public class LoginService {
   private final ContactService contactService;
   private final VerificationCodeManager verificationCodeManager;
 
+  @Value("${application.jwt.expiration:900000}")
+  private long accessTokenExpiration;
+
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
 
@@ -92,48 +95,9 @@ public class LoginService {
 
         if (userHasPassword) {
           // User has password but this contact is not verified
-          // Set tenant context for user's tenant before querying contact
-          UUID originalTenantId = TenantContext.getCurrentTenantIdOrNull();
-          try {
-            TenantContext.setCurrentTenantId(user.getTenantId());
-
-            com.fabricmanagement.common.platform.communication.domain.Contact contact =
-                contactService.findByValue(request.getContactValue()).orElse(null);
-
-            if (contact != null && !Boolean.TRUE.equals(contact.getIsVerified())) {
-              // ✅ Contact not verified - send verification code
-              log.info(
-                  "Contact not verified, sending verification code: contactValue={}",
-                  PiiMaskingUtil.maskEmail(request.getContactValue()));
-
-              try {
-                // Determine verification type based on contact type
-                VerificationType verificationType =
-                    contact.getContactType() != null && contact.getContactType().isMobile()
-                        ? VerificationType.PHONE_VERIFICATION
-                        : VerificationType.EMAIL_VERIFICATION;
-
-                verificationCodeManager.issueCode(request.getContactValue(), verificationType);
-                throw new IllegalArgumentException(
-                    "Contact not verified. Verification code sent to "
-                        + PiiMaskingUtil.maskEmail(request.getContactValue())
-                        + ". Please verify your contact first.");
-              } catch (IllegalArgumentException | IllegalStateException ex) {
-                log.warn(
-                    "Verification code issuance failed: contactValue={}, reason={}",
-                    PiiMaskingUtil.maskEmail(request.getContactValue()),
-                    ex.getMessage());
-                throw new IllegalArgumentException("Contact not verified. " + ex.getMessage());
-              }
-            }
-          } finally {
-            // Restore original tenant context
-            if (originalTenantId != null) {
-              TenantContext.setCurrentTenantId(originalTenantId);
-            } else {
-              TenantContext.clear();
-            }
-          }
+          TenantContext.executeInTenantContext(
+              user.getTenantId(),
+              () -> checkUnverifiedContact(request.getContactValue()));
         }
       }
 
@@ -207,7 +171,7 @@ public class LoginService {
     return LoginResponse.builder()
         .accessToken(accessToken)
         .refreshToken(refreshToken)
-        .expiresIn(900L) // 15 minutes in seconds
+        .expiresIn(accessTokenExpiration / 1000)
         .user(user)
         .needsOnboarding(!Boolean.TRUE.equals(user.getHasCompletedOnboarding()))
         .build();
@@ -320,5 +284,44 @@ public class LoginService {
       return null;
     }
     return parts[1].trim().toLowerCase();
+  }
+
+  /**
+   * Check if contact is unverified and send verification code if so.
+   *
+   * <p>Must be called within the correct TenantContext.
+   *
+   * @param contactValue Contact value to check
+   * @throws IllegalArgumentException if contact is not verified
+   */
+  private void checkUnverifiedContact(String contactValue) {
+    com.fabricmanagement.common.platform.communication.domain.Contact contact =
+        contactService.findByValue(contactValue).orElse(null);
+
+    if (contact != null && !Boolean.TRUE.equals(contact.getIsVerified())) {
+      log.info(
+          "Contact not verified, sending verification code: contactValue={}",
+          PiiMaskingUtil.maskEmail(contactValue));
+
+      VerificationType verificationType =
+          contact.getContactType() != null && contact.getContactType().isMobile()
+              ? VerificationType.PHONE_VERIFICATION
+              : VerificationType.EMAIL_VERIFICATION;
+
+      try {
+        verificationCodeManager.issueCode(contactValue, verificationType);
+      } catch (IllegalArgumentException | IllegalStateException ex) {
+        log.warn(
+            "Verification code issuance failed: contactValue={}, reason={}",
+            PiiMaskingUtil.maskEmail(contactValue),
+            ex.getMessage());
+        throw new IllegalArgumentException("Contact not verified. " + ex.getMessage());
+      }
+
+      throw new IllegalArgumentException(
+          "Contact not verified. Verification code sent to "
+              + PiiMaskingUtil.maskEmail(contactValue)
+              + ". Please verify your contact first.");
+    }
   }
 }

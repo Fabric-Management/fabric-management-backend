@@ -105,11 +105,18 @@ public class AuthUser extends BaseEntity {
     this.lockedUntil = null;
   }
 
-  public void recordFailedLogin() {
-    this.failedLoginAttempts++;
+  /**
+   * Record a failed login attempt and lock account if max attempts reached.
+   *
+   * @param maxAttempts Maximum allowed failed attempts before lockout
+   * @param lockDurationSeconds Lockout duration in seconds
+   */
+  public void recordFailedLogin(int maxAttempts, int lockDurationSeconds) {
+    this.failedLoginAttempts =
+        (this.failedLoginAttempts != null ? this.failedLoginAttempts : 0) + 1;
 
-    if (this.failedLoginAttempts >= 5) {
-      this.lockedUntil = Instant.now().plusSeconds(1800); // 30 minutes
+    if (this.failedLoginAttempts >= maxAttempts) {
+      this.lockedUntil = Instant.now().plusSeconds(lockDurationSeconds);
     }
   }
 
