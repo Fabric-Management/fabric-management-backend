@@ -80,17 +80,18 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
    * @return all trading partners referencing this registry
    */
   @Query(
-      "SELECT tp FROM TradingPartner tp WHERE tp.registry.id = :registryId AND tp.isActive = true")
+      "SELECT tp FROM TradingPartner tp JOIN FETCH tp.registry "
+          + "WHERE tp.registry.id = :registryId AND tp.isActive = true")
   List<TradingPartner> findByRegistryId(@Param("registryId") UUID registryId);
 
   /**
-   * Find suppliers (SUPPLIER or BOTH).
+   * Find suppliers (SUPPLIER or BOTH) with registry eagerly loaded.
    *
    * @param tenantId Tenant ID
    * @return list of suppliers
    */
   @Query(
-      "SELECT tp FROM TradingPartner tp "
+      "SELECT tp FROM TradingPartner tp JOIN FETCH tp.registry "
           + "WHERE tp.tenantId = :tenantId "
           + "AND tp.isActive = true "
           + "AND tp.partnerType IN ('SUPPLIER', 'BOTH') "
@@ -98,13 +99,13 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
   List<TradingPartner> findSuppliers(@Param("tenantId") UUID tenantId);
 
   /**
-   * Find customers (CUSTOMER or BOTH).
+   * Find customers (CUSTOMER or BOTH) with registry eagerly loaded.
    *
    * @param tenantId Tenant ID
    * @return list of customers
    */
   @Query(
-      "SELECT tp FROM TradingPartner tp "
+      "SELECT tp FROM TradingPartner tp JOIN FETCH tp.registry "
           + "WHERE tp.tenantId = :tenantId "
           + "AND tp.isActive = true "
           + "AND tp.partnerType IN ('CUSTOMER', 'BOTH') "
@@ -112,13 +113,13 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
   List<TradingPartner> findCustomers(@Param("tenantId") UUID tenantId);
 
   /**
-   * Find fason partners.
+   * Find fason partners with registry eagerly loaded.
    *
    * @param tenantId Tenant ID
    * @return list of fason partners
    */
   @Query(
-      "SELECT tp FROM TradingPartner tp "
+      "SELECT tp FROM TradingPartner tp JOIN FETCH tp.registry "
           + "WHERE tp.tenantId = :tenantId "
           + "AND tp.isActive = true "
           + "AND tp.partnerType = 'FASON' "
@@ -126,14 +127,14 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
   List<TradingPartner> findFasonPartners(@Param("tenantId") UUID tenantId);
 
   /**
-   * Search partners by name (custom name or official name).
+   * Search partners by name (custom name or official name) with registry eagerly loaded.
    *
    * @param tenantId Tenant ID
    * @param searchTerm Search term
    * @return matching partners
    */
   @Query(
-      "SELECT tp FROM TradingPartner tp "
+      "SELECT tp FROM TradingPartner tp JOIN FETCH tp.registry "
           + "WHERE tp.tenantId = :tenantId "
           + "AND tp.isActive = true "
           + "AND (LOWER(tp.customName) LIKE LOWER(CONCAT('%', :term, '%')) "

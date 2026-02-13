@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -52,6 +53,7 @@ public class TradingPartnerController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping
+  @PreAuthorize("hasAnyRole('ADMIN', 'TRADING_PARTNER_MANAGER')")
   @Operation(
       summary = "Create trading partner",
       description =
@@ -185,6 +187,7 @@ public class TradingPartnerController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{id}/suspend")
+  @PreAuthorize("hasAnyRole('ADMIN', 'TRADING_PARTNER_MANAGER')")
   @Operation(
       summary = "Suspend partner",
       description = "Suspends a partner relationship. No new transactions allowed.")
@@ -198,6 +201,7 @@ public class TradingPartnerController {
   }
 
   @PostMapping("/{id}/block")
+  @PreAuthorize("hasRole('ADMIN')")
   @Operation(
       summary = "Block partner",
       description = "Blocks a partner relationship. Relationship is terminated.")
@@ -211,6 +215,7 @@ public class TradingPartnerController {
   }
 
   @PostMapping("/{id}/reactivate")
+  @PreAuthorize("hasAnyRole('ADMIN', 'TRADING_PARTNER_MANAGER')")
   @Operation(
       summary = "Reactivate partner",
       description = "Reactivates a suspended or pending partner")
@@ -224,6 +229,7 @@ public class TradingPartnerController {
   }
 
   @DeleteMapping("/{id}")
+  @PreAuthorize("hasRole('ADMIN')")
   @Operation(summary = "Delete partner", description = "Soft-deletes a partner relationship")
   public ResponseEntity<ApiResponse<Void>> deletePartner(@PathVariable UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();

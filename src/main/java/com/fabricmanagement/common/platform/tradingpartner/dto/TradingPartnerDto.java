@@ -42,6 +42,9 @@ public class TradingPartnerDto {
   private UUID linkedTenantId;
   private String verifiedStatus;
 
+  // Partner Organization
+  private UUID organizationId;
+
   // Audit
   private Instant createdAt;
   private Boolean isActive;
@@ -73,6 +76,7 @@ public class TradingPartnerDto {
         .onPlatform(tp.isOnPlatform())
         .linkedTenantId(tp.getLinkedTenantId())
         .verifiedStatus(registry != null ? registry.getVerifiedStatus().name() : null)
+        .organizationId(tp.getOrganizationId())
         .createdAt(tp.getCreatedAt())
         .isActive(tp.getIsActive())
         .legacyCompanyId(tp.getLegacyCompanyId())

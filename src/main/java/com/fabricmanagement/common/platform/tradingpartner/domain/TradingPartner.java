@@ -63,6 +63,7 @@ import org.hibernate.annotations.Type;
       @Index(name = "idx_tp_registry", columnList = "registry_id"),
       @Index(name = "idx_tp_type", columnList = "partner_type"),
       @Index(name = "idx_tp_status", columnList = "status"),
+      @Index(name = "idx_tp_organization", columnList = "organization_id"),
       @Index(name = "idx_tp_legacy", columnList = "legacy_company_id")
     },
     uniqueConstraints = {
@@ -124,6 +125,18 @@ public class TradingPartner extends BaseEntity {
   private Map<String, Object> relationshipMeta = new HashMap<>();
 
   /**
+   * Linked Organization ID for user management.
+   *
+   * <p>When a TradingPartner is created, a corresponding "partner Organization" record is
+   * auto-created with type EXTERNAL_PARTNER. External users for this partner are linked to this
+   * Organization, enabling reuse of existing user management flows.
+   *
+   * @see com.fabricmanagement.common.platform.organization.domain.OrganizationType#EXTERNAL_PARTNER
+   */
+  @Column(name = "organization_id")
+  private UUID organizationId;
+
+  /**
    * Legacy Company ID for migration traceability.
    *
    * <p>Preserves link to old Company record during transition. Enables dual-read queries that find
@@ -173,17 +186,32 @@ public class TradingPartner extends BaseEntity {
   }
 
   /**
-   * Upgrade partner type to BOTH when adding a new relationship type.
+   * Upgrade partner type when adding a new relationship type.
    *
-   * <p>Called when the same partner is added with a different type (e.g., existing SUPPLIER is also
-   * a CUSTOMER).
+   * <p>Handles all valid type combinations:
+   *
+   * <ul>
+   *   <li>SUPPLIER + CUSTOMER (or vice versa) → BOTH
+   *   <li>FASON + SUPPLIER/CUSTOMER → BOTH (fason partners can also supply/buy)
+   *   <li>SERVICE_PROVIDER + any → BOTH
+   *   <li>Same type → no change
+   *   <li>Already BOTH → no change
+   * </ul>
    *
    * @param newType The additional relationship type
+   * @return true if upgrade occurred, false if no change needed
    */
-  public void upgradeToMultiType(PartnerType newType) {
-    if (this.partnerType != newType && this.partnerType != PartnerType.BOTH) {
-      this.partnerType = PartnerType.BOTH;
+  public boolean upgradeToMultiType(PartnerType newType) {
+    if (this.partnerType == newType || this.partnerType == PartnerType.BOTH) {
+      return false;
     }
+    if (newType == PartnerType.BOTH) {
+      this.partnerType = PartnerType.BOTH;
+      return true;
+    }
+    // Any combination of different types results in BOTH
+    this.partnerType = PartnerType.BOTH;
+    return true;
   }
 
   /**

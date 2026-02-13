@@ -2,10 +2,13 @@ package com.fabricmanagement.common.platform.tradingpartner.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartnerRegistry;
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerCreatedEvent;
+import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerStatusChangedEvent;
 import com.fabricmanagement.common.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerRepository;
@@ -47,6 +50,7 @@ public class TradingPartnerService {
 
   private final TradingPartnerRepository partnerRepository;
   private final TradingPartnerRegistryService registryService;
+  private final OrganizationFacade organizationFacade;
   private final DomainEventPublisher eventPublisher;
 
   private static final String DEFAULT_COUNTRY = "TUR";
@@ -105,6 +109,13 @@ public class TradingPartnerService {
 
     TradingPartner saved = partnerRepository.save(partner);
 
+    // Auto-create partner Organization for user management
+    OrganizationDto partnerOrg =
+        organizationFacade.createPartnerOrganization(
+            saved.getDisplayName(), registry.getTaxId(), saved.getUid());
+    saved.setOrganizationId(partnerOrg.getId());
+    saved = partnerRepository.save(saved);
+
     // Publish event
     eventPublisher.publish(
         new TradingPartnerCreatedEvent(
@@ -117,10 +128,11 @@ public class TradingPartnerService {
             ));
 
     log.info(
-        "Trading partner created: uid={}, registry={}, type={}",
+        "Trading partner created: uid={}, registry={}, type={}, organizationId={}",
         saved.getUid(),
         registry.getUid(),
-        saved.getPartnerType());
+        saved.getPartnerType(),
+        partnerOrg.getId());
 
     return TradingPartnerDto.from(saved);
   }
@@ -273,8 +285,10 @@ public class TradingPartnerService {
   @Transactional
   public void suspend(UUID tenantId, UUID partnerId) {
     TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
+    String previousStatus = partner.getStatus().name();
     partner.suspend();
     partnerRepository.save(partner);
+    publishStatusChangedEvent(tenantId, partner, previousStatus);
     log.info("Partner suspended: uid={}", partner.getUid());
   }
 
@@ -287,8 +301,10 @@ public class TradingPartnerService {
   @Transactional
   public void block(UUID tenantId, UUID partnerId) {
     TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
+    String previousStatus = partner.getStatus().name();
     partner.block();
     partnerRepository.save(partner);
+    publishStatusChangedEvent(tenantId, partner, previousStatus);
     log.info("Partner blocked: uid={}", partner.getUid());
   }
 
@@ -301,8 +317,10 @@ public class TradingPartnerService {
   @Transactional
   public void reactivate(UUID tenantId, UUID partnerId) {
     TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
+    String previousStatus = partner.getStatus().name();
     partner.reactivate();
     partnerRepository.save(partner);
+    publishStatusChangedEvent(tenantId, partner, previousStatus);
     log.info("Partner reactivated: uid={}", partner.getUid());
   }
 
@@ -315,8 +333,12 @@ public class TradingPartnerService {
   @Transactional
   public void delete(UUID tenantId, UUID partnerId) {
     TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
+    String previousStatus = partner.getStatus().name();
     partner.delete();
     partnerRepository.save(partner);
+    eventPublisher.publish(
+        new TradingPartnerStatusChangedEvent(
+            tenantId, partner.getId(), previousStatus, "DELETED", partner.getDisplayName()));
     log.info("Partner deleted (soft): uid={}", partner.getUid());
   }
 
@@ -329,5 +351,16 @@ public class TradingPartnerService {
         .findByTenantIdAndId(tenantId, partnerId)
         .or(() -> partnerRepository.findByTenantIdAndLegacyCompanyId(tenantId, partnerId))
         .orElseThrow(() -> new IllegalArgumentException("Trading partner not found: " + partnerId));
+  }
+
+  private void publishStatusChangedEvent(
+      UUID tenantId, TradingPartner partner, String previousStatus) {
+    eventPublisher.publish(
+        new TradingPartnerStatusChangedEvent(
+            tenantId,
+            partner.getId(),
+            previousStatus,
+            partner.getStatus().name(),
+            partner.getDisplayName()));
   }
 }

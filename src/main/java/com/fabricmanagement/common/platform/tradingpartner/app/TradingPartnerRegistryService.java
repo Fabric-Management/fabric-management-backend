@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +52,21 @@ public class TradingPartnerRegistryService {
    * @param country ISO 3166-1 alpha-3 country code (defaults to TUR)
    * @return Registry (existing or newly created)
    */
+  /**
+   * Find or create registry by tax_id + country.
+   *
+   * <p>Deduplication: If registry exists with same tax_id + country, returns existing. Otherwise
+   * creates new.
+   *
+   * <p><b>Concurrency Safety:</b> Handles race conditions where two concurrent requests try to
+   * create the same registry. If a DataIntegrityViolationException occurs (unique constraint
+   * violation on tax_id + country), the method retries the lookup instead of failing.
+   *
+   * @param taxId Tax identification number (nullable for foreign partners)
+   * @param officialName Official company name
+   * @param country ISO 3166-1 alpha-3 country code (defaults to TUR)
+   * @return Registry (existing or newly created)
+   */
   @Transactional
   public TradingPartnerRegistry findOrCreate(String taxId, String officialName, String country) {
     String normalizedCountry = country != null ? country.toUpperCase() : DEFAULT_COUNTRY;
@@ -67,25 +83,48 @@ public class TradingPartnerRegistryService {
       }
     }
 
-    // Create new registry
+    // Create new registry — handle race condition via catch-and-retry
     TradingPartnerRegistry registry =
         TradingPartnerRegistry.create(normalizedTaxId, officialName, normalizedCountry);
     registry.setUid(generateRegistryUid());
 
-    TradingPartnerRegistry saved = registryRepository.save(registry);
+    try {
+      TradingPartnerRegistry saved = registryRepository.saveAndFlush(registry);
 
-    // Publish event
-    eventPublisher.publish(
-        new TradingPartnerRegistryCreatedEvent(
-            saved.getId(), saved.getTaxId(), saved.getOfficialName(), saved.getCountry()));
+      // Publish event
+      eventPublisher.publish(
+          new TradingPartnerRegistryCreatedEvent(
+              saved.getId(), saved.getTaxId(), saved.getOfficialName(), saved.getCountry()));
 
-    log.info(
-        "Registry created: uid={}, taxId={}, name={}",
-        saved.getUid(),
-        saved.getTaxId(),
-        saved.getOfficialName());
+      log.info(
+          "Registry created: uid={}, taxId={}, name={}",
+          saved.getUid(),
+          saved.getTaxId(),
+          saved.getOfficialName());
 
-    return saved;
+      return saved;
+    } catch (DataIntegrityViolationException e) {
+      // Race condition: another transaction inserted the same tax_id + country concurrently.
+      // Retry the lookup — the record must now exist.
+      if (normalizedTaxId != null && !normalizedTaxId.isEmpty()) {
+        log.warn(
+            "Registry creation race condition detected for tax_id={}, country={}. Retrying lookup.",
+            normalizedTaxId,
+            normalizedCountry);
+        return registryRepository
+            .findByTaxIdAndCountry(normalizedTaxId, normalizedCountry)
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "Registry not found after concurrent insert for tax_id="
+                            + normalizedTaxId
+                            + ", country="
+                            + normalizedCountry,
+                        e));
+      }
+      // No tax_id — this is a real integrity violation, rethrow
+      throw e;
+    }
   }
 
   /**

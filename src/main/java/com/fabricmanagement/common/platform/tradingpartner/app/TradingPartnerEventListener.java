@@ -3,6 +3,7 @@ package com.fabricmanagement.common.platform.tradingpartner.app;
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerCreatedEvent;
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerLinkedEvent;
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerRegistryCreatedEvent;
+import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -127,5 +128,36 @@ public class TradingPartnerEventListener {
 
     // TODO: Platform-level audit
     // auditService.logRegistryLinked(event);
+  }
+
+  /**
+   * Handle partner status change event.
+   *
+   * <p>Logs the status transition for audit purposes. In future phases, this can trigger:
+   *
+   * <ul>
+   *   <li>Notification to affected users when partner is suspended/blocked
+   *   <li>Cascading status changes to related orders/invoices
+   *   <li>Compliance workflow triggers
+   * </ul>
+   */
+  @EventListener
+  public void onTradingPartnerStatusChanged(TradingPartnerStatusChangedEvent event) {
+    log.info(
+        "[AUDIT] TradingPartner status changed: id={}, from={}, to={}, tenant={}, name={}",
+        event.getTradingPartnerId(),
+        event.getPreviousStatus(),
+        event.getNewStatus(),
+        event.getTenantId(),
+        event.getPartnerDisplayName());
+
+    // TODO: Send notification for critical status changes (BLOCKED)
+    // if ("BLOCKED".equals(event.getNewStatus())) {
+    //   notificationService.notifyPartnerBlocked(event.getTenantId(),
+    // event.getTradingPartnerId());
+    // }
+
+    // TODO: Save to audit table
+    // auditService.logPartnerStatusChange(event);
   }
 }
