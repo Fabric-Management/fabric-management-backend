@@ -5,7 +5,7 @@ package com.fabricmanagement.common.platform.organization.domain;
  *
  * <p><b>IMPORTANT:</b> This enum only contains types for organizations that can be platform tenants
  * (internal structure). External partners (suppliers, customers, etc.) are now handled by {@link
- * com.fabricmanagement.common.platform.company.domain.PartnerType}.
+ * com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType}.
  *
  * <h2>Architecture:</h2>
  *
@@ -13,7 +13,7 @@ package com.fabricmanagement.common.platform.organization.domain;
  * OrganizationType (this enum)
  * └── Internal structures: SPINNER, WEAVER, etc.
  *
- * PartnerType (in company module - TradingPartner)
+ * PartnerType (in tradingpartner module - TradingPartner)
  * └── External partners: SUPPLIER, CUSTOMER, SERVICE_PROVIDER, etc.
  * </pre>
  *
