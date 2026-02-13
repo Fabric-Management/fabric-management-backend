@@ -1,6 +1,6 @@
 package com.fabricmanagement.common.platform.user.domain;
 
-import com.fabricmanagement.common.platform.company.domain.Position;
+import com.fabricmanagement.common.platform.organization.domain.Position;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;

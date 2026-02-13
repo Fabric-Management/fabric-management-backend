@@ -49,7 +49,7 @@ public class UserCreationService {
   private final DomainEventPublisher eventPublisher;
   private final RoleService roleService;
   private final UserDepartmentService userDepartmentService;
-  private final com.fabricmanagement.common.platform.company.infra.repository.PositionRepository
+  private final com.fabricmanagement.common.platform.organization.infra.repository.PositionRepository
       positionRepository;
   private final com.fabricmanagement.human.core.employee.application.EmployeeService
       employeeService;
@@ -134,7 +134,7 @@ public class UserCreationService {
 
     if (request.getPositionId() != null) {
       UUID tenantId = TenantContext.getCurrentTenantId();
-      com.fabricmanagement.common.platform.company.domain.Position position =
+      com.fabricmanagement.common.platform.organization.domain.Position position =
           positionRepository
               .findById(request.getPositionId())
               .orElseThrow(() -> new IllegalArgumentException("Position not found"));

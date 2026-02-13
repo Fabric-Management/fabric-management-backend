@@ -1,8 +1,8 @@
 package com.fabricmanagement.common.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.company.domain.Department;
-import com.fabricmanagement.common.platform.company.infra.repository.DepartmentRepository;
+import com.fabricmanagement.common.platform.organization.domain.Department;
+import com.fabricmanagement.common.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.UserDepartment;
 import com.fabricmanagement.common.platform.user.infra.repository.UserDepartmentRepository;

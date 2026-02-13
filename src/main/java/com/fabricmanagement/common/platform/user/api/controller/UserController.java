@@ -37,7 +37,7 @@ public class UserController {
   private final UserAddressAssignmentService userAddressAssignmentService;
   private final com.fabricmanagement.human.core.employee.application.EmployeeService
       employeeService;
-  private final com.fabricmanagement.common.platform.company.app.UserCreationOptionsService
+  private final com.fabricmanagement.common.platform.subscription.app.UserCreationOptionsService
       userCreationOptionsService;
 
   /**
@@ -353,11 +353,11 @@ public class UserController {
    */
   @GetMapping("/creation-options")
   public ResponseEntity<
-          ApiResponse<com.fabricmanagement.common.platform.company.dto.UserCreationOptionsDto>>
+          ApiResponse<com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto>>
       getUserCreationOptions() {
     log.debug("Getting user creation options");
 
-    com.fabricmanagement.common.platform.company.dto.UserCreationOptionsDto options =
+    com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto options =
         userCreationOptionsService.getUserCreationOptions();
 
     return ResponseEntity.ok(ApiResponse.success(options));

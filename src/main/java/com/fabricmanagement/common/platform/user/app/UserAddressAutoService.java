@@ -3,8 +3,8 @@ package com.fabricmanagement.common.platform.user.app;
 import com.fabricmanagement.common.platform.communication.app.AddressService;
 import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
-import com.fabricmanagement.common.platform.company.app.CompanyAddressAssignmentService;
-import com.fabricmanagement.common.platform.company.domain.CompanyAddress;
+import com.fabricmanagement.common.platform.organization.app.OrganizationAddressAssignmentService;
+import com.fabricmanagement.common.platform.organization.domain.OrganizationAddress;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class UserAddressAutoService {
 
-  private final CompanyAddressAssignmentService companyAddressAssignmentService;
+  private final OrganizationAddressAssignmentService organizationAddressAssignmentService;
   private final UserAddressAssignmentService userAddressAssignmentService;
   private final AddressService addressService;
 
@@ -40,15 +40,15 @@ public class UserAddressAutoService {
   @Transactional
   public void copyCompanyPrimaryAddress(UUID userId, UUID companyId, UUID tenantId) {
     try {
-      Optional<CompanyAddress> companyAddressOpt =
-          companyAddressAssignmentService.getPrimaryAddress(companyId);
+      Optional<OrganizationAddress> companyAddressOpt =
+          organizationAddressAssignmentService.getPrimaryAddress(companyId);
 
       if (companyAddressOpt.isEmpty()) {
         log.debug("Company has no primary address, skipping copy: companyId={}", companyId);
         return;
       }
 
-      CompanyAddress companyAddress = companyAddressOpt.get();
+      OrganizationAddress companyAddress = companyAddressOpt.get();
       Address companyAddr =
           addressService
               .findById(companyAddress.getAddressId())
