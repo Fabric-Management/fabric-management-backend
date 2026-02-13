@@ -1,7 +1,7 @@
 package com.fabricmanagement.finance.invoice.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.common.platform.company.domain.TradingPartner;
+import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;

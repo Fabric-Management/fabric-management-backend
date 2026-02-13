@@ -1,6 +1,6 @@
 package com.fabricmanagement.logistics.shipment.dto;
 
-import com.fabricmanagement.common.platform.company.dto.TradingPartnerDto;
+import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.logistics.shipment.domain.Shipment;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentStatus;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentType;
