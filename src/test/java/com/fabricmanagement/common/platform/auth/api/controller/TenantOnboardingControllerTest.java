@@ -11,7 +11,7 @@ import com.fabricmanagement.common.platform.auth.app.JwtService;
 import com.fabricmanagement.common.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.common.platform.auth.dto.TenantOnboardingResponse;
-import com.fabricmanagement.common.platform.company.infra.repository.CompanyRepository;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -30,7 +30,7 @@ class TenantOnboardingControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
-  @MockBean private CompanyRepository companyRepository;
+  @MockBean private OrganizationRepository organizationRepository;
 
   @MockBean
   private com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository
