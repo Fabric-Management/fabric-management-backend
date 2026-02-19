@@ -47,13 +47,8 @@ public class CreateOrganizationStep implements OnboardingStep {
         organizationFacade.createRootOrganization(
             context.getTenantId(), context.getCompanyName(), context.getTaxId(), organizationType);
 
-    // Set organization context for subsequent steps
     context.setOrganizationId(organization.getId());
     context.setOrganizationUid(organization.getUid());
-
-    // For backward compatibility, also set companyId/companyUid
-    context.setCompanyId(organization.getId());
-    context.setCompanyUid(organization.getUid());
 
     log.debug(
         "CreateOrganizationStep: organizationId={}, organizationUid={}",

@@ -114,19 +114,6 @@ public class UserContactController {
         ApiResponse.success(UserContactDto.from(userContact), "Default contact set successfully"));
   }
 
-  @PostMapping("/{contactId}/enable-auth")
-  @Deprecated
-  public ResponseEntity<ApiResponse<UserContactDto>> enableForAuthentication(
-      @PathVariable UUID userId, @PathVariable UUID contactId) {
-    log.warn("/enable-auth endpoint is deprecated. userId={}, contactId={}", userId, contactId);
-    UserContact userContact = userContactAssignmentService.assignContact(userId, contactId, false);
-
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            UserContactDto.from(userContact),
-            "Contact authentication flag is deprecated; no changes applied"));
-  }
-
   @DeleteMapping("/{contactId}")
   public ResponseEntity<ApiResponse<Void>> removeContact(
       @PathVariable UUID userId, @PathVariable UUID contactId) {

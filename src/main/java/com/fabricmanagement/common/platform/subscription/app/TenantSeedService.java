@@ -93,7 +93,7 @@ public class TenantSeedService {
    * Check if tenant has been seeded (has departments).
    *
    * @param tenantId Tenant ID
-   * @param companyId Company ID
+   * @param companyId Organization ID
    * @return true if tenant has departments
    */
   @Transactional(readOnly = true)
@@ -103,7 +103,7 @@ public class TenantSeedService {
       TenantContext.setCurrentTenantId(tenantId);
       long departmentCount =
           departmentRepository
-              .findByTenantIdAndCompanyIdAndIsActiveTrue(tenantId, companyId)
+              .findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, companyId)
               .size();
       return departmentCount > 0;
     } finally {
@@ -296,11 +296,11 @@ public class TenantSeedService {
 
   private Department createDepartment(
       UUID companyId, String name, String description, UUID categoryId) {
-    if (departmentRepository.existsByTenantIdAndCompanyIdAndDepartmentName(
+    if (departmentRepository.existsByTenantIdAndOrganizationIdAndDepartmentName(
         TenantContext.getCurrentTenantId(), companyId, name)) {
       log.debug("Department already exists: {}", name);
       return departmentRepository
-          .findByTenantIdAndCompanyIdAndDepartmentName(
+          .findByTenantIdAndOrganizationIdAndDepartmentName(
               TenantContext.getCurrentTenantId(), companyId, name)
           .orElseThrow();
     }

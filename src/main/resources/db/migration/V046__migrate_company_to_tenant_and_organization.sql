@@ -219,8 +219,8 @@ ALTER TABLE common_user.common_user
     FOREIGN KEY (organization_id)
     REFERENCES common_company.common_organization(id) ON DELETE RESTRICT;
 
--- Update index
-ALTER INDEX common_user.idx_user_company RENAME TO idx_user_organization;
+-- Update index (V003 created idx_user_tenant_company on (tenant_id, company_id); column renamed to organization_id above)
+ALTER INDEX common_user.idx_user_tenant_company RENAME TO idx_user_tenant_organization;
 
 COMMENT ON COLUMN common_user.common_user.organization_id IS 
 'FK to Organization - the user belongs to this organization within the tenant';

@@ -16,7 +16,7 @@ public class DepartmentDto {
   private UUID id;
   private UUID tenantId;
   private String uid;
-  private UUID companyId;
+  private UUID organizationId;
   private String departmentName;
   private String departmentCode;
   private String description;
@@ -34,7 +34,7 @@ public class DepartmentDto {
         .id(department.getId())
         .tenantId(department.getTenantId())
         .uid(department.getUid())
-        .companyId(department.getCompanyId())
+        .organizationId(department.getOrganizationId())
         .departmentName(department.getDepartmentName())
         .departmentCode(department.getDepartmentCode())
         .description(department.getDescription())

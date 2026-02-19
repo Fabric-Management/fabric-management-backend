@@ -167,8 +167,7 @@ public class OrganizationContactAssignmentService
   }
 
   @Transactional(readOnly = true)
-  public List<OrganizationContact> getDepartmentContacts(
-      UUID organizationId, String department) {
+  public List<OrganizationContact> getDepartmentContacts(UUID organizationId, String department) {
     return organizationContactRepository.findByOrganizationIdAndDepartment(
         organizationId, department);
   }

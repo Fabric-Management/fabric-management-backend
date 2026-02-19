@@ -329,7 +329,8 @@ public class TenantService {
         String uuidSuffix =
             UUID.randomUUID().toString().replace("-", "").substring(0, 6).toLowerCase();
         candidateSlug = baseSlug + "-" + uuidSuffix;
-        log.warn("Too many slug collisions for '{}', using UUID suffix: {}", baseSlug, candidateSlug);
+        log.warn(
+            "Too many slug collisions for '{}', using UUID suffix: {}", baseSlug, candidateSlug);
         break;
       }
     } while (tenantRepository.existsBySlug(candidateSlug));

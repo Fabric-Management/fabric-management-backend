@@ -317,9 +317,6 @@ public class GoogleMapsClient {
   /**
    * Search addresses by postcode using Google Geocoding API (Global).
    *
-   * <p><b>DEPRECATED:</b> This method is not used in the main user flow (autocomplete handles all
-   * searches). Kept for potential future use cases (bulk postcode validation, data import, etc.).
-   *
    * <p>Returns all addresses matching the postcode globally or in specified country.
    *
    * <p><b>Global Search:</b> If country is not provided, searches globally across all countries.
@@ -328,9 +325,7 @@ public class GoogleMapsClient {
    * @param country Optional country code (ISO 3166-1 alpha-2, e.g., "TR", "GB", "US"). If null,
    *     searches globally.
    * @return List of addresses matching the postcode
-   * @deprecated Not used in main user flow - autocomplete handles all address searches
    */
-  @Deprecated
   public List<AddressValidationResponse> searchByPostcode(String postcode, String country) {
     if (!properties.getEnabled()) {
       log.warn("Google Maps features are disabled");

@@ -49,8 +49,7 @@ public class UserInvitationEventListener {
     try {
       // Skip if user already has auth credentials (e.g., admin created during onboarding)
       if (authUserRepository.existsByUserId(event.getUserId())) {
-        log.debug(
-            "Skipping invitation for userId={}: AuthUser already exists", event.getUserId());
+        log.debug("Skipping invitation for userId={}: AuthUser already exists", event.getUserId());
         return;
       }
 
@@ -96,8 +95,7 @@ public class UserInvitationEventListener {
 
     String subject = "You've been invited to FabricOS";
     String message =
-        emailTemplateRenderer.renderSetupPassword(
-            firstName, "", event.getContactValue(), setupUrl);
+        emailTemplateRenderer.renderSetupPassword(firstName, "", event.getContactValue(), setupUrl);
 
     notificationService.sendNotificationSync(event.getContactValue(), subject, message);
 

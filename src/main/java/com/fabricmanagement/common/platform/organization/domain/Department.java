@@ -30,7 +30,7 @@ import lombok.*;
  *
  * <pre>{@code
  * Department production = Department.builder()
- *     .companyId(company.getId())
+ *     .organizationId(organization.getId())
  *     .departmentName("production")
  *     .description("Production Department")
  *     .build();
@@ -45,8 +45,8 @@ import lombok.*;
 @AllArgsConstructor
 public class Department extends BaseEntity {
 
-  @Column(name = "company_id", nullable = false)
-  private UUID companyId;
+  @Column(name = "organization_id", nullable = false)
+  private UUID organizationId;
 
   @Column(name = "department_name", nullable = false, length = 100)
   private String departmentName;
@@ -84,9 +84,9 @@ public class Department extends BaseEntity {
   private List<Position> positions = new ArrayList<>();
 
   public static Department create(
-      UUID companyId, String departmentName, String departmentCode, String description) {
+      UUID organizationId, String departmentName, String departmentCode, String description) {
     return Department.builder()
-        .companyId(companyId)
+        .organizationId(organizationId)
         .departmentName(departmentName)
         .departmentCode(departmentCode)
         .description(description)

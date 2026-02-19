@@ -96,8 +96,7 @@ public class LoginService {
         if (userHasPassword) {
           // User has password but this contact is not verified
           TenantContext.executeInTenantContext(
-              user.getTenantId(),
-              () -> checkUnverifiedContact(request.getContactValue()));
+              user.getTenantId(), () -> checkUnverifiedContact(request.getContactValue()));
         }
       }
 

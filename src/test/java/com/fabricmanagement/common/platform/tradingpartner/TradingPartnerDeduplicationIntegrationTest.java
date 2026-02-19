@@ -3,6 +3,11 @@ package com.fabricmanagement.common.platform.tradingpartner;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.platform.organization.domain.Organization;
+import com.fabricmanagement.common.platform.organization.domain.OrganizationType;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.common.platform.tenant.domain.Tenant;
+import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerRegistryService;
 import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType;
@@ -10,11 +15,6 @@ import com.fabricmanagement.common.platform.tradingpartner.dto.CreateTradingPart
 import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerRegistryRepository;
 import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerRepository;
-import com.fabricmanagement.common.platform.organization.domain.Organization;
-import com.fabricmanagement.common.platform.organization.domain.OrganizationType;
-import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.common.platform.tenant.domain.Tenant;
-import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

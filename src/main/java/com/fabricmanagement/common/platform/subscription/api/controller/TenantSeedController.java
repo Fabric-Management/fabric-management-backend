@@ -2,8 +2,8 @@ package com.fabricmanagement.common.platform.subscription.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.common.platform.subscription.app.TenantSeedService;
 import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.common.platform.subscription.app.TenantSeedService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

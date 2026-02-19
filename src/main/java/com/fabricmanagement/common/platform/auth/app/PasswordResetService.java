@@ -252,7 +252,8 @@ public class PasswordResetService {
    * @return Login response with tokens (auto-login after password reset)
    */
   @Transactional
-  public LoginResponse verifyAndResetPassword(PasswordResetVerifyRequest request, String ipAddress) {
+  public LoginResponse verifyAndResetPassword(
+      PasswordResetVerifyRequest request, String ipAddress) {
     log.info(
         "Password reset verification: authUserId={}, code={}",
         request.getAuthUserId(),

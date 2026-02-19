@@ -97,8 +97,8 @@ public class PromptBuilder {
     sb.append("## User Context:\n\n");
     sb.append("Current user: ").append(context.getUser().getDisplayName()).append("\n");
 
-    if (context.getUser().getCompanyId() != null) {
-      sb.append("Company ID: ").append(context.getUser().getCompanyId()).append("\n");
+    if (context.getUser().getOrganizationId() != null) {
+      sb.append("Organization ID: ").append(context.getUser().getOrganizationId()).append("\n");
     }
 
     if (context.getPreferences() != null) {

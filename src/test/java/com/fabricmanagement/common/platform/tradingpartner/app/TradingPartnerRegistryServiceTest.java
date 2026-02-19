@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartnerRegistry;
 import com.fabricmanagement.common.platform.tradingpartner.domain.VerifiedStatus;
@@ -16,7 +17,6 @@ import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingP
 import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerRegistryDto;
 import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerRegistryRepository;
 import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerRepository;
-import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -139,18 +139,12 @@ class TradingPartnerRegistryServiceTest {
               .build();
 
       TradingPartner tp1 =
-          TradingPartner.builder()
-              .registry(registry)
-              .partnerType(PartnerType.SUPPLIER)
-              .build();
+          TradingPartner.builder().registry(registry).partnerType(PartnerType.SUPPLIER).build();
       tp1.setId(UUID.randomUUID());
       tp1.setTenantId(TENANT_ID);
       UUID otherTenantId = UUID.randomUUID();
       TradingPartner tp2 =
-          TradingPartner.builder()
-              .registry(registry)
-              .partnerType(PartnerType.CUSTOMER)
-              .build();
+          TradingPartner.builder().registry(registry).partnerType(PartnerType.CUSTOMER).build();
       tp2.setId(UUID.randomUUID());
       tp2.setTenantId(otherTenantId);
 

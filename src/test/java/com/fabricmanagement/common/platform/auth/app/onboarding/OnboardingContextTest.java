@@ -15,10 +15,10 @@ class OnboardingContextTest {
 
   @Test
   void toCreateAdminUserRequest_buildsFromContext() {
-    UUID companyId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
     UUID tenantId = UUID.randomUUID();
     OnboardingContext context = new OnboardingContext();
-    context.setCompanyId(companyId);
+    context.setOrganizationId(organizationId);
     context.setTenantId(tenantId);
     context.setAdminFirstName("Jane");
     context.setAdminLastName("Doe");
@@ -27,7 +27,7 @@ class OnboardingContextTest {
 
     CreateAdminUserRequest request = context.toCreateAdminUserRequest();
 
-    assertThat(request.getCompanyId()).isEqualTo(companyId);
+    assertThat(request.getCompanyId()).isEqualTo(organizationId);
     assertThat(request.getTenantId()).isEqualTo(tenantId);
     assertThat(request.getFirstName()).isEqualTo("Jane");
     assertThat(request.getLastName()).isEqualTo("Doe");
@@ -37,14 +37,14 @@ class OnboardingContextTest {
 
   @Test
   void toResult_buildsResponseFromContext() {
-    UUID companyId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
     UUID tenantId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     OnboardingContext context = new OnboardingContext();
     context.setCompanyName("Acme");
-    context.setCompanyId(companyId);
+    context.setOrganizationId(organizationId);
     context.setTenantId(tenantId);
-    context.setCompanyUid("ACME-001");
+    context.setOrganizationUid("ACME-001");
     context.setUserId(userId);
     context.setAdminContactValue("admin@acme.com");
     context.setRegistrationToken("token-123");
@@ -54,9 +54,10 @@ class OnboardingContextTest {
 
     TenantOnboardingResponse result = context.toResult();
 
-    assertThat(result.getCompanyId()).isEqualTo(companyId);
+    assertThat(result.getCompanyId()).isEqualTo(organizationId);
     assertThat(result.getTenantId()).isEqualTo(tenantId);
-    assertThat(result.getCompanyUid()).isEqualTo("ACME-001");
+    assertThat(result.getCompanyUid())
+        .isEqualTo("ACME-001"); // TenantOnboardingResponse still uses companyUid field name
     assertThat(result.getCompanyName()).isEqualTo("Acme");
     assertThat(result.getAdminUserId()).isEqualTo(userId);
     assertThat(result.getAdminContactValue()).isEqualTo("admin@acme.com");

@@ -2,6 +2,7 @@ package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.platform.auth.domain.AuthUser;
+import com.fabricmanagement.common.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.common.platform.auth.domain.VerificationType;
 import com.fabricmanagement.common.platform.auth.domain.event.UserLoginEvent;
 import com.fabricmanagement.common.platform.auth.domain.event.UserRegisteredEvent;
@@ -9,7 +10,6 @@ import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.common.platform.auth.dto.OnboardingPrefillDto;
 import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
-import com.fabricmanagement.common.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
@@ -100,8 +100,7 @@ public class RegistrationService {
     // Check if user already has AuthUser (user-based authentication)
     if (authUserRepository.existsByUserId(user.getId())) {
       log.warn("User already registered: userId={}", user.getId());
-      throw new IllegalArgumentException(
-          "This account is already registered. Please login.");
+      throw new IllegalArgumentException("This account is already registered. Please login.");
     }
 
     verificationCodeManager.issueCode(request.getContactValue(), VerificationType.REGISTRATION);

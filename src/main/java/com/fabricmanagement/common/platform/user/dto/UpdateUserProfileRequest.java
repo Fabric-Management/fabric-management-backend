@@ -36,11 +36,11 @@ public class UpdateUserProfileRequest {
   /** Last name (WORK_PROFILE). */
   private String lastName;
 
-  /** Work email contact value (WORK_PROFILE). Will be used to create/update work email contact. */
-  @Deprecated private String workEmail;
+  /** Work email contact value (WORK_PROFILE). Creates/updates work email contact. */
+  private String workEmail;
 
-  /** Work phone contact value (WORK_PROFILE). Will be used to create/update work phone contact. */
-  @Deprecated private String workPhone;
+  /** Work phone contact value (WORK_PROFILE). Creates/updates work phone contact. */
+  private String workPhone;
 
   /** Work address data (WORK_PROFILE). */
   private AddressData workAddress;
@@ -54,7 +54,7 @@ public class UpdateUserProfileRequest {
   private AddressData homeAddress;
 
   /** Personal phone contact value (PERSONAL_PROFILE). */
-  @Deprecated private String personalPhone;
+  private String personalPhone;
 
   /** Birth date (PERSONAL_PROFILE). */
   private LocalDate birthDate;

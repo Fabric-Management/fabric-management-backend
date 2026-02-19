@@ -75,24 +75,24 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   List<User> findByTenantIdAndIsActiveTrue(@Param("tenantId") UUID tenantId);
 
   /**
-   * Get all users for a company.
+   * Get all users for an organization.
    *
    * <p>Eagerly fetches Role to avoid lazy loading issues.
    */
   @Query(
-      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.companyId = :companyId")
-  List<User> findByTenantIdAndCompanyId(
-      @Param("tenantId") UUID tenantId, @Param("companyId") UUID companyId);
+      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.organizationId = :organizationId")
+  List<User> findByTenantIdAndOrganizationId(
+      @Param("tenantId") UUID tenantId, @Param("organizationId") UUID organizationId);
 
   /**
-   * Get all active users for a company.
+   * Get all active users for an organization.
    *
    * <p>Eagerly fetches Role to avoid lazy loading issues.
    */
   @Query(
-      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.companyId = :companyId AND u.isActive = true")
-  List<User> findByTenantIdAndCompanyIdAndIsActiveTrue(
-      @Param("tenantId") UUID tenantId, @Param("companyId") UUID companyId);
+      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.organizationId = :organizationId AND u.isActive = true")
+  List<User> findByTenantIdAndOrganizationIdAndIsActiveTrue(
+      @Param("tenantId") UUID tenantId, @Param("organizationId") UUID organizationId);
 
   /**
    * Check if contact value exists via Contact entity (new system).
@@ -139,8 +139,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   /** Count active users in tenant. */
   long countByTenantIdAndIsActiveTrue(UUID tenantId);
 
-  /** Count users in company. */
-  long countByTenantIdAndCompanyId(UUID tenantId, UUID companyId);
+  /** Count users in organization. */
+  long countByTenantIdAndOrganizationId(UUID tenantId, UUID organizationId);
 
   /**
    * Find any user with contacts in the given email domain. Used for providing context-aware error

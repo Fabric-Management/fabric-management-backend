@@ -64,19 +64,6 @@ public class OnboardingContext {
   private String organizationUid;
 
   // ========================================
-  // OUTPUTS - Legacy/Backward Compatibility
-  // ========================================
-  /**
-   * @deprecated Use organizationId instead. Kept for backward compatibility.
-   */
-  @Deprecated private UUID companyId;
-
-  /**
-   * @deprecated Use organizationUid instead. Kept for backward compatibility.
-   */
-  @Deprecated private String companyUid;
-
-  // ========================================
   // OUTPUTS - User (Step 3)
   // ========================================
   private UUID userId;
@@ -96,7 +83,7 @@ public class OnboardingContext {
 
   public CreateAdminUserRequest toCreateAdminUserRequest() {
     return CreateAdminUserRequest.builder()
-        .companyId(organizationId != null ? organizationId : companyId)
+        .companyId(organizationId)
         .tenantId(tenantId)
         .firstName(adminFirstName)
         .lastName(adminLastName)
@@ -107,9 +94,9 @@ public class OnboardingContext {
 
   public TenantOnboardingResponse toResult() {
     return TenantOnboardingResponse.builder()
-        .companyId(organizationId != null ? organizationId : companyId)
+        .companyId(organizationId)
         .tenantId(tenantId)
-        .companyUid(organizationUid != null ? organizationUid : companyUid)
+        .companyUid(organizationUid)
         .companyName(companyName)
         .adminUserId(userId)
         .adminContactValue(adminContactValue != null ? adminContactValue : adminContact)
@@ -118,35 +105,5 @@ public class OnboardingContext {
         .trialEndsAt(trialEndsAt)
         .setupUrl(setupUrl)
         .build();
-  }
-
-  // ========================================
-  // BACKWARD COMPATIBILITY GETTERS/SETTERS
-  // ========================================
-
-  /** Gets companyId for backward compatibility. Returns organizationId if set. */
-  public UUID getCompanyId() {
-    return organizationId != null ? organizationId : companyId;
-  }
-
-  /** Sets companyId for backward compatibility. Also sets organizationId. */
-  public void setCompanyId(UUID companyId) {
-    this.companyId = companyId;
-    if (this.organizationId == null) {
-      this.organizationId = companyId;
-    }
-  }
-
-  /** Gets companyUid for backward compatibility. Returns organizationUid if set. */
-  public String getCompanyUid() {
-    return organizationUid != null ? organizationUid : companyUid;
-  }
-
-  /** Sets companyUid for backward compatibility. Also sets organizationUid. */
-  public void setCompanyUid(String companyUid) {
-    this.companyUid = companyUid;
-    if (this.organizationUid == null) {
-      this.organizationUid = companyUid;
-    }
   }
 }

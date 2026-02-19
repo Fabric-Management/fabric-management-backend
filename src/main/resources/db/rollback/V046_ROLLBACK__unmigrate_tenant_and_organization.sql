@@ -55,7 +55,7 @@ ALTER TABLE common_company.common_company
 -- Step 7: Restore User.company_id
 ALTER TABLE common_user.common_user 
     DROP CONSTRAINT IF EXISTS fk_user_organization;
-ALTER INDEX common_user.idx_user_organization RENAME TO idx_user_company;
+ALTER INDEX common_user.idx_user_tenant_organization RENAME TO idx_user_tenant_company;
 ALTER TABLE common_user.common_user 
     RENAME COLUMN organization_id TO company_id;
 

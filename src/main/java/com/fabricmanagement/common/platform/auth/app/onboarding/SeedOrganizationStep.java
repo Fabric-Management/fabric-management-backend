@@ -24,9 +24,6 @@ public class SeedOrganizationStep implements OnboardingStep {
   public void execute(OnboardingContext context) {
     UUID tenantId = context.getTenantId();
     UUID organizationId = context.getOrganizationId();
-    if (organizationId == null) {
-      organizationId = context.getCompanyId(); // Backward compat
-    }
     if (tenantId == null || organizationId == null) {
       return;
     }

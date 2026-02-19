@@ -32,7 +32,7 @@ class TenantOnboardingOrchestratorTest {
   void onboardRunsStepsAndReturnsResult() {
     OnboardingContext context = new OnboardingContext();
     context.setCompanyName("Test Co");
-    context.setCompanyId(UUID.randomUUID());
+    context.setOrganizationId(UUID.randomUUID());
     context.setTenantId(UUID.randomUUID());
     context.setUserId(UUID.randomUUID());
     context.setAdminContactValue("admin@test.com");
@@ -46,7 +46,7 @@ class TenantOnboardingOrchestratorTest {
     verify(step1).execute(captor.capture());
     assertThat(captor.getValue()).isSameAs(context);
     verify(step2).execute(context);
-    assertThat(result.getCompanyId()).isEqualTo(context.getCompanyId());
+    assertThat(result.getCompanyId()).isEqualTo(context.getOrganizationId());
     assertThat(result.getAdminContactValue()).isEqualTo("admin@test.com");
     assertThat(result.getRegistrationToken()).isEqualTo("tok");
   }

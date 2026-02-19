@@ -121,10 +121,7 @@ public class OrganizationAddressController {
   @PutMapping("/{addressId}/primary")
   public ResponseEntity<ApiResponse<OrganizationAddressDto>> setAsPrimary(
       @PathVariable UUID organizationId, @PathVariable UUID addressId) {
-    log.info(
-        "Setting primary address: organizationId={}, addressId={}",
-        organizationId,
-        addressId);
+    log.info("Setting primary address: organizationId={}, addressId={}", organizationId, addressId);
 
     OrganizationAddress organizationAddress =
         organizationAddressAssignmentService.setAsPrimary(organizationId, addressId);
@@ -137,8 +134,7 @@ public class OrganizationAddressController {
   @PutMapping("/{addressId}/headquarters")
   public ResponseEntity<ApiResponse<OrganizationAddressDto>> setAsHeadquarters(
       @PathVariable UUID organizationId, @PathVariable UUID addressId) {
-    log.info(
-        "Setting headquarters: organizationId={}, addressId={}", organizationId, addressId);
+    log.info("Setting headquarters: organizationId={}, addressId={}", organizationId, addressId);
 
     OrganizationAddress organizationAddress =
         organizationAddressAssignmentService.setAsHeadquarters(organizationId, addressId);

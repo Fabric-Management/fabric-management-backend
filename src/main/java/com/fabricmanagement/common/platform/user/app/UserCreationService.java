@@ -49,7 +49,8 @@ public class UserCreationService {
   private final DomainEventPublisher eventPublisher;
   private final RoleService roleService;
   private final UserDepartmentService userDepartmentService;
-  private final com.fabricmanagement.common.platform.organization.infra.repository.PositionRepository
+  private final com.fabricmanagement.common.platform.organization.infra.repository
+          .PositionRepository
       positionRepository;
   private final com.fabricmanagement.human.core.employee.application.EmployeeService
       employeeService;
@@ -118,7 +119,7 @@ public class UserCreationService {
             saved.getId(),
             saved.getDisplayName(),
             contactValue,
-            saved.getCompanyId()));
+            saved.getOrganizationId()));
 
     checkAndTrackHrCompliance(saved.getId(), request.getDepartment());
 
@@ -153,7 +154,7 @@ public class UserCreationService {
             userEntity.getId(),
             userEntity.getDisplayName(),
             contactValue,
-            userEntity.getCompanyId()));
+            userEntity.getOrganizationId()));
 
     log.info(
         "External user created: id={}, uid={}, displayName={}",
@@ -212,7 +213,7 @@ public class UserCreationService {
                   saved.getId(),
                   saved.getDisplayName(),
                   contact.getContactValue(),
-                  saved.getCompanyId()));
+                  saved.getOrganizationId()));
 
           log.info("Admin user created: id={}, uid={}", saved.getId(), saved.getUid());
           return UserDto.from(saved);

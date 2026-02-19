@@ -166,8 +166,7 @@ public class OrganizationAddressAssignmentService
 
   @Transactional
   public OrganizationAddress setAsHeadquarters(UUID organizationId, UUID addressId) {
-    log.info(
-        "Setting headquarters: organizationId={}, addressId={}", organizationId, addressId);
+    log.info("Setting headquarters: organizationId={}, addressId={}", organizationId, addressId);
     OrganizationAddress junction =
         organizationAddressRepository
             .findByOrganizationIdAndAddressId(organizationId, addressId)

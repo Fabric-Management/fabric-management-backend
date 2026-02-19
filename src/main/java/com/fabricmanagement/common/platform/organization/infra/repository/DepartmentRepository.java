@@ -19,15 +19,16 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
 
   Optional<Department> findByTenantIdAndId(UUID tenantId, UUID id);
 
-  List<Department> findByTenantIdAndCompanyId(UUID tenantId, UUID companyId);
+  List<Department> findByTenantIdAndOrganizationId(UUID tenantId, UUID organizationId);
 
-  List<Department> findByTenantIdAndCompanyIdAndIsActiveTrue(UUID tenantId, UUID companyId);
+  List<Department> findByTenantIdAndOrganizationIdAndIsActiveTrue(
+      UUID tenantId, UUID organizationId);
 
-  Optional<Department> findByTenantIdAndCompanyIdAndDepartmentName(
-      UUID tenantId, UUID companyId, String departmentName);
+  Optional<Department> findByTenantIdAndOrganizationIdAndDepartmentName(
+      UUID tenantId, UUID organizationId, String departmentName);
 
-  boolean existsByTenantIdAndCompanyIdAndDepartmentName(
-      UUID tenantId, UUID companyId, String departmentName);
+  boolean existsByTenantIdAndOrganizationIdAndDepartmentName(
+      UUID tenantId, UUID organizationId, String departmentName);
 
   /** Find all active departments by tenant ID. Used for user creation form dropdown options. */
   @Query(

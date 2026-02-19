@@ -8,8 +8,8 @@ import com.fabricmanagement.common.platform.communication.app.EmailDiagnosticSer
 import com.fabricmanagement.common.platform.communication.domain.EmailOutboxStatus;
 import com.fabricmanagement.common.platform.communication.infra.repository.EmailOutboxRepository;
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.common.platform.subscription.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.common.platform.policy.infra.repository.PolicyRepository;
+import com.fabricmanagement.common.platform.subscription.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import java.time.Instant;
 import java.util.Map;

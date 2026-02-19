@@ -44,15 +44,20 @@ public class DepartmentController {
     return ResponseEntity.ok(ApiResponse.success(departments));
   }
 
-  /** Get all departments for a specific company. */
-  @GetMapping("/company/{companyId}")
-  public ResponseEntity<ApiResponse<List<DepartmentDto>>> getDepartmentsByCompany(
-      @PathVariable UUID companyId) {
+  /** Get all departments for a specific organization. */
+  @GetMapping("/organization/{organizationId}")
+  public ResponseEntity<ApiResponse<List<DepartmentDto>>> getDepartmentsByOrganization(
+      @PathVariable UUID organizationId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Getting departments by company: tenantId={}, companyId={}", tenantId, companyId);
+    log.debug(
+        "Getting departments by organization: tenantId={}, organizationId={}",
+        tenantId,
+        organizationId);
 
     List<DepartmentDto> departments =
-        departmentRepository.findByTenantIdAndCompanyIdAndIsActiveTrue(tenantId, companyId).stream()
+        departmentRepository
+            .findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, organizationId)
+            .stream()
             .map(DepartmentDto::from)
             .collect(Collectors.toList());
 

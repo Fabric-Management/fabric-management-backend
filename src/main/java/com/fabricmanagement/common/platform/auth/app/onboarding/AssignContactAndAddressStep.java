@@ -37,10 +37,7 @@ public class AssignContactAndAddressStep implements OnboardingStep {
     UUID organizationId = context.getOrganizationId();
     UUID tenantId = context.getTenantId();
     if (organizationId == null || tenantId == null) {
-      organizationId = context.getCompanyId();
-      if (organizationId == null) {
-        return;
-      }
+      return;
     }
 
     // Create and assign address if provided

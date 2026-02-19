@@ -49,8 +49,7 @@ public class OrganizationContactController {
             .getDefaultContact(organizationId)
             .orElseThrow(() -> new IllegalArgumentException("No default contact found"));
 
-    return ResponseEntity.ok(
-        ApiResponse.success(OrganizationContactDto.from(defaultContact)));
+    return ResponseEntity.ok(ApiResponse.success(OrganizationContactDto.from(defaultContact)));
   }
 
   @GetMapping("/department/{department}")
@@ -126,16 +125,14 @@ public class OrganizationContactController {
   @PutMapping("/{contactId}/default")
   public ResponseEntity<ApiResponse<OrganizationContactDto>> setAsDefault(
       @PathVariable UUID organizationId, @PathVariable UUID contactId) {
-    log.info(
-        "Setting default contact: organizationId={}, contactId={}", organizationId, contactId);
+    log.info("Setting default contact: organizationId={}, contactId={}", organizationId, contactId);
 
     OrganizationContact organizationContact =
         organizationContactAssignmentService.setAsDefault(organizationId, contactId);
 
     return ResponseEntity.ok(
         ApiResponse.success(
-            OrganizationContactDto.from(organizationContact),
-            "Default contact set successfully"));
+            OrganizationContactDto.from(organizationContact), "Default contact set successfully"));
   }
 
   @DeleteMapping("/{contactId}")
