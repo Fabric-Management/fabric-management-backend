@@ -1,6 +1,6 @@
 package com.fabricmanagement.logistics.order.dto;
 
-import com.fabricmanagement.common.platform.company.dto.TradingPartnerDto;
+import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.logistics.order.domain.OrderStatus;
 import com.fabricmanagement.logistics.order.domain.OrderType;
 import com.fabricmanagement.logistics.order.domain.SalesOrder;

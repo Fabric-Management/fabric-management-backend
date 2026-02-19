@@ -20,15 +20,15 @@ public class CreateRegistrationTokenStep implements OnboardingStep {
   @Override
   public void execute(OnboardingContext context) {
     UUID userId = context.getUserId();
-    UUID companyId = context.getCompanyId();
+    UUID organizationId = context.getOrganizationId();
     String contactValue = context.getAdminContact();
-    if (userId == null || companyId == null || contactValue == null) {
+    if (userId == null || organizationId == null || contactValue == null) {
       return;
     }
     RegistrationTokenType tokenType =
         context.isSalesLed() ? RegistrationTokenType.SALES_LED : RegistrationTokenType.SELF_SERVICE;
     RegistrationToken token = RegistrationToken.create(contactValue, tokenType);
-    token.linkTo(userId, companyId);
+    token.linkTo(userId, organizationId);
     tokenRepository.save(token);
     context.setRegistrationToken(token.getToken());
     log.debug("CreateRegistrationTokenStep: token created for userId={}", userId);

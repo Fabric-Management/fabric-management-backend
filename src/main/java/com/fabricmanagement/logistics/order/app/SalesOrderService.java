@@ -1,9 +1,9 @@
 package com.fabricmanagement.logistics.order.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.company.app.TradingPartnerResolver;
-import com.fabricmanagement.common.platform.company.app.TradingPartnerService;
-import com.fabricmanagement.common.platform.company.dto.TradingPartnerDto;
+import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerService;
+import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.logistics.order.domain.OrderStatus;
 import com.fabricmanagement.logistics.order.domain.SalesOrder;
 import com.fabricmanagement.logistics.order.dto.CreateSalesOrderRequest;

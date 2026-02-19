@@ -71,8 +71,8 @@ public class SystemPrompts {
       prompt.append("## User Context:\n");
       prompt.append("\n");
       prompt.append("Current user: ").append(user.getDisplayName()).append("\n");
-      if (user.getCompanyId() != null) {
-        prompt.append("Company ID: ").append(user.getCompanyId()).append("\n");
+      if (user.getOrganizationId() != null) {
+        prompt.append("Organization ID: ").append(user.getOrganizationId()).append("\n");
       }
 
       // Add learned preferences if available

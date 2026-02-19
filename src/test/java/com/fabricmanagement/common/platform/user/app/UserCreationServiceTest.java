@@ -13,7 +13,6 @@ import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.common.platform.user.domain.User;
-import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.common.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -57,7 +55,7 @@ class UserCreationServiceTest {
   @Mock private UserDepartmentService userDepartmentService;
 
   @Mock
-  private com.fabricmanagement.common.platform.company.infra.repository.PositionRepository
+  private com.fabricmanagement.common.platform.organization.infra.repository.PositionRepository
       positionRepository;
 
   @Mock
@@ -76,22 +74,22 @@ class UserCreationServiceTest {
   }
 
   @Nested
-  @DisplayName("createUserBase")
-  class CreateUserBase {
+  @DisplayName("createUserEntity")
+  class CreateUserEntity {
 
     @Test
     void throwsWhenContactValueAlreadyRegistered() {
-      when(userRepository.existsByContactValue(CONTACT_VALUE)).thenReturn(true);
+      when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
+          .thenReturn(true);
 
       assertThatThrownBy(
               () ->
-                  service.createUserBase(
+                  service.createUserEntity(
                       "First",
                       "Last",
                       CONTACT_VALUE,
                       com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL,
                       COMPANY_ID,
-                      null,
                       null,
                       null))
           .isInstanceOf(IllegalArgumentException.class)
@@ -100,18 +98,18 @@ class UserCreationServiceTest {
 
     @Test
     void throwsWhenOrganizationNotFound() {
-      when(userRepository.existsByContactValue(CONTACT_VALUE)).thenReturn(false);
+      when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
+          .thenReturn(false);
       when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(false);
 
       assertThatThrownBy(
               () ->
-                  service.createUserBase(
+                  service.createUserEntity(
                       "First",
                       "Last",
                       CONTACT_VALUE,
                       com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL,
                       COMPANY_ID,
-                      null,
                       null,
                       null))
           .isInstanceOf(IllegalArgumentException.class)
@@ -120,7 +118,8 @@ class UserCreationServiceTest {
 
     @Test
     void createsUserAndContactAndAssignsWhenNoAddressesThenCopiesCompanyPrimaryAndPublishesEvent() {
-      when(userRepository.existsByContactValue(CONTACT_VALUE)).thenReturn(false);
+      when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
+          .thenReturn(false);
       when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
       User savedUser = User.create("First", "Last", COMPANY_ID);
       savedUser.setId(USER_ID);
@@ -135,14 +134,13 @@ class UserCreationServiceTest {
               eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
           .thenReturn(contact);
 
-      UserDto result =
-          service.createUserBase(
+      User result =
+          service.createUserEntity(
               "First",
               "Last",
               CONTACT_VALUE,
               com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL,
               COMPANY_ID,
-              null,
               null,
               null);
 
@@ -151,13 +149,6 @@ class UserCreationServiceTest {
       verify(userContactAssignmentService).assignContact(eq(USER_ID), eq(CONTACT_ID), eq(true));
       verify(userAddressAutoService)
           .copyCompanyPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
-      ArgumentCaptor<UserCreatedEvent> eventCaptor =
-          ArgumentCaptor.forClass(UserCreatedEvent.class);
-      verify(eventPublisher).publish(eventCaptor.capture());
-      UserCreatedEvent event = eventCaptor.getValue();
-      assertThat(event.getTenantId()).isEqualTo(TENANT_ID);
-      assertThat(event.getUserId()).isEqualTo(USER_ID);
-      assertThat(event.getCompanyId()).isEqualTo(COMPANY_ID);
       assertThat(result.getId()).isEqualTo(USER_ID);
       assertThat(result.getOrganizationId()).isEqualTo(COMPANY_ID);
     }
@@ -178,7 +169,8 @@ class UserCreationServiceTest {
               .companyId(COMPANY_ID)
               .build();
 
-      when(userRepository.existsByContactValue(CONTACT_VALUE)).thenReturn(false);
+      when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
+          .thenReturn(false);
       when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
       User savedUser = User.create("External", "User", COMPANY_ID);
       savedUser.setId(USER_ID);

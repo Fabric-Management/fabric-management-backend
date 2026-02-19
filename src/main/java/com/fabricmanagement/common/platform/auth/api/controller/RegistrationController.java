@@ -6,6 +6,7 @@ import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +38,20 @@ public class RegistrationController {
 
   @PostMapping("/verify")
   public ResponseEntity<ApiResponse<LoginResponse>> verifyAndRegister(
-      @Valid @RequestBody VerifyAndRegisterRequest request) {
+      @Valid @RequestBody VerifyAndRegisterRequest request, HttpServletRequest httpRequest) {
     log.info(
         "Verify and register: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
-    LoginResponse response = registrationService.verifyAndRegister(request);
+    String ipAddress = getClientIpAddress(httpRequest);
+    LoginResponse response = registrationService.verifyAndRegister(request, ipAddress);
     return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
+  }
+
+  private String getClientIpAddress(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+      return xForwardedFor.split(",")[0].trim();
+    }
+    return request.getRemoteAddr();
   }
 }

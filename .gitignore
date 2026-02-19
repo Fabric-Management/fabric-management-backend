@@ -11,6 +11,7 @@
 *.iws
 *.ipr
 .cursor/
+.claude/
 .vscode/
 .settings/
 .project

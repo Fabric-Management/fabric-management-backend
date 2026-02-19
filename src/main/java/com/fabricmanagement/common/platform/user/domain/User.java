@@ -71,24 +71,6 @@ public class User extends BaseEntity {
   @Column(name = "organization_id", nullable = false)
   private UUID organizationId;
 
-  /**
-   * @deprecated Use {@link #getOrganizationId()} instead. This method is provided for backward
-   *     compatibility during migration.
-   */
-  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
-  public UUID getCompanyId() {
-    return organizationId;
-  }
-
-  /**
-   * @deprecated Use {@link #setOrganizationId(UUID)} instead. This method is provided for backward
-   *     compatibility during migration.
-   */
-  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
-  public void setCompanyId(UUID companyId) {
-    this.organizationId = companyId;
-  }
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "role_id")
   private Role role;
@@ -150,14 +132,6 @@ public class User extends BaseEntity {
         .lastName(lastName)
         .organizationId(organizationId)
         .build();
-  }
-
-  /**
-   * @deprecated Use {@link #create(String, String, UUID)} with organizationId instead.
-   */
-  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
-  public static User createWithCompanyId(String firstName, String lastName, UUID companyId) {
-    return create(firstName, lastName, companyId);
   }
 
   public void updateProfile(String firstName, String lastName) {

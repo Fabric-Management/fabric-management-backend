@@ -1,6 +1,6 @@
 package com.fabricmanagement.common.platform.auth.app.onboarding;
 
-import com.fabricmanagement.common.platform.company.app.TenantSeedService;
+import com.fabricmanagement.common.platform.subscription.app.TenantSeedService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,9 +24,6 @@ public class SeedOrganizationStep implements OnboardingStep {
   public void execute(OnboardingContext context) {
     UUID tenantId = context.getTenantId();
     UUID organizationId = context.getOrganizationId();
-    if (organizationId == null) {
-      organizationId = context.getCompanyId(); // Backward compat
-    }
     if (tenantId == null || organizationId == null) {
       return;
     }

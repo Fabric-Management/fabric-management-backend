@@ -1,9 +1,9 @@
 package com.fabricmanagement.logistics.shipment.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.company.app.TradingPartnerResolver;
-import com.fabricmanagement.common.platform.company.app.TradingPartnerService;
-import com.fabricmanagement.common.platform.company.dto.TradingPartnerDto;
+import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerService;
+import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.logistics.shipment.domain.Shipment;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentStatus;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentType;

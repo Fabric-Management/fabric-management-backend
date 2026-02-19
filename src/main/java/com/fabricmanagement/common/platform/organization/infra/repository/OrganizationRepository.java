@@ -99,6 +99,15 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
   boolean existsByTenantIdAndTaxId(UUID tenantId, String taxId);
 
   /**
+   * Find organization by tenant and tax ID.
+   *
+   * @param tenantId Tenant UUID
+   * @param taxId Tax ID
+   * @return Organization if found
+   */
+  Optional<Organization> findByTenantIdAndTaxId(UUID tenantId, String taxId);
+
+  /**
    * Search organizations by name.
    *
    * @param tenantId Tenant UUID

@@ -1,6 +1,6 @@
 package com.fabricmanagement.finance.invoice.dto;
 
-import com.fabricmanagement.common.platform.company.dto.TradingPartnerDto;
+import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;

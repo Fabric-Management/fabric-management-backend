@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.platform.auth.app.onboarding;
 
-import com.fabricmanagement.common.platform.company.app.SubscriptionService;
-import com.fabricmanagement.common.platform.company.dto.CreateInitialSubscriptionsResult;
+import com.fabricmanagement.common.platform.subscription.app.SubscriptionService;
+import com.fabricmanagement.common.platform.subscription.dto.CreateInitialSubscriptionsResult;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

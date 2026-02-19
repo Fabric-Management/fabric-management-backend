@@ -30,22 +30,6 @@ public class UserDto {
   private Instant createdAt;
   private Instant updatedAt;
 
-  /**
-   * @deprecated Use {@link #getOrganizationId()} instead.
-   */
-  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
-  public UUID getCompanyId() {
-    return organizationId;
-  }
-
-  /**
-   * @deprecated Use {@link #setOrganizationId(UUID)} instead.
-   */
-  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
-  public void setCompanyId(UUID companyId) {
-    this.organizationId = companyId;
-  }
-
   public static UserDto from(User user) {
     return UserDto.builder()
         .id(user.getId())

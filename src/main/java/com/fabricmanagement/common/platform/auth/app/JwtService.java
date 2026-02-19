@@ -230,14 +230,6 @@ public class JwtService {
     return UUID.fromString(orgId);
   }
 
-  /**
-   * @deprecated Use {@link #getOrganizationIdFromToken(String)} instead.
-   */
-  @Deprecated(since = "Faz 3 Migration", forRemoval = true)
-  public UUID getCompanyIdFromToken(String token) {
-    return getOrganizationIdFromToken(token);
-  }
-
   public String getDepartmentFromToken(String token) {
     Claims claims = extractClaims(token);
     return claims.get("department", String.class);

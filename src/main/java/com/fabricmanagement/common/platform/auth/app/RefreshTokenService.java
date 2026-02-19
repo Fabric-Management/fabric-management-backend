@@ -36,6 +36,9 @@ public class RefreshTokenService {
   private final UserFacade userFacade;
   private final JwtService jwtService;
 
+  @Value("${application.jwt.expiration:900000}")
+  private long accessTokenExpiration;
+
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
 
@@ -106,7 +109,7 @@ public class RefreshTokenService {
     return LoginResponse.builder()
         .accessToken(newAccessToken)
         .refreshToken(newRefreshToken)
-        .expiresIn(900L) // 15 minutes in seconds
+        .expiresIn(accessTokenExpiration / 1000)
         .user(userDto)
         .needsOnboarding(!user.hasCompletedOnboarding())
         .build();

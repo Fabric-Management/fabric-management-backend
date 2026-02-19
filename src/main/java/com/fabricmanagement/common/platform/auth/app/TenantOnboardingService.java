@@ -27,6 +27,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class TenantOnboardingService {
 
+  /** Default trial days for self-service signups. */
+  private static final int DEFAULT_SELF_SERVICE_TRIAL_DAYS = 14;
+
+  /** Default trial days for sales-led onboarding when not specified. */
+  private static final int DEFAULT_SALES_LED_TRIAL_DAYS = 90;
+
   private final TenantOnboardingOrchestrator orchestrator;
   private final OrganizationFacade organizationFacade;
   private final UserFacade userFacade;
@@ -59,7 +65,8 @@ public class TenantOnboardingService {
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()
             : List.of("FabricOS"));
-    context.setTrialDays(request.getTrialDays() != null ? request.getTrialDays() : 90);
+    context.setTrialDays(
+        request.getTrialDays() != null ? request.getTrialDays() : DEFAULT_SALES_LED_TRIAL_DAYS);
     context.setSalesLed(true);
 
     return orchestrator.onboard(context);
@@ -86,11 +93,13 @@ public class TenantOnboardingService {
     context.setAdminFirstName(request.getFirstName());
     context.setAdminLastName(request.getLastName());
     context.setAdminContact(request.getEmail());
+    // Use admin email as billing email for self-service (no separate company email provided)
+    context.setCompanyEmail(request.getEmail());
     context.setSelectedOS(
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()
             : List.of("FabricOS"));
-    context.setTrialDays(14);
+    context.setTrialDays(DEFAULT_SELF_SERVICE_TRIAL_DAYS);
     context.setSalesLed(false);
 
     return orchestrator.onboard(context);

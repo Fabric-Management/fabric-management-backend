@@ -65,8 +65,11 @@ public class TenantService {
               : TenantSettings.defaults();
     }
 
+    // Generate collision-safe slug
+    String slug = generateUniqueSlug(request.getName());
+
     // Create tenant
-    Tenant tenant = Tenant.create(request.getName(), uid, settings);
+    Tenant tenant = Tenant.create(request.getName(), uid, slug, settings);
     tenant.setBillingEmail(request.getBillingEmail());
 
     // Start trial if requested
@@ -288,6 +291,51 @@ public class TenantService {
     } while (counter <= 999);
 
     return candidateUid;
+  }
+
+  /**
+   * Generate a unique URL-friendly slug from name. Appends numeric suffix on collision.
+   *
+   * @param name Tenant/company name
+   * @return unique slug guaranteed not to exist in the database
+   */
+  private String generateUniqueSlug(String name) {
+    String baseSlug;
+    if (name == null || name.isBlank()) {
+      baseSlug = "tenant-" + UUID.randomUUID().toString().substring(0, 8);
+    } else {
+      baseSlug =
+          name.toLowerCase()
+              .trim()
+              .replaceAll("[^a-z0-9\\s-]", "")
+              .replaceAll("\\s+", "-")
+              .replaceAll("-+", "-")
+              .replaceAll("^-|-$", "");
+      if (baseSlug.isEmpty()) {
+        baseSlug = "tenant-" + UUID.randomUUID().toString().substring(0, 8);
+      }
+    }
+
+    if (!tenantRepository.existsBySlug(baseSlug)) {
+      return baseSlug;
+    }
+
+    int counter = 2;
+    String candidateSlug;
+    do {
+      candidateSlug = baseSlug + "-" + counter;
+      counter++;
+      if (counter > 999) {
+        String uuidSuffix =
+            UUID.randomUUID().toString().replace("-", "").substring(0, 6).toLowerCase();
+        candidateSlug = baseSlug + "-" + uuidSuffix;
+        log.warn(
+            "Too many slug collisions for '{}', using UUID suffix: {}", baseSlug, candidateSlug);
+        break;
+      }
+    } while (tenantRepository.existsBySlug(candidateSlug));
+
+    return candidateSlug;
   }
 
   /**

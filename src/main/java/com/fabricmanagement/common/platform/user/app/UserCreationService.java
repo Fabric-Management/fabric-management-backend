@@ -49,7 +49,8 @@ public class UserCreationService {
   private final DomainEventPublisher eventPublisher;
   private final RoleService roleService;
   private final UserDepartmentService userDepartmentService;
-  private final com.fabricmanagement.common.platform.company.infra.repository.PositionRepository
+  private final com.fabricmanagement.common.platform.organization.infra.repository
+          .PositionRepository
       positionRepository;
   private final com.fabricmanagement.human.core.employee.application.EmployeeService
       employeeService;
@@ -60,101 +61,74 @@ public class UserCreationService {
         "Creating internal employee: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
 
-    UserDto user =
-        createUserBase(
+    // Step 1: Create base user with contacts and addresses (returns entity, not DTO)
+    User userEntity =
+        createUserEntity(
             request.getFirstName(),
             request.getLastName(),
             request.getContactValue(),
             request.getContactType(),
             request.getCompanyId(),
-            request.getDepartment(),
             request.getAdditionalContacts(),
             request.getAddresses());
 
-    String employeeNumber = request.getEmployeeNumber();
-    if (employeeNumber == null || employeeNumber.isBlank()) {
-      if (request.getTitle() != null
-          || request.getGender() != null
-          || request.getBirthDate() != null
-          || request.getNationality() != null
-          || request.getHireDate() != null
-          || request.getEmergencyContact() != null) {
-        employeeNumber = employeeService.generateEmployeeNumber();
-      }
-    }
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID assignedBy = TenantContext.getCurrentUserId();
 
-    if (request.getTitle() != null
-        || request.getGender() != null
-        || request.getBirthDate() != null
-        || request.getNationality() != null
-        || employeeNumber != null
-        || request.getHireDate() != null
-        || request.getEmergencyContact() != null) {
-
-      com.fabricmanagement.human.core.employee.domain.EmergencyContact emergencyContact = null;
-      if (request.getEmergencyContact() != null) {
-        emergencyContact =
-            com.fabricmanagement.human.core.employee.domain.EmergencyContact.builder()
-                .name(request.getEmergencyContact().getName())
-                .phone(request.getEmergencyContact().getPhone())
-                .relationship(request.getEmergencyContact().getRelationship())
-                .build();
-      }
-
-      employeeService.createOrUpdateEmployee(
-          user.getId(),
-          request.getTitle(),
-          request.getGender(),
-          request.getBirthDate(),
-          request.getNationality(),
-          employeeNumber,
-          request.getHireDate(),
-          emergencyContact);
-    }
-
+    // Step 2: Assign role (on same entity, no reload)
     if (request.getRoleId() != null) {
-      UUID tenantId = TenantContext.getCurrentTenantId();
       Role role =
           roleService
               .findById(request.getRoleId())
               .orElseThrow(() -> new IllegalArgumentException("Role not found"));
-      User userEntity =
-          userRepository
-              .findByTenantIdAndId(tenantId, user.getId())
-              .orElseThrow(() -> new IllegalArgumentException("User not found"));
       userEntity.setRole(role);
-      userRepository.save(userEntity);
     }
 
-    if (request.getDepartmentId() != null) {
-      UUID assignedBy = TenantContext.getCurrentUserId();
-      userDepartmentService.assignDepartment(
-          user.getId(), request.getDepartmentId(), true, assignedBy);
-    }
-
+    // Step 3: Assign position (on same entity, no reload)
     if (request.getPositionId() != null) {
-      UUID tenantId = TenantContext.getCurrentTenantId();
-      com.fabricmanagement.common.platform.company.domain.Position position =
+      com.fabricmanagement.common.platform.organization.domain.Position position =
           positionRepository
               .findById(request.getPositionId())
               .orElseThrow(() -> new IllegalArgumentException("Position not found"));
       if (!position.getTenantId().equals(tenantId)) {
         throw new IllegalArgumentException("Position must belong to the same tenant");
       }
-      User userEntity =
-          userRepository
-              .findByTenantIdAndId(tenantId, user.getId())
-              .orElseThrow(() -> new IllegalArgumentException("User not found"));
-      UUID assignedBy = TenantContext.getCurrentUserId();
       com.fabricmanagement.common.platform.user.domain.UserPosition userPosition =
           com.fabricmanagement.common.platform.user.domain.UserPosition.create(
               userEntity, position, true, assignedBy);
       userEntity.getUserPositions().add(userPosition);
-      userRepository.save(userEntity);
     }
 
-    checkAndTrackHrCompliance(user.getId(), request.getDepartment());
-    return user;
+    // Single save for role + position changes
+    User saved = userRepository.save(userEntity);
+
+    // Step 4: Assign department (uses separate junction service)
+    if (request.getDepartmentId() != null) {
+      userDepartmentService.assignDepartment(
+          saved.getId(), request.getDepartmentId(), true, assignedBy);
+    }
+
+    // Step 5: Create Employee record if any HR data provided
+    createEmployeeIfNeeded(saved.getId(), request);
+
+    // Step 6: Publish event
+    String contactValue = request.getContactValue();
+    eventPublisher.publish(
+        new UserCreatedEvent(
+            saved.getTenantId(),
+            saved.getId(),
+            saved.getDisplayName(),
+            contactValue,
+            saved.getOrganizationId()));
+
+    checkAndTrackHrCompliance(saved.getId(), request.getDepartment());
+
+    log.info(
+        "Internal user created: id={}, uid={}, displayName={}",
+        saved.getId(),
+        saved.getUid(),
+        saved.getDisplayName());
+    return UserDto.from(saved);
   }
 
   @Transactional
@@ -162,21 +136,37 @@ public class UserCreationService {
     log.info(
         "Creating external user: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
-    return createUserBase(
-        request.getFirstName(),
-        request.getLastName(),
-        request.getContactValue(),
-        request.getContactType(),
-        request.getCompanyId(),
-        request.getDepartment(),
-        request.getAdditionalContacts(),
-        request.getAddresses());
+
+    User userEntity =
+        createUserEntity(
+            request.getFirstName(),
+            request.getLastName(),
+            request.getContactValue(),
+            request.getContactType(),
+            request.getCompanyId(),
+            request.getAdditionalContacts(),
+            request.getAddresses());
+
+    String contactValue = request.getContactValue();
+    eventPublisher.publish(
+        new UserCreatedEvent(
+            userEntity.getTenantId(),
+            userEntity.getId(),
+            userEntity.getDisplayName(),
+            contactValue,
+            userEntity.getOrganizationId()));
+
+    log.info(
+        "External user created: id={}, uid={}, displayName={}",
+        userEntity.getId(),
+        userEntity.getUid(),
+        userEntity.getDisplayName());
+    return UserDto.from(userEntity);
   }
 
   /**
-   * Create tenant admin user during onboarding. User is created with primary contact (email),
-   * pre-verified, and assigned tenant ADMIN role. Optional department assignment if name provided
-   * and department exists (e.g. after seed).
+   * Create tenant admin user during onboarding. User is created with primary contact (unverified),
+   * assigned tenant ADMIN role. Contact verification deferred to PasswordSetupService.
    */
   @Transactional
   public UserDto createAdminUser(CreateAdminUserRequest request) {
@@ -188,8 +178,16 @@ public class UserCreationService {
         () -> {
           User user =
               User.create(request.getFirstName(), request.getLastName(), request.getCompanyId());
+
+          // Assign role before first save to avoid extra round-trip
+          com.fabricmanagement.common.platform.user.domain.Role role =
+              roleService.findTenantAdminRoleOrThrow(request.getTenantId());
+          user.setRole(role);
+
           User saved = userRepository.save(user);
 
+          // Create primary contact (unverified). Verification deferred to PasswordSetupService
+          // when user proves email ownership by clicking the registration link.
           com.fabricmanagement.common.platform.communication.domain.Contact contact =
               contactService.createContact(
                   request.getContactValue(),
@@ -198,7 +196,6 @@ public class UserCreationService {
                   true,
                   null);
           userContactAssignmentService.assignContact(saved.getId(), contact.getId(), true);
-          contactService.verifyContact(contact.getId());
 
           // TODO(BACKLOG): Department assignment by name - add findDepartmentIdByName to
           // OrganizationFacade or DepartmentService when needed
@@ -210,37 +207,38 @@ public class UserCreationService {
                 request.getDepartment());
           }
 
-          com.fabricmanagement.common.platform.user.domain.Role role =
-              roleService.findTenantAdminRoleOrThrow(request.getTenantId());
-          saved.setRole(role);
-          userRepository.save(saved);
-
           eventPublisher.publish(
               new UserCreatedEvent(
                   saved.getTenantId(),
                   saved.getId(),
                   saved.getDisplayName(),
                   contact.getContactValue(),
-                  saved.getCompanyId()));
+                  saved.getOrganizationId()));
 
           log.info("Admin user created: id={}, uid={}", saved.getId(), saved.getUid());
           return UserDto.from(saved);
         });
   }
 
-  @Transactional
-  public UserDto createUserBase(
+  /**
+   * Create user entity with contacts and addresses. Returns the persisted entity (not DTO) so
+   * callers can continue enriching it (role, position, etc.) without extra DB round-trips.
+   *
+   * <p><b>Note:</b> Does NOT publish UserCreatedEvent — callers must publish after completing all
+   * enrichment steps.
+   */
+  User createUserEntity(
       String firstName,
       String lastName,
       String contactValue,
       com.fabricmanagement.common.platform.user.domain.ContactType contactType,
       UUID companyId,
-      String department,
       List<ContactData> additionalContacts,
       List<AddressData> addresses) {
 
     UUID tenantId = TenantContext.getCurrentTenantId();
-    if (userRepository.existsByContactValue(contactValue)) {
+    // Tenant-scoped uniqueness: same contact can exist in different tenants (SaaS multi-tenancy)
+    if (userRepository.existsByTenantIdAndContactValue(tenantId, contactValue)) {
       throw new IllegalArgumentException("Contact value already registered");
     }
     if (!organizationFacade.exists(tenantId, companyId)) {
@@ -249,6 +247,17 @@ public class UserCreationService {
 
     User user = User.create(firstName, lastName, companyId);
     User saved = userRepository.save(user);
+
+    // Validate primary contact is not duplicated in additional contacts
+    if (additionalContacts != null) {
+      boolean hasDuplicate =
+          additionalContacts.stream()
+              .anyMatch(c -> contactValue.equalsIgnoreCase(c.getContactValue()));
+      if (hasDuplicate) {
+        throw new IllegalArgumentException(
+            "Primary contact value must not be duplicated in additional contacts");
+      }
+    }
 
     Contact primaryContact =
         contactService.createContact(
@@ -276,6 +285,14 @@ public class UserCreationService {
       }
     }
 
+    assignAddresses(saved, companyId, tenantId, addresses);
+
+    return saved;
+  }
+
+  /** Assign addresses to user. Uses company primary address as fallback when none provided. */
+  private void assignAddresses(
+      User user, UUID companyId, UUID tenantId, List<AddressData> addresses) {
     if (addresses != null && !addresses.isEmpty()) {
       boolean isFirstAddress = true;
       for (AddressData addressData : addresses) {
@@ -298,27 +315,56 @@ public class UserCreationService {
         boolean isPrimary = isFirstAddress || Boolean.TRUE.equals(addressData.getIsPrimary());
         boolean isWorkAddress = addressType == AddressType.OFFICE;
         userAddressAssignmentService.assignAddress(
-            saved.getId(), address.getId(), isPrimary, isWorkAddress);
+            user.getId(), address.getId(), isPrimary, isWorkAddress);
         isFirstAddress = false;
       }
     } else {
-      userAddressAutoService.copyCompanyPrimaryAddress(saved.getId(), companyId, tenantId);
+      userAddressAutoService.copyCompanyPrimaryAddress(user.getId(), companyId, tenantId);
+    }
+  }
+
+  /**
+   * Create Employee record if any HR-related fields are provided. Consolidates the repeated null
+   * checks into a single method.
+   */
+  private void createEmployeeIfNeeded(UUID userId, CreateInternalUserRequest request) {
+    boolean hasAnyHrData =
+        request.getTitle() != null
+            || request.getGender() != null
+            || request.getBirthDate() != null
+            || request.getNationality() != null
+            || request.getHireDate() != null
+            || request.getEmergencyContact() != null
+            || (request.getEmployeeNumber() != null && !request.getEmployeeNumber().isBlank());
+
+    if (!hasAnyHrData) {
+      return;
     }
 
-    eventPublisher.publish(
-        new UserCreatedEvent(
-            saved.getTenantId(),
-            saved.getId(),
-            saved.getDisplayName(),
-            contactValue,
-            saved.getCompanyId()));
+    String employeeNumber = request.getEmployeeNumber();
+    if (employeeNumber == null || employeeNumber.isBlank()) {
+      employeeNumber = employeeService.generateEmployeeNumber();
+    }
 
-    log.info(
-        "User created: id={}, uid={}, displayName={}",
-        saved.getId(),
-        saved.getUid(),
-        saved.getDisplayName());
-    return UserDto.from(saved);
+    com.fabricmanagement.human.core.employee.domain.EmergencyContact emergencyContact = null;
+    if (request.getEmergencyContact() != null) {
+      emergencyContact =
+          com.fabricmanagement.human.core.employee.domain.EmergencyContact.builder()
+              .name(request.getEmergencyContact().getName())
+              .phone(request.getEmergencyContact().getPhone())
+              .relationship(request.getEmergencyContact().getRelationship())
+              .build();
+    }
+
+    employeeService.createOrUpdateEmployee(
+        userId,
+        request.getTitle(),
+        request.getGender(),
+        request.getBirthDate(),
+        request.getNationality(),
+        employeeNumber,
+        request.getHireDate(),
+        emergencyContact);
   }
 
   private com.fabricmanagement.common.platform.communication.domain.AddressType parseAddressType(
@@ -362,6 +408,10 @@ public class UserCreationService {
     return ContactType.MOBILE;
   }
 
+  /**
+   * Check and track HR compliance for employee. Non-critical — failures are logged as errors but do
+   * NOT prevent user creation (compliance can be resolved later via HR module).
+   */
   private void checkAndTrackHrCompliance(UUID userId, String department) {
     try {
       Optional<com.fabricmanagement.human.core.employee.domain.Employee> employeeOpt =
@@ -370,11 +420,21 @@ public class UserCreationService {
         var employee = employeeOpt.get();
         List<String> missingFields = employeeService.checkAndUpdateCompliance(employee, department);
         if (!missingFields.isEmpty()) {
-          log.warn("HR Compliance: userId={}, missingFields={}", userId, missingFields);
+          log.warn(
+              "HR Compliance incomplete: userId={}, department={}, missingFields={}. "
+                  + "User created but compliance must be resolved via HR module.",
+              userId,
+              department,
+              missingFields);
         }
       }
     } catch (Exception e) {
-      log.error("Failed to track HR compliance for userId={}", userId, e);
+      log.error(
+          "HR Compliance check failed: userId={}, department={}. "
+              + "User created successfully but compliance status is unknown. Error: {}",
+          userId,
+          department,
+          e.getMessage());
     }
   }
 }

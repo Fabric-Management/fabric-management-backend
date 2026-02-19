@@ -49,7 +49,9 @@ public class UserQueryService {
   @Cacheable(value = "users-by-company", key = "#tenantId.toString() + '-' + #companyId.toString()")
   public List<UserDto> findByCompany(UUID tenantId, UUID companyId) {
     log.debug("Finding users by company: tenantId={}, companyId={}", tenantId, companyId);
-    return userRepository.findByTenantIdAndCompanyIdAndIsActiveTrue(tenantId, companyId).stream()
+    return userRepository
+        .findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, companyId)
+        .stream()
         .map(UserDto::from)
         .toList();
   }

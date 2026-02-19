@@ -1,6 +1,6 @@
 package com.fabricmanagement.common.platform.auth.dto;
 
-import com.fabricmanagement.common.platform.company.domain.CompanyType;
+import com.fabricmanagement.common.platform.organization.domain.OrganizationType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -28,7 +28,7 @@ public class SelfSignupRequest {
   private String taxId;
 
   @NotNull(message = "Company type is required")
-  private CompanyType companyType;
+  private OrganizationType companyType;
 
   @NotBlank(message = "First name is required")
   private String firstName;

@@ -282,11 +282,7 @@ class JwtRoundTripIntegrationTest {
             .get("accessToken")
             .asText();
 
-    // Verify backward compat: company_id == organization_id
     UUID organizationId = jwtService.getOrganizationIdFromToken(accessToken);
-    @SuppressWarnings("deprecation")
-    UUID companyId = jwtService.getCompanyIdFromToken(accessToken);
-
-    assertThat(companyId).isEqualTo(organizationId);
+    assertThat(organizationId).isNotNull();
   }
 }
