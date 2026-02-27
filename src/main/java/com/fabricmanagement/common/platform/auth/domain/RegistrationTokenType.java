@@ -54,5 +54,20 @@ public enum RegistrationTokenType {
    *
    * <p>Created automatically when a user is added via the internal/external user creation flow.
    */
-  INVITED_USER
+  INVITED_USER,
+
+  /**
+   * Partner portal invited user registration token.
+   *
+   * <p>Flow:
+   *
+   * <pre>
+   * Tenant admin invites partner user → Invitation email sent with token
+   * → User clicks link → /partner-portal/setup?token=...
+   * → Password setup → Partner portal access
+   * </pre>
+   *
+   * <p>Uses a dedicated email template and partner-portal-specific setup URL.
+   */
+  PARTNER_INVITED_USER
 }

@@ -166,6 +166,63 @@ public class TenantService {
   }
 
   // ========================================
+  // SETTINGS OPERATIONS
+  // ========================================
+
+  /**
+   * Get settings for a tenant.
+   *
+   * <p>Returns default settings when the tenant record is not found or settings are null. This
+   * ensures the GET endpoint never fails with 4xx/5xx for a missing or incomplete record.
+   *
+   * @param tenantId Tenant UUID
+   * @return TenantSettings (never null)
+   */
+  @Transactional(readOnly = true)
+  public TenantSettings getSettings(UUID tenantId) {
+    try {
+      return tenantRepository
+          .findById(tenantId)
+          .map(
+              tenant -> {
+                TenantSettings s = tenant.getSettings();
+                return s != null ? s : TenantSettings.defaults();
+              })
+          .orElseGet(
+              () -> {
+                log.warn("Tenant not found for settings fetch: {}. Returning defaults.", tenantId);
+                return TenantSettings.defaults();
+              });
+    } catch (Exception e) {
+      log.error(
+          "Unexpected error loading settings for tenant {}: {}. Returning defaults.",
+          tenantId,
+          e.getMessage(),
+          e);
+      return TenantSettings.defaults();
+    }
+  }
+
+  /**
+   * Update settings for a tenant.
+   *
+   * @param tenantId Tenant UUID
+   * @param settings New settings to apply (merged with existing)
+   * @return Updated TenantSettings
+   */
+  @Transactional
+  public TenantSettings updateSettings(UUID tenantId, TenantSettings settings) {
+    Tenant tenant =
+        tenantRepository
+            .findById(tenantId)
+            .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
+    tenant.setSettings(settings);
+    Tenant saved = tenantRepository.save(tenant);
+    log.info("Tenant settings updated: id={}", tenantId);
+    return saved.getSettings();
+  }
+
+  // ========================================
   // STATUS OPERATIONS
   // ========================================
 

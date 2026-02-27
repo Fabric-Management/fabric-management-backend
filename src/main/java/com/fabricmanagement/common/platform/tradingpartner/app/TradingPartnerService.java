@@ -11,6 +11,7 @@ import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingP
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerStatusChangedEvent;
 import com.fabricmanagement.common.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.common.platform.tradingpartner.dto.UpdateTradingPartnerRequest;
 import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerRepository;
 import java.util.List;
 import java.util.Optional;
@@ -134,6 +135,43 @@ public class TradingPartnerService {
         saved.getPartnerType(),
         partnerOrg.getId());
 
+    return TradingPartnerDto.from(saved);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UPDATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Update tenant-side relationship data for an existing trading partner.
+   *
+   * <p>Only relationship-level fields can be changed ({@code customName}, {@code partnerType},
+   * {@code relationshipMeta}). Registry-level data (officialName, taxId, country) is immutable.
+   *
+   * @param partnerId Partner ID
+   * @param request Update request
+   * @return Updated partner DTO
+   */
+  @Transactional
+  public TradingPartnerDto updatePartner(UUID partnerId, UpdateTradingPartnerRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
+
+    if (request.getCustomName() != null) {
+      partner.setCustomName(
+          request.getCustomName().isBlank() ? null : request.getCustomName().trim());
+    }
+
+    if (request.getPartnerType() != null) {
+      partner.setPartnerType(request.getPartnerType());
+    }
+
+    if (request.getRelationshipMeta() != null) {
+      partner.setRelationshipMeta(request.getRelationshipMeta());
+    }
+
+    TradingPartner saved = partnerRepository.save(partner);
+    log.info("Partner updated: uid={}, type={}", saved.getUid(), saved.getPartnerType());
     return TradingPartnerDto.from(saved);
   }
 

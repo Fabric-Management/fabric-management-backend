@@ -21,6 +21,12 @@ public interface OrganizationAddressRepository
   List<OrganizationAddress> findByTenantIdAndOrganizationId(UUID tenantId, UUID organizationId);
 
   @Query(
+      "SELECT oa FROM OrganizationAddress oa LEFT JOIN FETCH oa.address"
+          + " WHERE oa.tenantId = :tenantId AND oa.organizationId = :orgId")
+  List<OrganizationAddress> findWithAddressByTenantIdAndOrganizationId(
+      @Param("tenantId") UUID tenantId, @Param("orgId") UUID organizationId);
+
+  @Query(
       "SELECT oa FROM OrganizationAddress oa WHERE oa.organizationId = :orgId AND oa.isPrimary = true")
   Optional<OrganizationAddress> findPrimaryByOrganizationId(@Param("orgId") UUID organizationId);
 

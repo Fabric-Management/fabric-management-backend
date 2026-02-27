@@ -132,14 +132,23 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
   /**
    * Find the root organization for a tenant.
    *
-   * <p>The root organization is the one with tenant_id = id (created during onboarding).
+   * <p>The root organization is the internal tenant organization created during onboarding.
+   * EXTERNAL_PARTNER organizations are explicitly excluded because they are also parentless (no
+   * parent_organization_id) — without this exclusion, creating a TradingPartner causes a
+   * NonUniqueResultException.
    *
    * @param tenantId Tenant UUID
+   * @param excludeType Organization type to exclude (pass {@link
+   *     OrganizationType#EXTERNAL_PARTNER})
    * @return Root organization if found
    */
   @Query(
-      "SELECT o FROM Organization o WHERE o.tenantId = :tenantId AND o.parentOrganizationId IS NULL AND o.isActive = true")
-  Optional<Organization> findRootOrganization(@Param("tenantId") UUID tenantId);
+      "SELECT o FROM Organization o WHERE o.tenantId = :tenantId"
+          + " AND o.parentOrganizationId IS NULL"
+          + " AND o.isActive = true"
+          + " AND o.organizationType != :excludeType")
+  Optional<Organization> findRootOrganization(
+      @Param("tenantId") UUID tenantId, @Param("excludeType") OrganizationType excludeType);
 
   /**
    * Count active organizations for a tenant.

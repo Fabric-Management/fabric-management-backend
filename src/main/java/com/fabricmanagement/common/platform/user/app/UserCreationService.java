@@ -148,13 +148,16 @@ public class UserCreationService {
             request.getAddresses());
 
     String contactValue = request.getContactValue();
-    eventPublisher.publish(
-        new UserCreatedEvent(
-            userEntity.getTenantId(),
-            userEntity.getId(),
-            userEntity.getDisplayName(),
-            contactValue,
-            userEntity.getOrganizationId()));
+
+    if (!request.isSuppressEmailInvitation()) {
+      eventPublisher.publish(
+          new UserCreatedEvent(
+              userEntity.getTenantId(),
+              userEntity.getId(),
+              userEntity.getDisplayName(),
+              contactValue,
+              userEntity.getOrganizationId()));
+    }
 
     log.info(
         "External user created: id={}, uid={}, displayName={}",

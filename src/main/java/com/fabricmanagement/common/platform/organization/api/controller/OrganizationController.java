@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.organization.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.platform.organization.app.OrganizationService;
 import com.fabricmanagement.common.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.common.platform.organization.dto.CreateOrganizationRequest;
@@ -65,7 +66,7 @@ public class OrganizationController {
     OrganizationDto root =
         organizationService
             .getRootOrganization()
-            .orElseThrow(() -> new IllegalArgumentException("Root organization not found"));
+            .orElseThrow(() -> new NotFoundException("Root organization not found"));
 
     return ResponseEntity.ok(ApiResponse.success(root));
   }

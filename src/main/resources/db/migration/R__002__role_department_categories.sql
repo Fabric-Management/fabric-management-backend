@@ -128,7 +128,12 @@ BEGIN
         (system_tenant_id, 'SYS-ROLE-006', 'Logistics Manager', 'LOG_MANAGER', 'Lojistik yöneticisi', logistics_cat_id, TRUE, 6, TRUE),
         (system_tenant_id, 'SYS-ROLE-007', 'Warehouse Worker', 'WAREHOUSE_WORKER', 'Depo işçisi', logistics_cat_id, TRUE, 7, TRUE),
         -- Platform Admin Role (special - system-wide access)
-        (system_tenant_id, 'SYS-ROLE-0001', 'Platform Administrator', 'PLATFORM_ADMIN', 'Full platform access - can create tenants, manage system settings, access all tenant data', NULL, TRUE, 0, TRUE)
+        (system_tenant_id, 'SYS-ROLE-0001', 'Platform Administrator', 'PLATFORM_ADMIN', 'Full platform access - can create tenants, manage system settings, access all tenant data', NULL, TRUE, 0, TRUE),
+        -- Partner Portal Roles (used by external partner users only)
+        (system_tenant_id, 'SYS-ROLE-010', 'Partner Owner', 'PARTNER_OWNER', 'Partner şirket sahibi — tam erişim + kullanıcı yönetimi', NULL, TRUE, 10, TRUE),
+        (system_tenant_id, 'SYS-ROLE-011', 'Partner Accountant', 'PARTNER_ACCOUNTANT', 'Partner muhasebecisi — fatura, bakiye, ödeme geçmişi', NULL, TRUE, 11, TRUE),
+        (system_tenant_id, 'SYS-ROLE-012', 'Partner Buyer', 'PARTNER_BUYER', 'Partner alım sorumlusu — sipariş oluşturma ve takip', NULL, TRUE, 12, TRUE),
+        (system_tenant_id, 'SYS-ROLE-013', 'Partner Viewer', 'PARTNER_VIEWER', 'Partner görüntüleyici — yalnızca okuma erişimi', NULL, TRUE, 13, TRUE)
     ON CONFLICT (uid) DO UPDATE SET
         role_name = EXCLUDED.role_name,
         role_code = EXCLUDED.role_code,

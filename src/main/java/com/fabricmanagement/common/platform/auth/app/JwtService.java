@@ -140,6 +140,76 @@ public class JwtService {
         .compact();
   }
 
+  /**
+   * Generate access token for a partner portal user.
+   *
+   * <p>Adds {@code user_type: "PARTNER"} and {@code partner_id} claims so the security layer can
+   * enforce partner-scoped isolation. Department claims are omitted — partner users have no
+   * internal department assignments.
+   *
+   * @param user Partner user entity
+   * @param partnerId TradingPartner UUID the user belongs to
+   * @return signed JWT access token
+   */
+  public String generatePartnerAccessToken(User user, UUID partnerId) {
+    String contactValue =
+        user.getAnyVerifiedContact()
+            .map(contact -> contact.getContactValue())
+            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
+
+    log.debug(
+        "Generating partner access token for user: {}, partnerId: {}", contactValue, partnerId);
+
+    Optional<Tenant> tenantOpt = tenantRepository.findById(user.getTenantId());
+    String tenantUid =
+        tenantOpt.map(Tenant::getUid).orElseGet(() -> extractTenantUid(user.getUid()));
+
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("user_type", "PARTNER");
+    claims.put("partner_id", partnerId.toString());
+    claims.put("tenant_id", user.getTenantId().toString());
+    claims.put("tenant_uid", tenantUid);
+    claims.put("user_id", user.getId().toString());
+    claims.put("user_uid", user.getUid());
+    claims.put("organization_id", user.getOrganizationId().toString());
+    claims.put("firstName", user.getFirstName());
+    claims.put("lastName", user.getLastName());
+    if (user.getRole() != null) {
+      claims.put("role_id", user.getRole().getId().toString());
+      claims.put("role", user.getRole().getRoleName());
+      claims.put("role_code", user.getRole().getRoleCode());
+    }
+
+    return Jwts.builder()
+        .subject(contactValue)
+        .claims(claims)
+        .issuedAt(Date.from(Instant.now()))
+        .expiration(Date.from(Instant.now().plusMillis(accessTokenExpiration)))
+        .signWith(secretKey)
+        .compact();
+  }
+
+  /**
+   * Extract {@code user_type} claim from token.
+   *
+   * @param token JWT access token
+   * @return "PARTNER" or "INTERNAL", or null if absent
+   */
+  public String getUserTypeFromToken(String token) {
+    return extractClaims(token).get("user_type", String.class);
+  }
+
+  /**
+   * Extract {@code partner_id} claim from token.
+   *
+   * @param token JWT access token
+   * @return partner UUID or null if not a partner token
+   */
+  public UUID getPartnerIdFromToken(String token) {
+    String val = extractClaims(token).get("partner_id", String.class);
+    return val != null ? UUID.fromString(val) : null;
+  }
+
   public String generateRefreshToken(User user) {
     String contactValue =
         user.getAnyVerifiedContact()
@@ -195,6 +265,9 @@ public class JwtService {
   public UUID getTenantIdFromToken(String token) {
     Claims claims = extractClaims(token);
     String tenantId = claims.get("tenant_id", String.class);
+    if (tenantId == null || tenantId.isBlank()) {
+      throw new IllegalArgumentException("JWT missing tenant_id claim");
+    }
     return UUID.fromString(tenantId);
   }
 
@@ -206,6 +279,9 @@ public class JwtService {
   public UUID getUserIdFromToken(String token) {
     Claims claims = extractClaims(token);
     String userId = claims.get("user_id", String.class);
+    if (userId == null || userId.isBlank()) {
+      throw new IllegalArgumentException("JWT missing user_id claim");
+    }
     return UUID.fromString(userId);
   }
 
@@ -233,6 +309,23 @@ public class JwtService {
   public String getDepartmentFromToken(String token) {
     Claims claims = extractClaims(token);
     return claims.get("department", String.class);
+  }
+
+  /**
+   * Extract the user's role_code from a JWT token.
+   *
+   * <p>Used by {@link com.fabricmanagement.common.infrastructure.security.JwtAuthenticationFilter}
+   * to populate Spring Security's {@code SecurityContextHolder} with proper authorities.
+   *
+   * @param token JWT access token
+   * @return role_code string (e.g. {@code "ADMIN"}, {@code "PLATFORM_ADMIN"}), or {@code null}
+   */
+  public String getRoleCodeFromToken(String token) {
+    Claims claims = extractClaims(token);
+    String roleCode = claims.get("role_code", String.class);
+    if (roleCode != null) return roleCode;
+    // Fallback: try role display name
+    return claims.get("role", String.class);
   }
 
   private Claims extractClaims(String token) {

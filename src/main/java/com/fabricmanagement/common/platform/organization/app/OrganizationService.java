@@ -207,7 +207,9 @@ public class OrganizationService {
   @Transactional(readOnly = true)
   public Optional<OrganizationDto> getRootOrganization() {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return organizationRepository.findRootOrganization(tenantId).map(OrganizationDto::from);
+    return organizationRepository
+        .findRootOrganization(tenantId, OrganizationType.EXTERNAL_PARTNER)
+        .map(OrganizationDto::from);
   }
 
   // ========================================

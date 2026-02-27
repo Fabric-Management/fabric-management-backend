@@ -86,7 +86,7 @@ class TenantOnboardingIntegrationTest {
 
     String taxId = "111222333" + System.currentTimeMillis() % 10000;
     String body =
-            """
+        """
         {
           "companyName": "E2E Test Company",
           "taxId": "%s",
@@ -127,7 +127,7 @@ class TenantOnboardingIntegrationTest {
     String companyName = "Tenant Test Company " + timestamp;
     String taxId = "TENANT" + timestamp % 100000;
     String body =
-            """
+        """
         {
           "companyName": "%s",
           "taxId": "%s",
@@ -178,7 +178,7 @@ class TenantOnboardingIntegrationTest {
     String companyName = "Org Test Company " + timestamp;
     String taxId = "ORG" + timestamp % 100000;
     String body =
-            """
+        """
         {
           "companyName": "%s",
           "taxId": "%s",

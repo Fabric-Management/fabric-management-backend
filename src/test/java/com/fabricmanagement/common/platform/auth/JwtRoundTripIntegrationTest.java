@@ -119,7 +119,7 @@ class JwtRoundTripIntegrationTest {
 
     // Step 1: Signup
     String signupBody =
-            """
+        """
         {
           "companyName": "%s",
           "taxId": "%s",
@@ -154,7 +154,7 @@ class JwtRoundTripIntegrationTest {
 
     // Step 3: Login
     String loginBody =
-            """
+        """
         {
           "contactValue": "%s",
           "password": "%s"
@@ -229,7 +229,7 @@ class JwtRoundTripIntegrationTest {
 
     // Signup
     String signupBody =
-            """
+        """
         {
           "companyName": "Compat Test %s",
           "taxId": "COMPAT%s",
@@ -263,7 +263,7 @@ class JwtRoundTripIntegrationTest {
 
     // Login
     String loginBody =
-            """
+        """
         {"contactValue": "%s", "password": "%s"}
         """
             .formatted(email, password);

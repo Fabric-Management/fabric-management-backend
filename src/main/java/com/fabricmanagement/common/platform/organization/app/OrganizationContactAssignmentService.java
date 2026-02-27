@@ -89,7 +89,8 @@ public class OrganizationContactAssignmentService
   @Override
   protected List<OrganizationContact> findByParent(UUID parentId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return organizationContactRepository.findByTenantIdAndOrganizationId(tenantId, parentId);
+    return organizationContactRepository.findWithContactByTenantIdAndOrganizationId(
+        tenantId, parentId);
   }
 
   @Override
