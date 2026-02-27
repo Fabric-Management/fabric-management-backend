@@ -82,6 +82,14 @@ public class PartnerUserService {
         partnerId,
         PiiMaskingUtil.maskEmail(request.getEmail()));
 
+    // Check if user with this email already exists in the tenant
+    java.util.Optional<User> existingUser =
+        userRepository.findByTenantIdAndContactValue(tenantId, request.getEmail());
+
+    if (existingUser.isPresent()) {
+      return handleExistingUserInvitation(existingUser.get(), partner, partnerId, request);
+    }
+
     CreateExternalUserRequest createRequest =
         CreateExternalUserRequest.builder()
             .firstName(request.getFirstName())
@@ -128,6 +136,58 @@ public class PartnerUserService {
         user.getId(),
         partnerId,
         request.getPartnerRoleCode());
+
+    return toDto(user, partnerId, "INVITED");
+  }
+
+  /**
+   * Handle invitation when the email is already registered in this tenant.
+   *
+   * <ul>
+   *   <li>Same partner org + INVITED → resend invitation email
+   *   <li>Same partner org + ACTIVE → error: already active
+   *   <li>Same partner org + SUSPENDED → error: suspended, use reactivate
+   *   <li>Different org → error: email belongs to another organization
+   * </ul>
+   */
+  private PartnerUserDto handleExistingUserInvitation(
+      User user, TradingPartner partner, UUID partnerId, InvitePartnerUserRequest request) {
+
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    if (!partner.getOrganizationId().equals(user.getOrganizationId())) {
+      throw new IllegalArgumentException(
+          "This email address is already registered to another organization in this tenant.");
+    }
+
+    String status = deriveStatus(user);
+
+    if ("SUSPENDED".equals(status)) {
+      throw new IllegalArgumentException(
+          "This user is currently suspended. Use the reactivate endpoint to restore access.");
+    }
+
+    if ("ACTIVE".equals(status)) {
+      throw new IllegalArgumentException(
+          "This user is already an active partner portal user for this partner.");
+    }
+
+    // Status is INVITED — resend the invitation email
+    log.info(
+        "Resending partner invitation: userId={}, partnerId={}, email={}",
+        user.getId(),
+        partnerId,
+        PiiMaskingUtil.maskEmail(request.getEmail()));
+
+    eventPublisher.publish(
+        new PartnerUserCreatedEvent(
+            tenantId,
+            user.getId(),
+            user.getDisplayName(),
+            request.getEmail(),
+            partnerId,
+            partner.getOrganizationId(),
+            partner.getDisplayName()));
 
     return toDto(user, partnerId, "INVITED");
   }
