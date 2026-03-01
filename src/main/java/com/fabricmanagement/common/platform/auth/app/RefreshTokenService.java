@@ -91,11 +91,15 @@ public class RefreshTokenService {
     String newAccessToken = jwtService.generateAccessToken(user);
     String newRefreshToken = jwtService.generateRefreshToken(user);
 
-    // Save new refresh token
+    // Carry over device info from old token (same session, same device)
     RefreshToken newRefreshTokenEntity =
         RefreshToken.create(
-            user.getId(), newRefreshToken, Instant.now().plusMillis(refreshTokenExpiration));
-    // tenantId is automatically set by BaseEntity from TenantContext
+            user.getId(),
+            newRefreshToken,
+            Instant.now().plusMillis(refreshTokenExpiration),
+            token.getIpAddress(),
+            token.getUserAgent(),
+            token.getDeviceName());
     refreshTokenRepository.save(newRefreshTokenEntity);
 
     // Get UserDto for response

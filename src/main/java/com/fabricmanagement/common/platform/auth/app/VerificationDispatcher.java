@@ -37,10 +37,33 @@ public class VerificationDispatcher {
         TenantContext.getCurrentTenantIdOrNull() != null
             ? TenantContext.getCurrentTenantIdOrNull()
             : TenantContext.SYSTEM_TENANT_ID;
+
+    UUID userId = TenantContext.getCurrentUserId();
+    if (userId == null) {
+      userId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+    }
+
+    return sendVerificationCode(contactValue, type, tenantId, userId);
+  }
+
+  /**
+   * Check throttle, generate code, persist, and send via communication channel with explicit
+   * tenantId and userId.
+   *
+   * @param contactValue email or phone
+   * @param type verification type
+   * @param tenantId tenant ID
+   * @param userId user ID
+   * @return issued code (code is already sent; return for logging/expiresAt)
+   */
+  @Transactional
+  public VerificationCodeManager.IssuedVerificationCode sendVerificationCode(
+      String contactValue, VerificationType type, UUID tenantId, UUID userId) {
     throttleService.checkThrottle(contactValue, tenantId, type);
     VerificationCodeManager.IssuedVerificationCode result =
         codeService.generate(contactValue, type);
-    verificationService.sendVerificationCode(contactValue, result.code());
+
+    verificationService.sendVerificationCode(contactValue, result.code(), tenantId, userId, type);
     return result;
   }
 }

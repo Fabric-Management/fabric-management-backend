@@ -183,9 +183,10 @@ public class WhatsAppClient {
    *
    * @param phoneNumber E.164 format phone number (e.g., +14155551234)
    * @param code 6-digit verification code
+   * @return WhatsApp message response containing message ID (wamid)
    * @throws RuntimeException if sending fails
    */
-  public void sendVerificationCode(String phoneNumber, String code) {
+  public WhatsAppMessageResponse sendVerificationCode(String phoneNumber, String code) {
     if (!whatsAppEnabled) {
       log.warn("WhatsApp is disabled, cannot send verification code");
       throw new RuntimeException("WhatsApp is not enabled");
@@ -252,6 +253,8 @@ public class WhatsAppClient {
           "✅ WhatsApp verification code sent successfully: messageId={}, recipient={}",
           messageId,
           maskPhone(phoneNumber));
+
+      return responseBody;
 
     } catch (RestClientException e) {
       log.error(
@@ -361,7 +364,7 @@ public class WhatsAppClient {
 
   @Data
   @JsonIgnoreProperties(ignoreUnknown = true)
-  static class WhatsAppMessageResponse {
+  public static class WhatsAppMessageResponse {
     private List<WhatsAppMessageId> messages;
   }
 

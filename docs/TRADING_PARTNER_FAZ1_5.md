@@ -525,7 +525,7 @@ public class Order extends BaseEntity {
 
 ## Related Files
 
-- Migration templates: `src/main/resources/db/migration/templates/`
+- Migration templates: `src/main/resources/db/migration_templates/`
 - TradingPartnerService: `common/platform/company/app/TradingPartnerService.java`
 - TradingPartnerResolver: `common/platform/company/app/TradingPartnerResolver.java`
 - Skill: `.cursor/skills/create-trading-partner/`

@@ -21,6 +21,7 @@ import com.fabricmanagement.common.platform.user.app.UserContactAssignmentServic
 import com.fabricmanagement.common.platform.user.domain.ContactType;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.common.util.DeviceInfoUtil;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -253,7 +254,7 @@ public class PasswordResetService {
    */
   @Transactional
   public LoginResponse verifyAndResetPassword(
-      PasswordResetVerifyRequest request, String ipAddress) {
+      PasswordResetVerifyRequest request, String ipAddress, String userAgent) {
     log.info(
         "Password reset verification: authUserId={}, code={}",
         request.getAuthUserId(),
@@ -334,10 +335,14 @@ public class PasswordResetService {
     String accessToken = jwtService.generateAccessToken(userEntity);
     String refreshToken = jwtService.generateRefreshToken(userEntity);
 
-    // Save refresh token
     RefreshToken refreshTokenEntity =
         RefreshToken.create(
-            user.getId(), refreshToken, Instant.now().plusMillis(refreshTokenExpiration));
+            user.getId(),
+            refreshToken,
+            Instant.now().plusMillis(refreshTokenExpiration),
+            ipAddress,
+            userAgent,
+            DeviceInfoUtil.extractDeviceName(userAgent));
     refreshTokenRepository.save(refreshTokenEntity);
 
     // Publish login event (password reset is considered successful login)

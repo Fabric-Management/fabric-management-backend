@@ -62,6 +62,18 @@ public class AuthUser extends BaseEntity {
   @JoinColumn(name = "user_id", insertable = false, updatable = false)
   private com.fabricmanagement.common.platform.user.domain.User user;
 
+  @Column(name = "is_mfa_enabled", nullable = false)
+  @Builder.Default
+  private Boolean isMfaEnabled = false;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "primary_mfa_type", length = 30)
+  @Builder.Default
+  private MfaType primaryMfaType = MfaType.NONE;
+
+  @Column(name = "mfa_secret", length = 64)
+  private String mfaSecret;
+
   @Column(name = "password_hash", nullable = false, length = 255)
   private String passwordHash;
 

@@ -58,6 +58,18 @@ public class EmailTemplateRenderer {
     return render("sales-led-welcome.html", vars);
   }
 
+  /** Render partner portal invitation email. */
+  public String renderPartnerInvitation(
+      String firstName, String partnerDisplayName, String email, String setupUrl) {
+    Map<String, String> vars =
+        Map.of(
+            "firstName", firstName != null ? firstName : "there",
+            "partnerDisplayName", partnerDisplayName != null ? partnerDisplayName : "",
+            "email", email != null ? email : "",
+            "setupUrl", setupUrl);
+    return render("partner-invitation.html", vars);
+  }
+
   /** Render password reset email. */
   public String renderPasswordReset(
       String firstName, String resetUrl, String expiresIn, String verificationCode) {

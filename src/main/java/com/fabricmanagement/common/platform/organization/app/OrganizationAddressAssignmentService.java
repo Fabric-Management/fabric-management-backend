@@ -89,7 +89,8 @@ public class OrganizationAddressAssignmentService
   @Override
   protected List<OrganizationAddress> findByParent(UUID parentId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return organizationAddressRepository.findByTenantIdAndOrganizationId(tenantId, parentId);
+    return organizationAddressRepository.findWithAddressByTenantIdAndOrganizationId(
+        tenantId, parentId);
   }
 
   @Override

@@ -51,11 +51,41 @@ public class RefreshToken extends BaseEntity {
   @Column(name = "revoked_at")
   private Instant revokedAt;
 
+  @Column(name = "ip_address", length = 45)
+  private String ipAddress;
+
+  @Column(name = "user_agent", length = 1000)
+  private String userAgent;
+
+  @Column(name = "device_name", length = 255)
+  private String deviceName;
+
   public static RefreshToken create(UUID userId, String token, Instant expiresAt) {
     return RefreshToken.builder()
         .userId(userId)
         .token(token)
         .expiresAt(expiresAt)
+        .isRevoked(false)
+        .build();
+  }
+
+  public static RefreshToken create(
+      UUID userId,
+      String token,
+      Instant expiresAt,
+      String ipAddress,
+      String userAgent,
+      String deviceName) {
+    return RefreshToken.builder()
+        .userId(userId)
+        .token(token)
+        .expiresAt(expiresAt)
+        .ipAddress(ipAddress)
+        .userAgent(
+            userAgent != null && userAgent.length() > 1000
+                ? userAgent.substring(0, 1000)
+                : userAgent)
+        .deviceName(deviceName)
         .isRevoked(false)
         .build();
   }

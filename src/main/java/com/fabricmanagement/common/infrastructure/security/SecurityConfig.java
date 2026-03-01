@@ -2,11 +2,13 @@ package com.fabricmanagement.common.infrastructure.security;
 
 import java.util.Arrays;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -15,6 +17,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -28,8 +31,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@RequiredArgsConstructor
 @Slf4j
 public class SecurityConfig {
+
+  private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
   @Value("${spring.profiles.active:local}")
   private String activeProfile;
@@ -39,13 +45,71 @@ public class SecurityConfig {
     return new BCryptPasswordEncoder();
   }
 
+  // ── Partner Portal Filter Chains (Order 1 — evaluated before main chains)
+  // ────────────────────
+
+  /**
+   * Partner portal security chain for development.
+   *
+   * <p>Path: /api/partner-portal/** — only PARTNER tokens accepted. Public endpoints allow login
+   * and password setup flows.
+   */
+  @Bean
+  @Order(1)
+  @Profile({"local", "dev"})
+  public SecurityFilterChain devPartnerPortalFilterChain(HttpSecurity http) throws Exception {
+    return http.securityMatcher("/api/partner-portal/**")
+        .csrf(AbstractHttpConfigurer::disable)
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers(
+                        "/api/partner-portal/auth/login", "/api/partner-portal/setup-password")
+                    .permitAll()
+                    .anyRequest()
+                    .hasRole("PARTNER_USER"))
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        .build();
+  }
+
+  /**
+   * Partner portal security chain for production.
+   *
+   * <p>Path: /api/partner-portal/** — only PARTNER tokens accepted. Public endpoints allow login
+   * and password setup flows.
+   */
+  @Bean
+  @Order(1)
+  @Profile("prod")
+  public SecurityFilterChain prodPartnerPortalFilterChain(HttpSecurity http) throws Exception {
+    return http.securityMatcher("/api/partner-portal/**")
+        .csrf(AbstractHttpConfigurer::disable)
+        .cors(cors -> cors.configurationSource(productionCorsConfigurationSource()))
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers(
+                        "/api/partner-portal/auth/login", "/api/partner-portal/setup-password")
+                    .permitAll()
+                    .anyRequest()
+                    .hasRole("PARTNER_USER"))
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        .build();
+  }
+
+  // ── Main Filter Chains
+  // ────────────────────────────────────────────────────────────────────────
+
   @Bean
   @Profile({"local", "dev"})
   public SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
     log.warn("⚠️  DEVELOPMENT MODE - Security is PERMISSIVE");
 
     return http.csrf(AbstractHttpConfigurer::disable)
-        .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ Enable CORS
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
@@ -57,16 +121,20 @@ public class SecurityConfig {
                     .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**")
                     .permitAll()
                     .requestMatchers("/api/dev/**")
-                    .permitAll() // Development tools
+                    .permitAll()
                     .requestMatchers("/api/public/**")
-                    .permitAll() // Public signup
+                    .permitAll()
                     .requestMatchers("/api/auth/**")
-                    .permitAll() // Auth endpoints
+                    .permitAll()
+                    .requestMatchers("/api/webhooks/**")
+                    .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/admin/**")
-                    .permitAll() // ⚠️ TEMP: Admin endpoints (will be secured in production)
+                    .permitAll() // ⚠️ TEMP: secured in production
                     .anyRequest()
-                    .permitAll() // ⚠️ DEVELOPMENT: Allow all
+                    .permitAll() // ⚠️ DEVELOPMENT: URL-level allow all; method-level via
+            // @PreAuthorize
             )
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
 
@@ -76,8 +144,7 @@ public class SecurityConfig {
     log.info("🔒 PRODUCTION MODE - Security is ENFORCED");
 
     return http.csrf(AbstractHttpConfigurer::disable)
-        .cors(
-            cors -> cors.configurationSource(productionCorsConfigurationSource())) // ✅ Enable CORS
+        .cors(cors -> cors.configurationSource(productionCorsConfigurationSource()))
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
@@ -85,20 +152,26 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/health", "/api/info")
                     .permitAll()
                     .requestMatchers("/api/public/**")
-                    .permitAll() // Public signup
+                    .permitAll()
                     .requestMatchers("/api/common/company-types/**")
-                    .permitAll() // Company types (for signup forms)
+                    .permitAll()
                     .requestMatchers(
-                        "/api/auth/login", "/api/auth/register/**", "/api/auth/setup-password")
+                        "/api/auth/login",
+                        "/api/auth/mfa/verify",
+                        "/api/auth/register/**",
+                        "/api/auth/setup-password")
                     .permitAll()
                     .requestMatchers("/api/auth/password-reset/**")
-                    .permitAll() // Password reset endpoints
+                    .permitAll()
+                    .requestMatchers("/api/webhooks/**")
+                    .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
-                    .hasRole("PLATFORM_ADMIN") // ✅ Admin endpoints protected
+                    .hasRole("PLATFORM_ADMIN")
                     .anyRequest()
                     .authenticated())
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
 
@@ -115,7 +188,8 @@ public class SecurityConfig {
     CorsConfiguration configuration = new CorsConfiguration();
 
     // Allow common development origins
-    // Note: Cannot use "*" with allowCredentials(true), so we list common dev origins
+    // Note: Cannot use "*" with allowCredentials(true), so we list common dev
+    // origins
     configuration.setAllowedOriginPatterns(
         Arrays.asList("http://localhost:*", "http://127.0.0.1:*", "http://0.0.0.0:*"));
 

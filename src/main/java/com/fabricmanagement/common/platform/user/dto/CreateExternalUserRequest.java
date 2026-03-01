@@ -60,6 +60,15 @@ public class CreateExternalUserRequest {
 
   private String department;
 
+  /**
+   * When {@code true}, the {@link
+   * com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent} is not published after
+   * creation. The caller is responsible for publishing its own invitation event (e.g., partner
+   * portal users publish {@link
+   * com.fabricmanagement.common.platform.tradingpartner.domain.event.PartnerUserCreatedEvent}).
+   */
+  @Builder.Default private boolean suppressEmailInvitation = false;
+
   /** Additional contacts (emails, phones) beyond the primary contact. */
   @Builder.Default @Valid private List<ContactData> additionalContacts = new ArrayList<>();
 

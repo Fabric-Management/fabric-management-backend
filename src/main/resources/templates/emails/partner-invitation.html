@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+    <title>You've Been Invited to the Partner Portal</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        'Helvetica Neue', Arial, sans-serif;
+      background-color: #f9fafb;
+    ">
+    <div
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        padding: 0;
+      ">
+      <!-- Header -->
+      <div
+        style="
+          background-color: #0f172a;
+          padding: 40px 32px;
+          text-align: center;
+        ">
+        <p style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0">
+          Fabricode OS
+        </p>
+        <p style="color: #94a3b8; font-size: 14px; margin: 8px 0 0 0">
+          Partner Portal
+        </p>
+      </div>
+
+      <!-- Main Content -->
+      <div style="padding: 64px 32px 56px 32px; background-color: #ffffff">
+        <h1
+          style="
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+            margin-top: 0;
+            margin-bottom: 12px;
+            text-align: center;
+          ">
+          You've Been Invited
+        </h1>
+
+        <p
+          style="
+            font-size: 16px;
+            color: #374151;
+            text-align: center;
+            margin-bottom: 32px;
+          ">
+          Hi {{firstName}},
+        </p>
+
+        <p
+          style="
+            font-size: 15px;
+            color: #4b5563;
+            line-height: 1.6;
+            margin-bottom: 16px;
+          ">
+          <strong>{{partnerDisplayName}}</strong> has invited you to access their
+          Partner Portal on FabricOS. You can use the portal to view orders,
+          invoices, and communicate with your account team.
+        </p>
+
+        <p
+          style="
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+          ">
+          Your invitation email:
+        </p>
+        <p
+          style="
+            font-size: 15px;
+            font-weight: 600;
+            color: #111827;
+            margin-top: 0;
+            margin-bottom: 32px;
+          ">
+          {{email}}
+        </p>
+
+        <!-- CTA Button -->
+        <div style="text-align: center; margin: 40px 0">
+          <a
+            href="{{setupUrl}}"
+            style="
+              display: inline-block;
+              background-color: #2563eb;
+              color: #ffffff;
+              text-decoration: none;
+              padding: 14px 32px;
+              border-radius: 8px;
+              font-weight: 600;
+              font-size: 15px;
+            ">
+            Set Up Your Password
+          </a>
+        </div>
+
+        <p
+          style="
+            font-size: 13px;
+            color: #9ca3af;
+            text-align: center;
+            margin-bottom: 8px;
+          ">
+          If the button doesn't work, copy and paste this link:
+        </p>
+        <p
+          style="
+            font-size: 12px;
+            color: #6b7280;
+            word-break: break-all;
+            text-align: center;
+            margin-bottom: 32px;
+          ">
+          {{setupUrl}}
+        </p>
+
+        <!-- Expiry notice -->
+        <div
+          style="
+            background-color: #fef9c3;
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 32px;
+          ">
+          <p style="font-size: 13px; color: #92400e; margin: 0">
+            This invitation link expires in <strong>24 hours</strong>. If it
+            expires, ask your account manager to resend the invitation.
+          </p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div
+        style="
+          background-color: #f9fafb;
+          padding: 24px 32px;
+          text-align: center;
+          border-top: 1px solid #e5e7eb;
+        ">
+        <p style="font-size: 12px; color: #9ca3af; margin: 0">
+          You received this email because you were invited to FabricOS Partner Portal.
+          If you didn't expect this, you can safely ignore it.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

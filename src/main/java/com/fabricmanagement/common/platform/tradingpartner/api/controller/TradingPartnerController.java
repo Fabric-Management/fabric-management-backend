@@ -6,6 +6,7 @@ import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerSer
 import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.common.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.common.platform.tradingpartner.dto.UpdateTradingPartnerRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -79,6 +80,33 @@ public class TradingPartnerController {
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success(created, "Trading partner created successfully"));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UPDATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @PutMapping("/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN', 'TRADING_PARTNER_MANAGER')")
+  @Operation(
+      summary = "Update trading partner",
+      description =
+          "Updates tenant-side relationship data (alias, type, payment terms, etc.). "
+              + "Registry-level data (official name, tax ID, country) cannot be changed here.")
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Partner updated successfully"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "Partner not found")
+  })
+  public ResponseEntity<ApiResponse<TradingPartnerDto>> updatePartner(
+      @Parameter(description = "Partner ID") @PathVariable UUID id,
+      @Valid @RequestBody UpdateTradingPartnerRequest request) {
+    log.info("Updating trading partner: id={}", id);
+    TradingPartnerDto updated = tradingPartnerService.updatePartner(id, request);
+    return ResponseEntity.ok(ApiResponse.success(updated, "Trading partner updated successfully"));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

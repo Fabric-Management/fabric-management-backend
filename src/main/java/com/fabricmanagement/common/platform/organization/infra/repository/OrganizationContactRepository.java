@@ -21,6 +21,12 @@ public interface OrganizationContactRepository
   List<OrganizationContact> findByTenantIdAndOrganizationId(UUID tenantId, UUID organizationId);
 
   @Query(
+      "SELECT oc FROM OrganizationContact oc LEFT JOIN FETCH oc.contact"
+          + " WHERE oc.tenantId = :tenantId AND oc.organizationId = :orgId")
+  List<OrganizationContact> findWithContactByTenantIdAndOrganizationId(
+      @Param("tenantId") UUID tenantId, @Param("orgId") UUID organizationId);
+
+  @Query(
       "SELECT oc FROM OrganizationContact oc WHERE oc.organizationId = :orgId AND oc.isDefault = true")
   Optional<OrganizationContact> findDefaultByOrganizationId(@Param("orgId") UUID organizationId);
 

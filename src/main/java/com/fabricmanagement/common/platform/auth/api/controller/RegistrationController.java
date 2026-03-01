@@ -43,7 +43,8 @@ public class RegistrationController {
         "Verify and register: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
     String ipAddress = getClientIpAddress(httpRequest);
-    LoginResponse response = registrationService.verifyAndRegister(request, ipAddress);
+    String userAgent = httpRequest.getHeader("User-Agent");
+    LoginResponse response = registrationService.verifyAndRegister(request, ipAddress, userAgent);
     return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
   }
 

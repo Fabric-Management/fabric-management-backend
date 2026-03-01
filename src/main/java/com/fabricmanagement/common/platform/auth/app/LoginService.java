@@ -3,11 +3,13 @@ package com.fabricmanagement.common.platform.auth.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.auth.domain.AuthUser;
+import com.fabricmanagement.common.platform.auth.domain.MfaType;
 import com.fabricmanagement.common.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.common.platform.auth.domain.VerificationType;
 import com.fabricmanagement.common.platform.auth.domain.event.UserLoginEvent;
 import com.fabricmanagement.common.platform.auth.dto.LoginRequest;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
+import com.fabricmanagement.common.platform.auth.dto.VerifyMfaRequest;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
@@ -16,6 +18,7 @@ import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.common.util.DeviceInfoUtil;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import java.time.Instant;
 import java.util.Optional;
@@ -55,6 +58,10 @@ public class LoginService {
   private final DomainEventPublisher eventPublisher;
   private final ContactService contactService;
   private final VerificationCodeManager verificationCodeManager;
+  private final TotpMfaService totpMfaService;
+  private final TrustedDeviceService trustedDeviceService;
+  private final MfaRateLimitService mfaRateLimitService;
+  private final MfaEventService mfaEventService;
 
   @Value("${application.jwt.expiration:900000}")
   private long accessTokenExpiration;
@@ -63,7 +70,7 @@ public class LoginService {
   private long refreshTokenExpiration;
 
   @Transactional
-  public LoginResponse login(LoginRequest request, String ipAddress) {
+  public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
     log.info("Login attempt: contactValue={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
 
     // Debug: Log actual email (only in local/dev profiles)
@@ -147,12 +154,63 @@ public class LoginService {
             .findByTenantIdAndId(user.getTenantId(), user.getId())
             .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
 
+    // Check if MFA is enabled and handle it
+    boolean bypassMfa = false;
+
+    // Check trusted device token with full context binding (IP + User-Agent)
+    if (request.getTrustedDeviceToken() != null && !request.getTrustedDeviceToken().isBlank()) {
+      bypassMfa =
+          trustedDeviceService.validateDevice(
+              request.getTrustedDeviceToken(), user.getId(), ipAddress, userAgent);
+      if (bypassMfa) {
+        log.info(
+            "MFA bypassed due to valid trusted device token for user: {}",
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
+      } else {
+        log.warn(
+            "Invalid or expired trusted device token for user: {}",
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
+      }
+    }
+
+    if (!bypassMfa && Boolean.TRUE.equals(authUser.getIsMfaEnabled())) {
+      MfaType mfaType =
+          authUser.getPrimaryMfaType() != null ? authUser.getPrimaryMfaType() : MfaType.NONE;
+
+      if (mfaType != MfaType.NONE) {
+        String preAuthToken = jwtService.generatePreAuthToken(userEntity);
+
+        String maskedContact = null;
+        if (mfaType == MfaType.EMAIL || mfaType == MfaType.SMS || mfaType == MfaType.WHATSAPP) {
+          VerificationCodeManager.MfaCodeIssuanceResult mfaResult =
+              verificationCodeManager.issueMfaCode(user.getId(), user.getTenantId(), mfaType);
+          maskedContact = mfaResult.maskedContact();
+        }
+
+        log.info(
+            "MFA required for user: {}, mfaType={}",
+            PiiMaskingUtil.maskEmail(request.getContactValue()),
+            mfaType);
+        return LoginResponse.builder()
+            .mfaRequired(true)
+            .mfaToken(preAuthToken)
+            .mfaType(mfaType)
+            .maskedContact(maskedContact)
+            .build();
+      }
+    }
+
     String accessToken = jwtService.generateAccessToken(userEntity);
     String refreshToken = jwtService.generateRefreshToken(userEntity);
 
     RefreshToken refreshTokenEntity =
         RefreshToken.create(
-            user.getId(), refreshToken, Instant.now().plusMillis(refreshTokenExpiration));
+            user.getId(),
+            refreshToken,
+            Instant.now().plusMillis(refreshTokenExpiration),
+            ipAddress,
+            userAgent,
+            DeviceInfoUtil.extractDeviceName(userAgent));
     refreshTokenRepository.save(refreshTokenEntity);
 
     // Get contact value from Contact entity
@@ -165,7 +223,11 @@ public class LoginService {
     eventPublisher.publish(
         new UserLoginEvent(user.getTenantId(), user.getId(), contactValue, ipAddress));
 
-    log.info("Login successful: userId={}, uid={}", user.getId(), user.getUid());
+    log.info(
+        "Login successful: contactValue={}, userId={}, uid={}",
+        PiiMaskingUtil.maskEmail(request.getContactValue()),
+        user.getId(),
+        user.getUid());
 
     return LoginResponse.builder()
         .accessToken(accessToken)
@@ -173,6 +235,92 @@ public class LoginService {
         .expiresIn(accessTokenExpiration / 1000)
         .user(user)
         .needsOnboarding(!Boolean.TRUE.equals(user.getHasCompletedOnboarding()))
+        .build();
+  }
+
+  @Transactional
+  public LoginResponse verifyMfa(VerifyMfaRequest request, String ipAddress, String userAgent) {
+    if (!jwtService.validateToken(request.getMfaToken())) {
+      throw new IllegalArgumentException("Invalid or expired MFA token");
+    }
+
+    if (!jwtService.isPreAuthToken(request.getMfaToken())) {
+      throw new IllegalArgumentException("Provided token is not a valid MFA temporary token");
+    }
+
+    UUID userId = jwtService.getUserIdFromToken(request.getMfaToken());
+    UUID tenantId = jwtService.getTenantIdFromToken(request.getMfaToken());
+
+    // Brute-force protection: reject if user exceeded max failed MFA attempts
+    mfaRateLimitService.checkRateLimit(userId);
+
+    AuthUser authUser =
+        authUserRepository
+            .findByTenantIdAndUserId(tenantId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+    com.fabricmanagement.common.platform.user.domain.User userEntity =
+        userRepository
+            .findByTenantIdAndId(tenantId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
+
+    MfaType mfaType = authUser.getPrimaryMfaType();
+
+    try {
+      if (mfaType == MfaType.TOTP) {
+        boolean isValid = totpMfaService.verifyCode(authUser.getMfaSecret(), request.getCode());
+        if (!isValid) {
+          throw new IllegalArgumentException("Invalid TOTP code");
+        }
+      } else if (mfaType == MfaType.EMAIL
+          || mfaType == MfaType.SMS
+          || mfaType == MfaType.WHATSAPP) {
+        verificationCodeManager.validateMfaCode(userId, tenantId, mfaType, request.getCode());
+      } else {
+        throw new IllegalArgumentException("MFA is not enabled or type is invalid");
+      }
+    } catch (IllegalArgumentException e) {
+      mfaRateLimitService.recordFailedAttempt(userId);
+      throw e;
+    }
+
+    mfaRateLimitService.clearAttempts(userId);
+    mfaEventService.pushCompletionEvent(userId);
+
+    // Success! Generate actual tokens
+    String accessToken = jwtService.generateAccessToken(userEntity);
+    String refreshToken = jwtService.generateRefreshToken(userEntity);
+
+    RefreshToken refreshTokenEntity =
+        RefreshToken.create(
+            userId,
+            refreshToken,
+            Instant.now().plusMillis(refreshTokenExpiration),
+            ipAddress,
+            userAgent,
+            DeviceInfoUtil.extractDeviceName(userAgent));
+    refreshTokenRepository.save(refreshTokenEntity);
+
+    String newTrustedDeviceToken = null;
+    if (Boolean.TRUE.equals(request.getRememberDevice())) {
+      newTrustedDeviceToken =
+          trustedDeviceService.createTrustedDevice(userId, ipAddress, userAgent);
+    }
+
+    UserDto userDto = userFacade.findById(tenantId, userId).orElseThrow();
+
+    String contactValue = jwtService.getContactValueFromToken(request.getMfaToken());
+
+    eventPublisher.publish(new UserLoginEvent(tenantId, userId, contactValue, ipAddress));
+
+    return LoginResponse.builder()
+        .accessToken(accessToken)
+        .refreshToken(refreshToken)
+        .expiresIn(accessTokenExpiration / 1000)
+        .user(userDto)
+        .mfaRequired(false)
+        .trustedDeviceToken(newTrustedDeviceToken)
+        .needsOnboarding(!Boolean.TRUE.equals(userDto.getHasCompletedOnboarding()))
         .build();
   }
 
@@ -206,16 +354,19 @@ public class LoginService {
       return new IllegalArgumentException("User not found. Please check your credentials.");
     }
 
-    // Check if any contact exists with this domain (for context-aware error messages)
+    // Check if any contact exists with this domain (for context-aware error
+    // messages)
     boolean domainExists = contactService.existsByEmailDomain(domain);
 
     if (domainExists) {
-      // Domain exists in system - try to find a user with this domain to get company context
+      // Domain exists in system - try to find a user with this domain to get company
+      // context
       // We'll search for any user contact with this domain pattern
       // Note: We don't create incorrect emails, we just check domain existence
 
       // Try to find any user with contacts in this domain
-      // This helps provide better error messages without creating false email patterns
+      // This helps provide better error messages without creating false email
+      // patterns
       Optional<UserDto> anyUserWithDomain = findAnyUserWithDomain(domain);
 
       if (anyUserWithDomain.isPresent()) {
