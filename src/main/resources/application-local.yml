@@ -48,6 +48,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+    out-of-order: true  # V1_0_5, V1_0_6 gibi sonradan eklenen migration'ların uygulanması için
 
   jpa:
     show-sql: false  # SQL loglarını kapat (çok fazla log üretiyor)
@@ -100,3 +101,13 @@ application:
       enabled: ${GOOGLE_MAPS_ENABLED:true}
       timeout: ${GOOGLE_MAPS_TIMEOUT:10000}
       region-bias: ${GOOGLE_MAPS_REGION_BIAS:TR,GB,DE,FR,IT,ES}
+
+  # WhatsApp Business API Configuration
+  whatsapp:
+    enabled: ${PLATFORM_WHATSAPP_ENABLED:false}
+    business-api-url: ${PLATFORM_WHATSAPP_API_URL:https://graph.facebook.com}
+    business-api-token: ${PLATFORM_WHATSAPP_ACCESS_TOKEN:}
+    phone-number-id: ${PLATFORM_WHATSAPP_PHONE_NUMBER_ID:}
+    verification-template-name: ${PLATFORM_WHATSAPP_VERIFICATION_TEMPLATE:verification_code}
+    webhook-verify-token: ${PLATFORM_WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
+    timeout: ${PLATFORM_WHATSAPP_TIMEOUT:5000}

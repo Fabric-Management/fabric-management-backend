@@ -27,6 +27,12 @@ public interface AuthUserRepository extends JpaRepository<AuthUser, UUID> {
   @Query("SELECT au FROM AuthUser au LEFT JOIN FETCH au.user WHERE au.userId = :userId")
   Optional<AuthUser> findByUserId(@Param("userId") UUID userId);
 
+  /** Find AuthUser by Tenant ID and User ID. */
+  @Query(
+      "SELECT au FROM AuthUser au LEFT JOIN FETCH au.user WHERE au.tenantId = :tenantId AND au.userId = :userId")
+  Optional<AuthUser> findByTenantIdAndUserId(
+      @Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
+
   /**
    * Check if AuthUser exists for User ID.
    *

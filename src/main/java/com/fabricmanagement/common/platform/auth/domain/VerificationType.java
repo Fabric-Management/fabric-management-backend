@@ -29,5 +29,20 @@ public enum VerificationType {
    *
    * <p>Sent to verify phone ownership
    */
-  PHONE_VERIFICATION
+  PHONE_VERIFICATION,
+
+  /**
+   * MFA login via email
+   *
+   * <p>Sent when user logs in with MFA and selects Email fallback
+   */
+  MFA_LOGIN_EMAIL,
+
+  /**
+   * MFA login via phone (WhatsApp or SMS)
+   *
+   * <p>Sent when user logs in with MFA and selects Phone fallback. Routing engine determines
+   * whether to use WhatsApp or SMS.
+   */
+  MFA_LOGIN_PHONE
 }

@@ -1,0 +1,197 @@
+package com.fabricmanagement.common.platform.auth.app;
+
+import com.fabricmanagement.common.platform.auth.domain.AuthUser;
+import com.fabricmanagement.common.platform.auth.domain.MfaType;
+import com.fabricmanagement.common.platform.auth.dto.MfaSetupResponse;
+import com.fabricmanagement.common.platform.auth.dto.MfaStatusResponse;
+import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
+import com.fabricmanagement.common.platform.auth.infra.repository.TrustedDeviceRepository;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * MFA Setup Service - Manages MFA configuration for users.
+ *
+ * <p>Handles TOTP, EMAIL, SMS, and WHATSAPP MFA setup.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class MfaSetupService {
+
+  private final AuthUserRepository authUserRepository;
+  private final TrustedDeviceRepository trustedDeviceRepository;
+  private final TotpMfaService totpMfaService;
+
+  /**
+   * Initiate MFA setup for user.
+   *
+   * @param tenantId Tenant ID
+   * @param userId User ID
+   * @param mfaType MFA type to enable
+   * @return Setup response with secret/QR code for TOTP
+   */
+  @Transactional
+  public MfaSetupResponse setupMfa(UUID tenantId, UUID userId, MfaType mfaType) {
+    log.info("Setting up MFA: userId={}, mfaType={}", userId, mfaType);
+
+    AuthUser authUser =
+        authUserRepository
+            .findByTenantIdAndUserId(tenantId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+    if (mfaType == MfaType.TOTP) {
+      return setupTotpMfa(authUser);
+    } else if (mfaType == MfaType.EMAIL || mfaType == MfaType.SMS || mfaType == MfaType.WHATSAPP) {
+      return setupOtpMfa(authUser, mfaType);
+    } else {
+      throw new IllegalArgumentException("Invalid MFA type: " + mfaType);
+    }
+  }
+
+  /**
+   * Setup TOTP MFA.
+   *
+   * @param authUser Auth user
+   * @return Setup response with secret and QR code
+   */
+  private MfaSetupResponse setupTotpMfa(AuthUser authUser) {
+    String secret = totpMfaService.generateSecret();
+    String qrCodeUri = totpMfaService.getQrCodeImageUri(authUser.getUserId().toString(), secret);
+
+    authUser.setMfaSecret(secret);
+    authUser.setPrimaryMfaType(MfaType.TOTP);
+    authUser.setIsMfaEnabled(false);
+
+    authUserRepository.save(authUser);
+
+    log.info("TOTP MFA setup initiated for user: {}", authUser.getUserId());
+
+    return MfaSetupResponse.builder()
+        .mfaType(MfaType.TOTP)
+        .secret(secret)
+        .qrCodeUri(qrCodeUri)
+        .message(
+            "TOTP setup initiated. Scan QR code with authenticator app and confirm with 6-digit"
+                + " code.")
+        .build();
+  }
+
+  /**
+   * Setup OTP-based MFA (EMAIL, SMS, WHATSAPP).
+   *
+   * @param authUser Auth user
+   * @param mfaType MFA type
+   * @return Setup response
+   */
+  private MfaSetupResponse setupOtpMfa(AuthUser authUser, MfaType mfaType) {
+    authUser.setPrimaryMfaType(mfaType);
+    authUser.setIsMfaEnabled(false);
+    authUser.setMfaSecret(null);
+
+    authUserRepository.save(authUser);
+
+    log.info("{} MFA setup initiated for user: {}", mfaType, authUser.getUserId());
+
+    return MfaSetupResponse.builder()
+        .mfaType(mfaType)
+        .message(
+            mfaType
+                + " MFA setup initiated. You will receive verification codes via "
+                + mfaType
+                + " during login.")
+        .build();
+  }
+
+  /**
+   * Confirm MFA setup by verifying code.
+   *
+   * @param tenantId Tenant ID
+   * @param userId User ID
+   * @param code Verification code
+   */
+  @Transactional
+  public void confirmMfaSetup(UUID tenantId, UUID userId, String code) {
+    log.info("Confirming MFA setup: userId={}", userId);
+
+    AuthUser authUser =
+        authUserRepository
+            .findByTenantIdAndUserId(tenantId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+    if (authUser.getPrimaryMfaType() == null || authUser.getPrimaryMfaType() == MfaType.NONE) {
+      throw new IllegalArgumentException("MFA setup not initiated");
+    }
+
+    if (authUser.getPrimaryMfaType() == MfaType.TOTP) {
+      if (authUser.getMfaSecret() == null) {
+        throw new IllegalArgumentException("TOTP secret not found");
+      }
+
+      boolean isValid = totpMfaService.verifyCode(authUser.getMfaSecret(), code);
+      if (!isValid) {
+        throw new IllegalArgumentException("Invalid TOTP code");
+      }
+    } else {
+      throw new IllegalArgumentException(
+          "Confirmation not required for " + authUser.getPrimaryMfaType());
+    }
+
+    authUser.setIsMfaEnabled(true);
+    authUserRepository.save(authUser);
+
+    log.info("✅ MFA enabled for user: {}, type={}", userId, authUser.getPrimaryMfaType());
+  }
+
+  /**
+   * Disable MFA for user.
+   *
+   * @param tenantId Tenant ID
+   * @param userId User ID
+   */
+  @Transactional
+  public void disableMfa(UUID tenantId, UUID userId) {
+    log.info("Disabling MFA: userId={}", userId);
+
+    AuthUser authUser =
+        authUserRepository
+            .findByTenantIdAndUserId(tenantId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+    authUser.setIsMfaEnabled(false);
+    authUser.setPrimaryMfaType(MfaType.NONE);
+    authUser.setMfaSecret(null);
+
+    authUserRepository.save(authUser);
+
+    trustedDeviceRepository.deleteByUserId(userId);
+
+    log.info("✅ MFA disabled for user: {}", userId);
+  }
+
+  /**
+   * Get MFA status for user.
+   *
+   * @param tenantId Tenant ID
+   * @param userId User ID
+   * @return MFA status
+   */
+  @Transactional(readOnly = true)
+  public MfaStatusResponse getMfaStatus(UUID tenantId, UUID userId) {
+    AuthUser authUser =
+        authUserRepository
+            .findByTenantIdAndUserId(tenantId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+    int trustedDeviceCount = trustedDeviceRepository.countByUserId(userId);
+
+    return MfaStatusResponse.builder()
+        .isMfaEnabled(authUser.getIsMfaEnabled())
+        .primaryMfaType(authUser.getPrimaryMfaType())
+        .trustedDeviceCount(trustedDeviceCount)
+        .build();
+  }
+}

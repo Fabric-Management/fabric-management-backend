@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.auth.dto;
 
+import com.fabricmanagement.common.platform.auth.domain.MfaType;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -18,6 +19,14 @@ public class LoginResponse {
   private String refreshToken;
   private Long expiresIn;
   private UserDto user;
+
+  @Builder.Default private Boolean mfaRequired = false;
+
+  private String mfaToken;
+
+  private String trustedDeviceToken;
+
+  private MfaType mfaType;
 
   /**
    * When true, frontend must show onboarding form. Always set explicitly; never null in API

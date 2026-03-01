@@ -45,7 +45,8 @@ public class SecurityConfig {
     return new BCryptPasswordEncoder();
   }
 
-  // ── Partner Portal Filter Chains (Order 1 — evaluated before main chains) ────────────────────
+  // ── Partner Portal Filter Chains (Order 1 — evaluated before main chains)
+  // ────────────────────
 
   /**
    * Partner portal security chain for development.
@@ -99,7 +100,8 @@ public class SecurityConfig {
         .build();
   }
 
-  // ── Main Filter Chains ────────────────────────────────────────────────────────────────────────
+  // ── Main Filter Chains
+  // ────────────────────────────────────────────────────────────────────────
 
   @Bean
   @Profile({"local", "dev"})
@@ -124,6 +126,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/auth/**")
                     .permitAll()
+                    .requestMatchers("/api/webhooks/**")
+                    .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/admin/**")
                     .permitAll() // ⚠️ TEMP: secured in production
                     .anyRequest()
@@ -152,10 +156,15 @@ public class SecurityConfig {
                     .requestMatchers("/api/common/company-types/**")
                     .permitAll()
                     .requestMatchers(
-                        "/api/auth/login", "/api/auth/register/**", "/api/auth/setup-password")
+                        "/api/auth/login",
+                        "/api/auth/mfa/verify",
+                        "/api/auth/register/**",
+                        "/api/auth/setup-password")
                     .permitAll()
                     .requestMatchers("/api/auth/password-reset/**")
                     .permitAll()
+                    .requestMatchers("/api/webhooks/**")
+                    .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
@@ -179,7 +188,8 @@ public class SecurityConfig {
     CorsConfiguration configuration = new CorsConfiguration();
 
     // Allow common development origins
-    // Note: Cannot use "*" with allowCredentials(true), so we list common dev origins
+    // Note: Cannot use "*" with allowCredentials(true), so we list common dev
+    // origins
     configuration.setAllowedOriginPatterns(
         Arrays.asList("http://localhost:*", "http://127.0.0.1:*", "http://0.0.0.0:*"));
 

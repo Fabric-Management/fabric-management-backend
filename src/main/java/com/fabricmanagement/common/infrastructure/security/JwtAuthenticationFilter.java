@@ -67,6 +67,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       return;
     }
 
+    if (jwtService.isPreAuthToken(token)) {
+      log.warn(
+          "Attempt to use MFA pre-auth token as an access token for path: {}",
+          request.getRequestURI());
+      filterChain.doFilter(request, response);
+      return;
+    }
+
     try {
       String userId = jwtService.getUserIdFromToken(token).toString();
       String roleCode = jwtService.getRoleCodeFromToken(token);

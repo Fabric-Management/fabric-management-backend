@@ -4,11 +4,9 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.JwtService;
 import com.fabricmanagement.common.platform.auth.app.LoginService;
 import com.fabricmanagement.common.platform.auth.app.LogoutService;
+import com.fabricmanagement.common.platform.auth.app.MfaSetupService;
 import com.fabricmanagement.common.platform.auth.app.RefreshTokenService;
-import com.fabricmanagement.common.platform.auth.dto.LoginRequest;
-import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
-import com.fabricmanagement.common.platform.auth.dto.LogoutRequest;
-import com.fabricmanagement.common.platform.auth.dto.RefreshTokenRequest;
+import com.fabricmanagement.common.platform.auth.dto.*;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -34,6 +32,7 @@ public class AuthController {
   private final LogoutService logoutService;
   private final RefreshTokenService refreshTokenService;
   private final JwtService jwtService;
+  private final MfaSetupService mfaSetupService;
 
   @PostMapping("/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(
@@ -42,6 +41,15 @@ public class AuthController {
     String ipAddress = getClientIpAddress(httpRequest);
     LoginResponse response = loginService.login(request, ipAddress);
     return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
+  }
+
+  @PostMapping("/mfa/verify")
+  public ResponseEntity<ApiResponse<LoginResponse>> verifyMfa(
+      @Valid @RequestBody VerifyMfaRequest request, HttpServletRequest httpRequest) {
+    log.info("MFA verification request");
+    String ipAddress = getClientIpAddress(httpRequest);
+    LoginResponse response = loginService.verifyMfa(request, ipAddress);
+    return ResponseEntity.ok(ApiResponse.success(response, "MFA verified and login successful"));
   }
 
   @PostMapping("/logout")
@@ -61,6 +69,45 @@ public class AuthController {
     return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
   }
 
+  @PostMapping("/mfa/setup")
+  public ResponseEntity<ApiResponse<MfaSetupResponse>> setupMfa(
+      @Valid @RequestBody MfaSetupRequest request, HttpServletRequest httpRequest) {
+    log.info("MFA setup request: mfaType={}", request.getMfaType());
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    UUID tenantId = extractTenantIdFromRequest(httpRequest);
+    MfaSetupResponse response = mfaSetupService.setupMfa(tenantId, userId, request.getMfaType());
+    return ResponseEntity.ok(ApiResponse.success(response, "MFA setup initiated"));
+  }
+
+  @PostMapping("/mfa/confirm")
+  public ResponseEntity<ApiResponse<Void>> confirmMfa(
+      @Valid @RequestBody MfaConfirmRequest request, HttpServletRequest httpRequest) {
+    log.info("MFA confirmation request");
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    UUID tenantId = extractTenantIdFromRequest(httpRequest);
+    mfaSetupService.confirmMfaSetup(tenantId, userId, request.getCode());
+    return ResponseEntity.ok(ApiResponse.success(null, "MFA enabled successfully"));
+  }
+
+  @PostMapping("/mfa/disable")
+  public ResponseEntity<ApiResponse<Void>> disableMfa(HttpServletRequest httpRequest) {
+    log.info("MFA disable request");
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    UUID tenantId = extractTenantIdFromRequest(httpRequest);
+    mfaSetupService.disableMfa(tenantId, userId);
+    return ResponseEntity.ok(ApiResponse.success(null, "MFA disabled successfully"));
+  }
+
+  @GetMapping("/mfa/status")
+  public ResponseEntity<ApiResponse<MfaStatusResponse>> getMfaStatus(
+      HttpServletRequest httpRequest) {
+    log.info("MFA status request");
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    UUID tenantId = extractTenantIdFromRequest(httpRequest);
+    MfaStatusResponse response = mfaSetupService.getMfaStatus(tenantId, userId);
+    return ResponseEntity.ok(ApiResponse.success(response, "MFA status retrieved"));
+  }
+
   private UUID extractUserIdFromRequest(HttpServletRequest request) {
     String authHeader = request.getHeader("Authorization");
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -71,6 +118,20 @@ public class AuthController {
       return jwtService.getUserIdFromToken(token);
     } catch (Exception e) {
       log.warn("Failed to extract userId from token: {}", e.getMessage());
+      throw new IllegalArgumentException("Invalid token");
+    }
+  }
+
+  private UUID extractTenantIdFromRequest(HttpServletRequest request) {
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      throw new IllegalArgumentException("Authorization header missing or invalid");
+    }
+    String token = authHeader.substring(7);
+    try {
+      return jwtService.getTenantIdFromToken(token);
+    } catch (Exception e) {
+      log.warn("Failed to extract tenantId from token: {}", e.getMessage());
       throw new IllegalArgumentException("Invalid token");
     }
   }

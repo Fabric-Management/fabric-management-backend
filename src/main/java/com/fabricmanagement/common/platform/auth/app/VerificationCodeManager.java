@@ -25,6 +25,12 @@ public class VerificationCodeManager {
   }
 
   @Transactional
+  public IssuedVerificationCode issueCode(
+      String contactValue, VerificationType type, java.util.UUID tenantId, java.util.UUID userId) {
+    return verificationDispatcher.sendVerificationCode(contactValue, type, tenantId, userId);
+  }
+
+  @Transactional
   public void validateAndConsume(String contactValue, VerificationType type, String rawCode) {
     verificationCodeService.validateAndConsume(contactValue, type, rawCode);
   }

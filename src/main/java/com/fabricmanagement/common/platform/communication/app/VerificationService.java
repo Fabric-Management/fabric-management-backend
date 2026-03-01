@@ -1,10 +1,20 @@
 package com.fabricmanagement.common.platform.communication.app;
 
+import com.fabricmanagement.common.platform.auth.domain.VerificationType;
+import com.fabricmanagement.common.platform.communication.domain.DeliveryChannel;
+import com.fabricmanagement.common.platform.communication.domain.DeliveryStatus;
+import com.fabricmanagement.common.platform.communication.domain.SmsRoutingConfig;
+import com.fabricmanagement.common.platform.communication.domain.VerificationLog;
 import com.fabricmanagement.common.platform.communication.domain.strategy.VerificationStrategy;
 import com.fabricmanagement.common.platform.communication.infra.client.WhatsAppClient;
+import com.fabricmanagement.common.platform.communication.infra.repository.VerificationLogRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.google.i18n.phonenumbers.NumberParseException;
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+import com.google.i18n.phonenumbers.Phonenumber;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -47,6 +57,9 @@ public class VerificationService {
 
   private final List<VerificationStrategy> strategies;
   private final WhatsAppClient whatsAppClient;
+  private final VerificationLogRepository verificationLogRepository;
+  private final MarketRoutingService routingService;
+  private final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
 
   /**
    * Send verification code with smart channel selection (async - doesn't block user response).
@@ -72,30 +85,33 @@ public class VerificationService {
    *
    * @param recipient Email or phone number (E.164 format)
    * @param code 6-digit verification code
+   * @param tenantId Tenant ID for multi-tenancy
+   * @param userId User ID for tracking
+   * @param verificationType Type of verification (MFA_LOGIN_PHONE, MFA_LOGIN_EMAIL, etc.)
    */
   @Async
-  public void sendVerificationCode(String recipient, String code) {
+  public void sendVerificationCode(
+      String recipient,
+      String code,
+      UUID tenantId,
+      UUID userId,
+      VerificationType verificationType) {
     log.info("Sending verification code to: {}", maskRecipient(recipient));
 
-    // Resolve channel at verification time (no isWhatsApp on Contact - check API/cache)
-    if (isPhoneNumber(recipient)) {
-      boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(recipient);
+    String countryCode = extractCountryCode(recipient);
 
-      if (hasWhatsApp) {
-        log.info("Phone has WhatsApp capability, using WhatsApp strategy");
-        sendViaStrategy("WhatsApp", recipient, code);
-        return;
-      } else {
-        log.info("Phone does not have WhatsApp, using SMS strategy");
-        sendViaStrategy("SMS", recipient, code);
-        return;
-      }
+    // Use market-based routing for phone numbers
+    if (isPhoneNumber(recipient)) {
+      sendViaMarketRouting(recipient, code, tenantId, userId, verificationType, countryCode);
+      return;
     }
 
     // Email flow
     if (isEmail(recipient)) {
       log.info("Email detected, using Email strategy");
       sendViaStrategy("Email", recipient, code);
+      createVerificationLog(
+          tenantId, userId, recipient, verificationType, DeliveryChannel.EMAIL, countryCode, null);
       return;
     }
 
@@ -110,6 +126,14 @@ public class VerificationService {
               log.info("Using {} strategy", strategy.name());
               strategy.sendVerificationCode(recipient, code);
               log.info("✅ Verification code sent successfully via {}", strategy.name());
+              createVerificationLog(
+                  tenantId,
+                  userId,
+                  recipient,
+                  verificationType,
+                  DeliveryChannel.EMAIL,
+                  countryCode,
+                  null);
             },
             () -> {
               log.error("No verification strategy available!");
@@ -175,5 +199,249 @@ public class VerificationService {
       return PiiMaskingUtil.maskPhone(recipient);
     }
     return recipient.length() > 4 ? recipient.substring(0, 2) + "***" : "***";
+  }
+
+  /**
+   * Send verification code using market-based routing configuration.
+   *
+   * <p>Uses MarketRoutingService to determine primary and fallback channels based on tenant and
+   * country code.
+   */
+  private void sendViaMarketRouting(
+      String recipient,
+      String code,
+      UUID tenantId,
+      UUID userId,
+      VerificationType verificationType,
+      String countryCode) {
+    if (countryCode == null) {
+      log.warn(
+          "No country code available for phone number, falling back to WhatsApp capability check");
+      sendViaWhatsAppCapabilityCheck(recipient, code, tenantId, userId, verificationType, null);
+      return;
+    }
+
+    SmsRoutingConfig config = routingService.getRoutingConfig(tenantId, countryCode);
+    DeliveryChannel primaryChannel = config.getPrimaryChannel();
+
+    log.info(
+        "Market routing: country={}, primaryChannel={}, fallbackChannel={}",
+        countryCode,
+        primaryChannel,
+        config.getFallbackChannel());
+
+    try {
+      if (primaryChannel == DeliveryChannel.WHATSAPP) {
+        boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(recipient);
+        if (hasWhatsApp) {
+          sendViaWhatsApp(recipient, code, tenantId, userId, verificationType, countryCode);
+        } else {
+          log.warn("Phone does not have WhatsApp, using fallback channel");
+          sendViaFallbackChannel(
+              recipient, code, tenantId, userId, verificationType, countryCode, config);
+        }
+      } else if (primaryChannel == DeliveryChannel.SMS) {
+        sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
+      } else if (primaryChannel == DeliveryChannel.EMAIL) {
+        log.warn("Email configured as primary for phone number, using SMS instead");
+        sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
+      }
+    } catch (Exception e) {
+      log.error("Primary channel failed: {}", e.getMessage());
+      sendViaFallbackChannel(
+          recipient, code, tenantId, userId, verificationType, countryCode, config);
+    }
+  }
+
+  /** Send via fallback channel configured in routing config. */
+  private void sendViaFallbackChannel(
+      String recipient,
+      String code,
+      UUID tenantId,
+      UUID userId,
+      VerificationType verificationType,
+      String countryCode,
+      SmsRoutingConfig config) {
+    DeliveryChannel fallbackChannel = config.getFallbackChannel();
+    if (fallbackChannel == null) {
+      log.error("No fallback channel configured for country: {}", countryCode);
+      throw new RuntimeException("Primary channel failed and no fallback configured");
+    }
+
+    log.info("Using fallback channel: {}", fallbackChannel);
+    if (fallbackChannel == DeliveryChannel.SMS) {
+      sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
+    } else if (fallbackChannel == DeliveryChannel.EMAIL) {
+      log.warn("Email fallback for phone number not supported");
+      throw new RuntimeException("Email fallback not supported for phone numbers");
+    } else if (fallbackChannel == DeliveryChannel.WHATSAPP) {
+      sendViaWhatsApp(recipient, code, tenantId, userId, verificationType, countryCode);
+    }
+  }
+
+  /** Send via SMS strategy. */
+  private void sendViaSms(
+      String recipient,
+      String code,
+      UUID tenantId,
+      UUID userId,
+      VerificationType verificationType,
+      String countryCode) {
+    log.info("Sending via SMS");
+    sendViaStrategy("SMS", recipient, code);
+    createVerificationLog(
+        tenantId, userId, recipient, verificationType, DeliveryChannel.SMS, countryCode, null);
+  }
+
+  /**
+   * Fallback method: Use WhatsApp capability check when country code unavailable.
+   *
+   * @deprecated Use market-based routing instead
+   */
+  private void sendViaWhatsAppCapabilityCheck(
+      String recipient,
+      String code,
+      UUID tenantId,
+      UUID userId,
+      VerificationType verificationType,
+      String countryCode) {
+    boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(recipient);
+
+    if (hasWhatsApp) {
+      log.info("Phone has WhatsApp capability, using WhatsApp strategy");
+      sendViaWhatsApp(recipient, code, tenantId, userId, verificationType, countryCode);
+    } else {
+      log.info("Phone does not have WhatsApp, using SMS strategy");
+      sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
+    }
+  }
+
+  /**
+   * Send verification code via WhatsApp and create VerificationLog.
+   *
+   * @return External message ID (wamid) from WhatsApp
+   */
+  private String sendViaWhatsApp(
+      String recipient,
+      String code,
+      UUID tenantId,
+      UUID userId,
+      VerificationType verificationType,
+      String countryCode) {
+    try {
+      com.fabricmanagement.common.platform.communication.infra.client.WhatsAppMessageResponse
+          response = whatsAppClient.sendVerificationCode(recipient, code);
+
+      String messageId = null;
+      if (response != null && response.getMessages() != null && !response.getMessages().isEmpty()) {
+        messageId = response.getMessages().get(0).getId();
+      }
+
+      createVerificationLog(
+          tenantId,
+          userId,
+          recipient,
+          verificationType,
+          DeliveryChannel.WHATSAPP,
+          countryCode,
+          messageId);
+
+      log.info("✅ Verification code sent via WhatsApp, messageId={}", messageId);
+      return messageId;
+
+    } catch (Exception e) {
+      log.error("❌ Failed to send WhatsApp verification code: {}", e.getMessage(), e);
+      createVerificationLog(
+          tenantId,
+          userId,
+          recipient,
+          verificationType,
+          DeliveryChannel.WHATSAPP,
+          countryCode,
+          null,
+          DeliveryStatus.FAILED,
+          e.getMessage());
+      throw new RuntimeException("WhatsApp sending failed: " + e.getMessage(), e);
+    }
+  }
+
+  /** Create VerificationLog entry for tracking and fallback. */
+  private void createVerificationLog(
+      UUID tenantId,
+      UUID userId,
+      String contactValue,
+      VerificationType verificationType,
+      DeliveryChannel deliveryChannel,
+      String countryCode,
+      String externalMessageId) {
+    createVerificationLog(
+        tenantId,
+        userId,
+        contactValue,
+        verificationType,
+        deliveryChannel,
+        countryCode,
+        externalMessageId,
+        DeliveryStatus.PENDING,
+        null);
+  }
+
+  /** Create VerificationLog entry with custom status and error. */
+  private void createVerificationLog(
+      UUID tenantId,
+      UUID userId,
+      String contactValue,
+      VerificationType verificationType,
+      DeliveryChannel deliveryChannel,
+      String countryCode,
+      String externalMessageId,
+      DeliveryStatus status,
+      String errorMessage) {
+    try {
+      VerificationLog vLog =
+          VerificationLog.builder()
+              .tenantId(tenantId)
+              .userId(userId)
+              .contactValue(contactValue)
+              .countryCode(countryCode)
+              .verificationType(verificationType)
+              .deliveryChannel(deliveryChannel)
+              .deliveryStatus(status)
+              .externalMessageId(externalMessageId)
+              .errorMessage(errorMessage)
+              .build();
+
+      verificationLogRepository.save(vLog);
+      log.debug(
+          "VerificationLog created: channel={}, status={}, countryCode={}, messageId={}",
+          deliveryChannel,
+          status,
+          countryCode,
+          externalMessageId);
+    } catch (Exception e) {
+      log.error("Failed to create VerificationLog: {}", e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Extract country code from phone number (E.164 format).
+   *
+   * @param recipient Phone number or email
+   * @return Country code (e.g., "TR", "US") or null if not a phone number
+   */
+  private String extractCountryCode(String recipient) {
+    if (!isPhoneNumber(recipient)) {
+      return null;
+    }
+
+    try {
+      Phonenumber.PhoneNumber phoneNumber = phoneNumberUtil.parse(recipient, null);
+      String regionCode = phoneNumberUtil.getRegionCodeForNumber(phoneNumber);
+      log.debug("Extracted country code: {} from phone: {}", regionCode, maskRecipient(recipient));
+      return regionCode;
+    } catch (NumberParseException e) {
+      log.warn("Failed to parse phone number for country code: {}", maskRecipient(recipient));
+      return null;
+    }
   }
 }

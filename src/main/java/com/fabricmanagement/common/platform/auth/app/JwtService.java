@@ -72,7 +72,8 @@ public class JwtService {
   }
 
   public String generateAccessToken(User user) {
-    // Get any verified contact for JWT subject (any verified contact = authentication contact)
+    // Get any verified contact for JWT subject (any verified contact =
+    // authentication contact)
     String contactValue =
         user.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
@@ -104,7 +105,8 @@ public class JwtService {
       claims.put("organization_type", organizationType);
       claims.put("company_category", organizationType); // Backward compat
     }
-    // Department: primary name (backward compat) + department_codes list + primary_department code
+    // Department: primary name (backward compat) + department_codes list +
+    // primary_department code
     List<String> departmentCodes = new ArrayList<>();
     String primaryDepartmentCode = null;
     String department = null;
@@ -136,6 +138,30 @@ public class JwtService {
         .claims(claims)
         .issuedAt(Date.from(Instant.now()))
         .expiration(Date.from(Instant.now().plusMillis(accessTokenExpiration)))
+        .signWith(secretKey)
+        .compact();
+  }
+
+  /** Generates a short-lived token granting permission to verify MFA only. */
+  public String generatePreAuthToken(User user) {
+    String contactValue =
+        user.getAnyVerifiedContact()
+            .map(contact -> contact.getContactValue())
+            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
+
+    log.debug("Generating MFA pre-auth token for user: {}", contactValue);
+
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("user_id", user.getId().toString());
+    claims.put("tenant_id", user.getTenantId().toString());
+    claims.put("mfa_pre_auth", true);
+
+    return Jwts.builder()
+        .subject(contactValue)
+        .claims(claims)
+        .issuedAt(Date.from(Instant.now()))
+        // 5 minutes expiration for MFA token
+        .expiration(Date.from(Instant.now().plusMillis(300000)))
         .signWith(secretKey)
         .compact();
   }
@@ -231,7 +257,8 @@ public class JwtService {
    */
   public String generateAccessToken(UserDto userDto) {
     // UserDto no longer has contactValue - should use User entity directly
-    // This method kept for backward compatibility but should use User entity version
+    // This method kept for backward compatibility but should use User entity
+    // version
     throw new UnsupportedOperationException(
         "Use generateAccessToken(User) instead. UserDto no longer includes contactValue/department fields.");
   }
@@ -283,6 +310,13 @@ public class JwtService {
       throw new IllegalArgumentException("JWT missing user_id claim");
     }
     return UUID.fromString(userId);
+  }
+
+  /** Check if token is a pre-auth token */
+  public boolean isPreAuthToken(String token) {
+    Claims claims = extractClaims(token);
+    Boolean isPreAuth = claims.get("mfa_pre_auth", Boolean.class);
+    return Boolean.TRUE.equals(isPreAuth);
   }
 
   public String getUserUidFromToken(String token) {

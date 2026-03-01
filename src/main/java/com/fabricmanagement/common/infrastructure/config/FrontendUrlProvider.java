@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.config;
 
+import java.util.Set;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,9 +26,13 @@ public class FrontendUrlProvider {
 
   private final String baseUrl;
 
-  public FrontendUrlProvider(@Value("${application.frontend.base-url}") String baseUrl) {
+  private static final Set<String> LOCAL_PROFILES = Set.of("local", "dev");
+
+  public FrontendUrlProvider(
+      @Value("${application.frontend.base-url}") String baseUrl,
+      @Value("${spring.profiles.active:local}") String activeProfile) {
     this.baseUrl = baseUrl;
-    if (baseUrl.startsWith("http://localhost")) {
+    if (baseUrl.startsWith("http://localhost") && !LOCAL_PROFILES.contains(activeProfile)) {
       log.warn(
           "⚠️ Frontend base URL is using local fallback ({}). Set FRONTEND_URL or APP_BASE_URL for production.",
           baseUrl);

@@ -10,13 +10,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginRequest {
+public class VerifyMfaRequest {
 
-  @NotBlank(message = "Contact value is required")
-  private String contactValue;
+  @NotBlank(message = "MFA Token is required")
+  private String mfaToken;
 
-  @NotBlank(message = "Password is required")
-  private String password;
+  @NotBlank(message = "Verification code is required")
+  private String code;
 
-  private String trustedDeviceToken;
+  @Builder.Default private Boolean rememberDevice = false;
 }
