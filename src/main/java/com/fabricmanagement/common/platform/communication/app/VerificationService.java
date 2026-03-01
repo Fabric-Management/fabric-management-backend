@@ -329,8 +329,8 @@ public class VerificationService {
       VerificationType verificationType,
       String countryCode) {
     try {
-      com.fabricmanagement.common.platform.communication.infra.client.WhatsAppMessageResponse
-          response = whatsAppClient.sendVerificationCode(recipient, code);
+      WhatsAppClient.WhatsAppMessageResponse response =
+          whatsAppClient.sendVerificationCode(recipient, code);
 
       String messageId = null;
       if (response != null && response.getMessages() != null && !response.getMessages().isEmpty()) {

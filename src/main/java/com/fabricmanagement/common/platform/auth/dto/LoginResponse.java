@@ -29,6 +29,15 @@ public class LoginResponse {
   private MfaType mfaType;
 
   /**
+   * Masked contact value shown to the user after MFA code is dispatched.
+   *
+   * <p>Example: "j***@gmail.com" or "+90 *** *** ** 42". Lets the frontend display "We sent a code
+   * to j***@gmail.com" without revealing the full address. Only present when mfaRequired=true.
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private String maskedContact;
+
+  /**
    * When true, frontend must show onboarding form. Always set explicitly; never null in API
    * response. Serialized as "needsOnboarding" for frontend contract.
    */

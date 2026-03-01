@@ -56,7 +56,13 @@ class VerificationDispatcherTest {
 
     verify(throttleService).checkThrottle(CONTACT, TENANT_ID, TYPE);
     verify(codeService).generate(CONTACT, TYPE);
-    verify(verificationService).sendVerificationCode(eq(CONTACT), eq("123456"));
+    verify(verificationService)
+        .sendVerificationCode(
+            eq(CONTACT),
+            eq("123456"),
+            eq(TENANT_ID),
+            eq(UUID.fromString("00000000-0000-0000-0000-000000000000")),
+            eq(TYPE));
     assertThat(result.code()).isEqualTo("123456");
     assertThat(result.expiresAt()).isAfter(Instant.now());
   }

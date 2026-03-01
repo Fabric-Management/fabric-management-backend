@@ -111,3 +111,5 @@ application:
     verification-template-name: ${PLATFORM_WHATSAPP_VERIFICATION_TEMPLATE:verification_code}
     webhook-verify-token: ${PLATFORM_WHATSAPP_WEBHOOK_VERIFY_TOKEN:}
     timeout: ${PLATFORM_WHATSAPP_TIMEOUT:5000}
+    app-secret: ${PLATFORM_WHATSAPP_APP_SECRET:}
+    webhook-signature-enabled: ${PLATFORM_WHATSAPP_WEBHOOK_SIGNATURE_ENABLED:false}

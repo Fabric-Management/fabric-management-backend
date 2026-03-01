@@ -38,7 +38,7 @@ public class VerificationDispatcher {
             ? TenantContext.getCurrentTenantIdOrNull()
             : TenantContext.SYSTEM_TENANT_ID;
 
-    UUID userId = TenantContext.getCurrentUserIdOrNull();
+    UUID userId = TenantContext.getCurrentUserId();
     if (userId == null) {
       userId = UUID.fromString("00000000-0000-0000-0000-000000000000");
     }

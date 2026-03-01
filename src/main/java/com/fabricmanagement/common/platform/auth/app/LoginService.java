@@ -18,6 +18,7 @@ import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.common.util.DeviceInfoUtil;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import java.time.Instant;
 import java.util.Optional;
@@ -59,6 +60,8 @@ public class LoginService {
   private final VerificationCodeManager verificationCodeManager;
   private final TotpMfaService totpMfaService;
   private final TrustedDeviceService trustedDeviceService;
+  private final MfaRateLimitService mfaRateLimitService;
+  private final MfaEventService mfaEventService;
 
   @Value("${application.jwt.expiration:900000}")
   private long accessTokenExpiration;
@@ -67,7 +70,7 @@ public class LoginService {
   private long refreshTokenExpiration;
 
   @Transactional
-  public LoginResponse login(LoginRequest request, String ipAddress) {
+  public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
     log.info("Login attempt: contactValue={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
 
     // Debug: Log actual email (only in local/dev profiles)
@@ -154,14 +157,19 @@ public class LoginService {
     // Check if MFA is enabled and handle it
     boolean bypassMfa = false;
 
-    // Check trusted device token first
+    // Check trusted device token with full context binding (IP + User-Agent)
     if (request.getTrustedDeviceToken() != null && !request.getTrustedDeviceToken().isBlank()) {
       bypassMfa =
-          trustedDeviceService.validateDevice(request.getTrustedDeviceToken(), user.getId());
+          trustedDeviceService.validateDevice(
+              request.getTrustedDeviceToken(), user.getId(), ipAddress, userAgent);
       if (bypassMfa) {
-        log.info("MFA bypassed due to valid trusted device token for user: {}", user.getId());
+        log.info(
+            "MFA bypassed due to valid trusted device token for user: {}",
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
       } else {
-        log.warn("Invalid or expired trusted device token for user: {}", user.getId());
+        log.warn(
+            "Invalid or expired trusted device token for user: {}",
+            PiiMaskingUtil.maskEmail(request.getContactValue()));
       }
     }
 
@@ -172,26 +180,22 @@ public class LoginService {
       if (mfaType != MfaType.NONE) {
         String preAuthToken = jwtService.generatePreAuthToken(userEntity);
 
+        String maskedContact = null;
         if (mfaType == MfaType.EMAIL || mfaType == MfaType.SMS || mfaType == MfaType.WHATSAPP) {
-          VerificationType vType =
-              mfaType == MfaType.EMAIL
-                  ? VerificationType.MFA_LOGIN_EMAIL
-                  : VerificationType.MFA_LOGIN_PHONE;
-          String contactToVerify =
-              userEntity
-                  .getAnyVerifiedContact()
-                  .map(c -> c.getContactValue())
-                  .orElse(request.getContactValue());
-
-          verificationCodeManager.issueCode(
-              contactToVerify, vType, user.getTenantId(), user.getId());
+          VerificationCodeManager.MfaCodeIssuanceResult mfaResult =
+              verificationCodeManager.issueMfaCode(user.getId(), user.getTenantId(), mfaType);
+          maskedContact = mfaResult.maskedContact();
         }
 
-        log.info("MFA required for user: {}, mfaType={}", user.getId(), mfaType);
+        log.info(
+            "MFA required for user: {}, mfaType={}",
+            PiiMaskingUtil.maskEmail(request.getContactValue()),
+            mfaType);
         return LoginResponse.builder()
             .mfaRequired(true)
             .mfaToken(preAuthToken)
             .mfaType(mfaType)
+            .maskedContact(maskedContact)
             .build();
       }
     }
@@ -201,7 +205,12 @@ public class LoginService {
 
     RefreshToken refreshTokenEntity =
         RefreshToken.create(
-            user.getId(), refreshToken, Instant.now().plusMillis(refreshTokenExpiration));
+            user.getId(),
+            refreshToken,
+            Instant.now().plusMillis(refreshTokenExpiration),
+            ipAddress,
+            userAgent,
+            DeviceInfoUtil.extractDeviceName(userAgent));
     refreshTokenRepository.save(refreshTokenEntity);
 
     // Get contact value from Contact entity
@@ -214,7 +223,11 @@ public class LoginService {
     eventPublisher.publish(
         new UserLoginEvent(user.getTenantId(), user.getId(), contactValue, ipAddress));
 
-    log.info("Login successful: userId={}, uid={}", user.getId(), user.getUid());
+    log.info(
+        "Login successful: contactValue={}, userId={}, uid={}",
+        PiiMaskingUtil.maskEmail(request.getContactValue()),
+        user.getId(),
+        user.getUid());
 
     return LoginResponse.builder()
         .accessToken(accessToken)
@@ -226,7 +239,7 @@ public class LoginService {
   }
 
   @Transactional
-  public LoginResponse verifyMfa(VerifyMfaRequest request, String ipAddress) {
+  public LoginResponse verifyMfa(VerifyMfaRequest request, String ipAddress, String userAgent) {
     if (!jwtService.validateToken(request.getMfaToken())) {
       throw new IllegalArgumentException("Invalid or expired MFA token");
     }
@@ -237,6 +250,9 @@ public class LoginService {
 
     UUID userId = jwtService.getUserIdFromToken(request.getMfaToken());
     UUID tenantId = jwtService.getTenantIdFromToken(request.getMfaToken());
+
+    // Brute-force protection: reject if user exceeded max failed MFA attempts
+    mfaRateLimitService.checkRateLimit(userId);
 
     AuthUser authUser =
         authUserRepository
@@ -250,42 +266,45 @@ public class LoginService {
 
     MfaType mfaType = authUser.getPrimaryMfaType();
 
-    // Verify the code based on the chosen MFA method
-    if (mfaType == MfaType.TOTP) {
-      boolean isValid = totpMfaService.verifyCode(authUser.getMfaSecret(), request.getCode());
-      if (!isValid) {
-        throw new IllegalArgumentException("Invalid TOTP code");
+    try {
+      if (mfaType == MfaType.TOTP) {
+        boolean isValid = totpMfaService.verifyCode(authUser.getMfaSecret(), request.getCode());
+        if (!isValid) {
+          throw new IllegalArgumentException("Invalid TOTP code");
+        }
+      } else if (mfaType == MfaType.EMAIL
+          || mfaType == MfaType.SMS
+          || mfaType == MfaType.WHATSAPP) {
+        verificationCodeManager.validateMfaCode(userId, tenantId, mfaType, request.getCode());
+      } else {
+        throw new IllegalArgumentException("MFA is not enabled or type is invalid");
       }
-    } else if (mfaType == MfaType.EMAIL || mfaType == MfaType.SMS || mfaType == MfaType.WHATSAPP) {
-      VerificationType vType =
-          mfaType == MfaType.EMAIL
-              ? VerificationType.MFA_LOGIN_EMAIL
-              : VerificationType.MFA_LOGIN_PHONE;
-      String contactToVerify =
-          userEntity.getAnyVerifiedContact().map(c -> c.getContactValue()).orElse(null);
-      if (contactToVerify == null) {
-        throw new IllegalArgumentException("No verified contact found to verify MFA");
-      }
-      verificationCodeManager.validateAndConsume(contactToVerify, vType, request.getCode());
-    } else {
-      throw new IllegalArgumentException("MFA is not enabled or type is invalid");
+    } catch (IllegalArgumentException e) {
+      mfaRateLimitService.recordFailedAttempt(userId);
+      throw e;
     }
+
+    mfaRateLimitService.clearAttempts(userId);
+    mfaEventService.pushCompletionEvent(userId);
 
     // Success! Generate actual tokens
     String accessToken = jwtService.generateAccessToken(userEntity);
     String refreshToken = jwtService.generateRefreshToken(userEntity);
 
     RefreshToken refreshTokenEntity =
-        RefreshToken.create(userId, refreshToken, Instant.now().plusMillis(refreshTokenExpiration));
+        RefreshToken.create(
+            userId,
+            refreshToken,
+            Instant.now().plusMillis(refreshTokenExpiration),
+            ipAddress,
+            userAgent,
+            DeviceInfoUtil.extractDeviceName(userAgent));
     refreshTokenRepository.save(refreshTokenEntity);
 
     String newTrustedDeviceToken = null;
     if (Boolean.TRUE.equals(request.getRememberDevice())) {
       newTrustedDeviceToken =
-          trustedDeviceService.createTrustedDevice(
-              userId,
-              ipAddress,
-              "Unknown Browser"); // Browser info can be pulled from headers later
+          trustedDeviceService.createTrustedDevice(userId, ipAddress, userAgent);
     }
 
     UserDto userDto = userFacade.findById(tenantId, userId).orElseThrow();

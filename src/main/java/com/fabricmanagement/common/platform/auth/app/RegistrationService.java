@@ -21,6 +21,7 @@ import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.common.util.DeviceInfoUtil;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import java.time.Instant;
 import java.util.Optional;
@@ -113,7 +114,8 @@ public class RegistrationService {
   }
 
   @Transactional
-  public LoginResponse verifyAndRegister(VerifyAndRegisterRequest request, String ipAddress) {
+  public LoginResponse verifyAndRegister(
+      VerifyAndRegisterRequest request, String ipAddress, String userAgent) {
     log.info(
         "Verifying and registering: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
@@ -166,10 +168,14 @@ public class RegistrationService {
     String accessToken = jwtService.generateAccessToken(userEntity);
     String refreshToken = jwtService.generateRefreshToken(userEntity);
 
-    // Persist refresh token for token refresh flow
     RefreshToken refreshTokenEntity =
         RefreshToken.create(
-            user.getId(), refreshToken, Instant.now().plusMillis(refreshTokenExpiration));
+            user.getId(),
+            refreshToken,
+            Instant.now().plusMillis(refreshTokenExpiration),
+            ipAddress,
+            userAgent,
+            DeviceInfoUtil.extractDeviceName(userAgent));
     refreshTokenEntity.setTenantId(user.getTenantId());
     refreshTokenRepository.save(refreshTokenEntity);
 

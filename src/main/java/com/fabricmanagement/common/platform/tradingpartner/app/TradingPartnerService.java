@@ -276,7 +276,7 @@ public class TradingPartnerService {
           default -> List.of(type);
         };
 
-    return partnerRepository.findByTenantIdAndPartnerTypeIn(tenantId, types).stream()
+    return partnerRepository.findByTenantIdAndPartnerTypeInAndIsActiveTrue(tenantId, types).stream()
         .map(TradingPartnerDto::from)
         .toList();
   }

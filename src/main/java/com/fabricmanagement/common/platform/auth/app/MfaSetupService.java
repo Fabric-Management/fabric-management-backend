@@ -6,6 +6,8 @@ import com.fabricmanagement.common.platform.auth.dto.MfaSetupResponse;
 import com.fabricmanagement.common.platform.auth.dto.MfaStatusResponse;
 import com.fabricmanagement.common.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.common.platform.auth.infra.repository.TrustedDeviceRepository;
+import com.fabricmanagement.common.platform.user.domain.User;
+import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ public class MfaSetupService {
   private final AuthUserRepository authUserRepository;
   private final TrustedDeviceRepository trustedDeviceRepository;
   private final TotpMfaService totpMfaService;
+  private final UserRepository userRepository;
 
   /**
    * Initiate MFA setup for user.
@@ -60,7 +63,25 @@ public class MfaSetupService {
    */
   private MfaSetupResponse setupTotpMfa(AuthUser authUser) {
     String secret = totpMfaService.generateSecret();
-    String qrCodeUri = totpMfaService.getQrCodeImageUri(authUser.getUserId().toString(), secret);
+
+    String accountName = authUser.getUserId().toString();
+    try {
+      User userEntity =
+          userRepository
+              .findByTenantIdAndId(authUser.getTenantId(), authUser.getUserId())
+              .orElse(null);
+      if (userEntity != null) {
+        accountName =
+            userEntity
+                .getAnyVerifiedContact()
+                .map(contact -> contact.getContactValue())
+                .orElse(authUser.getUserId().toString());
+      }
+    } catch (Exception e) {
+      log.warn("Failed to retrieve user contact for TOTP account name, using ID", e);
+    }
+
+    String qrCodeUri = totpMfaService.getQrCodeImageUri(secret, accountName, "Fabric Management");
 
     authUser.setMfaSecret(secret);
     authUser.setPrimaryMfaType(MfaType.TOTP);

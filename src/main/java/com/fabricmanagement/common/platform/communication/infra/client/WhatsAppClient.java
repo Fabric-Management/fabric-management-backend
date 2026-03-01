@@ -364,7 +364,7 @@ public class WhatsAppClient {
 
   @Data
   @JsonIgnoreProperties(ignoreUnknown = true)
-  static class WhatsAppMessageResponse {
+  public static class WhatsAppMessageResponse {
     private List<WhatsAppMessageId> messages;
   }
 

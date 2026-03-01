@@ -2,8 +2,12 @@ package com.fabricmanagement.common.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.common.platform.auth.domain.event.UserLogoutEvent;
+import com.fabricmanagement.common.platform.auth.dto.ActiveSessionDto;
 import com.fabricmanagement.common.platform.auth.infra.repository.RefreshTokenRepository;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,15 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Logout Service - Handles user logout and token revocation.
- *
- * <h2>Responsibilities:</h2>
- *
- * <ul>
- *   <li>Revoke refresh token
- *   <li>Publish logout event
- *   <li>Support "logout from all devices" (optional)
- * </ul>
+ * Logout and session management: single-device logout, revoke all, list active sessions, revoke by
+ * session ID.
  */
 @Service
 @RequiredArgsConstructor
@@ -92,5 +89,47 @@ public class LogoutService {
     eventPublisher.publish(new UserLogoutEvent(tenantId, userId));
 
     log.info("✅ Logged out from all devices: userId={}", userId);
+  }
+
+  /**
+   * List active (non-revoked, non-expired) sessions for a user.
+   *
+   * @param userId user whose sessions to list
+   * @param currentTokenId the RefreshToken.id of the requester's current session (for isCurrent
+   *     flag)
+   * @return list of active sessions, newest first
+   */
+  @Transactional(readOnly = true)
+  public List<ActiveSessionDto> getActiveSessions(UUID userId, UUID currentTokenId) {
+    List<RefreshToken> tokens =
+        refreshTokenRepository.findByUserIdAndIsRevokedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
+            userId, Instant.now());
+
+    return tokens.stream()
+        .map(t -> ActiveSessionDto.from(t, t.getId().equals(currentTokenId)))
+        .toList();
+  }
+
+  /**
+   * Revoke a specific session by its ID.
+   *
+   * @param sessionId RefreshToken PK
+   * @param userId ownership guard — must belong to this user
+   */
+  @Transactional
+  public void revokeSession(UUID sessionId, UUID userId) {
+    RefreshToken token =
+        refreshTokenRepository
+            .findByIdAndUserId(sessionId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+
+    if (token.getIsRevoked()) {
+      log.info("Session already revoked: sessionId={}", sessionId);
+      return;
+    }
+
+    token.revoke();
+    refreshTokenRepository.save(token);
+    log.info("Session revoked: sessionId={}, userId={}", sessionId, userId);
   }
 }

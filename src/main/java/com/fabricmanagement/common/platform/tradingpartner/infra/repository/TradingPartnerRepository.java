@@ -57,7 +57,7 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
       @Param("tenantId") UUID tenantId, @Param("partnerType") PartnerType partnerType);
 
   /** Find by tenant and multiple partner types. */
-  List<TradingPartner> findByTenantIdAndPartnerTypeIn(
+  List<TradingPartner> findByTenantIdAndPartnerTypeInAndIsActiveTrue(
       @Param("tenantId") UUID tenantId, @Param("types") List<PartnerType> types);
 
   /** Find by tenant and status. */

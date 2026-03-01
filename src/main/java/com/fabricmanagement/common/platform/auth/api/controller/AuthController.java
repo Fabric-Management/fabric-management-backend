@@ -4,17 +4,22 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.JwtService;
 import com.fabricmanagement.common.platform.auth.app.LoginService;
 import com.fabricmanagement.common.platform.auth.app.LogoutService;
+import com.fabricmanagement.common.platform.auth.app.MfaEventService;
 import com.fabricmanagement.common.platform.auth.app.MfaSetupService;
 import com.fabricmanagement.common.platform.auth.app.RefreshTokenService;
 import com.fabricmanagement.common.platform.auth.dto.*;
+import com.fabricmanagement.common.platform.auth.dto.ActiveSessionDto;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Auth session: login, logout, refresh token.
@@ -33,13 +38,15 @@ public class AuthController {
   private final RefreshTokenService refreshTokenService;
   private final JwtService jwtService;
   private final MfaSetupService mfaSetupService;
+  private final MfaEventService mfaEventService;
 
   @PostMapping("/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(
       @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
     log.info("Login request: contactValue={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
     String ipAddress = getClientIpAddress(httpRequest);
-    LoginResponse response = loginService.login(request, ipAddress);
+    String userAgent = httpRequest.getHeader("User-Agent");
+    LoginResponse response = loginService.login(request, ipAddress, userAgent);
     return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
   }
 
@@ -48,7 +55,8 @@ public class AuthController {
       @Valid @RequestBody VerifyMfaRequest request, HttpServletRequest httpRequest) {
     log.info("MFA verification request");
     String ipAddress = getClientIpAddress(httpRequest);
-    LoginResponse response = loginService.verifyMfa(request, ipAddress);
+    String userAgent = httpRequest.getHeader("User-Agent");
+    LoginResponse response = loginService.verifyMfa(request, ipAddress, userAgent);
     return ResponseEntity.ok(ApiResponse.success(response, "MFA verified and login successful"));
   }
 
@@ -67,6 +75,31 @@ public class AuthController {
     log.info("Refresh token request");
     LoginResponse response = refreshTokenService.refreshAccessToken(request.getRefreshToken());
     return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
+  }
+
+  // ── Session management endpoints ──────────────────────────────────────────────
+
+  @GetMapping("/sessions")
+  public ResponseEntity<ApiResponse<List<ActiveSessionDto>>> getActiveSessions(
+      HttpServletRequest httpRequest) {
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    List<ActiveSessionDto> sessions = logoutService.getActiveSessions(userId, null);
+    return ResponseEntity.ok(ApiResponse.success(sessions, "Active sessions retrieved"));
+  }
+
+  @DeleteMapping("/sessions/{sessionId}")
+  public ResponseEntity<ApiResponse<Void>> revokeSession(
+      @PathVariable UUID sessionId, HttpServletRequest httpRequest) {
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    logoutService.revokeSession(sessionId, userId);
+    return ResponseEntity.ok(ApiResponse.success(null, "Session revoked successfully"));
+  }
+
+  @DeleteMapping("/sessions")
+  public ResponseEntity<ApiResponse<Void>> revokeAllSessions(HttpServletRequest httpRequest) {
+    UUID userId = extractUserIdFromRequest(httpRequest);
+    logoutService.logoutFromAllDevices(userId);
+    return ResponseEntity.ok(ApiResponse.success(null, "All sessions revoked successfully"));
   }
 
   @PostMapping("/mfa/setup")
@@ -96,6 +129,40 @@ public class AuthController {
     UUID tenantId = extractTenantIdFromRequest(httpRequest);
     mfaSetupService.disableMfa(tenantId, userId);
     return ResponseEntity.ok(ApiResponse.success(null, "MFA disabled successfully"));
+  }
+
+  /**
+   * SSE endpoint for real-time MFA status updates (fallback notifications).
+   *
+   * <p>Frontend subscribes after receiving mfaRequired=true. Receives events when WhatsApp times
+   * out and SMS fallback is triggered.
+   */
+  @GetMapping(value = "/mfa/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  public SseEmitter mfaEvents(HttpServletRequest httpRequest) {
+    String token = null;
+
+    String authHeader = httpRequest.getHeader("Authorization");
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    } else {
+      token = httpRequest.getParameter("token");
+    }
+
+    if (token == null || token.isBlank()) {
+      throw new IllegalArgumentException("MFA token required");
+    }
+
+    if (!jwtService.validateToken(token)) {
+      throw new IllegalArgumentException("Invalid or expired MFA token");
+    }
+
+    if (!jwtService.isPreAuthToken(token)) {
+      throw new IllegalArgumentException("Only pre-auth MFA tokens can subscribe to MFA events");
+    }
+
+    UUID userId = jwtService.getUserIdFromToken(token);
+    log.info("MFA SSE subscription for user: {}", userId);
+    return mfaEventService.subscribe(userId);
   }
 
   @GetMapping("/mfa/status")

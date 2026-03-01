@@ -28,7 +28,8 @@ import org.springframework.web.bind.annotation.*;
  *
  * <ul>
  *   <li>Webhook verification via verify token (GET request)
- *   <li>Optional: Validate X-Hub-Signature header (not implemented yet)
+ *   <li>X-Hub-Signature-256 HMAC-SHA256 validation via {@link
+ *       com.fabricmanagement.common.platform.communication.infra.webhook.WebhookSignatureFilter}
  * </ul>
  *
  * @see <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks">WhatsApp

@@ -113,6 +113,10 @@ auth:
     refresh-token-expiry: ${AUTH_JWT_REFRESH_EXPIRY:7d}
   password:
     bcrypt-strength: ${AUTH_BCRYPT_STRENGTH:10}
+  mfa:
+    rate-limit:
+      max-attempts: ${AUTH_MFA_RATE_LIMIT_MAX_ATTEMPTS:5}
+      lockout-seconds: ${AUTH_MFA_RATE_LIMIT_LOCKOUT_SECONDS:900}
 
 # Application Properties
 application:
@@ -207,6 +211,8 @@ application:
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
     verification-template-name: ${WHATSAPP_VERIFICATION_TEMPLATE:verification_code}
     timeout: ${WHATSAPP_TIMEOUT:5000}
+    app-secret: ${WHATSAPP_APP_SECRET:}
+    webhook-signature-enabled: ${WHATSAPP_WEBHOOK_SIGNATURE_ENABLED:true}
 
 # Feature Flags
 feature:

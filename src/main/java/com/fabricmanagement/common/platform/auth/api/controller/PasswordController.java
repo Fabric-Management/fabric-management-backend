@@ -70,7 +70,9 @@ public class PasswordController {
       @Valid @RequestBody PasswordResetVerifyRequest request, HttpServletRequest httpRequest) {
     log.info("Password reset verification: authUserId={}, code=***", request.getAuthUserId());
     String ipAddress = getClientIpAddress(httpRequest);
-    LoginResponse response = passwordResetService.verifyAndResetPassword(request, ipAddress);
+    String userAgent = httpRequest.getHeader("User-Agent");
+    LoginResponse response =
+        passwordResetService.verifyAndResetPassword(request, ipAddress, userAgent);
     return ResponseEntity.ok(
         ApiResponse.success(
             response, "Password reset successful! You have been automatically logged in."));

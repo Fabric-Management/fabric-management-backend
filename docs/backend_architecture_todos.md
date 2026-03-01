@@ -13,18 +13,18 @@ Bu tablo analizi yapılan backend yapısını (Multi-Tenant, AuthUser, TradingPa
 - [ ] **Trusted Device (Kayıtlı Cihazlar):** İleriki faz için "Bu cihazda 30 gün boyunca bir daha sorma" Session/Token mantığı kurgulanacak.
 
 ### 2. Multi-Organization ve Platform Yönetimi (Matrix Management & WABA)
-- [ ] **Personel Matris (Matrix) Yetkilendirmesi:** `User` entitisindeki statik ve tekil `organizationId` alanı geliştirilerek, bir yöneticinin aynı anda birden fazla alt fabrikada/departmanda yetkili olabilmesini sağlayan çoklu (`UserOrganization` vb.) bağlantı kurgulanacak.
-- [ ] **Platform Düzeyi Tekil WABA Havuzu:** Her tenant/müşteri için Meta süreci yaşamak yerine, platform tek bir kurumsal WhatsApp Business API (WABA) hesabı üzerinden tüm tenantların doğrulama mesajlarını atacak. İşletme masrafları abonelik kurgusunda hesaplanacak.
-- [ ] **Encapsulation (Gizleme):** PazarRouting, Outbox atımı vb. karmaşık operasyonlar çağıran servisten (Controller) gizli tutulacak. Sadece `verificationService.sendOtp(userId)` komutu çağrılarak tamamen Clean Architecture (Solid) kuralları işletilecek.
+- [ ] **Personel Matris (Matrix) Yetkilendirmesi *(Donduruldu / İleri Faz)*:** "Soft-Matrix" (Additive) stratesiyle ilerlenecek. Mevcut `User.organizationId` kamerasını kırmadan, `UserOrganization` junction table eklenip (Faz 1), Dual-Read Pattern (Faz 2) ve aşamalı geçiş (Faz 3) ile implement edilecek. Şu anki müşteri profilinde acil ihtiyaç olmadığı için ertelendi.
+- [x] **Platform Düzeyi Tekil WABA Havuzu:** Her tenant/müşteri için Meta süreci yaşamak yerine, platform tek bir kurumsal WhatsApp Business API (WABA) hesabı üzerinden tüm tenantların doğrulama mesajlarını atacak. `application.yml` içindeki `whatsapp.*` bloku platform-geneli olarak kurgulanmış, `WhatsAppClient` tek merkezden bağlanıyor.
+- [x] **Encapsulation (Gizleme) — Tamamlandı:** `VerificationCodeManager.issueMfaCode(userId, tenantId, mfaType)` ve `validateMfaCode(userId, tenantId, mfaType, code)` facade metodları eklendi. `LoginService` artık contact çözümlemeyi, `VerificationType` belirlemeyi veya iletişim kanalını bilmiyor; tek satırla `verificationCodeManager.issueMfaCode(userId, tenantId, mfaType)` çağrısı yapıyor. İletişim kanalı seçimi (WhatsApp → SMS fallback, Market routing) ve PII maskeleme `VerificationCodeManager` içinde encapsulate edildi. `LoginResponse`'a `maskedContact` alanı eklenerek frontend "j***@gmail.com adresinize kod gönderdik" uyarısını gösterebilir hale getirildi.
 
 ---
 
 ## 🟡 Öncelik 2: Orta (İzlenebilirlik, Oturum Güvenliği ve Doğrulama)
 
-### 3. Oturum (Session) ve Cihaz Yönetimi
-- [ ] Sadece "son giriş zamanı" yerine, `UserSession` (veya `RefreshToken` tracking) tablosu tasarlanacak.
-- [ ] Refresh Token'lar veritabanında tutulacak ve Cihaz Bilgisi (User-Agent), IP adresi kayıt altına alınacak.
-- [ ] Kullanıcı "Tüm oturumlarımı (veya o cihazı) kapat" dediğinde token/session invalidate edilecek (Revoke All Sessions).
+### 3. Oturum (Session) ve Cihaz Yönetimi — *Tamamlandı*
+- [x] Sadece "son giriş zamanı" yerine, `UserSession` (veya `RefreshToken` tracking) tablosu tasarlanacak. *(RefreshToken üzerine ip_address, user_agent, device_name eklenerek RefreshToken bir session tracker olarak genişletildi)*
+- [x] Refresh Token'lar veritabanında tutulacak ve Cihaz Bilgisi (User-Agent), IP adresi kayıt altına alınacak. *(DeviceInfoUtil oluşturuldu, ActiveSessionDto yazıldı. RefreshTokenCleanupJob ile eski token temizliği 6 saatte bir CRON ile sağlandı)*
+- [x] Kullanıcı "Tüm oturumlarımı (veya o cihazı) kapat" dediğinde token/session invalidate edilecek (Revoke All Sessions). *(LogoutService içine getActiveSessions, revokeSession, logoutFromAllDevices metodları eklendi, AuthController'da GET/DELETE endpointleri açıldı)*
 
 ### 4. Alan Bazlı Audit Log (Veri İz İzi)
 - [ ] `Hibernate Envers` kütüphanesi veya "Event / AOP" tabanlı Custom Audit mekanizması entegre edilecek.

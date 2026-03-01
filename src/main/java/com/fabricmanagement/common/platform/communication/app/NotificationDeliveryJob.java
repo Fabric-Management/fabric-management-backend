@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.communication.app;
 
+import com.fabricmanagement.common.platform.auth.app.MfaEventService;
 import com.fabricmanagement.common.platform.auth.app.VerificationCodeService;
 import com.fabricmanagement.common.platform.auth.app.VerificationDispatcher;
 import com.fabricmanagement.common.platform.communication.domain.DeliveryChannel;
@@ -32,6 +33,7 @@ public class NotificationDeliveryJob {
   private final JobScheduler jobScheduler;
   private final VerificationDispatcher verificationDispatcher;
   private final VerificationCodeService verificationCodeService;
+  private final MfaEventService mfaEventService;
 
   @PostConstruct
   public void schedule() {
@@ -108,6 +110,10 @@ public class NotificationDeliveryJob {
           "✅ Fallback verification code sent via {} to user {}",
           fallbackChannel,
           originalLog.getUserId());
+
+      if (originalLog.getUserId() != null) {
+        mfaEventService.pushFallbackEvent(originalLog.getUserId(), fallbackChannel.name());
+      }
 
     } catch (Exception e) {
       log.error(
