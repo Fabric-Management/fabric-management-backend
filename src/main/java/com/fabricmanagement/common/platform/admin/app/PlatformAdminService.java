@@ -156,8 +156,7 @@ public class PlatformAdminService {
                               String.format("User %s not found in tenant %s", userId, tenantId)));
 
           return UserDto.from(
-              user,
-              employeeService.getEmployeeByUserId(tenantId, userId).orElse(null));
+              user, employeeService.getEmployeeByUserId(tenantId, userId).orElse(null));
         });
   }
 

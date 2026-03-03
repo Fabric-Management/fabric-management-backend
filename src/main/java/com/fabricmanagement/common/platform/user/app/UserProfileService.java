@@ -8,11 +8,13 @@ import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
+import com.fabricmanagement.common.platform.user.domain.Role;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserProfileUpdatedEvent;
 import com.fabricmanagement.common.platform.user.domain.value.ProfileCategory;
 import com.fabricmanagement.common.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.human.core.employee.application.EmployeeService;
 import com.fabricmanagement.human.core.employee.domain.EmergencyContact;
@@ -42,8 +44,7 @@ public class UserProfileService {
   private final AddressService addressService;
   private final UserAddressAssignmentService userAddressAssignmentService;
   private final UserDepartmentService userDepartmentService;
-  private final com.fabricmanagement.common.platform.user.infra.repository.RoleRepository
-      roleRepository;
+  private final RoleRepository roleRepository;
   private final EmployeeService employeeService;
   private final DomainEventPublisher eventPublisher;
 
@@ -94,7 +95,7 @@ public class UserProfileService {
       updateWorkAddress(userId, request.getWorkAddress());
     }
     if (request.getRoleId() != null) {
-      com.fabricmanagement.common.platform.user.domain.Role role =
+      Role role =
           roleRepository
               .findByTenantIdAndId(TenantContext.getCurrentTenantId(), request.getRoleId())
               .orElseThrow(() -> new IllegalArgumentException("Role not found"));
@@ -151,8 +152,7 @@ public class UserProfileService {
             })
         .orElseGet(
             () -> {
-              log.debug(
-                  "No Employee record for userId={}; skipping personal field update", userId);
+              log.debug("No Employee record for userId={}; skipping personal field update", userId);
               return null;
             });
   }

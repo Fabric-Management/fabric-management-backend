@@ -126,8 +126,7 @@ public class UserDto {
           .employeeNumber(employee.getEmployeeNumber())
           .hireDate(employee.getHireDate());
 
-      if (employee.getEmergencyContact() != null
-          && !employee.getEmergencyContact().isEmpty()) {
+      if (employee.getEmergencyContact() != null && !employee.getEmergencyContact().isEmpty()) {
         builder.emergencyContact(
             EmergencyContactDto.builder()
                 .name(employee.getEmergencyContact().getName())

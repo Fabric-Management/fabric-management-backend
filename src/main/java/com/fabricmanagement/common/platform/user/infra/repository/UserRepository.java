@@ -138,7 +138,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * <p>Eagerly fetches Role to avoid lazy loading issues.
    */
   @Query(
-      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND (u.firstName LIKE %:search% OR u.lastName LIKE %:search% OR u.displayName LIKE %:search%)")
+      "SELECT u FROM User u LEFT JOIN FETCH u.role "
+          + "WHERE u.tenantId = :tenantId AND (u.firstName LIKE %:search% OR u.lastName LIKE"
+          + " %:search% OR u.displayName LIKE %:search%)")
   List<User> searchByName(@Param("tenantId") UUID tenantId, @Param("search") String search);
 
   /** Get active users belonging to specific departments (for department-scoped access). */
@@ -150,8 +152,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + "WHERE u.tenantId = :tenantId AND u.isActive = true "
           + "AND ud.departmentId IN :departmentIds")
   List<User> findByTenantIdAndDepartmentIds(
-      @Param("tenantId") UUID tenantId,
-      @Param("departmentIds") java.util.Set<UUID> departmentIds);
+      @Param("tenantId") UUID tenantId, @Param("departmentIds") java.util.Set<UUID> departmentIds);
 
   /** Count active users in tenant. */
   long countByTenantIdAndIsActiveTrue(UUID tenantId);

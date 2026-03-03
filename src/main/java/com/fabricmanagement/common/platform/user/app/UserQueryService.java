@@ -8,6 +8,7 @@ import com.fabricmanagement.human.core.employee.domain.Employee;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,9 +48,7 @@ public class UserQueryService {
         .findByContactValue(contactValue)
         .map(
             user ->
-                UserDto.from(
-                    user,
-                    employeeService.getEmployeeByUserId(user.getId()).orElse(null)));
+                UserDto.from(user, employeeService.getEmployeeByUserId(user.getId()).orElse(null)));
   }
 
   @Transactional(readOnly = true)
@@ -70,7 +69,7 @@ public class UserQueryService {
   }
 
   @Transactional(readOnly = true)
-  public List<UserDto> findByDepartments(UUID tenantId, java.util.Set<UUID> departmentIds) {
+  public List<UserDto> findByDepartments(UUID tenantId, Set<UUID> departmentIds) {
     log.debug(
         "Finding users by departments: tenantId={}, departmentCount={}",
         tenantId,
@@ -116,8 +115,6 @@ public class UserQueryService {
     }
     List<UUID> userIds = users.stream().map(User::getId).toList();
     Map<UUID, Employee> employeeMap = employeeService.getEmployeesByUserIds(tenantId, userIds);
-    return users.stream()
-        .map(user -> UserDto.from(user, employeeMap.get(user.getId())))
-        .toList();
+    return users.stream().map(user -> UserDto.from(user, employeeMap.get(user.getId()))).toList();
   }
 }

@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
 import com.fabricmanagement.common.platform.communication.app.ContactSuggestionService;
 import com.fabricmanagement.common.platform.communication.dto.ContactSuggestionsDto;
+import com.fabricmanagement.common.platform.subscription.app.UserCreationOptionsService;
 import com.fabricmanagement.common.platform.user.app.TeamAccessService;
 import com.fabricmanagement.common.platform.user.app.UserAddressAssignmentService;
 import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
@@ -16,8 +17,10 @@ import com.fabricmanagement.common.platform.user.dto.UserAddressDto;
 import com.fabricmanagement.common.platform.user.dto.UserContactDto;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.fabricmanagement.human.core.employee.application.EmployeeService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,10 +39,8 @@ public class UserController {
   private final ContactSuggestionService contactSuggestionService;
   private final UserContactAssignmentService userContactAssignmentService;
   private final UserAddressAssignmentService userAddressAssignmentService;
-  private final com.fabricmanagement.human.core.employee.application.EmployeeService
-      employeeService;
-  private final com.fabricmanagement.common.platform.subscription.app.UserCreationOptionsService
-      userCreationOptionsService;
+  private final EmployeeService employeeService;
+  private final UserCreationOptionsService userCreationOptionsService;
   private final TeamAccessService teamAccessService;
 
   /**
@@ -103,8 +104,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<UserDto>> getUser(@PathVariable UUID id) {
     UUID requesterId = TenantContext.getCurrentUserId();
     if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
-      throw new AccessDeniedException(
-          "You don't have permission to view member details.");
+      throw new AccessDeniedException("You don't have permission to view member details.");
     }
 
     log.debug("Getting user: id={}, requesterId={}", id, requesterId);
@@ -134,13 +134,12 @@ public class UserController {
     TeamAccessService.AccessLevel accessLevel = teamAccessService.resolveAccessLevel(requesterId);
 
     if (accessLevel == TeamAccessService.AccessLevel.NO_ACCESS) {
-      throw new AccessDeniedException(
-          "You don't have permission to view team members.");
+      throw new AccessDeniedException("You don't have permission to view team members.");
     }
 
     if (accessLevel == TeamAccessService.AccessLevel.DEPARTMENT_ONLY) {
       log.debug("Getting department-scoped users: requesterId={}", requesterId);
-      java.util.Set<UUID> deptIds = teamAccessService.getUserDepartmentIds(requesterId);
+      Set<UUID> deptIds = teamAccessService.getUserDepartmentIds(requesterId);
       List<UserDto> users = userService.findByDepartments(tenantId, deptIds);
       return ResponseEntity.ok(ApiResponse.success(users));
     }
@@ -155,14 +154,12 @@ public class UserController {
       @PathVariable UUID companyId) {
     UUID requesterId = TenantContext.getCurrentUserId();
     if (!teamAccessService.canViewAllMembers(requesterId)) {
-      throw new AccessDeniedException(
-          "You don't have permission to view company members.");
+      throw new AccessDeniedException("You don't have permission to view company members.");
     }
 
     log.debug("Getting users by company: companyId={}, requesterId={}", companyId, requesterId);
 
-    List<UserDto> users =
-        userService.findByCompany(TenantContext.getCurrentTenantId(), companyId);
+    List<UserDto> users = userService.findByCompany(TenantContext.getCurrentTenantId(), companyId);
 
     return ResponseEntity.ok(ApiResponse.success(users));
   }
@@ -308,8 +305,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<List<UserContactDto>>> getUserContacts(@PathVariable UUID id) {
     UUID requesterId = TenantContext.getCurrentUserId();
     if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
-      throw new AccessDeniedException(
-          "You don't have permission to view member contacts.");
+      throw new AccessDeniedException("You don't have permission to view member contacts.");
     }
 
     log.debug("Getting user contacts: userId={}", id);
@@ -344,8 +340,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<List<UserAddressDto>>> getUserAddresses(@PathVariable UUID id) {
     UUID requesterId = TenantContext.getCurrentUserId();
     if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
-      throw new AccessDeniedException(
-          "You don't have permission to view member addresses.");
+      throw new AccessDeniedException("You don't have permission to view member addresses.");
     }
 
     log.debug("Getting user addresses: userId={}", id);

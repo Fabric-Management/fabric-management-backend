@@ -40,8 +40,7 @@ public class TeamAccessService {
 
   private static final Set<String> ADMIN_ROLES = Set.of("ADMIN", "PLATFORM_ADMIN");
 
-  private static final Set<String> DEPARTMENT_READ_ROLES =
-      Set.of("MANAGER", "SUPERVISOR");
+  private static final Set<String> DEPARTMENT_READ_ROLES = Set.of("MANAGER", "SUPERVISOR");
 
   private final UserRepository userRepository;
   private final UserDepartmentRepository userDepartmentRepository;
