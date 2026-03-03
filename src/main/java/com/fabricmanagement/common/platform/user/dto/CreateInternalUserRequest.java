@@ -5,6 +5,7 @@ import com.fabricmanagement.human.core.employee.domain.Title;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,12 +47,15 @@ public class CreateInternalUserRequest {
   // ========== Basic User Fields (from CreateUserRequest) ==========
 
   @NotBlank(message = "First name is required")
+  @Size(max = 100, message = "First name must be at most 100 characters")
   private String firstName;
 
   @NotBlank(message = "Last name is required")
+  @Size(max = 100, message = "Last name must be at most 100 characters")
   private String lastName;
 
   @NotBlank(message = "Contact value is required")
+  @Size(max = 255, message = "Contact value must be at most 255 characters")
   private String contactValue;
 
   @NotNull(message = "Contact type is required")
@@ -65,14 +69,8 @@ public class CreateInternalUserRequest {
   /** Department ID (if department is selected by ID instead of name). */
   private UUID departmentId;
 
-  /** Department Category ID (for organizational structure). */
-  private UUID departmentCategoryId;
-
   /** Role ID for user assignment. */
   private UUID roleId;
-
-  /** Position ID for user assignment. */
-  private UUID positionId;
 
   /** Additional contacts (emails, phones) beyond the primary contact. */
   @Builder.Default @Valid private List<ContactData> additionalContacts = new ArrayList<>();
@@ -92,9 +90,11 @@ public class CreateInternalUserRequest {
   private LocalDate birthDate;
 
   /** Nationality (ISO 3166-1 alpha-2 country code: TR, US, GB, etc.). */
+  @Size(max = 10, message = "Nationality code must be at most 10 characters")
   private String nationality;
 
   /** Employee number (company-specific unique identifier). Example: "EMP-001", "2024-001" */
+  @Size(max = 50, message = "Employee number must be at most 50 characters")
   private String employeeNumber;
 
   /** Employment start date (hire date). */

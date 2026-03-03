@@ -8,7 +8,6 @@ import com.fabricmanagement.common.platform.organization.domain.OrganizationType
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.common.platform.tenant.domain.Tenant;
 import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerRegistryService;
 import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.common.platform.tradingpartner.dto.CreateTradingPartnerRequest;
@@ -56,6 +55,7 @@ class TradingPartnerDeduplicationIntegrationTest {
   }
 
   @Container
+  @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
           .withDatabaseName("fabric_test")
@@ -71,7 +71,6 @@ class TradingPartnerDeduplicationIntegrationTest {
   }
 
   @Autowired private TradingPartnerService tradingPartnerService;
-  @Autowired private TradingPartnerRegistryService registryService;
   @Autowired private TradingPartnerRepository partnerRepository;
   @Autowired private TradingPartnerRegistryRepository registryRepository;
   @Autowired private TenantRepository tenantRepository;
@@ -215,7 +214,8 @@ class TradingPartnerDeduplicationIntegrationTest {
                   .country("USA")
                   .build());
 
-      // Then: They should have different Registries (same tax_id is allowed in different countries)
+      // Then: They should have different Registries (same tax_id is allowed in
+      // different countries)
       assertThat(partnerTur.getRegistryId()).isNotEqualTo(partnerUsa.getRegistryId());
     }
   }

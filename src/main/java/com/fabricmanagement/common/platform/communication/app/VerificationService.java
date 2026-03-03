@@ -215,9 +215,8 @@ public class VerificationService {
       VerificationType verificationType,
       String countryCode) {
     if (countryCode == null) {
-      log.warn(
-          "No country code available for phone number, falling back to WhatsApp capability check");
-      sendViaWhatsAppCapabilityCheck(recipient, code, tenantId, userId, verificationType, null);
+      log.warn("No country code available for phone number, falling back to all strategies");
+      sendViaFallback(recipient, code);
       return;
     }
 
@@ -231,20 +230,42 @@ public class VerificationService {
         config.getFallbackChannel());
 
     try {
-      if (primaryChannel == DeliveryChannel.WHATSAPP) {
-        boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(recipient);
-        if (hasWhatsApp) {
-          sendViaWhatsApp(recipient, code, tenantId, userId, verificationType, countryCode);
-        } else {
-          log.warn("Phone does not have WhatsApp, using fallback channel");
-          sendViaFallbackChannel(
-              recipient, code, tenantId, userId, verificationType, countryCode, config);
-        }
+      if (primaryChannel == DeliveryChannel.WHATSAPP
+          && whatsAppClient.phoneHasWhatsApp(recipient)) {
+        sendAndLogViaStrategy(
+            "WhatsApp",
+            recipient,
+            code,
+            tenantId,
+            userId,
+            verificationType,
+            countryCode,
+            DeliveryChannel.WHATSAPP);
+      } else if (primaryChannel == DeliveryChannel.WHATSAPP) {
+        log.warn("Phone does not have WhatsApp capability, using fallback channel");
+        sendViaFallbackChannel(
+            recipient, code, tenantId, userId, verificationType, countryCode, config);
       } else if (primaryChannel == DeliveryChannel.SMS) {
-        sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
+        sendAndLogViaStrategy(
+            "SMS",
+            recipient,
+            code,
+            tenantId,
+            userId,
+            verificationType,
+            countryCode,
+            DeliveryChannel.SMS);
       } else if (primaryChannel == DeliveryChannel.EMAIL) {
         log.warn("Email configured as primary for phone number, using SMS instead");
-        sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
+        sendAndLogViaStrategy(
+            "SMS",
+            recipient,
+            code,
+            tenantId,
+            userId,
+            verificationType,
+            countryCode,
+            DeliveryChannel.SMS);
       }
     } catch (Exception e) {
       log.error("Primary channel failed: {}", e.getMessage());
@@ -270,99 +291,74 @@ public class VerificationService {
 
     log.info("Using fallback channel: {}", fallbackChannel);
     if (fallbackChannel == DeliveryChannel.SMS) {
-      sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
+      sendAndLogViaStrategy(
+          "SMS",
+          recipient,
+          code,
+          tenantId,
+          userId,
+          verificationType,
+          countryCode,
+          DeliveryChannel.SMS);
     } else if (fallbackChannel == DeliveryChannel.EMAIL) {
       log.warn("Email fallback for phone number not supported");
       throw new RuntimeException("Email fallback not supported for phone numbers");
     } else if (fallbackChannel == DeliveryChannel.WHATSAPP) {
-      sendViaWhatsApp(recipient, code, tenantId, userId, verificationType, countryCode);
-    }
-  }
-
-  /** Send via SMS strategy. */
-  private void sendViaSms(
-      String recipient,
-      String code,
-      UUID tenantId,
-      UUID userId,
-      VerificationType verificationType,
-      String countryCode) {
-    log.info("Sending via SMS");
-    sendViaStrategy("SMS", recipient, code);
-    createVerificationLog(
-        tenantId, userId, recipient, verificationType, DeliveryChannel.SMS, countryCode, null);
-  }
-
-  /**
-   * Fallback method: Use WhatsApp capability check when country code unavailable.
-   *
-   * @deprecated Use market-based routing instead
-   */
-  private void sendViaWhatsAppCapabilityCheck(
-      String recipient,
-      String code,
-      UUID tenantId,
-      UUID userId,
-      VerificationType verificationType,
-      String countryCode) {
-    boolean hasWhatsApp = whatsAppClient.phoneHasWhatsApp(recipient);
-
-    if (hasWhatsApp) {
-      log.info("Phone has WhatsApp capability, using WhatsApp strategy");
-      sendViaWhatsApp(recipient, code, tenantId, userId, verificationType, countryCode);
-    } else {
-      log.info("Phone does not have WhatsApp, using SMS strategy");
-      sendViaSms(recipient, code, tenantId, userId, verificationType, countryCode);
-    }
-  }
-
-  /**
-   * Send verification code via WhatsApp and create VerificationLog.
-   *
-   * @return External message ID (wamid) from WhatsApp
-   */
-  private String sendViaWhatsApp(
-      String recipient,
-      String code,
-      UUID tenantId,
-      UUID userId,
-      VerificationType verificationType,
-      String countryCode) {
-    try {
-      WhatsAppClient.WhatsAppMessageResponse response =
-          whatsAppClient.sendVerificationCode(recipient, code);
-
-      String messageId = null;
-      if (response != null && response.getMessages() != null && !response.getMessages().isEmpty()) {
-        messageId = response.getMessages().get(0).getId();
-      }
-
-      createVerificationLog(
+      sendAndLogViaStrategy(
+          "WhatsApp",
+          recipient,
+          code,
           tenantId,
           userId,
-          recipient,
           verificationType,
-          DeliveryChannel.WHATSAPP,
           countryCode,
-          messageId);
-
-      log.info("✅ Verification code sent via WhatsApp, messageId={}", messageId);
-      return messageId;
-
-    } catch (Exception e) {
-      log.error("❌ Failed to send WhatsApp verification code: {}", e.getMessage(), e);
-      createVerificationLog(
-          tenantId,
-          userId,
-          recipient,
-          verificationType,
-          DeliveryChannel.WHATSAPP,
-          countryCode,
-          null,
-          DeliveryStatus.FAILED,
-          e.getMessage());
-      throw new RuntimeException("WhatsApp sending failed: " + e.getMessage(), e);
+          DeliveryChannel.WHATSAPP);
     }
+  }
+
+  /** Helper to send via strategy and log the verification attempt */
+  private void sendAndLogViaStrategy(
+      String strategyName,
+      String recipient,
+      String code,
+      UUID tenantId,
+      UUID userId,
+      VerificationType verificationType,
+      String countryCode,
+      DeliveryChannel channel) {
+
+    strategies.stream()
+        .filter(s -> s.name().equalsIgnoreCase(strategyName))
+        .filter(VerificationStrategy::isAvailable)
+        .findFirst()
+        .ifPresentOrElse(
+            strategy -> {
+              try {
+                log.info("Using {} strategy for verification", strategyName);
+                strategy.sendVerificationCode(recipient, code);
+                createVerificationLog(
+                    tenantId, userId, recipient, verificationType, channel, countryCode, null);
+                log.info("✅ Verification code sent via {}", strategyName);
+              } catch (Exception e) {
+                createVerificationLog(
+                    tenantId,
+                    userId,
+                    recipient,
+                    verificationType,
+                    channel,
+                    countryCode,
+                    null,
+                    DeliveryStatus.FAILED,
+                    e.getMessage());
+                throw e; // rethrow to trigger failover mechanism if any
+              }
+            },
+            () -> {
+              log.warn(
+                  "{} strategy not available, throwing exception to trigger fallback",
+                  strategyName);
+              throw new RuntimeException(strategyName + " strategy unavailable");
+            });
   }
 
   /** Create VerificationLog entry for tracking and fallback. */

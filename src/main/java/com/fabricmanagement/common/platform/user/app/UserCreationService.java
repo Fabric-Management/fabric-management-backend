@@ -9,6 +9,8 @@ import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.common.platform.organization.domain.Department;
+import com.fabricmanagement.common.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.common.platform.user.domain.Role;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
@@ -20,11 +22,16 @@ import com.fabricmanagement.common.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +46,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class UserCreationService {
 
+  private static final Pattern EMAIL_PATTERN =
+      Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+  private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+[1-9]\\d{1,14}$");
+
   private final UserRepository userRepository;
   private final OrganizationFacade organizationFacade;
   private final ContactService contactService;
@@ -49,9 +60,7 @@ public class UserCreationService {
   private final DomainEventPublisher eventPublisher;
   private final RoleService roleService;
   private final UserDepartmentService userDepartmentService;
-  private final com.fabricmanagement.common.platform.organization.infra.repository
-          .PositionRepository
-      positionRepository;
+  private final DepartmentRepository departmentRepository;
   private final com.fabricmanagement.human.core.employee.application.EmployeeService
       employeeService;
 
@@ -61,7 +70,6 @@ public class UserCreationService {
         "Creating internal employee: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
 
-    // Step 1: Create base user with contacts and addresses (returns entity, not DTO)
     User userEntity =
         createUserEntity(
             request.getFirstName(),
@@ -69,13 +77,14 @@ public class UserCreationService {
             request.getContactValue(),
             request.getContactType(),
             request.getCompanyId(),
+            com.fabricmanagement.common.platform.user.domain.UserType.INTERNAL,
             request.getAdditionalContacts(),
             request.getAddresses());
 
     UUID tenantId = TenantContext.getCurrentTenantId();
     UUID assignedBy = TenantContext.getCurrentUserId();
 
-    // Step 2: Assign role (on same entity, no reload)
+    // Step 2: Assign role
     if (request.getRoleId() != null) {
       Role role =
           roleService
@@ -84,35 +93,19 @@ public class UserCreationService {
       userEntity.setRole(role);
     }
 
-    // Step 3: Assign position (on same entity, no reload)
-    if (request.getPositionId() != null) {
-      com.fabricmanagement.common.platform.organization.domain.Position position =
-          positionRepository
-              .findById(request.getPositionId())
-              .orElseThrow(() -> new IllegalArgumentException("Position not found"));
-      if (!position.getTenantId().equals(tenantId)) {
-        throw new IllegalArgumentException("Position must belong to the same tenant");
-      }
-      com.fabricmanagement.common.platform.user.domain.UserPosition userPosition =
-          com.fabricmanagement.common.platform.user.domain.UserPosition.create(
-              userEntity, position, true, assignedBy);
-      userEntity.getUserPositions().add(userPosition);
-    }
-
-    // Single save for role + position changes
     User saved = userRepository.save(userEntity);
 
-    // Step 4: Assign department (uses separate junction service)
+    // Step 3: Assign department (uses separate junction service)
     if (request.getDepartmentId() != null) {
       userDepartmentService.assignDepartment(
           saved.getId(), request.getDepartmentId(), true, assignedBy);
     }
 
-    // Step 5: Create Employee record if any HR data provided
+    // Step 4: Create Employee record if any HR data provided
     createEmployeeIfNeeded(saved.getId(), request);
 
     // Step 6: Publish event
-    String contactValue = request.getContactValue();
+    String contactValue = request.getContactValue().trim().toLowerCase(Locale.ROOT);
     eventPublisher.publish(
         new UserCreatedEvent(
             saved.getTenantId(),
@@ -123,12 +116,15 @@ public class UserCreationService {
 
     checkAndTrackHrCompliance(saved.getId(), request.getDepartment());
 
+    com.fabricmanagement.human.core.employee.domain.Employee employee =
+        employeeService.getEmployeeByUserId(saved.getId()).orElse(null);
+
     log.info(
         "Internal user created: id={}, uid={}, displayName={}",
         saved.getId(),
         saved.getUid(),
         saved.getDisplayName());
-    return UserDto.from(saved);
+    return UserDto.from(saved, employee);
   }
 
   @Transactional
@@ -144,10 +140,26 @@ public class UserCreationService {
             request.getContactValue(),
             request.getContactType(),
             request.getCompanyId(),
+            com.fabricmanagement.common.platform.user.domain.UserType.EXTERNAL,
             request.getAdditionalContacts(),
             request.getAddresses());
 
-    String contactValue = request.getContactValue();
+    // Assign default external role if available (EXTERNAL_USER or VIEWER)
+    roleService
+        .findByCode("EXTERNAL_USER")
+        .or(() -> roleService.findByCode("VIEWER"))
+        .ifPresentOrElse(
+            role -> {
+              userEntity.setRole(role);
+              userRepository.save(userEntity);
+            },
+            () ->
+                log.warn(
+                    "No default role for external user. "
+                        + "Consider creating EXTERNAL_USER or VIEWER platform role. userId={}",
+                    userEntity.getId()));
+
+    String contactValue = request.getContactValue().trim().toLowerCase(Locale.ROOT);
 
     if (!request.isSuppressEmailInvitation()) {
       eventPublisher.publish(
@@ -176,39 +188,44 @@ public class UserCreationService {
     log.debug(
         "Creating admin user: contact={}", PiiMaskingUtil.maskEmail(request.getContactValue()));
 
+    String normalizedContact = request.getContactValue().trim().toLowerCase(Locale.ROOT);
+    String trimmedFirstName = request.getFirstName().trim();
+    String trimmedLastName = request.getLastName().trim();
+
+    validateContactFormat(
+        normalizedContact, com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL);
+
     return TenantContext.executeInTenantContext(
         request.getTenantId(),
         () -> {
-          User user =
-              User.create(request.getFirstName(), request.getLastName(), request.getCompanyId());
+          if (userRepository.existsByTenantIdAndContactValue(
+              request.getTenantId(), normalizedContact)) {
+            throw new IllegalArgumentException("Contact value already registered for this tenant");
+          }
 
-          // Assign role before first save to avoid extra round-trip
+          User user =
+              User.create(
+                  trimmedFirstName,
+                  trimmedLastName,
+                  request.getCompanyId(),
+                  com.fabricmanagement.common.platform.user.domain.UserType.INTERNAL);
+
           com.fabricmanagement.common.platform.user.domain.Role role =
               roleService.findTenantAdminRoleOrThrow(request.getTenantId());
           user.setRole(role);
 
           User saved = userRepository.save(user);
 
-          // Create primary contact (unverified). Verification deferred to PasswordSetupService
-          // when user proves email ownership by clicking the registration link.
           com.fabricmanagement.common.platform.communication.domain.Contact contact =
               contactService.createContact(
-                  request.getContactValue(),
+                  normalizedContact,
                   com.fabricmanagement.common.platform.communication.domain.ContactType.EMAIL,
                   "Primary",
                   true,
                   null);
           userContactAssignmentService.assignContact(saved.getId(), contact.getId(), true);
 
-          // TODO(BACKLOG): Department assignment by name - add findDepartmentIdByName to
-          // OrganizationFacade or DepartmentService when needed
-          if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
-            log.debug(
-                "Department by name skipped (no resolver): tenant={}, org={}, department={}",
-                request.getTenantId(),
-                request.getCompanyId(),
-                request.getDepartment());
-          }
+          assignAdminDefaultDepartment(saved, request);
 
           eventPublisher.publish(
               new UserCreatedEvent(
@@ -236,75 +253,106 @@ public class UserCreationService {
       String contactValue,
       com.fabricmanagement.common.platform.user.domain.ContactType contactType,
       UUID companyId,
+      com.fabricmanagement.common.platform.user.domain.UserType userType,
       List<ContactData> additionalContacts,
       List<AddressData> addresses) {
 
+    String trimmedFirstName = firstName.trim();
+    String trimmedLastName = lastName.trim();
+    String normalizedContact = contactValue.trim().toLowerCase(Locale.ROOT);
+
     UUID tenantId = TenantContext.getCurrentTenantId();
-    // Tenant-scoped uniqueness: same contact can exist in different tenants (SaaS multi-tenancy)
-    if (userRepository.existsByTenantIdAndContactValue(tenantId, contactValue)) {
+
+    // --- All validations BEFORE any persistence ---
+    validateContactFormat(normalizedContact, contactType);
+
+    if (userRepository.existsByTenantIdAndContactValue(tenantId, normalizedContact)) {
       throw new IllegalArgumentException("Contact value already registered");
     }
     if (!organizationFacade.exists(tenantId, companyId)) {
       throw new IllegalArgumentException("Organization not found");
     }
 
-    User user = User.create(firstName, lastName, companyId);
-    User saved = userRepository.save(user);
-
     // Validate primary contact is not duplicated in additional contacts
-    if (additionalContacts != null) {
-      boolean hasDuplicate =
-          additionalContacts.stream()
-              .anyMatch(c -> contactValue.equalsIgnoreCase(c.getContactValue()));
-      if (hasDuplicate) {
-        throw new IllegalArgumentException(
-            "Primary contact value must not be duplicated in additional contacts");
-      }
-    }
-
-    Contact primaryContact =
-        contactService.createContact(
-            contactValue, mapContactType(contactType), "Primary", true, null);
-    userContactAssignmentService.assignContact(saved.getId(), primaryContact.getId(), true);
-
     if (additionalContacts != null && !additionalContacts.isEmpty()) {
-      for (ContactData contactData : additionalContacts) {
-        ContactType mappedType = mapContactType(contactData);
-        String label =
-            contactData.getLabel() != null
-                ? contactData.getLabel()
-                : (contactData.getContactType()
-                        == com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL
-                    ? "Email"
-                    : mappedType == ContactType.LANDLINE ? "Landline" : "Mobile");
-        Contact additionalContact =
-            contactService.createContact(
-                contactData.getContactValue(),
-                mappedType,
-                label,
-                contactData.getIsPersonal() != null ? contactData.getIsPersonal() : true,
-                null);
-        userContactAssignmentService.assignContact(saved.getId(), additionalContact.getId(), false);
+      Set<String> seenContacts = new HashSet<>();
+      seenContacts.add(normalizedContact);
+
+      for (ContactData cd : additionalContacts) {
+        String normalized = cd.getContactValue().trim().toLowerCase(Locale.ROOT);
+
+        validateContactFormat(normalized, cd.getContactType());
+
+        if (!seenContacts.add(normalized)) {
+          throw new IllegalArgumentException(
+              "Duplicate contact value detected: "
+                  + PiiMaskingUtil.maskEmail(cd.getContactValue()));
+        }
       }
     }
 
-    assignAddresses(saved, companyId, tenantId, addresses);
+    // --- Persistence starts here ---
+    try {
+      User user = User.create(trimmedFirstName, trimmedLastName, companyId, userType);
+      User saved = userRepository.save(user);
 
-    return saved;
+      Contact primaryContact =
+          contactService.createContact(
+              normalizedContact, mapContactType(contactType), "Primary", true, null);
+      userContactAssignmentService.assignContact(saved.getId(), primaryContact.getId(), true);
+
+      if (additionalContacts != null && !additionalContacts.isEmpty()) {
+        for (ContactData contactData : additionalContacts) {
+          ContactType mappedType = mapContactType(contactData);
+          String label =
+              contactData.getLabel() != null && !contactData.getLabel().isBlank()
+                  ? contactData.getLabel().trim()
+                  : (contactData.getContactType()
+                          == com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL
+                      ? "Email"
+                      : mappedType == ContactType.LANDLINE ? "Landline" : "Mobile");
+
+          String normalizedContactValue =
+              contactData.getContactValue().trim().toLowerCase(Locale.ROOT);
+
+          Contact additionalContact =
+              contactService.createContact(
+                  normalizedContactValue,
+                  mappedType,
+                  label,
+                  contactData.getIsPersonal() != null ? contactData.getIsPersonal() : true,
+                  null);
+          userContactAssignmentService.assignContact(
+              saved.getId(), additionalContact.getId(), false);
+        }
+      }
+
+      assignAddresses(saved, companyId, tenantId, addresses);
+
+      return saved;
+    } catch (DataIntegrityViolationException e) {
+      log.warn("Concurrent duplicate contact detected: {}", normalizedContact);
+      throw new IllegalArgumentException("Contact value already registered");
+    }
   }
 
   /** Assign addresses to user. Uses company primary address as fallback when none provided. */
   private void assignAddresses(
       User user, UUID companyId, UUID tenantId, List<AddressData> addresses) {
     if (addresses != null && !addresses.isEmpty()) {
-      boolean isFirstAddress = true;
-      for (AddressData addressData : addresses) {
+      // Check if any address is explicitly marked as primary
+      boolean hasExplicitPrimary =
+          addresses.stream().anyMatch(a -> Boolean.TRUE.equals(a.getIsPrimary()));
+
+      boolean primaryAlreadyAssigned = false;
+      for (int i = 0; i < addresses.size(); i++) {
+        AddressData addressData = addresses.get(i);
         com.fabricmanagement.common.platform.communication.domain.AddressType addressType =
             parseAddressType(addressData.getAddressType());
         boolean isWorkType = addressType == AddressType.OFFICE;
         String addressLabel =
-            addressData.getLabel() != null
-                ? addressData.getLabel()
+            addressData.getLabel() != null && !addressData.getLabel().isBlank()
+                ? addressData.getLabel().trim()
                 : (isWorkType ? "Work Address" : "Home Address");
         Address address =
             addressService.createAddress(
@@ -315,11 +363,21 @@ public class UserCreationService {
                 addressData.getCountry(),
                 addressType,
                 addressLabel);
-        boolean isPrimary = isFirstAddress || Boolean.TRUE.equals(addressData.getIsPrimary());
+
+        boolean isPrimary;
+        if (hasExplicitPrimary) {
+          isPrimary = Boolean.TRUE.equals(addressData.getIsPrimary()) && !primaryAlreadyAssigned;
+        } else {
+          isPrimary = (i == 0);
+        }
+
+        if (isPrimary) {
+          primaryAlreadyAssigned = true;
+        }
+
         boolean isWorkAddress = addressType == AddressType.OFFICE;
         userAddressAssignmentService.assignAddress(
             user.getId(), address.getId(), isPrimary, isWorkAddress);
-        isFirstAddress = false;
       }
     } else {
       userAddressAutoService.copyCompanyPrimaryAddress(user.getId(), companyId, tenantId);
@@ -387,6 +445,22 @@ public class UserCreationService {
     }
   }
 
+  private void validateContactFormat(
+      String contactValue,
+      com.fabricmanagement.common.platform.user.domain.ContactType contactType) {
+    if (contactType == com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL) {
+      if (!EMAIL_PATTERN.matcher(contactValue).matches()) {
+        throw new IllegalArgumentException(
+            "Invalid email format: " + PiiMaskingUtil.maskEmail(contactValue));
+      }
+    } else if (contactType == com.fabricmanagement.common.platform.user.domain.ContactType.PHONE) {
+      if (!PHONE_PATTERN.matcher(contactValue).matches()) {
+        throw new IllegalArgumentException(
+            "Invalid phone format. Must be E.164 format (e.g., +905551234567)");
+      }
+    }
+  }
+
   private ContactType mapContactType(
       com.fabricmanagement.common.platform.user.domain.ContactType userContactType) {
     return switch (userContactType) {
@@ -403,12 +477,46 @@ public class UserCreationService {
     if (contactData.getContactType()
         == com.fabricmanagement.common.platform.user.domain.ContactType.PHONE) {
       String phoneType = contactData.getPhoneType();
-      if ("LANDLINE".equalsIgnoreCase(phoneType)) {
+      if (ContactData.PHONE_TYPE_LANDLINE.equalsIgnoreCase(phoneType)) {
         return ContactType.LANDLINE;
       }
       return ContactType.MOBILE;
     }
     return ContactType.MOBILE;
+  }
+
+  private static final String ADMIN_DEFAULT_DEPARTMENT = "Administration Office";
+
+  /**
+   * Assign the default "Administration Office" department to admin user during onboarding. Falls
+   * back silently if the department doesn't exist yet (seed step may not have run).
+   */
+  private void assignAdminDefaultDepartment(User savedUser, CreateAdminUserRequest request) {
+    try {
+      Optional<Department> adminDept =
+          departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentName(
+              request.getTenantId(), request.getCompanyId(), ADMIN_DEFAULT_DEPARTMENT);
+
+      if (adminDept.isPresent()) {
+        userDepartmentService.assignDepartment(
+            savedUser.getId(), adminDept.get().getId(), true, null);
+        log.debug(
+            "Admin default department assigned: userId={}, department={}",
+            savedUser.getId(),
+            ADMIN_DEFAULT_DEPARTMENT);
+      } else {
+        log.warn(
+            "Admin default department '{}' not found — skipping assignment: tenantId={}, orgId={}",
+            ADMIN_DEFAULT_DEPARTMENT,
+            request.getTenantId(),
+            request.getCompanyId());
+      }
+    } catch (Exception e) {
+      log.error(
+          "Failed to assign admin default department: userId={}, error={}",
+          savedUser.getId(),
+          e.getMessage());
+    }
   }
 
   /**

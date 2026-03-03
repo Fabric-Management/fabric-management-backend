@@ -2,6 +2,7 @@ package com.fabricmanagement.common.platform.user.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,12 +28,15 @@ public class CreateAdminUserRequest {
   private UUID tenantId;
 
   @NotBlank(message = "First name is required")
+  @Size(max = 100, message = "First name must be at most 100 characters")
   private String firstName;
 
   @NotBlank(message = "Last name is required")
+  @Size(max = 100, message = "Last name must be at most 100 characters")
   private String lastName;
 
   @NotBlank(message = "Contact value (email) is required")
+  @Size(max = 255, message = "Contact value must be at most 255 characters")
   private String contactValue;
 
   /** Optional department name for assignment (must exist in seed data). */

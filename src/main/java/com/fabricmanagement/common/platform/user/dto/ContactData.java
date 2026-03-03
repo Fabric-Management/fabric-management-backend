@@ -3,6 +3,7 @@ package com.fabricmanagement.common.platform.user.dto;
 import com.fabricmanagement.common.platform.user.domain.ContactType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +20,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ContactData {
   @NotBlank(message = "Contact value is required")
+  @Size(max = 255, message = "Contact value must be at most 255 characters")
   private String contactValue;
 
   @NotNull(message = "Contact type is required")
@@ -36,6 +38,9 @@ public class ContactData {
    * prioritize WhatsApp. Note: Only applicable for MOBILE phones, not LANDLINE.
    */
   private Boolean isWhatsApp;
+
+  public static final String PHONE_TYPE_MOBILE = "MOBILE";
+  public static final String PHONE_TYPE_LANDLINE = "LANDLINE";
 
   /**
    * Phone type (for PHONE contacts only). If null, defaults to MOBILE for backward compatibility.

@@ -21,8 +21,6 @@ public class DepartmentDto {
   private String departmentCode;
   private String description;
   private UUID managerId;
-  private UUID departmentCategoryId;
-  private String departmentCategoryName;
   private UUID parentDepartmentId;
   private String parentDepartmentName;
   private Boolean isSystemDepartment;
@@ -39,14 +37,6 @@ public class DepartmentDto {
         .departmentCode(department.getDepartmentCode())
         .description(department.getDescription())
         .managerId(department.getManagerId())
-        .departmentCategoryId(
-            department.getDepartmentCategory() != null
-                ? department.getDepartmentCategory().getId()
-                : null)
-        .departmentCategoryName(
-            department.getDepartmentCategory() != null
-                ? department.getDepartmentCategory().getCategoryName()
-                : null)
         .parentDepartmentId(
             department.getParentDepartment() != null
                 ? department.getParentDepartment().getId()

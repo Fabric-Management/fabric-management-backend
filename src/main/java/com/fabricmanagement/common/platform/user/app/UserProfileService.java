@@ -8,12 +8,17 @@ import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
+import com.fabricmanagement.common.platform.user.domain.Role;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserProfileUpdatedEvent;
 import com.fabricmanagement.common.platform.user.domain.value.ProfileCategory;
 import com.fabricmanagement.common.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import com.fabricmanagement.common.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.human.core.employee.application.EmployeeService;
+import com.fabricmanagement.human.core.employee.domain.EmergencyContact;
+import com.fabricmanagement.human.core.employee.domain.Employee;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +44,8 @@ public class UserProfileService {
   private final AddressService addressService;
   private final UserAddressAssignmentService userAddressAssignmentService;
   private final UserDepartmentService userDepartmentService;
+  private final RoleRepository roleRepository;
+  private final EmployeeService employeeService;
   private final DomainEventPublisher eventPublisher;
 
   @Transactional
@@ -87,6 +94,13 @@ public class UserProfileService {
     if (request.getWorkAddress() != null) {
       updateWorkAddress(userId, request.getWorkAddress());
     }
+    if (request.getRoleId() != null) {
+      Role role =
+          roleRepository
+              .findByTenantIdAndId(TenantContext.getCurrentTenantId(), request.getRoleId())
+              .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+      user.setRole(role);
+    }
     if (request.getDepartmentId() != null) {
       boolean hasPrimaryDept = userDepartmentService.getPrimaryDepartment(userId).isPresent();
       userDepartmentService.assignDepartment(
@@ -99,12 +113,48 @@ public class UserProfileService {
       updatePersonalContact(userId, request.getPersonalPhone(), ContactType.MOBILE);
     }
 
+    Employee employee = updateEmployeePersonalFields(userId, request);
+
     User saved = userRepository.save(user);
     eventPublisher.publish(
         new UserProfileUpdatedEvent(saved.getTenantId(), saved.getId(), requesterId, categories));
 
     log.info("Profile updated: userId={}, updatedBy={}", saved.getId(), requesterId);
-    return UserDto.from(saved);
+    return UserDto.from(saved, employee);
+  }
+
+  /**
+   * Persist birthDate and emergencyContact to the Employee record. If the user has no Employee
+   * record yet, these fields are silently skipped (user is external or Employee wasn't created
+   * during onboarding).
+   */
+  private Employee updateEmployeePersonalFields(UUID userId, UpdateUserProfileRequest request) {
+    if (request.getBirthDate() == null && request.getEmergencyContact() == null) {
+      return employeeService.getEmployeeByUserId(userId).orElse(null);
+    }
+
+    return employeeService
+        .getEmployeeByUserId(userId)
+        .map(
+            employee -> {
+              if (request.getBirthDate() != null) {
+                employee.setBirthDate(request.getBirthDate());
+              }
+              if (request.getEmergencyContact() != null) {
+                employee.setEmergencyContact(
+                    EmergencyContact.builder()
+                        .name(request.getEmergencyContact().getName())
+                        .phone(request.getEmergencyContact().getPhone())
+                        .relationship(request.getEmergencyContact().getRelationship())
+                        .build());
+              }
+              return employeeService.saveEmployee(employee);
+            })
+        .orElseGet(
+            () -> {
+              log.debug("No Employee record for userId={}; skipping personal field update", userId);
+              return null;
+            });
   }
 
   private void updateWorkContact(UUID userId, String contactValue, ContactType contactType) {

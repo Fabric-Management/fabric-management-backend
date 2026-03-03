@@ -5,6 +5,8 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
 import com.fabricmanagement.common.platform.communication.app.ContactSuggestionService;
 import com.fabricmanagement.common.platform.communication.dto.ContactSuggestionsDto;
+import com.fabricmanagement.common.platform.subscription.app.UserCreationOptionsService;
+import com.fabricmanagement.common.platform.user.app.TeamAccessService;
 import com.fabricmanagement.common.platform.user.app.UserAddressAssignmentService;
 import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.common.platform.user.app.UserService;
@@ -15,13 +17,15 @@ import com.fabricmanagement.common.platform.user.dto.UserAddressDto;
 import com.fabricmanagement.common.platform.user.dto.UserContactDto;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.fabricmanagement.human.core.employee.application.EmployeeService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,10 +39,9 @@ public class UserController {
   private final ContactSuggestionService contactSuggestionService;
   private final UserContactAssignmentService userContactAssignmentService;
   private final UserAddressAssignmentService userAddressAssignmentService;
-  private final com.fabricmanagement.human.core.employee.application.EmployeeService
-      employeeService;
-  private final com.fabricmanagement.common.platform.subscription.app.UserCreationOptionsService
-      userCreationOptionsService;
+  private final EmployeeService employeeService;
+  private final UserCreationOptionsService userCreationOptionsService;
+  private final TeamAccessService teamAccessService;
 
   /**
    * Create internal employee (own staff with HR data).
@@ -48,13 +51,20 @@ public class UserController {
    * <p><b>Includes:</b> Title, gender, birth date, nationality, emergency contact, employee number,
    * hire date.
    */
-  @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER')")
+  @PreAuthorize("isAuthenticated()")
   @PostMapping("/internal")
   public ResponseEntity<ApiResponse<UserDto>> createInternalUser(
       @Valid @RequestBody CreateInternalUserRequest request) {
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canManageMembers(requesterId)) {
+      throw new AccessDeniedException(
+          "Only Administration Office and Human Resources can create members.");
+    }
+
     log.info(
-        "Creating internal employee: contactValue={}",
-        PiiMaskingUtil.maskEmail(request.getContactValue()));
+        "Creating internal employee: contactValue={}, requesterId={}",
+        PiiMaskingUtil.maskEmail(request.getContactValue()),
+        requesterId);
 
     UserDto created = userService.createInternalUser(request);
 
@@ -70,13 +80,20 @@ public class UserController {
    *
    * <p><b>Includes:</b> Only basic user information (no HR data).
    */
-  @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER')")
+  @PreAuthorize("isAuthenticated()")
   @PostMapping("/external")
   public ResponseEntity<ApiResponse<UserDto>> createExternalUser(
       @Valid @RequestBody CreateExternalUserRequest request) {
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canManageMembers(requesterId)) {
+      throw new AccessDeniedException(
+          "Only Administration Office and Human Resources can create members.");
+    }
+
     log.info(
-        "Creating external user: contactValue={}",
-        PiiMaskingUtil.maskEmail(request.getContactValue()));
+        "Creating external user: contactValue={}, requesterId={}",
+        PiiMaskingUtil.maskEmail(request.getContactValue()),
+        requesterId);
 
     UserDto created = userService.createExternalUser(request);
 
@@ -85,70 +102,97 @@ public class UserController {
 
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<UserDto>> getUser(@PathVariable UUID id) {
-    log.debug("Getting user: id={}", id);
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
+      throw new AccessDeniedException("You don't have permission to view member details.");
+    }
+
+    log.debug("Getting user: id={}, requesterId={}", id, requesterId);
 
     UserDto user =
         userService
-            .findById(
-                com.fabricmanagement.common.infrastructure.persistence.TenantContext
-                    .getCurrentTenantId(),
-                id)
+            .findById(TenantContext.getCurrentTenantId(), id)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     return ResponseEntity.ok(ApiResponse.success(user));
   }
 
   /**
-   * Get all users for current tenant.
+   * Get users for current tenant, scoped by requester's access level.
    *
-   * <p><b>Cached:</b> 5 minutes (tenant-scoped cache key)
+   * <ul>
+   *   <li>FULL_ACCESS / READ_ALL → all active users (cached per tenant)
+   *   <li>DEPARTMENT_ONLY → users in requester's departments only
+   *   <li>NO_ACCESS → 403
+   * </ul>
    */
   @GetMapping
-  @Cacheable(
-      value = "users",
-      key =
-          "T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).getCurrentTenantId()")
   public ResponseEntity<ApiResponse<List<UserDto>>> getAllUsers() {
-    log.debug("Getting all users");
+    UUID requesterId = TenantContext.getCurrentUserId();
+    UUID tenantId = TenantContext.getCurrentTenantId();
 
-    UUID tenantId =
-        com.fabricmanagement.common.infrastructure.persistence.TenantContext.getCurrentTenantId();
+    TeamAccessService.AccessLevel accessLevel = teamAccessService.resolveAccessLevel(requesterId);
+
+    if (accessLevel == TeamAccessService.AccessLevel.NO_ACCESS) {
+      throw new AccessDeniedException("You don't have permission to view team members.");
+    }
+
+    if (accessLevel == TeamAccessService.AccessLevel.DEPARTMENT_ONLY) {
+      log.debug("Getting department-scoped users: requesterId={}", requesterId);
+      Set<UUID> deptIds = teamAccessService.getUserDepartmentIds(requesterId);
+      List<UserDto> users = userService.findByDepartments(tenantId, deptIds);
+      return ResponseEntity.ok(ApiResponse.success(users));
+    }
+
+    log.debug("Getting all users: requesterId={}, accessLevel={}", requesterId, accessLevel);
     List<UserDto> users = userService.findByTenant(tenantId);
-
     return ResponseEntity.ok(ApiResponse.success(users));
   }
 
   @GetMapping("/company/{companyId}")
   public ResponseEntity<ApiResponse<List<UserDto>>> getUsersByCompany(
       @PathVariable UUID companyId) {
-    log.debug("Getting users by company: companyId={}", companyId);
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canViewAllMembers(requesterId)) {
+      throw new AccessDeniedException("You don't have permission to view company members.");
+    }
 
-    List<UserDto> users =
-        userService.findByCompany(
-            com.fabricmanagement.common.infrastructure.persistence.TenantContext
-                .getCurrentTenantId(),
-            companyId);
+    log.debug("Getting users by company: companyId={}, requesterId={}", companyId, requesterId);
+
+    List<UserDto> users = userService.findByCompany(TenantContext.getCurrentTenantId(), companyId);
 
     return ResponseEntity.ok(ApiResponse.success(users));
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER')")
+  @PreAuthorize("isAuthenticated()")
   @PutMapping("/{id}")
   public ResponseEntity<ApiResponse<UserDto>> updateUser(
       @PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
-    log.info("Updating user: id={}", id);
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canManageMembers(requesterId)) {
+      throw new AccessDeniedException(
+          "Only Administration Office and Human Resources can edit members.");
+    }
+
+    log.info("Updating user: id={}, requesterId={}", id, requesterId);
 
     UserDto updated = userService.updateUser(id, request);
 
     return ResponseEntity.ok(ApiResponse.success(updated, "User updated successfully"));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("isAuthenticated()")
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable UUID id) {
-    log.info("Deactivating user: id={}", id);
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canManageMembers(requesterId)) {
+      throw new AccessDeniedException(
+          "Only Administration Office and Human Resources can deactivate members.");
+    }
 
-    userService.deactivateUser(id, "Deactivated by admin");
+    log.info("Deactivating user: id={}, requesterId={}", id, requesterId);
+
+    userService.deactivateUser(id, "Deactivated by " + requesterId);
 
     return ResponseEntity.ok(ApiResponse.success(null, "User deactivated successfully"));
   }
@@ -178,8 +222,7 @@ public class UserController {
    */
   @GetMapping("/me")
   public ResponseEntity<ApiResponse<UserDto>> getCurrentUser() {
-    UUID userId =
-        com.fabricmanagement.common.infrastructure.persistence.TenantContext.getCurrentUserId();
+    UUID userId = TenantContext.getCurrentUserId();
 
     if (userId == null) {
       throw new IllegalStateException("User not authenticated");
@@ -189,13 +232,27 @@ public class UserController {
 
     UserDto user =
         userService
-            .findById(
-                com.fabricmanagement.common.infrastructure.persistence.TenantContext
-                    .getCurrentTenantId(),
-                userId)
+            .findById(TenantContext.getCurrentTenantId(), userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     return ResponseEntity.ok(ApiResponse.success(user));
+  }
+
+  /**
+   * Get the current user's access level for team member management.
+   *
+   * <p>Returns: FULL_ACCESS, READ_ALL, DEPARTMENT_ONLY, or NO_ACCESS.
+   */
+  @GetMapping("/me/team-access")
+  public ResponseEntity<ApiResponse<String>> getMyTeamAccess() {
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (requesterId == null) {
+      throw new IllegalStateException("User not authenticated");
+    }
+
+    TeamAccessService.AccessLevel level = teamAccessService.resolveAccessLevel(requesterId);
+
+    return ResponseEntity.ok(ApiResponse.success(level.name()));
   }
 
   /**
@@ -246,14 +303,15 @@ public class UserController {
    */
   @GetMapping("/{id}/contacts")
   public ResponseEntity<ApiResponse<List<UserContactDto>>> getUserContacts(@PathVariable UUID id) {
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
+      throw new AccessDeniedException("You don't have permission to view member contacts.");
+    }
+
     log.debug("Getting user contacts: userId={}", id);
 
-    // Validate user exists (tenant-scoped)
     userService
-        .findById(
-            com.fabricmanagement.common.infrastructure.persistence.TenantContext
-                .getCurrentTenantId(),
-            id)
+        .findById(TenantContext.getCurrentTenantId(), id)
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     List<UserContactDto> contacts =
@@ -280,14 +338,15 @@ public class UserController {
    */
   @GetMapping("/{id}/addresses")
   public ResponseEntity<ApiResponse<List<UserAddressDto>>> getUserAddresses(@PathVariable UUID id) {
+    UUID requesterId = TenantContext.getCurrentUserId();
+    if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
+      throw new AccessDeniedException("You don't have permission to view member addresses.");
+    }
+
     log.debug("Getting user addresses: userId={}", id);
 
-    // Validate user exists (tenant-scoped)
     userService
-        .findById(
-            com.fabricmanagement.common.infrastructure.persistence.TenantContext
-                .getCurrentTenantId(),
-            id)
+        .findById(TenantContext.getCurrentTenantId(), id)
         .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     List<UserAddressDto> addresses =
@@ -335,34 +394,28 @@ public class UserController {
     return ResponseEntity.ok(ApiResponse.success(employeeNumber));
   }
 
-  /**
-   * Get all options needed for user creation form.
-   *
-   * <p><b>Orchestration Endpoint:</b> Returns department categories, departments, and positions in
-   * a single response to optimize frontend form loading.
-   *
-   * <p><b>Performance Benefits:</b>
-   *
-   * <ul>
-   *   <li>✅ Single HTTP request instead of 3 separate requests
-   *   <li>✅ Reduced network overhead
-   *   <li>✅ Faster page load (parallel loading not needed)
-   *   <li>✅ Single database transaction
-   * </ul>
-   *
-   * <p>This endpoint should be called when the user creation modal/form is opened to populate all
-   * dropdown options.
-   *
-   * @return User creation options (categories, departments, positions)
-   */
+  /** Get options for creating an internal employee. Returns INTERNAL-scoped roles + departments. */
   @GetMapping("/creation-options")
   public ResponseEntity<
           ApiResponse<com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto>>
       getUserCreationOptions() {
-    log.debug("Getting user creation options");
+    log.debug("Getting internal user creation options");
 
     com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto options =
         userCreationOptionsService.getUserCreationOptions();
+
+    return ResponseEntity.ok(ApiResponse.success(options));
+  }
+
+  /** Get options for inviting a partner user. Returns PARTNER-scoped roles + departments. */
+  @GetMapping("/creation-options/partner")
+  public ResponseEntity<
+          ApiResponse<com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto>>
+      getPartnerCreationOptions() {
+    log.debug("Getting partner user creation options");
+
+    com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto options =
+        userCreationOptionsService.getPartnerCreationOptions();
 
     return ResponseEntity.ok(ApiResponse.success(options));
   }

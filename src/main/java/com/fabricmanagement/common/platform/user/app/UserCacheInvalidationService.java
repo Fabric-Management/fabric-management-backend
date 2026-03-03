@@ -3,6 +3,7 @@ package com.fabricmanagement.common.platform.user.app;
 import com.fabricmanagement.common.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.common.platform.user.domain.event.UserDeactivatedEvent;
 import com.fabricmanagement.common.platform.user.domain.event.UserProfileUpdatedEvent;
+import com.fabricmanagement.human.core.employee.domain.event.EmployeeUpdatedEvent;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,8 +14,9 @@ import org.springframework.stereotype.Service;
 /**
  * Invalidates user caches when user-related domain events occur.
  *
- * <p>Listens to UserCreatedEvent, UserDeactivatedEvent, UserProfileUpdatedEvent and evicts
- * users-by-tenant and users-by-company caches so query results stay consistent.
+ * <p>Listens to UserCreatedEvent, UserDeactivatedEvent, UserProfileUpdatedEvent, and
+ * EmployeeUpdatedEvent. Evicts users-by-tenant and users-by-company caches so query results
+ * (including enriched Employee data) stay consistent.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,13 +35,16 @@ public class UserCacheInvalidationService {
 
   @EventListener
   public void onUserDeactivated(UserDeactivatedEvent event) {
-    // We don't have companyId in UserDeactivatedEvent - evict tenant cache only
     evictTenantCache(event.getTenantId());
   }
 
   @EventListener
   public void onUserProfileUpdated(UserProfileUpdatedEvent event) {
-    // We don't have companyId in UserProfileUpdatedEvent - evict tenant cache only
+    evictTenantCache(event.getTenantId());
+  }
+
+  @EventListener
+  public void onEmployeeUpdated(EmployeeUpdatedEvent event) {
     evictTenantCache(event.getTenantId());
   }
 

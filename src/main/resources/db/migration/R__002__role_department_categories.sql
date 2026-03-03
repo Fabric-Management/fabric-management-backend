@@ -1,145 +1,49 @@
 -- ============================================================================
--- R002: Seed Roles and Department Categories (Repeatable)
+-- R002: Seed System Roles (Repeatable)
 -- ============================================================================
--- Seeds system-wide roles and department categories for SYSTEM_TENANT_ID
--- These are reference data shared by all tenants
--- 
--- Repeatable Migration: Runs every time Flyway checks migrations
--- If content changes, Flyway will re-execute this script
--- 
--- Last Updated: 2025-11-13
+-- Seeds system-wide roles for SYSTEM_TENANT_ID.
+-- Roles are generic — department provides organizational context.
+--
+-- Scopes:
+--   INTERNAL = Tenant's own employees
+--   PARTNER  = Trading partner users
+--   SYSTEM   = Platform admin (hidden from tenant UI)
 -- ============================================================================
 
 DO $$
 DECLARE
     system_tenant_id UUID := '00000000-0000-0000-0000-000000000000'::UUID;
-    prod_cat_id UUID;
-    admin_cat_id UUID;
-    util_cat_id UUID;
-    logistics_cat_id UUID;
-    support_cat_id UUID;
 BEGIN
-    -- ========================================================================
-    -- SEED: Department Categories
-    -- ========================================================================
-    -- Production Category
-    INSERT INTO common_company.common_department_category 
-        (id, tenant_id, uid, category_name, description, display_order, is_active)
-    VALUES 
-        (gen_random_uuid(), system_tenant_id, 'SYS-CAT-001', 'Production', 
-         'Üretim ile doğrudan ilgili departmanlar', 1, TRUE)
-    ON CONFLICT (uid) DO UPDATE SET 
-        category_name = EXCLUDED.category_name,
-        description = EXCLUDED.description,
-        display_order = EXCLUDED.display_order
-    RETURNING id INTO prod_cat_id;
-    
-    -- Get if already exists
-    IF prod_cat_id IS NULL THEN
-        SELECT id INTO prod_cat_id FROM common_company.common_department_category 
-        WHERE uid = 'SYS-CAT-001';
-    END IF;
-    
-    -- Administration Category
-    INSERT INTO common_company.common_department_category 
-        (id, tenant_id, uid, category_name, description, display_order, is_active)
-    VALUES 
-        (gen_random_uuid(), system_tenant_id, 'SYS-CAT-002', 'Administration', 
-         'İdari ve yönetim departmanları', 2, TRUE)
-    ON CONFLICT (uid) DO UPDATE SET 
-        category_name = EXCLUDED.category_name,
-        description = EXCLUDED.description,
-        display_order = EXCLUDED.display_order
-    RETURNING id INTO admin_cat_id;
-    
-    IF admin_cat_id IS NULL THEN
-        SELECT id INTO admin_cat_id FROM common_company.common_department_category 
-        WHERE uid = 'SYS-CAT-002';
-    END IF;
-    
-    -- Utility Category
-    INSERT INTO common_company.common_department_category 
-        (id, tenant_id, uid, category_name, description, display_order, is_active)
-    VALUES 
-        (gen_random_uuid(), system_tenant_id, 'SYS-CAT-003', 'Utility', 
-         'Yardımcı hizmet departmanları', 3, TRUE)
-    ON CONFLICT (uid) DO UPDATE SET 
-        category_name = EXCLUDED.category_name,
-        description = EXCLUDED.description,
-        display_order = EXCLUDED.display_order
-    RETURNING id INTO util_cat_id;
-    
-    IF util_cat_id IS NULL THEN
-        SELECT id INTO util_cat_id FROM common_company.common_department_category 
-        WHERE uid = 'SYS-CAT-003';
-    END IF;
-    
-    -- Logistics Category
-    INSERT INTO common_company.common_department_category 
-        (id, tenant_id, uid, category_name, description, display_order, is_active)
-    VALUES 
-        (gen_random_uuid(), system_tenant_id, 'SYS-CAT-004', 'Logistics', 
-         'Lojistik ve tedarik departmanları', 4, TRUE)
-    ON CONFLICT (uid) DO UPDATE SET 
-        category_name = EXCLUDED.category_name,
-        description = EXCLUDED.description,
-        display_order = EXCLUDED.display_order
-    RETURNING id INTO logistics_cat_id;
-    
-    IF logistics_cat_id IS NULL THEN
-        SELECT id INTO logistics_cat_id FROM common_company.common_department_category 
-        WHERE uid = 'SYS-CAT-004';
-    END IF;
-    
-    -- Support Category
-    INSERT INTO common_company.common_department_category 
-        (id, tenant_id, uid, category_name, description, display_order, is_active)
-    VALUES 
-        (gen_random_uuid(), system_tenant_id, 'SYS-CAT-005', 'Support', 
-         'Destek ve hizmet departmanları', 5, TRUE)
-    ON CONFLICT (uid) DO UPDATE SET 
-        category_name = EXCLUDED.category_name,
-        description = EXCLUDED.description,
-        display_order = EXCLUDED.display_order
-    RETURNING id INTO support_cat_id;
-    
-    IF support_cat_id IS NULL THEN
-        SELECT id INTO support_cat_id FROM common_company.common_department_category 
-        WHERE uid = 'SYS-CAT-005';
-    END IF;
-
-    -- ========================================================================
-    -- SEED: Roles
-    -- ========================================================================
-    -- ✅ Platform-level system roles that are shared by ALL tenants
-    -- These roles are NOT copied to tenants - all tenants use the same platform roles
-    -- Tenant-specific roles can be created but are not shown in standard role lists
-    INSERT INTO common_user.common_role 
-        (tenant_id, uid, role_name, role_code, description, department_category_id, is_system_role, display_order, is_active)
+    INSERT INTO common_user.common_role
+        (tenant_id, uid, role_name, role_code, description, role_scope, is_system_role, display_order, is_active)
     VALUES
-        -- Production Roles
-        (system_tenant_id, 'SYS-ROLE-001', 'Production Manager', 'PROD_MANAGER', 'Üretim yöneticisi', prod_cat_id, TRUE, 1, TRUE),
-        (system_tenant_id, 'SYS-ROLE-002', 'Production Worker', 'PROD_WORKER', 'Üretim işçisi', prod_cat_id, TRUE, 2, TRUE),
-        (system_tenant_id, 'SYS-ROLE-003', 'Quality Control', 'QC', 'Kalite kontrol', prod_cat_id, TRUE, 3, TRUE),
-        -- Administration Roles
-        (system_tenant_id, 'SYS-ROLE-004', 'Administrator', 'ADMIN', 'Sistem yöneticisi', admin_cat_id, TRUE, 4, TRUE),
-        (system_tenant_id, 'SYS-ROLE-005', 'HR Manager', 'HR_MANAGER', 'İnsan kaynakları yöneticisi', admin_cat_id, TRUE, 5, TRUE),
-        -- Logistics Roles
-        (system_tenant_id, 'SYS-ROLE-006', 'Logistics Manager', 'LOG_MANAGER', 'Lojistik yöneticisi', logistics_cat_id, TRUE, 6, TRUE),
-        (system_tenant_id, 'SYS-ROLE-007', 'Warehouse Worker', 'WAREHOUSE_WORKER', 'Depo işçisi', logistics_cat_id, TRUE, 7, TRUE),
-        -- Platform Admin Role (special - system-wide access)
-        (system_tenant_id, 'SYS-ROLE-0001', 'Platform Administrator', 'PLATFORM_ADMIN', 'Full platform access - can create tenants, manage system settings, access all tenant data', NULL, TRUE, 0, TRUE),
-        -- Partner Portal Roles (used by external partner users only)
-        (system_tenant_id, 'SYS-ROLE-010', 'Partner Owner', 'PARTNER_OWNER', 'Partner şirket sahibi — tam erişim + kullanıcı yönetimi', NULL, TRUE, 10, TRUE),
-        (system_tenant_id, 'SYS-ROLE-011', 'Partner Accountant', 'PARTNER_ACCOUNTANT', 'Partner muhasebecisi — fatura, bakiye, ödeme geçmişi', NULL, TRUE, 11, TRUE),
-        (system_tenant_id, 'SYS-ROLE-012', 'Partner Buyer', 'PARTNER_BUYER', 'Partner alım sorumlusu — sipariş oluşturma ve takip', NULL, TRUE, 12, TRUE),
-        (system_tenant_id, 'SYS-ROLE-013', 'Partner Viewer', 'PARTNER_VIEWER', 'Partner görüntüleyici — yalnızca okuma erişimi', NULL, TRUE, 13, TRUE)
+        -- SYSTEM scope (hidden from tenant UI)
+        (system_tenant_id, 'SYS-ROLE-0001', 'Platform Administrator', 'PLATFORM_ADMIN', 'Full platform access — hidden from tenants', 'SYSTEM', TRUE, 0, TRUE),
+
+        -- INTERNAL scope (tenant employee roles)
+        (system_tenant_id, 'SYS-ROLE-004', 'Administrator', 'ADMIN', 'Full tenant access — manage everything', 'INTERNAL', TRUE, 1, TRUE),
+        (system_tenant_id, 'SYS-ROLE-008', 'Manager', 'MANAGER', 'Department-level management', 'INTERNAL', TRUE, 2, TRUE),
+        (system_tenant_id, 'SYS-ROLE-009', 'Supervisor', 'SUPERVISOR', 'Team/shift leadership', 'INTERNAL', TRUE, 3, TRUE),
+        (system_tenant_id, 'SYS-ROLE-014', 'Worker', 'WORKER', 'Standard employee', 'INTERNAL', TRUE, 4, TRUE),
+        (system_tenant_id, 'SYS-ROLE-015', 'Viewer', 'VIEWER', 'Read-only access', 'INTERNAL', TRUE, 5, TRUE),
+
+        -- PARTNER scope (trading partner roles)
+        (system_tenant_id, 'SYS-ROLE-010', 'Partner Owner', 'PARTNER_OWNER', 'Partner company owner — full access + user management', 'PARTNER', TRUE, 10, TRUE),
+        (system_tenant_id, 'SYS-ROLE-011', 'Partner Accountant', 'PARTNER_ACCOUNTANT', 'Partner accountant — invoices, balance, payment history', 'PARTNER', TRUE, 11, TRUE),
+        (system_tenant_id, 'SYS-ROLE-012', 'Partner Buyer', 'PARTNER_BUYER', 'Partner buyer — order creation and tracking', 'PARTNER', TRUE, 12, TRUE),
+        (system_tenant_id, 'SYS-ROLE-013', 'Partner Viewer', 'PARTNER_VIEWER', 'Partner viewer — read-only access', 'PARTNER', TRUE, 13, TRUE)
     ON CONFLICT (uid) DO UPDATE SET
         role_name = EXCLUDED.role_name,
         role_code = EXCLUDED.role_code,
         description = EXCLUDED.description,
-        department_category_id = EXCLUDED.department_category_id,
-        display_order = EXCLUDED.display_order;
+        role_scope = EXCLUDED.role_scope,
+        display_order = EXCLUDED.display_order,
+        is_active = EXCLUDED.is_active;
+
+    -- Deactivate deprecated department-specific roles
+    UPDATE common_user.common_role
+    SET is_active = FALSE
+    WHERE tenant_id = system_tenant_id
+      AND role_code IN ('PROD_MANAGER', 'PROD_WORKER', 'HR_MANAGER', 'LOG_MANAGER', 'WAREHOUSE_WORKER', 'QC');
 
 END $$;
-

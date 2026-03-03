@@ -1,7 +1,6 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import com.fabricmanagement.common.platform.auth.app.MfaEventService;
-import com.fabricmanagement.common.platform.auth.app.VerificationCodeService;
 import com.fabricmanagement.common.platform.auth.app.VerificationDispatcher;
 import com.fabricmanagement.common.platform.communication.domain.DeliveryChannel;
 import com.fabricmanagement.common.platform.communication.domain.DeliveryStatus;
@@ -32,7 +31,6 @@ public class NotificationDeliveryJob {
   private final MarketRoutingService routingService;
   private final JobScheduler jobScheduler;
   private final VerificationDispatcher verificationDispatcher;
-  private final VerificationCodeService verificationCodeService;
   private final MfaEventService mfaEventService;
 
   @PostConstruct
@@ -99,7 +97,8 @@ public class NotificationDeliveryJob {
 
     try {
       // Generate new verification code for fallback
-      // Note: We generate a new code because the original is hashed and cannot be retrieved
+      // Note: We generate a new code because the original is hashed and cannot be
+      // retrieved
       verificationDispatcher.sendVerificationCode(
           originalLog.getContactValue(),
           originalLog.getVerificationType(),

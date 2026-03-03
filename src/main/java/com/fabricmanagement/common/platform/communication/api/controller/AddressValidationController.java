@@ -63,7 +63,8 @@ public class AddressValidationController {
       AutocompleteResponse response = googleMapsClient.autocomplete(input, country);
       return ResponseEntity.ok(ApiResponse.success(response));
     } catch (IllegalStateException e) {
-      // Handle Google Maps API configuration errors (REQUEST_DENIED, OVER_QUERY_LIMIT, etc.)
+      // Handle Google Maps API configuration errors (REQUEST_DENIED,
+      // OVER_QUERY_LIMIT, etc.)
       log.error("Google Maps API error: {}", e.getMessage());
       return ResponseEntity.status(500).body(ApiResponse.error("GOOGLE_API_ERROR", e.getMessage()));
     } catch (Exception e) {
@@ -173,7 +174,6 @@ public class AddressValidationController {
    * @return List of addresses matching the postcode
    */
   @GetMapping("/search-by-postcode")
-  @SuppressWarnings("deprecation")
   public ResponseEntity<ApiResponse<List<AddressValidationResponse>>> searchByPostcode(
       @RequestParam String postcode, @RequestParam(required = false) String country) {
     log.debug("Postcode search request: postcode={}, country={}", postcode, country);
@@ -204,7 +204,8 @@ public class AddressValidationController {
       if (!postcodeValidator.isValidFormat(postcode, countryCode)) {
         log.debug(
             "Postcode format validation failed: postcode={}, country={}", postcode, countryCode);
-        // Don't reject - let Google API handle it (format might be valid but not match our regex)
+        // Don't reject - let Google API handle it (format might be valid but not match
+        // our regex)
         // This is just a pre-check to reduce unnecessary API calls
       }
     }
@@ -214,7 +215,8 @@ public class AddressValidationController {
           googleMapsClient.searchByPostcode(postcode, country);
       return ResponseEntity.ok(ApiResponse.success(results));
     } catch (IllegalStateException e) {
-      // Handle Google Maps API configuration errors (REQUEST_DENIED, OVER_QUERY_LIMIT, etc.)
+      // Handle Google Maps API configuration errors (REQUEST_DENIED,
+      // OVER_QUERY_LIMIT, etc.)
       log.error("Google Maps API error: {}", e.getMessage());
       return ResponseEntity.status(500).body(ApiResponse.error("GOOGLE_API_ERROR", e.getMessage()));
     } catch (Exception e) {

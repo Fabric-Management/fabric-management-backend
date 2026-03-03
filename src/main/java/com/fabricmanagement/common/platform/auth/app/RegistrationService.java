@@ -221,7 +221,7 @@ public class RegistrationService {
     var userContacts = userContactAssignmentService.getUserContacts(userId);
     var contactIds = userContacts.stream().map(uc -> uc.getContactId()).toList();
     return contactService.findAllById(contactIds).stream()
-        .filter(c -> c.getContactValue().equals(contactValue))
+        .filter(c -> c.getContactValue().equalsIgnoreCase(contactValue))
         .findFirst()
         .or(() -> contactService.findByValue(contactValue))
         .orElseThrow(() -> new IllegalStateException("Contact not found for user"));

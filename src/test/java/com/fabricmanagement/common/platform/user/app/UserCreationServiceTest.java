@@ -55,8 +55,8 @@ class UserCreationServiceTest {
   @Mock private UserDepartmentService userDepartmentService;
 
   @Mock
-  private com.fabricmanagement.common.platform.organization.infra.repository.PositionRepository
-      positionRepository;
+  private com.fabricmanagement.common.platform.organization.infra.repository.DepartmentRepository
+      departmentRepository;
 
   @Mock
   private com.fabricmanagement.human.core.employee.application.EmployeeService employeeService;

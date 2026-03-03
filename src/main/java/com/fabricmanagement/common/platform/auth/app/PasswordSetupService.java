@@ -24,6 +24,7 @@ import com.fabricmanagement.common.platform.user.app.UserContactAssignmentServic
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.fabricmanagement.human.core.employee.application.EmployeeService;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
@@ -71,6 +72,7 @@ public class PasswordSetupService {
   private final EntityManager entityManager;
   private final OrganizationRepository organizationRepository;
   private final TenantRepository tenantRepository;
+  private final EmployeeService employeeService;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
@@ -202,7 +204,12 @@ public class PasswordSetupService {
     eventPublisher.publish(
         new UserLoginEvent(user.getTenantId(), user.getId(), contactValue, ipAddress));
 
-    UserDto freshUser = UserDto.from(freshUserEntity);
+    UserDto freshUser =
+        UserDto.from(
+            freshUserEntity,
+            employeeService
+                .getEmployeeByUserId(freshUserEntity.getTenantId(), freshUserEntity.getId())
+                .orElse(null));
 
     boolean needsOnboarding = !Boolean.TRUE.equals(user.getHasCompletedOnboarding());
     OnboardingPrefillDto onboardingPrefill = null;
