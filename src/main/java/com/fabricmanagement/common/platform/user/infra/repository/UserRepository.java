@@ -33,7 +33,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + "LEFT JOIN FETCH u.role "
           + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
-          + "WHERE c.contactValue = :contactValue "
+          + "WHERE LOWER(c.contactValue) = LOWER(:contactValue) "
           + "AND u.tenantId = c.tenantId")
   Optional<User> findByContactValue(@Param("contactValue") String contactValue);
 
@@ -44,7 +44,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    *
    * <p>Eagerly fetches Role to avoid lazy loading issues.
    */
-  @Query("SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.id = :id")
+  @Query(
+      "SELECT u FROM User u "
+          + "LEFT JOIN FETCH u.role "
+          + "LEFT JOIN FETCH u.userDepartments ud "
+          + "LEFT JOIN FETCH ud.department "
+          + "WHERE u.tenantId = :tenantId AND u.id = :id")
   Optional<User> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
   /**
@@ -61,36 +66,36 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + "LEFT JOIN FETCH uc.contact "
           + "JOIN UserContact ucFilter ON u.id = ucFilter.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON ucFilter.contactId = c.id "
-          + "WHERE u.tenantId = :tenantId AND c.contactValue = :contactValue")
+          + "WHERE u.tenantId = :tenantId AND LOWER(c.contactValue) = LOWER(:contactValue)")
   Optional<User> findByTenantIdAndContactValue(
       @Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
-  /**
-   * Get all active users for a tenant.
-   *
-   * <p>Eagerly fetches Role to avoid lazy loading issues.
-   */
+  /** Get all active users for a tenant with role and primary department eagerly loaded. */
   @Query(
-      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.isActive = true")
+      "SELECT DISTINCT u FROM User u "
+          + "LEFT JOIN FETCH u.role "
+          + "LEFT JOIN FETCH u.userDepartments ud "
+          + "LEFT JOIN FETCH ud.department "
+          + "WHERE u.tenantId = :tenantId AND u.isActive = true")
   List<User> findByTenantIdAndIsActiveTrue(@Param("tenantId") UUID tenantId);
 
-  /**
-   * Get all users for an organization.
-   *
-   * <p>Eagerly fetches Role to avoid lazy loading issues.
-   */
+  /** Get all users for an organization with role and department eagerly loaded. */
   @Query(
-      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.organizationId = :organizationId")
+      "SELECT DISTINCT u FROM User u "
+          + "LEFT JOIN FETCH u.role "
+          + "LEFT JOIN FETCH u.userDepartments ud "
+          + "LEFT JOIN FETCH ud.department "
+          + "WHERE u.tenantId = :tenantId AND u.organizationId = :organizationId")
   List<User> findByTenantIdAndOrganizationId(
       @Param("tenantId") UUID tenantId, @Param("organizationId") UUID organizationId);
 
-  /**
-   * Get all active users for an organization.
-   *
-   * <p>Eagerly fetches Role to avoid lazy loading issues.
-   */
+  /** Get all active users for an organization with role and department eagerly loaded. */
   @Query(
-      "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND u.organizationId = :organizationId AND u.isActive = true")
+      "SELECT DISTINCT u FROM User u "
+          + "LEFT JOIN FETCH u.role "
+          + "LEFT JOIN FETCH u.userDepartments ud "
+          + "LEFT JOIN FETCH ud.department "
+          + "WHERE u.tenantId = :tenantId AND u.organizationId = :organizationId AND u.isActive = true")
   List<User> findByTenantIdAndOrganizationIdAndIsActiveTrue(
       @Param("tenantId") UUID tenantId, @Param("organizationId") UUID organizationId);
 
@@ -105,7 +110,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       "SELECT COUNT(u) > 0 FROM User u "
           + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
-          + "WHERE c.contactValue = :contactValue "
+          + "WHERE LOWER(c.contactValue) = LOWER(:contactValue) "
           + "AND u.tenantId = c.tenantId")
   boolean existsByContactValue(@Param("contactValue") String contactValue);
 
@@ -123,7 +128,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       "SELECT COUNT(u) > 0 FROM User u "
           + "JOIN com.fabricmanagement.common.platform.user.domain.UserContact uc ON u.id = uc.userId "
           + "JOIN com.fabricmanagement.common.platform.communication.domain.Contact c ON uc.contactId = c.id "
-          + "WHERE u.tenantId = :tenantId AND c.contactValue = :contactValue")
+          + "WHERE u.tenantId = :tenantId AND LOWER(c.contactValue) = LOWER(:contactValue)")
   boolean existsByTenantIdAndContactValue(
       @Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
@@ -135,6 +140,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       "SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.tenantId = :tenantId AND (u.firstName LIKE %:search% OR u.lastName LIKE %:search% OR u.displayName LIKE %:search%)")
   List<User> searchByName(@Param("tenantId") UUID tenantId, @Param("search") String search);
+
+  /** Get active users belonging to specific departments (for department-scoped access). */
+  @Query(
+      "SELECT DISTINCT u FROM User u "
+          + "LEFT JOIN FETCH u.role "
+          + "LEFT JOIN FETCH u.userDepartments ud "
+          + "LEFT JOIN FETCH ud.department "
+          + "WHERE u.tenantId = :tenantId AND u.isActive = true "
+          + "AND ud.departmentId IN :departmentIds")
+  List<User> findByTenantIdAndDepartmentIds(
+      @Param("tenantId") UUID tenantId,
+      @Param("departmentIds") java.util.Set<UUID> departmentIds);
 
   /** Count active users in tenant. */
   long countByTenantIdAndIsActiveTrue(UUID tenantId);

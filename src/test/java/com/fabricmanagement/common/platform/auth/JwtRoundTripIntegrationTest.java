@@ -72,6 +72,7 @@ class JwtRoundTripIntegrationTest {
   }
 
   @Container
+  @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
           .withDatabaseName("fabric_test")
@@ -120,16 +121,16 @@ class JwtRoundTripIntegrationTest {
     // Step 1: Signup
     String signupBody =
         """
-        {
-          "companyName": "%s",
-          "taxId": "%s",
-          "companyType": "SPINNER",
-          "firstName": "JWT",
-          "lastName": "Test",
-          "email": "%s",
-          "acceptedTerms": true
-        }
-        """
+                {
+                  "companyName": "%s",
+                  "taxId": "%s",
+                  "companyType": "SPINNER",
+                  "firstName": "JWT",
+                  "lastName": "Test",
+                  "email": "%s",
+                  "acceptedTerms": true
+                }
+                """
             .formatted(companyName, taxId, email);
 
     mockMvc
@@ -155,11 +156,11 @@ class JwtRoundTripIntegrationTest {
     // Step 3: Login
     String loginBody =
         """
-        {
-          "contactValue": "%s",
-          "password": "%s"
-        }
-        """
+                {
+                  "contactValue": "%s",
+                  "password": "%s"
+                }
+                """
             .formatted(email, password);
 
     MvcResult loginResult =
@@ -230,16 +231,16 @@ class JwtRoundTripIntegrationTest {
     // Signup
     String signupBody =
         """
-        {
-          "companyName": "Compat Test %s",
-          "taxId": "COMPAT%s",
-          "companyType": "WEAVER",
-          "firstName": "Compat",
-          "lastName": "Test",
-          "email": "%s",
-          "acceptedTerms": true
-        }
-        """
+                {
+                  "companyName": "Compat Test %s",
+                  "taxId": "COMPAT%s",
+                  "companyType": "WEAVER",
+                  "firstName": "Compat",
+                  "lastName": "Test",
+                  "email": "%s",
+                  "acceptedTerms": true
+                }
+                """
             .formatted(timestamp, timestamp % 100000, email);
 
     mockMvc
@@ -264,8 +265,8 @@ class JwtRoundTripIntegrationTest {
     // Login
     String loginBody =
         """
-        {"contactValue": "%s", "password": "%s"}
-        """
+                {"contactValue": "%s", "password": "%s"}
+                """
             .formatted(email, password);
 
     MvcResult result =

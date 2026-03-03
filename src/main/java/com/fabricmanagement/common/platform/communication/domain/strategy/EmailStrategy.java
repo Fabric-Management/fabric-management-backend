@@ -65,7 +65,8 @@ public class EmailStrategy implements VerificationStrategy {
 
   @Override
   public void sendVerificationCode(String recipient, String code) {
-    // ✅ SECURITY: Use DEBUG level for low-level email sending (NotificationService logs at INFO
+    // ✅ SECURITY: Use DEBUG level for low-level email sending (NotificationService
+    // logs at INFO
     // with masking)
     log.debug("Sending verification email to: {}", PiiMaskingUtil.maskEmail(recipient));
 
@@ -103,17 +104,19 @@ public class EmailStrategy implements VerificationStrategy {
    * @param htmlBody Email body (HTML content - rendered from template)
    */
   @Retryable(
-      value = {MailException.class, MessagingException.class},
+      retryFor = {MailException.class, MessagingException.class},
       maxAttempts = 3,
       backoff = @Backoff(delay = 1000, multiplier = 2))
   public void sendEmail(String recipient, String subject, String htmlBody) {
-    // ✅ SECURITY: Use DEBUG level to avoid duplicate logs (NotificationService logs at INFO with
+    // ✅ SECURITY: Use DEBUG level to avoid duplicate logs (NotificationService logs
+    // at INFO with
     // masking)
     log.debug("Sending custom email to: {}", PiiMaskingUtil.maskEmail(recipient));
 
     try {
       MimeMessage mimeMessage = mailSender.createMimeMessage();
-      // ✅ CRITICAL: multipart=false (no attachments) - prevents multipart/related encoding issues
+      // ✅ CRITICAL: multipart=false (no attachments) - prevents multipart/related
+      // encoding issues
       MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, "UTF-8");
 
       helper.setFrom(String.format("%s <%s>", fromName, fromEmail));
@@ -137,7 +140,8 @@ public class EmailStrategy implements VerificationStrategy {
       // ✅ Auto-Submitted header (prevents auto-replies and marks as transactional)
       mimeMessage.setHeader("Auto-Submitted", "auto-generated");
 
-      // ✅ Return-Path header (for bounce handling - SMTP server will set this, but we set it
+      // ✅ Return-Path header (for bounce handling - SMTP server will set this, but we
+      // set it
       // explicitly)
       mimeMessage.setHeader("Return-Path", fromEmail);
 

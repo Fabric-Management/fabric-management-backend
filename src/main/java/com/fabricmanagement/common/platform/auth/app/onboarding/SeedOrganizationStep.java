@@ -8,11 +8,11 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * Step 6: Seed default departments and positions for the organization.
+ * Step 3: Seed default departments for the organization.
  *
- * <p>Uses TenantSeedService directly for seeding organizational structure.
+ * <p>Runs before CreateAdminUserStep so the admin user can be assigned to "Administration Office".
  */
-@Order(6) // After CreateSubscriptionsStep (5)
+@Order(3) // After CreateOrganizationStep (2) — departments must exist before admin user
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -27,7 +27,7 @@ public class SeedOrganizationStep implements OnboardingStep {
     if (tenantId == null || organizationId == null) {
       return;
     }
-    tenantSeedService.seedDepartmentsAndPositions(tenantId, organizationId);
+    tenantSeedService.seedDepartments(tenantId, organizationId);
     log.debug("SeedOrganizationStep: tenantId={}, organizationId={}", tenantId, organizationId);
   }
 }

@@ -3,6 +3,7 @@ package com.fabricmanagement.common.platform.user.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -44,12 +45,15 @@ import lombok.NoArgsConstructor;
 public class CreateExternalUserRequest {
 
   @NotBlank(message = "First name is required")
+  @Size(max = 100, message = "First name must be at most 100 characters")
   private String firstName;
 
   @NotBlank(message = "Last name is required")
+  @Size(max = 100, message = "Last name must be at most 100 characters")
   private String lastName;
 
   @NotBlank(message = "Contact value is required")
+  @Size(max = 255, message = "Contact value must be at most 255 characters")
   private String contactValue;
 
   @NotNull(message = "Contact type is required")
@@ -58,7 +62,11 @@ public class CreateExternalUserRequest {
   @NotNull(message = "Company ID is required")
   private UUID companyId;
 
-  private String department;
+  /**
+   * @deprecated Not used in external user creation flow. External users don't have department
+   *     assignments. Kept for backward compatibility — will be removed in a future version.
+   */
+  @Deprecated private String department;
 
   /**
    * When {@code true}, the {@link

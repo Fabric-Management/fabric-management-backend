@@ -1,5 +1,6 @@
 package com.fabricmanagement.human.core.employee.application;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.human.compliance.app.EmployeeComplianceContext;
 import com.fabricmanagement.human.compliance.app.EmployeeCompliancePolicyRegistry;
@@ -9,6 +10,7 @@ import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.human.core.employee.domain.EmployeeNumberSequence;
 import com.fabricmanagement.human.core.employee.domain.Gender;
 import com.fabricmanagement.human.core.employee.domain.Title;
+import com.fabricmanagement.human.core.employee.domain.event.EmployeeUpdatedEvent;
 import com.fabricmanagement.human.core.employee.infra.repository.EmployeeNumberSequenceRepository;
 import com.fabricmanagement.human.core.employee.infra.repository.EmployeeRepository;
 import java.time.LocalDate;
@@ -28,6 +30,7 @@ public class EmployeeService {
   private final EmployeeRepository employeeRepository;
   private final EmployeeNumberSequenceRepository sequenceRepository;
   private final EmployeeCompliancePolicyRegistry compliancePolicyRegistry;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public Employee createOrUpdateEmployee(
@@ -62,7 +65,9 @@ public class EmployeeService {
     employee.setHireDate(hireDate);
     employee.setEmergencyContact(emergencyContact);
 
-    return employeeRepository.save(employee);
+    Employee saved = employeeRepository.save(employee);
+    eventPublisher.publish(new EmployeeUpdatedEvent(tenantId, userId));
+    return saved;
   }
 
   @Transactional
@@ -89,9 +94,38 @@ public class EmployeeService {
     return missingFields;
   }
 
+  @Transactional
+  public Employee saveEmployee(Employee employee) {
+    Employee saved = employeeRepository.save(employee);
+    eventPublisher.publish(new EmployeeUpdatedEvent(employee.getTenantId(), employee.getUserId()));
+    return saved;
+  }
+
   public Optional<Employee> getEmployeeByUserId(UUID userId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     return employeeRepository.findByTenantIdAndUserId(tenantId, userId);
+  }
+
+  /**
+   * Tenant-explicit overload for contexts where TenantContext may not be set (e.g. platform admin,
+   * password setup across tenants).
+   */
+  public Optional<Employee> getEmployeeByUserId(UUID tenantId, UUID userId) {
+    return employeeRepository.findByTenantIdAndUserId(tenantId, userId);
+  }
+
+  /**
+   * Batch-fetch employees by user IDs. Returns a map of userId -> Employee for efficient lookup
+   * when enriching user lists with employee data.
+   */
+  @Transactional(readOnly = true)
+  public java.util.Map<UUID, Employee> getEmployeesByUserIds(
+      UUID tenantId, java.util.Collection<UUID> userIds) {
+    if (userIds == null || userIds.isEmpty()) {
+      return java.util.Map.of();
+    }
+    return employeeRepository.findByTenantIdAndUserIdIn(tenantId, userIds).stream()
+        .collect(java.util.stream.Collectors.toMap(Employee::getUserId, e -> e));
   }
 
   public Optional<Employee> getEmployeeByEmployeeNumber(String employeeNumber) {

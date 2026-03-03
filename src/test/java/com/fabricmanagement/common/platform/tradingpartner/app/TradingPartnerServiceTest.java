@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.common.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartner;
@@ -41,6 +43,7 @@ class TradingPartnerServiceTest {
   @Mock private TradingPartnerRepository partnerRepository;
   @Mock private TradingPartnerRegistryService registryService;
   @Mock private DomainEventPublisher eventPublisher;
+  @Mock private OrganizationFacade organizationFacade;
 
   @InjectMocks private TradingPartnerService service;
 
@@ -92,6 +95,12 @@ class TradingPartnerServiceTest {
                 return tp;
               });
 
+      OrganizationDto mockedOrg =
+          com.fabricmanagement.common.platform.organization.dto.OrganizationDto.builder()
+              .id(UUID.randomUUID())
+              .build();
+      when(organizationFacade.createPartnerOrganization(any(), any(), any())).thenReturn(mockedOrg);
+
       TradingPartnerDto result = service.createPartner(request);
 
       assertThat(result).isNotNull();
@@ -99,7 +108,8 @@ class TradingPartnerServiceTest {
       assertThat(result.getStatus()).isEqualTo(PartnerStatus.ACTIVE);
 
       ArgumentCaptor<TradingPartner> partnerCaptor = ArgumentCaptor.forClass(TradingPartner.class);
-      verify(partnerRepository).save(partnerCaptor.capture());
+      // It's saved twice (once for partner, once to update organizationId)
+      verify(partnerRepository, org.mockito.Mockito.times(2)).save(partnerCaptor.capture());
       TradingPartner saved = partnerCaptor.getValue();
       assertThat(saved.getRegistry().getId()).isEqualTo(REGISTRY_ID);
       assertThat(saved.getCustomName()).isEqualTo("Ana tedarikçi");

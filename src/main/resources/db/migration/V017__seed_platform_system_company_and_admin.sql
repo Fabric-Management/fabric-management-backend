@@ -62,7 +62,6 @@ DECLARE
     -- Role IDs (for platform-level seeding)
     prod_mgr_role_id UUID;
     prod_worker_role_id UUID;
-    qc_role_id UUID;
     admin_role_id UUID;
     hr_mgr_role_id UUID;
     log_mgr_role_id UUID;
@@ -309,11 +308,9 @@ BEGIN
         -- Get role IDs
         SELECT id INTO prod_mgr_role_id FROM common_company.common_role 
             WHERE tenant_id = system_tenant_id AND role_code = 'PROD_MANAGER';
-        SELECT id INTO prod_worker_role_id FROM common_company.common_role 
+        SELECT id INTO prod_worker_role_id FROM common_company.common_role
             WHERE tenant_id = system_tenant_id AND role_code = 'PROD_WORKER';
-        SELECT id INTO qc_role_id FROM common_company.common_role 
-            WHERE tenant_id = system_tenant_id AND role_code = 'QC';
-        SELECT id INTO admin_role_id FROM common_company.common_role 
+        SELECT id INTO admin_role_id FROM common_company.common_role
             WHERE tenant_id = system_tenant_id AND role_code = 'ADMIN';
         SELECT id INTO hr_mgr_role_id FROM common_company.common_role 
             WHERE tenant_id = system_tenant_id AND role_code = 'HR_MANAGER';

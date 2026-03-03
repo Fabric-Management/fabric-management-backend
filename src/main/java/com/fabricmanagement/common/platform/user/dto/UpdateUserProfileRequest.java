@@ -36,6 +36,9 @@ public class UpdateUserProfileRequest {
   /** Last name (WORK_PROFILE). */
   private String lastName;
 
+  /** Role ID (WORK_PROFILE). Updates the user's role assignment. */
+  private UUID roleId;
+
   /** Work email contact value (WORK_PROFILE). Creates/updates work email contact. */
   private String workEmail;
 
@@ -69,6 +72,7 @@ public class UpdateUserProfileRequest {
     // Check WORK_PROFILE fields
     if (firstName != null
         || lastName != null
+        || roleId != null
         || workEmail != null
         || workPhone != null
         || workAddress != null
@@ -91,6 +95,7 @@ public class UpdateUserProfileRequest {
   public boolean hasUpdates() {
     return firstName != null
         || lastName != null
+        || roleId != null
         || workEmail != null
         || workPhone != null
         || workAddress != null

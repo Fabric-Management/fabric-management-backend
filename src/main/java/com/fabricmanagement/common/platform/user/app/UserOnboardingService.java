@@ -7,6 +7,8 @@ import com.fabricmanagement.common.platform.user.domain.event.UserOnboardingComp
 import com.fabricmanagement.common.platform.user.dto.OnboardingStatusResponse;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.human.core.employee.application.EmployeeService;
+import com.fabricmanagement.human.core.employee.domain.Employee;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserOnboardingService {
 
   private final UserRepository userRepository;
+  private final EmployeeService employeeService;
   private final DomainEventPublisher eventPublisher;
 
   @Transactional(readOnly = true)
@@ -59,7 +62,8 @@ public class UserOnboardingService {
 
     if (user.getOnboardingCompletedAt() != null) {
       log.debug("User already completed onboarding: userId={}", userId);
-      return UserDto.from(user);
+      Employee employee = employeeService.getEmployeeByUserId(userId).orElse(null);
+      return UserDto.from(user, employee);
     }
 
     user.completeOnboarding();
@@ -69,7 +73,8 @@ public class UserOnboardingService {
 
     log.info("Onboarding completed: userId={}, uid={}", saved.getId(), saved.getUid());
 
-    return UserDto.from(saved);
+    Employee employee = employeeService.getEmployeeByUserId(saved.getId()).orElse(null);
+    return UserDto.from(saved, employee);
   }
 
   @Transactional(readOnly = true)

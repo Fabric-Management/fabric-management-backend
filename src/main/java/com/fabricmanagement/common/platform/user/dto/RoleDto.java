@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.user.dto;
 
 import com.fabricmanagement.common.platform.user.domain.Role;
+import com.fabricmanagement.common.platform.user.domain.RoleScope;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +20,7 @@ public class RoleDto {
   private String roleName;
   private String roleCode;
   private String description;
+  private RoleScope roleScope;
   private Boolean isActive;
 
   public static RoleDto from(Role role) {
@@ -29,6 +31,7 @@ public class RoleDto {
         .roleName(role.getRoleName())
         .roleCode(role.getRoleCode())
         .description(role.getDescription())
+        .roleScope(role.getRoleScope())
         .isActive(role.getIsActive())
         .build();
   }

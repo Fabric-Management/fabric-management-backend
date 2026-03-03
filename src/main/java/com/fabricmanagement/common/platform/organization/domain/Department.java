@@ -61,10 +61,6 @@ public class Department extends BaseEntity {
   private UUID managerId;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "department_category_id")
-  private DepartmentCategory departmentCategory;
-
-  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_department_id")
   private Department parentDepartment;
 
@@ -78,10 +74,6 @@ public class Department extends BaseEntity {
   @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, orphanRemoval = false)
   @Builder.Default
   private List<UserDepartment> userDepartments = new ArrayList<>();
-
-  @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, orphanRemoval = false)
-  @Builder.Default
-  private List<Position> positions = new ArrayList<>();
 
   public static Department create(
       UUID organizationId, String departmentName, String departmentCode, String description) {

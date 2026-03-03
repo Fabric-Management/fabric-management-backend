@@ -3,6 +3,7 @@ package com.fabricmanagement.common.platform.user.api.controller;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.user.app.ProfileUpdateRequestService;
+import com.fabricmanagement.common.platform.user.app.TeamAccessService;
 import com.fabricmanagement.common.platform.user.app.UserService;
 import com.fabricmanagement.common.platform.user.dto.CreateProfileUpdateRequestDto;
 import com.fabricmanagement.common.platform.user.dto.ProfileUpdateRequestDto;
@@ -15,6 +16,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -30,6 +32,7 @@ public class UserProfileController {
 
   private final UserService userService;
   private final ProfileUpdateRequestService profileUpdateRequestService;
+  private final TeamAccessService teamAccessService;
 
   /**
    * Update user profile (Admin/HR/Dept Manager only).
@@ -51,6 +54,11 @@ public class UserProfileController {
 
     if (requesterId == null) {
       throw new IllegalStateException("User not authenticated");
+    }
+
+    if (!teamAccessService.canManageMembers(requesterId)) {
+      throw new AccessDeniedException(
+          "Only Administration Office and Human Resources can update member profiles.");
     }
 
     log.info("Profile update request: targetUserId={}, requesterId={}", id, requesterId);

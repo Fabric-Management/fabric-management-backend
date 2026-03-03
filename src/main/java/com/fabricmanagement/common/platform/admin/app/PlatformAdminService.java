@@ -12,6 +12,7 @@ import com.fabricmanagement.common.platform.tenant.infra.repository.TenantReposi
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.human.core.employee.application.EmployeeService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -50,6 +51,7 @@ public class PlatformAdminService {
   private final OrganizationRepository organizationRepository;
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
+  private final EmployeeService employeeService;
 
   /**
    * Get all tenants in the system.
@@ -153,7 +155,9 @@ public class PlatformAdminService {
                           new IllegalArgumentException(
                               String.format("User %s not found in tenant %s", userId, tenantId)));
 
-          return UserDto.from(user);
+          return UserDto.from(
+              user,
+              employeeService.getEmployeeByUserId(tenantId, userId).orElse(null));
         });
   }
 

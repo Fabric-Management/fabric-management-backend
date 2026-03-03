@@ -102,7 +102,6 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
   @Transactional
   public UserAddress assignAddress(
       UUID userId, UUID addressId, Boolean isPrimary, Boolean isWorkAddress) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
     log.info(
         "Assigning address to user: userId={}, addressId={}, isPrimary={}, isWork={}",
         userId,

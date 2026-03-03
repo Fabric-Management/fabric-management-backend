@@ -21,9 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class AuthUserResolutionService {
 
-  private static final int DEFAULT_MAX_ATTEMPTS = 5;
-  private static final int DEFAULT_LOCK_SECONDS = 1800; // 30 minutes
-
   private final AuthUserRepository authUserRepository;
   private final AuthProperties authProperties;
 

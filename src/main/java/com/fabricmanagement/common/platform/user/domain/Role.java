@@ -9,39 +9,22 @@ import lombok.*;
 /**
  * Role entity - Dynamic, database-driven role management.
  *
- * <p>Represents user roles in the system. Unlike static enums, roles are fully database-driven and
- * can be managed through CRUD operations.
- *
- * <p><b>Standard Roles (seeded):</b>
+ * <p>Roles are generic and context-free. The department provides organizational context:
  *
  * <ul>
- *   <li>ADMIN - Administrator (Full system access)
- *   <li>DIRECTOR - Director (Üst yönetim erişimi)
- *   <li>MANAGER - Manager (Departman yönetimi)
- *   <li>SUPERVISOR - Supervisor (Vardiya / ekip lideri)
- *   <li>USER - User (Standart çalışan)
- *   <li>INTERN - Intern (Stajyer erişimi)
- *   <li>VIEWER - Viewer (Sadece okuma yetkisi)
+ *   <li>Role = WHAT the user can do (Admin, Manager, Worker, Viewer...)
+ *   <li>Department = WHERE the user operates (Production, Logistics, HR...)
+ *   <li>Combined: "Manager in Production" = Production Manager
  * </ul>
  *
- * <h2>Relationship:</h2>
+ * <p><b>Role Scopes:</b>
  *
- * <p>One Role can have Many Users (One-to-Many via User.roleId)
- *
- * <h2>Usage in Authorization:</h2>
- *
- * <p>Roles are referenced in Policy conditions by role_code (e.g., "ADMIN", "MANAGER"). This allows
- * policies to remain stable even when role names change.
- *
- * <h2>Example:</h2>
- *
- * <pre>{@code
- * Role admin = Role.builder()
- *     .roleName("Administrator")
- *     .roleCode("ADMIN")
- *     .description("Full system access")
- *     .build();
- * }</pre>
+ * <ul>
+ *   <li>INTERNAL — Tenant employee roles (ADMIN, MANAGER, SUPERVISOR, WORKER, VIEWER)
+ *   <li>PARTNER — Trading partner roles (PARTNER_OWNER, PARTNER_ACCOUNTANT, PARTNER_BUYER,
+ *       PARTNER_VIEWER)
+ *   <li>SYSTEM — Platform roles, hidden from tenant UI (PLATFORM_ADMIN)
+ * </ul>
  */
 @Entity
 @Table(
@@ -69,12 +52,27 @@ public class Role extends BaseEntity {
   @Column(name = "description", length = 500)
   private String description;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role_scope", nullable = false, length = 20)
+  @Builder.Default
+  private RoleScope roleScope = RoleScope.INTERNAL;
+
   @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = false)
   @Builder.Default
   private List<User> users = new ArrayList<>();
 
+  public static Role create(
+      String roleName, String roleCode, String description, RoleScope roleScope) {
+    return Role.builder()
+        .roleName(roleName)
+        .roleCode(roleCode)
+        .description(description)
+        .roleScope(roleScope)
+        .build();
+  }
+
   public static Role create(String roleName, String roleCode, String description) {
-    return Role.builder().roleName(roleName).roleCode(roleCode).description(description).build();
+    return create(roleName, roleCode, description, RoleScope.INTERNAL);
   }
 
   @Override

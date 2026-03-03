@@ -4,17 +4,12 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.util.DuplicateValidator;
 import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.common.platform.organization.domain.Department;
-import com.fabricmanagement.common.platform.organization.domain.DepartmentCategory;
-import com.fabricmanagement.common.platform.organization.domain.Position;
-import com.fabricmanagement.common.platform.organization.dto.DepartmentCategoryDto;
 import com.fabricmanagement.common.platform.organization.dto.DepartmentDto;
-import com.fabricmanagement.common.platform.organization.dto.PositionDto;
-import com.fabricmanagement.common.platform.organization.infra.repository.DepartmentCategoryRepository;
 import com.fabricmanagement.common.platform.organization.infra.repository.DepartmentRepository;
-import com.fabricmanagement.common.platform.organization.infra.repository.PositionRepository;
 import com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto;
 import com.fabricmanagement.common.platform.user.app.RoleService;
 import com.fabricmanagement.common.platform.user.domain.Role;
+import com.fabricmanagement.common.platform.user.domain.RoleScope;
 import com.fabricmanagement.common.platform.user.dto.RoleDto;
 import java.util.HashMap;
 import java.util.List;
@@ -23,24 +18,13 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for providing user creation form options in a single response.
  *
- * <p><b>Purpose:</b> Optimize frontend form loading by providing all required data (department
- * categories, departments, positions) in a single API call.
- *
- * <p><b>Performance Benefits:</b>
- *
- * <ul>
- *   <li>Single HTTP request instead of 3 separate requests
- *   <li>Reduced network round-trips
- *   <li>Faster page load time
- *   <li>Single database transaction
- * </ul>
+ * <p>Returns roles (filtered by scope) and departments (hierarchical via parentDepartment).
  */
 @Service
 @RequiredArgsConstructor
@@ -48,134 +32,69 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserCreationOptionsService {
 
   private final RoleService roleService;
-  private final DepartmentCategoryRepository departmentCategoryRepository;
   private final DepartmentRepository departmentRepository;
-  private final PositionRepository positionRepository;
   private final TenantSeedService tenantSeedService;
   private final OrganizationFacade organizationFacade;
 
   /**
-   * Get all options needed for user creation form.
+   * Get options for creating an internal employee.
    *
-   * <p>Returns roles, department categories, departments, and positions in a single response. All
-   * data is tenant-scoped and filtered to active records only.
-   *
-   * <p><b>Cached:</b> 10 minutes (tenant-scoped cache key)
-   *
-   * @return User creation options (roles, categories, departments, positions)
+   * <p>Returns only INTERNAL-scoped roles and tenant departments.
    */
   @Transactional(readOnly = true)
-  @Cacheable(
-      value = "userCreationOptions",
-      key =
-          "T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).getCurrentTenantId()")
   public UserCreationOptionsDto getUserCreationOptions() {
+    return getOptions(RoleScope.INTERNAL);
+  }
+
+  /**
+   * Get options for inviting a partner user.
+   *
+   * <p>Returns only PARTNER-scoped roles and tenant departments.
+   */
+  @Transactional(readOnly = true)
+  public UserCreationOptionsDto getPartnerCreationOptions() {
+    return getOptions(RoleScope.PARTNER);
+  }
+
+  private UserCreationOptionsDto getOptions(RoleScope scope) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Getting user creation options: tenantId={}", tenantId);
+    log.debug("Getting user creation options: tenantId={}, scope={}", tenantId, scope);
 
-    // Get root organization ID for this tenant
     UUID organizationId =
-        organizationFacade
-            .getRootOrganization()
-            .map(o -> o.getId())
-            .orElse(tenantId); // Fallback to tenantId if organization not found
+        organizationFacade.getRootOrganization().map(o -> o.getId()).orElse(tenantId);
 
-    // Auto-seed if tenant has no departments (lazy initialization)
     if (!tenantSeedService.isTenantSeeded(tenantId, organizationId)) {
-      log.info("Tenant not seeded, auto-seeding departments and positions: tenantId={}", tenantId);
-      tenantSeedService.seedDepartmentsAndPositions(tenantId, organizationId);
+      log.info("Tenant not seeded, auto-seeding departments: tenantId={}", tenantId);
+      tenantSeedService.seedDepartments(tenantId, organizationId);
     }
 
-    // Fetch all data in single transaction (efficient)
-    List<Role> roles = roleService.findAll();
-
-    // Get department categories: both system-wide (reference data) and tenant-specific
-    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-    List<DepartmentCategory> systemCategories =
-        departmentCategoryRepository.findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(
-            systemTenantId);
-    List<DepartmentCategory> tenantCategories =
-        departmentCategoryRepository.findByTenantIdAndIsActiveTrueOrderByDisplayOrderAsc(tenantId);
-
-    log.debug(
-        "Department categories: system={}, tenant={}",
-        systemCategories.size(),
-        tenantCategories.size());
-
-    // Combine: system categories (reference) + tenant-specific categories
-    List<DepartmentCategory> allCategories = new java.util.ArrayList<>();
-    allCategories.addAll(systemCategories);
-    allCategories.addAll(tenantCategories);
-
-    log.debug("Total categories after merge: {}", allCategories.size());
-
-    // Get departments by tenant (optimized query)
+    List<Role> roles = roleService.findByScope(scope);
     List<Department> departments = departmentRepository.findByTenantIdAndIsActiveTrue(tenantId);
 
-    List<Position> positions = positionRepository.findByTenantId(tenantId);
-
-    // Convert to DTOs
     List<RoleDto> roleDtos = roles.stream().map(RoleDto::from).collect(Collectors.toList());
-
-    List<DepartmentCategoryDto> categoryDtos =
-        allCategories.stream().map(DepartmentCategoryDto::from).collect(Collectors.toList());
-
     List<DepartmentDto> departmentDtos =
         departments.stream().map(DepartmentDto::from).collect(Collectors.toList());
 
-    List<PositionDto> positionDtos =
-        positions.stream().map(PositionDto::from).collect(Collectors.toList());
-
     log.debug(
-        "User creation options: roles={}, categories={}, departments={}, positions={}",
+        "User creation options: scope={}, roles={}, departments={}",
+        scope,
         roleDtos.size(),
-        categoryDtos.size(),
-        departmentDtos.size(),
-        positionDtos.size());
+        departmentDtos.size());
 
-    // ✅ Validate for duplicates (non-blocking, logs warnings)
-    // Note: Positions can have the same name across different departments (e.g., "Forklift
-    // Operator"
-    // in both Shipping and Fiber departments), so we validate by (departmentId + positionName)
-    // combination
     Map<String, Boolean> validations = new HashMap<>();
     validations.put(
         "roles",
         DuplicateValidator.validateAndLog(
             roleDtos, role -> role.getRoleName() != null ? role.getRoleName() : "", "roles"));
     validations.put(
-        "departmentCategories",
-        DuplicateValidator.validateAndLog(
-            categoryDtos,
-            cat -> cat.getCategoryName() != null ? cat.getCategoryName() : "",
-            "departmentCategories"));
-    validations.put(
         "departments",
         DuplicateValidator.validateAndLog(
             departmentDtos,
             dept -> dept.getDepartmentName() != null ? dept.getDepartmentName() : "",
             "departments"));
-    validations.put(
-        "positions",
-        DuplicateValidator.validateAndLog(
-            positionDtos,
-            pos -> {
-              // Use (departmentId + positionName) as key to allow same position name in different
-              // departments
-              String deptId =
-                  pos.getDepartmentId() != null ? pos.getDepartmentId().toString() : "null";
-              String posName = pos.getPositionName() != null ? pos.getPositionName() : "";
-              return deptId + "::" + posName;
-            },
-            "positions"));
 
     DuplicateValidator.validateAll(validations);
 
-    return UserCreationOptionsDto.builder()
-        .roles(roleDtos)
-        .departmentCategories(categoryDtos)
-        .departments(departmentDtos)
-        .positions(positionDtos)
-        .build();
+    return UserCreationOptionsDto.builder().roles(roleDtos).departments(departmentDtos).build();
   }
 }

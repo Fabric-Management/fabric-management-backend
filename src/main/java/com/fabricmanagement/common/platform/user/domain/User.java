@@ -71,6 +71,11 @@ public class User extends BaseEntity {
   @Column(name = "organization_id", nullable = false)
   private UUID organizationId;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "user_type", nullable = false, length = 20)
+  @Builder.Default
+  private UserType userType = UserType.INTERNAL;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "role_id")
   private Role role;
@@ -86,10 +91,6 @@ public class User extends BaseEntity {
   @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
   @Builder.Default
   private List<UserAddress> userAddresses = new ArrayList<>();
-
-  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-  @Builder.Default
-  private List<UserPosition> userPositions = new ArrayList<>();
 
   @Column(name = "last_active_at")
   private Instant lastActiveAt;
@@ -118,19 +119,17 @@ public class User extends BaseEntity {
     return this.firstName + " " + this.lastName;
   }
 
-  /**
-   * Create a new user.
-   *
-   * @param firstName First name
-   * @param lastName Last name
-   * @param organizationId Organization the user belongs to
-   * @return new User
-   */
   public static User create(String firstName, String lastName, UUID organizationId) {
+    return create(firstName, lastName, organizationId, UserType.INTERNAL);
+  }
+
+  public static User create(
+      String firstName, String lastName, UUID organizationId, UserType userType) {
     return User.builder()
         .firstName(firstName)
         .lastName(lastName)
         .organizationId(organizationId)
+        .userType(userType)
         .build();
   }
 

@@ -28,7 +28,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -51,6 +50,7 @@ class TenantOnboardingIntegrationTest {
   }
 
   @Container
+  @SuppressWarnings("resource")
   static PostgreSQLContainer<?> postgres =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
           .withDatabaseName("fabric_test")
@@ -87,16 +87,16 @@ class TenantOnboardingIntegrationTest {
     String taxId = "111222333" + System.currentTimeMillis() % 10000;
     String body =
         """
-        {
-          "companyName": "E2E Test Company",
-          "taxId": "%s",
-          "companyType": "SPINNER",
-          "firstName": "Test",
-          "lastName": "User",
-          "email": "e2e-test-%s@example.com",
-          "acceptedTerms": true
-        }
-        """
+                {
+                  "companyName": "E2E Test Company",
+                  "taxId": "%s",
+                  "companyType": "SPINNER",
+                  "firstName": "Test",
+                  "lastName": "User",
+                  "email": "e2e-test-%s@example.com",
+                  "acceptedTerms": true
+                }
+                """
             .formatted(taxId, System.currentTimeMillis());
 
     mockMvc
@@ -128,27 +128,25 @@ class TenantOnboardingIntegrationTest {
     String taxId = "TENANT" + timestamp % 100000;
     String body =
         """
-        {
-          "companyName": "%s",
-          "taxId": "%s",
-          "companyType": "VERTICAL_MILL",
-          "firstName": "Tenant",
-          "lastName": "Test",
-          "email": "tenant-test-%s@example.com",
-          "acceptedTerms": true
-        }
-        """
+                {
+                  "companyName": "%s",
+                  "taxId": "%s",
+                  "companyType": "VERTICAL_MILL",
+                  "firstName": "Tenant",
+                  "lastName": "Test",
+                  "email": "tenant-test-%s@example.com",
+                  "acceptedTerms": true
+                }
+                """
             .formatted(companyName, taxId, timestamp);
 
-    MvcResult result =
-        mockMvc
-            .perform(
-                post("/api/public/signup")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(body))
-            .andExpect(status().isOk())
-            .andReturn();
+    mockMvc
+        .perform(
+            post("/api/public/signup")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
 
     // Verify Tenant was created in common_tenant table
     Optional<Tenant> tenant =
@@ -179,16 +177,16 @@ class TenantOnboardingIntegrationTest {
     String taxId = "ORG" + timestamp % 100000;
     String body =
         """
-        {
-          "companyName": "%s",
-          "taxId": "%s",
-          "companyType": "WEAVER",
-          "firstName": "Org",
-          "lastName": "Test",
-          "email": "org-test-%s@example.com",
-          "acceptedTerms": true
-        }
-        """
+                {
+                  "companyName": "%s",
+                  "taxId": "%s",
+                  "companyType": "WEAVER",
+                  "firstName": "Org",
+                  "lastName": "Test",
+                  "email": "org-test-%s@example.com",
+                  "acceptedTerms": true
+                }
+                """
             .formatted(companyName, taxId, timestamp);
 
     mockMvc

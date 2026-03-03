@@ -155,7 +155,8 @@ public class WhatsAppClient {
   private boolean checkRecipientCapability(String phoneNumber) {
     try {
       // Alternative: Use recipient phone number check endpoint if available
-      // This requires additional API permissions and may not be available in all setups
+      // This requires additional API permissions and may not be available in all
+      // setups
       log.debug("Attempting alternative WhatsApp capability check");
 
       // For now, return false and rely on primary check method
@@ -370,7 +371,7 @@ public class WhatsAppClient {
 
   @Data
   @JsonIgnoreProperties(ignoreUnknown = true)
-  static class WhatsAppMessageId {
+  public static class WhatsAppMessageId {
     @JsonProperty("id")
     private String id;
   }

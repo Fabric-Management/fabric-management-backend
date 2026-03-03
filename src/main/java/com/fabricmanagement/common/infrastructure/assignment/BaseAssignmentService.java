@@ -1,7 +1,6 @@
 package com.fabricmanagement.common.infrastructure.assignment;
 
 import com.fabricmanagement.common.infrastructure.persistence.Assignable;
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,7 +52,6 @@ public abstract class BaseAssignmentService<J extends Assignable> {
 
   @Transactional
   public J assign(UUID parentId, UUID childId, Boolean primaryFlag) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
     log.info("Assigning: parentId={}, childId={}, primary={}", parentId, childId, primaryFlag);
 
     validateParentExists(parentId);
