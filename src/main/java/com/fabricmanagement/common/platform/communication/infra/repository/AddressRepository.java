@@ -13,24 +13,30 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface AddressRepository extends JpaRepository<Address, UUID> {
 
-  /** Find all addresses by type within tenant. */
-  @Query("SELECT a FROM Address a WHERE a.tenantId = :tenantId AND a.addressType = :addressType")
+  /** Find all active addresses by type within tenant. */
+  @Query(
+      "SELECT a FROM Address a WHERE a.tenantId = :tenantId "
+          + "AND a.addressType = :addressType AND a.isActive = true")
   List<Address> findByTenantIdAndAddressType(
       @Param("tenantId") UUID tenantId, @Param("addressType") AddressType addressType);
 
-  /** Find primary addresses by type within tenant. */
+  /** Find primary active addresses by type within tenant. */
   @Query(
       "SELECT a FROM Address a WHERE a.tenantId = :tenantId "
-          + "AND a.addressType = :addressType AND a.isPrimary = true")
+          + "AND a.addressType = :addressType AND a.isPrimary = true AND a.isActive = true")
   List<Address> findPrimaryByTenantIdAndAddressType(
       @Param("tenantId") UUID tenantId, @Param("addressType") AddressType addressType);
 
-  /** Find addresses by city within tenant. */
-  @Query("SELECT a FROM Address a WHERE a.tenantId = :tenantId AND a.city = :city")
+  /** Find active addresses by city within tenant. */
+  @Query(
+      "SELECT a FROM Address a WHERE a.tenantId = :tenantId "
+          + "AND a.city = :city AND a.isActive = true")
   List<Address> findByTenantIdAndCity(@Param("tenantId") UUID tenantId, @Param("city") String city);
 
-  /** Find addresses by country within tenant. */
-  @Query("SELECT a FROM Address a WHERE a.tenantId = :tenantId AND a.country = :country")
+  /** Find active addresses by country within tenant. */
+  @Query(
+      "SELECT a FROM Address a WHERE a.tenantId = :tenantId "
+          + "AND a.country = :country AND a.isActive = true")
   List<Address> findByTenantIdAndCountry(
       @Param("tenantId") UUID tenantId, @Param("country") String country);
 }

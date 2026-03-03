@@ -54,7 +54,7 @@ public class TenantSeedController {
     }
 
     // Seed departments and positions
-    tenantSeedService.seedDepartmentsAndPositions(tenantId, organizationId);
+    tenantSeedService.seedDepartments(tenantId, organizationId);
 
     return ResponseEntity.ok(ApiResponse.success("Departments and positions seeded successfully"));
   }

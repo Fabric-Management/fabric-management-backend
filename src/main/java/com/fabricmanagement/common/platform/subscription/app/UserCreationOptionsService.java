@@ -4,8 +4,11 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.util.DuplicateValidator;
 import com.fabricmanagement.common.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.common.platform.organization.domain.Department;
+import com.fabricmanagement.common.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.common.platform.organization.dto.DepartmentDto;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationAddressDto;
 import com.fabricmanagement.common.platform.organization.infra.repository.DepartmentRepository;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.common.platform.subscription.dto.UserCreationOptionsDto;
 import com.fabricmanagement.common.platform.user.app.RoleService;
 import com.fabricmanagement.common.platform.user.domain.Role;
@@ -33,6 +36,7 @@ public class UserCreationOptionsService {
 
   private final RoleService roleService;
   private final DepartmentRepository departmentRepository;
+  private final OrganizationAddressRepository organizationAddressRepository;
   private final TenantSeedService tenantSeedService;
   private final OrganizationFacade organizationFacade;
 
@@ -70,16 +74,22 @@ public class UserCreationOptionsService {
 
     List<Role> roles = roleService.findByScope(scope);
     List<Department> departments = departmentRepository.findByTenantIdAndIsActiveTrue(tenantId);
+    List<OrganizationAddress> orgAddresses =
+        organizationAddressRepository.findWithAddressByTenantIdAndOrganizationId(
+            tenantId, organizationId);
 
     List<RoleDto> roleDtos = roles.stream().map(RoleDto::from).collect(Collectors.toList());
     List<DepartmentDto> departmentDtos =
         departments.stream().map(DepartmentDto::from).collect(Collectors.toList());
+    List<OrganizationAddressDto> addressDtos =
+        orgAddresses.stream().map(OrganizationAddressDto::from).collect(Collectors.toList());
 
     log.debug(
-        "User creation options: scope={}, roles={}, departments={}",
+        "User creation options: scope={}, roles={}, departments={}, addresses={}",
         scope,
         roleDtos.size(),
-        departmentDtos.size());
+        departmentDtos.size(),
+        addressDtos.size());
 
     Map<String, Boolean> validations = new HashMap<>();
     validations.put(
@@ -95,6 +105,10 @@ public class UserCreationOptionsService {
 
     DuplicateValidator.validateAll(validations);
 
-    return UserCreationOptionsDto.builder().roles(roleDtos).departments(departmentDtos).build();
+    return UserCreationOptionsDto.builder()
+        .roles(roleDtos)
+        .departments(departmentDtos)
+        .addresses(addressDtos)
+        .build();
   }
 }

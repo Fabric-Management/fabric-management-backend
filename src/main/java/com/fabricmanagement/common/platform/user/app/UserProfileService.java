@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserProfileService {
 
   private final UserRepository userRepository;
+  private final UserQueryService userQueryService;
   private final UserProfilePermissionService permissionService;
   private final ContactService contactService;
   private final UserContactAssignmentService userContactAssignmentService;
@@ -53,7 +54,15 @@ public class UserProfileService {
     log.info("Updating user profile: userId={}, requesterId={}", userId, requesterId);
 
     if (!request.hasUpdates()) {
-      throw new IllegalArgumentException("No fields provided for update");
+      log.debug("No profile fields to update for userId={}, returning current user", userId);
+      return userQueryService
+          .findById(TenantContext.getCurrentTenantId(), userId)
+          .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    }
+
+    if (userId.equals(requesterId)) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Users cannot update their own profile. Please contact HR or Admin.");
     }
 
     Set<ProfileCategory> categories = request.getUpdatedCategories();
@@ -66,11 +75,6 @@ public class UserProfileService {
         throw new org.springframework.security.access.AccessDeniedException(
             "You don't have permission to update " + category.name().toLowerCase() + " profile.");
       }
-    }
-
-    if (userId.equals(requesterId)) {
-      throw new org.springframework.security.access.AccessDeniedException(
-          "Users cannot update their own profile. Please contact HR or Admin.");
     }
 
     User user =
@@ -124,12 +128,21 @@ public class UserProfileService {
   }
 
   /**
-   * Persist birthDate and emergencyContact to the Employee record. If the user has no Employee
-   * record yet, these fields are silently skipped (user is external or Employee wasn't created
-   * during onboarding).
+   * Persist employee HR fields to the Employee record. If the user has no Employee record yet,
+   * these fields are silently skipped (user is external or Employee wasn't created during
+   * onboarding).
    */
   private Employee updateEmployeePersonalFields(UUID userId, UpdateUserProfileRequest request) {
-    if (request.getBirthDate() == null && request.getEmergencyContact() == null) {
+    boolean hasEmployeeUpdates =
+        request.getBirthDate() != null
+            || request.getEmergencyContact() != null
+            || request.getTitle() != null
+            || request.getGender() != null
+            || request.getNationality() != null
+            || request.getEmployeeNumber() != null
+            || request.getHireDate() != null;
+
+    if (!hasEmployeeUpdates) {
       return employeeService.getEmployeeByUserId(userId).orElse(null);
     }
 
@@ -137,8 +150,23 @@ public class UserProfileService {
         .getEmployeeByUserId(userId)
         .map(
             employee -> {
+              if (request.getTitle() != null) {
+                employee.setTitle(request.getTitle());
+              }
+              if (request.getGender() != null) {
+                employee.setGender(request.getGender());
+              }
               if (request.getBirthDate() != null) {
                 employee.setBirthDate(request.getBirthDate());
+              }
+              if (request.getNationality() != null) {
+                employee.setNationality(request.getNationality());
+              }
+              if (request.getEmployeeNumber() != null) {
+                employee.setEmployeeNumber(request.getEmployeeNumber());
+              }
+              if (request.getHireDate() != null) {
+                employee.setHireDate(request.getHireDate());
               }
               if (request.getEmergencyContact() != null) {
                 employee.setEmergencyContact(

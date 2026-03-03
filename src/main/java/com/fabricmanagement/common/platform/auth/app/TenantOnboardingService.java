@@ -54,6 +54,9 @@ public class TenantOnboardingService {
     context.setCompanyType(request.getCompanyType());
     context.setAddress(request.getAddress());
     context.setCity(request.getCity());
+    context.setState(request.getState());
+    context.setDistrict(request.getDistrict());
+    context.setPostalCode(request.getPostalCode());
     context.setCountry(request.getCountry());
     context.setPhoneNumber(request.getPhoneNumber());
     context.setCompanyEmail(request.getCompanyEmail());
@@ -93,7 +96,8 @@ public class TenantOnboardingService {
     context.setAdminFirstName(request.getFirstName());
     context.setAdminLastName(request.getLastName());
     context.setAdminContact(request.getEmail());
-    // Use admin email as billing email for self-service (no separate company email provided)
+    // Use admin email as billing email for self-service (no separate company email
+    // provided)
     context.setCompanyEmail(request.getEmail());
     context.setSelectedOS(
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()

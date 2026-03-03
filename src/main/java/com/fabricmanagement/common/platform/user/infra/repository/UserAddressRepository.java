@@ -14,17 +14,29 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserAddressRepository extends JpaRepository<UserAddress, UserAddressId> {
 
-  @Query("SELECT ua FROM UserAddress ua WHERE ua.tenantId = :tenantId AND ua.userId = :userId")
+  @Query(
+      "SELECT ua FROM UserAddress ua "
+          + "LEFT JOIN FETCH ua.address "
+          + "WHERE ua.tenantId = :tenantId AND ua.userId = :userId")
   List<UserAddress> findByTenantIdAndUserId(
       @Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
 
-  @Query("SELECT ua FROM UserAddress ua WHERE ua.userId = :userId AND ua.addressId = :addressId")
+  @Query(
+      "SELECT ua FROM UserAddress ua "
+          + "LEFT JOIN FETCH ua.address "
+          + "WHERE ua.userId = :userId AND ua.addressId = :addressId")
   Optional<UserAddress> findByUserIdAndAddressId(
       @Param("userId") UUID userId, @Param("addressId") UUID addressId);
 
-  @Query("SELECT ua FROM UserAddress ua WHERE ua.userId = :userId AND ua.isPrimary = true")
+  @Query(
+      "SELECT ua FROM UserAddress ua "
+          + "LEFT JOIN FETCH ua.address "
+          + "WHERE ua.userId = :userId AND ua.isPrimary = true")
   Optional<UserAddress> findPrimaryByUserId(@Param("userId") UUID userId);
 
-  @Query("SELECT ua FROM UserAddress ua WHERE ua.userId = :userId AND ua.isWorkAddress = true")
+  @Query(
+      "SELECT ua FROM UserAddress ua "
+          + "LEFT JOIN FETCH ua.address "
+          + "WHERE ua.userId = :userId AND ua.isWorkAddress = true")
   List<UserAddress> findWorkAddressesByUserId(@Param("userId") UUID userId);
 }

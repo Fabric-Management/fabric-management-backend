@@ -8,7 +8,7 @@
 .PHONY: help setup validate-env app-build app-run test test-integration coverage \
         dev up up-all down down-clean restart restart-db status ps logs logs-db logs-errors \
         health metrics swagger \
-        db-shell db-migrate db-info db-validate db-clean db-tables db-schemas \
+        db-shell db-migrate db-info db-validate db-repair db-clean db-tables db-schemas \
         db-view-companies db-view-users db-view-subscriptions db-view-tokens db-view-all \
         show-tables \
         db-backup db-restore db-reset \
@@ -237,6 +237,11 @@ db-validate: ## Validate migrations
 	@echo "$(YELLOW)🔍 Validating migrations...$(NC)"
 	$(MVN) flyway:validate
 	@echo "$(GREEN)✅ Migrations valid$(NC)"
+
+db-repair: ## Fix Flyway checksum mismatch (e.g. after editing an already-applied migration)
+	@echo "$(YELLOW)🔧 Repairing Flyway schema history (updating checksums)...$(NC)"
+	$(MVN) flyway:repair
+	@echo "$(GREEN)✅ Repair completed. You can run 'make app-run' again.$(NC)"
 
 db-clean: ## Clean database (DESTRUCTIVE! Drops all objects)
 	@echo "$(RED)⚠️  This will drop ALL DB objects!$(NC)"

@@ -6,6 +6,7 @@ import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.dto.AddressDto;
 import com.fabricmanagement.common.platform.communication.dto.CreateAddressRequest;
+import com.fabricmanagement.common.platform.communication.dto.UpdateAddressRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -33,8 +34,10 @@ public class AddressController {
             request.getStreetAddress(),
             request.getCity(),
             request.getState(),
+            request.getDistrict(),
             request.getPostalCode(),
             request.getCountry(),
+            null, // countryCode (not in CreateAddressRequest)
             request.getAddressType(),
             request.getLabel());
 
@@ -66,6 +69,31 @@ public class AddressController {
             .collect(Collectors.toList());
 
     return ResponseEntity.ok(ApiResponse.success(addresses));
+  }
+
+  @PutMapping("/{id}")
+  public ResponseEntity<ApiResponse<AddressDto>> updateAddress(
+      @PathVariable UUID id, @RequestBody UpdateAddressRequest request) {
+    log.info("Updating address: id={}", id);
+
+    Address address =
+        addressService.updateAddress(
+            id,
+            request.getStreetAddress(),
+            request.getCity(),
+            request.getState(),
+            request.getDistrict(),
+            request.getPostalCode(),
+            request.getCountry(),
+            request.getCountryCode(),
+            request.getAddressType(),
+            request.getLabel(),
+            request.getContactPerson(),
+            request.getContactPhone(),
+            request.getContactEmail());
+
+    return ResponseEntity.ok(
+        ApiResponse.success(AddressDto.from(address), "Address updated successfully"));
   }
 
   @PutMapping("/{id}/primary")

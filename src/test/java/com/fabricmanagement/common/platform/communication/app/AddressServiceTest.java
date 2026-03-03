@@ -176,7 +176,19 @@ class AddressServiceTest {
 
       Address result =
           service.updateAddress(
-              addressId, "New St", "NewCity", "State", "12345", "Country", "New Label");
+              addressId,
+              "New St",
+              "NewCity",
+              "State",
+              null,
+              "12345",
+              "Country",
+              null,
+              null,
+              "New Label",
+              null,
+              null,
+              null);
 
       verify(addressRepository).save(address);
       assertThat(address.getStreetAddress()).isEqualTo("New St");

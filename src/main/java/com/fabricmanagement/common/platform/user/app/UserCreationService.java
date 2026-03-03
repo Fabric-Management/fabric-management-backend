@@ -61,6 +61,7 @@ public class UserCreationService {
   private final RoleService roleService;
   private final UserDepartmentService userDepartmentService;
   private final DepartmentRepository departmentRepository;
+  private final UserWorkLocationService userWorkLocationService;
   private final com.fabricmanagement.human.core.employee.application.EmployeeService
       employeeService;
 
@@ -101,7 +102,13 @@ public class UserCreationService {
           saved.getId(), request.getDepartmentId(), true, assignedBy);
     }
 
-    // Step 4: Create Employee record if any HR data provided
+    // Step 4: Assign work location (org address the user works at)
+    if (request.getWorkLocationOrgAddressId() != null) {
+      userWorkLocationService.assignLocation(
+          saved.getId(), request.getWorkLocationOrgAddressId(), true, null);
+    }
+
+    // Step 5: Create Employee record if any HR data provided
     createEmployeeIfNeeded(saved.getId(), request);
 
     // Step 6: Publish event

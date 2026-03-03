@@ -100,6 +100,9 @@ public class CreateInternalUserRequest {
   /** Employment start date (hire date). */
   private LocalDate hireDate;
 
+  /** Organization address ID for work location assignment (optional). */
+  private UUID workLocationOrgAddressId;
+
   /** Emergency contact information. */
   @Valid private EmergencyContactData emergencyContact;
 

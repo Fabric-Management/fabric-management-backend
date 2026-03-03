@@ -46,9 +46,11 @@ public class AssignContactAndAddressStep implements OnboardingStep {
           addressService.createAddress(
               context.getAddress() != null ? context.getAddress() : "",
               context.getCity() != null ? context.getCity() : "",
-              null,
-              null,
+              context.getState(),
+              context.getDistrict(),
+              context.getPostalCode(),
               context.getCountry() != null ? context.getCountry() : "",
+              null, // countryCode
               AddressType.HEADQUARTERS,
               "Organization");
       addressAssignmentService.assignAddress(organizationId, address.getId(), true, false);

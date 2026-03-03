@@ -36,6 +36,12 @@ public class TenantOnboardingRequest {
 
   private String city;
 
+  private String state;
+
+  private String district;
+
+  private String postalCode;
+
   private String country;
 
   private String phoneNumber;

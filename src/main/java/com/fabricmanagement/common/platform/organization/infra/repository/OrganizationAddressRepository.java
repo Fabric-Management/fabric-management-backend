@@ -15,23 +15,53 @@ import org.springframework.stereotype.Repository;
 public interface OrganizationAddressRepository
     extends JpaRepository<OrganizationAddress, OrganizationAddressId> {
 
+  /** Finds the assignment regardless of soft-delete status. Used by cascade operations. */
   Optional<OrganizationAddress> findByOrganizationIdAndAddressId(
       UUID organizationId, UUID addressId);
 
-  List<OrganizationAddress> findByTenantIdAndOrganizationId(UUID tenantId, UUID organizationId);
+  /** Finds only active assignments. Used by business-logic operations. */
+  @Query(
+      "SELECT oa FROM OrganizationAddress oa "
+          + "WHERE oa.organizationId = :orgId AND oa.addressId = :addressId "
+          + "AND oa.isActive = true")
+  Optional<OrganizationAddress> findActiveByOrganizationIdAndAddressId(
+      @Param("orgId") UUID organizationId, @Param("addressId") UUID addressId);
+
+  @Query(
+      "SELECT oa FROM OrganizationAddress oa "
+          + "WHERE oa.tenantId = :tenantId AND oa.organizationId = :orgId "
+          + "AND oa.isActive = true")
+  List<OrganizationAddress> findByTenantIdAndOrganizationId(
+      @Param("tenantId") UUID tenantId, @Param("orgId") UUID organizationId);
 
   @Query(
       "SELECT oa FROM OrganizationAddress oa LEFT JOIN FETCH oa.address"
-          + " WHERE oa.tenantId = :tenantId AND oa.organizationId = :orgId")
+          + " WHERE oa.tenantId = :tenantId AND oa.organizationId = :orgId"
+          + " AND oa.isActive = true")
   List<OrganizationAddress> findWithAddressByTenantIdAndOrganizationId(
       @Param("tenantId") UUID tenantId, @Param("orgId") UUID organizationId);
 
   @Query(
-      "SELECT oa FROM OrganizationAddress oa WHERE oa.organizationId = :orgId AND oa.isPrimary = true")
+      "SELECT oa FROM OrganizationAddress oa "
+          + "WHERE oa.organizationId = :orgId AND oa.isPrimary = true AND oa.isActive = true")
   Optional<OrganizationAddress> findPrimaryByOrganizationId(@Param("orgId") UUID organizationId);
 
   @Query(
-      "SELECT oa FROM OrganizationAddress oa WHERE oa.organizationId = :orgId AND oa.isHeadquarters = true")
+      "SELECT oa FROM OrganizationAddress oa "
+          + "WHERE oa.organizationId = :orgId AND oa.isHeadquarters = true AND oa.isActive = true")
   Optional<OrganizationAddress> findHeadquartersByOrganizationId(
       @Param("orgId") UUID organizationId);
+
+  @Query(
+      "SELECT oa FROM OrganizationAddress oa "
+          + "LEFT JOIN FETCH oa.address "
+          + "LEFT JOIN FETCH oa.organization "
+          + "WHERE oa.addressId = :addressId AND oa.isActive = true")
+  Optional<OrganizationAddress> findByAddressId(@Param("addressId") UUID addressId);
+
+  @Query(
+      "SELECT oa FROM OrganizationAddress oa "
+          + "LEFT JOIN FETCH oa.address "
+          + "WHERE oa.addressId = :addressId")
+  Optional<OrganizationAddress> findByAddressIdIncludingDeleted(@Param("addressId") UUID addressId);
 }

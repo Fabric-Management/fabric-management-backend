@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.platform.organization.domain.Department;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.UserDepartment;
@@ -59,7 +60,7 @@ public class TeamAccessService {
     User user =
         userRepository
             .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
     String roleCode = user.getRole() != null ? user.getRole().getRoleCode() : null;
 
