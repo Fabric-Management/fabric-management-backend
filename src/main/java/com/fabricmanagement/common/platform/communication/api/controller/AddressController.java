@@ -96,16 +96,6 @@ public class AddressController {
         ApiResponse.success(AddressDto.from(address), "Address updated successfully"));
   }
 
-  @PutMapping("/{id}/primary")
-  public ResponseEntity<ApiResponse<AddressDto>> setAsPrimary(@PathVariable UUID id) {
-    log.info("Setting address as primary: id={}", id);
-
-    Address address = addressService.setAsPrimary(id);
-
-    return ResponseEntity.ok(
-        ApiResponse.success(AddressDto.from(address), "Address set as primary"));
-  }
-
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<Void>> deleteAddress(@PathVariable UUID id) {
     log.info("Deleting address: id={}", id);

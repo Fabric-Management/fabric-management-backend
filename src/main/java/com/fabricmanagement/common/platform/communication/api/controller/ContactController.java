@@ -81,16 +81,6 @@ public class ContactController {
         ApiResponse.success(ContactDto.from(contact), "Contact verified successfully"));
   }
 
-  @PutMapping("/{id}/primary")
-  public ResponseEntity<ApiResponse<ContactDto>> setAsPrimary(@PathVariable UUID id) {
-    log.info("Setting contact as primary: id={}", id);
-
-    Contact contact = contactService.setAsPrimary(id);
-
-    return ResponseEntity.ok(
-        ApiResponse.success(ContactDto.from(contact), "Contact set as primary"));
-  }
-
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<Void>> deleteContact(@PathVariable UUID id) {
     log.info("Deleting contact: id={}", id);

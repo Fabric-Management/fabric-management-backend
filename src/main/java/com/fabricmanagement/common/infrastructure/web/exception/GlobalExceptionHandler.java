@@ -10,6 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -125,6 +126,13 @@ public class GlobalExceptionHandler {
         "OPTIMISTIC_LOCK",
         "Resource was updated by another transaction. Please retry.",
         req.getRequestURI());
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  @ResponseStatus(HttpStatus.FORBIDDEN)
+  public ApiError handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
+    log.warn("Access denied: {} — {}", req.getRequestURI(), ex.getMessage());
+    return ApiError.of(403, "Forbidden", "ACCESS_DENIED", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler(TooManyRequestsException.class)

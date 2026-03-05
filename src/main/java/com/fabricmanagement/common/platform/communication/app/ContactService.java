@@ -94,7 +94,6 @@ public class ContactService {
             .isPersonal(isPersonal != null ? isPersonal : true)
             .parentContactId(parentContactId)
             .isVerified(false)
-            .isPrimary(false)
             .build();
 
     applyWhatsAppRules(contact);
@@ -195,7 +194,8 @@ public class ContactService {
     contact.verify();
     Contact savedContact = contactRepository.save(contact);
 
-    // Note: With user-based authentication, AuthUser is linked to User, not Contact.
+    // Note: With user-based authentication, AuthUser is linked to User, not
+    // Contact.
     // All verified contacts of a user can login using the user's AuthUser.
 
     return savedContact;
@@ -210,36 +210,6 @@ public class ContactService {
       throw new DomainException("Contact does not belong to current tenant");
     }
 
-    return contactRepository.save(contact);
-  }
-
-  @Transactional
-  public Contact setAsPrimary(UUID contactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.info("Setting contact as primary: tenantId={}, contactId={}", tenantId, contactId);
-
-    Contact contact =
-        contactRepository
-            .findById(contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
-
-    if (!contact.getTenantId().equals(tenantId)) {
-      throw new DomainException("Contact does not belong to current tenant");
-    }
-
-    // Remove primary flag from other contacts of same type
-    List<Contact> sameTypeContacts =
-        contactRepository.findByTenantIdAndContactType(tenantId, contact.getContactType());
-
-    sameTypeContacts.forEach(
-        c -> {
-          if (!c.getId().equals(contactId) && c.getIsPrimary()) {
-            c.removePrimary();
-            contactRepository.save(c);
-          }
-        });
-
-    contact.setAsPrimary();
     return contactRepository.save(contact);
   }
 
@@ -276,7 +246,8 @@ public class ContactService {
   }
 
   private void applyWhatsAppRules(Contact contact) {
-    // Contact entity has no isWhatsApp field; WhatsApp handling can be added when needed.
+    // Contact entity has no isWhatsApp field; WhatsApp handling can be added when
+    // needed.
   }
 
   private void validateContactValue(String contactValue, ContactType contactType) {

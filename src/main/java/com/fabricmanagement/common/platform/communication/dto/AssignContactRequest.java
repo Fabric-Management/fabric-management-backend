@@ -17,5 +17,4 @@ public class AssignContactRequest {
   private UUID contactId;
 
   @Builder.Default private Boolean isDefault = false;
-  private String department; // For CompanyContact only
 }

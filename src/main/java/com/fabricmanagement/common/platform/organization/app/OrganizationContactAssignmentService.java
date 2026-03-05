@@ -99,21 +99,17 @@ public class OrganizationContactAssignmentService
         .organizationId(parentId)
         .contactId(childId)
         .isDefault(Boolean.TRUE.equals(primaryFlag))
-        .department(null)
         .build();
   }
 
   /** Assign contact to organization with optional department. */
   @Transactional
-  public OrganizationContact assignContact(
-      UUID organizationId, UUID contactId, Boolean isDefault, String department) {
+  public OrganizationContact assignContact(UUID organizationId, UUID contactId, Boolean isDefault) {
     log.info(
-        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={},"
-            + " department={}",
+        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={}",
         organizationId,
         contactId,
-        isDefault,
-        department);
+        isDefault);
 
     validateParentExists(organizationId);
     validateChildExists(contactId);
@@ -140,7 +136,6 @@ public class OrganizationContactAssignmentService
             .organizationId(organizationId)
             .contactId(contactId)
             .isDefault(isDefault != null ? isDefault : false)
-            .department(department)
             .build();
     OrganizationContact saved = organizationContactRepository.save(junction);
     onAfterAssign(saved);
@@ -165,11 +160,5 @@ public class OrganizationContactAssignmentService
   @Transactional(readOnly = true)
   public Optional<OrganizationContact> getDefaultContact(UUID organizationId) {
     return getPrimary(organizationId);
-  }
-
-  @Transactional(readOnly = true)
-  public List<OrganizationContact> getDepartmentContacts(UUID organizationId, String department) {
-    return organizationContactRepository.findByOrganizationIdAndDepartment(
-        organizationId, department);
   }
 }

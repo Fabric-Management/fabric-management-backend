@@ -11,7 +11,6 @@ import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.infra.repository.ContactRepository;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -201,35 +200,6 @@ class ContactServiceTest {
 
       assertThat(contact.getIsVerified()).isTrue();
       verify(contactRepository).save(contact);
-      assertThat(result).isSameAs(contact);
-    }
-  }
-
-  @Nested
-  @DisplayName("setAsPrimary")
-  class SetAsPrimary {
-
-    @Test
-    void removesPrimaryFromOthersAndSetsContactPrimary() {
-      UUID contactId = UUID.randomUUID();
-      Contact contact = Contact.builder().contactType(ContactType.EMAIL).isPrimary(false).build();
-      contact.setId(contactId);
-      contact.setTenantId(TENANT_ID);
-      Contact otherPrimary =
-          Contact.builder().contactType(ContactType.EMAIL).isPrimary(true).build();
-      otherPrimary.setId(UUID.randomUUID());
-      otherPrimary.setTenantId(TENANT_ID);
-      when(contactRepository.findById(contactId)).thenReturn(Optional.of(contact));
-      when(contactRepository.findByTenantIdAndContactType(TENANT_ID, ContactType.EMAIL))
-          .thenReturn(List.of(contact, otherPrimary));
-      when(contactRepository.save(any(Contact.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      Contact result = service.setAsPrimary(contactId);
-
-      verify(contactRepository).save(otherPrimary);
-      verify(contactRepository).save(contact);
-      assertThat(otherPrimary.getIsPrimary()).isFalse();
-      assertThat(contact.getIsPrimary()).isTrue();
       assertThat(result).isSameAs(contact);
     }
   }

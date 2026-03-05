@@ -52,41 +52,18 @@ public class OrganizationContactController {
     return ResponseEntity.ok(ApiResponse.success(OrganizationContactDto.from(defaultContact)));
   }
 
-  @GetMapping("/department/{department}")
-  public ResponseEntity<ApiResponse<List<OrganizationContactDto>>> getDepartmentContacts(
-      @PathVariable UUID organizationId, @PathVariable String department) {
-    log.debug(
-        "Getting department contacts: organizationId={}, department={}",
-        organizationId,
-        department);
-
-    List<OrganizationContactDto> contacts =
-        organizationContactAssignmentService
-            .getDepartmentContacts(organizationId, department)
-            .stream()
-            .map(OrganizationContactDto::from)
-            .collect(Collectors.toList());
-
-    return ResponseEntity.ok(ApiResponse.success(contacts));
-  }
-
   @PostMapping
   public ResponseEntity<ApiResponse<OrganizationContactDto>> assignContact(
       @PathVariable UUID organizationId, @Valid @RequestBody AssignContactRequest request) {
     log.info(
-        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={},"
-            + " department={}",
+        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={}",
         organizationId,
         request.getContactId(),
-        request.getIsDefault(),
-        request.getDepartment());
+        request.getIsDefault());
 
     OrganizationContact organizationContact =
         organizationContactAssignmentService.assignContact(
-            organizationId,
-            request.getContactId(),
-            request.getIsDefault(),
-            request.getDepartment());
+            organizationId, request.getContactId(), request.getIsDefault());
 
     return ResponseEntity.ok(
         ApiResponse.success(
@@ -97,8 +74,7 @@ public class OrganizationContactController {
   public ResponseEntity<ApiResponse<OrganizationContactDto>> createAndAssignContact(
       @PathVariable UUID organizationId,
       @Valid @RequestBody CreateContactRequest createRequest,
-      @RequestParam(defaultValue = "false") Boolean isDefault,
-      @RequestParam(required = false) String department) {
+      @RequestParam(defaultValue = "false") Boolean isDefault) {
     log.info(
         "Creating and assigning contact to organization: organizationId={}, type={}",
         organizationId,
@@ -114,7 +90,7 @@ public class OrganizationContactController {
 
     OrganizationContact organizationContact =
         organizationContactAssignmentService.assignContact(
-            organizationId, contact.getId(), isDefault, department);
+            organizationId, contact.getId(), isDefault);
 
     return ResponseEntity.ok(
         ApiResponse.success(

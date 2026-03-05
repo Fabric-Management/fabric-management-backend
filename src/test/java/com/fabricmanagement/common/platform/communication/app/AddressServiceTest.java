@@ -1,7 +1,6 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,7 +9,6 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.infra.repository.AddressRepository;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -72,7 +70,6 @@ class AddressServiceTest {
       assertThat(saved.getCountry()).isEqualTo("Turkey");
       assertThat(saved.getAddressType()).isEqualTo(AddressType.HEADQUARTERS);
       assertThat(saved.getLabel()).isEqualTo("HQ");
-      assertThat(saved.getIsPrimary()).isFalse();
       assertThat(result).isSameAs(saved);
     }
   }
@@ -105,59 +102,6 @@ class AddressServiceTest {
       Optional<Address> result = service.findById(addressId);
 
       assertThat(result).contains(address);
-    }
-  }
-
-  @Nested
-  @DisplayName("setAsPrimary")
-  class SetAsPrimary {
-
-    @Test
-    void throwsWhenAddressNotFound() {
-      UUID addressId = UUID.randomUUID();
-      when(addressRepository.findById(addressId)).thenReturn(Optional.empty());
-
-      assertThatThrownBy(() -> service.setAsPrimary(addressId))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("not found");
-    }
-
-    @Test
-    void throwsWhenAddressDifferentTenant() {
-      UUID addressId = UUID.randomUUID();
-      Address address = Address.builder().build();
-      address.setId(addressId);
-      address.setTenantId(UUID.randomUUID());
-      when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
-
-      assertThatThrownBy(() -> service.setAsPrimary(addressId))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("current tenant");
-    }
-
-    @Test
-    void removesPrimaryFromOthersAndSetsAddressPrimary() {
-      UUID addressId = UUID.randomUUID();
-      Address address =
-          Address.builder().addressType(AddressType.HEADQUARTERS).isPrimary(false).build();
-      address.setId(addressId);
-      address.setTenantId(TENANT_ID);
-      Address otherPrimary =
-          Address.builder().addressType(AddressType.HEADQUARTERS).isPrimary(true).build();
-      otherPrimary.setId(UUID.randomUUID());
-      otherPrimary.setTenantId(TENANT_ID);
-      when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
-      when(addressRepository.findByTenantIdAndAddressType(TENANT_ID, AddressType.HEADQUARTERS))
-          .thenReturn(List.of(address, otherPrimary));
-      when(addressRepository.save(any(Address.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      Address result = service.setAsPrimary(addressId);
-
-      verify(addressRepository).save(otherPrimary);
-      verify(addressRepository).save(address);
-      assertThat(otherPrimary.getIsPrimary()).isFalse();
-      assertThat(address.getIsPrimary()).isTrue();
-      assertThat(result).isSameAs(address);
     }
   }
 

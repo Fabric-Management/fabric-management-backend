@@ -76,7 +76,6 @@ public class AddressService {
             .countryCode(countryCode)
             .addressType(addressType)
             .label(label)
-            .isPrimary(false)
             .build();
 
     return addressRepository.save(address);
@@ -112,36 +111,6 @@ public class AddressService {
     log.trace("Finding addresses by country: tenantId={}, country={}", tenantId, country);
 
     return addressRepository.findByTenantIdAndCountry(tenantId, country);
-  }
-
-  @Transactional
-  public Address setAsPrimary(UUID addressId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.info("Setting address as primary: tenantId={}, addressId={}", tenantId, addressId);
-
-    Address address =
-        addressRepository
-            .findById(addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
-
-    if (!address.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Address does not belong to current tenant");
-    }
-
-    // Remove primary flag from other addresses of same type
-    List<Address> sameTypeAddresses =
-        addressRepository.findByTenantIdAndAddressType(tenantId, address.getAddressType());
-
-    sameTypeAddresses.forEach(
-        a -> {
-          if (!a.getId().equals(addressId) && a.getIsPrimary()) {
-            a.removePrimary();
-            addressRepository.save(a);
-          }
-        });
-
-    address.setAsPrimary();
-    return addressRepository.save(address);
   }
 
   @Transactional

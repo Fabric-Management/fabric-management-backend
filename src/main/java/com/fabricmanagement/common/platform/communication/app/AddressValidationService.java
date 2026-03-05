@@ -105,7 +105,6 @@ public class AddressValidationService {
             .placeId(validation.getPlaceId())
             .latitude(validation.getLatitude())
             .longitude(validation.getLongitude())
-            .isPrimary(false)
             .build();
 
     Address saved = addressRepository.save(address);

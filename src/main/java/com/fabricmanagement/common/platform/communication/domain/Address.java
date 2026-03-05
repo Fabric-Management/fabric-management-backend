@@ -30,7 +30,6 @@ import lombok.*;
  *     .postalCode("34000")
  *     .country("Turkey")
  *     .addressType(AddressType.HOME)
- *     .isPrimary(true)
  *     .label("Home")
  *     .build();
  *
@@ -136,17 +135,6 @@ public class Address extends BaseEntity {
   private AddressType addressType;
 
   /**
-   * Primary address flag
-   *
-   * <p>true = primary address for this owner (User or Company)
-   *
-   * <p>Multiple addresses can have isPrimary = true (one per type)
-   */
-  @Column(name = "is_primary", nullable = false)
-  @Builder.Default
-  private Boolean isPrimary = false;
-
-  /**
    * Label for categorization
    *
    * <p>Examples: "Home", "Work", "Main Headquarters", "Warehouse A", "Shipping Address"
@@ -177,16 +165,6 @@ public class Address extends BaseEntity {
    */
   @Column(name = "formatted_address", length = 500)
   private String formattedAddress;
-
-  /** Mark address as primary */
-  public void setAsPrimary() {
-    this.isPrimary = true;
-  }
-
-  /** Remove primary flag */
-  public void removePrimary() {
-    this.isPrimary = false;
-  }
 
   /**
    * Get full address as formatted string

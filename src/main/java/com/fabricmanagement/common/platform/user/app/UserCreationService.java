@@ -234,6 +234,25 @@ public class UserCreationService {
 
           assignAdminDefaultDepartment(saved, request);
 
+          try {
+            String employeeNumber = employeeService.generateEmployeeNumber();
+            employeeService.createOrUpdateEmployee(
+                saved.getId(),
+                null,
+                null,
+                null,
+                null,
+                employeeNumber,
+                java.time.LocalDate.now(),
+                null);
+            log.info(
+                "Initialized default Employee profile for admin: userId={}, empNo={}",
+                saved.getId(),
+                employeeNumber);
+          } catch (Exception e) {
+            log.error("Failed to initialize HR profile for admin user: {}", e.getMessage());
+          }
+
           eventPublisher.publish(
               new UserCreatedEvent(
                   saved.getTenantId(),

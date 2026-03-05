@@ -20,13 +20,6 @@ public interface AddressRepository extends JpaRepository<Address, UUID> {
   List<Address> findByTenantIdAndAddressType(
       @Param("tenantId") UUID tenantId, @Param("addressType") AddressType addressType);
 
-  /** Find primary active addresses by type within tenant. */
-  @Query(
-      "SELECT a FROM Address a WHERE a.tenantId = :tenantId "
-          + "AND a.addressType = :addressType AND a.isPrimary = true AND a.isActive = true")
-  List<Address> findPrimaryByTenantIdAndAddressType(
-      @Param("tenantId") UUID tenantId, @Param("addressType") AddressType addressType);
-
   /** Find active addresses by city within tenant. */
   @Query(
       "SELECT a FROM Address a WHERE a.tenantId = :tenantId "

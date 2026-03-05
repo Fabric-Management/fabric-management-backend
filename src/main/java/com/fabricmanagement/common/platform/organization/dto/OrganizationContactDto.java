@@ -19,7 +19,6 @@ public class OrganizationContactDto {
   private UUID organizationId;
   private UUID contactId;
   private Boolean isDefault;
-  private String department;
 
   /** Nested contact details — populated when the contact relation is loaded. */
   private ContactData contact;
@@ -43,8 +42,7 @@ public class OrganizationContactDto {
         OrganizationContactDto.builder()
             .organizationId(entity.getOrganizationId())
             .contactId(entity.getContactId())
-            .isDefault(entity.getIsDefault())
-            .department(entity.getDepartment());
+            .isDefault(entity.getIsDefault());
 
     Contact contact = entity.getContact();
     if (contact != null) {

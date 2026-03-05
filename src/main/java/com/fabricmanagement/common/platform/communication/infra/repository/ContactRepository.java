@@ -39,13 +39,6 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
   List<Contact> findExtensionsByParentContactId(
       @Param("tenantId") UUID tenantId, @Param("parentContactId") UUID parentContactId);
 
-  /** Find primary contacts by type within tenant. */
-  @Query(
-      "SELECT c FROM Contact c WHERE c.tenantId = :tenantId "
-          + "AND c.contactType = :contactType AND c.isPrimary = true")
-  List<Contact> findPrimaryByTenantIdAndContactType(
-      @Param("tenantId") UUID tenantId, @Param("contactType") ContactType contactType);
-
   /** Find verified contacts by type within tenant. */
   @Query(
       "SELECT c FROM Contact c WHERE c.tenantId = :tenantId "

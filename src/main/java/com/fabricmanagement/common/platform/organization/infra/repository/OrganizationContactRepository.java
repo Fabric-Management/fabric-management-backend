@@ -29,7 +29,4 @@ public interface OrganizationContactRepository
   @Query(
       "SELECT oc FROM OrganizationContact oc WHERE oc.organizationId = :orgId AND oc.isDefault = true")
   Optional<OrganizationContact> findDefaultByOrganizationId(@Param("orgId") UUID organizationId);
-
-  List<OrganizationContact> findByOrganizationIdAndDepartment(
-      UUID organizationId, String department);
 }

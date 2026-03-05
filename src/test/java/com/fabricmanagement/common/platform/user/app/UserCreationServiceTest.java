@@ -91,6 +91,7 @@ class UserCreationServiceTest {
                       com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL,
                       COMPANY_ID,
                       null,
+                      null,
                       null))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("already registered");
@@ -110,6 +111,7 @@ class UserCreationServiceTest {
                       CONTACT_VALUE,
                       com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL,
                       COMPANY_ID,
+                      null,
                       null,
                       null))
           .isInstanceOf(IllegalArgumentException.class)
@@ -141,6 +143,7 @@ class UserCreationServiceTest {
               CONTACT_VALUE,
               com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL,
               COMPANY_ID,
+              null,
               null,
               null);
 

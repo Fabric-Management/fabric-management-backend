@@ -39,7 +39,6 @@ import lombok.*;
  *     .contactValue("john.doe@gmail.com")
  *     .contactType(ContactType.EMAIL)
  *     .isVerified(true)
- *     .isPrimary(true)
  *     .label("Personal Email")
  *     .isPersonal(true)
  *     .build();
@@ -104,17 +103,6 @@ public class Contact extends BaseEntity {
   private Boolean isVerified = false;
 
   /**
-   * Primary contact flag
-   *
-   * <p>true = primary contact for this owner (User or Company)
-   *
-   * <p>Multiple contacts can have isPrimary = true (one per type)
-   */
-  @Column(name = "is_primary", nullable = false)
-  @Builder.Default
-  private Boolean isPrimary = false;
-
-  /**
    * Label for categorization
    *
    * <p>Examples: "Home", "Work", "Mobile", "Extension 101", "Main Office"
@@ -146,16 +134,6 @@ public class Contact extends BaseEntity {
   /** Mark contact as verified */
   public void verify() {
     this.isVerified = true;
-  }
-
-  /** Mark contact as primary */
-  public void setAsPrimary() {
-    this.isPrimary = true;
-  }
-
-  /** Remove primary flag */
-  public void removePrimary() {
-    this.isPrimary = false;
   }
 
   /** Check if this is a phone extension */

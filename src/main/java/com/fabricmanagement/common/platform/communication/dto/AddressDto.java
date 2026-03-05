@@ -26,7 +26,6 @@ public class AddressDto {
   private String country;
   private String countryCode;
   private AddressType addressType;
-  private Boolean isPrimary;
   private String label;
   private String contactPhone;
   private String contactEmail;
@@ -52,7 +51,6 @@ public class AddressDto {
         .country(address.getCountry())
         .countryCode(address.getCountryCode())
         .addressType(address.getAddressType())
-        .isPrimary(address.getIsPrimary())
         .label(address.getLabel())
         .contactPhone(address.getContactPhone())
         .contactEmail(address.getContactEmail())
