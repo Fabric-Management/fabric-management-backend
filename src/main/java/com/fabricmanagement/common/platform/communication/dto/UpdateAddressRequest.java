@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 public class UpdateAddressRequest {
 
   private String streetAddress;
+  private String addressLine2;
   private String city;
   private String state;
   private String district;

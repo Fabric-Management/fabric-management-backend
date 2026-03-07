@@ -61,13 +61,13 @@ public class AssignContactAndAddressStep implements OnboardingStep {
       var contact =
           contactService.createContact(
               context.getCompanyEmail(), ContactType.EMAIL, "Organization", false, null);
-      contactAssignmentService.assignContact(organizationId, contact.getId(), true);
+      contactAssignmentService.assignContact(organizationId, contact.getId(), true, null);
     }
     if (context.getPhoneNumber() != null && !context.getPhoneNumber().isBlank()) {
       var contact =
           contactService.createContact(
               context.getPhoneNumber(), ContactType.MOBILE, "Organization", false, null);
-      contactAssignmentService.assignContact(organizationId, contact.getId(), false);
+      contactAssignmentService.assignContact(organizationId, contact.getId(), false, null);
     }
 
     log.debug("AssignContactAndAddressStep: organizationId={}", organizationId);

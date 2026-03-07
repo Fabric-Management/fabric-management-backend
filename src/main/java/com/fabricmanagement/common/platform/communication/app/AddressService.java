@@ -62,6 +62,46 @@ public class AddressService {
       String countryCode,
       AddressType addressType,
       String label) {
+    return createAddress(
+        streetAddress,
+        city,
+        state,
+        district,
+        postalCode,
+        country,
+        countryCode,
+        addressType,
+        label,
+        null);
+  }
+
+  /**
+   * Create an address with full field set including {@code addressLine2}.
+   *
+   * @param streetAddress Primary street address (line 1)
+   * @param city City
+   * @param state State / province
+   * @param district District / sub-administrative area
+   * @param postalCode Postal code
+   * @param country Country
+   * @param countryCode ISO 3166-1 alpha-2 country code
+   * @param addressType Address type
+   * @param label Human-readable label
+   * @param addressLine2 Suite, floor, building name etc. (may be null)
+   * @return Persisted Address
+   */
+  @Transactional
+  public Address createAddress(
+      String streetAddress,
+      String city,
+      String state,
+      String district,
+      String postalCode,
+      String country,
+      String countryCode,
+      AddressType addressType,
+      String label,
+      String addressLine2) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     log.debug("Creating address: tenantId={}, type={}, city={}", tenantId, addressType, city);
 
@@ -76,6 +116,7 @@ public class AddressService {
             .countryCode(countryCode)
             .addressType(addressType)
             .label(label)
+            .addressLine2(addressLine2)
             .build();
 
     return addressRepository.save(address);
@@ -117,6 +158,7 @@ public class AddressService {
   public Address updateAddress(
       UUID addressId,
       String streetAddress,
+      String addressLine2,
       String city,
       String state,
       String district,
@@ -141,6 +183,7 @@ public class AddressService {
     }
 
     if (streetAddress != null) address.setStreetAddress(streetAddress);
+    if (addressLine2 != null) address.setAddressLine2(addressLine2);
     if (city != null) address.setCity(city);
     if (state != null) address.setState(state);
     if (district != null) address.setDistrict(district);

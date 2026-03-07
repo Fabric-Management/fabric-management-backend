@@ -168,7 +168,10 @@ public class OrganizationAddressAssignmentService
 
   @Transactional
   public OrganizationAddress setAsPrimary(UUID organizationId, UUID addressId) {
-    return setPrimary(organizationId, addressId);
+    setPrimary(organizationId, addressId);
+    return organizationAddressRepository
+        .findActiveWithAddressByOrganizationIdAndAddressId(organizationId, addressId)
+        .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
   }
 
   @Transactional
@@ -188,7 +191,10 @@ public class OrganizationAddressAssignmentService
               }
             });
     junction.setIsHeadquarters(true);
-    return organizationAddressRepository.save(junction);
+    organizationAddressRepository.save(junction);
+    return organizationAddressRepository
+        .findActiveWithAddressByOrganizationIdAndAddressId(organizationId, addressId)
+        .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
   }
 
   @Transactional(readOnly = true)

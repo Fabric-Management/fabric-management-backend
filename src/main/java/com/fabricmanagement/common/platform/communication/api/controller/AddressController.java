@@ -37,9 +37,10 @@ public class AddressController {
             request.getDistrict(),
             request.getPostalCode(),
             request.getCountry(),
-            null, // countryCode (not in CreateAddressRequest)
+            request.getCountryCode(),
             request.getAddressType(),
-            request.getLabel());
+            request.getLabel(),
+            request.getAddressLine2());
 
     return ResponseEntity.ok(
         ApiResponse.success(AddressDto.from(address), "Address created successfully"));
@@ -80,6 +81,7 @@ public class AddressController {
         addressService.updateAddress(
             id,
             request.getStreetAddress(),
+            request.getAddressLine2(),
             request.getCity(),
             request.getState(),
             request.getDistrict(),

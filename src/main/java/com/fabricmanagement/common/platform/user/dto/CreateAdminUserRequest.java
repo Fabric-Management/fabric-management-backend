@@ -21,8 +21,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateAdminUserRequest {
 
-  @NotNull(message = "Company ID is required")
-  private UUID companyId;
+  @NotNull(message = "Organization ID is required")
+  private UUID organizationId;
 
   @NotNull(message = "Tenant ID is required")
   private UUID tenantId;

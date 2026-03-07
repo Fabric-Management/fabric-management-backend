@@ -15,6 +15,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateMaterialRequest {
 
+  private Long version;
+
   @NotNull(message = "Material type is required")
   private MaterialType materialType;
 

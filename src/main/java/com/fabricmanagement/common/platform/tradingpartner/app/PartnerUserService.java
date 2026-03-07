@@ -96,7 +96,7 @@ public class PartnerUserService {
             .lastName(request.getLastName())
             .contactValue(request.getEmail())
             .contactType(com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL)
-            .companyId(partner.getOrganizationId())
+            .organizationId(partner.getOrganizationId())
             .suppressEmailInvitation(true) // partner listener sends its own invitation email
             .build();
 

@@ -30,7 +30,8 @@ import lombok.*;
     indexes = {
       @Index(name = "idx_fiber_test_batch", columnList = "fiber_batch_id"),
       @Index(name = "idx_fiber_test_date", columnList = "test_date"),
-      @Index(name = "idx_fiber_test_tenant", columnList = "tenant_id")
+      @Index(name = "idx_fiber_test_tenant", columnList = "tenant_id"),
+      @Index(name = "idx_fiber_test_approval", columnList = "approval_status")
     })
 @Getter
 @Setter
@@ -49,7 +50,8 @@ public class FiberTestResult extends BaseEntity {
   @Builder.Default
   private String testType = "LABORATORY"; // LABORATORY, PRODUCTION, INCOMING
 
-  /** Laboratory measurement values. */
+  // ── Core "Big 4" measurements ───────────────────────────────────────────────
+
   @Column(name = "fineness")
   private Double fineness;
 
@@ -62,11 +64,31 @@ public class FiberTestResult extends BaseEntity {
   @Column(name = "elongation_percent")
   private Double elongationPercent;
 
+  // ── Extended measurements (textile-industry essentials) ────────────────────
+
+  /** Moisture / humidity percentage — critical for weight-based raw material pricing. */
+  @Column(name = "moisture_percent")
+  private Double moisturePercent;
+
+  /** Trash & neps content percentage — affects waste ratio and yarn quality. */
+  @Column(name = "trash_content_percent")
+  private Double trashContentPercent;
+
+  // ── Quality gate ──────────────────────────────────────────────────────────
+
+  /** Quality engineer's approval decision. Defaults to PENDING until reviewed. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "approval_status", nullable = false, length = 30)
+  @Builder.Default
+  private TestApprovalStatus approvalStatus = TestApprovalStatus.PENDING;
+
+  // ── Metadata ──────────────────────────────────────────────────────────────
+
   @Column(name = "test_lab", length = 255)
   private String testLab;
 
   @Column(name = "test_standard", length = 100)
-  private String testStandard; // ISO 1833, ASTM D7641, etc.
+  private String testStandard;
 
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;

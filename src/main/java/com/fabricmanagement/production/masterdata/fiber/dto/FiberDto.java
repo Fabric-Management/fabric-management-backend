@@ -29,6 +29,7 @@ public class FiberDto {
   private FiberStatus status;
   private String remarks;
   private Boolean isActive;
+  private Long version;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -52,6 +53,7 @@ public class FiberDto {
         .status(entity.getStatus())
         .composition(entity.getComposition())
         .remarks(entity.getRemarks())
+        .version(entity.getVersion())
         .isActive(entity.getIsActive())
         .createdAt(entity.getCreatedAt())
         .updatedAt(entity.getUpdatedAt())

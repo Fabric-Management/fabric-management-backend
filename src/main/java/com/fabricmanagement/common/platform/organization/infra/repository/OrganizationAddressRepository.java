@@ -27,6 +27,14 @@ public interface OrganizationAddressRepository
   Optional<OrganizationAddress> findActiveByOrganizationIdAndAddressId(
       @Param("orgId") UUID organizationId, @Param("addressId") UUID addressId);
 
+  /** Finds only active assignments with the address eagerly fetched. */
+  @Query(
+      "SELECT oa FROM OrganizationAddress oa LEFT JOIN FETCH oa.address "
+          + "WHERE oa.organizationId = :orgId AND oa.addressId = :addressId "
+          + "AND oa.isActive = true")
+  Optional<OrganizationAddress> findActiveWithAddressByOrganizationIdAndAddressId(
+      @Param("orgId") UUID organizationId, @Param("addressId") UUID addressId);
+
   @Query(
       "SELECT oa FROM OrganizationAddress oa "
           + "WHERE oa.tenantId = :tenantId AND oa.organizationId = :orgId "

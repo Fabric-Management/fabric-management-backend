@@ -3,8 +3,10 @@ package com.fabricmanagement.common.platform.user.api.controller;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.user.app.UserService;
+import com.fabricmanagement.common.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.common.platform.user.dto.OnboardingStatusResponse;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,9 +44,16 @@ public class UserOnboardingController {
             OnboardingStatusResponse.builder().hasCompletedOnboarding(completed).build()));
   }
 
-  /** Complete onboarding for current user. */
+  /**
+   * Complete onboarding for current user.
+   *
+   * <p>Accepts an optional {@link CompleteOnboardingRequest} body with company enrichment data
+   * (legalName, industry, address, etc.). If the body is absent or null, onboarding is still marked
+   * complete and no enrichment is performed — existing callers remain unaffected.
+   */
   @PostMapping("/onboarding/complete")
-  public ResponseEntity<ApiResponse<UserDto>> completeOnboarding() {
+  public ResponseEntity<ApiResponse<UserDto>> completeOnboarding(
+      @RequestBody(required = false) @Valid CompleteOnboardingRequest request) {
     UUID userId = TenantContext.getCurrentUserId();
 
     if (userId == null) {
@@ -53,7 +62,7 @@ public class UserOnboardingController {
 
     log.info("Completing onboarding: userId={}", userId);
 
-    UserDto user = userService.completeOnboarding(userId);
+    UserDto user = userService.completeOnboarding(userId, request);
 
     return ResponseEntity.ok(ApiResponse.success(user, "Onboarding completed successfully"));
   }

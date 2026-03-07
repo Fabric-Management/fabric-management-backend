@@ -13,9 +13,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-/** Fiber Controller - REST API for fiber management. */
+/**
+ * Fiber Controller - REST API for fiber management.
+ *
+ * <p>Security uses department-aware checks via {@code ProductionAccessService}. WRITE = create /
+ * update / deactivate (ADMIN, or MANAGER in R&D / Prod. Planning / Fiber dept). READ = any
+ * authenticated user in a production-related department.
+ */
 @RestController
 @RequestMapping("/api/production/fibers")
 @RequiredArgsConstructor
@@ -26,6 +33,7 @@ public class FiberController {
   private final FiberCategoryRepository fiberCategoryRepository;
 
   @PostMapping
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberDto>> createFiber(
       @Valid @RequestBody CreateFiberRequest request) {
     boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
@@ -51,6 +59,7 @@ public class FiberController {
   }
 
   @GetMapping("/{id}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<FiberDto>> getFiber(@PathVariable UUID id) {
     return fiberService
         .getById(id)
@@ -59,6 +68,7 @@ public class FiberController {
   }
 
   @GetMapping("/material/{materialId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<FiberDto>> getFiberByMaterial(@PathVariable UUID materialId) {
     return fiberService
         .getByMaterialId(materialId)
@@ -67,18 +77,21 @@ public class FiberController {
   }
 
   @GetMapping
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberDto>>> getAllFibers() {
     List<FiberDto> fibers = fiberService.getAll();
     return ResponseEntity.ok(ApiResponse.success(fibers));
   }
 
   @GetMapping("/search")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberDto>>> searchFibers(@RequestParam String name) {
     List<FiberDto> fibers = fiberService.searchByName(name);
     return ResponseEntity.ok(ApiResponse.success(fibers));
   }
 
   @PutMapping("/{id}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberDto>> updateFiber(
       @PathVariable UUID id, @Valid @RequestBody CreateFiberRequest request) {
     log.info("Updating fiber: id={}", id);
@@ -89,12 +102,14 @@ public class FiberController {
   }
 
   @DeleteMapping("/{id}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
   public ResponseEntity<ApiResponse<Void>> deactivateFiber(@PathVariable UUID id) {
     fiberService.deactivateFiber(id);
     return ResponseEntity.ok(ApiResponse.success(null, "Fiber deactivated successfully"));
   }
 
   @GetMapping("/categories")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberCategoryDto>>> getCategories() {
     List<FiberCategoryDto> categories =
         fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();

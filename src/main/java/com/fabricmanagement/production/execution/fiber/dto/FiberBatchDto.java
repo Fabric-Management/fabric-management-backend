@@ -26,7 +26,10 @@ public class FiberBatchDto {
   private BigDecimal quantity;
   private BigDecimal reservedQuantity;
   private BigDecimal consumedQuantity;
+  private BigDecimal wasteQuantity;
   private BigDecimal availableQuantity;
+  private BigDecimal netOutputQuantity;
+  private BigDecimal wastePercentage;
   private String unit;
   private Instant productionDate;
   private Instant expiryDate;
@@ -34,6 +37,7 @@ public class FiberBatchDto {
   private String warehouseLocation;
   private String remarks;
   private Boolean isActive;
+  private Long version;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -49,13 +53,17 @@ public class FiberBatchDto {
         .quantity(entity.getQuantity())
         .reservedQuantity(entity.getReservedQuantity())
         .consumedQuantity(entity.getConsumedQuantity())
+        .wasteQuantity(entity.getWasteQuantity())
         .availableQuantity(entity.getAvailableQuantity())
+        .netOutputQuantity(entity.getNetOutputQuantity())
+        .wastePercentage(entity.getWastePercentage())
         .unit(entity.getUnit())
         .productionDate(entity.getProductionDate())
         .expiryDate(entity.getExpiryDate())
         .status(entity.getStatus())
         .warehouseLocation(entity.getWarehouseLocation())
         .remarks(entity.getRemarks())
+        .version(entity.getVersion())
         .isActive(entity.getIsActive())
         .createdAt(entity.getCreatedAt())
         .updatedAt(entity.getUpdatedAt())

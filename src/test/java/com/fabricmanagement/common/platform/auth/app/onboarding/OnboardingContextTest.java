@@ -27,7 +27,7 @@ class OnboardingContextTest {
 
     CreateAdminUserRequest request = context.toCreateAdminUserRequest();
 
-    assertThat(request.getCompanyId()).isEqualTo(organizationId);
+    assertThat(request.getOrganizationId()).isEqualTo(organizationId);
     assertThat(request.getTenantId()).isEqualTo(tenantId);
     assertThat(request.getFirstName()).isEqualTo("Jane");
     assertThat(request.getLastName()).isEqualTo("Doe");

@@ -2,9 +2,14 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.execution.fiber.domain.FiberBatchStatus;
+import com.fabricmanagement.production.execution.fiber.infra.repository.FiberBatchRepository;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
+import com.fabricmanagement.production.masterdata.fiber.domain.FiberStatus;
 import com.fabricmanagement.production.masterdata.fiber.domain.event.FiberCreatedEvent;
+import com.fabricmanagement.production.masterdata.fiber.domain.exception.FiberDomainException;
+import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeInUseException;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
@@ -25,11 +30,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
 
 /**
  * Fiber Service - Business logic for fiber management.
  *
- * <p>Implements FiberFacade for cross-module communication.
+ * <p>
+ * Implements FiberFacade for cross-module communication.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,15 +49,18 @@ public class FiberService implements FiberFacade {
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
   private final DomainEventPublisher eventPublisher;
   private final FiberValidationService validationService;
+  private final FiberBatchRepository fiberBatchRepository;
 
   /**
    * Create fiber (pure or blended).
    *
-   * <p><b>Unified method:</b> Handles both pure and blended fibers.
+   * <p>
+   * <b>Unified method:</b> Handles both pure and blended fibers.
    *
    * <ul>
-   *   <li><b>Pure fiber:</b> composition is null or empty
-   *   <li><b>Blended fiber:</b> composition contains base fiber IDs with percentages
+   * <li><b>Pure fiber:</b> composition is null or empty
+   * <li><b>Blended fiber:</b> composition contains base fiber IDs with
+   * percentages
    * </ul>
    *
    * @param request Unified fiber request (composition optional)
@@ -71,39 +81,37 @@ public class FiberService implements FiberFacade {
 
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation reduces user
+    // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation
+    // reduces user
     // errors)
     Material material;
     if (request.getMaterialId() != null) {
       // Use existing Material
-      material =
-          materialRepository
-              .findByTenantIdAndId(tenantId, request.getMaterialId())
-              .orElseThrow(
-                  () ->
-                      new IllegalArgumentException(
-                          String.format(
-                              "Material not found: %s (or not accessible for current tenant)",
-                              request.getMaterialId())));
+      material = materialRepository
+          .findByTenantIdAndId(tenantId, request.getMaterialId())
+          .orElseThrow(
+              () -> new IllegalArgumentException(
+                  String.format(
+                      "Material not found: %s (or not accessible for current tenant)",
+                      request.getMaterialId())));
     } else {
-      // Auto-create Material (USER-FRIENDLY: System handles Material creation automatically)
+      // Auto-create Material (USER-FRIENDLY: System handles Material creation
+      // automatically)
       if (request.getUnit() == null || request.getUnit().isBlank()) {
         throw new IllegalArgumentException(
             "Unit is required when materialId is not provided. Material will be auto-created with type=FIBER.");
       }
 
       log.info("Auto-creating Material: type=FIBER, unit={}", request.getUnit());
-      material =
-          Material.create(
-              com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER,
-              request.getUnit());
+      material = Material.create(
+          com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER,
+          request.getUnit());
       material = materialRepository.save(material);
       log.info("✅ Material auto-created: id={}, uid={}", material.getId(), material.getUid());
     }
 
     // Validate material type is FIBER
-    if (material.getMaterialType()
-        != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
+    if (material.getMaterialType() != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
       throw new IllegalArgumentException(
           "Material type must be FIBER, got: " + material.getMaterialType());
     }
@@ -121,36 +129,31 @@ public class FiberService implements FiberFacade {
     }
 
     // Load reference entities
-    FiberCategory category =
-        request.getFiberCategoryId() != null
-            ? fiberCategoryRepository
-                .findById(request.getFiberCategoryId())
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "Fiber category not found: " + request.getFiberCategoryId()))
-            : null;
+    FiberCategory category = request.getFiberCategoryId() != null
+        ? fiberCategoryRepository
+            .findById(request.getFiberCategoryId())
+            .orElseThrow(
+                () -> new IllegalArgumentException(
+                    "Fiber category not found: " + request.getFiberCategoryId()))
+        : null;
 
-    FiberIsoCode isoCode =
-        request.getFiberIsoCodeId() != null
-            ? fiberIsoCodeRepository
-                .findById(request.getFiberIsoCodeId())
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "Fiber ISO code not found: " + request.getFiberIsoCodeId()))
-            : null;
+    FiberIsoCode isoCode = request.getFiberIsoCodeId() != null
+        ? fiberIsoCodeRepository
+            .findById(request.getFiberIsoCodeId())
+            .orElseThrow(
+                () -> new IllegalArgumentException(
+                    "Fiber ISO code not found: " + request.getFiberIsoCodeId()))
+        : null;
 
     // Generate suggested name for blended fiber if not provided
     String fiberName = request.getFiberName();
     if (isBlended && (fiberName == null || fiberName.isBlank())) {
       Map<UUID, String> baseFiberNames = new HashMap<>();
       for (UUID baseFiberId : request.getComposition().keySet()) {
-        Fiber baseFiber =
-            fiberRepository
-                .findById(baseFiberId)
-                .orElseThrow(
-                    () -> new IllegalArgumentException("Base fiber not found: " + baseFiberId));
+        Fiber baseFiber = fiberRepository
+            .findById(baseFiberId)
+            .orElseThrow(
+                () -> new IllegalArgumentException("Base fiber not found: " + baseFiberId));
         baseFiberNames.put(baseFiberId, baseFiber.getFiberName());
       }
       fiberName = generateFiberName(request.getComposition(), baseFiberNames);
@@ -160,17 +163,15 @@ public class FiberService implements FiberFacade {
     // Create fiber (pure or blended)
     Fiber fiber;
     if (isBlended) {
-      fiber =
-          Fiber.createBlendedFiber(
-              material,
-              category,
-              isoCode,
-              fiberName,
-              request.getFiberGrade(),
-              request.getComposition());
+      fiber = Fiber.createBlendedFiber(
+          material,
+          category,
+          isoCode,
+          fiberName,
+          request.getFiberGrade(),
+          request.getComposition());
     } else {
-      fiber =
-          Fiber.createPureFiber(material, category, isoCode, fiberName, request.getFiberGrade());
+      fiber = Fiber.createPureFiber(material, category, isoCode, fiberName, request.getFiberGrade());
     }
 
     fiber.setRemarks(request.getRemarks());
@@ -265,37 +266,81 @@ public class FiberService implements FiberFacade {
   public FiberDto updateFiber(UUID id, CreateFiberRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    Fiber fiber =
-        fiberRepository
-            .findByTenantIdAndId(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
+    Fiber fiber = fiberRepository
+        .findByTenantIdAndId(tenantId, id)
+        .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
+
+    if (fiber.getStatus() == FiberStatus.OBSOLETE) {
+      throw new FiberDomainException(
+          "Fiber '"
+              + fiber.getFiberName()
+              + "' is OBSOLETE and cannot be updated. "
+              + "Create a new fiber version instead.");
+    }
+
+    if (request.getVersion() != null && !request.getVersion().equals(fiber.getVersion())) {
+      throw new OptimisticLockConflictException("Fiber", id, request.getVersion(), fiber.getVersion());
+    }
 
     fiber.update(request.getFiberName(), request.getFiberGrade(), request.getRemarks());
 
-    // Update composition if provided
-    if (request.getComposition() != null) {
+    // Composition (recipe) change requires extra guards:
+    // 1) Block if batches are RESERVED or IN_PROGRESS on the production floor
+    // (immutability rule)
+    // 2) Validate the new composition (percentages, circular refs, active base
+    // fibers, etc.)
+    if (request.getComposition() != null && !request.getComposition().isEmpty()) {
+      if (fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
+          tenantId, id, FiberBatchStatus.PRODUCTION_ACTIVE)) {
+        throw new RecipeInUseException(id, fiber.getFiberName());
+      }
+      validateCompositionUpdate(request.getComposition(), id);
       fiber.setComposition(request.getComposition());
     }
 
     Fiber saved = fiberRepository.save(fiber);
-    log.info("✅ Fiber updated: id={}", saved.getId());
+    log.info("Fiber updated: id={}", saved.getId());
 
     return FiberDto.from(saved);
+  }
+
+  /**
+   * Validate composition on update — same business rules as creation, excluding
+   * duplicate check
+   * against self.
+   */
+  private void validateCompositionUpdate(Map<UUID, BigDecimal> composition, UUID currentFiberId) {
+    validationService.validateCompositionPercentages(composition);
+    validationService.validateMinimumRatio(composition, FiberConstants.MIN_COMPONENT_PERCENTAGE);
+    validationService.validateMaxComponents(composition, FiberConstants.MAX_BLEND_COMPONENTS);
+    validationService.validateBaseFibersActive(composition);
+    validationService.validateNoCircularReferences(composition);
+
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    validationService.validateTenantConsistency(composition, tenantId);
   }
 
   @Transactional
   public void deactivateFiber(UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    Fiber fiber =
-        fiberRepository
-            .findByTenantIdAndId(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
+    Fiber fiber = fiberRepository
+        .findByTenantIdAndId(tenantId, id)
+        .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
+
+    if (fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
+        tenantId, id, FiberBatchStatus.PRODUCTION_ACTIVE)) {
+      throw new FiberDomainException(
+          "Fiber '"
+              + fiber.getFiberName()
+              + "' cannot be deactivated: it has batches currently RESERVED or IN_PROGRESS on the"
+              + " production floor. Complete or cancel those batches first.");
+    }
 
     fiber.delete();
     fiberRepository.save(fiber);
 
-    log.info("✅ Fiber deactivated: id={}", id);
+    log.info("Fiber deactivated: id={}", id);
   }
 
   // =====================================================
@@ -333,7 +378,8 @@ public class FiberService implements FiberFacade {
   /**
    * Check if a fiber with identical composition already exists.
    *
-   * <p>Compares compositions by base fiber IDs and percentages.
+   * <p>
+   * Compares compositions by base fiber IDs and percentages.
    *
    * @param composition Map of baseFiberId → percentage
    * @return true if duplicate exists
@@ -388,8 +434,8 @@ public class FiberService implements FiberFacade {
       }
 
       // Compare percentages with configured tolerance
-      if (Math.abs(entry.getValue().subtract(percentage2).doubleValue())
-          > FiberConstants.COMPOSITION_COMPARISON_TOLERANCE) {
+      if (Math.abs(
+          entry.getValue().subtract(percentage2).doubleValue()) > FiberConstants.COMPOSITION_COMPARISON_TOLERANCE) {
         return false;
       }
     }
@@ -400,16 +446,18 @@ public class FiberService implements FiberFacade {
   /**
    * Generate a suggested name for a blended fiber based on composition.
    *
-   * <p>Generates compact code format: COT60_LIN40_VIS20
+   * <p>
+   * Generates compact code format: COT60_LIN40_VIS20
    *
-   * <p>Examples:
+   * <p>
+   * Examples:
    *
    * <ul>
-   *   <li>60% Cotton + 40% Linen → "COT60_LIN40"
-   *   <li>40% Cotton + 40% Linen + 20% Viscose → "COT40_LIN40_VIS20"
+   * <li>60% Cotton + 40% Linen → "COT60_LIN40"
+   * <li>40% Cotton + 40% Linen + 20% Viscose → "COT40_LIN40_VIS20"
    * </ul>
    *
-   * @param composition Map of baseFiberId → percentage
+   * @param composition    Map of baseFiberId → percentage
    * @param baseFiberNames Map of baseFiberId → fiberName
    * @return Suggested fiber name in compact code format
    */
@@ -430,20 +478,23 @@ public class FiberService implements FiberFacade {
   /**
    * Get fiber code abbreviation from fiber name.
    *
-   * <p>Examples:
+   * <p>
+   * Examples:
    *
    * <ul>
-   *   <li>"Cotton (100%)" → "COT"
-   *   <li>"Linen (100%)" → "LIN"
-   *   <li>"Viscose (100%)" → "VIS"
-   *   <li>"Polyester (100%)" → "POL"
-   *   <li>"Wool (100%)" → "WOL"
-   *   <li>"Nylon (100%)" → "NYL"
+   * <li>"Cotton (100%)" → "COT"
+   * <li>"Linen (100%)" → "LIN"
+   * <li>"Viscose (100%)" → "VIS"
+   * <li>"Polyester (100%)" → "POL"
+   * <li>"Wool (100%)" → "WOL"
+   * <li>"Nylon (100%)" → "NYL"
    * </ul>
    *
-   * <p>If fiber name doesn't match known patterns, uses first 3 uppercase letters.
+   * <p>
+   * If fiber name doesn't match known patterns, uses first 3 uppercase letters.
    *
-   * @param fiberName Full fiber name (e.g., "Cotton (100%)", "Recycled Cotton (100%)")
+   * @param fiberName Full fiber name (e.g., "Cotton (100%)", "Recycled Cotton
+   *                  (100%)")
    * @return 3-letter uppercase code (e.g., "COT", "LIN", "VIS")
    */
   private String getFiberCode(String fiberName) {
@@ -452,13 +503,12 @@ public class FiberService implements FiberFacade {
     }
 
     // Normalize: remove parentheses, percentages, and extra whitespace
-    String normalized =
-        fiberName
-            .replaceAll("\\(.*?\\)", "") // Remove (100%) etc.
-            .replaceAll("%", "") // Remove % signs
-            .replaceAll("\\s+", " ") // Normalize whitespace
-            .trim()
-            .toLowerCase();
+    String normalized = fiberName
+        .replaceAll("\\(.*?\\)", "") // Remove (100%) etc.
+        .replaceAll("%", "") // Remove % signs
+        .replaceAll("\\s+", " ") // Normalize whitespace
+        .trim()
+        .toLowerCase();
 
     // Known fiber type mappings (case-insensitive)
     if (normalized.contains("cotton")) {

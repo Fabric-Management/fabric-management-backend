@@ -116,6 +116,16 @@ public class TenantSeedService {
 
   private void seedProductionDepartments(UUID companyId, Department parent) {
     createDepartment(
+        companyId,
+        "R&D / Product Development",
+        "Research, development and fiber formula design",
+        parent);
+    createDepartment(
+        companyId,
+        "Production Planning",
+        "Production scheduling, capacity planning and work orders",
+        parent);
+    createDepartment(
         companyId, "Fiber & Raw Material", "Fiber procurement and raw material management", parent);
     createDepartment(companyId, "Yarn Production", "Yarn manufacturing operations", parent);
     createDepartment(

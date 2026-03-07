@@ -15,7 +15,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-/** REST API for managing fiber batches with production-ready reservation logic. */
+/**
+ * REST API for managing fiber batches with production-ready reservation logic.
+ *
+ * <p>Security uses department-aware checks via {@code ProductionAccessService}. WRITE = create /
+ * reserve / release / consume (ADMIN, or MANAGER/SUPERVISOR in production depts). READ = any
+ * authenticated user in a production-related department.
+ */
 @RestController
 @RequestMapping("/api/production/batches/fiber")
 @RequiredArgsConstructor
@@ -25,7 +31,7 @@ public class FiberBatchController {
   private final FiberBatchService fiberBatchService;
 
   @PostMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCTION_MANAGER', 'WAREHOUSE_MANAGER')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberBatchDto>> createBatch(
       @Valid @RequestBody CreateFiberBatchRequest request) {
     FiberBatchDto batch = fiberBatchService.create(request);
@@ -33,14 +39,14 @@ public class FiberBatchController {
   }
 
   @GetMapping
-  @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCTION_MANAGER', 'WAREHOUSE_MANAGER')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberBatchDto>>> getAllBatches() {
     List<FiberBatchDto> batches = fiberBatchService.getAll();
     return ResponseEntity.ok(ApiResponse.success(batches));
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCTION_MANAGER', 'WAREHOUSE_MANAGER')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
   public ResponseEntity<ApiResponse<FiberBatchDto>> getBatch(@PathVariable UUID id) {
     return fiberBatchService
         .getById(id)
@@ -49,7 +55,7 @@ public class FiberBatchController {
   }
 
   @GetMapping("/fiber/{fiberId}")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCTION_MANAGER', 'WAREHOUSE_MANAGER')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberBatchDto>>> getBatchesByFiberId(
       @PathVariable UUID fiberId) {
     List<FiberBatchDto> batches = fiberBatchService.getByFiberId(fiberId);
@@ -57,7 +63,7 @@ public class FiberBatchController {
   }
 
   @PostMapping("/{id}/reserve")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCTION_MANAGER')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberBatchDto>> reserve(
       @PathVariable UUID id, @Valid @RequestBody QuantityRequest request) {
     FiberBatchDto batch = fiberBatchService.reserve(id, request.getQuantity());
@@ -65,7 +71,7 @@ public class FiberBatchController {
   }
 
   @PostMapping("/{id}/release")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCTION_MANAGER')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberBatchDto>> release(
       @PathVariable UUID id, @Valid @RequestBody QuantityRequest request) {
     FiberBatchDto batch = fiberBatchService.release(id, request.getQuantity());
@@ -73,10 +79,18 @@ public class FiberBatchController {
   }
 
   @PostMapping("/{id}/consume")
-  @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCTION_MANAGER')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberBatchDto>> consume(
       @PathVariable UUID id, @Valid @RequestBody QuantityRequest request) {
     FiberBatchDto batch = fiberBatchService.consume(id, request.getQuantity());
+    return ResponseEntity.ok(ApiResponse.success(batch));
+  }
+
+  @PostMapping("/{id}/waste")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<FiberBatchDto>> recordWaste(
+      @PathVariable UUID id, @Valid @RequestBody QuantityRequest request) {
+    FiberBatchDto batch = fiberBatchService.recordWaste(id, request.getQuantity());
     return ResponseEntity.ok(ApiResponse.success(batch));
   }
 }

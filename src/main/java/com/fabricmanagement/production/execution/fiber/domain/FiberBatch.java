@@ -1,6 +1,9 @@
 package com.fabricmanagement.production.execution.fiber.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.production.common.exception.InsufficientStockException;
+import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
+import com.fabricmanagement.production.execution.fiber.domain.exception.FiberBatchDomainException;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,7 +26,7 @@ import lombok.NoArgsConstructor;
  *   <li>Links to Fiber (masterdata) via fiberId
  *   <li>Has a unique batchCode for traceability
  *   <li>Tracks quantity and supplierBatch information
- *   <li>Supports status tracking (NEW, IN_USE, DEPLETED)
+ *   <li>Supports status tracking (AVAILABLE, RESERVED, IN_PROGRESS, DEPLETED)
  * </ul>
  */
 @Entity
@@ -52,6 +55,9 @@ public class FiberBatch extends BaseEntity {
 
   @Column(name = "consumed_quantity", nullable = false, precision = 15, scale = 3)
   private BigDecimal consumedQuantity;
+
+  @Column(name = "waste_quantity", nullable = false, precision = 15, scale = 3)
+  private BigDecimal wasteQuantity;
 
   @Column(name = "unit", nullable = false)
   private String unit;
@@ -94,10 +100,11 @@ public class FiberBatch extends BaseEntity {
     batch.setQuantity(quantity);
     batch.setReservedQuantity(BigDecimal.ZERO);
     batch.setConsumedQuantity(BigDecimal.ZERO);
+    batch.setWasteQuantity(BigDecimal.ZERO);
     batch.setUnit(unit);
     batch.setProductionDate(productionDate);
     batch.setExpiryDate(expiryDate);
-    batch.setStatus(FiberBatchStatus.NEW);
+    batch.setStatus(FiberBatchStatus.AVAILABLE);
     batch.setWarehouseLocation(warehouseLocation);
     batch.setRemarks(remarks);
     batch.onCreate();
@@ -110,85 +117,127 @@ public class FiberBatch extends BaseEntity {
     return quantity.subtract(reservedQuantity).subtract(consumedQuantity);
   }
 
-  /** Reserve quantity for production order. */
+  /** Reserve quantity for a production order. */
   public void reserve(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Reservation amount must be positive");
     }
+    if (this.status == FiberBatchStatus.DEPLETED) {
+      throw new InvalidStatusTransitionException("FiberBatch", "DEPLETED", "RESERVED");
+    }
     if (getAvailableQuantity().compareTo(qty) < 0) {
-      throw new IllegalStateException("Insufficient available quantity");
+      throw new InsufficientStockException(batchCode, qty, getAvailableQuantity(), unit);
     }
     this.reservedQuantity = this.reservedQuantity.add(qty);
-    if (this.status == FiberBatchStatus.NEW) {
+    if (this.status == FiberBatchStatus.AVAILABLE) {
       this.status = FiberBatchStatus.RESERVED;
     }
     onUpdate();
   }
 
-  /** Release reserved quantity (cancellation). */
+  /** Release reserved quantity (production order cancellation). */
   public void release(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Release amount must be positive");
     }
     if (this.reservedQuantity.compareTo(qty) < 0) {
-      throw new IllegalStateException("Insufficient reserved quantity");
+      throw new FiberBatchDomainException(
+          String.format(
+              "Cannot release %.2f %s from batch %s: only %.2f %s is reserved.",
+              qty, unit, batchCode, reservedQuantity, unit));
     }
     this.reservedQuantity = this.reservedQuantity.subtract(qty);
-    if (this.reservedQuantity.compareTo(BigDecimal.ZERO) == 0) {
-      this.status = FiberBatchStatus.NEW;
+    if (this.reservedQuantity.compareTo(BigDecimal.ZERO) == 0
+        && this.status == FiberBatchStatus.RESERVED) {
+      this.status = FiberBatchStatus.AVAILABLE;
     }
     onUpdate();
   }
 
-  /** Mark batch as in use. */
+  /** Mark batch as actively in use on the production floor. */
   public void markInUse() {
-    if (this.status == FiberBatchStatus.NEW || this.status == FiberBatchStatus.RESERVED) {
-      this.status = FiberBatchStatus.IN_USE;
-      onUpdate();
-    } else {
-      throw new IllegalStateException("Batch must be in NEW or RESERVED status to mark as IN_USE");
+    if (this.status != FiberBatchStatus.AVAILABLE && this.status != FiberBatchStatus.RESERVED) {
+      throw new InvalidStatusTransitionException("FiberBatch", this.status.name(), "IN_PROGRESS");
     }
+    this.status = FiberBatchStatus.IN_PROGRESS;
+    onUpdate();
   }
 
-  /** Mark batch as depleted. */
+  /** Mark batch as fully depleted (terminal state). */
   public void markDepleted() {
-    if (this.status == FiberBatchStatus.IN_USE) {
-      this.status = FiberBatchStatus.DEPLETED;
-      onUpdate();
-    } else {
-      throw new IllegalStateException("Batch must be in IN_USE status to mark as DEPLETED");
+    if (this.status != FiberBatchStatus.IN_PROGRESS) {
+      throw new InvalidStatusTransitionException("FiberBatch", this.status.name(), "DEPLETED");
     }
+    this.status = FiberBatchStatus.DEPLETED;
+    onUpdate();
   }
 
-  /** Consume quantity from batch (covers both reserved and available). */
+  /** Consume quantity from batch (draws from reserved first, then available). */
   public void consume(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Consumption amount must be positive");
     }
+    if (this.status == FiberBatchStatus.DEPLETED) {
+      throw new InvalidStatusTransitionException("FiberBatch", "DEPLETED", "IN_PROGRESS");
+    }
 
-    // First consume from reserved quantity
+    // Draw from reserved first, then from free available quantity
     BigDecimal fromReserve = reservedQuantity.min(qty);
     this.reservedQuantity = this.reservedQuantity.subtract(fromReserve);
     BigDecimal remaining = qty.subtract(fromReserve);
 
-    // Check if available quantity is sufficient
-    BigDecimal available = getAvailableQuantity();
-    if (available.compareTo(remaining) < 0) {
-      throw new IllegalStateException("Insufficient available quantity");
+    if (getAvailableQuantity().compareTo(remaining) < 0) {
+      // Restore reserved before throwing so the entity stays consistent
+      this.reservedQuantity = this.reservedQuantity.add(fromReserve);
+      throw new InsufficientStockException(
+          batchCode, qty, getAvailableQuantity().add(fromReserve), unit);
     }
 
     this.consumedQuantity = this.consumedQuantity.add(qty);
 
-    // Update status
     if (this.consumedQuantity.compareTo(this.quantity) == 0) {
       this.status = FiberBatchStatus.DEPLETED;
-    } else if (this.status == FiberBatchStatus.NEW) {
-      this.status = FiberBatchStatus.IN_USE;
-    } else if (this.status == FiberBatchStatus.RESERVED) {
-      this.status = FiberBatchStatus.IN_USE;
+    } else if (this.status == FiberBatchStatus.AVAILABLE
+        || this.status == FiberBatchStatus.RESERVED) {
+      this.status = FiberBatchStatus.IN_PROGRESS;
     }
 
     onUpdate();
+  }
+
+  /**
+   * Record production waste (fire/telef) — a subset of already-consumed quantity.
+   *
+   * <p>Invariant: waste_quantity <= consumed_quantity (you can only waste what was consumed).
+   */
+  public void recordWaste(BigDecimal qty) {
+    if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new IllegalArgumentException("Waste amount must be positive");
+    }
+    BigDecimal newWaste = this.wasteQuantity.add(qty);
+    if (newWaste.compareTo(this.consumedQuantity) > 0) {
+      throw new FiberBatchDomainException(
+          String.format(
+              "Waste (%.3f %s) would exceed consumed quantity (%.3f %s) for batch %s",
+              newWaste, unit, consumedQuantity, unit, batchCode));
+    }
+    this.wasteQuantity = newWaste;
+    onUpdate();
+  }
+
+  /** Net useful output = consumed - waste. */
+  public BigDecimal getNetOutputQuantity() {
+    return consumedQuantity.subtract(wasteQuantity);
+  }
+
+  /** Waste percentage relative to consumed quantity. Returns 0 if nothing consumed yet. */
+  public BigDecimal getWastePercentage() {
+    if (consumedQuantity.compareTo(BigDecimal.ZERO) == 0) {
+      return BigDecimal.ZERO;
+    }
+    return wasteQuantity
+        .multiply(new BigDecimal("100"))
+        .divide(consumedQuantity, 2, java.math.RoundingMode.HALF_UP);
   }
 
   private static String generateUid(String batchCode) {

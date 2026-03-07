@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
  * <p><b>Required fields:</b>
  *
  * <ul>
- *   <li>firstName, lastName, companyId - Basic user info
+ *   <li>firstName, lastName, organizationId - Basic user info
  *   <li>contactValue, contactType - Primary contact for authentication
  * </ul>
  *
@@ -59,8 +59,8 @@ public class CreateExternalUserRequest {
   @NotNull(message = "Contact type is required")
   private com.fabricmanagement.common.platform.user.domain.ContactType contactType;
 
-  @NotNull(message = "Company ID is required")
-  private UUID companyId;
+  @NotNull(message = "Organization ID is required")
+  private UUID organizationId;
 
   /**
    * @deprecated Not used in external user creation flow. External users don't have department

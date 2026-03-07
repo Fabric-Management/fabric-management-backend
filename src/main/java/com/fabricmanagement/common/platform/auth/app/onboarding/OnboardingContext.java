@@ -86,7 +86,7 @@ public class OnboardingContext {
 
   public CreateAdminUserRequest toCreateAdminUserRequest() {
     return CreateAdminUserRequest.builder()
-        .companyId(organizationId)
+        .organizationId(organizationId)
         .tenantId(tenantId)
         .firstName(adminFirstName)
         .lastName(adminLastName)

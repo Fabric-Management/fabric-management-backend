@@ -346,6 +346,42 @@ public class JwtService {
   }
 
   /**
+   * Extract the list of department codes from a JWT token.
+   *
+   * <p>Maps to the {@code department_codes} claim populated by {@link #generateAccessToken(User)}.
+   * Used by {@link com.fabricmanagement.common.infrastructure.security.JwtAuthenticationFilter} to
+   * build an {@link com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext}.
+   *
+   * @param token JWT access token
+   * @return unmodifiable list of department codes; empty list if claim is absent
+   */
+  @SuppressWarnings("unchecked")
+  public List<String> getDepartmentCodesFromToken(String token) {
+    Claims claims = extractClaims(token);
+    Object raw = claims.get("department_codes");
+    if (raw instanceof List<?> list) {
+      return list.stream()
+          .filter(item -> item instanceof String)
+          .map(item -> (String) item)
+          .toList();
+    }
+    return List.of();
+  }
+
+  /**
+   * Extract the primary department code from a JWT token.
+   *
+   * <p>Maps to the {@code primary_department} claim.
+   *
+   * @param token JWT access token
+   * @return primary department code, or {@code null} if absent
+   */
+  public String getPrimaryDepartmentFromToken(String token) {
+    Claims claims = extractClaims(token);
+    return claims.get("primary_department", String.class);
+  }
+
+  /**
    * Extract the user's role_code from a JWT token.
    *
    * <p>Used by {@link com.fabricmanagement.common.infrastructure.security.JwtAuthenticationFilter}

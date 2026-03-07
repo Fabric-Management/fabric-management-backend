@@ -50,6 +50,10 @@ public class OrganizationContact extends BaseJunctionEntity implements Assignabl
   @Builder.Default
   private Boolean isDefault = false;
 
+  /** Optional department label for this contact (e.g. "Sales", "Support"). */
+  @Column(name = "department", length = 255)
+  private String department;
+
   @Override
   public UUID getParentId() {
     return organizationId;

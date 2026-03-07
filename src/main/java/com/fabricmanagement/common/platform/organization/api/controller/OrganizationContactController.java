@@ -7,7 +7,9 @@ import com.fabricmanagement.common.platform.communication.dto.AssignContactReque
 import com.fabricmanagement.common.platform.communication.dto.CreateContactRequest;
 import com.fabricmanagement.common.platform.organization.app.OrganizationContactAssignmentService;
 import com.fabricmanagement.common.platform.organization.domain.OrganizationContact;
+import com.fabricmanagement.common.platform.organization.dto.EditOrganizationContactRequest;
 import com.fabricmanagement.common.platform.organization.dto.OrganizationContactDto;
+import com.fabricmanagement.common.platform.organization.dto.UpdateContactAssignmentRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -56,14 +58,18 @@ public class OrganizationContactController {
   public ResponseEntity<ApiResponse<OrganizationContactDto>> assignContact(
       @PathVariable UUID organizationId, @Valid @RequestBody AssignContactRequest request) {
     log.info(
-        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={}",
+        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={}, department={}",
         organizationId,
         request.getContactId(),
-        request.getIsDefault());
+        request.getIsDefault(),
+        request.getDepartment());
 
     OrganizationContact organizationContact =
         organizationContactAssignmentService.assignContact(
-            organizationId, request.getContactId(), request.getIsDefault());
+            organizationId,
+            request.getContactId(),
+            request.getIsDefault(),
+            request.getDepartment());
 
     return ResponseEntity.ok(
         ApiResponse.success(
@@ -74,11 +80,13 @@ public class OrganizationContactController {
   public ResponseEntity<ApiResponse<OrganizationContactDto>> createAndAssignContact(
       @PathVariable UUID organizationId,
       @Valid @RequestBody CreateContactRequest createRequest,
-      @RequestParam(defaultValue = "false") Boolean isDefault) {
+      @RequestParam(defaultValue = "false") Boolean isDefault,
+      @RequestParam(required = false) String department) {
     log.info(
-        "Creating and assigning contact to organization: organizationId={}, type={}",
+        "Creating and assigning contact to organization: organizationId={}, type={}, department={}",
         organizationId,
-        createRequest.getContactType());
+        createRequest.getContactType(),
+        department);
 
     Contact contact =
         contactService.createContact(
@@ -90,12 +98,33 @@ public class OrganizationContactController {
 
     OrganizationContact organizationContact =
         organizationContactAssignmentService.assignContact(
-            organizationId, contact.getId(), isDefault);
+            organizationId, contact.getId(), isDefault, department);
 
     return ResponseEntity.ok(
         ApiResponse.success(
             OrganizationContactDto.from(organizationContact),
             "Contact created and assigned successfully"));
+  }
+
+  @PatchMapping("/{contactId}")
+  public ResponseEntity<ApiResponse<OrganizationContactDto>> updateContactAssignment(
+      @PathVariable UUID organizationId,
+      @PathVariable UUID contactId,
+      @RequestBody UpdateContactAssignmentRequest request) {
+    log.info(
+        "Updating contact assignment: organizationId={}, contactId={}, department={}",
+        organizationId,
+        contactId,
+        request.getDepartment());
+
+    OrganizationContact organizationContact =
+        organizationContactAssignmentService.updateContactAssignment(
+            organizationId, contactId, request.getDepartment());
+
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            OrganizationContactDto.from(organizationContact),
+            "Contact assignment updated successfully"));
   }
 
   @PutMapping("/{contactId}/default")
@@ -109,6 +138,28 @@ public class OrganizationContactController {
     return ResponseEntity.ok(
         ApiResponse.success(
             OrganizationContactDto.from(organizationContact), "Default contact set successfully"));
+  }
+
+  @PutMapping("/{contactId}/edit")
+  public ResponseEntity<ApiResponse<OrganizationContactDto>> editOrganizationContact(
+      @PathVariable UUID organizationId,
+      @PathVariable UUID contactId,
+      @RequestBody EditOrganizationContactRequest request) {
+    log.info("Atomic edit contact: organizationId={}, contactId={}", organizationId, contactId);
+
+    OrganizationContact result =
+        organizationContactAssignmentService.editOrganizationContact(
+            organizationId,
+            contactId,
+            request.getContactValue(),
+            request.getContactType(),
+            request.getLabel(),
+            request.getIsPersonal(),
+            request.getIsDefault(),
+            request.getDepartment());
+
+    return ResponseEntity.ok(
+        ApiResponse.success(OrganizationContactDto.from(result), "Contact updated successfully"));
   }
 
   @DeleteMapping("/{contactId}")

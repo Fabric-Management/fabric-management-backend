@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -143,6 +144,24 @@ public class ContactService {
   }
 
   /**
+   * Search contacts by partial value (case-insensitive). Returns up to 20 results.
+   *
+   * @param query Partial contact value (email, phone, website, etc.)
+   * @return Matching contacts scoped to current tenant
+   */
+  @Transactional(readOnly = true)
+  public List<Contact> searchByValue(String query) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    if (query == null || query.isBlank()) {
+      return List.of();
+    }
+    log.trace(
+        "Searching contacts: tenantId={}, query={}", tenantId, maskContactValue(query.trim()));
+    return contactRepository.searchByTenantIdAndContactValue(
+        tenantId, query.trim(), PageRequest.of(0, 20));
+  }
+
+  /**
    * Check if any contact exists with the given email domain. Used for providing context-aware error
    * messages during login.
    *
@@ -227,8 +246,70 @@ public class ContactService {
       throw new DomainException("Contact does not belong to current tenant");
     }
 
+    if (contact.getContactType() == ContactType.LANDLINE) {
+      List<Contact> extensions =
+          contactRepository.findExtensionsByParentContactId(tenantId, contactId);
+      for (Contact ext : extensions) {
+        log.info(
+            "Cascade soft-deleting PHONE_EXTENSION: extensionId={}, parentId={}",
+            ext.getId(),
+            contactId);
+        ext.delete();
+        contactRepository.save(ext);
+      }
+    }
+
     contact.delete();
     contactRepository.save(contact);
+  }
+
+  /**
+   * Update individual fields of an existing contact with validation.
+   *
+   * <p>Only non-null fields are updated; null values are ignored (patch semantics).
+   */
+  @Transactional
+  public Contact updateContactFields(
+      UUID contactId,
+      String contactValue,
+      ContactType contactType,
+      String label,
+      Boolean isPersonal) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info("Updating contact fields: tenantId={}, contactId={}", tenantId, contactId);
+
+    Contact contact =
+        contactRepository
+            .findById(contactId)
+            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
+
+    if (!contact.getTenantId().equals(tenantId)) {
+      throw new DomainException("Contact does not belong to current tenant");
+    }
+
+    boolean changed = false;
+    ContactType resolvedType = contactType != null ? contactType : contact.getContactType();
+
+    if (contactValue != null) {
+      String normalizedValue = normalizeContactValue(contactValue, resolvedType);
+      validateContactValue(normalizedValue, resolvedType);
+      contact.setContactValue(normalizedValue);
+      changed = true;
+    }
+    if (contactType != null && contactType != contact.getContactType()) {
+      contact.setContactType(contactType);
+      changed = true;
+    }
+    if (label != null) {
+      contact.setLabel(label);
+      changed = true;
+    }
+    if (isPersonal != null) {
+      contact.setIsPersonal(isPersonal);
+      changed = true;
+    }
+
+    return changed ? contactRepository.save(contact) : contact;
   }
 
   private String maskContactValue(String contactValue) {

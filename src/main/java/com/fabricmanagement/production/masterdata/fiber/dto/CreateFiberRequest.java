@@ -32,6 +32,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateFiberRequest {
 
+  private Long version;
+
   /**
    * Material ID (optional).
    *

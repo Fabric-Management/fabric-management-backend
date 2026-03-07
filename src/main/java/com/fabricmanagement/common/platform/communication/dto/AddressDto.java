@@ -19,6 +19,7 @@ public class AddressDto {
   private UUID tenantId;
   private String uid;
   private String streetAddress;
+  private String addressLine2;
   private String city;
   private String state;
   private String district;
@@ -44,6 +45,7 @@ public class AddressDto {
         .tenantId(address.getTenantId())
         .uid(address.getUid())
         .streetAddress(address.getStreetAddress())
+        .addressLine2(address.getAddressLine2())
         .city(address.getCity())
         .state(address.getState())
         .district(address.getDistrict())

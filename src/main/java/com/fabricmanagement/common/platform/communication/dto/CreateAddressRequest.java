@@ -31,6 +31,8 @@ public class CreateAddressRequest {
 
   private String countryCode;
 
+  private String addressLine2;
+
   @NotNull(message = "Address type is required")
   private AddressType addressType;
 

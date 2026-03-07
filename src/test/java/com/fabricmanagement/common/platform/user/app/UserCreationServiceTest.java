@@ -151,7 +151,7 @@ class UserCreationServiceTest {
       verify(contactService).createContact(CONTACT_VALUE, ContactType.EMAIL, "Primary", true, null);
       verify(userContactAssignmentService).assignContact(eq(USER_ID), eq(CONTACT_ID), eq(true));
       verify(userAddressAutoService)
-          .copyCompanyPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
+          .copyOrganizationPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
       assertThat(result.getId()).isEqualTo(USER_ID);
       assertThat(result.getOrganizationId()).isEqualTo(COMPANY_ID);
     }
@@ -169,7 +169,7 @@ class UserCreationServiceTest {
               .lastName("User")
               .contactValue(CONTACT_VALUE)
               .contactType(com.fabricmanagement.common.platform.user.domain.ContactType.EMAIL)
-              .companyId(COMPANY_ID)
+              .organizationId(COMPANY_ID)
               .build();
 
       when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
@@ -192,7 +192,7 @@ class UserCreationServiceTest {
 
       verify(userRepository).save(any(User.class));
       verify(userAddressAutoService)
-          .copyCompanyPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
+          .copyOrganizationPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
       assertThat(result.getId()).isEqualTo(USER_ID);
       assertThat(result.getFirstName()).isEqualTo("External");
       assertThat(result.getLastName()).isEqualTo("User");

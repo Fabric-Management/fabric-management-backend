@@ -47,6 +47,19 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
       @Param("tenantId") UUID tenantId, @Param("contactType") ContactType contactType);
 
   /**
+   * Case-insensitive partial search by contact value within tenant (max 20 results to keep it
+   * lightweight).
+   */
+  @Query(
+      "SELECT c FROM Contact c WHERE c.tenantId = :tenantId "
+          + "AND LOWER(c.contactValue) LIKE LOWER(CONCAT('%', :query, '%')) "
+          + "ORDER BY c.contactValue ASC")
+  List<Contact> searchByTenantIdAndContactValue(
+      @Param("tenantId") UUID tenantId,
+      @Param("query") String query,
+      org.springframework.data.domain.Pageable pageable);
+
+  /**
    * Check if any contact exists with the given email domain. Used for providing context-aware error
    * messages during login.
    *

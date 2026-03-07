@@ -18,6 +18,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateFiberBatchRequest {
 
+  private Long version;
+
   @NotNull(message = "Fiber ID is required")
   private UUID fiberId;
 

@@ -75,6 +75,26 @@ public class Organization extends BaseEntity {
   @Builder.Default
   private OrganizationType organizationType = OrganizationType.VERTICAL_MILL;
 
+  /** Legal registered name (e.g. for invoicing) */
+  @Column(name = "legal_name", length = 200)
+  private String legalName;
+
+  /** Trade registry / chamber registration number */
+  @Column(name = "registration_number", length = 100)
+  private String registrationNumber;
+
+  /** Industry sector (e.g. TEXTILE, LOGISTICS) */
+  @Column(name = "industry", length = 100)
+  private String industry;
+
+  /** Company website URL */
+  @Column(name = "website", length = 500)
+  private String website;
+
+  /** Short company description */
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String description;
+
   /** Parent organization for hierarchy (departments, branches) */
   @Column(name = "parent_organization_id")
   private UUID parentOrganizationId;
@@ -140,6 +160,31 @@ public class Organization extends BaseEntity {
   public void update(String name, String taxId) {
     this.name = name;
     this.taxId = taxId;
+  }
+
+  /**
+   * Enrich organization with onboarding profile data.
+   *
+   * <p>Called during self-service onboarding completion to persist company profile fields that were
+   * not available at registration time. Only non-null values overwrite existing data.
+   *
+   * @param legalName Legal registered name
+   * @param registrationNumber Trade registry number
+   * @param industry Industry sector
+   * @param website Company website URL
+   * @param description Short company description
+   */
+  public void enrich(
+      String legalName,
+      String registrationNumber,
+      String industry,
+      String website,
+      String description) {
+    if (legalName != null) this.legalName = legalName;
+    if (registrationNumber != null) this.registrationNumber = registrationNumber;
+    if (industry != null) this.industry = industry;
+    if (website != null) this.website = website;
+    if (description != null) this.description = description;
   }
 
   /**

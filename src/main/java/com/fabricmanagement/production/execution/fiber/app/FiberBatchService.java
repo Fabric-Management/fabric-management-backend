@@ -3,9 +3,12 @@ package com.fabricmanagement.production.execution.fiber.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.fiber.domain.FiberBatch;
+import com.fabricmanagement.production.execution.fiber.domain.exception.FiberBatchDomainException;
 import com.fabricmanagement.production.execution.fiber.dto.CreateFiberBatchRequest;
 import com.fabricmanagement.production.execution.fiber.dto.FiberBatchDto;
 import com.fabricmanagement.production.execution.fiber.infra.repository.FiberBatchRepository;
+import com.fabricmanagement.production.execution.inventory.app.InventoryTransactionService;
+import com.fabricmanagement.production.execution.inventory.domain.InventoryTransactionType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -23,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FiberBatchService {
 
   private final FiberBatchRepository fiberBatchRepository;
+  private final InventoryTransactionService inventoryTransactionService;
 
   @Transactional
   public FiberBatchDto create(CreateFiberBatchRequest request) {
@@ -30,7 +34,7 @@ public class FiberBatchService {
     log.debug("Creating fiber batch: tenantId={}, request={}", tenantId, request);
 
     if (fiberBatchRepository.existsByTenantIdAndBatchCode(tenantId, request.getBatchCode())) {
-      throw new IllegalArgumentException("Batch code already exists: " + request.getBatchCode());
+      throw new FiberBatchDomainException("Batch code already exists: " + request.getBatchCode());
     }
 
     FiberBatch batch =
@@ -131,11 +135,50 @@ public class FiberBatchService {
     batch.consume(quantity);
 
     FiberBatch saved = fiberBatchRepository.save(batch);
+
+    inventoryTransactionService.logTransaction(
+        tenantId,
+        batchId,
+        InventoryTransactionType.CONSUMPTION,
+        quantity,
+        saved.getUnit(),
+        null,
+        null,
+        "Batch consumption");
+
     log.info(
         "Consumed from batch: id={}, consumedQty={}, status={}",
         saved.getId(),
         saved.getConsumedQuantity(),
         saved.getStatus());
+
+    return FiberBatchDto.from(saved);
+  }
+
+  /** Record production waste (fire/telef) against a batch. */
+  @Transactional
+  public FiberBatchDto recordWaste(UUID batchId, BigDecimal quantity) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.debug("Recording waste: tenantId={}, batchId={}, quantity={}", tenantId, batchId, quantity);
+
+    FiberBatch batch = loadBatchWithLock(batchId, tenantId);
+    batch.recordWaste(quantity);
+
+    FiberBatch saved = fiberBatchRepository.save(batch);
+
+    inventoryTransactionService.logTransaction(
+        tenantId,
+        batchId,
+        InventoryTransactionType.WASTE,
+        quantity,
+        saved.getUnit(),
+        null,
+        null,
+        "Production waste");
+
+    log.info(
+        "Waste recorded: id={}, wasteQty={}, wastePercent={}%",
+        saved.getId(), saved.getWasteQuantity(), saved.getWastePercentage());
 
     return FiberBatchDto.from(saved);
   }

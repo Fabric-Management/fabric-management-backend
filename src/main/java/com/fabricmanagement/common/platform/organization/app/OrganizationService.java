@@ -9,6 +9,7 @@ import com.fabricmanagement.common.platform.organization.domain.event.Organizati
 import com.fabricmanagement.common.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.common.platform.user.dto.CompleteOnboardingRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -215,6 +216,51 @@ public class OrganizationService {
   // ========================================
   // UPDATE OPERATIONS
   // ========================================
+
+  /**
+   * Enrich the tenant's root organization with onboarding profile data.
+   *
+   * <p>Applies only non-null fields from the request so that partial payloads are safe. Skips
+   * silently when the root organization cannot be resolved (edge case: no root yet).
+   *
+   * @param tenantId Tenant UUID
+   * @param request Onboarding enrichment data
+   */
+  @Transactional
+  public void enrichRootOrganization(UUID tenantId, CompleteOnboardingRequest request) {
+    if (request == null) return;
+
+    Organization root =
+        organizationRepository
+            .findRootOrganization(tenantId, OrganizationType.EXTERNAL_PARTNER)
+            .orElse(null);
+
+    if (root == null) {
+      log.warn("enrichRootOrganization: root organization not found for tenant={}", tenantId);
+      return;
+    }
+
+    if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
+      root.setName(request.getCompanyName().trim());
+    }
+    if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+      String newTaxId = request.getTaxId().trim();
+      if (!newTaxId.equals(root.getTaxId())
+          && !organizationRepository.existsByTenantIdAndTaxId(tenantId, newTaxId)) {
+        root.setTaxId(newTaxId);
+      }
+    }
+
+    root.enrich(
+        request.getLegalName() != null ? request.getLegalName().trim() : null,
+        request.getRegistrationNumber() != null ? request.getRegistrationNumber().trim() : null,
+        request.getIndustry() != null ? request.getIndustry().trim() : null,
+        request.getWebsite() != null ? request.getWebsite().trim() : null,
+        request.getDescription() != null ? request.getDescription().trim() : null);
+
+    organizationRepository.save(root);
+    log.info("enrichRootOrganization: enriched orgId={}, tenantId={}", root.getId(), tenantId);
+  }
 
   /**
    * Update organization basic info.

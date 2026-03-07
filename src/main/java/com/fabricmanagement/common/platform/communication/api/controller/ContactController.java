@@ -57,6 +57,28 @@ public class ContactController {
     return ResponseEntity.ok(ApiResponse.success(ContactDto.from(contact)));
   }
 
+  /**
+   * Search contacts by partial contact value (case-insensitive, min 2 chars). Returns up to 20
+   * results scoped to the current tenant.
+   */
+  @GetMapping("/search")
+  public ResponseEntity<ApiResponse<List<ContactDto>>> searchContacts(
+      @RequestParam @NotBlank(message = "Query is required") String query) {
+    log.debug(
+        "Searching contacts: query={}", query.length() > 2 ? query.substring(0, 2) + "***" : "***");
+
+    if (query.length() < 2) {
+      return ResponseEntity.ok(ApiResponse.success(List.of()));
+    }
+
+    List<ContactDto> contacts =
+        contactService.searchByValue(query).stream()
+            .map(ContactDto::from)
+            .collect(Collectors.toList());
+
+    return ResponseEntity.ok(ApiResponse.success(contacts));
+  }
+
   @GetMapping("/type/{type}")
   public ResponseEntity<ApiResponse<List<ContactDto>>> getContactsByType(
       @PathVariable String type) {

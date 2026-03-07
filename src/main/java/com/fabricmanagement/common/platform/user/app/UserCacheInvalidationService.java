@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
  * Invalidates user caches when user-related domain events occur.
  *
  * <p>Listens to UserCreatedEvent, UserDeactivatedEvent, UserProfileUpdatedEvent, and
- * EmployeeUpdatedEvent. Evicts users-by-tenant and users-by-company caches so query results
+ * EmployeeUpdatedEvent. Evicts users-by-tenant and users-by-organization caches so query results
  * (including enriched Employee data) stay consistent.
  */
 @Service
@@ -30,7 +30,7 @@ public class UserCacheInvalidationService {
 
   @EventListener
   public void onUserCreated(UserCreatedEvent event) {
-    evictUserCaches(event.getTenantId(), event.getCompanyId());
+    evictUserCaches(event.getTenantId(), event.getOrganizationId());
   }
 
   @EventListener
@@ -48,10 +48,10 @@ public class UserCacheInvalidationService {
     evictTenantCache(event.getTenantId());
   }
 
-  private void evictUserCaches(UUID tenantId, UUID companyId) {
+  private void evictUserCaches(UUID tenantId, UUID organizationId) {
     evictTenantCache(tenantId);
-    if (companyId != null) {
-      evictCompanyCache(tenantId, companyId);
+    if (organizationId != null) {
+      evictOrganizationCache(tenantId, organizationId);
     }
   }
 
@@ -63,13 +63,13 @@ public class UserCacheInvalidationService {
     }
   }
 
-  private void evictCompanyCache(UUID tenantId, UUID companyId) {
+  private void evictOrganizationCache(UUID tenantId, UUID organizationId) {
     var cache = cacheManager.getCache(CACHE_USERS_BY_COMPANY);
     if (cache != null) {
       String key =
           (tenantId != null ? tenantId.toString() : "")
               + "-"
-              + (companyId != null ? companyId.toString() : "");
+              + (organizationId != null ? organizationId.toString() : "");
       cache.evict(key);
       log.trace("Evicted cache {} for key={}", CACHE_USERS_BY_COMPANY, key);
     }

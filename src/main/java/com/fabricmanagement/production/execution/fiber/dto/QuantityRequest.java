@@ -15,6 +15,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class QuantityRequest {
 
+  private Long version;
+
   @NotNull(message = "Quantity is required")
   @DecimalMin(value = "0.001", message = "Quantity must be at least 0.001")
   private BigDecimal quantity;

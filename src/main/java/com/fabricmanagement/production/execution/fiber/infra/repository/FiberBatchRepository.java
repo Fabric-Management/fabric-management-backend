@@ -33,4 +33,17 @@ public interface FiberBatchRepository extends JpaRepository<FiberBatch, UUID> {
 
   List<FiberBatch> findByTenantIdAndFiberIdAndStatusIn(
       UUID tenantId, UUID fiberId, Collection<FiberBatchStatus> statuses);
+
+  /**
+   * Returns true if the given fiber has at least one batch in any of the given statuses.
+   *
+   * <p>Used by {@code FiberService.deactivateFiber()} to block deactivation when {@code statuses =
+   * FiberBatchStatus.PRODUCTION_ACTIVE} — i.e. the fiber still has batches in RESERVED or
+   * IN_PROGRESS state on the production floor.
+   *
+   * <p>This query is index-friendly: {@code (tenant_id, fiber_id, status)} and returns as soon as
+   * one matching row is found.
+   */
+  boolean existsByTenantIdAndFiberIdAndStatusIn(
+      UUID tenantId, UUID fiberId, Collection<FiberBatchStatus> statuses);
 }

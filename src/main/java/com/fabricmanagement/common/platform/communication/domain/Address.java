@@ -113,6 +113,10 @@ public class Address extends BaseEntity {
   @Column(name = "district", length = 100)
   private String district;
 
+  /** Second address line: apartment, floor, suite, building name */
+  @Column(name = "address_line2", length = 255)
+  private String addressLine2;
+
   /** Latitude coordinate (from Google Geocoding) */
   @Column(name = "latitude")
   private Double latitude;

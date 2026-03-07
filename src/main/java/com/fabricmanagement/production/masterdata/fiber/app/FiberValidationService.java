@@ -3,8 +3,9 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -16,7 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Fiber Validation Service - Business rule validations for fibers.
  *
- * <p>Centralizes all validation logic for fiber creation/updates.
+ * <p>
+ * Centralizes all validation logic for fiber creation/updates.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,13 +34,14 @@ public class FiberValidationService {
   /**
    * Validate composition percentages.
    *
-   * <p>Rules:
+   * <p>
+   * Rules:
    *
    * <ul>
-   *   <li>Total must be exactly 100%
-   *   <li>No negative percentages
-   *   <li>No zero percentages
-   *   <li>Each percentage ≤ 100%
+   * <li>Total must be exactly 100%
+   * <li>No negative percentages
+   * <li>No zero percentages
+   * <li>Each percentage ≤ 100%
    * </ul>
    */
   @Transactional(readOnly = true)
@@ -82,7 +85,8 @@ public class FiberValidationService {
   /**
    * Validate minimum composition ratio.
    *
-   * <p>Rule: No single fiber can be less than 5% (to avoid trace amounts).
+   * <p>
+   * Rule: No single fiber can be less than 5% (to avoid trace amounts).
    */
   @Transactional(readOnly = true)
   public void validateMinimumRatio(Map<UUID, BigDecimal> composition, double minPercentage) {
@@ -101,7 +105,8 @@ public class FiberValidationService {
   /**
    * Validate maximum number of components in blend.
    *
-   * <p>Rule: Blended fiber cannot have more than 5 components.
+   * <p>
+   * Rule: Blended fiber cannot have more than 5 components.
    */
   @Transactional(readOnly = true)
   public void validateMaxComponents(Map<UUID, BigDecimal> composition, int maxComponents) {
@@ -116,22 +121,15 @@ public class FiberValidationService {
   /**
    * Validate that base fibers are not circular references.
    *
-   * <p>Rule: Base fiber cannot be another blended fiber (to prevent recursion).
+   * <p>
+   * Rule: Base fiber cannot be another blended fiber (to prevent recursion).
    */
   @Transactional(readOnly = true)
   public void validateNoCircularReferences(Map<UUID, BigDecimal> composition) {
-    for (UUID baseFiberId : composition.keySet()) {
-      Fiber baseFiber = fiberRepository.findById(baseFiberId).orElse(null);
+    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
 
-      if (baseFiber == null) {
-        continue;
-      }
-
-      // Check if base fiber itself has a composition (it's also a blend)
-      Fiber baseFiberEntity = fiberRepository.findById(baseFiberId).orElse(null);
-      boolean isBlend = baseFiberEntity != null && baseFiberEntity.isBlended();
-
-      if (isBlend) {
+    for (Fiber baseFiber : baseFibers) {
+      if (baseFiber.isBlended()) {
         throw new IllegalArgumentException(
             String.format(
                 "Base fiber '%s' is also a blend. Cannot blend already-blended fibers.",
@@ -143,19 +141,18 @@ public class FiberValidationService {
   /**
    * Validate that base fibers belong to same tenant.
    *
-   * <p>Rule: All base fibers must belong to the same tenant.
+   * <p>
+   * Rule: All base fibers must belong to the same tenant.
    */
   @Transactional(readOnly = true)
   public void validateTenantConsistency(Map<UUID, BigDecimal> composition, UUID currentTenantId) {
-    Set<UUID> tenantIds =
-        composition.keySet().stream()
-            .map(baseFiberId -> fiberRepository.findById(baseFiberId))
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .map(Fiber::getTenantId)
-            .collect(Collectors.toSet());
+    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
 
-    if (tenantIds.size() > 1 || !tenantIds.contains(currentTenantId)) {
+    Set<UUID> tenantIds = baseFibers.stream()
+        .map(Fiber::getTenantId)
+        .collect(Collectors.toSet());
+
+    if (tenantIds.size() > 1 || (!tenantIds.isEmpty() && !tenantIds.contains(currentTenantId))) {
       throw new IllegalArgumentException("All base fibers must belong to the same tenant");
     }
   }
@@ -163,17 +160,18 @@ public class FiberValidationService {
   /**
    * Validate that base fibers are active.
    *
-   * <p>Rule: Cannot create blend from deactivated fibers.
+   * <p>
+   * Rule: Cannot create blend from deactivated fibers.
    */
   @Transactional(readOnly = true)
   public void validateBaseFibersActive(Map<UUID, BigDecimal> composition) {
-    for (UUID baseFiberId : composition.keySet()) {
-      Fiber baseFiber =
-          fiberRepository
-              .findById(baseFiberId)
-              .orElseThrow(
-                  () -> new IllegalArgumentException("Base fiber not found: " + baseFiberId));
+    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
 
+    if (baseFibers.size() != composition.size()) {
+      throw new IllegalArgumentException("One or more base fibers not found in the system");
+    }
+
+    for (Fiber baseFiber : baseFibers) {
       if (!Boolean.TRUE.equals(baseFiber.getIsActive())) {
         throw new IllegalArgumentException(
             String.format("Base fiber '%s' is not active", baseFiber.getFiberName()));
@@ -184,7 +182,8 @@ public class FiberValidationService {
   /**
    * Validate fiber name format.
    *
-   * <p>Rule: Fiber name must be 3-255 characters.
+   * <p>
+   * Rule: Fiber name must be 3-255 characters.
    */
   public void validateFiberNameFormat(String fiberName) {
     if (fiberName == null || fiberName.isBlank()) {
@@ -203,9 +202,25 @@ public class FiberValidationService {
   /**
    * Validate category compatibility with composition.
    *
-   * <p>Rule: Blended fiber category should be compatible with base fiber categories.
+   * <p>
+   * Rule: Blended fiber category should be compatible with base fiber categories.
    */
   @Transactional(readOnly = true)
   public void validateCategoryCompatibility(
-      UUID blendedCategoryId, Map<UUID, BigDecimal> composition) {}
+      UUID blendedCategoryId, Map<UUID, BigDecimal> composition) {
+    if (blendedCategoryId == null) {
+      throw new IllegalArgumentException("Blended fiber category must be specified for validation");
+    }
+
+    List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
+    for (Fiber baseFiber : baseFibers) {
+      if (baseFiber.getFiberCategory() == null) {
+        log.warn("Base fiber '{}' has no category assigned. Category compatibility skipped for this component.",
+            baseFiber.getFiberName());
+      }
+    }
+    // Further complex category compatibility rules (e.g. blend can't be natural if
+    // components are synthetic)
+    // can be added here matching business requirements.
+  }
 }

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -76,18 +77,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     try {
-      String userId = jwtService.getUserIdFromToken(token).toString();
+      UUID userId = jwtService.getUserIdFromToken(token);
       String roleCode = jwtService.getRoleCodeFromToken(token);
       String userType = jwtService.getUserTypeFromToken(token);
 
       List<SimpleGrantedAuthority> authorities = buildAuthorities(roleCode, userType);
 
+      // Build the user context so downstream security beans (e.g. ProductionAccessService)
+      // can evaluate role + department without additional DB calls.
+      List<String> departmentCodes = jwtService.getDepartmentCodesFromToken(token);
+      String primaryDepartment = jwtService.getPrimaryDepartmentFromToken(token);
+      AuthenticatedUserContext userContext =
+          new AuthenticatedUserContext(userId, roleCode, departmentCodes, primaryDepartment);
+
       UsernamePasswordAuthenticationToken authentication =
-          new UsernamePasswordAuthenticationToken(userId, null, authorities);
+          new UsernamePasswordAuthenticationToken(userId.toString(), null, authorities);
+      authentication.setDetails(userContext);
 
       // Expose partner_id on the request so service/AOP layers can enforce isolation
       if ("PARTNER".equals(userType)) {
-        java.util.UUID partnerId = jwtService.getPartnerIdFromToken(token);
+        UUID partnerId = jwtService.getPartnerIdFromToken(token);
         if (partnerId != null) {
           request.setAttribute("partnerId", partnerId);
         }
@@ -96,10 +105,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       SecurityContextHolder.getContext().setAuthentication(authentication);
 
       log.debug(
-          "JWT authentication set: userId={}, userType={}, roles={}, path={}",
+          "JWT authentication set: userId={}, userType={}, roles={}, departments={}, path={}",
           userId,
           userType,
           authorities,
+          departmentCodes,
           request.getRequestURI());
 
     } catch (Exception e) {

@@ -15,14 +15,14 @@ public class UserCreatedEvent extends DomainEvent {
   private final UUID userId;
   private final String displayName;
   private final String contactValue;
-  private final UUID companyId;
+  private final UUID organizationId;
 
   public UserCreatedEvent(
-      UUID tenantId, UUID userId, String displayName, String contactValue, UUID companyId) {
+      UUID tenantId, UUID userId, String displayName, String contactValue, UUID organizationId) {
     super(tenantId, "USER_CREATED");
     this.userId = userId;
     this.displayName = displayName;
     this.contactValue = contactValue;
-    this.companyId = companyId;
+    this.organizationId = organizationId;
   }
 }
