@@ -13,6 +13,7 @@ import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeI
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
+import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
@@ -263,7 +264,7 @@ public class FiberService implements FiberFacade {
   }
 
   @Transactional
-  public FiberDto updateFiber(UUID id, CreateFiberRequest request) {
+  public FiberDto updateFiber(UUID id, UpdateFiberRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     Fiber fiber = fiberRepository

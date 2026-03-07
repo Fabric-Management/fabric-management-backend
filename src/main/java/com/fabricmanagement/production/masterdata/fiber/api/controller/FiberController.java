@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.fiber.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
+import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
@@ -19,8 +20,11 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Fiber Controller - REST API for fiber management.
  *
- * <p>Security uses department-aware checks via {@code ProductionAccessService}. WRITE = create /
- * update / deactivate (ADMIN, or MANAGER in R&D / Prod. Planning / Fiber dept). READ = any
+ * <p>
+ * Security uses department-aware checks via {@code ProductionAccessService}.
+ * WRITE = create /
+ * update / deactivate (ADMIN, or MANAGER in R&D / Prod. Planning / Fiber dept).
+ * READ = any
  * authenticated user in a production-related department.
  */
 @RestController
@@ -93,7 +97,7 @@ public class FiberController {
   @PutMapping("/{id}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberDto>> updateFiber(
-      @PathVariable UUID id, @Valid @RequestBody CreateFiberRequest request) {
+      @PathVariable UUID id, @Valid @RequestBody UpdateFiberRequest request) {
     log.info("Updating fiber: id={}", id);
 
     FiberDto fiber = fiberService.updateFiber(id, request);
@@ -111,8 +115,8 @@ public class FiberController {
   @GetMapping("/categories")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberCategoryDto>>> getCategories() {
-    List<FiberCategoryDto> categories =
-        fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
+    List<FiberCategoryDto> categories = fiberCategoryRepository.findByIsActiveTrue().stream()
+        .map(FiberCategoryDto::from).toList();
     return ResponseEntity.ok(ApiResponse.success(categories));
   }
 }
