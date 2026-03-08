@@ -21,26 +21,28 @@ import org.springframework.stereotype.Service;
  * // Fiber masterdata — write (create / update / deactivate)
  * {@code @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")}
  *
- * // FiberBatch execution — reserve / release / consume
- * {@code @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")}
+ * // Batch execution — reserve / release / consume
+ * {@code @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")}
  * </pre>
  *
  * <h2>Permission Matrix</h2>
  *
  * <pre>
- * ┌────────────────────────────┬───────────────────────┬──────────────────┬──────────────────┐
- * │ Role / Department          │ FIBER / MATERIAL      │ FIBER_BATCH      │ QUALITY_TEST     │
- * ├────────────────────────────┼───────────────────────┼──────────────────┼──────────────────┤
- * │ ADMIN (any dept)           │ READ + WRITE          │ READ + WRITE     │ READ + WRITE     │
- * │ MANAGER + R&D/Prod.Dev.    │ READ + WRITE          │ READ + WRITE     │ READ + WRITE     │
- * │ MANAGER + Prod.Planning    │ READ + WRITE          │ READ + WRITE     │ READ only        │
- * │ MANAGER + Fiber&RawMat.    │ READ + WRITE          │ READ + WRITE     │ READ + WRITE     │
- * │ MANAGER + QualityControl   │ READ only             │ READ + WRITE     │ READ + WRITE     │
- * │ MANAGER + other prod. dept │ READ only             │ READ + WRITE     │ READ only        │
- * │ SUPERVISOR + QC/R&D/Fiber  │ READ only             │ READ + WRITE     │ READ + WRITE     │
- * │ SUPERVISOR + other prod.   │ READ only             │ READ + WRITE     │ READ only        │
- * │ WORKER / VIEWER + any dept │ READ only             │ READ only        │ READ only        │
- * └────────────────────────────┴───────────────────────┴──────────────────┴──────────────────┘
+ * ┌────────────────────────────┬───────────────────┬──────────────┬──────────────┬──────────────────────┐
+ * │ Role / Department          │ FIBER / MATERIAL  │ BATCH        │ QUALITY_TEST │ WAREHOUSE_LOCATION   │
+ * ├────────────────────────────┼───────────────────┼──────────────┼──────────────┼──────────────────────┤
+ * │ ADMIN (any dept)           │ READ + WRITE      │ READ + WRITE │ READ + WRITE │ READ + WRITE         │
+ * │ MANAGER + R&D/Prod.Dev.    │ READ + WRITE      │ READ + WRITE │ READ + WRITE │ READ only            │
+ * │ MANAGER + Prod.Planning    │ READ + WRITE      │ READ + WRITE │ READ only    │ READ + WRITE         │
+ * │ MANAGER + Fiber&RawMat.    │ READ + WRITE      │ READ + WRITE │ READ + WRITE │ READ only            │
+ * │ MANAGER + QualityControl   │ READ only         │ READ + WRITE │ READ + WRITE │ READ only            │
+ * │ MANAGER + Warehouse        │ READ only         │ READ + WRITE │ READ only    │ READ + WRITE         │
+ * │ MANAGER + other prod. dept │ READ only         │ READ + WRITE │ READ only    │ READ only            │
+ * │ SUPERVISOR + QC/R&D/Fiber  │ READ only         │ READ + WRITE │ READ + WRITE │ READ only            │
+ * │ SUPERVISOR + Warehouse     │ READ only         │ READ + WRITE │ READ only    │ READ + WRITE         │
+ * │ SUPERVISOR + other prod.   │ READ only         │ READ + WRITE │ READ only    │ READ only            │
+ * │ WORKER / VIEWER + any dept │ READ only         │ READ only    │ READ only    │ READ only            │
+ * └────────────────────────────┴───────────────────┴──────────────┴──────────────┴──────────────────────┘
  * </pre>
  *
  * <h2>Department Codes</h2>
@@ -72,10 +74,13 @@ public class ProductionAccessService {
   public static final String MODULE_MATERIAL = "MATERIAL";
 
   /** Fiber batch execution — lot / inventory ({@code /api/production/batches/fiber}). */
-  public static final String MODULE_FIBER_BATCH = "FIBER_BATCH";
+  public static final String MODULE_BATCH = "BATCH";
 
   /** Quality test results ({@code /api/production/quality/fiber-tests}). */
   public static final String MODULE_QUALITY_TEST = "QUALITY_TEST";
+
+  /** Warehouse location masterdata ({@code /api/production/warehouse-locations}). */
+  public static final String MODULE_WAREHOUSE_LOCATION = "WAREHOUSE_LOCATION";
 
   // ── Supported actions ──────────────────────────────────────────────────────
 
@@ -98,10 +103,8 @@ public class ProductionAccessService {
   private static final Set<String> FIBER_MASTERDATA_WRITE_DEPARTMENTS =
       Set.of("RDPRODUCTDEVELOPMENT", "PRODUCTIONPLANNING", "FIBERRAWMATERIAL");
 
-  /**
-   * All production-adjacent departments: entitled to READ/WRITE on FIBER_BATCH (execution layer).
-   */
-  private static final Set<String> FIBER_BATCH_WRITE_DEPARTMENTS =
+  /** All production-adjacent departments: entitled to READ/WRITE on BATCH (execution layer). */
+  private static final Set<String> BATCH_WRITE_DEPARTMENTS =
       Set.of(
           "RDPRODUCTDEVELOPMENT",
           "PRODUCTIONPLANNING",
@@ -118,6 +121,13 @@ public class ProductionAccessService {
    */
   private static final Set<String> QUALITY_TEST_WRITE_DEPARTMENTS =
       Set.of("QUALITYCONTROL", "RDPRODUCTDEVELOPMENT", "FIBERRAWMATERIAL");
+
+  /**
+   * Warehouse location WRITE departments: the Warehouse team owns the physical location catalog;
+   * Production Planning also needs to manage locations for planning purposes.
+   */
+  private static final Set<String> WAREHOUSE_LOCATION_WRITE_DEPARTMENTS =
+      Set.of("WAREHOUSE", "PRODUCTIONPLANNING");
 
   /**
    * READ is open to any production-related department (includes QC and Warehouse who consume fiber
@@ -141,12 +151,18 @@ public class ProductionAccessService {
       Map.of(
           MODULE_FIBER, FIBER_MASTERDATA_WRITE_DEPARTMENTS,
           MODULE_MATERIAL, FIBER_MASTERDATA_WRITE_DEPARTMENTS,
-          MODULE_FIBER_BATCH, FIBER_BATCH_WRITE_DEPARTMENTS,
-          MODULE_QUALITY_TEST, QUALITY_TEST_WRITE_DEPARTMENTS);
+          MODULE_BATCH, BATCH_WRITE_DEPARTMENTS,
+          MODULE_QUALITY_TEST, QUALITY_TEST_WRITE_DEPARTMENTS,
+          MODULE_WAREHOUSE_LOCATION, WAREHOUSE_LOCATION_WRITE_DEPARTMENTS);
 
   /** All known modules — used to reject unknown module names early. */
   private static final Set<String> KNOWN_MODULES =
-      Set.of(MODULE_FIBER, MODULE_MATERIAL, MODULE_FIBER_BATCH, MODULE_QUALITY_TEST);
+      Set.of(
+          MODULE_FIBER,
+          MODULE_MATERIAL,
+          MODULE_BATCH,
+          MODULE_QUALITY_TEST,
+          MODULE_WAREHOUSE_LOCATION);
 
   // ── Public API (SpEL entry point) ──────────────────────────────────────────
 
@@ -160,8 +176,7 @@ public class ProductionAccessService {
    * </pre>
    *
    * @param authentication current Spring Security Authentication (injected by SpEL)
-   * @param module one of {@link #MODULE_FIBER}, {@link #MODULE_MATERIAL}, {@link
-   *     #MODULE_FIBER_BATCH}
+   * @param module one of {@link #MODULE_FIBER}, {@link #MODULE_MATERIAL}, {@link #MODULE_BATCH}
    * @param action one of {@link #ACTION_READ}, {@link #ACTION_WRITE}
    * @return {@code true} if access is granted
    */
@@ -245,7 +260,7 @@ public class ProductionAccessService {
    *
    * <ul>
    *   <li>FIBER / MATERIAL — MANAGER + fiber masterdata department
-   *   <li>FIBER_BATCH — MANAGER or SUPERVISOR + production-adjacent department
+   *   <li>BATCH — MANAGER or SUPERVISOR + production-adjacent department
    *   <li>QUALITY_TEST — MANAGER or SUPERVISOR + QC / R&D / Fiber dept
    * </ul>
    */
@@ -259,7 +274,9 @@ public class ProductionAccessService {
     }
 
     if ("SUPERVISOR".equals(role)
-        && (MODULE_FIBER_BATCH.equals(module) || MODULE_QUALITY_TEST.equals(module))) {
+        && (MODULE_BATCH.equals(module)
+            || MODULE_QUALITY_TEST.equals(module)
+            || MODULE_WAREHOUSE_LOCATION.equals(module))) {
       return ctx.isInAnyDepartment(authorizedDepts);
     }
 

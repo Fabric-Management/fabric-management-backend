@@ -4,6 +4,7 @@ import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -24,6 +25,7 @@ public class FiberDto {
   private UUID materialId;
   private UUID fiberCategoryId;
   private UUID fiberIsoCodeId;
+  private FiberIsoCodeDto isoCode;
   private String fiberName;
   private String fiberGrade;
   private FiberStatus status;
@@ -34,6 +36,8 @@ public class FiberDto {
   private Instant updatedAt;
 
   @Builder.Default private Map<UUID, BigDecimal> composition = Map.of();
+  @Builder.Default private List<FiberAttributeDto> attributes = List.of();
+  @Builder.Default private List<FiberCertificationDto> certifications = List.of();
 
   /**
    * Map entity to DTO.
@@ -48,6 +52,10 @@ public class FiberDto {
         .materialId(entity.getMaterialId())
         .fiberCategoryId(entity.getFiberCategoryId())
         .fiberIsoCodeId(entity.getFiberIsoCodeId())
+        .isoCode(
+            entity.getFiberIsoCode() != null
+                ? FiberIsoCodeDto.from(entity.getFiberIsoCode())
+                : null)
         .fiberName(entity.getFiberName())
         .fiberGrade(entity.getFiberGrade())
         .status(entity.getStatus())

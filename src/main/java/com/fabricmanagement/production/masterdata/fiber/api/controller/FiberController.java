@@ -3,10 +3,16 @@ package com.fabricmanagement.production.masterdata.fiber.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -20,11 +26,8 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Fiber Controller - REST API for fiber management.
  *
- * <p>
- * Security uses department-aware checks via {@code ProductionAccessService}.
- * WRITE = create /
- * update / deactivate (ADMIN, or MANAGER in R&D / Prod. Planning / Fiber dept).
- * READ = any
+ * <p>Security uses department-aware checks via {@code ProductionAccessService}. WRITE = create /
+ * update / deactivate (ADMIN, or MANAGER in R&D / Prod. Planning / Fiber dept). READ = any
  * authenticated user in a production-related department.
  */
 @RestController
@@ -35,6 +38,9 @@ public class FiberController {
 
   private final FiberService fiberService;
   private final FiberCategoryRepository fiberCategoryRepository;
+  private final FiberIsoCodeRepository fiberIsoCodeRepository;
+  private final FiberAttributeRepository fiberAttributeRepository;
+  private final FiberCertificationRepository fiberCertificationRepository;
 
   @PostMapping
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
@@ -115,8 +121,36 @@ public class FiberController {
   @GetMapping("/categories")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberCategoryDto>>> getCategories() {
-    List<FiberCategoryDto> categories = fiberCategoryRepository.findByIsActiveTrue().stream()
-        .map(FiberCategoryDto::from).toList();
+    List<FiberCategoryDto> categories =
+        fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
     return ResponseEntity.ok(ApiResponse.success(categories));
+  }
+
+  @GetMapping("/iso-codes")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
+  public ResponseEntity<ApiResponse<List<FiberIsoCodeDto>>> getIsoCodes() {
+    List<FiberIsoCodeDto> isoCodes =
+        fiberIsoCodeRepository.findByIsActiveTrue().stream().map(FiberIsoCodeDto::from).toList();
+    return ResponseEntity.ok(ApiResponse.success(isoCodes));
+  }
+
+  @GetMapping("/attributes")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
+  public ResponseEntity<ApiResponse<List<FiberAttributeDto>>> getAttributes() {
+    List<FiberAttributeDto> attributes =
+        fiberAttributeRepository.findByIsActiveTrue().stream()
+            .map(FiberAttributeDto::from)
+            .toList();
+    return ResponseEntity.ok(ApiResponse.success(attributes));
+  }
+
+  @GetMapping("/certifications")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
+  public ResponseEntity<ApiResponse<List<FiberCertificationDto>>> getCertifications() {
+    List<FiberCertificationDto> certifications =
+        fiberCertificationRepository.findByIsActiveTrue().stream()
+            .map(FiberCertificationDto::from)
+            .toList();
+    return ResponseEntity.ok(ApiResponse.success(certifications));
   }
 }

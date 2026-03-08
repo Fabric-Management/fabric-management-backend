@@ -1,16 +1,16 @@
 package com.fabricmanagement.production.execution.inventory.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.production.execution.inventory.app.InventoryTransactionService;
-import com.fabricmanagement.production.execution.inventory.domain.InventoryTransactionType;
-import com.fabricmanagement.production.execution.inventory.dto.CreateInventoryTransactionRequest;
+import com.fabricmanagement.production.execution.inventory.app.query.InventoryTransactionQueryService;
+import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionType;
 import com.fabricmanagement.production.execution.inventory.dto.InventoryTransactionDto;
-import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,34 +27,43 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class InventoryTransactionController {
 
-  private final InventoryTransactionService transactionService;
-
-  @PostMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
-  public ResponseEntity<ApiResponse<InventoryTransactionDto>> createTransaction(
-      @Valid @RequestBody CreateInventoryTransactionRequest request) {
-    InventoryTransactionDto txn = transactionService.create(request);
-    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(txn));
-  }
+  private final InventoryTransactionQueryService transactionQueryService;
 
   @GetMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<List<InventoryTransactionDto>>> getAll() {
-    return ResponseEntity.ok(ApiResponse.success(transactionService.getAll()));
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<Page<InventoryTransactionDto>>> getAll(
+      @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ResponseEntity.ok(ApiResponse.success(transactionQueryService.getAll(pageable)));
   }
 
   @GetMapping("/batch/{batchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<List<InventoryTransactionDto>>> getByBatch(
-      @PathVariable UUID batchId) {
-    return ResponseEntity.ok(ApiResponse.success(transactionService.getByBatchId(batchId)));
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<Page<InventoryTransactionDto>>> getByBatch(
+      @PathVariable UUID batchId,
+      @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(transactionQueryService.getByBatchId(batchId, pageable)));
   }
 
   @GetMapping("/batch/{batchId}/type/{type}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<List<InventoryTransactionDto>>> getByBatchAndType(
-      @PathVariable UUID batchId, @PathVariable InventoryTransactionType type) {
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<Page<InventoryTransactionDto>>> getByBatchAndType(
+      @PathVariable UUID batchId,
+      @PathVariable InventoryTransactionType type,
+      @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
+          Pageable pageable) {
     return ResponseEntity.ok(
-        ApiResponse.success(transactionService.getByBatchIdAndType(batchId, type)));
+        ApiResponse.success(transactionQueryService.getByBatchIdAndType(batchId, type, pageable)));
+  }
+
+  @GetMapping("/reference/{referenceType}/{referenceId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<java.util.List<InventoryTransactionDto>>> getByReference(
+      @PathVariable String referenceType, @PathVariable UUID referenceId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            transactionQueryService.getTransactionsByReference(referenceId, referenceType)));
   }
 }

@@ -3,7 +3,7 @@ package com.fabricmanagement.production.common.exception;
 /**
  * Exception thrown when a state machine transition is not allowed for the given entity.
  *
- * <p>Used across all production execution entities (FiberBatch, YarnBatch, FabricRoll, DyeOrder) to
+ * <p>Used across all production execution entities (Batch, YarnBatch, FabricRoll, DyeOrder) to
  * enforce valid lifecycle transitions. The {@code from} and {@code to} status values are included
  * in the error response so the frontend can surface a meaningful message.
  *
@@ -12,9 +12,9 @@ package com.fabricmanagement.production.common.exception;
  * <pre>
  * {
  *   "code": "INVALID_STATUS_TRANSITION",
- *   "message": "FiberBatch cannot transition from CONSUMED to AVAILABLE.",
+ *   "message": "Batch cannot transition from CONSUMED to AVAILABLE.",
  *   "details": {
- *     "entityType": "FiberBatch",
+ *     "entityType": "Batch",
  *     "from": "CONSUMED",
  *     "to": "AVAILABLE"
  *   }
@@ -25,7 +25,7 @@ package com.fabricmanagement.production.common.exception;
  *
  * <pre>{@code
  * if (batch.getStatus() == BatchStatus.CONSUMED) {
- *   throw new InvalidStatusTransitionException("FiberBatch", "CONSUMED", "AVAILABLE");
+ *   throw new InvalidStatusTransitionException("Batch", "CONSUMED", "AVAILABLE");
  * }
  * }</pre>
  */

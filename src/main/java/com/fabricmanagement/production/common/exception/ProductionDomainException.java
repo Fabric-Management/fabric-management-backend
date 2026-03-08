@@ -17,7 +17,7 @@ package com.fabricmanagement.production.common.exception;
  *     ├── InvalidStatusTransitionException (409)
  *     ├── FiberDomainException           (fiber master data)
  *     ├── RecipeDomainException          (BOM / formula)
- *     ├── FiberBatchDomainException      (batch execution)
+ *     ├── BatchDomainException      (batch execution)
  *     ├── YarnDomainException            (yarn production — future)
  *     └── ProcessDomainException         (dye &amp; finishing — future)
  * </pre>

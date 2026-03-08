@@ -12,14 +12,13 @@ import lombok.*;
  * <p><b>Purpose:</b> Stores actual measurement values from laboratory tests or production quality
  * checks.
  *
- * <p>Each test result belongs to a specific FiberBatch and records the physical properties
- * measured.
+ * <p>Each test result belongs to a specific Batch and records the physical properties measured.
  *
  * <p><b>Domain Separation:</b>
  *
  * <ul>
  *   <li>Fiber = Catalog definition (what type of fiber)
- *   <li>FiberBatch = Production lot (physical inventory)
+ *   <li>Batch = Production lot (physical inventory)
  *   <li>FiberTestResult = Laboratory measurements (test data)
  * </ul>
  */
@@ -28,7 +27,7 @@ import lombok.*;
     name = "production_quality_fiber_test_result",
     schema = "production",
     indexes = {
-      @Index(name = "idx_fiber_test_batch", columnList = "fiber_batch_id"),
+      @Index(name = "idx_fiber_test_batch", columnList = "batch_id"),
       @Index(name = "idx_fiber_test_date", columnList = "test_date"),
       @Index(name = "idx_fiber_test_tenant", columnList = "tenant_id"),
       @Index(name = "idx_fiber_test_approval", columnList = "approval_status")
@@ -40,8 +39,8 @@ import lombok.*;
 @AllArgsConstructor
 public class FiberTestResult extends BaseEntity {
 
-  @Column(name = "fiber_batch_id", nullable = false)
-  private UUID fiberBatchId;
+  @Column(name = "batch_id", nullable = false)
+  private UUID batchId;
 
   @Column(name = "test_date", nullable = false)
   private Instant testDate;

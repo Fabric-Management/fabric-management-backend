@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS production.production_execution_inventory_transaction
     transaction_type    VARCHAR(30)     NOT NULL,
     quantity            DECIMAL(15,3)   NOT NULL,
     unit                VARCHAR(20)     NOT NULL,
+    location_id         UUID,
 
     transaction_date    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reference_id        UUID,

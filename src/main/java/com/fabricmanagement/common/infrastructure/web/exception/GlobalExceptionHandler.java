@@ -3,9 +3,9 @@ package com.fabricmanagement.common.infrastructure.web.exception;
 import com.fabricmanagement.common.platform.subscription.domain.exception.FeatureNotAvailableException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.QuotaExceededException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.SubscriptionRequiredException;
-import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
+import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
 import com.fabricmanagement.production.common.exception.ProductionDomainException;
 import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeInUseException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,11 +15,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.StaleObjectStateException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.hibernate.StaleObjectStateException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -126,10 +126,8 @@ public class GlobalExceptionHandler {
         ex.getFeatureId(),
         ex.getMinimumTier());
     Map<String, Object> details = new LinkedHashMap<>();
-    if (ex.getFeatureId() != null)
-      details.put("featureId", ex.getFeatureId());
-    if (ex.getMinimumTier() != null)
-      details.put("minimumTier", ex.getMinimumTier());
+    if (ex.getFeatureId() != null) details.put("featureId", ex.getFeatureId());
+    if (ex.getMinimumTier() != null) details.put("minimumTier", ex.getMinimumTier());
     return ApiError.of(
         402,
         "Payment Required",
@@ -148,12 +146,9 @@ public class GlobalExceptionHandler {
         ex.getLimit(),
         ex.getUsed());
     Map<String, Object> details = new LinkedHashMap<>();
-    if (ex.getQuotaType() != null)
-      details.put("quotaType", ex.getQuotaType());
-    if (ex.getLimit() != null)
-      details.put("limit", ex.getLimit());
-    if (ex.getUsed() != null)
-      details.put("used", ex.getUsed());
+    if (ex.getQuotaType() != null) details.put("quotaType", ex.getQuotaType());
+    if (ex.getLimit() != null) details.put("limit", ex.getLimit());
+    if (ex.getUsed() != null) details.put("used", ex.getUsed());
     return ApiError.of(
         429, "Too Many Requests", "QUOTA_EXCEEDED", ex.getMessage(), req.getRequestURI(), details);
   }
@@ -194,7 +189,7 @@ public class GlobalExceptionHandler {
         400, "Bad Request", "CONTACT_ALREADY_REGISTERED", ex.getMessage(), req.getRequestURI());
   }
 
-  @ExceptionHandler({ IllegalArgumentException.class, IllegalStateException.class })
+  @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiError handleIllegal(RuntimeException ex, HttpServletRequest req) {
     log.info("Illegal argument/state: {}", ex.getMessage());
@@ -205,14 +200,16 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MethodArgumentNotValidException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiError handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
-    Map<String, String> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-        .collect(
-            Collectors.toMap(
-                FieldError::getField,
-                fieldError -> fieldError.getDefaultMessage() != null
-                    ? fieldError.getDefaultMessage()
-                    : "",
-                (existing, replacement) -> existing));
+    Map<String, String> fieldErrors =
+        ex.getBindingResult().getFieldErrors().stream()
+            .collect(
+                Collectors.toMap(
+                    FieldError::getField,
+                    fieldError ->
+                        fieldError.getDefaultMessage() != null
+                            ? fieldError.getDefaultMessage()
+                            : "",
+                    (existing, replacement) -> existing));
 
     log.info("Validation failed: {}", fieldErrors);
     return ApiError.of(
@@ -228,12 +225,13 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiError handleConstraintViolation(
       ConstraintViolationException ex, HttpServletRequest req) {
-    Map<String, String> details = ex.getConstraintViolations().stream()
-        .collect(
-            Collectors.toMap(
-                v -> v.getPropertyPath().toString(),
-                ConstraintViolation::getMessage,
-                (existing, replacement) -> existing));
+    Map<String, String> details =
+        ex.getConstraintViolations().stream()
+            .collect(
+                Collectors.toMap(
+                    v -> v.getPropertyPath().toString(),
+                    ConstraintViolation::getMessage,
+                    (existing, replacement) -> existing));
 
     log.info("Constraint violation: {}", details);
     return ApiError.of(
@@ -254,8 +252,8 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler({
-      ObjectOptimisticLockingFailureException.class,
-      StaleObjectStateException.class
+    ObjectOptimisticLockingFailureException.class,
+    StaleObjectStateException.class
   })
   @ResponseStatus(HttpStatus.CONFLICT)
   public ApiError handleOptimisticLock(Exception ex, HttpServletRequest req) {

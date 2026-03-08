@@ -69,7 +69,7 @@ class TradingPartnerServiceTest {
               .taxId("1234567890")
               .country("TUR")
               .partnerType(PartnerType.SUPPLIER)
-              .customName("Ana tedarikçi")
+              .customName("Main supplier")
               .build();
 
       TradingPartnerRegistry registry =
@@ -112,7 +112,7 @@ class TradingPartnerServiceTest {
       verify(partnerRepository, org.mockito.Mockito.times(2)).save(partnerCaptor.capture());
       TradingPartner saved = partnerCaptor.getValue();
       assertThat(saved.getRegistry().getId()).isEqualTo(REGISTRY_ID);
-      assertThat(saved.getCustomName()).isEqualTo("Ana tedarikçi");
+      assertThat(saved.getCustomName()).isEqualTo("Main supplier");
 
       ArgumentCaptor<TradingPartnerCreatedEvent> eventCaptor =
           ArgumentCaptor.forClass(TradingPartnerCreatedEvent.class);

@@ -108,7 +108,7 @@ public class Address extends BaseEntity {
   /**
    * District/County/Sub-administrative area
    *
-   * <p>Examples: "Kadıköy", "Westminster", "Bavaria"
+   * <p>Examples: "Brooklyn", "Westminster", "Bavaria"
    */
   @Column(name = "district", length = 100)
   private String district;

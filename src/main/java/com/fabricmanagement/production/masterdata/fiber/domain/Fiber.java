@@ -14,15 +14,21 @@ import lombok.*;
 import org.hibernate.annotations.Type;
 
 @Entity
-@Table(name = "prod_fiber", schema = "production", indexes = {
-    @Index(name = "idx_fiber_tenant", columnList = "tenant_id"),
-    @Index(name = "idx_fiber_material", columnList = "material_id"),
-    @Index(name = "idx_fiber_category", columnList = "fiber_category_id"),
-    @Index(name = "idx_fiber_iso", columnList = "fiber_iso_code_id"),
-    @Index(name = "idx_fiber_status", columnList = "status")
-}, uniqueConstraints = {
-    @UniqueConstraint(name = "uk_fiber_material", columnNames = { "material_id" })
-})
+@Table(
+    name = "prod_fiber",
+    schema = "production",
+    indexes = {
+      @Index(name = "idx_fiber_tenant", columnList = "tenant_id"),
+      @Index(name = "idx_fiber_material", columnList = "material_id"),
+      @Index(name = "idx_fiber_category", columnList = "fiber_category_id"),
+      @Index(name = "idx_fiber_iso", columnList = "fiber_iso_code_id"),
+      @Index(name = "idx_fiber_status", columnList = "status")
+    },
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_fiber_material",
+          columnNames = {"material_id"})
+    })
 @Getter
 @Setter
 @Builder
@@ -72,15 +78,11 @@ public class Fiber extends BaseEntity {
   /**
    * Fiber composition as JSONB: Map of baseFiberId → percentage.
    *
-   * <p>
-   * <b>Pure fiber:</b> null or empty Map
+   * <p><b>Pure fiber:</b> null or empty Map
    *
-   * <p>
-   * <b>Blended fiber:</b> Map with base fiber IDs and percentages (must sum to
-   * 100%)
+   * <p><b>Blended fiber:</b> Map with base fiber IDs and percentages (must sum to 100%)
    *
-   * <p>
-   * Example: {"uuid1": "60.00", "uuid2": "40.00"} for 60%+40% blend
+   * <p>Example: {"uuid1": "60.00", "uuid2": "40.00"} for 60%+40% blend
    */
   @Type(JsonType.class)
   @Column(name = "composition", columnDefinition = "jsonb")
@@ -139,9 +141,7 @@ public class Fiber extends BaseEntity {
         .build();
   }
 
-  /**
-   * Update fiber properties (excluding status - use lifecycle methods instead).
-   */
+  /** Update fiber properties (excluding status - use lifecycle methods instead). */
   public void update(String fiberName, String fiberGrade, String remarks) {
     this.fiberName = fiberName;
     this.fiberGrade = fiberGrade;
@@ -151,11 +151,9 @@ public class Fiber extends BaseEntity {
   /**
    * Mark fiber as obsolete.
    *
-   * <p>
-   * Transition: ACTIVE → OBSOLETE
+   * <p>Transition: ACTIVE → OBSOLETE
    *
-   * <p>
-   * Use when fiber is discontinued or no longer valid.
+   * <p>Use when fiber is discontinued or no longer valid.
    */
   public void markObsolete() {
     if (this.status == FiberStatus.ACTIVE) {

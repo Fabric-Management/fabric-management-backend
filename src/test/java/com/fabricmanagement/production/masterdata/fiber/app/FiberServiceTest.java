@@ -10,13 +10,13 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.production.execution.fiber.domain.FiberBatchStatus;
-import com.fabricmanagement.production.execution.fiber.infra.repository.FiberBatchRepository;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeInUseException;
-import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
@@ -43,23 +43,15 @@ class FiberServiceTest {
   private static final UUID FIBER_ID = UUID.randomUUID();
   private static final String FIBER_NAME = "COT60_LIN40";
 
-  @Mock
-  private FiberRepository fiberRepository;
-  @Mock
-  private MaterialRepository materialRepository;
-  @Mock
-  private FiberCategoryRepository fiberCategoryRepository;
-  @Mock
-  private FiberIsoCodeRepository fiberIsoCodeRepository;
-  @Mock
-  private DomainEventPublisher eventPublisher;
-  @Mock
-  private FiberValidationService validationService;
-  @Mock
-  private FiberBatchRepository fiberBatchRepository;
+  @Mock private FiberRepository fiberRepository;
+  @Mock private MaterialRepository materialRepository;
+  @Mock private FiberCategoryRepository fiberCategoryRepository;
+  @Mock private FiberIsoCodeRepository fiberIsoCodeRepository;
+  @Mock private DomainEventPublisher eventPublisher;
+  @Mock private FiberValidationService validationService;
+  @Mock private BatchRepository batchRepository;
 
-  @InjectMocks
-  private FiberService fiberService;
+  @InjectMocks private FiberService fiberService;
 
   @BeforeEach
   void setUp() {
@@ -89,18 +81,19 @@ class FiberServiceTest {
       when(fiberRepository.findByTenantIdAndId(TENANT_ID, FIBER_ID)).thenReturn(Optional.of(fiber));
 
       Map<UUID, BigDecimal> newComposition = Map.of(UUID.randomUUID(), new BigDecimal("60.00"));
-      requestWithComposition = UpdateFiberRequest.builder()
-          .fiberName(FIBER_NAME)
-          .composition(newComposition)
-          .version(1L)
-          .build();
+      requestWithComposition =
+          UpdateFiberRequest.builder()
+              .fiberName(FIBER_NAME)
+              .composition(newComposition)
+              .version(1L)
+              .build();
     }
 
     @Test
     @DisplayName("succeeds and persists new composition when no batches are in active production")
     void whenNoActiveBatches_compositionUpdatesSuccessfully() {
-      when(fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
-          TENANT_ID, FIBER_ID, FiberBatchStatus.PRODUCTION_ACTIVE))
+      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+              TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(false);
       when(fiberRepository.save(fiber)).thenReturn(fiber);
 
@@ -114,8 +107,8 @@ class FiberServiceTest {
     @Test
     @DisplayName("throws RecipeInUseException when batches are RESERVED or IN_PROGRESS")
     void whenActiveBatchesExist_throwsRecipeInUseException() {
-      when(fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
-          TENANT_ID, FIBER_ID, FiberBatchStatus.PRODUCTION_ACTIVE))
+      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+              TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(true);
 
       assertThatThrownBy(() -> fiberService.updateFiber(FIBER_ID, requestWithComposition))
@@ -131,8 +124,8 @@ class FiberServiceTest {
     @Test
     @DisplayName("thrown RecipeInUseException carries fiberId and fiberName for API details")
     void whenActiveBatchesExist_exceptionCarriesStructuredContext() {
-      when(fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
-          TENANT_ID, FIBER_ID, FiberBatchStatus.PRODUCTION_ACTIVE))
+      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+              TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(true);
 
       assertThatThrownBy(() -> fiberService.updateFiber(FIBER_ID, requestWithComposition))
@@ -148,15 +141,15 @@ class FiberServiceTest {
     @Test
     @DisplayName("skips production check entirely when composition is absent from the request")
     void whenCompositionIsNull_productionCheckIsNotPerformed() {
-      UpdateFiberRequest requestWithoutComposition = UpdateFiberRequest.builder().fiberName("Updated Name").version(1L)
-          .build();
+      UpdateFiberRequest requestWithoutComposition =
+          UpdateFiberRequest.builder().fiberName("Updated Name").version(1L).build();
       when(fiberRepository.save(fiber)).thenReturn(fiber);
 
       fiberService.updateFiber(FIBER_ID, requestWithoutComposition);
 
       // Guard query must not run — no composition means no recipe risk
-      verify(fiberBatchRepository, never())
-          .existsByTenantIdAndFiberIdAndStatusIn(any(), any(), any());
+      verify(batchRepository, never())
+          .existsByTenantIdAndMaterialIdAndStatusIn(any(), any(), any());
       verify(fiberRepository).save(fiber);
     }
   }
@@ -181,8 +174,8 @@ class FiberServiceTest {
     @Test
     @DisplayName("succeeds and marks fiber deleted when no batches are in active production")
     void whenNoActiveBatches_deactivationSucceeds() {
-      when(fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
-          TENANT_ID, FIBER_ID, FiberBatchStatus.PRODUCTION_ACTIVE))
+      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+              TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(false);
       when(fiberRepository.save(fiber)).thenReturn(fiber);
 
@@ -195,8 +188,8 @@ class FiberServiceTest {
     @Test
     @DisplayName("throws FiberDomainException when batches are RESERVED or IN_PROGRESS")
     void whenActiveBatchesExist_throwsFiberDomainException() {
-      when(fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
-          TENANT_ID, FIBER_ID, FiberBatchStatus.PRODUCTION_ACTIVE))
+      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+              TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(true);
 
       assertThatThrownBy(() -> fiberService.deactivateFiber(FIBER_ID))

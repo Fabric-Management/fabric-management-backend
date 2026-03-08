@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.inventory.dto;
 
 import com.fabricmanagement.production.execution.inventory.domain.InventoryTransaction;
-import com.fabricmanagement.production.execution.inventory.domain.InventoryTransactionType;
+import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -26,7 +26,8 @@ public class InventoryTransactionDto {
   private Instant transactionDate;
   private UUID referenceId;
   private String referenceType;
-  private String reason;
+  private String reasonCode;
+  private String idempotencyKey;
   private String remarks;
   private Boolean isActive;
   private Long version;
@@ -43,8 +44,9 @@ public class InventoryTransactionDto {
         .unit(entity.getUnit())
         .transactionDate(entity.getTransactionDate())
         .referenceId(entity.getReferenceId())
-        .referenceType(entity.getReferenceType())
-        .reason(entity.getReason())
+        .referenceType(entity.getReferenceType() != null ? entity.getReferenceType().name() : null)
+        .reasonCode(entity.getReasonCode() != null ? entity.getReasonCode().name() : null)
+        .idempotencyKey(entity.getIdempotencyKey())
         .remarks(entity.getRemarks())
         .version(entity.getVersion())
         .isActive(entity.getIsActive())

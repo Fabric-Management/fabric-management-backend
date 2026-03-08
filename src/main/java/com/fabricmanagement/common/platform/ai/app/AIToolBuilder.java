@@ -34,7 +34,7 @@ public class AIToolBuilder {
             "smart_search",
             "INTELLIGENT SEARCH: Automatically detects entity type (Fiber/Yarn/Fabric) from query and searches accordingly. "
                 + "Use this as PRIMARY search function when user asks about textile items. "
-                + "Examples: 'pamuk' → searches FIBER, 'pamuk ipliği' → searches YARN, 'gabardin' → searches FABRIC. "
+                + "Examples: 'cotton' → FIBER, 'cotton yarn' → YARN, 'gabardine' → FABRIC. "
                 + "More efficient than separate searches - ONE function call, smart detection, lower token cost.",
             Map.of(
                 "type", "object",
@@ -46,7 +46,7 @@ public class AIToolBuilder {
                             "string",
                             "description",
                             "Search query - automatically detects if it's Fiber, Yarn, or Fabric. "
-                                + "Examples: 'pamuk' (fiber), 'pamuk ipliği' (yarn), 'gabardin' (fabric), '30/1 gabardin' (fabric). "
+                                + "Examples: 'cotton' (fiber), 'cotton yarn' (yarn), 'gabardine' (fabric), '30/1 gabardine' (fabric). "
                                 + "Preserve technical textile specifications EXACTLY as user typed (30/1, 40/2, GSM, etc.).")),
                 "required", List.of("query"))),
         buildTool(

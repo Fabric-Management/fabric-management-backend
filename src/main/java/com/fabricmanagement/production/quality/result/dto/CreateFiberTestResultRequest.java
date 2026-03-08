@@ -20,7 +20,7 @@ public class CreateFiberTestResultRequest {
   private Long version;
 
   @NotNull(message = "Fiber batch ID is required")
-  private UUID fiberBatchId;
+  private UUID batchId;
 
   @NotNull(message = "Test date is required")
   @PastOrPresent(message = "Test date cannot be in the future")

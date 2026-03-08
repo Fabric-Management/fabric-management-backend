@@ -27,16 +27,16 @@ import lombok.NoArgsConstructor;
  *
  * <pre>{@code
  * {
- *   "companyName": "Akkaya Tekstil A.Ş.",
+ *   "companyName": "Acme Textile Inc.",
  *   "taxId": "1234567890",
- *   "country": "TUR",
+ *   "country": "USA",
  *   "partnerType": "SUPPLIER",
- *   "customName": "Ana İplik Tedarikçimiz",
+ *   "customName": "Main Yarn Supplier",
  *   "relationshipMeta": {
  *     "payment_terms": "NET30",
  *     "credit_limit": 100000,
- *     "contact_person": "Ahmet Yılmaz",
- *     "contact_email": "ahmet@akkaya.com"
+ *     "contact_person": "John Smith",
+ *     "contact_email": "john@acme.com"
  *   }
  * }
  * }</pre>

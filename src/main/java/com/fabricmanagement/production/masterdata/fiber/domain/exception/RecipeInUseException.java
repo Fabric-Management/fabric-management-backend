@@ -27,8 +27,8 @@ import java.util.UUID;
  * <h2>Usage</h2>
  *
  * <pre>{@code
- * if (fiberBatchRepository.existsByTenantIdAndFiberIdAndStatusIn(
- *         tenantId, fiberId, FiberBatchStatus.PRODUCTION_ACTIVE)) {
+ * if (batchRepository.existsByTenantIdAndFiberIdAndStatusIn(
+ *         tenantId, fiberId, BatchStatus.PRODUCTION_ACTIVE)) {
  *   throw new RecipeInUseException(fiberId, fiber.getFiberName());
  * }
  * }</pre>

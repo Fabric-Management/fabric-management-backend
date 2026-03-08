@@ -2,13 +2,17 @@ package com.fabricmanagement.production.execution.lineage.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
+import com.fabricmanagement.production.execution.lineage.dto.BatchLineageDetailDto;
 import com.fabricmanagement.production.execution.lineage.dto.BatchLineageDto;
 import com.fabricmanagement.production.execution.lineage.dto.CreateBatchLineageRequest;
+import com.fabricmanagement.production.execution.lineage.dto.TraceNodeDto;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,7 +33,7 @@ public class BatchLineageController {
   private final BatchLineageService batchLineageService;
 
   @PostMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<BatchLineageDto>> createLineage(
       @Valid @RequestBody CreateBatchLineageRequest request) {
     BatchLineageDto lineage = batchLineageService.create(request);
@@ -37,32 +41,57 @@ public class BatchLineageController {
   }
 
   @GetMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<List<BatchLineageDto>>> getAll() {
-    List<BatchLineageDto> lineages = batchLineageService.getAll();
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<Page<BatchLineageDto>>> getAll(Pageable pageable) {
+    Page<BatchLineageDto> lineages = batchLineageService.getAll(pageable);
     return ResponseEntity.ok(ApiResponse.success(lineages));
   }
 
   /** Forward trace: what input batches were consumed to produce this batch? */
   @GetMapping("/parents/{childBatchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
   public ResponseEntity<ApiResponse<List<BatchLineageDto>>> getParents(
       @PathVariable UUID childBatchId) {
     List<BatchLineageDto> parents = batchLineageService.getParents(childBatchId);
     return ResponseEntity.ok(ApiResponse.success(parents));
   }
 
+  /** Aggregated lineage detail: focal batch + enriched parents & children in one call. */
+  @GetMapping("/batch/{batchId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<BatchLineageDetailDto>> getLineageDetail(
+      @PathVariable UUID batchId) {
+    BatchLineageDetailDto detail = batchLineageService.getLineageDetail(batchId);
+    return ResponseEntity.ok(ApiResponse.success(detail));
+  }
+
   /** Backward trace: where was this parent batch used as input? */
   @GetMapping("/children/{parentBatchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'READ')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
   public ResponseEntity<ApiResponse<List<BatchLineageDto>>> getChildren(
       @PathVariable UUID parentBatchId) {
     List<BatchLineageDto> children = batchLineageService.getChildren(parentBatchId);
     return ResponseEntity.ok(ApiResponse.success(children));
   }
 
+  /** Recursive backward trace: full ancestry tree (cotton → yarn → fabric). */
+  @GetMapping("/trace-backward/{batchId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<TraceNodeDto>> traceBackward(@PathVariable UUID batchId) {
+    TraceNodeDto tree = batchLineageService.traceBackward(batchId);
+    return ResponseEntity.ok(ApiResponse.success(tree));
+  }
+
+  /** Recursive forward trace: full descendant tree (cotton → yarn → fabric). */
+  @GetMapping("/trace-forward/{batchId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<TraceNodeDto>> traceForward(@PathVariable UUID batchId) {
+    TraceNodeDto tree = batchLineageService.traceForward(batchId);
+    return ResponseEntity.ok(ApiResponse.success(tree));
+  }
+
   @DeleteMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER_BATCH', 'WRITE')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<Void>> deleteLineage(@PathVariable UUID id) {
     batchLineageService.delete(id);
     return ResponseEntity.ok(ApiResponse.success(null, "Batch lineage deleted"));

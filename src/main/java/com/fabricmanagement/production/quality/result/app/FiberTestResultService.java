@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.quality.result.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.production.execution.fiber.infra.repository.FiberBatchRepository;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
@@ -22,22 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class FiberTestResultService {
 
   private final FiberTestResultRepository testResultRepository;
-  private final FiberBatchRepository fiberBatchRepository;
+  private final BatchRepository batchRepository;
 
   @Transactional
   public FiberTestResultDto create(CreateFiberTestResultRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    fiberBatchRepository
-        .findByIdAndTenantId(request.getFiberBatchId(), tenantId)
+    batchRepository
+        .findByIdAndTenantId(request.getBatchId(), tenantId)
         .orElseThrow(
-            () ->
-                new IllegalArgumentException(
-                    "Fiber batch not found: " + request.getFiberBatchId()));
+            () -> new IllegalArgumentException("Fiber batch not found: " + request.getBatchId()));
 
     FiberTestResult result =
         FiberTestResult.builder()
-            .fiberBatchId(request.getFiberBatchId())
+            .batchId(request.getBatchId())
             .testDate(request.getTestDate())
             .testType(request.getTestType() != null ? request.getTestType() : "LABORATORY")
             .fineness(request.getFineness())
@@ -53,8 +51,7 @@ public class FiberTestResultService {
             .build();
 
     FiberTestResult saved = testResultRepository.save(result);
-    log.info(
-        "Fiber test result created: id={}, batchId={}", saved.getId(), saved.getFiberBatchId());
+    log.info("Fiber test result created: id={}, batchId={}", saved.getId(), saved.getBatchId());
 
     return FiberTestResultDto.from(saved);
   }
@@ -66,11 +63,9 @@ public class FiberTestResultService {
   }
 
   @Transactional(readOnly = true)
-  public List<FiberTestResultDto> getByBatchId(UUID fiberBatchId) {
+  public List<FiberTestResultDto> getByBatchId(UUID batchId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return testResultRepository
-        .findByTenantIdAndFiberBatchIdAndIsActiveTrue(tenantId, fiberBatchId)
-        .stream()
+    return testResultRepository.findByTenantIdAndBatchIdAndIsActiveTrue(tenantId, batchId).stream()
         .map(FiberTestResultDto::from)
         .toList();
   }

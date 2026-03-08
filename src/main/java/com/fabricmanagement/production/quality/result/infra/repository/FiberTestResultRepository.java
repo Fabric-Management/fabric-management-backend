@@ -15,14 +15,13 @@ public interface FiberTestResultRepository extends JpaRepository<FiberTestResult
 
   Optional<FiberTestResult> findByTenantIdAndId(UUID tenantId, UUID id);
 
-  List<FiberTestResult> findByTenantIdAndFiberBatchId(UUID tenantId, UUID fiberBatchId);
+  List<FiberTestResult> findByTenantIdAndBatchId(UUID tenantId, UUID batchId);
 
-  List<FiberTestResult> findByTenantIdAndFiberBatchIdAndIsActiveTrue(
-      UUID tenantId, UUID fiberBatchId);
+  List<FiberTestResult> findByTenantIdAndBatchIdAndIsActiveTrue(UUID tenantId, UUID batchId);
 
   List<FiberTestResult> findByTenantIdAndApprovalStatus(
       UUID tenantId, TestApprovalStatus approvalStatus);
 
-  boolean existsByTenantIdAndFiberBatchIdAndApprovalStatus(
-      UUID tenantId, UUID fiberBatchId, TestApprovalStatus approvalStatus);
+  boolean existsByTenantIdAndBatchIdAndApprovalStatus(
+      UUID tenantId, UUID batchId, TestApprovalStatus approvalStatus);
 }

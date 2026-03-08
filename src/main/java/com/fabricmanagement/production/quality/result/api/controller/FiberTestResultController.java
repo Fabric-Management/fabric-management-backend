@@ -35,7 +35,7 @@ public class FiberTestResultController {
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'WRITE')")
   public ResponseEntity<ApiResponse<FiberTestResultDto>> createTestResult(
       @Valid @RequestBody CreateFiberTestResultRequest request) {
-    log.info("Recording fiber test result: batchId={}", request.getFiberBatchId());
+    log.info("Recording fiber test result: batchId={}", request.getBatchId());
     FiberTestResultDto result = testResultService.create(request);
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(result));
   }
@@ -55,11 +55,11 @@ public class FiberTestResultController {
     return ResponseEntity.ok(ApiResponse.success(testResultService.getAll()));
   }
 
-  @GetMapping("/batch/{fiberBatchId}")
+  @GetMapping("/batch/{batchId}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberTestResultDto>>> getTestResultsByBatch(
-      @PathVariable UUID fiberBatchId) {
-    return ResponseEntity.ok(ApiResponse.success(testResultService.getByBatchId(fiberBatchId)));
+      @PathVariable UUID batchId) {
+    return ResponseEntity.ok(ApiResponse.success(testResultService.getByBatchId(batchId)));
   }
 
   @GetMapping("/status/{status}")
