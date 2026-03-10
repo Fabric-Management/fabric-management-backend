@@ -3,37 +3,37 @@
   "targetType": "YARN",
   "rules": [
     {
-      "sourceAttribute": "micronaire",
-      "targetAttribute": "fiberMicronaire",
+      "sourceAttribute": "fiber_micronaire",
+      "targetAttribute": "fiber_micronaire",
       "action": "WEIGHTED_AVERAGE",
       "description": "Weighted average across consumed fiber batches by quantity."
     },
     {
-      "sourceAttribute": "stapleLength",
-      "targetAttribute": "fiberStapleLength",
+      "sourceAttribute": "fiber_staple_length",
+      "targetAttribute": "fiber_staple_length",
       "action": "WEIGHTED_AVERAGE",
       "description": "Weighted average staple length from parent fibers."
     },
     {
-      "sourceAttribute": "fiberGrade",
-      "targetAttribute": "rawFiberGrade",
+      "sourceAttribute": "fiber_grade",
+      "targetAttribute": "raw_fiber_grade",
       "action": "MIN",
       "description": "Yarn quality floor is determined by the lowest grade parent fiber."
     },
     {
-      "sourceAttribute": "fiberShade",
-      "targetAttribute": "rawFiberShade",
+      "sourceAttribute": "fiber_shade",
+      "targetAttribute": "raw_fiber_shade",
       "action": "REQUIRE_EQUAL",
       "description": "All parent fibers must have the same shade. Mixing shades is a validation error."
     },
     {
-      "sourceAttribute": "organicCertNo",
-      "targetAttribute": "organicCertNo",
+      "sourceAttribute": "fiber_organic_cert_no",
+      "targetAttribute": "fiber_organic_cert_no",
       "action": "COLLECT_TO_ARRAY",
       "description": "All TC numbers from parent fibers are collected into an array."
     },
     {
-      "sourceAttribute": "baleMoisture",
+      "sourceAttribute": "bale_moisture",
       "targetAttribute": null,
       "action": "DROP",
       "description": "Bale moisture is irrelevant at yarn stage and is dropped."
