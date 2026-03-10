@@ -3,6 +3,7 @@ package com.fabricmanagement.common.platform.communication.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
+import com.fabricmanagement.common.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.common.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.common.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationAddressRepository;
@@ -37,6 +38,31 @@ public class AddressService {
   private final AddressRepository addressRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
   private final UserWorkLocationRepository userWorkLocationRepository;
+
+  /**
+   * Create an address from the shared DTO. Single entry point for all address creation (REST and
+   * internal callers such as onboarding). Ensures DRY and consistent handling of label,
+   * addressLine2, and countryCode.
+   *
+   * @param request CreateAddressRequest (from API or built from CompleteOnboardingRequest etc.)
+   * @return Persisted Address
+   */
+  @Transactional
+  public Address createAddress(CreateAddressRequest request) {
+    String label =
+        (request.getLabel() != null && !request.getLabel().isBlank()) ? request.getLabel() : "";
+    return createAddress(
+        request.getStreetAddress(),
+        request.getCity(),
+        request.getState(),
+        request.getDistrict(),
+        request.getPostalCode(),
+        request.getCountry(),
+        request.getCountryCode(),
+        request.getAddressType(),
+        label,
+        request.getAddressLine2());
+  }
 
   @Transactional
   public Address createAddress(

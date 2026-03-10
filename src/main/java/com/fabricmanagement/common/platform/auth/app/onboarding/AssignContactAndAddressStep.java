@@ -4,6 +4,7 @@ import com.fabricmanagement.common.platform.communication.app.AddressService;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
+import com.fabricmanagement.common.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.common.platform.organization.app.OrganizationAddressAssignmentService;
 import com.fabricmanagement.common.platform.organization.app.OrganizationContactAssignmentService;
 import java.util.UUID;
@@ -42,17 +43,18 @@ public class AssignContactAndAddressStep implements OnboardingStep {
 
     // Create and assign address if provided
     if (context.getAddress() != null || context.getCity() != null || context.getCountry() != null) {
-      var address =
-          addressService.createAddress(
-              context.getAddress() != null ? context.getAddress() : "",
-              context.getCity() != null ? context.getCity() : "",
-              context.getState(),
-              context.getDistrict(),
-              context.getPostalCode(),
-              context.getCountry() != null ? context.getCountry() : "",
-              null, // countryCode
-              AddressType.HEADQUARTERS,
-              "Organization");
+      CreateAddressRequest createRequest =
+          CreateAddressRequest.builder()
+              .streetAddress(context.getAddress() != null ? context.getAddress() : "")
+              .city(context.getCity() != null ? context.getCity() : "")
+              .state(context.getState())
+              .district(context.getDistrict())
+              .postalCode(context.getPostalCode())
+              .country(context.getCountry() != null ? context.getCountry() : "")
+              .addressType(AddressType.HEADQUARTERS)
+              .label("Organization")
+              .build();
+      var address = addressService.createAddress(createRequest);
       addressAssignmentService.assignAddress(organizationId, address.getId(), true, false);
     }
 

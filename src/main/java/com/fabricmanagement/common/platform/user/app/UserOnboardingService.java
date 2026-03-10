@@ -6,6 +6,7 @@ import com.fabricmanagement.common.platform.communication.app.AddressService;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
+import com.fabricmanagement.common.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.common.platform.organization.app.OrganizationAddressAssignmentService;
 import com.fabricmanagement.common.platform.organization.app.OrganizationContactAssignmentService;
 import com.fabricmanagement.common.platform.organization.app.OrganizationService;
@@ -22,6 +23,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -153,23 +155,33 @@ public class UserOnboardingService {
       return;
     }
     try {
-      var address =
-          addressService.createAddress(
-              req.getAddressLine1() != null ? req.getAddressLine1().trim() : "",
-              req.getCity() != null ? req.getCity().trim() : "",
-              req.getState() != null ? req.getState().trim() : null,
-              req.getDistrict() != null ? req.getDistrict().trim() : null,
-              req.getPostalCode() != null ? req.getPostalCode().trim() : null,
-              req.getCountry() != null ? req.getCountry().trim() : "",
-              null,
-              AddressType.HEADQUARTERS,
-              "Headquarters",
-              req.getAddressLine2() != null ? req.getAddressLine2().trim() : null);
+      String label =
+          (req.getAddressLabel() != null && !req.getAddressLabel().isBlank())
+              ? req.getAddressLabel().trim()
+              : "Headquarters";
 
+      CreateAddressRequest createRequest =
+          CreateAddressRequest.builder()
+              .streetAddress(req.getAddressLine1() != null ? req.getAddressLine1().trim() : "")
+              .addressLine2(req.getAddressLine2() != null ? req.getAddressLine2().trim() : null)
+              .city(req.getCity() != null ? req.getCity().trim() : "")
+              .state(req.getState() != null ? req.getState().trim() : null)
+              .district(req.getDistrict() != null ? req.getDistrict().trim() : null)
+              .postalCode(req.getPostalCode() != null ? req.getPostalCode().trim() : null)
+              .country(req.getCountry() != null ? req.getCountry().trim() : "")
+              .countryCode(null)
+              .addressType(AddressType.HEADQUARTERS)
+              .label(label)
+              .build();
+
+      var address = addressService.createAddress(createRequest);
       addressAssignmentService.assignAddress(orgId, address.getId(), true, true);
       log.debug("saveHqAddress: addressId={}, orgId={}", address.getId(), orgId);
-    } catch (Exception ex) {
+    } catch (DataAccessException | IllegalArgumentException ex) {
       log.warn("saveHqAddress: failed for orgId={} — {}", orgId, ex.getMessage());
+    } catch (Exception ex) {
+      log.warn("saveHqAddress: unexpected error for orgId={} — {}", orgId, ex.getMessage(), ex);
+      throw ex;
     }
   }
 

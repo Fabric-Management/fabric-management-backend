@@ -26,6 +26,10 @@ public class CreateBatchRequest {
   @NotNull(message = "Material type is required")
   private com.fabricmanagement.production.masterdata.material.domain.MaterialType materialType;
 
+  /**
+   * Generic JSONB attributes. For FIBER, use fiber-prefixed keys or the optional fiber fields
+   * below.
+   */
   private java.util.Map<String, Object> attributes;
 
   @NotBlank(message = "Batch code is required")
@@ -47,4 +51,13 @@ public class CreateBatchRequest {
   private UUID locationId;
 
   private String remarks;
+
+  // ── Optional fiber-specific fields (mapped to attributes with "fiber_" prefix when materialType
+  // = FIBER) ──
+
+  private Double micronaire;
+  private Double stapleLength;
+  private String fiberGrade;
+  private String fiberShade;
+  private String organicCertNo;
 }

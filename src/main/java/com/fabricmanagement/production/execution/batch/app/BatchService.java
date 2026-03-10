@@ -14,9 +14,12 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchRes
 import com.fabricmanagement.production.execution.warehouse.app.WarehouseLocationService;
 import com.fabricmanagement.production.execution.warehouse.domain.WarehouseLocationType;
 import com.fabricmanagement.production.execution.warehouse.dto.WarehouseLocationDto;
+import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -48,6 +51,8 @@ public class BatchService {
       throw new BatchDomainException("Batch code already exists: " + request.getBatchCode());
     }
 
+    Map<String, Object> attributes = resolveAttributes(request);
+
     Batch batch =
         Batch.create(
             tenantId,
@@ -61,7 +66,7 @@ public class BatchService {
             request.getExpiryDate(),
             request.getLocationId(),
             request.getRemarks(),
-            request.getAttributes());
+            attributes);
 
     batch = batchRepository.save(batch);
 
@@ -72,6 +77,36 @@ public class BatchService {
     log.info("Created batch: id={}, batchCode={}", batch.getId(), batch.getBatchCode());
 
     return BatchDto.from(batch);
+  }
+
+  /**
+   * Builds the attributes map for the batch. For FIBER material type, maps optional fiber-specific
+   * request fields into the "fiber_" prefix convention; only non-null values are included. Merges
+   * with any request.getAttributes() so client can override or add.
+   */
+  private Map<String, Object> resolveAttributes(CreateBatchRequest request) {
+    Map<String, Object> attrs =
+        request.getAttributes() != null ? new HashMap<>(request.getAttributes()) : new HashMap<>();
+
+    if (request.getMaterialType() == MaterialType.FIBER) {
+      if (request.getMicronaire() != null) {
+        attrs.put("fiber_micronaire", request.getMicronaire());
+      }
+      if (request.getStapleLength() != null) {
+        attrs.put("fiber_staple_length", request.getStapleLength());
+      }
+      if (request.getFiberGrade() != null) {
+        attrs.put("fiber_grade", request.getFiberGrade());
+      }
+      if (request.getFiberShade() != null) {
+        attrs.put("fiber_shade", request.getFiberShade());
+      }
+      if (request.getOrganicCertNo() != null) {
+        attrs.put("fiber_organic_cert_no", request.getOrganicCertNo());
+      }
+    }
+
+    return attrs;
   }
 
   @Transactional(readOnly = true)

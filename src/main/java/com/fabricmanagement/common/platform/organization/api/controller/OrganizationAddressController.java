@@ -99,18 +99,7 @@ public class OrganizationAddressController {
         organizationId,
         createRequest.getAddressType());
 
-    Address address =
-        addressService.createAddress(
-            createRequest.getStreetAddress(),
-            createRequest.getCity(),
-            createRequest.getState(),
-            createRequest.getDistrict(),
-            createRequest.getPostalCode(),
-            createRequest.getCountry(),
-            null, // countryCode
-            createRequest.getAddressType(),
-            createRequest.getLabel());
-
+    Address address = addressService.createAddress(createRequest);
     OrganizationAddress organizationAddress =
         organizationAddressAssignmentService.assignAddress(
             organizationId, address.getId(), isPrimary, isHeadquarters);

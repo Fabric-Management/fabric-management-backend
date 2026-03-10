@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
+import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
@@ -31,6 +32,7 @@ import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCe
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.material.domain.Material;
+import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -693,5 +695,20 @@ public class FiberService implements FiberFacade {
     }
 
     return "XXX"; // Unknown fiber type
+  }
+
+  /**
+   * Asserts that the given batch is a Fiber material batch. Call this at the start of any method
+   * that loads a {@link Batch} and performs fiber-specific logic (e.g. reading fiber_* attributes
+   * or delegating to fiber-only APIs) so that Yarn/Fabric batches are not processed by mistake.
+   *
+   * @param batch the batch to check
+   * @throws IllegalStateException if batch.getMaterialType() != MaterialType.FIBER
+   */
+  private void assertFiberMaterialType(Batch batch) {
+    if (batch.getMaterialType() != MaterialType.FIBER) {
+      throw new IllegalStateException(
+          "Expected FIBER batch but got materialType=" + batch.getMaterialType());
+    }
   }
 }

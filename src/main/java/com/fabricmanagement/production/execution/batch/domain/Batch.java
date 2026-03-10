@@ -16,18 +16,20 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Batch represents a physical production lot/batch of fiber.
+ * Universal physical batch entity for all material types (Fiber, Yarn, Fabric, etc.).
  *
- * <p>A Batch is created when fiber is received from a supplier or produced internally. It tracks
- * the actual inventory of fiber that can be used in production.
+ * <p>Replaces the previous module-specific batch tables (e.g. FiberBatch). All physical lots are
+ * stored in {@code production_execution_batch} with {@code material_id} and {@code material_type};
+ * material-specific properties live in the JSONB {@code attributes} column.
  *
- * <p>Key Concepts:
+ * <p>Key concepts:
  *
  * <ul>
- *   <li>Links to Fiber (masterdata) via materialId
- *   <li>Has a unique batchCode for traceability
- *   <li>Tracks quantity and supplierBatch information
- *   <li>Supports status tracking (AVAILABLE, RESERVED, IN_PROGRESS, DEPLETED)
+ *   <li>Links to Material (masterdata) via materialId; materialType indicates the kind of lot
+ *   <li>Unique batchCode per tenant for traceability
+ *   <li>Tracks quantity, reserved/consumed/waste, and status (AVAILABLE, RESERVED, IN_PROGRESS,
+ *       etc.)
+ *   <li>Flexible attributes (JSONB) for module-specific fields (e.g. fiber_micronaire, yarn_count)
  * </ul>
  */
 @Entity
@@ -48,7 +50,8 @@ public class Batch extends BaseEntity {
 
   @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.json.JsonType.class)
   @Column(name = "attributes", columnDefinition = "jsonb")
-  private java.util.Map<String, Object> attributes;
+  @Builder.Default
+  private java.util.Map<String, Object> attributes = new java.util.HashMap<>();
 
   @Column(name = "batch_code", nullable = false)
   private String batchCode;

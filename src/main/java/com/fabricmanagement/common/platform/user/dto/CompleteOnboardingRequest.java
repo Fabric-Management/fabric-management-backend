@@ -100,6 +100,13 @@ public class CompleteOnboardingRequest {
   @Size(max = 100, message = "Country must not exceed 100 characters")
   private String country;
 
+  /**
+   * Location name / label for the headquarters address (e.g. "Headquarters", "Production Plant").
+   * If blank or null, backend defaults to "Headquarters".
+   */
+  @Size(max = 100, message = "Address label must not exceed 100 characters")
+  private String addressLabel;
+
   // ── Company contacts ─────────────────────────────────────────────────────────
 
   /** Company email address. */
