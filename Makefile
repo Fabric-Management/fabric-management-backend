@@ -14,6 +14,8 @@ BASE_URL := http://localhost:$(APP_PORT)
 POSTGRES_SERVICE := postgres
 POSTGRES_CONTAINER := fabric-postgres
 MVN := $(if $(wildcard mvnw),./mvnw,mvn)
+# Auto-detect JAVA_HOME for Homebrew OpenJDK when not set (prefer Java 21 for project compatibility)
+export JAVA_HOME ?= $(or $(shell [ -d /usr/local/opt/openjdk@21 ] && echo /usr/local/opt/openjdk@21),$(shell [ -d /opt/homebrew/opt/openjdk@21 ] && echo /opt/homebrew/opt/openjdk@21),$(shell [ -d /usr/local/opt/openjdk ] && echo /usr/local/opt/openjdk),$(shell [ -d /opt/homebrew/opt/openjdk ] && echo /opt/homebrew/opt/openjdk))
 
 # Colors
 GREEN := \033[0;32m

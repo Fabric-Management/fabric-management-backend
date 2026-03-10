@@ -25,11 +25,13 @@ Fabric Management System is a comprehensive platform for fabric manufacturing, i
 
 ### Prerequisites
 
-- Java 21+
-- Maven 3.9+
+- Java 21+ (recommended: `brew install openjdk@21` on macOS)
+- Maven 3.9+ (or use `./mvnw` – Maven wrapper included)
 - Docker & Docker Compose
 - PostgreSQL 15+ (via Docker)
 
+> **macOS:** Makefile and pre-commit hooks auto-detect `JAVA_HOME` for Homebrew OpenJDK. If `mvn` is not in PATH, use `./mvnw` or `make format` (uses wrapper).
+>
 > **Local setup without Docker:** See [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
 
 ### Installation
