@@ -98,8 +98,10 @@ public class UserAddressController {
             createRequest.getStreetAddress(),
             createRequest.getCity(),
             createRequest.getState(),
+            createRequest.getDistrict(),
             createRequest.getPostalCode(),
             createRequest.getCountry(),
+            null, // countryCode
             createRequest.getAddressType(),
             createRequest.getLabel());
 

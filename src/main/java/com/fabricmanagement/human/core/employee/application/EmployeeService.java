@@ -172,4 +172,22 @@ public class EmployeeService {
     log.debug("Generated employee number: {}", employeeNumber);
     return employeeNumber;
   }
+
+  @Transactional
+  public Employee terminateEmployee(UUID userId, LocalDate terminationDate) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info("Terminating employee. userId={}, terminationDate={}", userId, terminationDate);
+
+    Employee employee =
+        getEmployeeByUserId(userId)
+            .orElseThrow(() -> new IllegalArgumentException("Employee not found"));
+
+    employee.terminate(terminationDate);
+    Employee saved = employeeRepository.save(employee);
+
+    eventPublisher.publish(
+        new com.fabricmanagement.human.core.employee.domain.event.EmployeeTerminatedEvent(
+            tenantId, userId, terminationDate));
+    return saved;
+  }
 }

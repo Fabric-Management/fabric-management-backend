@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.fiber.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -31,6 +32,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateFiberRequest {
+
+  private Long version;
 
   /**
    * Material ID (optional).
@@ -66,6 +69,10 @@ public class CreateFiberRequest {
    * <p>Example: {cottonId: 60.0, viscoseId: 40.0}
    */
   private Map<UUID, BigDecimal> composition;
+
+  private List<UUID> attributeIds;
+
+  private List<UUID> certificationIds;
 
   private String remarks;
 }

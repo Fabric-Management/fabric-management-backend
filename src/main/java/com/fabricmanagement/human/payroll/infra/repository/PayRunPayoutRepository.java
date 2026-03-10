@@ -13,17 +13,27 @@ public interface PayRunPayoutRepository extends JpaRepository<PayRunPayout, UUID
 
   @Query(
       """
-        select p from PayRunPayout p
-        where p.payRun = :payRun
-        """)
+      select p from PayRunPayout p
+      where p.payRun = :payRun
+      """)
   List<PayRunPayout> findByPayRun(@Param("payRun") PayRun payRun);
 
   @Query(
       """
-        select p from PayRunPayout p
-        where p.payRun = :payRun
-          and p.employeeId = :employeeId
-        """)
+      select p from PayRunPayout p
+      where p.payRun = :payRun
+        and p.employeeId = :employeeId
+      """)
   Optional<PayRunPayout> findByPayRunAndEmployee(
       @Param("payRun") PayRun payRun, @Param("employeeId") UUID employeeId);
+
+  @Query(
+      """
+      select p from PayRunPayout p
+      join fetch p.payRun pr
+      join fetch pr.payPeriod
+      where p.employeeId = :employeeId
+      order by pr.payPeriod.endDate desc
+      """)
+  List<PayRunPayout> findDescByEmployeeId(@Param("employeeId") UUID employeeId);
 }

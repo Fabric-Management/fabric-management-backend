@@ -39,19 +39,25 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
   List<Contact> findExtensionsByParentContactId(
       @Param("tenantId") UUID tenantId, @Param("parentContactId") UUID parentContactId);
 
-  /** Find primary contacts by type within tenant. */
-  @Query(
-      "SELECT c FROM Contact c WHERE c.tenantId = :tenantId "
-          + "AND c.contactType = :contactType AND c.isPrimary = true")
-  List<Contact> findPrimaryByTenantIdAndContactType(
-      @Param("tenantId") UUID tenantId, @Param("contactType") ContactType contactType);
-
   /** Find verified contacts by type within tenant. */
   @Query(
       "SELECT c FROM Contact c WHERE c.tenantId = :tenantId "
           + "AND c.contactType = :contactType AND c.isVerified = true")
   List<Contact> findVerifiedByTenantIdAndContactType(
       @Param("tenantId") UUID tenantId, @Param("contactType") ContactType contactType);
+
+  /**
+   * Case-insensitive partial search by contact value within tenant (max 20 results to keep it
+   * lightweight).
+   */
+  @Query(
+      "SELECT c FROM Contact c WHERE c.tenantId = :tenantId "
+          + "AND LOWER(c.contactValue) LIKE LOWER(CONCAT('%', :query, '%')) "
+          + "ORDER BY c.contactValue ASC")
+  List<Contact> searchByTenantIdAndContactValue(
+      @Param("tenantId") UUID tenantId,
+      @Param("query") String query,
+      org.springframework.data.domain.Pageable pageable);
 
   /**
    * Check if any contact exists with the given email domain. Used for providing context-aware error

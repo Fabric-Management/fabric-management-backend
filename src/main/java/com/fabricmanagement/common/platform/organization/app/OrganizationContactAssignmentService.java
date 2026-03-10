@@ -3,7 +3,10 @@ package com.fabricmanagement.common.platform.organization.app;
 import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentService;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
+import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
+import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.common.platform.organization.domain.OrganizationContact;
 import com.fabricmanagement.common.platform.organization.domain.event.OrganizationContactAssignedEvent;
@@ -30,16 +33,19 @@ public class OrganizationContactAssignmentService
   private final ContactRepository contactRepository;
   private final OrganizationContactRepository organizationContactRepository;
   private final DomainEventPublisher eventPublisher;
+  private final ContactService contactService;
 
   public OrganizationContactAssignmentService(
       OrganizationRepository organizationRepository,
       ContactRepository contactRepository,
       OrganizationContactRepository organizationContactRepository,
-      DomainEventPublisher eventPublisher) {
+      DomainEventPublisher eventPublisher,
+      ContactService contactService) {
     this.organizationRepository = organizationRepository;
     this.contactRepository = contactRepository;
     this.organizationContactRepository = organizationContactRepository;
     this.eventPublisher = eventPublisher;
+    this.contactService = contactService;
   }
 
   @Override
@@ -108,8 +114,7 @@ public class OrganizationContactAssignmentService
   public OrganizationContact assignContact(
       UUID organizationId, UUID contactId, Boolean isDefault, String department) {
     log.info(
-        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={},"
-            + " department={}",
+        "Assigning contact to organization: organizationId={}, contactId={}, isDefault={}, department={}",
         organizationId,
         contactId,
         isDefault,
@@ -147,14 +152,134 @@ public class OrganizationContactAssignmentService
     return saved;
   }
 
+  /**
+   * Update mutable fields of an existing organization–contact junction.
+   *
+   * <p>Currently supports updating {@code department}. Pass {@code null} or empty string to clear
+   * the department.
+   */
+  @Transactional
+  public OrganizationContact updateContactAssignment(
+      UUID organizationId, UUID contactId, String department) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info(
+        "Updating contact assignment: organizationId={}, contactId={}, department={}",
+        organizationId,
+        contactId,
+        department);
+
+    OrganizationContact oc =
+        organizationContactRepository
+            .findByOrganizationIdAndContactId(organizationId, contactId)
+            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+
+    if (!oc.getTenantId().equals(tenantId)) {
+      throw new IllegalArgumentException("Contact assignment does not belong to current tenant");
+    }
+
+    oc.setDepartment(department == null || department.isBlank() ? null : department.trim());
+    return organizationContactRepository.save(oc);
+  }
+
   @Transactional
   public void removeContact(UUID organizationId, UUID contactId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    OrganizationContact oc =
+        organizationContactRepository
+            .findByOrganizationIdAndContactId(organizationId, contactId)
+            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+
+    if (Boolean.TRUE.equals(oc.getIsDefault())) {
+      throw new DomainException(
+          "Cannot remove the default contact. Please set another contact as default first.");
+    }
+
+    Contact contact =
+        contactRepository
+            .findById(contactId)
+            .filter(c -> c.getTenantId().equals(tenantId))
+            .orElse(null);
+
+    if (contact != null && contact.getContactType() == ContactType.LANDLINE) {
+      List<Contact> extensions =
+          contactRepository.findExtensionsByParentContactId(tenantId, contactId);
+      for (Contact ext : extensions) {
+        organizationContactRepository
+            .findByOrganizationIdAndContactId(organizationId, ext.getId())
+            .ifPresent(
+                extOc -> {
+                  log.info(
+                      "Cascade removing PHONE_EXTENSION assignment: orgId={}, extensionId={}",
+                      organizationId,
+                      ext.getId());
+                  organizationContactRepository.delete(extOc);
+                });
+      }
+    }
+
     unassign(organizationId, contactId);
   }
 
   @Transactional
   public OrganizationContact setAsDefault(UUID organizationId, UUID contactId) {
     return setPrimary(organizationId, contactId);
+  }
+
+  /**
+   * Atomically edit both contact entity fields and organization–contact assignment fields in a
+   * single transaction. Null values are ignored (patch semantics).
+   */
+  @Transactional
+  public OrganizationContact editOrganizationContact(
+      UUID organizationId,
+      UUID contactId,
+      String contactValue,
+      ContactType contactType,
+      String label,
+      Boolean isPersonal,
+      Boolean isDefault,
+      String department) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info(
+        "Atomic edit: orgId={}, contactId={}, isDefault={}, department={}",
+        organizationId,
+        contactId,
+        isDefault,
+        department);
+
+    OrganizationContact oc =
+        organizationContactRepository
+            .findByOrganizationIdAndContactId(organizationId, contactId)
+            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+
+    if (!oc.getTenantId().equals(tenantId)) {
+      throw new DomainException("Contact assignment does not belong to current tenant");
+    }
+
+    Contact contact =
+        contactService.updateContactFields(contactId, contactValue, contactType, label, isPersonal);
+
+    if (department != null) {
+      oc.setDepartment(department.isBlank() ? null : department.trim());
+    }
+
+    if (Boolean.TRUE.equals(isDefault) && !Boolean.TRUE.equals(oc.getIsDefault())) {
+      organizationContactRepository
+          .findDefaultByOrganizationId(organizationId)
+          .ifPresent(
+              existing -> {
+                existing.setIsDefault(false);
+                organizationContactRepository.save(existing);
+              });
+      oc.setIsDefault(true);
+    } else if (Boolean.FALSE.equals(isDefault) && Boolean.TRUE.equals(oc.getIsDefault())) {
+      oc.setIsDefault(false);
+    }
+
+    OrganizationContact saved = organizationContactRepository.save(oc);
+    saved.setContact(contact);
+    return saved;
   }
 
   @Transactional(readOnly = true)
@@ -165,11 +290,5 @@ public class OrganizationContactAssignmentService
   @Transactional(readOnly = true)
   public Optional<OrganizationContact> getDefaultContact(UUID organizationId) {
     return getPrimary(organizationId);
-  }
-
-  @Transactional(readOnly = true)
-  public List<OrganizationContact> getDepartmentContacts(UUID organizationId, String department) {
-    return organizationContactRepository.findByOrganizationIdAndDepartment(
-        organizationId, department);
   }
 }

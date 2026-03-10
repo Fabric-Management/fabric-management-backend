@@ -2,19 +2,38 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
+import com.fabricmanagement.production.masterdata.fiber.domain.FiberAttributeLink;
+import com.fabricmanagement.production.masterdata.fiber.domain.FiberCertificationLink;
+import com.fabricmanagement.production.masterdata.fiber.domain.FiberStatus;
 import com.fabricmanagement.production.masterdata.fiber.domain.event.FiberCreatedEvent;
+import com.fabricmanagement.production.masterdata.fiber.domain.exception.FiberDomainException;
+import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeInUseException;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCatalogSummaryDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeLinkRepository;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationLinkRepository;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.material.domain.Material;
 import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,8 +59,13 @@ public class FiberService implements FiberFacade {
   private final MaterialRepository materialRepository;
   private final FiberCategoryRepository fiberCategoryRepository;
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
+  private final FiberAttributeRepository fiberAttributeRepository;
+  private final FiberCertificationRepository fiberCertificationRepository;
+  private final FiberAttributeLinkRepository fiberAttributeLinkRepository;
+  private final FiberCertificationLinkRepository fiberCertificationLinkRepository;
   private final DomainEventPublisher eventPublisher;
   private final FiberValidationService validationService;
+  private final BatchRepository batchRepository;
 
   /**
    * Create fiber (pure or blended).
@@ -71,7 +95,8 @@ public class FiberService implements FiberFacade {
 
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation reduces user
+    // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation
+    // reduces user
     // errors)
     Material material;
     if (request.getMaterialId() != null) {
@@ -86,7 +111,8 @@ public class FiberService implements FiberFacade {
                               "Material not found: %s (or not accessible for current tenant)",
                               request.getMaterialId())));
     } else {
-      // Auto-create Material (USER-FRIENDLY: System handles Material creation automatically)
+      // Auto-create Material (USER-FRIENDLY: System handles Material creation
+      // automatically)
       if (request.getUnit() == null || request.getUnit().isBlank()) {
         throw new IllegalArgumentException(
             "Unit is required when materialId is not provided. Material will be auto-created with type=FIBER.");
@@ -176,6 +202,25 @@ public class FiberService implements FiberFacade {
     fiber.setRemarks(request.getRemarks());
     Fiber saved = fiberRepository.save(fiber);
 
+    // Save attributes
+    if (request.getAttributeIds() != null && !request.getAttributeIds().isEmpty()) {
+      for (UUID attrId : request.getAttributeIds()) {
+        fiberAttributeLinkRepository.save(
+            FiberAttributeLink.builder().fiberId(saved.getId()).attributeId(attrId).build());
+      }
+    }
+
+    // Save certifications
+    if (request.getCertificationIds() != null && !request.getCertificationIds().isEmpty()) {
+      for (UUID certId : request.getCertificationIds()) {
+        fiberCertificationLinkRepository.save(
+            FiberCertificationLink.builder()
+                .fiberId(saved.getId())
+                .certificationId(certId)
+                .build());
+      }
+    }
+
     // Publish domain event
     eventPublisher.publish(
         new FiberCreatedEvent(
@@ -191,7 +236,42 @@ public class FiberService implements FiberFacade {
         saved.getId(),
         saved.getUid());
 
-    return FiberDto.from(saved);
+    return enrichFiberDto(FiberDto.from(saved));
+  }
+
+  private FiberDto enrichFiberDto(FiberDto dto) {
+    if (dto == null || dto.getId() == null) {
+      return dto;
+    }
+
+    List<FiberAttributeDto> attributes =
+        fiberAttributeLinkRepository.findByFiberId(dto.getId()).stream()
+            .map(
+                link -> {
+                  // We need to fetch the actual attribute if it's lazy loaded and not initialized
+                  // Or we can just fetch all attributes and map them
+                  return fiberAttributeRepository
+                      .findById(link.getAttributeId())
+                      .map(FiberAttributeDto::from)
+                      .orElse(null);
+                })
+            .filter(java.util.Objects::nonNull)
+            .toList();
+    dto.setAttributes(attributes);
+
+    List<FiberCertificationDto> certifications =
+        fiberCertificationLinkRepository.findByFiberId(dto.getId()).stream()
+            .map(
+                link ->
+                    fiberCertificationRepository
+                        .findById(link.getCertificationId())
+                        .map(FiberCertificationDto::from)
+                        .orElse(null))
+            .filter(java.util.Objects::nonNull)
+            .toList();
+    dto.setCertifications(certifications);
+
+    return dto;
   }
 
   /** Validate blended fiber composition. */
@@ -229,40 +309,88 @@ public class FiberService implements FiberFacade {
     UUID tenantId = TenantContext.getCurrentTenantId();
     log.debug("Getting fiber: tenantId={}, id={}", tenantId, id);
 
-    return fiberRepository.findByTenantIdAndId(tenantId, id).map(FiberDto::from);
+    return fiberRepository
+        .findByTenantIdAndId(tenantId, id)
+        .or(() -> fiberRepository.findByTenantIdAndId(TenantContext.SYSTEM_TENANT_ID, id))
+        .map(FiberDto::from)
+        .map(this::enrichFiberDto);
   }
 
   @Transactional(readOnly = true)
   public Optional<FiberDto> getByMaterialId(UUID materialId) {
     log.debug("Getting fiber by materialId: materialId={}", materialId);
 
-    return fiberRepository.findByMaterialId(materialId).map(FiberDto::from);
+    return fiberRepository
+        .findByMaterialId(materialId)
+        .map(FiberDto::from)
+        .map(this::enrichFiberDto);
   }
 
   @Transactional(readOnly = true)
   public List<FiberDto> getAll() {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Getting all fibers: tenantId={}", tenantId);
+    log.debug("Getting all fibers: tenantId={} (including platform seed)", tenantId);
 
-    return fiberRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+    List<UUID> tenantIds = new ArrayList<>();
+    tenantIds.add(tenantId);
+    if (!TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
+      tenantIds.add(TenantContext.SYSTEM_TENANT_ID);
+    }
+    return fiberRepository.findByTenantIdInAndIsActiveTrueOrderByFiberName(tenantIds).stream()
         .map(FiberDto::from)
+        .map(this::enrichFiberDto)
         .toList();
+  }
+
+  /** Catalog summary: reference data + all fibers (tenant + platform seed) for one-shot UI load. */
+  @Transactional(readOnly = true)
+  public FiberCatalogSummaryDto getCatalogSummary() {
+    List<FiberCategoryDto> categories =
+        fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
+    List<FiberIsoCodeDto> isoCodes =
+        fiberIsoCodeRepository.findByIsActiveTrue().stream().map(FiberIsoCodeDto::from).toList();
+    List<FiberAttributeDto> attributes =
+        fiberAttributeRepository.findByIsActiveTrue().stream()
+            .map(FiberAttributeDto::from)
+            .toList();
+    List<FiberCertificationDto> certifications =
+        fiberCertificationRepository.findByIsActiveTrue().stream()
+            .map(FiberCertificationDto::from)
+            .toList();
+    List<FiberDto> fibers = getAll();
+    return FiberCatalogSummaryDto.builder()
+        .categories(categories)
+        .isoCodes(isoCodes)
+        .attributes(attributes)
+        .certifications(certifications)
+        .fibers(fibers)
+        .build();
   }
 
   @Transactional(readOnly = true)
   public List<FiberDto> searchByName(String fiberName) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Searching fibers by name: tenantId={}, name={}", tenantId, fiberName);
+    log.debug(
+        "Searching fibers by name: tenantId={}, name={} (including platform seed)",
+        tenantId,
+        fiberName);
 
+    List<UUID> tenantIds = new ArrayList<>();
+    tenantIds.add(tenantId);
+    if (!TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
+      tenantIds.add(TenantContext.SYSTEM_TENANT_ID);
+    }
     return fiberRepository
-        .findByTenantIdAndFiberNameContainingIgnoreCase(tenantId, fiberName)
+        .findByTenantIdInAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
+            tenantIds, fiberName)
         .stream()
         .map(FiberDto::from)
+        .map(this::enrichFiberDto)
         .toList();
   }
 
   @Transactional
-  public FiberDto updateFiber(UUID id, CreateFiberRequest request) {
+  public FiberDto updateFiber(UUID id, UpdateFiberRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     Fiber fiber =
@@ -270,17 +398,76 @@ public class FiberService implements FiberFacade {
             .findByTenantIdAndId(tenantId, id)
             .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
 
+    if (fiber.getStatus() == FiberStatus.OBSOLETE) {
+      throw new FiberDomainException(
+          "Fiber '"
+              + fiber.getFiberName()
+              + "' is OBSOLETE and cannot be updated. "
+              + "Create a new fiber version instead.");
+    }
+
+    if (request.getVersion() != null && !request.getVersion().equals(fiber.getVersion())) {
+      throw new OptimisticLockConflictException(
+          "Fiber", id, request.getVersion(), fiber.getVersion());
+    }
+
     fiber.update(request.getFiberName(), request.getFiberGrade(), request.getRemarks());
 
-    // Update composition if provided
-    if (request.getComposition() != null) {
+    // Composition (recipe) change requires extra guards:
+    // 1) Block if batches are RESERVED or IN_PROGRESS on the production floor
+    // (immutability rule)
+    // 2) Validate the new composition (percentages, circular refs, active base
+    // fibers, etc.)
+    if (request.getComposition() != null && !request.getComposition().isEmpty()) {
+      if (batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+          tenantId, fiber.getMaterial().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
+        throw new RecipeInUseException(id, fiber.getFiberName());
+      }
+      validateCompositionUpdate(request.getComposition(), id);
       fiber.setComposition(request.getComposition());
     }
 
     Fiber saved = fiberRepository.save(fiber);
-    log.info("✅ Fiber updated: id={}", saved.getId());
 
-    return FiberDto.from(saved);
+    // Update attributes
+    if (request.getAttributeIds() != null) {
+      fiberAttributeLinkRepository.deleteByFiberId(saved.getId());
+      for (UUID attrId : request.getAttributeIds()) {
+        fiberAttributeLinkRepository.save(
+            FiberAttributeLink.builder().fiberId(saved.getId()).attributeId(attrId).build());
+      }
+    }
+
+    // Update certifications
+    if (request.getCertificationIds() != null) {
+      fiberCertificationLinkRepository.deleteByFiberId(saved.getId());
+      for (UUID certId : request.getCertificationIds()) {
+        fiberCertificationLinkRepository.save(
+            FiberCertificationLink.builder()
+                .fiberId(saved.getId())
+                .certificationId(certId)
+                .build());
+      }
+    }
+
+    log.info("Fiber updated: id={}", saved.getId());
+
+    return enrichFiberDto(FiberDto.from(saved));
+  }
+
+  /**
+   * Validate composition on update — same business rules as creation, excluding duplicate check
+   * against self.
+   */
+  private void validateCompositionUpdate(Map<UUID, BigDecimal> composition, UUID currentFiberId) {
+    validationService.validateCompositionPercentages(composition);
+    validationService.validateMinimumRatio(composition, FiberConstants.MIN_COMPONENT_PERCENTAGE);
+    validationService.validateMaxComponents(composition, FiberConstants.MAX_BLEND_COMPONENTS);
+    validationService.validateBaseFibersActive(composition);
+    validationService.validateNoCircularReferences(composition);
+
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    validationService.validateTenantConsistency(composition, tenantId);
   }
 
   @Transactional
@@ -292,10 +479,19 @@ public class FiberService implements FiberFacade {
             .findByTenantIdAndId(tenantId, id)
             .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
 
+    if (batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+        tenantId, fiber.getMaterial().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
+      throw new FiberDomainException(
+          "Fiber '"
+              + fiber.getFiberName()
+              + "' cannot be deactivated: it has batches currently RESERVED or IN_PROGRESS on the"
+              + " production floor. Complete or cancel those batches first.");
+    }
+
     fiber.delete();
     fiberRepository.save(fiber);
 
-    log.info("✅ Fiber deactivated: id={}", id);
+    log.info("Fiber deactivated: id={}", id);
   }
 
   // =====================================================
@@ -305,16 +501,17 @@ public class FiberService implements FiberFacade {
   @Override
   @Transactional(readOnly = true)
   public Optional<FiberDto> findById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("FiberFacade: Finding fiber: tenantId={}, id={}", tenantId, id);
-    return fiberRepository.findByTenantIdAndId(tenantId, id).map(FiberDto::from);
+    return getById(id);
   }
 
   @Override
   @Transactional(readOnly = true)
   public Optional<FiberDto> findByMaterialId(UUID materialId) {
     log.debug("FiberFacade: Finding fiber by materialId: materialId={}", materialId);
-    return fiberRepository.findByMaterialId(materialId).map(FiberDto::from);
+    return fiberRepository
+        .findByMaterialId(materialId)
+        .map(FiberDto::from)
+        .map(this::enrichFiberDto);
   }
 
   @Override
@@ -327,7 +524,8 @@ public class FiberService implements FiberFacade {
   @Transactional(readOnly = true)
   public boolean exists(UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent();
+    return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent()
+        || fiberRepository.findByTenantIdAndId(TenantContext.SYSTEM_TENANT_ID, id).isPresent();
   }
 
   /**

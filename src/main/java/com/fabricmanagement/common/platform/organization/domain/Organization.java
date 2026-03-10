@@ -75,6 +75,26 @@ public class Organization extends BaseEntity {
   @Builder.Default
   private OrganizationType organizationType = OrganizationType.VERTICAL_MILL;
 
+  /** Legal registered name (e.g. for invoicing) */
+  @Column(name = "legal_name", length = 200)
+  private String legalName;
+
+  /** Trade registry / chamber registration number */
+  @Column(name = "registration_number", length = 100)
+  private String registrationNumber;
+
+  /** Industry sector (e.g. TEXTILE, LOGISTICS) */
+  @Column(name = "industry", length = 100)
+  private String industry;
+
+  /** Company website URL */
+  @Column(name = "website", length = 500)
+  private String website;
+
+  /** Short company description */
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String description;
+
   /** Parent organization for hierarchy (departments, branches) */
   @Column(name = "parent_organization_id")
   private UUID parentOrganizationId;
@@ -96,7 +116,10 @@ public class Organization extends BaseEntity {
   /**
    * Create a new organization.
    *
-   * @param name Display name
+   * <p>Maps name to both display name and legalName so that organizationName from self-signup or
+   * sales-led onboarding is consistently stored in both fields.
+   *
+   * @param name Display name (also used as legalName when not separately provided)
    * @param taxId Tax ID
    * @param organizationType Type
    * @return new Organization
@@ -104,6 +127,7 @@ public class Organization extends BaseEntity {
   public static Organization create(String name, String taxId, OrganizationType organizationType) {
     return Organization.builder()
         .name(name)
+        .legalName(name)
         .taxId(taxId)
         .organizationType(organizationType)
         .build();
@@ -138,8 +162,49 @@ public class Organization extends BaseEntity {
    * @param taxId New tax ID
    */
   public void update(String name, String taxId) {
-    this.name = name;
+    setName(name);
     this.taxId = taxId;
+  }
+
+  /**
+   * Set organization display name.
+   *
+   * <p>Safeguard: If legalName is null or empty when name is set, automatically assigns the same
+   * value to legalName. Ensures self-signup organizationName is consistently reflected in both
+   * fields even when only name is updated.
+   *
+   * @param name Display name
+   */
+  public void setName(String name) {
+    this.name = name;
+    if (name != null && !name.isBlank() && (this.legalName == null || this.legalName.isBlank())) {
+      this.legalName = name;
+    }
+  }
+
+  /**
+   * Enrich organization with onboarding profile data.
+   *
+   * <p>Called during self-service onboarding completion to persist company profile fields that were
+   * not available at registration time. Only non-null values overwrite existing data.
+   *
+   * @param legalName Legal registered name
+   * @param registrationNumber Trade registry number
+   * @param industry Industry sector
+   * @param website Company website URL
+   * @param description Short company description
+   */
+  public void enrich(
+      String legalName,
+      String registrationNumber,
+      String industry,
+      String website,
+      String description) {
+    if (legalName != null) this.legalName = legalName;
+    if (registrationNumber != null) this.registrationNumber = registrationNumber;
+    if (industry != null) this.industry = industry;
+    if (website != null) this.website = website;
+    if (description != null) this.description = description;
   }
 
   /**

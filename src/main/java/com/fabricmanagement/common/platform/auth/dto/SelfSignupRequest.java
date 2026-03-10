@@ -21,14 +21,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SelfSignupRequest {
 
-  @NotBlank(message = "Company name is required")
-  private String companyName;
+  @NotBlank(message = "Organization name is required")
+  private String organizationName;
 
   @NotBlank(message = "Tax ID is required")
   private String taxId;
 
-  @NotNull(message = "Company type is required")
-  private OrganizationType companyType;
+  @NotNull(message = "Organization type is required")
+  private OrganizationType organizationType;
 
   @NotBlank(message = "First name is required")
   private String firstName;

@@ -96,14 +96,11 @@ public class JwtService {
     claims.put("tenant_uid", tenantUid);
     claims.put("user_id", user.getId().toString());
     claims.put("user_uid", user.getUid());
-    // Use organization_id (new), keep company_id for backward compatibility
     claims.put("organization_id", user.getOrganizationId().toString());
-    claims.put("company_id", user.getOrganizationId().toString()); // Backward compat
     claims.put("firstName", user.getFirstName());
     claims.put("lastName", user.getLastName());
     if (organizationType != null) {
       claims.put("organization_type", organizationType);
-      claims.put("company_category", organizationType); // Backward compat
     }
     // Department: primary name (backward compat) + department_codes list +
     // primary_department code
@@ -343,6 +340,42 @@ public class JwtService {
   public String getDepartmentFromToken(String token) {
     Claims claims = extractClaims(token);
     return claims.get("department", String.class);
+  }
+
+  /**
+   * Extract the list of department codes from a JWT token.
+   *
+   * <p>Maps to the {@code department_codes} claim populated by {@link #generateAccessToken(User)}.
+   * Used by {@link com.fabricmanagement.common.infrastructure.security.JwtAuthenticationFilter} to
+   * build an {@link com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext}.
+   *
+   * @param token JWT access token
+   * @return unmodifiable list of department codes; empty list if claim is absent
+   */
+  @SuppressWarnings("unchecked")
+  public List<String> getDepartmentCodesFromToken(String token) {
+    Claims claims = extractClaims(token);
+    Object raw = claims.get("department_codes");
+    if (raw instanceof List<?> list) {
+      return list.stream()
+          .filter(item -> item instanceof String)
+          .map(item -> (String) item)
+          .toList();
+    }
+    return List.of();
+  }
+
+  /**
+   * Extract the primary department code from a JWT token.
+   *
+   * <p>Maps to the {@code primary_department} claim.
+   *
+   * @param token JWT access token
+   * @return primary department code, or {@code null} if absent
+   */
+  public String getPrimaryDepartmentFromToken(String token) {
+    Claims claims = extractClaims(token);
+    return claims.get("primary_department", String.class);
   }
 
   /**

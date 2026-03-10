@@ -50,7 +50,8 @@ public class OrganizationContact extends BaseJunctionEntity implements Assignabl
   @Builder.Default
   private Boolean isDefault = false;
 
-  @Column(name = "department", length = 100)
+  /** Optional department label for this contact (e.g. "Sales", "Support"). */
+  @Column(name = "department", length = 255)
   private String department;
 
   @Override

@@ -20,6 +20,7 @@ public class OrganizationDto {
   private UUID tenantId;
   private String uid;
   private String name;
+  private String legalName;
   private String taxId;
   private OrganizationType organizationType;
   private UUID parentOrganizationId;
@@ -41,6 +42,7 @@ public class OrganizationDto {
         .tenantId(organization.getTenantId())
         .uid(organization.getUid())
         .name(organization.getName())
+        .legalName(organization.getLegalName())
         .taxId(organization.getTaxId())
         .organizationType(organization.getOrganizationType())
         .parentOrganizationId(organization.getParentOrganizationId())

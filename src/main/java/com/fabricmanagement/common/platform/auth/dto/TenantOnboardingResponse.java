@@ -19,13 +19,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TenantOnboardingResponse {
 
-  private UUID companyId;
+  private UUID organizationId;
 
   private UUID tenantId;
 
-  private String companyUid;
+  private String organizationUid;
 
-  private String companyName;
+  private String organizationName;
 
   private UUID adminUserId;
 

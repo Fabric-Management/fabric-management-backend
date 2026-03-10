@@ -1,8 +1,6 @@
 package com.fabricmanagement.common.platform.ai.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade;
-import com.fabricmanagement.logistics.inventory.api.facade.InventoryFacade.StockInfo;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
@@ -48,8 +46,6 @@ public class AIFunctionCaller {
   private final MaterialFacade materialFacade;
   private final FiberFacade fiberFacade;
   private final FiberRepository fiberRepository;
-  private final InventoryFacade inventoryFacade;
-  private final com.fabricmanagement.logistics.inventory.app.MaterialMatcher materialMatcher;
   private final FiberCategoryRepository fiberCategoryRepository;
 
   /**
@@ -152,91 +148,56 @@ public class AIFunctionCaller {
     return str.length() > 100 ? str.substring(0, 100) : str; // Limit length
   }
 
-  /** Check material stock by name using InventoryService. */
+  /** Check material by name; directs user to Inventory module for stock details. */
   private String checkMaterialStock(UUID tenantId, Map<String, Object> parameters) {
     String materialName = (String) parameters.get("materialName");
     if (materialName == null || materialName.isBlank()) {
       return "Material name is required for stock check.";
     }
 
-    // Query real inventory data via InventoryFacade
-    Optional<StockInfo> stockInfo = inventoryFacade.getStockByMaterialName(tenantId, materialName);
+    String search = materialName.toLowerCase().trim();
+    List<MaterialDto> materials =
+        materialFacade.findByTenant(tenantId).stream().limit(AI_SEARCH_LIMIT).toList();
+    List<MaterialDto> matching =
+        materials.stream()
+            .filter(
+                m ->
+                    m.getUid() != null && m.getUid().toLowerCase().contains(search)
+                        || (m.getMaterialType() != null
+                            && m.getMaterialType().toString().toLowerCase().contains(search)))
+            .toList();
 
-    if (stockInfo.isEmpty()) {
-      // Material not found - use intelligent matching to find similar materials
-      // ✅ Performance: Limit material loading to prevent memory overflow
-      List<MaterialDto> materials =
-          materialFacade.findByTenant(tenantId).stream().limit(AI_SEARCH_LIMIT).toList();
-      List<MaterialDto> matching = materialMatcher.findMatches(materialName, materials);
-
-      // Material doesn't exist in system at all
-      if (matching.isEmpty()) {
-        return String.format(
-            "Material '%s' bulunamadı. Sistemde böyle bir material/ürün tanımı yok.\n\n"
-                + "Bu material'ı sisteme eklemek için Material Management modülünü kullanmanız gerekiyor.",
-            materialName);
-      }
-
-      // Multiple matches found - user needs to specify
-      if (matching.size() > 1) {
-        StringBuilder result =
-            new StringBuilder(
-                String.format(
-                    "'%s' için %d farklı material bulundu:\n\n", materialName, matching.size()));
-        for (MaterialDto m : matching) {
-          result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
-        }
-        result.append("\nLütfen hangi material'ı kontrol etmek istediğinizi belirtin.");
-        return result.toString();
-      }
-
-      // Single match found but no stock data available
-      MaterialDto material = matching.get(0);
+    if (matching.isEmpty()) {
       return String.format(
-          "Material '%s' sistemde tanımlı ancak stok kaydı bulunamadı.\n\n"
-              + "Material Bilgileri:\n"
-              + "- Tip: %s\n"
-              + "- Birim: %s\n"
-              + "- Durum: %s\n\n"
-              + "Stok bilgisi için lütfen Inventory Management modülünü kontrol edin.",
-          material.getUid(),
-          material.getMaterialType() != null ? material.getMaterialType().toString() : "N/A",
-          material.getUnit() != null ? material.getUnit() : "N/A",
-          material.getIsActive() != null && material.getIsActive() ? "Aktif" : "Pasif");
+          "Material '%s' not found. No such material/product is defined in the system.\n\n"
+              + "Use the Material Management module to add this material.",
+          materialName);
     }
 
-    // Stock data found - format user-friendly response
-    StockInfo stock = stockInfo.get();
-
-    if (!stock.available()) {
-      return String.format(
-          "Material '%s' exists in system but is currently inactive or unavailable.",
-          stock.materialName());
+    if (matching.size() > 1) {
+      StringBuilder result =
+          new StringBuilder(
+              String.format(
+                  "Found %d materials matching '%s':\n\n", matching.size(), materialName));
+      for (MaterialDto m : matching) {
+        result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
+      }
+      result.append("\nPlease specify which material to check.");
+      return result.toString();
     }
 
-    // Format quantity with proper unit
-    String quantityStr = formatQuantity(stock.quantity(), stock.unit());
-
+    MaterialDto material = matching.get(0);
     return String.format(
-        "Material: %s\nStock Quantity: %s\nLocation: %s\nStatus: Available",
-        stock.materialName(), quantityStr, stock.location());
-  }
-
-  /** Format quantity with unit for user-friendly display. */
-  private String formatQuantity(BigDecimal quantity, String unit) {
-    if (quantity == null || quantity.compareTo(BigDecimal.ZERO) == 0) {
-      return "0 " + (unit != null ? unit : "units");
-    }
-
-    // Format large numbers with commas
-    String formatted = quantity.stripTrailingZeros().toPlainString();
-    if (formatted.contains(".")) {
-      // For decimal values, show up to 2 decimal places
-      double value = quantity.doubleValue();
-      formatted = String.format("%.2f", value);
-    }
-
-    return formatted + " " + (unit != null ? unit : "units");
+        "Material '%s' is defined in the system.\n\n"
+            + "Material details:\n"
+            + "- Type: %s\n"
+            + "- Unit: %s\n"
+            + "- Status: %s\n\n"
+            + "Use the Production / Inventory modules for stock quantity.",
+        material.getUid(),
+        material.getMaterialType() != null ? material.getMaterialType().toString() : "N/A",
+        material.getUnit() != null ? material.getUnit() : "N/A",
+        material.getIsActive() != null && material.getIsActive() ? "Active" : "Inactive");
   }
 
   /**
@@ -245,10 +206,10 @@ public class AIFunctionCaller {
    * <p>Entity Type Detection Rules:
    *
    * <ul>
-   *   <li>"pamuk" (without suffix) → FIBER
-   *   <li>"pamuk ipliği" / "cotton yarn" → YARN
-   *   <li>"gabardin" / "kumaş" → FABRIC
-   *   <li>"iplik" / "yarn" → YARN
+   *   <li>"cotton" (without suffix) → FIBER
+   *   <li>"cotton yarn" → YARN
+   *   <li>"gabardine" / "fabric" → FABRIC
+   *   <li>"yarn" → YARN
    *   <li>Technical specs (30/1, GSM) → Usually FABRIC or YARN
    * </ul>
    *
@@ -258,7 +219,7 @@ public class AIFunctionCaller {
     String query = (String) parameters.getOrDefault("query", "");
 
     if (query.isBlank()) {
-      return "Arama sorgusu gereklidir. Örnek: 'pamuk', 'pamuk ipliği', 'gabardin'";
+      return "Search query is required. Examples: 'cotton', 'cotton yarn', 'gabardine'";
     }
 
     // Detect entity type from query
@@ -268,8 +229,8 @@ public class AIFunctionCaller {
     String normalizedQuery = normalizeFiberQuery(query);
 
     StringBuilder result = new StringBuilder();
-    result.append(String.format("🔍 '%s' için arama yapılıyor...\n", query));
-    result.append(String.format("📌 Algılanan tip: %s\n\n", entityType.displayName));
+    result.append(String.format("🔍 Searching for '%s'...\n", query));
+    result.append(String.format("📌 Detected type: %s\n\n", entityType.displayName));
 
     boolean found = false;
 
@@ -327,11 +288,10 @@ public class AIFunctionCaller {
 
         // Debug log for troubleshooting
         log.debug(
-            "FIBER search - query: '{}', normalized: '{}', cleaned: '{}', cleanedNormalized: '{}', totalFibers: {}",
+            "FIBER search - query: '{}', norm: '{}', cleaned: '{}', total: {}",
             query,
             normalizedQuery,
             cleanedQuery,
-            cleanedNormalized,
             allFibers.size());
 
         List<FiberDto> matching =
@@ -376,8 +336,7 @@ public class AIFunctionCaller {
             result.append(String.format("- %s (%s)\n", f.getFiberName(), f.getUid()));
           }
           if (matching.size() > limit) {
-            result.append(
-                String.format("(Top %d gösteriliyor, %d toplam)\n", limit, matching.size()));
+            result.append(String.format("(Showing top %d of %d)\n", limit, matching.size()));
           }
         }
       }
@@ -400,13 +359,13 @@ public class AIFunctionCaller {
           found = true;
           // ✅ Performance: Limit to top 5 results
           int limit = Math.min(5, matching.size());
-          result.append(String.format("✅ %d iplik bulundu:\n", matching.size()));
+          result.append(String.format("✅ Found %d yarn(s):\n", matching.size()));
           for (int i = 0; i < limit; i++) {
             MaterialDto m = matching.get(i);
             result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
           }
           if (matching.size() > limit) {
-            result.append(String.format("(Top %d gösteriliyor)\n", limit));
+            result.append(String.format("(Showing top %d)\n", limit));
           }
         }
       }
@@ -429,19 +388,19 @@ public class AIFunctionCaller {
           found = true;
           // ✅ Performance: Limit to top 5 results
           int limit = Math.min(5, matching.size());
-          result.append(String.format("✅ %d kumaş bulundu:\n", matching.size()));
+          result.append(String.format("✅ Found %d fabric(s):\n", matching.size()));
           for (int i = 0; i < limit; i++) {
             MaterialDto m = matching.get(i);
             result.append(String.format("- %s (%s)\n", m.getUid(), m.getMaterialType()));
           }
           if (matching.size() > limit) {
-            result.append(String.format("(Top %d gösteriliyor)\n", limit));
+            result.append(String.format("(Showing top %d)\n", limit));
           }
         }
       }
       case UNKNOWN -> {
         // Try all entity types
-        result.append("⚠️ Tip belirsiz, tüm entity tiplerinde aranıyor...\n\n");
+        result.append("⚠️ Type unclear, searching all entity types...\n\n");
 
         // ✅ Performance: Use filtered query instead of findAll
         String searchQuery = cleanedQuery.isBlank() ? normalizedQuery : cleanedQuery;
@@ -507,19 +466,19 @@ public class AIFunctionCaller {
 
         if (!matchingFibers.isEmpty()) {
           found = true;
-          result.append("✅ Fiber Bulundu:\n");
+          result.append("✅ Fiber(s) found:\n");
           for (FiberDto f :
               matchingFibers.size() > 3 ? matchingFibers.subList(0, 3) : matchingFibers) {
             result.append(String.format("- Fiber: %s (UID: %s)\n", f.getFiberName(), f.getUid()));
           }
           if (matchingFibers.size() > 3) {
-            result.append(String.format("(%d fiber bulundu)\n", matchingFibers.size()));
+            result.append(String.format("(%d fiber(s) found)\n", matchingFibers.size()));
           }
         }
 
         if (!matchingMaterials.isEmpty()) {
           found = true;
-          result.append("\n✅ Material Bulundu:\n");
+          result.append("\n✅ Material(s) found:\n");
           for (MaterialDto m :
               matchingMaterials.size() > 3 ? matchingMaterials.subList(0, 3) : matchingMaterials) {
             result.append(
@@ -528,18 +487,18 @@ public class AIFunctionCaller {
                     m.getUid(), m.getMaterialType(), m.getUid()));
           }
           if (matchingMaterials.size() > 3) {
-            result.append(String.format("(%d material bulundu)\n", matchingMaterials.size()));
+            result.append(String.format("(%d material(s) found)\n", matchingMaterials.size()));
           }
         }
       }
     }
 
     if (!found) {
-      result.append(String.format("\n❌ '%s' için sonuç bulunamadı.\n", query));
-      result.append("💡 İpuçları:\n");
-      result.append("- 'pamuk' → Fiber arayın\n");
-      result.append("- 'pamuk ipliği' → İplik (YARN) arayın\n");
-      result.append("- 'gabardin' → Kumaş (FABRIC) arayın\n");
+      result.append(String.format("\n❌ No results found for '%s'.\n", query));
+      result.append("💡 Tips:\n");
+      result.append("- 'cotton' → search FIBER\n");
+      result.append("- 'cotton yarn' → search YARN\n");
+      result.append("- 'gabardine' → search FABRIC\n");
     }
 
     return result.toString();
@@ -578,8 +537,10 @@ public class AIFunctionCaller {
     }
 
     // FIBER indicators (base materials, but not yarn/fabric)
-    if (lowerQuery.matches(
-            ".*\\b(pamuk|cotton|polyester|poliester|yün|wool|keten|linen|ipek|silk|akrilik|acrylic|naylon|nylon|viscose|viskoz|viskon|elastan|elastane)\\b.*")
+    String fiberPattern =
+        ".*\\b(pamuk|cotton|polyester|poliester|yün|wool|keten|linen|ipek|silk|"
+            + "akrilik|acrylic|naylon|nylon|viscose|viskoz|viskon|elastan|elastane)\\b.*";
+    if (lowerQuery.matches(fiberPattern)
         && !lowerQuery.contains("iplik")
         && !lowerQuery.contains("yarn")
         && !lowerQuery.contains("kumaş")
@@ -595,10 +556,10 @@ public class AIFunctionCaller {
 
   /** Entity type enum for smart search. */
   private enum EntityType {
-    FIBER("Fiber (Pamuk, Polyester, Yün, vb.)"),
-    YARN("İplik (Yarn)"),
-    FABRIC("Kumaş (Fabric)"),
-    UNKNOWN("Belirsiz (Tüm tiplerde arama)");
+    FIBER("Fiber (Cotton, Polyester, Wool, etc.)"),
+    YARN("Yarn"),
+    FABRIC("Fabric"),
+    UNKNOWN("Unknown (search all types)");
 
     private final String displayName;
 
@@ -629,8 +590,7 @@ public class AIFunctionCaller {
     // Solution: For Material type=FIBER, also search in Fiber.fiberName (e.g., "Cotton (100%)")
 
     // ✅ Performance: Batch load all FIBER-type materials' fibers in one SQL query
-    // Problem: Material UID'de "cotton" yok, Fiber fiberName'de var
-    // Solution: Material type=FIBER ise, ilişkili Fiber'ın fiberName'inde de ara
+    // Material UID may not contain "cotton"; search in related Fiber.fiberName as well.
 
     List<MaterialDto> fiberMaterials =
         materials.stream()
@@ -698,7 +658,7 @@ public class AIFunctionCaller {
                           fiberName.contains(lowerNormalized) || fiberName.contains(lowerQuery);
                       if (matchesFiberName) {
                         log.debug(
-                            "✅ Material match via Fiber: Material UID={}, Fiber Name={}, Query={}",
+                            "Material match via Fiber: UID={}, FiberName={}, Query={}",
                             m.getUid(),
                             fiber.getFiberName(),
                             query);
@@ -731,7 +691,7 @@ public class AIFunctionCaller {
       if (!matchingFibers.isEmpty()) {
         StringBuilder result = new StringBuilder();
         result.append(
-            String.format("⚠️ '%s' için Material bulunamadı, ancak Fiber bulundu:\n\n", query));
+            String.format("⚠️ No material found for '%s', but fiber(s) found:\n\n", query));
         for (FiberDto f : matchingFibers) {
           result.append(
               String.format(
@@ -744,19 +704,19 @@ public class AIFunctionCaller {
                     m -> {
                       result.append(
                           String.format(
-                              "  → İlişkili Material: %s (UID: %s)\n",
+                              "  → Related Material: %s (UID: %s)\n",
                               m.getMaterialType(), m.getUid()));
                     });
           }
         }
         result.append(
-            "\n💡 Not: Material ve Fiber farklı entity'lerdir. Fiber aramak için 'search_fibers' fonksiyonunu kullanın.");
+            "\n💡 Note: Material and Fiber are different entities. "
+                + "Use 'search_fibers' to search fibers.");
         return result.toString();
       }
 
       return String.format(
-          "No materials found matching '%s'. Try searching fibers with 'search_fibers' if you're looking for fiber names like 'cotton' or 'pamuk'.",
-          query);
+          "No materials found matching '%s'. Try 'search_fibers' for names like 'cotton'.", query);
     }
 
     // Summarize if too many results (reduce token usage)
@@ -847,18 +807,17 @@ public class AIFunctionCaller {
 
       if (fibers.isEmpty()) {
         return String.format(
-            "Fiber '%s' bulunamadı. Sistemde böyle bir fiber tanımı yok.", fiberName);
+            "Fiber '%s' not found. No such fiber is defined in the system.", fiberName);
       }
 
       if (fibers.size() > 1) {
         StringBuilder result =
             new StringBuilder(
-                String.format("'%s' için %d farklı fiber bulundu:\n\n", fiberName, fibers.size()));
+                String.format("Found %d fiber(s) matching '%s':\n\n", fibers.size(), fiberName));
         for (FiberDto f : fibers) {
           result.append(String.format("- %s (%s)\n", f.getFiberName(), f.getStatus()));
         }
-        result.append(
-            "\nLütfen hangi fiber'ı kontrol etmek istediğinizi belirtin (UID veya tam ad).");
+        result.append("\nPlease specify which fiber to check (UID or full name).");
         return result.toString();
       }
 
@@ -866,19 +825,19 @@ public class AIFunctionCaller {
     }
 
     if (fiber.isEmpty()) {
-      return String.format("Fiber bulunamadı (ID: %s)", fiberId);
+      return String.format("Fiber not found (ID: %s)", fiberId);
     }
 
     FiberDto f = fiber.get();
     StringBuilder info = new StringBuilder();
-    info.append(String.format("📊 Fiber Bilgileri: %s\n\n", f.getFiberName()));
+    info.append(String.format("📊 Fiber details: %s\n\n", f.getFiberName()));
     info.append(String.format("UID: %s\n", f.getUid()));
-    info.append(String.format("Durum: %s\n", f.getStatus() != null ? f.getStatus() : "N/A"));
+    info.append(String.format("Status: %s\n", f.getStatus() != null ? f.getStatus() : "N/A"));
     info.append(
         String.format("Grade: %s\n", f.getFiberGrade() != null ? f.getFiberGrade() : "N/A"));
 
     if (f.getComposition() != null && !f.getComposition().isEmpty()) {
-      info.append("\nBileşim (Blended Fiber):\n");
+      info.append("\nComposition (Blended Fiber):\n");
       f.getComposition()
           .forEach(
               (baseFiberId, percentage) -> {
@@ -889,7 +848,7 @@ public class AIFunctionCaller {
     }
 
     if (f.getRemarks() != null && !f.getRemarks().isBlank()) {
-      info.append(String.format("\nNotlar: %s\n", f.getRemarks()));
+      info.append(String.format("\nRemarks: %s\n", f.getRemarks()));
     }
 
     return info.toString();
@@ -904,7 +863,7 @@ public class AIFunctionCaller {
 
     if (query.isBlank()) {
       long count = fiberFacade.findAll().size();
-      return String.format("Toplam fiber sayısı: %d", count);
+      return String.format("Total fiber count: %d", count);
     }
 
     // Turkish-to-English translation
@@ -959,21 +918,21 @@ public class AIFunctionCaller {
 
     if (matching.isEmpty()) {
       if (!normalizedQuery.equalsIgnoreCase(query)) {
-        return String.format("'%s' (veya '%s') için fiber bulunamadı.", query, normalizedQuery);
+        return String.format("No fiber found for '%s' (or '%s').", query, normalizedQuery);
       }
-      return String.format("'%s' için fiber bulunamadı.", query);
+      return String.format("No fiber found for '%s'.", query);
     }
 
     // ✅ Performance: Limit to top 5 results
     int limit = Math.min(5, matching.size());
     StringBuilder result = new StringBuilder();
-    result.append(String.format("✅ %d fiber bulundu:\n", matching.size()));
+    result.append(String.format("✅ Found %d fiber(s):\n", matching.size()));
     for (int i = 0; i < limit; i++) {
       FiberDto f = matching.get(i);
       result.append(String.format("- %s (%s)\n", f.getFiberName(), f.getUid()));
     }
     if (matching.size() > limit) {
-      result.append(String.format("(Top %d gösteriliyor)\n", limit));
+      result.append(String.format("(Showing top %d)\n", limit));
     }
     return result.toString();
   }
@@ -1016,7 +975,7 @@ public class AIFunctionCaller {
       String unit = (String) parameters.get("unit");
 
       if (materialTypeStr == null || materialTypeStr.isBlank()) {
-        return "❌ Material Type is required. Valid values: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE";
+        return "❌ Material Type is required. Valid: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE";
       }
 
       if (unit == null || unit.isBlank()) {
@@ -1028,7 +987,7 @@ public class AIFunctionCaller {
         materialType = MaterialType.valueOf(materialTypeStr.toUpperCase());
       } catch (IllegalArgumentException e) {
         return String.format(
-            "❌ Invalid Material Type: %s. Valid values: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE",
+            "❌ Invalid Material Type: %s. Valid: FIBER, YARN, FABRIC, CHEMICAL, CONSUMABLE",
             materialTypeStr);
       }
 
@@ -1073,7 +1032,7 @@ public class AIFunctionCaller {
       if ((materialIdStr == null || materialIdStr.isBlank()) && (unit == null || unit.isBlank())) {
         return "❌ Either materialId or unit is required.\n\n"
             + "Option 1: Provide materialId to use existing Material\n"
-            + "Option 2: Provide unit (e.g., 'kg') and Material will be auto-created with type=FIBER";
+            + "Option 2: Provide unit (e.g. 'kg') to auto-create Material with type=FIBER";
       }
 
       if (fiberCategoryIdStr == null || fiberCategoryIdStr.isBlank()) {
@@ -1098,7 +1057,7 @@ public class AIFunctionCaller {
                     + "- Material ID is incorrect\n"
                     + "- Material belongs to another tenant\n"
                     + "- Material was deleted\n\n"
-                    + "Please use search_materials to find the correct Material ID, or provide unit to auto-create Material.",
+                    + "Use search_materials for ID, or provide unit to auto-create.",
                 materialId);
           }
         }
@@ -1164,7 +1123,7 @@ public class AIFunctionCaller {
    * <ul>
    *   <li>"pamuk" → "cotton"
    *   <li>"viskoz" → "viscose"
-   *   <li>"polyester pamuk karışımı" → "polyester cotton karışımı"
+   *   <li>"polyester cotton blend" → normalized for matching
    * </ul>
    *
    * @param query Original query (may contain Turkish fiber names)

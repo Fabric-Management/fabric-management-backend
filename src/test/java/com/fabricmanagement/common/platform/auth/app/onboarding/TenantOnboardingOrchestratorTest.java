@@ -31,7 +31,7 @@ class TenantOnboardingOrchestratorTest {
   @DisplayName("onboard runs all steps in order and returns context toResult")
   void onboardRunsStepsAndReturnsResult() {
     OnboardingContext context = new OnboardingContext();
-    context.setCompanyName("Test Co");
+    context.setOrganizationName("Test Co");
     context.setOrganizationId(UUID.randomUUID());
     context.setTenantId(UUID.randomUUID());
     context.setUserId(UUID.randomUUID());
@@ -46,7 +46,7 @@ class TenantOnboardingOrchestratorTest {
     verify(step1).execute(captor.capture());
     assertThat(captor.getValue()).isSameAs(context);
     verify(step2).execute(context);
-    assertThat(result.getCompanyId()).isEqualTo(context.getOrganizationId());
+    assertThat(result.getOrganizationId()).isEqualTo(context.getOrganizationId());
     assertThat(result.getAdminContactValue()).isEqualTo("admin@test.com");
     assertThat(result.getRegistrationToken()).isEqualTo("tok");
   }

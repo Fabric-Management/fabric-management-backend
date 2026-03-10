@@ -36,7 +36,7 @@ import org.hibernate.annotations.Type;
 @AllArgsConstructor
 public class Fiber extends BaseEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY)
+  @OneToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "material_id", nullable = false, unique = true, updatable = false)
   private Material material;
 

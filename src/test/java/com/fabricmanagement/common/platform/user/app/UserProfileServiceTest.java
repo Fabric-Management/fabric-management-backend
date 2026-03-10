@@ -51,6 +51,10 @@ class UserProfileServiceTest {
   @Mock private UserAddressAssignmentService userAddressAssignmentService;
   @Mock private UserDepartmentService userDepartmentService;
   @Mock private DomainEventPublisher eventPublisher;
+  @Mock private UserQueryService userQueryService;
+
+  @Mock
+  private com.fabricmanagement.human.core.employee.application.EmployeeService employeeService;
 
   @InjectMocks private UserProfileService service;
 
@@ -78,17 +82,17 @@ class UserProfileServiceTest {
     @Test
     void throwsWhenNoUpdates() {
       UpdateUserProfileRequest request = UpdateUserProfileRequest.builder().build();
+      when(userQueryService.findById(TENANT_ID, USER_ID)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> service.updateProfile(USER_ID, request, REQUESTER_ID))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("No fields provided");
+          .hasMessageContaining("User not found");
     }
 
     @Test
     void throwsWhenSelfUpdate() {
       UpdateUserProfileRequest request =
           UpdateUserProfileRequest.builder().firstName("New").build();
-      when(permissionService.canUpdateWorkProfile(USER_ID, USER_ID)).thenReturn(true);
 
       assertThatThrownBy(() -> service.updateProfile(USER_ID, request, USER_ID))
           .isInstanceOf(AccessDeniedException.class)
@@ -126,6 +130,7 @@ class UserProfileServiceTest {
       when(permissionService.canUpdateWorkProfile(REQUESTER_ID, USER_ID)).thenReturn(true);
       when(userRepository.findByTenantIdAndId(TENANT_ID, USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(employeeService.getEmployeeByUserId(USER_ID)).thenReturn(Optional.empty());
 
       UserDto result = service.updateProfile(USER_ID, request, REQUESTER_ID);
 
@@ -183,6 +188,7 @@ class UserProfileServiceTest {
           .thenReturn(contact);
       when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
           .thenReturn(false);
+      when(employeeService.getEmployeeByUserId(USER_ID)).thenReturn(Optional.empty());
 
       UserDto result = service.updateProfile(USER_ID, request, REQUESTER_ID);
 

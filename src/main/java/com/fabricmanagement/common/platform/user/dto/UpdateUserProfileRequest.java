@@ -1,6 +1,9 @@
 package com.fabricmanagement.common.platform.user.dto;
 
 import com.fabricmanagement.common.platform.user.domain.value.ProfileCategory;
+import com.fabricmanagement.human.core.employee.domain.Gender;
+import com.fabricmanagement.human.core.employee.domain.Title;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
@@ -17,7 +20,8 @@ import lombok.NoArgsConstructor;
  *
  * <ul>
  *   <li>WORK_PROFILE: firstName, lastName, workEmail, workPhone, workAddress, departmentId
- *   <li>PERSONAL_PROFILE: homeAddress, personalPhone, birthDate, emergencyContact
+ *   <li>PERSONAL_PROFILE: homeAddress, personalPhone, birthDate, emergencyContact, title, gender,
+ *       nationality, employeeNumber, hireDate
  * </ul>
  *
  * <p><b>Security:</b> Self-update is NOT allowed. Only Admin/HR/Dept Manager can update.
@@ -65,6 +69,23 @@ public class UpdateUserProfileRequest {
   /** Emergency contact data (PERSONAL_PROFILE). */
   private EmergencyContactData emergencyContact;
 
+  /** Personal title/salutation (PERSONAL_PROFILE). */
+  private Title title;
+
+  /** Gender identity (PERSONAL_PROFILE). */
+  private Gender gender;
+
+  /** Nationality ISO code (PERSONAL_PROFILE). */
+  @Size(max = 10, message = "Nationality code must be at most 10 characters")
+  private String nationality;
+
+  /** Employee number (PERSONAL_PROFILE). */
+  @Size(max = 50, message = "Employee number must be at most 50 characters")
+  private String employeeNumber;
+
+  /** Employment start / hire date (PERSONAL_PROFILE). */
+  private LocalDate hireDate;
+
   /** Determine which categories are being updated. Used for permission checks. */
   public Set<ProfileCategory> getUpdatedCategories() {
     Set<ProfileCategory> categories = new HashSet<>();
@@ -84,7 +105,12 @@ public class UpdateUserProfileRequest {
     if (homeAddress != null
         || personalPhone != null
         || birthDate != null
-        || emergencyContact != null) {
+        || emergencyContact != null
+        || title != null
+        || gender != null
+        || nationality != null
+        || employeeNumber != null
+        || hireDate != null) {
       categories.add(ProfileCategory.PERSONAL_PROFILE);
     }
 
@@ -103,7 +129,12 @@ public class UpdateUserProfileRequest {
         || homeAddress != null
         || personalPhone != null
         || birthDate != null
-        || emergencyContact != null;
+        || emergencyContact != null
+        || title != null
+        || gender != null
+        || nationality != null
+        || employeeNumber != null
+        || hireDate != null;
   }
 
   // ========== Nested DTOs ==========

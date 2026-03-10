@@ -23,7 +23,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
  *   <li><b>uid (String):</b> Human-readable identifier for audit/debugging (e.g.,
  *       "ACME-001-USER-00042")
  *   <li><b>Audit fields:</b> createdAt, createdBy, updatedAt, updatedBy
- *   <li><b>Soft delete:</b> isActive flag for logical deletion
+ *   <li><b>Soft delete:</b> isActive flag + deletedAt timestamp for logical deletion
  *   <li><b>Optimistic locking:</b> version field for concurrent updates
  * </ul>
  *
@@ -120,6 +120,10 @@ public abstract class BaseEntity implements Serializable {
   @Column(name = "is_active", nullable = false)
   private Boolean isActive = true;
 
+  /** Soft delete timestamp - records when the entity was logically deleted */
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
   /**
    * Optimistic locking version field
    *
@@ -209,14 +213,16 @@ public abstract class BaseEntity implements Serializable {
     this.updatedAt = Instant.now();
   }
 
-  /** Soft delete - marks entity as inactive */
+  /** Soft delete - marks entity as inactive and records deletion timestamp */
   public void delete() {
     this.isActive = false;
+    this.deletedAt = Instant.now();
   }
 
-  /** Reactivate - marks entity as active */
+  /** Reactivate - marks entity as active and clears deletion timestamp */
   public void activate() {
     this.isActive = true;
+    this.deletedAt = null;
   }
 
   /** Check if entity is new (not persisted yet) */

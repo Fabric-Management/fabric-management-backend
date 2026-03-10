@@ -42,15 +42,15 @@ class TenantOnboardingControllerTest {
   @Test
   @DisplayName("POST /api/admin/onboarding/tenant returns 200 and onboarding response")
   void createTenant_returnsOkAndResponse() throws Exception {
-    UUID companyId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
     UUID tenantId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     TenantOnboardingResponse response =
         TenantOnboardingResponse.builder()
-            .companyId(companyId)
+            .organizationId(organizationId)
             .tenantId(tenantId)
-            .companyUid("ACME-001")
-            .companyName("Acme Corp")
+            .organizationUid("ACME-001")
+            .organizationName("Acme Corp")
             .adminUserId(userId)
             .adminContactValue("admin@acme.com")
             .registrationToken("token-123")
@@ -64,9 +64,9 @@ class TenantOnboardingControllerTest {
     String body =
         """
         {
-          "companyName": "Acme Corp",
+          "organizationName": "Acme Corp",
           "taxId": "1234567890",
-          "companyType": "SPINNER",
+          "organizationType": "SPINNER",
           "adminFirstName": "Jane",
           "adminLastName": "Doe",
           "adminContact": "admin@acme.com",
@@ -82,10 +82,10 @@ class TenantOnboardingControllerTest {
                 .content(body))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.companyId").value(companyId.toString()))
+        .andExpect(jsonPath("$.data.organizationId").value(organizationId.toString()))
         .andExpect(jsonPath("$.data.tenantId").value(tenantId.toString()))
-        .andExpect(jsonPath("$.data.companyUid").value("ACME-001"))
-        .andExpect(jsonPath("$.data.companyName").value("Acme Corp"))
+        .andExpect(jsonPath("$.data.organizationUid").value("ACME-001"))
+        .andExpect(jsonPath("$.data.organizationName").value("Acme Corp"))
         .andExpect(jsonPath("$.data.registrationToken").value("token-123"))
         .andExpect(
             jsonPath("$.data.setupUrl").value("https://app.example.com/setup?token=token-123"));

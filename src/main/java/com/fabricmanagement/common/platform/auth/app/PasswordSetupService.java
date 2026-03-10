@@ -16,6 +16,7 @@ import com.fabricmanagement.common.platform.auth.infra.repository.RegistrationTo
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.organization.domain.Organization;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.common.platform.tenant.domain.Tenant;
 import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
@@ -71,6 +72,7 @@ public class PasswordSetupService {
   private final DomainEventPublisher eventPublisher;
   private final EntityManager entityManager;
   private final OrganizationRepository organizationRepository;
+  private final OrganizationAddressRepository organizationAddressRepository;
   private final TenantRepository tenantRepository;
   private final EmployeeService employeeService;
 
@@ -214,16 +216,40 @@ public class PasswordSetupService {
     boolean needsOnboarding = !Boolean.TRUE.equals(user.getHasCompletedOnboarding());
     OnboardingPrefillDto onboardingPrefill = null;
     if (needsOnboarding) {
-      // Get organization for onboarding prefill (User.organizationId)
       var orgOpt =
           organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
-      onboardingPrefill =
+      var prefillBuilder =
           OnboardingPrefillDto.builder()
               .primaryEmail(contactValue)
-              .companyName(orgOpt.map(Organization::getName).orElse(null))
+              .organizationName(orgOpt.map(Organization::getName).orElse(null))
+              .legalName(
+                  orgOpt
+                      .map(
+                          o -> {
+                            String ln = o.getLegalName();
+                            return (ln != null && !ln.isBlank()) ? ln : o.getName();
+                          })
+                      .orElse(null))
               .taxId(orgOpt.map(Organization::getTaxId).orElse(null))
-              .companyType(orgOpt.map(o -> o.getOrganizationType().name()).orElse(null))
-              .build();
+              .organizationType(orgOpt.map(o -> o.getOrganizationType().name()).orElse(null));
+
+      // Sales-led: prefill address from Organization primary address; self-signup: no address
+      organizationAddressRepository
+          .findPrimaryWithAddressByOrganizationId(user.getOrganizationId())
+          .map(oa -> oa.getAddress())
+          .ifPresent(
+              addr -> {
+                prefillBuilder
+                    .addressLine1(addr.getStreetAddress())
+                    .addressLine2(addr.getAddressLine2())
+                    .city(addr.getCity())
+                    .state(addr.getState())
+                    .district(addr.getDistrict())
+                    .postalCode(addr.getPostalCode())
+                    .country(addr.getCountry());
+              });
+
+      onboardingPrefill = prefillBuilder.build();
     }
 
     log.info(

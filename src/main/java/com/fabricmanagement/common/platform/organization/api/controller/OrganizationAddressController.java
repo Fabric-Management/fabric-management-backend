@@ -7,6 +7,7 @@ import com.fabricmanagement.common.platform.communication.dto.AssignAddressReque
 import com.fabricmanagement.common.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.common.platform.organization.app.OrganizationAddressAssignmentService;
 import com.fabricmanagement.common.platform.organization.domain.OrganizationAddress;
+import com.fabricmanagement.common.platform.organization.dto.AddressDeletionImpactDto;
 import com.fabricmanagement.common.platform.organization.dto.OrganizationAddressDto;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -103,8 +104,10 @@ public class OrganizationAddressController {
             createRequest.getStreetAddress(),
             createRequest.getCity(),
             createRequest.getState(),
+            createRequest.getDistrict(),
             createRequest.getPostalCode(),
             createRequest.getCountry(),
+            null, // countryCode
             createRequest.getAddressType(),
             createRequest.getLabel());
 
@@ -144,15 +147,27 @@ public class OrganizationAddressController {
             OrganizationAddressDto.from(organizationAddress), "Headquarters set successfully"));
   }
 
+  @GetMapping("/{addressId}/deletion-impact")
+  public ResponseEntity<ApiResponse<AddressDeletionImpactDto>> getAddressDeletionImpact(
+      @PathVariable UUID organizationId, @PathVariable UUID addressId) {
+    log.debug(
+        "Getting deletion impact: organizationId={}, addressId={}", organizationId, addressId);
+
+    AddressDeletionImpactDto impact =
+        organizationAddressAssignmentService.getAddressDeletionImpact(organizationId, addressId);
+
+    return ResponseEntity.ok(ApiResponse.success(impact));
+  }
+
   @DeleteMapping("/{addressId}")
   public ResponseEntity<ApiResponse<Void>> removeAddress(
       @PathVariable UUID organizationId, @PathVariable UUID addressId) {
     log.info(
-        "Removing address from organization: organizationId={}, addressId={}",
+        "Safe-removing address from organization: organizationId={}, addressId={}",
         organizationId,
         addressId);
 
-    organizationAddressAssignmentService.removeAddress(organizationId, addressId);
+    organizationAddressAssignmentService.safeRemoveAddress(organizationId, addressId);
 
     return ResponseEntity.ok(ApiResponse.success(null, "Address removed successfully"));
   }

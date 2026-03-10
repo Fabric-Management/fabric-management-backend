@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.common.platform.user.domain.User;
 import com.fabricmanagement.common.platform.user.domain.event.UserDeactivatedEvent;
+import com.fabricmanagement.common.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.common.platform.user.dto.CreateAdminUserRequest;
 import com.fabricmanagement.common.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.common.platform.user.dto.CreateInternalUserRequest;
@@ -78,8 +79,8 @@ public class UserService implements UserFacade {
 
   @Override
   @Transactional(readOnly = true)
-  public List<UserDto> findByCompany(UUID tenantId, UUID companyId) {
-    return userQueryService.findByCompany(tenantId, companyId);
+  public List<UserDto> findByOrganization(UUID tenantId, UUID organizationId) {
+    return userQueryService.findByOrganization(tenantId, organizationId);
   }
 
   @Transactional(readOnly = true)
@@ -147,7 +148,12 @@ public class UserService implements UserFacade {
 
   @Transactional
   public UserDto completeOnboarding(UUID userId) {
-    return userOnboardingService.completeOnboarding(userId);
+    return userOnboardingService.completeOnboarding(userId, null);
+  }
+
+  @Transactional
+  public UserDto completeOnboarding(UUID userId, CompleteOnboardingRequest request) {
+    return userOnboardingService.completeOnboarding(userId, request);
   }
 
   @Transactional

@@ -140,7 +140,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       "SELECT u FROM User u LEFT JOIN FETCH u.role "
           + "WHERE u.tenantId = :tenantId AND (u.firstName LIKE %:search% OR u.lastName LIKE"
-          + " %:search% OR u.displayName LIKE %:search%)")
+          + " %:search% OR CONCAT(u.firstName, ' ', u.lastName) LIKE %:search%)")
   List<User> searchByName(@Param("tenantId") UUID tenantId, @Param("search") String search);
 
   /** Get active users belonging to specific departments (for department-scoped access). */

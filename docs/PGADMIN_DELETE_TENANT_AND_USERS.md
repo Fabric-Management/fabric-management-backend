@@ -18,7 +18,7 @@ ORDER BY created_at;
 
 ```sql
 -- <TENANT_ID> yerine silmek istediğiniz tenant'ın id değerini yazın
-SELECT id, uid, first_name, last_name, display_name, company_id, onboarding_completed_at
+SELECT id, uid, first_name, last_name, display_name, organization_id, onboarding_completed_at
 FROM common_user.common_user
 WHERE tenant_id = '<TENANT_ID>';
 ```
@@ -100,16 +100,16 @@ WHERE tenant_id = '<TENANT_ID>';
 -- 11) Address'ler (tenant'a ait) – junction sonra silinmeli; V034'te address_contact var
 DELETE FROM common_communication.common_address_contact
 WHERE address_id IN (SELECT id FROM common_communication.common_address WHERE tenant_id = '<TENANT_ID>');
-DELETE FROM common_communication.common_company_address
-WHERE company_id = '<TENANT_ID>';
+DELETE FROM common_company.common_company_address
+WHERE organization_id IN (SELECT id FROM common_company.common_organization WHERE tenant_id = '<TENANT_ID>');
 DELETE FROM common_communication.common_user_address
 WHERE user_id IN (SELECT id FROM common_user.common_user WHERE tenant_id = '<TENANT_ID>');
 DELETE FROM common_communication.common_address
 WHERE tenant_id = '<TENANT_ID>';
 
 -- 12) Company–contact ilişkisi
-DELETE FROM common_communication.common_company_contact
-WHERE company_id = '<TENANT_ID>';
+DELETE FROM common_company.common_company_contact
+WHERE organization_id IN (SELECT id FROM common_company.common_organization WHERE tenant_id = '<TENANT_ID>');
 
 -- 13) Kullanıcılar
 DELETE FROM common_user.common_user

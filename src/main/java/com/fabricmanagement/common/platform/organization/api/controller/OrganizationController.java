@@ -84,10 +84,11 @@ public class OrganizationController {
   public ResponseEntity<ApiResponse<OrganizationDto>> updateOrganization(
       @PathVariable UUID id,
       @RequestParam String name,
-      @RequestParam(required = false) String taxId) {
+      @RequestParam(required = false) String taxId,
+      @RequestParam(required = false) String legalName) {
     log.info("Updating organization: id={}", id);
 
-    OrganizationDto updated = organizationService.updateOrganization(id, name, taxId);
+    OrganizationDto updated = organizationService.updateOrganization(id, name, taxId, legalName);
 
     return ResponseEntity.ok(ApiResponse.success(updated, "Organization updated successfully"));
   }

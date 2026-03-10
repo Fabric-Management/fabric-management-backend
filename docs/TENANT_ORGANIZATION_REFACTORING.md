@@ -200,20 +200,16 @@ common/platform/
 ### OnboardingContext
 
 ```java
-// New fields
 UUID tenantId;
 String tenantUid;
 UUID organizationId;
 String organizationUid;
-
-// Deprecated (kept for backward compatibility)
-@Deprecated UUID companyId;
-@Deprecated String companyUid;
+// ... other outputs
 ```
 
 ### TenantOnboardingResponse
 
-Returns `organizationId` in `companyId` field for backward compatibility.
+Uses `organizationId`, `organizationUid`, and `organizationName`. API and JWT use organization terminology throughout.
 
 ## Next Steps
 

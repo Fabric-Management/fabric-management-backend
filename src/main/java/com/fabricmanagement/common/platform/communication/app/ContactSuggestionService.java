@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <pre>{@code
  * ContactSuggestionsDto suggestions = contactSuggestionService.getSuggestions(
- *     companyId, "John", "Smith"
+ *     organizationId, "John", "Smith"
  * );
  * // Returns: phone suggestion + email suggestions
  * }</pre>
@@ -61,28 +61,29 @@ public class ContactSuggestionService {
    *   <li>Email: Generates multiple formats from company domain
    * </ul>
    *
-   * @param companyId Company ID
+   * @param organizationId Organization ID
    * @param firstName User first name
    * @param lastName User last name
    * @return Contact suggestions (phone + emails)
    */
   @Transactional(readOnly = true)
-  public ContactSuggestionsDto getSuggestions(UUID companyId, String firstName, String lastName) {
+  public ContactSuggestionsDto getSuggestions(
+      UUID organizationId, String firstName, String lastName) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     log.debug(
-        "Getting contact suggestions: tenantId={}, companyId={}, firstName={}, lastName={}",
+        "Getting contact suggestions: tenantId={}, organizationId={}, firstName={}, lastName={}",
         tenantId,
-        companyId,
+        organizationId,
         firstName,
         lastName);
 
     // Validate organization exists and belongs to tenant
     organizationRepository
-        .findByTenantIdAndId(tenantId, companyId)
+        .findByTenantIdAndId(tenantId, organizationId)
         .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
 
     List<OrganizationContact> companyContacts =
-        organizationContactAssignmentService.getOrganizationContacts(companyId);
+        organizationContactAssignmentService.getOrganizationContacts(organizationId);
 
     ContactSuggestionsDto suggestions =
         ContactSuggestionsDto.builder()

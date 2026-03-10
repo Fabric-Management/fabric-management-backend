@@ -61,6 +61,7 @@ public class UserCreationService {
   private final RoleService roleService;
   private final UserDepartmentService userDepartmentService;
   private final DepartmentRepository departmentRepository;
+  private final UserWorkLocationService userWorkLocationService;
   private final com.fabricmanagement.human.core.employee.application.EmployeeService
       employeeService;
 
@@ -76,7 +77,7 @@ public class UserCreationService {
             request.getLastName(),
             request.getContactValue(),
             request.getContactType(),
-            request.getCompanyId(),
+            request.getOrganizationId(),
             com.fabricmanagement.common.platform.user.domain.UserType.INTERNAL,
             request.getAdditionalContacts(),
             request.getAddresses());
@@ -101,7 +102,13 @@ public class UserCreationService {
           saved.getId(), request.getDepartmentId(), true, assignedBy);
     }
 
-    // Step 4: Create Employee record if any HR data provided
+    // Step 4: Assign work location (org address the user works at)
+    if (request.getWorkLocationOrgAddressId() != null) {
+      userWorkLocationService.assignLocation(
+          saved.getId(), request.getWorkLocationOrgAddressId(), true, null);
+    }
+
+    // Step 5: Create Employee record if any HR data provided
     createEmployeeIfNeeded(saved.getId(), request);
 
     // Step 6: Publish event
@@ -139,7 +146,7 @@ public class UserCreationService {
             request.getLastName(),
             request.getContactValue(),
             request.getContactType(),
-            request.getCompanyId(),
+            request.getOrganizationId(),
             com.fabricmanagement.common.platform.user.domain.UserType.EXTERNAL,
             request.getAdditionalContacts(),
             request.getAddresses());
@@ -207,7 +214,7 @@ public class UserCreationService {
               User.create(
                   trimmedFirstName,
                   trimmedLastName,
-                  request.getCompanyId(),
+                  request.getOrganizationId(),
                   com.fabricmanagement.common.platform.user.domain.UserType.INTERNAL);
 
           com.fabricmanagement.common.platform.user.domain.Role role =
@@ -226,6 +233,25 @@ public class UserCreationService {
           userContactAssignmentService.assignContact(saved.getId(), contact.getId(), true);
 
           assignAdminDefaultDepartment(saved, request);
+
+          try {
+            String employeeNumber = employeeService.generateEmployeeNumber();
+            employeeService.createOrUpdateEmployee(
+                saved.getId(),
+                null,
+                null,
+                null,
+                null,
+                employeeNumber,
+                java.time.LocalDate.now(),
+                null);
+            log.info(
+                "Initialized default Employee profile for admin: userId={}, empNo={}",
+                saved.getId(),
+                employeeNumber);
+          } catch (Exception e) {
+            log.error("Failed to initialize HR profile for admin user: {}", e.getMessage());
+          }
 
           eventPublisher.publish(
               new UserCreatedEvent(
@@ -252,7 +278,7 @@ public class UserCreationService {
       String lastName,
       String contactValue,
       com.fabricmanagement.common.platform.user.domain.ContactType contactType,
-      UUID companyId,
+      UUID organizationId,
       com.fabricmanagement.common.platform.user.domain.UserType userType,
       List<ContactData> additionalContacts,
       List<AddressData> addresses) {
@@ -269,7 +295,7 @@ public class UserCreationService {
     if (userRepository.existsByTenantIdAndContactValue(tenantId, normalizedContact)) {
       throw new IllegalArgumentException("Contact value already registered");
     }
-    if (!organizationFacade.exists(tenantId, companyId)) {
+    if (!organizationFacade.exists(tenantId, organizationId)) {
       throw new IllegalArgumentException("Organization not found");
     }
 
@@ -293,7 +319,7 @@ public class UserCreationService {
 
     // --- Persistence starts here ---
     try {
-      User user = User.create(trimmedFirstName, trimmedLastName, companyId, userType);
+      User user = User.create(trimmedFirstName, trimmedLastName, organizationId, userType);
       User saved = userRepository.save(user);
 
       Contact primaryContact =
@@ -327,7 +353,7 @@ public class UserCreationService {
         }
       }
 
-      assignAddresses(saved, companyId, tenantId, addresses);
+      assignAddresses(saved, organizationId, tenantId, addresses);
 
       return saved;
     } catch (DataIntegrityViolationException e) {
@@ -336,9 +362,9 @@ public class UserCreationService {
     }
   }
 
-  /** Assign addresses to user. Uses company primary address as fallback when none provided. */
+  /** Assign addresses to user. Uses organization primary address as fallback when none provided. */
   private void assignAddresses(
-      User user, UUID companyId, UUID tenantId, List<AddressData> addresses) {
+      User user, UUID organizationId, UUID tenantId, List<AddressData> addresses) {
     if (addresses != null && !addresses.isEmpty()) {
       // Check if any address is explicitly marked as primary
       boolean hasExplicitPrimary =
@@ -380,7 +406,7 @@ public class UserCreationService {
             user.getId(), address.getId(), isPrimary, isWorkAddress);
       }
     } else {
-      userAddressAutoService.copyCompanyPrimaryAddress(user.getId(), companyId, tenantId);
+      userAddressAutoService.copyOrganizationPrimaryAddress(user.getId(), organizationId, tenantId);
     }
   }
 
@@ -495,7 +521,7 @@ public class UserCreationService {
     try {
       Optional<Department> adminDept =
           departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentName(
-              request.getTenantId(), request.getCompanyId(), ADMIN_DEFAULT_DEPARTMENT);
+              request.getTenantId(), request.getOrganizationId(), ADMIN_DEFAULT_DEPARTMENT);
 
       if (adminDept.isPresent()) {
         userDepartmentService.assignDepartment(
@@ -509,7 +535,7 @@ public class UserCreationService {
             "Admin default department '{}' not found — skipping assignment: tenantId={}, orgId={}",
             ADMIN_DEFAULT_DEPARTMENT,
             request.getTenantId(),
-            request.getCompanyId());
+            request.getOrganizationId());
       }
     } catch (Exception e) {
       log.error(

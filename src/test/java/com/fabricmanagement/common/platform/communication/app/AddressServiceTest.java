@@ -1,7 +1,6 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,7 +9,8 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.infra.repository.AddressRepository;
-import java.util.List;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationAddressRepository;
+import com.fabricmanagement.common.platform.user.infra.repository.UserWorkLocationRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -31,6 +31,8 @@ class AddressServiceTest {
   private static final UUID TENANT_ID = UUID.randomUUID();
 
   @Mock private AddressRepository addressRepository;
+  @Mock private OrganizationAddressRepository organizationAddressRepository;
+  @Mock private UserWorkLocationRepository userWorkLocationRepository;
 
   @InjectMocks private AddressService service;
 
@@ -72,7 +74,6 @@ class AddressServiceTest {
       assertThat(saved.getCountry()).isEqualTo("Turkey");
       assertThat(saved.getAddressType()).isEqualTo(AddressType.HEADQUARTERS);
       assertThat(saved.getLabel()).isEqualTo("HQ");
-      assertThat(saved.getIsPrimary()).isFalse();
       assertThat(result).isSameAs(saved);
     }
   }
@@ -109,59 +110,6 @@ class AddressServiceTest {
   }
 
   @Nested
-  @DisplayName("setAsPrimary")
-  class SetAsPrimary {
-
-    @Test
-    void throwsWhenAddressNotFound() {
-      UUID addressId = UUID.randomUUID();
-      when(addressRepository.findById(addressId)).thenReturn(Optional.empty());
-
-      assertThatThrownBy(() -> service.setAsPrimary(addressId))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("not found");
-    }
-
-    @Test
-    void throwsWhenAddressDifferentTenant() {
-      UUID addressId = UUID.randomUUID();
-      Address address = Address.builder().build();
-      address.setId(addressId);
-      address.setTenantId(UUID.randomUUID());
-      when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
-
-      assertThatThrownBy(() -> service.setAsPrimary(addressId))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("current tenant");
-    }
-
-    @Test
-    void removesPrimaryFromOthersAndSetsAddressPrimary() {
-      UUID addressId = UUID.randomUUID();
-      Address address =
-          Address.builder().addressType(AddressType.HEADQUARTERS).isPrimary(false).build();
-      address.setId(addressId);
-      address.setTenantId(TENANT_ID);
-      Address otherPrimary =
-          Address.builder().addressType(AddressType.HEADQUARTERS).isPrimary(true).build();
-      otherPrimary.setId(UUID.randomUUID());
-      otherPrimary.setTenantId(TENANT_ID);
-      when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
-      when(addressRepository.findByTenantIdAndAddressType(TENANT_ID, AddressType.HEADQUARTERS))
-          .thenReturn(List.of(address, otherPrimary));
-      when(addressRepository.save(any(Address.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      Address result = service.setAsPrimary(addressId);
-
-      verify(addressRepository).save(otherPrimary);
-      verify(addressRepository).save(address);
-      assertThat(otherPrimary.getIsPrimary()).isFalse();
-      assertThat(address.getIsPrimary()).isTrue();
-      assertThat(result).isSameAs(address);
-    }
-  }
-
-  @Nested
   @DisplayName("updateAddress")
   class UpdateAddress {
 
@@ -176,7 +124,20 @@ class AddressServiceTest {
 
       Address result =
           service.updateAddress(
-              addressId, "New St", "NewCity", "State", "12345", "Country", "New Label");
+              addressId,
+              "New St",
+              null,
+              "NewCity",
+              "State",
+              null,
+              "12345",
+              "Country",
+              null,
+              AddressType.OFFICE,
+              "New Label",
+              null,
+              null,
+              null);
 
       verify(addressRepository).save(address);
       assertThat(address.getStreetAddress()).isEqualTo("New St");
@@ -201,6 +162,8 @@ class AddressServiceTest {
       address.setTenantId(TENANT_ID);
       when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
       when(addressRepository.save(any(Address.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(organizationAddressRepository.findByAddressIdIncludingDeleted(addressId))
+          .thenReturn(Optional.empty());
 
       service.deleteAddress(addressId);
 

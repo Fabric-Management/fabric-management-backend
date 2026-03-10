@@ -2,19 +2,16 @@ package com.fabricmanagement.common.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
 import com.fabricmanagement.common.platform.communication.app.ContactSuggestionService;
 import com.fabricmanagement.common.platform.communication.dto.ContactSuggestionsDto;
 import com.fabricmanagement.common.platform.subscription.app.UserCreationOptionsService;
 import com.fabricmanagement.common.platform.user.app.TeamAccessService;
-import com.fabricmanagement.common.platform.user.app.UserAddressAssignmentService;
-import com.fabricmanagement.common.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.common.platform.user.app.UserService;
 import com.fabricmanagement.common.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.common.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.common.platform.user.dto.UpdateUserRequest;
-import com.fabricmanagement.common.platform.user.dto.UserAddressDto;
-import com.fabricmanagement.common.platform.user.dto.UserContactDto;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.human.core.employee.application.EmployeeService;
@@ -37,8 +34,6 @@ public class UserController {
 
   private final UserService userService;
   private final ContactSuggestionService contactSuggestionService;
-  private final UserContactAssignmentService userContactAssignmentService;
-  private final UserAddressAssignmentService userAddressAssignmentService;
   private final EmployeeService employeeService;
   private final UserCreationOptionsService userCreationOptionsService;
   private final TeamAccessService teamAccessService;
@@ -100,6 +95,7 @@ public class UserController {
     return ResponseEntity.ok(ApiResponse.success(created, "External user created successfully"));
   }
 
+  @PreAuthorize("isAuthenticated()")
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<UserDto>> getUser(@PathVariable UUID id) {
     UUID requesterId = TenantContext.getCurrentUserId();
@@ -112,7 +108,7 @@ public class UserController {
     UserDto user =
         userService
             .findById(TenantContext.getCurrentTenantId(), id)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
     return ResponseEntity.ok(ApiResponse.success(user));
   }
@@ -126,6 +122,7 @@ public class UserController {
    *   <li>NO_ACCESS → 403
    * </ul>
    */
+  @PreAuthorize("isAuthenticated()")
   @GetMapping
   public ResponseEntity<ApiResponse<List<UserDto>>> getAllUsers() {
     UUID requesterId = TenantContext.getCurrentUserId();
@@ -149,17 +146,22 @@ public class UserController {
     return ResponseEntity.ok(ApiResponse.success(users));
   }
 
-  @GetMapping("/company/{companyId}")
-  public ResponseEntity<ApiResponse<List<UserDto>>> getUsersByCompany(
-      @PathVariable UUID companyId) {
+  @PreAuthorize("isAuthenticated()")
+  @GetMapping("/organization/{organizationId}")
+  public ResponseEntity<ApiResponse<List<UserDto>>> getUsersByOrganization(
+      @PathVariable UUID organizationId) {
     UUID requesterId = TenantContext.getCurrentUserId();
     if (!teamAccessService.canViewAllMembers(requesterId)) {
-      throw new AccessDeniedException("You don't have permission to view company members.");
+      throw new AccessDeniedException("You don't have permission to view organization members.");
     }
 
-    log.debug("Getting users by company: companyId={}, requesterId={}", companyId, requesterId);
+    log.debug(
+        "Getting users by organization: organizationId={}, requesterId={}",
+        organizationId,
+        requesterId);
 
-    List<UserDto> users = userService.findByCompany(TenantContext.getCurrentTenantId(), companyId);
+    List<UserDto> users =
+        userService.findByOrganization(TenantContext.getCurrentTenantId(), organizationId);
 
     return ResponseEntity.ok(ApiResponse.success(users));
   }
@@ -233,7 +235,7 @@ public class UserController {
     UserDto user =
         userService
             .findById(TenantContext.getCurrentTenantId(), userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
     return ResponseEntity.ok(ApiResponse.success(user));
   }
@@ -267,94 +269,26 @@ public class UserController {
    *
    * <p><b>Purpose:</b> Minimize manual data entry during user creation.
    *
-   * @param companyId Company ID
+   * @param organizationId Organization ID
    * @param firstName User first name
    * @param lastName User last name
    * @return Contact suggestions
    */
   @GetMapping("/contact-suggestions")
   public ResponseEntity<ApiResponse<ContactSuggestionsDto>> getContactSuggestions(
-      @RequestParam UUID companyId, @RequestParam String firstName, @RequestParam String lastName) {
+      @RequestParam UUID organizationId,
+      @RequestParam String firstName,
+      @RequestParam String lastName) {
     log.debug(
-        "Getting contact suggestions: companyId={}, firstName={}, lastName={}",
-        companyId,
+        "Getting contact suggestions: organizationId={}, firstName={}, lastName={}",
+        organizationId,
         firstName,
         lastName);
 
     ContactSuggestionsDto suggestions =
-        contactSuggestionService.getSuggestions(companyId, firstName, lastName);
+        contactSuggestionService.getSuggestions(organizationId, firstName, lastName);
 
     return ResponseEntity.ok(ApiResponse.success(suggestions));
-  }
-
-  /**
-   * Get user contacts.
-   *
-   * <p>Returns all contacts assigned to the user, including:
-   *
-   * <ul>
-   *   <li>Contact details (value, type, verification status)
-   *   <li>Default contact flag
-   *   <li>Authentication contact flag
-   * </ul>
-   *
-   * @param id User ID
-   * @return List of user contacts
-   */
-  @GetMapping("/{id}/contacts")
-  public ResponseEntity<ApiResponse<List<UserContactDto>>> getUserContacts(@PathVariable UUID id) {
-    UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
-      throw new AccessDeniedException("You don't have permission to view member contacts.");
-    }
-
-    log.debug("Getting user contacts: userId={}", id);
-
-    userService
-        .findById(TenantContext.getCurrentTenantId(), id)
-        .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-    List<UserContactDto> contacts =
-        userContactAssignmentService.getUserContacts(id).stream()
-            .map(UserContactDto::from)
-            .toList();
-
-    return ResponseEntity.ok(ApiResponse.success(contacts));
-  }
-
-  /**
-   * Get user addresses.
-   *
-   * <p>Returns all addresses assigned to the user, including:
-   *
-   * <ul>
-   *   <li>Address details (full address, coordinates, type)
-   *   <li>Primary address flag
-   *   <li>Work address flag
-   * </ul>
-   *
-   * @param id User ID
-   * @return List of user addresses
-   */
-  @GetMapping("/{id}/addresses")
-  public ResponseEntity<ApiResponse<List<UserAddressDto>>> getUserAddresses(@PathVariable UUID id) {
-    UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
-      throw new AccessDeniedException("You don't have permission to view member addresses.");
-    }
-
-    log.debug("Getting user addresses: userId={}", id);
-
-    userService
-        .findById(TenantContext.getCurrentTenantId(), id)
-        .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-    List<UserAddressDto> addresses =
-        userAddressAssignmentService.getUserAddresses(id).stream()
-            .map(UserAddressDto::from)
-            .toList();
-
-    return ResponseEntity.ok(ApiResponse.success(addresses));
   }
 
   /**

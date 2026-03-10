@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.subscription.dto;
 
 import com.fabricmanagement.common.platform.organization.dto.DepartmentDto;
+import com.fabricmanagement.common.platform.organization.dto.OrganizationAddressDto;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,6 +16,7 @@ import lombok.NoArgsConstructor;
  * <ul>
  *   <li>Roles
  *   <li>Departments (hierarchical via parentDepartmentId)
+ *   <li>Addresses (organization locations for work location assignment)
  * </ul>
  */
 @Data
@@ -28,4 +30,7 @@ public class UserCreationOptionsDto {
 
   /** List of departments (hierarchical — top-level groups + child departments). */
   private List<DepartmentDto> departments;
+
+  /** Organization addresses (company locations) for work location dropdown. */
+  private List<OrganizationAddressDto> addresses;
 }

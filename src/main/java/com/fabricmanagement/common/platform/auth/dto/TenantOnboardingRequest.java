@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
  *
  * <p>Used by internal sales team to create new tenant companies.
  *
- * <p><b>Critical:</b> Creates company with tenant_id = company_id
+ * <p><b>Critical:</b> Creates tenant and organization (tenant + organization model).
  */
 @Data
 @Builder
@@ -23,25 +23,31 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TenantOnboardingRequest {
 
-  @NotBlank(message = "Company name is required")
-  private String companyName;
+  @NotBlank(message = "Organization name is required")
+  private String organizationName;
 
   @NotBlank(message = "Tax ID is required")
   private String taxId;
 
-  @NotNull(message = "Company type is required")
-  private OrganizationType companyType;
+  @NotNull(message = "Organization type is required")
+  private OrganizationType organizationType;
 
   private String address;
 
   private String city;
 
+  private String state;
+
+  private String district;
+
+  private String postalCode;
+
   private String country;
 
   private String phoneNumber;
 
-  @Email(message = "Invalid company email")
-  private String companyEmail;
+  @Email(message = "Invalid organization email")
+  private String organizationEmail;
 
   @NotBlank(message = "Admin first name is required")
   private String adminFirstName;
@@ -52,8 +58,6 @@ public class TenantOnboardingRequest {
   @NotBlank(message = "Admin contact is required")
   @Email(message = "Invalid admin email")
   private String adminContact;
-
-  private String adminDepartment;
 
   private List<String> selectedOS;
 

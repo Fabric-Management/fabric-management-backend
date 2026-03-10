@@ -151,16 +151,17 @@ public class PlatformAdminController {
    * <p><b>Security:</b> PLATFORM_ADMIN role required
    *
    * @param tenantId The tenant ID
-   * @param companyId The organization ID (path kept as companyId for backward compat)
+   * @param organizationId The organization ID
    * @return Organization details
    */
-  @GetMapping("/tenants/{tenantId}/companies/{companyId}")
+  @GetMapping("/tenants/{tenantId}/organizations/{organizationId}")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-  public ResponseEntity<ApiResponse<OrganizationDto>> getTenantCompany(
-      @PathVariable UUID tenantId, @PathVariable UUID companyId) {
-    log.info("Platform admin: Getting organization {} from tenant {}", companyId, tenantId);
+  public ResponseEntity<ApiResponse<OrganizationDto>> getTenantOrganization(
+      @PathVariable UUID tenantId, @PathVariable UUID organizationId) {
+    log.info("Platform admin: Getting organization {} from tenant {}", organizationId, tenantId);
 
-    OrganizationDto organization = platformAdminService.getTenantOrganization(tenantId, companyId);
+    OrganizationDto organization =
+        platformAdminService.getTenantOrganization(tenantId, organizationId);
 
     return ResponseEntity.ok(ApiResponse.success(organization));
   }

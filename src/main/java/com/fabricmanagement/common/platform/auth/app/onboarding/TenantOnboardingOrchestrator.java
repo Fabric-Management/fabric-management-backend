@@ -30,8 +30,8 @@ public class TenantOnboardingOrchestrator {
   @Transactional
   public TenantOnboardingResponse onboard(OnboardingContext context) {
     log.info(
-        "Onboarding started: company={}, salesLed={}",
-        context.getCompanyName(),
+        "Onboarding started: organization={}, salesLed={}",
+        context.getOrganizationName(),
         context.isSalesLed());
 
     // Save TenantContext before steps (CreateTenantStep will set a new one)
@@ -64,8 +64,8 @@ public class TenantOnboardingOrchestrator {
 
     TenantOnboardingResponse result = context.toResult();
     log.info(
-        "Onboarding completed: companyId={}, tenantId={}",
-        result.getCompanyId(),
+        "Onboarding completed: organizationId={}, tenantId={}",
+        result.getOrganizationId(),
         result.getTenantId());
     return result;
   }

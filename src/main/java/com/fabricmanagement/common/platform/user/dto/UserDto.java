@@ -36,6 +36,9 @@ public class UserDto {
   private Instant createdAt;
   private Instant updatedAt;
 
+  // Work location label — populated from user's primary work location address
+  private String workLocationLabel;
+
   // Employee (HR) fields — populated when user has an Employee record
   private Boolean isEmployee;
   private String title;

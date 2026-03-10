@@ -55,13 +55,13 @@ public interface UserFacade {
   List<UserDto> findByTenant(UUID tenantId);
 
   /**
-   * Get users by company.
+   * Get users by organization.
    *
    * @param tenantId the tenant ID
-   * @param companyId the company ID
+   * @param organizationId the organization ID
    * @return list of users
    */
-  List<UserDto> findByCompany(UUID tenantId, UUID companyId);
+  List<UserDto> findByOrganization(UUID tenantId, UUID organizationId);
 
   /**
    * Check if user exists.
@@ -84,8 +84,8 @@ public interface UserFacade {
    * Create tenant admin user during onboarding. Used only by Auth module
    * (TenantOnboardingOrchestrator).
    *
-   * @param request admin user creation request (companyId, tenantId, names, contactValue, optional
-   *     department)
+   * @param request admin user creation request (organizationId, tenantId, names, contactValue,
+   *     optional department)
    * @return created user DTO
    */
   UserDto createAdminUser(CreateAdminUserRequest request);

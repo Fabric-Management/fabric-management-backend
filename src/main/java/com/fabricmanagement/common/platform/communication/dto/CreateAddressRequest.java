@@ -22,13 +22,20 @@ public class CreateAddressRequest {
 
   private String state;
 
+  private String district;
+
   private String postalCode;
 
   @NotBlank(message = "Country is required")
   private String country;
 
+  private String countryCode;
+
+  private String addressLine2;
+
   @NotNull(message = "Address type is required")
   private AddressType addressType;
 
+  @NotBlank(message = "Location Name (Label) is required")
   private String label;
 }

@@ -460,42 +460,6 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
-                    <execution>
-                        <id>jacoco-check</id>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                        <configuration>
-                            <excludes>
-                                <!-- Exclude DTOs -->
-                                <exclude>**/dto/**/*Dto.class</exclude>
-                                <exclude>**/dto/**/*Request.class</exclude>
-                                <exclude>**/dto/**/*Response.class</exclude>
-                                <exclude>**/*Dto$*Builder.class</exclude>
-                                <exclude>**/*Request$*Builder.class</exclude>
-                                <exclude>**/*Response$*Builder.class</exclude>
-                                <!-- Exclude Events -->
-                                <exclude>**/event/**/*Event.class</exclude>
-                                <exclude>**/*Event$*Builder.class</exclude>
-                                <!-- Exclude Application main class -->
-                                <exclude>**/*Application.class</exclude>
-                                <!-- Exclude Config classes -->
-                                <exclude>**/config/**/*Config.class</exclude>
-                            </excludes>
-                            <rules>
-                                <rule>
-                                    <element>BUNDLE</element>
-                                    <limits>
-                                        <limit>
-                                            <counter>LINE</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.80</minimum>
-                                        </limit>
-                                    </limits>
-                                </rule>
-                            </rules>
-                        </configuration>
-                    </execution>
                 </executions>
             </plugin>
 
@@ -628,6 +592,54 @@
             <properties>
                 <spring.profiles.active>prod</spring.profiles.active>
             </properties>
+        </profile>
+
+        <!-- Enforce coverage only in CI; local verify skips check when tests are skipped (e.g. no Docker). -->
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <version>${jacoco-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>jacoco-check</id>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                                <configuration>
+                                    <excludes>
+                                        <exclude>**/dto/**/*Dto.class</exclude>
+                                        <exclude>**/dto/**/*Request.class</exclude>
+                                        <exclude>**/dto/**/*Response.class</exclude>
+                                        <exclude>**/*Dto$*Builder.class</exclude>
+                                        <exclude>**/*Request$*Builder.class</exclude>
+                                        <exclude>**/*Response$*Builder.class</exclude>
+                                        <exclude>**/event/**/*Event.class</exclude>
+                                        <exclude>**/*Event$*Builder.class</exclude>
+                                        <exclude>**/*Application.class</exclude>
+                                        <exclude>**/config/**/*Config.class</exclude>
+                                    </excludes>
+                                    <rules>
+                                        <rule>
+                                            <element>BUNDLE</element>
+                                            <limits>
+                                                <limit>
+                                                    <counter>LINE</counter>
+                                                    <value>COVEREDRATIO</value>
+                                                    <minimum>0.80</minimum>
+                                                </limit>
+                                            </limits>
+                                        </rule>
+                                    </rules>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>

@@ -61,8 +61,8 @@ public class SystemPrompts {
     prompt.append("- Always ask confirmation before creating\n\n");
 
     prompt.append("## Confirmations:\n");
-    prompt.append("- Turkish: evet, onaylıyorum, tamam, yap\n");
-    prompt.append("- English: yes, confirm, proceed, ok\n");
+    prompt.append("- Accept: yes, confirm, proceed, ok, do it, go ahead\n");
+    prompt.append("- Prefer responding in English unless user writes in another language.\n");
 
     // Add user context if available
     if (context != null && context.getUser() != null) {

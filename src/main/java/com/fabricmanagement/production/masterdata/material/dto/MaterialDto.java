@@ -22,6 +22,7 @@ public class MaterialDto {
   private MaterialType materialType;
   private String unit;
   private Boolean isActive;
+  private Long version;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -32,6 +33,7 @@ public class MaterialDto {
         .uid(entity.getUid())
         .materialType(entity.getMaterialType())
         .unit(entity.getUnit())
+        .version(entity.getVersion())
         .isActive(entity.getIsActive())
         .createdAt(entity.getCreatedAt())
         .updatedAt(entity.getUpdatedAt())

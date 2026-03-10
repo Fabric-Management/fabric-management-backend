@@ -84,7 +84,7 @@ public class UserInvitationEventListener {
               RegistrationToken regToken =
                   RegistrationToken.create(
                       event.getContactValue(), RegistrationTokenType.INVITED_USER);
-              regToken.linkTo(event.getUserId(), event.getCompanyId());
+              regToken.linkTo(event.getUserId(), event.getOrganizationId());
               regToken.setTenantId(event.getTenantId());
               return registrationTokenRepository.save(regToken);
             });

@@ -155,27 +155,27 @@ public class FabricAIService {
           && (errorMessage.contains("502") || errorMessage.contains("Bad Gateway"))) {
         log.error("OpenAI API unavailable (502 Bad Gateway) - service temporarily down");
         throw new RuntimeException(
-            "AI servisi şu anda geçici olarak kullanılamıyor. Lütfen birkaç saniye sonra tekrar deneyin. "
-                + "Sorun devam ederse, lütfen sistem yöneticinize bildirin.",
+            "AI service is temporarily unavailable. Please try again in a few seconds. "
+                + "If the problem persists, please contact your system administrator.",
             e);
       } else if (errorMessage != null
           && (errorMessage.contains("503") || errorMessage.contains("Service Unavailable"))) {
         log.error("OpenAI API service unavailable");
         throw new RuntimeException(
-            "AI servisi şu anda bakımda. Lütfen birkaç dakika sonra tekrar deneyin.", e);
+            "AI service is currently under maintenance. Please try again in a few minutes.", e);
       } else if (errorMessage != null
           && (errorMessage.contains("429") || errorMessage.contains("Too Many Requests"))) {
         log.error("OpenAI API rate limit exceeded");
         throw new RuntimeException(
-            "AI servisi çok fazla istek alıyor. Lütfen birkaç saniye sonra tekrar deneyin.", e);
+            "AI service is receiving too many requests. Please try again in a few seconds.", e);
       } else if (errorMessage != null
           && errorMessage.contains("after")
           && errorMessage.contains("attempts")) {
         // All retries exhausted
         log.error("OpenAI API failed after all retries: {}", errorMessage);
         throw new RuntimeException(
-            "AI servisine bağlanılamıyor. Lütfen internet bağlantınızı kontrol edip tekrar deneyin. "
-                + "Sorun devam ederse, lütfen sistem yöneticinize bildirin.",
+            "Could not connect to AI service. Please check your internet connection and try again. "
+                + "If the problem persists, please contact your system administrator.",
             e);
       } else {
         // Other errors - rethrow with original message

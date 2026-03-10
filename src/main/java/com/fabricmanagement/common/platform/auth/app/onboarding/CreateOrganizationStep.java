@@ -39,13 +39,16 @@ public class CreateOrganizationStep implements OnboardingStep {
 
     // Context already holds OrganizationType directly
     OrganizationType organizationType =
-        context.getCompanyType() != null
-            ? context.getCompanyType()
+        context.getOrganizationType() != null
+            ? context.getOrganizationType()
             : OrganizationType.VERTICAL_MILL;
 
     OrganizationDto organization =
         organizationFacade.createRootOrganization(
-            context.getTenantId(), context.getCompanyName(), context.getTaxId(), organizationType);
+            context.getTenantId(),
+            context.getOrganizationName(),
+            context.getTaxId(),
+            organizationType);
 
     context.setOrganizationId(organization.getId());
     context.setOrganizationUid(organization.getUid());

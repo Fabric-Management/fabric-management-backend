@@ -21,8 +21,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateAdminUserRequest {
 
-  @NotNull(message = "Company ID is required")
-  private UUID companyId;
+  @NotNull(message = "Organization ID is required")
+  private UUID organizationId;
 
   @NotNull(message = "Tenant ID is required")
   private UUID tenantId;
@@ -38,7 +38,4 @@ public class CreateAdminUserRequest {
   @NotBlank(message = "Contact value (email) is required")
   @Size(max = 255, message = "Contact value must be at most 255 characters")
   private String contactValue;
-
-  /** Optional department name for assignment (must exist in seed data). */
-  private String department;
 }

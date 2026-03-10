@@ -64,9 +64,9 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 ### SelfSignupRequest
 | Alan | Java Tipi | Not |
 |------|-----------|-----|
-| companyName | String | |
+| organizationName | String | |
 | taxId | String | |
-| companyType | CompanyType | enum |
+| organizationType | OrganizationType | enum |
 | firstName | String | |
 | lastName | String | |
 | email | String | @Email |
@@ -88,14 +88,14 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 ### TenantOnboardingRequest
 | Alan | Java Tipi | Not |
 |------|-----------|-----|
-| companyName | String | |
+| organizationName | String | |
 | taxId | String | |
-| companyType | CompanyType | |
+| organizationType | OrganizationType | |
 | address | String? | |
 | city | String? | |
 | country | String? | |
 | phoneNumber | String? | |
-| companyEmail | String? | @Email |
+| organizationEmail | String? | @Email |
 | adminFirstName | String | |
 | adminLastName | String | |
 | adminContact | String | @Email |
@@ -106,10 +106,10 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 ### TenantOnboardingResponse
 | Alan | Java Tipi |
 |------|-----------|
-| companyId | UUID |
+| organizationId | UUID |
 | tenantId | UUID |
-| companyUid | String |
-| companyName | String |
+| organizationUid | String |
+| organizationName | String |
 | adminUserId | UUID |
 | adminContactValue | String |
 | registrationToken | String |
@@ -151,7 +151,7 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 | firstName | String |
 | lastName | String |
 | displayName | String? |
-| companyId | UUID? |
+| organizationId | UUID? |
 | roleId | UUID? |
 | role | String? | role name |
 | isActive | Boolean? |
@@ -231,7 +231,7 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 | lastName | String | |
 | contactValue | String | |
 | contactType | ContactType (user) | EMAIL \| PHONE |
-| companyId | UUID | |
+| organizationId | UUID | |
 | department | String? | |
 | departmentId | UUID? | |
 | departmentCategoryId | UUID? | |
@@ -261,7 +261,7 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 | lastName | String |
 | contactValue | String |
 | contactType | ContactType (user) | EMAIL \| PHONE |
-| companyId | UUID |
+| organizationId | UUID |
 | department | String? |
 | additionalContacts | List\<ContactData\> |
 | addresses | List\<AddressData\> |
@@ -269,7 +269,7 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 ### CreateAdminUserRequest
 | Alan | Java Tipi |
 |------|-----------|
-| companyId | UUID |
+| organizationId | UUID |
 | tenantId | UUID |
 | firstName | String |
 | lastName | String |
@@ -381,7 +381,7 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 ### CompanyAddressDto
 | Alan | Java Tipi |
 |------|-----------|
-| companyId | UUID |
+| organizationId | UUID |
 | addressId | UUID |
 | address | AddressDto? |
 | isPrimary | Boolean? |
@@ -390,7 +390,7 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 ### CompanyContactDto
 | Alan | Java Tipi |
 |------|-----------|
-| companyId | UUID |
+| organizationId | UUID |
 | contactId | UUID |
 | contact | ContactDto? |
 | isDefault | Boolean? |
@@ -487,7 +487,7 @@ Backend Java DTO'larının alan listesi. TypeScript interface/type oluştururken
 | id | UUID |
 | tenantId | UUID |
 | uid | String |
-| companyId | UUID |
+| organizationId | UUID |
 | departmentName | String |
 | departmentCode | String? |
 | description | String? |

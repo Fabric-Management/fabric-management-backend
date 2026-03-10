@@ -21,6 +21,7 @@ public class FiberCategoryDto {
   private String description;
   private Integer displayOrder;
   private Boolean isActive;
+  private Long version;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -33,6 +34,7 @@ public class FiberCategoryDto {
         .categoryName(entity.getCategoryName())
         .description(entity.getDescription())
         .displayOrder(entity.getDisplayOrder())
+        .version(entity.getVersion())
         .isActive(entity.getIsActive())
         .createdAt(entity.getCreatedAt())
         .updatedAt(entity.getUpdatedAt())

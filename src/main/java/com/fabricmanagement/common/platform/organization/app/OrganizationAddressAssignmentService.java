@@ -7,8 +7,11 @@ import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.common.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.common.platform.organization.domain.event.OrganizationAddressAssignedEvent;
+import com.fabricmanagement.common.platform.organization.dto.AddressDeletionImpactDto;
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.common.platform.user.domain.UserWorkLocation;
+import com.fabricmanagement.common.platform.user.infra.repository.UserWorkLocationRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,16 +32,19 @@ public class OrganizationAddressAssignmentService
   private final OrganizationRepository organizationRepository;
   private final AddressRepository addressRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
+  private final UserWorkLocationRepository userWorkLocationRepository;
   private final DomainEventPublisher eventPublisher;
 
   public OrganizationAddressAssignmentService(
       OrganizationRepository organizationRepository,
       AddressRepository addressRepository,
       OrganizationAddressRepository organizationAddressRepository,
+      UserWorkLocationRepository userWorkLocationRepository,
       DomainEventPublisher eventPublisher) {
     this.organizationRepository = organizationRepository;
     this.addressRepository = addressRepository;
     this.organizationAddressRepository = organizationAddressRepository;
+    this.userWorkLocationRepository = userWorkLocationRepository;
     this.eventPublisher = eventPublisher;
   }
 
@@ -119,7 +125,7 @@ public class OrganizationAddressAssignmentService
     validateAssignment(organizationId, addressId);
 
     if (organizationAddressRepository
-        .findByOrganizationIdAndAddressId(organizationId, addressId)
+        .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
         .isPresent()) {
       throw new IllegalArgumentException("Address is already assigned to this organization");
     }
@@ -162,7 +168,10 @@ public class OrganizationAddressAssignmentService
 
   @Transactional
   public OrganizationAddress setAsPrimary(UUID organizationId, UUID addressId) {
-    return setPrimary(organizationId, addressId);
+    setPrimary(organizationId, addressId);
+    return organizationAddressRepository
+        .findActiveWithAddressByOrganizationIdAndAddressId(organizationId, addressId)
+        .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
   }
 
   @Transactional
@@ -170,7 +179,7 @@ public class OrganizationAddressAssignmentService
     log.info("Setting headquarters: organizationId={}, addressId={}", organizationId, addressId);
     OrganizationAddress junction =
         organizationAddressRepository
-            .findByOrganizationIdAndAddressId(organizationId, addressId)
+            .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
             .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
     organizationAddressRepository
         .findHeadquartersByOrganizationId(organizationId)
@@ -182,7 +191,10 @@ public class OrganizationAddressAssignmentService
               }
             });
     junction.setIsHeadquarters(true);
-    return organizationAddressRepository.save(junction);
+    organizationAddressRepository.save(junction);
+    return organizationAddressRepository
+        .findActiveWithAddressByOrganizationIdAndAddressId(organizationId, addressId)
+        .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
   }
 
   @Transactional(readOnly = true)
@@ -198,5 +210,103 @@ public class OrganizationAddressAssignmentService
   @Transactional(readOnly = true)
   public Optional<OrganizationAddress> getHeadquarters(UUID organizationId) {
     return organizationAddressRepository.findHeadquartersByOrganizationId(organizationId);
+  }
+
+  /**
+   * Analyzes the impact of deleting an organization address. Returns the number and details of
+   * users whose work location would be affected.
+   */
+  @Transactional(readOnly = true)
+  public AddressDeletionImpactDto getAddressDeletionImpact(UUID organizationId, UUID addressId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info(
+        "Analyzing deletion impact: tenantId={}, organizationId={}, addressId={}",
+        tenantId,
+        organizationId,
+        addressId);
+
+    OrganizationAddress orgAddress =
+        organizationAddressRepository
+            .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Organization address not found"));
+
+    Address address =
+        addressRepository
+            .findById(addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+
+    List<UserWorkLocation> affectedLocations =
+        userWorkLocationRepository.findByOrgAddressId(orgAddress.getAddressId());
+
+    List<AddressDeletionImpactDto.AffectedUserDto> affectedUsers =
+        affectedLocations.stream()
+            .map(
+                wl -> {
+                  String displayName = wl.getUser() != null ? wl.getUser().getDisplayName() : null;
+                  return AddressDeletionImpactDto.AffectedUserDto.builder()
+                      .userId(wl.getUserId())
+                      .displayName(displayName)
+                      .isPrimaryLocation(Boolean.TRUE.equals(wl.getIsPrimary()))
+                      .build();
+                })
+            .toList();
+
+    return AddressDeletionImpactDto.builder()
+        .addressId(addressId)
+        .addressLabel(address.getLabel())
+        .affectedUserCount(affectedUsers.size())
+        .affectedUsers(affectedUsers)
+        .hasOrganizationAssignment(true)
+        .build();
+  }
+
+  /**
+   * Safely removes an organization address with full cascade:
+   *
+   * <ol>
+   *   <li>Hard-delete all UserWorkLocation junctions (users lose this location)
+   *   <li>Soft-delete the OrganizationAddress junction
+   *   <li>Soft-delete the underlying Address entity
+   * </ol>
+   */
+  @Transactional
+  public void safeRemoveAddress(UUID organizationId, UUID addressId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.info(
+        "Safe-removing org address: tenantId={}, organizationId={}, addressId={}",
+        tenantId,
+        organizationId,
+        addressId);
+
+    OrganizationAddress orgAddress =
+        organizationAddressRepository
+            .findByOrganizationIdAndAddressId(organizationId, addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Organization address not found"));
+
+    Address address =
+        addressRepository
+            .findById(addressId)
+            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+
+    if (!address.getTenantId().equals(tenantId)) {
+      throw new IllegalArgumentException("Address does not belong to current tenant");
+    }
+
+    long affectedCount = userWorkLocationRepository.countByOrgAddressId(orgAddress.getAddressId());
+    log.info(
+        "Cascading deletion: {} user work-location assignments will be removed", affectedCount);
+
+    userWorkLocationRepository.deleteAllByOrgAddressId(orgAddress.getAddressId());
+
+    orgAddress.delete();
+    organizationAddressRepository.save(orgAddress);
+
+    address.delete();
+    addressRepository.save(address);
+
+    log.info(
+        "Safe-remove completed: addressId={}, cascaded {} user locations",
+        addressId,
+        affectedCount);
   }
 }

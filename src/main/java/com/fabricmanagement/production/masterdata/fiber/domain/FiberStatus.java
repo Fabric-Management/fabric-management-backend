@@ -12,7 +12,7 @@ package com.fabricmanagement.production.masterdata.fiber.domain;
  * </pre>
  *
  * <p><b>Note:</b> Masterdata Fiber is a catalog definition. Physical usage tracking is handled by
- * FiberBatch (execution layer). Status here is simplified: ACTIVE = available for use, OBSOLETE =
+ * Batch (execution layer). Status here is simplified: ACTIVE = available for use, OBSOLETE =
  * discontinued.
  */
 public enum FiberStatus {

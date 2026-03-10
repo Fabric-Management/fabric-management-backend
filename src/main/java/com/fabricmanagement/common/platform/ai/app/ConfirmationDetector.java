@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 /**
  * Confirmation Detector - Detects user confirmation in messages.
  *
- * <p>Recognizes confirmation patterns in Turkish and English.
+ * <p>Recognizes confirmation patterns in English (and legacy Turkish for backward compatibility).
  */
 @Component
 @Slf4j
@@ -15,7 +15,6 @@ public class ConfirmationDetector {
 
   private static final Set<String> CONFIRMATION_PATTERNS =
       Set.of(
-          // Turkish
           "evet",
           "onaylıyorum",
           "onayla",
@@ -27,7 +26,6 @@ public class ConfirmationDetector {
           "evet onaylıyorum",
           "onaylıyorum evet",
           "tamam onayla",
-          // English
           "yes",
           "confirm",
           "proceed",
@@ -69,9 +67,10 @@ public class ConfirmationDetector {
 
     String normalized = message.toLowerCase();
 
-    return normalized.contains("onaylıyor musunuz")
-        || normalized.contains("onaylar mısınız")
+    return normalized.contains("do you confirm")
         || normalized.contains("confirm")
+        || normalized.contains("onaylıyor musunuz")
+        || normalized.contains("onaylar mısınız")
         || normalized.contains("proceed")
         || normalized.contains("do you want")
         || normalized.contains("would you like");

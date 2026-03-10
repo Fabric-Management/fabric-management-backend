@@ -1,6 +1,7 @@
 package com.fabricmanagement.human.core.employee.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -31,6 +32,9 @@ import lombok.Setter;
           columnList = "tenant_id,employee_number",
           unique = true)
     })
+@AttributeOverride(
+    name = "uid",
+    column = @Column(name = "employee_number", insertable = false, updatable = false))
 @Getter
 @Setter
 @Builder
@@ -83,8 +87,12 @@ public class Employee extends BaseEntity {
     return Period.between(birthDate, LocalDate.now()).getYears();
   }
 
-  public boolean isActive() {
+  public boolean isCurrentlyEmployed() {
     return terminationDate == null;
+  }
+
+  public void terminate(LocalDate terminationDate) {
+    this.terminationDate = terminationDate;
   }
 
   public String getFormattedDisplayName(String firstName, String lastName) {

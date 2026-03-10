@@ -30,7 +30,6 @@ import lombok.*;
  *     .postalCode("34000")
  *     .country("Turkey")
  *     .addressType(AddressType.HOME)
- *     .isPrimary(true)
  *     .label("Home")
  *     .build();
  *
@@ -109,10 +108,14 @@ public class Address extends BaseEntity {
   /**
    * District/County/Sub-administrative area
    *
-   * <p>Examples: "Kadıköy", "Westminster", "Bavaria"
+   * <p>Examples: "Brooklyn", "Westminster", "Bavaria"
    */
   @Column(name = "district", length = 100)
   private String district;
+
+  /** Second address line: apartment, floor, suite, building name */
+  @Column(name = "address_line2", length = 255)
+  private String addressLine2;
 
   /** Latitude coordinate (from Google Geocoding) */
   @Column(name = "latitude")
@@ -134,17 +137,6 @@ public class Address extends BaseEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "address_type", nullable = false, length = 50)
   private AddressType addressType;
-
-  /**
-   * Primary address flag
-   *
-   * <p>true = primary address for this owner (User or Company)
-   *
-   * <p>Multiple addresses can have isPrimary = true (one per type)
-   */
-  @Column(name = "is_primary", nullable = false)
-  @Builder.Default
-  private Boolean isPrimary = false;
 
   /**
    * Label for categorization
@@ -177,16 +169,6 @@ public class Address extends BaseEntity {
    */
   @Column(name = "formatted_address", length = 500)
   private String formattedAddress;
-
-  /** Mark address as primary */
-  public void setAsPrimary() {
-    this.isPrimary = true;
-  }
-
-  /** Remove primary flag */
-  public void removePrimary() {
-    this.isPrimary = false;
-  }
 
   /**
    * Get full address as formatted string

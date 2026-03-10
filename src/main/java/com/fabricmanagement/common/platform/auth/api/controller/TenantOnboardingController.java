@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Authorization: Bearer {admin-token}
  *
  * Creates:
- * - New tenant company (tenant_id = company_id)
+ * - New tenant and organization
  * - Admin user (pre-approved)
  * - FabricOS subscription (mandatory, trial)
  * - Selected OS subscriptions (trial)
@@ -47,7 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Tenant Onboarding (Admin)",
     description =
-        "Sales-led tenant creation. Creates tenant company, admin user, subscriptions, and sends welcome email with setup link. Requires platform admin in production.")
+        "Sales-led tenant creation. Creates tenant and organization, admin user, subscriptions, and sends welcome email with setup link. Requires platform admin in production.")
 public class TenantOnboardingController {
 
   private final TenantOnboardingService onboardingService;
@@ -55,7 +55,7 @@ public class TenantOnboardingController {
   @Operation(
       summary = "Create tenant (sales-led)",
       description =
-          "Creates a new tenant company with tenant_id = company_id, admin user, selected OS subscriptions (trial), and registration token. Sends welcome email to admin with setup link. In production this endpoint should be protected with PLATFORM_ADMIN role.")
+          "Creates a new tenant and organization, admin user, selected OS subscriptions (trial), and registration token. Sends welcome email to admin with setup link. In production this endpoint should be protected with PLATFORM_ADMIN role.")
   @io.swagger.v3.oas.annotations.responses.ApiResponse(
       responseCode = "200",
       description = "Tenant created successfully; welcome email sent to admin",
@@ -70,15 +70,15 @@ public class TenantOnboardingController {
       @Valid @RequestBody TenantOnboardingRequest request) {
 
     log.info(
-        "Admin onboarding request: company={}, admin={}",
-        request.getCompanyName(),
+        "Admin onboarding request: organizationName={}, admin={}",
+        request.getOrganizationName(),
         request.getAdminContact());
 
     TenantOnboardingResponse response = onboardingService.createSalesLedTenant(request);
 
     log.info(
-        "✅ Tenant onboarded successfully: companyUid={}, setupUrl={}",
-        response.getCompanyUid(),
+        "✅ Tenant onboarded successfully: organizationUid={}, setupUrl={}",
+        response.getOrganizationUid(),
         response.getSetupUrl());
 
     return ResponseEntity.ok(

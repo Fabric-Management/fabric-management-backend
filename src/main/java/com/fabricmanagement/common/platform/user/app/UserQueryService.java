@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * User query service — read-only operations with optional caching.
  *
- * <p>Used by UserFacade and controllers for listing and lookup. Cache keys are tenant/company
+ * <p>Used by UserFacade and controllers for listing and lookup. Cache keys are tenant/organization
  * scoped; invalidation is handled by {@link UserCacheInvalidationService}.
  *
  * <p>All user queries are enriched with Employee (HR) data when available, so UserDto always
@@ -32,13 +32,22 @@ public class UserQueryService {
 
   private final UserRepository userRepository;
   private final EmployeeService employeeService;
+  private final UserWorkLocationService userWorkLocationService;
 
   @Transactional(readOnly = true)
   public Optional<UserDto> findById(UUID tenantId, UUID userId) {
     log.debug("Finding user: tenantId={}, userId={}", tenantId, userId);
     return userRepository
         .findByTenantIdAndId(tenantId, userId)
-        .map(user -> UserDto.from(user, employeeService.getEmployeeByUserId(userId).orElse(null)));
+        .map(
+            user -> {
+              UserDto dto =
+                  UserDto.from(user, employeeService.getEmployeeByUserId(userId).orElse(null));
+              Map<UUID, String> labelMap =
+                  userWorkLocationService.getPrimaryLocationLabels(tenantId, List.of(userId));
+              dto.setWorkLocationLabel(labelMap.get(userId));
+              return dto;
+            });
   }
 
   @Transactional(readOnly = true)
@@ -60,11 +69,14 @@ public class UserQueryService {
   }
 
   @Transactional(readOnly = true)
-  @Cacheable(value = "users-by-company", key = "#tenantId.toString() + '-' + #companyId.toString()")
-  public List<UserDto> findByCompany(UUID tenantId, UUID companyId) {
-    log.debug("Finding users by company: tenantId={}, companyId={}", tenantId, companyId);
+  @Cacheable(
+      value = "users-by-organization",
+      key = "#tenantId.toString() + '-' + #organizationId.toString()")
+  public List<UserDto> findByOrganization(UUID tenantId, UUID organizationId) {
+    log.debug(
+        "Finding users by organization: tenantId={}, organizationId={}", tenantId, organizationId);
     List<User> users =
-        userRepository.findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, companyId);
+        userRepository.findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, organizationId);
     return enrichWithEmployeeData(tenantId, users);
   }
 
@@ -106,8 +118,8 @@ public class UserQueryService {
   }
 
   /**
-   * Batch-enrich a list of users with their Employee data. Single query for all employees avoids
-   * N+1.
+   * Batch-enrich a list of users with Employee data and primary work-location labels. Two batch
+   * queries avoid N+1.
    */
   private List<UserDto> enrichWithEmployeeData(UUID tenantId, List<User> users) {
     if (users.isEmpty()) {
@@ -115,6 +127,16 @@ public class UserQueryService {
     }
     List<UUID> userIds = users.stream().map(User::getId).toList();
     Map<UUID, Employee> employeeMap = employeeService.getEmployeesByUserIds(tenantId, userIds);
-    return users.stream().map(user -> UserDto.from(user, employeeMap.get(user.getId()))).toList();
+    Map<UUID, String> labelMap =
+        userWorkLocationService.getPrimaryLocationLabels(tenantId, userIds);
+
+    return users.stream()
+        .map(
+            user -> {
+              UserDto dto = UserDto.from(user, employeeMap.get(user.getId()));
+              dto.setWorkLocationLabel(labelMap.get(user.getId()));
+              return dto;
+            })
+        .toList();
   }
 }

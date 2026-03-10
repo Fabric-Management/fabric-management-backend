@@ -59,9 +59,6 @@ public class User extends BaseEntity {
   @Column(name = "last_name", nullable = false, length = 100)
   private String lastName;
 
-  @Column(name = "display_name", nullable = false, length = 255)
-  private String displayName;
-
   /**
    * The organization this user belongs to.
    *
@@ -98,27 +95,6 @@ public class User extends BaseEntity {
   @Column(name = "onboarding_completed_at")
   private Instant onboardingCompletedAt;
 
-  @PrePersist
-  protected void onCreate() {
-    super.onCreate();
-    if (this.displayName == null || this.displayName.isBlank()) {
-      this.displayName = generateDisplayName();
-    }
-  }
-
-  @PreUpdate
-  protected void onUpdate() {
-    super.onUpdate();
-    this.displayName = generateDisplayName();
-  }
-
-  private String generateDisplayName() {
-    if (this.firstName == null || this.lastName == null) {
-      return null;
-    }
-    return this.firstName + " " + this.lastName;
-  }
-
   public static User create(String firstName, String lastName, UUID organizationId) {
     return create(firstName, lastName, organizationId, UserType.INTERNAL);
   }
@@ -136,6 +112,10 @@ public class User extends BaseEntity {
   public void updateProfile(String firstName, String lastName) {
     this.firstName = firstName;
     this.lastName = lastName;
+  }
+
+  public String getDisplayName() {
+    return this.firstName + " " + this.lastName;
   }
 
   public void updateLastActive() {

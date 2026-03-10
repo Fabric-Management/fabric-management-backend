@@ -19,6 +19,7 @@ public class AddressDto {
   private UUID tenantId;
   private String uid;
   private String streetAddress;
+  private String addressLine2;
   private String city;
   private String state;
   private String district;
@@ -26,7 +27,6 @@ public class AddressDto {
   private String country;
   private String countryCode;
   private AddressType addressType;
-  private Boolean isPrimary;
   private String label;
   private String contactPhone;
   private String contactEmail;
@@ -45,6 +45,7 @@ public class AddressDto {
         .tenantId(address.getTenantId())
         .uid(address.getUid())
         .streetAddress(address.getStreetAddress())
+        .addressLine2(address.getAddressLine2())
         .city(address.getCity())
         .state(address.getState())
         .district(address.getDistrict())
@@ -52,7 +53,6 @@ public class AddressDto {
         .country(address.getCountry())
         .countryCode(address.getCountryCode())
         .addressType(address.getAddressType())
-        .isPrimary(address.getIsPrimary())
         .label(address.getLabel())
         .contactPhone(address.getContactPhone())
         .contactEmail(address.getContactEmail())
