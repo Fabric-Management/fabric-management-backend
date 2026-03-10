@@ -17,8 +17,11 @@ import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCa
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCatalogSummaryDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeLinkRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
@@ -30,6 +33,7 @@ import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRe
 import com.fabricmanagement.production.masterdata.material.domain.Material;
 import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -307,6 +311,7 @@ public class FiberService implements FiberFacade {
 
     return fiberRepository
         .findByTenantIdAndId(tenantId, id)
+        .or(() -> fiberRepository.findByTenantIdAndId(TenantContext.SYSTEM_TENANT_ID, id))
         .map(FiberDto::from)
         .map(this::enrichFiberDto);
   }
@@ -324,21 +329,60 @@ public class FiberService implements FiberFacade {
   @Transactional(readOnly = true)
   public List<FiberDto> getAll() {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Getting all fibers: tenantId={}", tenantId);
+    log.debug("Getting all fibers: tenantId={} (including platform seed)", tenantId);
 
-    return fiberRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+    List<UUID> tenantIds = new ArrayList<>();
+    tenantIds.add(tenantId);
+    if (!TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
+      tenantIds.add(TenantContext.SYSTEM_TENANT_ID);
+    }
+    return fiberRepository.findByTenantIdInAndIsActiveTrueOrderByFiberName(tenantIds).stream()
         .map(FiberDto::from)
         .map(this::enrichFiberDto)
         .toList();
   }
 
+  /** Catalog summary: reference data + all fibers (tenant + platform seed) for one-shot UI load. */
+  @Transactional(readOnly = true)
+  public FiberCatalogSummaryDto getCatalogSummary() {
+    List<FiberCategoryDto> categories =
+        fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
+    List<FiberIsoCodeDto> isoCodes =
+        fiberIsoCodeRepository.findByIsActiveTrue().stream().map(FiberIsoCodeDto::from).toList();
+    List<FiberAttributeDto> attributes =
+        fiberAttributeRepository.findByIsActiveTrue().stream()
+            .map(FiberAttributeDto::from)
+            .toList();
+    List<FiberCertificationDto> certifications =
+        fiberCertificationRepository.findByIsActiveTrue().stream()
+            .map(FiberCertificationDto::from)
+            .toList();
+    List<FiberDto> fibers = getAll();
+    return FiberCatalogSummaryDto.builder()
+        .categories(categories)
+        .isoCodes(isoCodes)
+        .attributes(attributes)
+        .certifications(certifications)
+        .fibers(fibers)
+        .build();
+  }
+
   @Transactional(readOnly = true)
   public List<FiberDto> searchByName(String fiberName) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Searching fibers by name: tenantId={}, name={}", tenantId, fiberName);
+    log.debug(
+        "Searching fibers by name: tenantId={}, name={} (including platform seed)",
+        tenantId,
+        fiberName);
 
+    List<UUID> tenantIds = new ArrayList<>();
+    tenantIds.add(tenantId);
+    if (!TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
+      tenantIds.add(TenantContext.SYSTEM_TENANT_ID);
+    }
     return fiberRepository
-        .findByTenantIdAndFiberNameContainingIgnoreCase(tenantId, fiberName)
+        .findByTenantIdInAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
+            tenantIds, fiberName)
         .stream()
         .map(FiberDto::from)
         .map(this::enrichFiberDto)
@@ -457,12 +501,7 @@ public class FiberService implements FiberFacade {
   @Override
   @Transactional(readOnly = true)
   public Optional<FiberDto> findById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("FiberFacade: Finding fiber: tenantId={}, id={}", tenantId, id);
-    return fiberRepository
-        .findByTenantIdAndId(tenantId, id)
-        .map(FiberDto::from)
-        .map(this::enrichFiberDto);
+    return getById(id);
   }
 
   @Override
@@ -485,7 +524,8 @@ public class FiberService implements FiberFacade {
   @Transactional(readOnly = true)
   public boolean exists(UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent();
+    return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent()
+        || fiberRepository.findByTenantIdAndId(TenantContext.SYSTEM_TENANT_ID, id).isPresent();
   }
 
   /**

@@ -57,10 +57,10 @@ public class AssignContactAndAddressStep implements OnboardingStep {
     }
 
     // Create and assign contact if provided (email or phone)
-    if (context.getCompanyEmail() != null && !context.getCompanyEmail().isBlank()) {
+    if (context.getOrganizationEmail() != null && !context.getOrganizationEmail().isBlank()) {
       var contact =
           contactService.createContact(
-              context.getCompanyEmail(), ContactType.EMAIL, "Organization", false, null);
+              context.getOrganizationEmail(), ContactType.EMAIL, "Organization", false, null);
       contactAssignmentService.assignContact(organizationId, contact.getId(), true, null);
     }
     if (context.getPhoneNumber() != null && !context.getPhoneNumber().isBlank()) {

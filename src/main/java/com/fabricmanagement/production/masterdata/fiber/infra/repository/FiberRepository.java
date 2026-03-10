@@ -34,8 +34,21 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
   /** Find all active fibers for a tenant. */
   List<Fiber> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
+  /**
+   * Find all active fibers for the given tenants (e.g. current tenant + system tenant for platform
+   * seed). Used so tenant organizations can use platform organization's fiber catalog.
+   */
+  @Query(
+      "SELECT f FROM Fiber f WHERE f.tenantId IN :tenantIds AND f.isActive = true ORDER BY f.fiberName")
+  List<Fiber> findByTenantIdInAndIsActiveTrueOrderByFiberName(
+      @Param("tenantIds") List<UUID> tenantIds);
+
   /** Find fibers by name (case-insensitive). */
   List<Fiber> findByTenantIdAndFiberNameContainingIgnoreCase(UUID tenantId, String fiberName);
+
+  /** Find fibers by name across multiple tenants (current + system for platform seed). */
+  List<Fiber> findByTenantIdInAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
+      List<UUID> tenantIds, String fiberName);
 
   /** Find fibers by status. */
   List<Fiber> findByTenantIdAndStatusAndIsActiveTrue(UUID tenantId, FiberStatus status);

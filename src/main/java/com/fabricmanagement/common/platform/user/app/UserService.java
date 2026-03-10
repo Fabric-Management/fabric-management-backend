@@ -79,8 +79,8 @@ public class UserService implements UserFacade {
 
   @Override
   @Transactional(readOnly = true)
-  public List<UserDto> findByCompany(UUID tenantId, UUID companyId) {
-    return userQueryService.findByCompany(tenantId, companyId);
+  public List<UserDto> findByOrganization(UUID tenantId, UUID organizationId) {
+    return userQueryService.findByOrganization(tenantId, organizationId);
   }
 
   @Transactional(readOnly = true)

@@ -73,8 +73,8 @@ public class RegistrationToken extends BaseEntity {
   @Column(name = "user_id")
   private UUID userId;
 
-  @Column(name = "company_id")
-  private UUID companyId;
+  @Column(name = "organization_id")
+  private UUID organizationId;
 
   /**
    * Create new registration token.
@@ -118,14 +118,14 @@ public class RegistrationToken extends BaseEntity {
   }
 
   /**
-   * Link token to user and company.
+   * Link token to user and organization.
    *
    * @param userId User ID
-   * @param companyId Company ID
+   * @param organizationId Organization ID
    */
-  public void linkTo(UUID userId, UUID companyId) {
+  public void linkTo(UUID userId, UUID organizationId) {
     this.userId = userId;
-    this.companyId = companyId;
+    this.organizationId = organizationId;
   }
 
   @Override

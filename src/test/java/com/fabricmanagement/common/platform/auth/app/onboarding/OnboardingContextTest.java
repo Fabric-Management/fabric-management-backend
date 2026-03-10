@@ -23,7 +23,6 @@ class OnboardingContextTest {
     context.setAdminFirstName("Jane");
     context.setAdminLastName("Doe");
     context.setAdminContact("jane@acme.com");
-    context.setAdminDepartment("IT");
 
     CreateAdminUserRequest request = context.toCreateAdminUserRequest();
 
@@ -32,7 +31,6 @@ class OnboardingContextTest {
     assertThat(request.getFirstName()).isEqualTo("Jane");
     assertThat(request.getLastName()).isEqualTo("Doe");
     assertThat(request.getContactValue()).isEqualTo("jane@acme.com");
-    assertThat(request.getDepartment()).isEqualTo("IT");
   }
 
   @Test
@@ -41,7 +39,7 @@ class OnboardingContextTest {
     UUID tenantId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     OnboardingContext context = new OnboardingContext();
-    context.setCompanyName("Acme");
+    context.setOrganizationName("Acme");
     context.setOrganizationId(organizationId);
     context.setTenantId(tenantId);
     context.setOrganizationUid("ACME-001");
@@ -54,11 +52,10 @@ class OnboardingContextTest {
 
     TenantOnboardingResponse result = context.toResult();
 
-    assertThat(result.getCompanyId()).isEqualTo(organizationId);
+    assertThat(result.getOrganizationId()).isEqualTo(organizationId);
     assertThat(result.getTenantId()).isEqualTo(tenantId);
-    assertThat(result.getCompanyUid())
-        .isEqualTo("ACME-001"); // TenantOnboardingResponse still uses companyUid field name
-    assertThat(result.getCompanyName()).isEqualTo("Acme");
+    assertThat(result.getOrganizationUid()).isEqualTo("ACME-001");
+    assertThat(result.getOrganizationName()).isEqualTo("Acme");
     assertThat(result.getAdminUserId()).isEqualTo(userId);
     assertThat(result.getAdminContactValue()).isEqualTo("admin@acme.com");
     assertThat(result.getRegistrationToken()).isEqualTo("token-123");

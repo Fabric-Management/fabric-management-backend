@@ -26,7 +26,7 @@ public class UserCacheInvalidationService {
   private final CacheManager cacheManager;
 
   private static final String CACHE_USERS_BY_TENANT = "users-by-tenant";
-  private static final String CACHE_USERS_BY_COMPANY = "users-by-company";
+  private static final String CACHE_USERS_BY_ORGANIZATION = "users-by-organization";
 
   @EventListener
   public void onUserCreated(UserCreatedEvent event) {
@@ -64,14 +64,14 @@ public class UserCacheInvalidationService {
   }
 
   private void evictOrganizationCache(UUID tenantId, UUID organizationId) {
-    var cache = cacheManager.getCache(CACHE_USERS_BY_COMPANY);
+    var cache = cacheManager.getCache(CACHE_USERS_BY_ORGANIZATION);
     if (cache != null) {
       String key =
           (tenantId != null ? tenantId.toString() : "")
               + "-"
               + (organizationId != null ? organizationId.toString() : "");
       cache.evict(key);
-      log.trace("Evicted cache {} for key={}", CACHE_USERS_BY_COMPANY, key);
+      log.trace("Evicted cache {} for key={}", CACHE_USERS_BY_ORGANIZATION, key);
     }
   }
 }

@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
+import com.fabricmanagement.production.masterdata.material.domain.Material;
 import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -77,7 +79,11 @@ class FiberServiceTest {
     @BeforeEach
     void setUp() {
       fiber = mock(Fiber.class);
+      Material material = mock(Material.class);
+      lenient().when(material.getId()).thenReturn(FIBER_ID);
       when(fiber.getFiberName()).thenReturn(FIBER_NAME);
+      lenient().when(fiber.getVersion()).thenReturn(1L);
+      lenient().when(fiber.getMaterial()).thenReturn(material);
       when(fiberRepository.findByTenantIdAndId(TENANT_ID, FIBER_ID)).thenReturn(Optional.of(fiber));
 
       Map<UUID, BigDecimal> newComposition = Map.of(UUID.randomUUID(), new BigDecimal("60.00"));
@@ -167,7 +173,10 @@ class FiberServiceTest {
     @BeforeEach
     void setUp() {
       fiber = mock(Fiber.class);
-      when(fiber.getFiberName()).thenReturn(FIBER_NAME);
+      Material material = mock(Material.class);
+      when(material.getId()).thenReturn(FIBER_ID);
+      lenient().when(fiber.getFiberName()).thenReturn(FIBER_NAME);
+      lenient().when(fiber.getMaterial()).thenReturn(material);
       when(fiberRepository.findByTenantIdAndId(TENANT_ID, FIBER_ID)).thenReturn(Optional.of(fiber));
     }
 

@@ -45,13 +45,13 @@ public class TenantOnboardingService {
    */
   @Transactional
   public TenantOnboardingResponse createSalesLedTenant(TenantOnboardingRequest request) {
-    log.info("Creating sales-led tenant: company={}", request.getCompanyName());
+    log.info("Creating sales-led tenant: organization={}", request.getOrganizationName());
     validateTenantCreation(request.getTaxId(), request.getAdminContact());
 
     OnboardingContext context = new OnboardingContext();
-    context.setCompanyName(request.getCompanyName());
+    context.setOrganizationName(request.getOrganizationName());
     context.setTaxId(request.getTaxId());
-    context.setCompanyType(request.getCompanyType());
+    context.setOrganizationType(request.getOrganizationType());
     context.setAddress(request.getAddress());
     context.setCity(request.getCity());
     context.setState(request.getState());
@@ -59,11 +59,10 @@ public class TenantOnboardingService {
     context.setPostalCode(request.getPostalCode());
     context.setCountry(request.getCountry());
     context.setPhoneNumber(request.getPhoneNumber());
-    context.setCompanyEmail(request.getCompanyEmail());
+    context.setOrganizationEmail(request.getOrganizationEmail());
     context.setAdminFirstName(request.getAdminFirstName());
     context.setAdminLastName(request.getAdminLastName());
     context.setAdminContact(request.getAdminContact());
-    context.setAdminDepartment(request.getAdminDepartment());
     context.setSelectedOS(
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()
@@ -83,22 +82,22 @@ public class TenantOnboardingService {
    */
   @Transactional
   public TenantOnboardingResponse createSelfServiceTenant(SelfSignupRequest request) {
-    log.info("Creating self-service tenant: company={}", request.getCompanyName());
+    log.info("Creating self-service tenant: organization={}", request.getOrganizationName());
     validateTenantCreation(request.getTaxId(), request.getEmail());
     if (!Boolean.TRUE.equals(request.getAcceptedTerms())) {
       throw new IllegalArgumentException("Terms and conditions must be accepted");
     }
 
     OnboardingContext context = new OnboardingContext();
-    context.setCompanyName(request.getCompanyName());
+    context.setOrganizationName(request.getOrganizationName());
     context.setTaxId(request.getTaxId());
-    context.setCompanyType(request.getCompanyType());
+    context.setOrganizationType(request.getOrganizationType());
     context.setAdminFirstName(request.getFirstName());
     context.setAdminLastName(request.getLastName());
     context.setAdminContact(request.getEmail());
-    // Use admin email as billing email for self-service (no separate company email
+    // Use admin email as billing email for self-service (no separate organization email
     // provided)
-    context.setCompanyEmail(request.getEmail());
+    context.setOrganizationEmail(request.getEmail());
     context.setSelectedOS(
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()

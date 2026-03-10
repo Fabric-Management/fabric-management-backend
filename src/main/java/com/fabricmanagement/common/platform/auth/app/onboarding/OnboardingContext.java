@@ -29,9 +29,9 @@ public class OnboardingContext {
   // ========================================
   // REQUEST DATA (sales-led or self-service)
   // ========================================
-  private String companyName;
+  private String organizationName;
   private String taxId;
-  private OrganizationType companyType;
+  private OrganizationType organizationType;
   private String address;
   private String city;
   private String state;
@@ -39,11 +39,10 @@ public class OnboardingContext {
   private String postalCode;
   private String country;
   private String phoneNumber;
-  private String companyEmail;
+  private String organizationEmail;
   private String adminFirstName;
   private String adminLastName;
   private String adminContact;
-  private String adminDepartment;
   private List<String> selectedOS;
   private int trialDays;
   private boolean salesLed;
@@ -91,16 +90,15 @@ public class OnboardingContext {
         .firstName(adminFirstName)
         .lastName(adminLastName)
         .contactValue(adminContact)
-        .department(adminDepartment)
         .build();
   }
 
   public TenantOnboardingResponse toResult() {
     return TenantOnboardingResponse.builder()
-        .companyId(organizationId)
+        .organizationId(organizationId)
         .tenantId(tenantId)
-        .companyUid(organizationUid)
-        .companyName(companyName)
+        .organizationUid(organizationUid)
+        .organizationName(organizationName)
         .adminUserId(userId)
         .adminContactValue(adminContactValue != null ? adminContactValue : adminContact)
         .registrationToken(registrationToken)

@@ -88,9 +88,9 @@ class TenantOnboardingIntegrationTest {
     String body =
         """
                 {
-                  "companyName": "E2E Test Company",
+                  "organizationName": "E2E Test Company",
                   "taxId": "%s",
-                  "companyType": "SPINNER",
+                  "organizationType": "SPINNER",
                   "firstName": "Test",
                   "lastName": "User",
                   "email": "e2e-test-%s@example.com",
@@ -124,21 +124,21 @@ class TenantOnboardingIntegrationTest {
         .thenReturn("Setup password email body");
 
     long timestamp = System.currentTimeMillis();
-    String companyName = "Tenant Test Company " + timestamp;
+    String organizationName = "Tenant Test Company " + timestamp;
     String taxId = "TENANT" + timestamp % 100000;
     String body =
         """
                 {
-                  "companyName": "%s",
+                  "organizationName": "%s",
                   "taxId": "%s",
-                  "companyType": "VERTICAL_MILL",
+                  "organizationType": "VERTICAL_MILL",
                   "firstName": "Tenant",
                   "lastName": "Test",
                   "email": "tenant-test-%s@example.com",
                   "acceptedTerms": true
                 }
                 """
-            .formatted(companyName, taxId, timestamp);
+            .formatted(organizationName, taxId, timestamp);
 
     mockMvc
         .perform(
@@ -151,11 +151,11 @@ class TenantOnboardingIntegrationTest {
     // Verify Tenant was created in common_tenant table
     Optional<Tenant> tenant =
         tenantRepository.findAll().stream()
-            .filter(t -> t.getName().equals(companyName))
+            .filter(t -> t.getName().equals(organizationName))
             .findFirst();
 
     assertThat(tenant).isPresent();
-    assertThat(tenant.get().getName()).isEqualTo(companyName);
+    assertThat(tenant.get().getName()).isEqualTo(organizationName);
     assertThat(tenant.get().getStatus()).isNotNull();
     assertThat(tenant.get().getIsActive()).isTrue();
   }
@@ -173,21 +173,21 @@ class TenantOnboardingIntegrationTest {
         .thenReturn("Setup password email body");
 
     long timestamp = System.currentTimeMillis();
-    String companyName = "Org Test Company " + timestamp;
+    String organizationName = "Org Test Company " + timestamp;
     String taxId = "ORG" + timestamp % 100000;
     String body =
         """
                 {
-                  "companyName": "%s",
+                  "organizationName": "%s",
                   "taxId": "%s",
-                  "companyType": "WEAVER",
+                  "organizationType": "WEAVER",
                   "firstName": "Org",
                   "lastName": "Test",
                   "email": "org-test-%s@example.com",
                   "acceptedTerms": true
                 }
                 """
-            .formatted(companyName, taxId, timestamp);
+            .formatted(organizationName, taxId, timestamp);
 
     mockMvc
         .perform(
@@ -201,7 +201,8 @@ class TenantOnboardingIntegrationTest {
     Optional<Organization> org = organizationRepository.findByTaxId(taxId);
 
     assertThat(org).isPresent();
-    assertThat(org.get().getName()).isEqualTo(companyName);
+    assertThat(org.get().getName()).isEqualTo(organizationName);
+    assertThat(org.get().getLegalName()).isEqualTo(organizationName);
     assertThat(org.get().getTaxId()).isEqualTo(taxId);
     assertThat(org.get().getOrganizationType().name()).isEqualTo("WEAVER");
     assertThat(org.get().getIsActive()).isTrue();
@@ -212,6 +213,6 @@ class TenantOnboardingIntegrationTest {
     // Verify Tenant exists for this Organization
     Optional<Tenant> tenant = tenantRepository.findById(org.get().getTenantId());
     assertThat(tenant).isPresent();
-    assertThat(tenant.get().getName()).isEqualTo(companyName);
+    assertThat(tenant.get().getName()).isEqualTo(organizationName);
   }
 }

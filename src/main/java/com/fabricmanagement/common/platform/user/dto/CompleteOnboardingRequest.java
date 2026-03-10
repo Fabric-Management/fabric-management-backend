@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.user.dto;
 
+import com.fabricmanagement.common.platform.organization.domain.OrganizationType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -27,11 +28,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CompleteOnboardingRequest {
 
-  // ── Company identity ────────────────────────────────────────────────────────
+  // ── Organization identity ───────────────────────────────────────────────────
 
   /** Display / trading name (max 255, matches Organization.name column). */
-  @Size(max = 255, message = "Company name must not exceed 255 characters")
-  private String companyName;
+  @Size(max = 255, message = "Organization name must not exceed 255 characters")
+  private String organizationName;
+
+  /** Organization type (e.g. VERTICAL_MILL). Optional; set at registration, may be updated. */
+  private OrganizationType organizationType;
 
   /** Tax / VAT identification number (5–50 chars). */
   @Size(min = 5, max = 50, message = "Tax ID must be between 5 and 50 characters")

@@ -48,7 +48,8 @@ public class LoginResponse {
 
   /**
    * Pre-fill data for onboarding form when needsOnboarding is true. Frontend uses user (firstName,
-   * lastName) + onboardingPrefill (primaryEmail, companyName). Serialized as "onboardingPrefill".
+   * lastName) + onboardingPrefill (primaryEmail, organizationName, organizationType). Serialized as
+   * "onboardingPrefill".
    */
   @JsonProperty("onboardingPrefill")
   private OnboardingPrefillDto onboardingPrefill;

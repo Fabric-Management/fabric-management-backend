@@ -102,10 +102,11 @@ public class OrganizationFacade {
    * @param id Organization UUID
    * @param name New name
    * @param taxId New tax ID
+   * @param legalName Legal registered name (optional)
    * @return Updated organization
    */
-  public OrganizationDto updateOrganization(UUID id, String name, String taxId) {
-    return organizationService.updateOrganization(id, name, taxId);
+  public OrganizationDto updateOrganization(UUID id, String name, String taxId, String legalName) {
+    return organizationService.updateOrganization(id, name, taxId, legalName);
   }
 
   /**

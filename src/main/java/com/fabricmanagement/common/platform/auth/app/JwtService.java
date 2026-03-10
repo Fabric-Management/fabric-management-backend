@@ -96,14 +96,11 @@ public class JwtService {
     claims.put("tenant_uid", tenantUid);
     claims.put("user_id", user.getId().toString());
     claims.put("user_uid", user.getUid());
-    // Use organization_id (new), keep company_id for backward compatibility
     claims.put("organization_id", user.getOrganizationId().toString());
-    claims.put("company_id", user.getOrganizationId().toString()); // Backward compat
     claims.put("firstName", user.getFirstName());
     claims.put("lastName", user.getLastName());
     if (organizationType != null) {
       claims.put("organization_type", organizationType);
-      claims.put("company_category", organizationType); // Backward compat
     }
     // Department: primary name (backward compat) + department_codes list +
     // primary_department code

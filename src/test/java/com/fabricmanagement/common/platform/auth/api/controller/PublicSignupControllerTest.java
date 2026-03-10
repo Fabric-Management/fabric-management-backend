@@ -53,14 +53,14 @@ class PublicSignupControllerTest {
   @Test
   @DisplayName("POST /api/public/signup returns 200 and success message")
   void signup_returnsOkAndSuccessMessage() throws Exception {
-    UUID companyId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
     UUID tenantId = UUID.randomUUID();
     TenantOnboardingResponse response =
         TenantOnboardingResponse.builder()
-            .companyId(companyId)
+            .organizationId(organizationId)
             .tenantId(tenantId)
-            .companyUid("SIGNUP-001")
-            .companyName("Signup Co")
+            .organizationUid("SIGNUP-001")
+            .organizationName("Signup Co")
             .adminUserId(UUID.randomUUID())
             .adminContactValue("user@example.com")
             .registrationToken("token-456")
@@ -74,9 +74,9 @@ class PublicSignupControllerTest {
     String body =
         """
         {
-          "companyName": "Signup Co",
+          "organizationName": "Signup Co",
           "taxId": "9876543210",
-          "companyType": "WEAVER",
+          "organizationType": "WEAVER",
           "firstName": "John",
           "lastName": "Doe",
           "email": "user@example.com",

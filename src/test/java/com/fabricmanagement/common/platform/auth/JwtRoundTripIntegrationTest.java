@@ -56,7 +56,7 @@ import org.testcontainers.utility.DockerImageName;
  *   <li>tenant_id - references common_tenant
  *   <li>organization_id - references common_organization
  *   <li>user_id - references common_user
- *   <li>company_id - backward compat (equals organization_id)
+ *   <li>organization_id - references common_organization
  * </ul>
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -116,22 +116,22 @@ class JwtRoundTripIntegrationTest {
     String email = "jwt-test-" + timestamp + "@example.com";
     String password = "TestPassword123!";
     String taxId = "JWT" + timestamp % 100000;
-    String companyName = "JWT Test Company " + timestamp;
+    String organizationName = "JWT Test Company " + timestamp;
 
     // Step 1: Signup
     String signupBody =
         """
                 {
-                  "companyName": "%s",
+                  "organizationName": "%s",
                   "taxId": "%s",
-                  "companyType": "SPINNER",
+                  "organizationType": "SPINNER",
                   "firstName": "JWT",
                   "lastName": "Test",
                   "email": "%s",
                   "acceptedTerms": true
                 }
                 """
-            .formatted(companyName, taxId, email);
+            .formatted(organizationName, taxId, email);
 
     mockMvc
         .perform(
@@ -232,9 +232,9 @@ class JwtRoundTripIntegrationTest {
     String signupBody =
         """
                 {
-                  "companyName": "Compat Test %s",
+                  "organizationName": "Compat Test %s",
                   "taxId": "COMPAT%s",
-                  "companyType": "WEAVER",
+                  "organizationType": "WEAVER",
                   "firstName": "Compat",
                   "lastName": "Test",
                   "email": "%s",

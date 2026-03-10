@@ -9,6 +9,8 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.platform.communication.domain.Address;
 import com.fabricmanagement.common.platform.communication.domain.AddressType;
 import com.fabricmanagement.common.platform.communication.infra.repository.AddressRepository;
+import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationAddressRepository;
+import com.fabricmanagement.common.platform.user.infra.repository.UserWorkLocationRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -29,6 +31,8 @@ class AddressServiceTest {
   private static final UUID TENANT_ID = UUID.randomUUID();
 
   @Mock private AddressRepository addressRepository;
+  @Mock private OrganizationAddressRepository organizationAddressRepository;
+  @Mock private UserWorkLocationRepository userWorkLocationRepository;
 
   @InjectMocks private AddressService service;
 
@@ -158,6 +162,8 @@ class AddressServiceTest {
       address.setTenantId(TENANT_ID);
       when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
       when(addressRepository.save(any(Address.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(organizationAddressRepository.findByAddressIdIncludingDeleted(addressId))
+          .thenReturn(Optional.empty());
 
       service.deleteAddress(addressId);
 

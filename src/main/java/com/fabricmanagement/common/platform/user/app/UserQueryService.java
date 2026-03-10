@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * User query service — read-only operations with optional caching.
  *
- * <p>Used by UserFacade and controllers for listing and lookup. Cache keys are tenant/company
+ * <p>Used by UserFacade and controllers for listing and lookup. Cache keys are tenant/organization
  * scoped; invalidation is handled by {@link UserCacheInvalidationService}.
  *
  * <p>All user queries are enriched with Employee (HR) data when available, so UserDto always
@@ -69,11 +69,14 @@ public class UserQueryService {
   }
 
   @Transactional(readOnly = true)
-  @Cacheable(value = "users-by-company", key = "#tenantId.toString() + '-' + #companyId.toString()")
-  public List<UserDto> findByCompany(UUID tenantId, UUID companyId) {
-    log.debug("Finding users by company: tenantId={}, companyId={}", tenantId, companyId);
+  @Cacheable(
+      value = "users-by-organization",
+      key = "#tenantId.toString() + '-' + #organizationId.toString()")
+  public List<UserDto> findByOrganization(UUID tenantId, UUID organizationId) {
+    log.debug(
+        "Finding users by organization: tenantId={}, organizationId={}", tenantId, organizationId);
     List<User> users =
-        userRepository.findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, companyId);
+        userRepository.findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, organizationId);
     return enrichWithEmployeeData(tenantId, users);
   }
 

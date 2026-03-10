@@ -54,6 +54,13 @@ public interface OrganizationAddressRepository
           + "WHERE oa.organizationId = :orgId AND oa.isPrimary = true AND oa.isActive = true")
   Optional<OrganizationAddress> findPrimaryByOrganizationId(@Param("orgId") UUID organizationId);
 
+  /** Primary assignment with address eagerly fetched (avoids lazy load outside transaction). */
+  @Query(
+      "SELECT oa FROM OrganizationAddress oa LEFT JOIN FETCH oa.address "
+          + "WHERE oa.organizationId = :orgId AND oa.isPrimary = true AND oa.isActive = true")
+  Optional<OrganizationAddress> findPrimaryWithAddressByOrganizationId(
+      @Param("orgId") UUID organizationId);
+
   @Query(
       "SELECT oa FROM OrganizationAddress oa "
           + "WHERE oa.organizationId = :orgId AND oa.isHeadquarters = true AND oa.isActive = true")

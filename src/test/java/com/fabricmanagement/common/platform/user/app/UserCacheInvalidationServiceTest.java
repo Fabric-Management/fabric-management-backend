@@ -25,14 +25,15 @@ import org.springframework.cache.support.SimpleCacheManager;
 class UserCacheInvalidationServiceTest {
 
   private static final UUID TENANT_ID = UUID.randomUUID();
-  private static final UUID COMPANY_ID = UUID.randomUUID();
+  private static final UUID ORGANIZATION_ID = UUID.randomUUID();
   private static final UUID USER_ID = UUID.randomUUID();
 
   private static CacheManager cacheManager() {
     SimpleCacheManager manager = new SimpleCacheManager();
     manager.setCaches(
         java.util.List.of(
-            new ConcurrentMapCache("users-by-tenant"), new ConcurrentMapCache("users-by-company")));
+            new ConcurrentMapCache("users-by-tenant"),
+            new ConcurrentMapCache("users-by-organization")));
     manager.afterPropertiesSet();
     return manager;
   }
@@ -53,15 +54,16 @@ class UserCacheInvalidationServiceTest {
     }
 
     @Test
-    @DisplayName("onUserCreated evicts tenant and company caches")
+    @DisplayName("onUserCreated evicts tenant and organization caches")
     void onUserCreated_evictsBothCaches() {
       UserCreatedEvent event =
-          new UserCreatedEvent(TENANT_ID, USER_ID, "Display", "email@test.com", COMPANY_ID);
+          new UserCreatedEvent(TENANT_ID, USER_ID, "Display", "email@test.com", ORGANIZATION_ID);
 
       service.onUserCreated(event);
 
       // Service calls cacheManager.getCache("users-by-tenant").evict(tenantId) and
-      // getCache("users-by-company").evict(tenantId + "-" + companyId). We use real cache manager
+      // getCache("users-by-organization").evict(tenantId + "-" + organizationId). We use real cache
+      // manager
       // so evict is a no-op on empty cache; we just ensure no exception.
       // With mock we'd verify getCache and evict were called.
     }
@@ -72,7 +74,7 @@ class UserCacheInvalidationServiceTest {
       UserDeactivatedEvent event = new UserDeactivatedEvent(TENANT_ID, USER_ID, "reason");
 
       service.onUserDeactivated(event);
-      // No exception; tenant cache evicted (no companyId in event)
+      // No exception; tenant cache evicted (no organizationId in event)
     }
 
     @Test
@@ -95,26 +97,26 @@ class UserCacheInvalidationServiceTest {
     }
 
     @Test
-    @DisplayName("onUserCreated calls evict on tenant and company caches")
+    @DisplayName("onUserCreated calls evict on tenant and organization caches")
     void onUserCreated_callsEvict() {
       ConcurrentMapCache tenantCache = new ConcurrentMapCache("users-by-tenant");
-      ConcurrentMapCache companyCache = new ConcurrentMapCache("users-by-company");
-      String companyCacheKey = TENANT_ID.toString() + "-" + COMPANY_ID.toString();
+      ConcurrentMapCache organizationCache = new ConcurrentMapCache("users-by-organization");
+      String organizationCacheKey = TENANT_ID.toString() + "-" + ORGANIZATION_ID.toString();
       tenantCache.put(TENANT_ID.toString(), "cached-tenant-users");
-      companyCache.put(companyCacheKey, "cached-company-users");
+      organizationCache.put(organizationCacheKey, "cached-organization-users");
       when(mockCacheManager.getCache("users-by-tenant")).thenReturn(tenantCache);
-      when(mockCacheManager.getCache("users-by-company")).thenReturn(companyCache);
+      when(mockCacheManager.getCache("users-by-organization")).thenReturn(organizationCache);
 
       UserCacheInvalidationService service = new UserCacheInvalidationService(mockCacheManager);
       UserCreatedEvent event =
-          new UserCreatedEvent(TENANT_ID, USER_ID, "Display", "e@t.com", COMPANY_ID);
+          new UserCreatedEvent(TENANT_ID, USER_ID, "Display", "e@t.com", ORGANIZATION_ID);
 
       service.onUserCreated(event);
 
       verify(mockCacheManager).getCache("users-by-tenant");
-      verify(mockCacheManager).getCache("users-by-company");
+      verify(mockCacheManager).getCache("users-by-organization");
       assertThat(tenantCache.get(TENANT_ID.toString())).isNull();
-      assertThat(companyCache.get(companyCacheKey)).isNull();
+      assertThat(organizationCache.get(organizationCacheKey)).isNull();
     }
   }
 }

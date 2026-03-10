@@ -116,7 +116,10 @@ public class Organization extends BaseEntity {
   /**
    * Create a new organization.
    *
-   * @param name Display name
+   * <p>Maps name to both display name and legalName so that organizationName from self-signup or
+   * sales-led onboarding is consistently stored in both fields.
+   *
+   * @param name Display name (also used as legalName when not separately provided)
    * @param taxId Tax ID
    * @param organizationType Type
    * @return new Organization
@@ -124,6 +127,7 @@ public class Organization extends BaseEntity {
   public static Organization create(String name, String taxId, OrganizationType organizationType) {
     return Organization.builder()
         .name(name)
+        .legalName(name)
         .taxId(taxId)
         .organizationType(organizationType)
         .build();
@@ -158,8 +162,24 @@ public class Organization extends BaseEntity {
    * @param taxId New tax ID
    */
   public void update(String name, String taxId) {
-    this.name = name;
+    setName(name);
     this.taxId = taxId;
+  }
+
+  /**
+   * Set organization display name.
+   *
+   * <p>Safeguard: If legalName is null or empty when name is set, automatically assigns the same
+   * value to legalName. Ensures self-signup organizationName is consistently reflected in both
+   * fields even when only name is updated.
+   *
+   * @param name Display name
+   */
+  public void setName(String name) {
+    this.name = name;
+    if (name != null && !name.isBlank() && (this.legalName == null || this.legalName.isBlank())) {
+      this.legalName = name;
+    }
   }
 
   /**

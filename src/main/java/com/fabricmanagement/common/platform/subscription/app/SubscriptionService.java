@@ -135,7 +135,7 @@ public class SubscriptionService {
   }
 
   @Transactional(readOnly = true)
-  public List<SubscriptionDto> getCompanySubscriptions(UUID companyId) {
+  public List<SubscriptionDto> getOrganizationSubscriptions(UUID organizationId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     log.debug("Getting subscriptions: tenantId={}", tenantId);
 

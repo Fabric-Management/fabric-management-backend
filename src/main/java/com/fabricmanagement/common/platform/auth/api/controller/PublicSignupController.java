@@ -67,16 +67,16 @@ public class PublicSignupController {
   public ResponseEntity<ApiResponse<String>> signup(@Valid @RequestBody SelfSignupRequest request) {
 
     log.info(
-        "Public signup request: company={}, email={}",
-        request.getCompanyName(),
+        "Public signup request: organizationName={}, email={}",
+        request.getOrganizationName(),
         PiiMaskingUtil.maskEmail(request.getEmail()));
 
     // Orchestrator handles everything: tenant, org, user, subscriptions, token, and email
     TenantOnboardingResponse response = onboardingService.createSelfServiceTenant(request);
 
     log.info(
-        "Self-service signup completed: companyUid={}, setupUrl={}",
-        response.getCompanyUid(),
+        "Self-service signup completed: organizationUid={}, setupUrl={}",
+        response.getOrganizationUid(),
         response.getSetupUrl());
 
     return ResponseEntity.ok(

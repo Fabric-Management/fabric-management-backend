@@ -28,11 +28,12 @@ public class SubscriptionController {
   private final SubscriptionService subscriptionService;
   private final SubscriptionQuotaService quotaService;
 
-  @GetMapping("/company/{companyId}")
-  public ResponseEntity<ApiResponse<List<SubscriptionDto>>> getCompanySubscriptions(
-      @PathVariable UUID companyId) {
-    log.debug("Getting subscriptions for company: companyId={}", companyId);
-    List<SubscriptionDto> subscriptions = subscriptionService.getCompanySubscriptions(companyId);
+  @GetMapping("/organization/{organizationId}")
+  public ResponseEntity<ApiResponse<List<SubscriptionDto>>> getOrganizationSubscriptions(
+      @PathVariable UUID organizationId) {
+    log.debug("Getting subscriptions for organization: organizationId={}", organizationId);
+    List<SubscriptionDto> subscriptions =
+        subscriptionService.getOrganizationSubscriptions(organizationId);
     return ResponseEntity.ok(ApiResponse.success(subscriptions));
   }
 

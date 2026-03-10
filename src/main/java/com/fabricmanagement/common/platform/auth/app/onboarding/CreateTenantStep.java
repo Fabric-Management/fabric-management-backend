@@ -32,12 +32,12 @@ public class CreateTenantStep implements OnboardingStep {
 
   @Override
   public void execute(OnboardingContext context) {
-    log.debug("CreateTenantStep: Creating tenant for {}", context.getCompanyName());
+    log.debug("CreateTenantStep: Creating tenant for {}", context.getOrganizationName());
 
     CreateTenantRequest request =
         CreateTenantRequest.builder()
-            .name(context.getCompanyName())
-            .billingEmail(context.getCompanyEmail())
+            .name(context.getOrganizationName())
+            .billingEmail(context.getOrganizationEmail())
             .country(context.getCountry())
             .trialDays(context.getTrialDays())
             .build();

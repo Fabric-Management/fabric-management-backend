@@ -209,9 +209,17 @@ public class RegistrationService {
         organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
     return OnboardingPrefillDto.builder()
         .primaryEmail(primaryEmail)
-        .companyName(orgOpt.map(Organization::getName).orElse(null))
+        .organizationName(orgOpt.map(Organization::getName).orElse(null))
+        .legalName(
+            orgOpt
+                .map(
+                    o -> {
+                      String ln = o.getLegalName();
+                      return (ln != null && !ln.isBlank()) ? ln : o.getName();
+                    })
+                .orElse(null))
         .taxId(orgOpt.map(Organization::getTaxId).orElse(null))
-        .companyType(orgOpt.map(o -> o.getOrganizationType().name()).orElse(null))
+        .organizationType(orgOpt.map(o -> o.getOrganizationType().name()).orElse(null))
         .build();
   }
 

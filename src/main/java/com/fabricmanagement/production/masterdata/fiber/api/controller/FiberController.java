@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCatalogSummaryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
@@ -70,7 +71,7 @@ public class FiberController {
 
   @GetMapping("/{id}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
-  public ResponseEntity<ApiResponse<FiberDto>> getFiber(@PathVariable UUID id) {
+  public ResponseEntity<ApiResponse<FiberDto>> getFiber(@PathVariable("id") UUID id) {
     return fiberService
         .getById(id)
         .map(fiber -> ResponseEntity.ok(ApiResponse.success(fiber)))
@@ -91,6 +92,17 @@ public class FiberController {
   public ResponseEntity<ApiResponse<List<FiberDto>>> getAllFibers() {
     List<FiberDto> fibers = fiberService.getAll();
     return ResponseEntity.ok(ApiResponse.success(fibers));
+  }
+
+  /**
+   * Single response with categories, ISO codes, attributes, certifications, and fibers (tenant +
+   * platform seed).
+   */
+  @GetMapping("/catalog-summary")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
+  public ResponseEntity<ApiResponse<FiberCatalogSummaryDto>> getCatalogSummary() {
+    FiberCatalogSummaryDto summary = fiberService.getCatalogSummary();
+    return ResponseEntity.ok(ApiResponse.success(summary));
   }
 
   @GetMapping("/search")

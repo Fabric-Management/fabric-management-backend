@@ -1,13 +1,12 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -133,18 +132,22 @@ public class FiberValidationService {
   }
 
   /**
-   * Validate that base fibers belong to same tenant.
+   * Validate that base fibers are accessible to the current tenant.
    *
-   * <p>Rule: All base fibers must belong to the same tenant.
+   * <p>Rule: All base fibers must belong to the current tenant or the platform (system tenant).
+   * Tenant organizations can use platform seed fibers in blends.
    */
   @Transactional(readOnly = true)
   public void validateTenantConsistency(Map<UUID, BigDecimal> composition, UUID currentTenantId) {
     List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
+    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
 
-    Set<UUID> tenantIds = baseFibers.stream().map(Fiber::getTenantId).collect(Collectors.toSet());
-
-    if (tenantIds.size() > 1 || (!tenantIds.isEmpty() && !tenantIds.contains(currentTenantId))) {
-      throw new IllegalArgumentException("All base fibers must belong to the same tenant");
+    for (Fiber baseFiber : baseFibers) {
+      UUID fiberTenantId = baseFiber.getTenantId();
+      if (!currentTenantId.equals(fiberTenantId) && !systemTenantId.equals(fiberTenantId)) {
+        throw new IllegalArgumentException(
+            "All base fibers must belong to your organization or the platform catalog");
+      }
     }
   }
 

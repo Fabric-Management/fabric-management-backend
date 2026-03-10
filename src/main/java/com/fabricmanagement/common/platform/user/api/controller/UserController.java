@@ -147,17 +147,21 @@ public class UserController {
   }
 
   @PreAuthorize("isAuthenticated()")
-  @GetMapping("/company/{companyId}")
-  public ResponseEntity<ApiResponse<List<UserDto>>> getUsersByCompany(
-      @PathVariable UUID companyId) {
+  @GetMapping("/organization/{organizationId}")
+  public ResponseEntity<ApiResponse<List<UserDto>>> getUsersByOrganization(
+      @PathVariable UUID organizationId) {
     UUID requesterId = TenantContext.getCurrentUserId();
     if (!teamAccessService.canViewAllMembers(requesterId)) {
-      throw new AccessDeniedException("You don't have permission to view company members.");
+      throw new AccessDeniedException("You don't have permission to view organization members.");
     }
 
-    log.debug("Getting users by company: companyId={}, requesterId={}", companyId, requesterId);
+    log.debug(
+        "Getting users by organization: organizationId={}, requesterId={}",
+        organizationId,
+        requesterId);
 
-    List<UserDto> users = userService.findByCompany(TenantContext.getCurrentTenantId(), companyId);
+    List<UserDto> users =
+        userService.findByOrganization(TenantContext.getCurrentTenantId(), organizationId);
 
     return ResponseEntity.ok(ApiResponse.success(users));
   }
@@ -265,22 +269,24 @@ public class UserController {
    *
    * <p><b>Purpose:</b> Minimize manual data entry during user creation.
    *
-   * @param companyId Company ID
+   * @param organizationId Organization ID
    * @param firstName User first name
    * @param lastName User last name
    * @return Contact suggestions
    */
   @GetMapping("/contact-suggestions")
   public ResponseEntity<ApiResponse<ContactSuggestionsDto>> getContactSuggestions(
-      @RequestParam UUID companyId, @RequestParam String firstName, @RequestParam String lastName) {
+      @RequestParam UUID organizationId,
+      @RequestParam String firstName,
+      @RequestParam String lastName) {
     log.debug(
-        "Getting contact suggestions: companyId={}, firstName={}, lastName={}",
-        companyId,
+        "Getting contact suggestions: organizationId={}, firstName={}, lastName={}",
+        organizationId,
         firstName,
         lastName);
 
     ContactSuggestionsDto suggestions =
-        contactSuggestionService.getSuggestions(companyId, firstName, lastName);
+        contactSuggestionService.getSuggestions(organizationId, firstName, lastName);
 
     return ResponseEntity.ok(ApiResponse.success(suggestions));
   }

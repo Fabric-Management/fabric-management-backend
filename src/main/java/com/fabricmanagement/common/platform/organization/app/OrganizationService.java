@@ -240,8 +240,11 @@ public class OrganizationService {
       return;
     }
 
-    if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
-      root.setName(request.getCompanyName().trim());
+    if (request.getOrganizationName() != null && !request.getOrganizationName().isBlank()) {
+      root.setName(request.getOrganizationName().trim());
+    }
+    if (request.getOrganizationType() != null) {
+      root.setOrganizationType(request.getOrganizationType());
     }
     if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
       String newTaxId = request.getTaxId().trim();
@@ -268,10 +271,11 @@ public class OrganizationService {
    * @param id Organization UUID
    * @param name New name
    * @param taxId New tax ID
+   * @param legalName Legal registered name (optional)
    * @return Updated organization
    */
   @Transactional
-  public OrganizationDto updateOrganization(UUID id, String name, String taxId) {
+  public OrganizationDto updateOrganization(UUID id, String name, String taxId, String legalName) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     Organization organization =
         organizationRepository
@@ -284,7 +288,11 @@ public class OrganizationService {
       throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
 
-    organization.update(name, taxId);
+    String effectiveTaxId = taxId != null ? taxId : organization.getTaxId();
+    organization.update(name, effectiveTaxId);
+    if (legalName != null) {
+      organization.setLegalName(legalName.trim().isEmpty() ? null : legalName.trim());
+    }
     Organization saved = organizationRepository.save(organization);
 
     log.info("Organization updated: id={}", saved.getId());

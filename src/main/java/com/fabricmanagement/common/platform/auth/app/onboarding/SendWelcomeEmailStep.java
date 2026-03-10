@@ -30,7 +30,8 @@ public class SendWelcomeEmailStep implements OnboardingStep {
     context.setSetupUrl(setupUrl);
 
     String firstName = context.getAdminFirstName() != null ? context.getAdminFirstName() : "";
-    String companyName = context.getCompanyName() != null ? context.getCompanyName() : "";
+    String organizationName =
+        context.getOrganizationName() != null ? context.getOrganizationName() : "";
 
     String subject;
     String message;
@@ -39,11 +40,12 @@ public class SendWelcomeEmailStep implements OnboardingStep {
       // Sales-led: full welcome email with OS list
       subject = "Welcome to FabricOS";
       String osList = buildOsList(context.getSubscriptionOsCodes());
-      message = emailTemplateRenderer.renderWelcome(firstName, companyName, osList, setupUrl);
+      message = emailTemplateRenderer.renderWelcome(firstName, organizationName, osList, setupUrl);
     } else {
       // Self-service: setup-password email (email link click = verification)
       subject = "Complete Your FabricOS Registration";
-      message = emailTemplateRenderer.renderSetupPassword(firstName, companyName, email, setupUrl);
+      message =
+          emailTemplateRenderer.renderSetupPassword(firstName, organizationName, email, setupUrl);
     }
 
     notificationService.sendNotificationSync(email, subject, message);
