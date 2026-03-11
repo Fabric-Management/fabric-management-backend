@@ -39,6 +39,7 @@ public class BatchDto {
   private BatchStatus status;
   private UUID locationId;
   private UUID parentBatchId;
+  private UUID qualityStandardId;
   private String remarks;
 
   /**
@@ -77,6 +78,7 @@ public class BatchDto {
             .status(entity.getStatus())
             .locationId(entity.getLocationId())
             .parentBatchId(entity.getParentBatchId())
+            .qualityStandardId(entity.getQualityStandardId())
             .remarks(entity.getRemarks())
             .version(entity.getVersion())
             .isActive(entity.getIsActive())

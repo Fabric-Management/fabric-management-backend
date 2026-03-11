@@ -17,6 +17,8 @@ import com.fabricmanagement.production.execution.warehouse.app.WarehouseLocation
 import com.fabricmanagement.production.execution.warehouse.domain.WarehouseLocationType;
 import com.fabricmanagement.production.execution.warehouse.dto.WarehouseLocationDto;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
+import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStandard;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import java.math.BigDecimal;
@@ -44,6 +46,7 @@ public class BatchService {
   private final BatchOverrideLogRepository overrideLogRepository;
   private final BatchCodeGenerator batchCodeGenerator;
   private final FiberRepository fiberRepository;
+  private final FiberQualityStandardRepository qualityStandardRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final WarehouseLocationService warehouseLocationService;
 
@@ -67,6 +70,8 @@ public class BatchService {
       attributes.put("composition", compMap);
     }
 
+    UUID qualityStandardId = resolveQualityStandardId(request);
+
     Batch batch =
         Batch.create(
             tenantId,
@@ -79,6 +84,7 @@ public class BatchService {
             request.getProductionDate() != null ? request.getProductionDate() : Instant.now(),
             request.getExpiryDate(),
             request.getLocationId(),
+            qualityStandardId,
             request.getRemarks(),
             attributes);
 
@@ -91,6 +97,42 @@ public class BatchService {
     log.info("Created batch: id={}, batchCode={}", batch.getId(), batch.getBatchCode());
 
     return toBatchDto(batch);
+  }
+
+  /**
+   * Resolves qualityStandardId for batch creation. If request has qualityStandardId, validate and
+   * use it. If null and FIBER: apply default profile for material's ISO code. If no default, skip.
+   */
+  private UUID resolveQualityStandardId(CreateBatchRequest request) {
+    if (request.getQualityStandardId() != null) {
+      UUID tenantId = TenantContext.getCurrentTenantId();
+      if (qualityStandardRepository
+          .findByTenantIdAndId(tenantId, request.getQualityStandardId())
+          .isEmpty()) {
+        throw new BatchDomainException(
+            "Quality standard not found: " + request.getQualityStandardId());
+      }
+      return request.getQualityStandardId();
+    }
+    if (request.getMaterialType() != MaterialType.FIBER) {
+      return null;
+    }
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    Optional<Fiber> fiberOpt = fiberRepository.findByMaterialId(request.getMaterialId());
+    if (fiberOpt.isEmpty()) {
+      fiberOpt = fiberRepository.findById(request.getMaterialId());
+    }
+    if (fiberOpt.isEmpty()) {
+      return null;
+    }
+    UUID isoCodeId = fiberOpt.get().getFiberIsoCodeId();
+    if (isoCodeId == null) {
+      return null;
+    }
+    return qualityStandardRepository
+        .findByTenantIdAndIsoCode_IdAndIsDefaultTrueAndIsActiveTrue(tenantId, isoCodeId)
+        .map(FiberQualityStandard::getId)
+        .orElse(null);
   }
 
   /**
@@ -560,6 +602,7 @@ public class BatchService {
             Instant.now(),
             sourceBatch.getExpiryDate(),
             sourceBatch.getLocationId(),
+            sourceBatch.getQualityStandardId(),
             request.getReason(),
             sourceBatch.getAttributes() != null
                 ? new HashMap<>(sourceBatch.getAttributes())
@@ -664,6 +707,7 @@ public class BatchService {
             Instant.now(),
             sourceBatch.getExpiryDate(),
             sourceBatch.getLocationId(),
+            sourceBatch.getQualityStandardId(),
             request.getReason(),
             sourceBatch.getAttributes() != null
                 ? new HashMap<>(sourceBatch.getAttributes())

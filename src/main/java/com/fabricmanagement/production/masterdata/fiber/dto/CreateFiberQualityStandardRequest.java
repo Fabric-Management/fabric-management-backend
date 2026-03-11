@@ -15,21 +15,18 @@ import org.hibernate.validator.constraints.Range;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateFiberSpecificationRequest {
+public class CreateFiberQualityStandardRequest {
 
   private Long version;
 
-  @NotNull(message = "Fiber ID is required")
-  private UUID fiberId;
+  @NotNull(message = "ISO code ID is required")
+  private UUID isoCodeId;
 
-  @NotBlank(message = "Specification name is required")
-  @Size(max = 100, message = "Specification name must be at most 100 characters")
-  private String specName;
+  @NotBlank(message = "Standard name is required")
+  @Size(max = 100, message = "Standard name must be at most 100 characters")
+  private String standardName;
 
   private Boolean isDefault;
-
-  @Size(max = 100, message = "Test standard must be at most 100 characters")
-  private String testStandard;
 
   // Fineness
   @PositiveOrZero(message = "Fineness min must be ≥ 0")
@@ -42,54 +39,52 @@ public class CreateFiberSpecificationRequest {
   private Double finenessMax;
 
   // Length (mm)
-  @PositiveOrZero(message = "Length min must be ≥ 0")
-  private Double lengthMin;
+  @PositiveOrZero(message = "Length mm min must be ≥ 0")
+  private Double lengthMmMin;
 
-  @PositiveOrZero(message = "Length target must be ≥ 0")
-  private Double lengthTarget;
+  @PositiveOrZero(message = "Length mm target must be ≥ 0")
+  private Double lengthMmTarget;
 
-  @PositiveOrZero(message = "Length max must be ≥ 0")
-  private Double lengthMax;
+  @PositiveOrZero(message = "Length mm max must be ≥ 0")
+  private Double lengthMmMax;
 
   // Strength (cN/dtex)
   @PositiveOrZero(message = "Strength min must be ≥ 0")
-  private Double strengthMin;
+  private Double strengthCndTexMin;
 
   @PositiveOrZero(message = "Strength target must be ≥ 0")
-  private Double strengthTarget;
+  private Double strengthCndTexTarget;
 
   @PositiveOrZero(message = "Strength max must be ≥ 0")
-  private Double strengthMax;
+  private Double strengthCndTexMax;
 
   // Elongation (%)
   @Range(min = 0, max = 100, message = "Elongation min must be between 0 and 100")
-  private Double elongationMin;
+  private Double elongationPctMin;
 
   @Range(min = 0, max = 100, message = "Elongation target must be between 0 and 100")
-  private Double elongationTarget;
+  private Double elongationPctTarget;
 
   @Range(min = 0, max = 100, message = "Elongation max must be between 0 and 100")
-  private Double elongationMax;
+  private Double elongationPctMax;
 
   // Moisture (%)
   @Range(min = 0, max = 100, message = "Moisture min must be between 0 and 100")
-  private Double moistureMin;
+  private Double moisturePctMin;
 
   @Range(min = 0, max = 100, message = "Moisture target must be between 0 and 100")
-  private Double moistureTarget;
+  private Double moisturePctTarget;
 
   @Range(min = 0, max = 100, message = "Moisture max must be between 0 and 100")
-  private Double moistureMax;
+  private Double moisturePctMax;
 
   // Trash content (%)
   @Range(min = 0, max = 100, message = "Trash content min must be between 0 and 100")
-  private Double trashContentMin;
+  private Double trashContentPctMin;
 
   @Range(min = 0, max = 100, message = "Trash content target must be between 0 and 100")
-  private Double trashContentTarget;
+  private Double trashContentPctTarget;
 
   @Range(min = 0, max = 100, message = "Trash content max must be between 0 and 100")
-  private Double trashContentMax;
-
-  private String remarks;
+  private Double trashContentPctMax;
 }

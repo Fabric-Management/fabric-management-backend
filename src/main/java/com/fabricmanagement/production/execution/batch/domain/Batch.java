@@ -90,6 +90,12 @@ public class Batch extends BaseEntity {
   @Column(name = "parent_batch_id")
   private UUID parentBatchId;
 
+  /**
+   * Optional FiberQualityStandard for QC. When null, default profile for batch's ISO code is used.
+   */
+  @Column(name = "quality_standard_id")
+  private UUID qualityStandardId;
+
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;
 
@@ -105,6 +111,7 @@ public class Batch extends BaseEntity {
       Instant productionDate,
       Instant expiryDate,
       UUID locationId,
+      UUID qualityStandardId,
       String remarks,
       java.util.Map<String, Object> attributes) {
 
@@ -124,6 +131,7 @@ public class Batch extends BaseEntity {
     batch.setExpiryDate(expiryDate);
     batch.setStatus(BatchStatus.PENDING_QC);
     batch.setLocationId(locationId);
+    batch.setQualityStandardId(qualityStandardId);
     batch.setRemarks(remarks);
     batch.setAttributes(attributes != null ? attributes : new java.util.HashMap<>());
     batch.onCreate();

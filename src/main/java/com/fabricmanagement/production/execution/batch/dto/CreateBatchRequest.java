@@ -51,6 +51,12 @@ public class CreateBatchRequest {
 
   private UUID locationId;
 
+  /**
+   * Optional FiberQualityStandard for QC. When null, default profile for batch's ISO code is
+   * applied. If no default exists, profile selection is skipped.
+   */
+  private UUID qualityStandardId;
+
   private String remarks;
 
   /**

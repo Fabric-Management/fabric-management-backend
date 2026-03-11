@@ -30,5 +30,8 @@ public enum NotificationType {
   BATCH_QUARANTINE,
 
   /** Batch override required (e.g. quarantine override); relevant users are notified */
-  BATCH_OVERRIDE_REQUIRED
+  BATCH_OVERRIDE_REQUIRED,
+
+  /** No quality standard defined for ISO code; batch stays PENDING_QC, manual review required */
+  BATCH_NO_QUALITY_STANDARD
 }

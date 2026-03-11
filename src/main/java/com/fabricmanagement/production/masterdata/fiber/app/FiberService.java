@@ -139,22 +139,9 @@ public class FiberService implements FiberFacade {
       validateBlendedFiber(request);
     }
 
-    // Load reference entities (required)
-    FiberCategory category =
-        fiberCategoryRepository
-            .findById(request.getFiberCategoryId())
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "Fiber category not found: " + request.getFiberCategoryId()));
-
-    FiberIsoCode isoCode =
-        fiberIsoCodeRepository
-            .findById(request.getFiberIsoCodeId())
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "Fiber ISO code not found: " + request.getFiberIsoCodeId()));
+    // Resolve category and ISO code (backend derives for blends)
+    FiberCategory category = resolveFiberCategory(request);
+    FiberIsoCode isoCode = resolveFiberIsoCode(request);
 
     // Generate suggested name for blended fiber if not provided
     String fiberName = request.getFiberName();
@@ -231,6 +218,107 @@ public class FiberService implements FiberFacade {
     // Validate tenant consistency
     UUID currentTenantId = TenantContext.getCurrentTenantId();
     validationService.validateTenantConsistency(composition, currentTenantId);
+  }
+
+  /** Resolve FiberCategory: for blends use MIXED_BLEND; for pure fibers use request value. */
+  private FiberCategory resolveFiberCategory(CreateFiberRequest request) {
+    boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
+
+    if (isBlended) {
+      return fiberCategoryRepository
+          .findByCategoryCode("MIXED_BLEND")
+          .orElseGet(
+              () ->
+                  fiberCategoryRepository.findByIsActiveTrue().stream()
+                      .filter(
+                          c ->
+                              c.getCategoryCode() != null
+                                  && (c.getCategoryCode().contains("MIXED")
+                                      || c.getCategoryCode().contains("BLEND")))
+                      .findFirst()
+                      .orElseThrow(
+                          () ->
+                              new IllegalArgumentException(
+                                  "No MIXED_BLEND category found. Run V008 migration.")));
+    }
+
+    if (request.getFiberCategoryId() == null) {
+      throw new IllegalArgumentException("Fiber category ID is required for pure fibers.");
+    }
+    return fiberCategoryRepository
+        .findById(request.getFiberCategoryId())
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Fiber category not found: " + request.getFiberCategoryId()));
+  }
+
+  /**
+   * Resolve FiberIsoCode: for blends use primary (highest-percentage) base fiber's ISO; for pure
+   * fibers use request value.
+   */
+  private FiberIsoCode resolveFiberIsoCode(CreateFiberRequest request) {
+    boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
+
+    if (isBlended) {
+      Map<UUID, BigDecimal> composition = request.getComposition();
+      // Order by percentage desc, then by ISO code asc (tie-breaker for equal %)
+      List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
+      if (baseFibers.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Blend composition is empty. Cannot resolve primary ISO code.");
+      }
+      Map<UUID, String> fiberIdToIso =
+          baseFibers.stream()
+              .collect(
+                  Collectors.toMap(
+                      Fiber::getId,
+                      f ->
+                          f.getFiberIsoCode() != null && f.getFiberIsoCode().getIsoCode() != null
+                              ? f.getFiberIsoCode().getIsoCode()
+                              : ""));
+
+      UUID primaryFiberId =
+          composition.entrySet().stream()
+              .sorted(
+                  Map.Entry.<UUID, BigDecimal>comparingByValue()
+                      .reversed()
+                      .thenComparing(e -> fiberIdToIso.getOrDefault(e.getKey(), "")))
+              .map(Map.Entry::getKey)
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "Blend composition is empty. Cannot resolve primary ISO code."));
+
+      Fiber primaryFiber =
+          fiberRepository
+              .findById(primaryFiberId)
+              .orElseThrow(
+                  () -> new IllegalArgumentException("Base fiber not found: " + primaryFiberId));
+
+      if (primaryFiber.getFiberIsoCodeId() == null) {
+        throw new IllegalArgumentException("Primary base fiber has no ISO code: " + primaryFiberId);
+      }
+
+      return fiberIsoCodeRepository
+          .findById(primaryFiber.getFiberIsoCodeId())
+          .orElseThrow(
+              () ->
+                  new IllegalArgumentException(
+                      "Fiber ISO code not found for primary component: "
+                          + primaryFiber.getFiberIsoCodeId()));
+    }
+
+    if (request.getFiberIsoCodeId() == null) {
+      throw new IllegalArgumentException("Fiber ISO code ID is required for pure fibers.");
+    }
+    return fiberIsoCodeRepository
+        .findById(request.getFiberIsoCodeId())
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Fiber ISO code not found: " + request.getFiberIsoCodeId()));
   }
 
   @Transactional(readOnly = true)
@@ -513,7 +601,14 @@ public class FiberService implements FiberFacade {
   private String generateFiberName(
       Map<UUID, BigDecimal> composition, Map<UUID, String> baseFiberNames) {
     return composition.entrySet().stream()
-        .sorted((a, b) -> b.getValue().compareTo(a.getValue())) // Sort by percentage descending
+        .sorted(
+            (a, b) -> {
+              int cmp = b.getValue().compareTo(a.getValue());
+              if (cmp != 0) return cmp;
+              String nameA = baseFiberNames.getOrDefault(a.getKey(), "");
+              String nameB = baseFiberNames.getOrDefault(b.getKey(), "");
+              return nameA.compareToIgnoreCase(nameB);
+            })
         .map(
             entry -> {
               String fiberName = baseFiberNames.get(entry.getKey());

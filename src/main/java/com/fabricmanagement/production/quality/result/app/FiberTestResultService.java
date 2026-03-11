@@ -1,6 +1,10 @@
 package com.fabricmanagement.production.quality.result.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.platform.communication.app.InAppNotificationService;
+import com.fabricmanagement.common.platform.communication.domain.NotificationDeliveryChannel;
+import com.fabricmanagement.common.platform.communication.domain.NotificationType;
+import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
@@ -26,15 +30,19 @@ public class FiberTestResultService {
   private final FiberTestResultRepository testResultRepository;
   private final BatchRepository batchRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
+  private final FiberQcAutoEvaluator qcAutoEvaluator;
+  private final InAppNotificationService notificationService;
 
   @Transactional
   public FiberTestResultDto create(CreateFiberTestResultRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    batchRepository
-        .findByIdAndTenantId(request.getBatchId(), tenantId)
-        .orElseThrow(
-            () -> new IllegalArgumentException("Fiber batch not found: " + request.getBatchId()));
+    Batch batch =
+        batchRepository
+            .findByIdAndTenantId(request.getBatchId(), tenantId)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException("Fiber batch not found: " + request.getBatchId()));
 
     FiberTestResult result =
         FiberTestResult.builder()
@@ -55,6 +63,35 @@ public class FiberTestResultService {
 
     FiberTestResult saved = testResultRepository.save(result);
     log.info("Fiber test result created: id={}, batchId={}", saved.getId(), saved.getBatchId());
+
+    // QC auto-decision: evaluate against FiberQualityStandard
+    FiberQcAutoEvaluator.EvaluationResult eval = qcAutoEvaluator.evaluate(saved, batch, tenantId);
+
+    if (eval.hasStandard()) {
+      saved.setApprovalStatus(eval.approvalStatus());
+      saved = testResultRepository.save(saved);
+      applicationEventPublisher.publishEvent(
+          new FiberTestResultApprovedEvent(
+              tenantId,
+              saved.getBatchId(),
+              saved.getApprovalStatus(),
+              TenantContext.getCurrentUserId()));
+    } else if (eval.isoCodeLabel() != null) {
+      notificationService.sendToTenantRoles(
+          tenantId,
+          InAppNotificationService.QUARANTINE_NOTIFY_ROLES,
+          NotificationType.BATCH_NO_QUALITY_STANDARD,
+          "No Quality Standard Defined",
+          String.format(
+              "No quality standard defined for %s. Manual review required.", eval.isoCodeLabel()),
+          request.getBatchId(),
+          "BATCH",
+          NotificationDeliveryChannel.IN_APP);
+      log.info(
+          "BATCH_NO_QUALITY_STANDARD notification sent: batchId={}, isoCode={}",
+          request.getBatchId(),
+          eval.isoCodeLabel());
+    }
 
     return FiberTestResultDto.from(saved);
   }

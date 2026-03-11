@@ -101,7 +101,8 @@ public class ProductionAccessService {
    * modules.
    */
   private static final Set<String> FIBER_MASTERDATA_WRITE_DEPARTMENTS =
-      Set.of("RDPRODUCTDEVELOPMENT", "PRODUCTIONPLANNING", "FIBERRAWMATERIAL");
+      Set.of(
+          "RDPRODUCTDEVELOPMENT", "PRODUCTIONPLANNING", "FIBERRAWMATERIAL", "ADMINISTRATIONOFFICE");
 
   /** All production-adjacent departments: entitled to READ/WRITE on BATCH (execution layer). */
   private static final Set<String> BATCH_WRITE_DEPARTMENTS =
