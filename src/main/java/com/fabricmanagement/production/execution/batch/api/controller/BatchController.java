@@ -1,7 +1,10 @@
 package com.fabricmanagement.production.execution.batch.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.production.execution.batch.app.BatchAttributeService;
+import com.fabricmanagement.production.execution.batch.app.BatchCertificationService;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
+import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
 import com.fabricmanagement.production.execution.batch.dto.*;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -27,6 +30,8 @@ import org.springframework.web.bind.annotation.*;
 public class BatchController {
 
   private final BatchService batchService;
+  private final BatchCertificationService batchCertificationService;
+  private final BatchAttributeService batchAttributeService;
 
   // ── Batch CRUD ─────────────────────────────────────────────────────────────
 
@@ -60,6 +65,19 @@ public class BatchController {
       @PathVariable UUID materialId) {
     List<BatchDto> batches = batchService.getByMaterialId(materialId);
     return ResponseEntity.ok(ApiResponse.success(batches));
+  }
+
+  @GetMapping("/certification-autofill")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<BatchCertificationAutoFillResponse>> getCertificationAutoFill(
+      @RequestParam BatchCertificationScope scope,
+      @RequestParam(required = false) UUID partnerCertificationId,
+      @RequestParam(required = false) UUID orgCertificationId) {
+    BatchCertificationAutoFillResponse result =
+        batchCertificationService.autoFill(scope, partnerCertificationId, orgCertificationId);
+    return result != null
+        ? ResponseEntity.ok(ApiResponse.success(result))
+        : ResponseEntity.ok(ApiResponse.success(null));
   }
 
   // ── Named Reservation ──────────────────────────────────────────────────────
@@ -138,11 +156,27 @@ public class BatchController {
 
   // ── Split & Transfer ───────────────────────────────────────────────────────
 
+  /**
+   * Split batch: acceptedQuantity → new AVAILABLE batch; remainder stays in source with
+   * RETURNED/DESTROYED. Returns both batches.
+   */
   @PostMapping("/{id}/split")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
-  public ResponseEntity<ApiResponse<BatchDto>> splitBatch(
+  public ResponseEntity<ApiResponse<SplitBatchResponse>> splitBatch(
       @PathVariable UUID id, @Valid @RequestBody SplitBatchRequest request) {
-    BatchDto batch = batchService.splitBatch(id, request);
+    SplitBatchResponse response = batchService.splitBatch(id, request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+  }
+
+  /**
+   * Partial acceptance split (QC kısmi kabul). Source batch remainder gets rejectedStatus; new
+   * batch with acceptedQuantity is AVAILABLE.
+   */
+  @PostMapping("/{id}/split-partial-acceptance")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<BatchDto>> splitPartialAcceptance(
+      @PathVariable UUID id, @Valid @RequestBody PartialAcceptanceSplitRequest request) {
+    BatchDto batch = batchService.splitPartialAcceptance(id, request);
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(batch));
   }
 
@@ -152,5 +186,68 @@ public class BatchController {
       @PathVariable UUID id, @Valid @RequestBody TransferBatchRequest request) {
     BatchDto batch = batchService.transferBatch(id, request);
     return ResponseEntity.ok(ApiResponse.success(batch));
+  }
+
+  /**
+   * Override batch status (QC_REJECTED or QUARANTINE → AVAILABLE). Requires reason (min 10 chars).
+   * Logged to override_log for audit. Manager-only: SUPERVISOR/WORKER/VIEWER → 403.
+   */
+  @PatchMapping("/{id}/override-status")
+  @PreAuthorize("@productionAccessService.hasManagerPermission(authentication, 'BATCH')")
+  public ResponseEntity<ApiResponse<BatchDto>> overrideStatus(
+      @PathVariable UUID id, @Valid @RequestBody OverrideStatusRequest request) {
+    BatchDto batch = batchService.overrideStatus(id, request);
+    return ResponseEntity.ok(ApiResponse.success(batch));
+  }
+
+  // ── Certifications ────────────────────────────────────────────────────────
+
+  @GetMapping("/{id}/certifications")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<List<BatchCertificationDto>>> getCertifications(
+      @PathVariable UUID id) {
+    List<BatchCertificationDto> list = batchCertificationService.findByBatchId(id);
+    return ResponseEntity.ok(ApiResponse.success(list));
+  }
+
+  @PostMapping("/{id}/certifications")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<BatchCertificationDto>> addCertification(
+      @PathVariable UUID id, @Valid @RequestBody AddBatchCertificationRequest request) {
+    BatchCertificationDto created = batchCertificationService.add(id, request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
+  }
+
+  @DeleteMapping("/{id}/certifications/{certificationId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<Void> deleteCertification(
+      @PathVariable UUID id, @PathVariable UUID certificationId) {
+    batchCertificationService.delete(id, certificationId);
+    return ResponseEntity.noContent().build();
+  }
+
+  // ── Attributes ─────────────────────────────────────────────────────────────
+
+  @GetMapping("/{id}/attributes")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<List<BatchAttributeDto>>> getAttributes(@PathVariable UUID id) {
+    List<BatchAttributeDto> list = batchAttributeService.findByBatchId(id);
+    return ResponseEntity.ok(ApiResponse.success(list));
+  }
+
+  @PostMapping("/{id}/attributes")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<BatchAttributeDto>> addAttribute(
+      @PathVariable UUID id, @Valid @RequestBody AddBatchAttributeRequest request) {
+    BatchAttributeDto created = batchAttributeService.add(id, request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
+  }
+
+  @DeleteMapping("/{id}/attributes/{attributeId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<Void> deleteAttribute(
+      @PathVariable UUID id, @PathVariable UUID attributeId) {
+    batchAttributeService.delete(id, attributeId);
+    return ResponseEntity.noContent().build();
   }
 }

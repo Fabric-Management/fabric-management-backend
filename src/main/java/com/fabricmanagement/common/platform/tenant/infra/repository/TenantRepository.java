@@ -6,6 +6,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -94,6 +96,15 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
    */
   @Query("SELECT t FROM Tenant t WHERE t.isActive = true ORDER BY t.createdAt DESC")
   List<Tenant> findAllActive();
+
+  /**
+   * Find all active tenants with pagination.
+   *
+   * @param pageable page and sort parameters
+   * @return page of active tenants
+   */
+  @Query("SELECT t FROM Tenant t WHERE t.isActive = true")
+  Page<Tenant> findAllActive(Pageable pageable);
 
   /**
    * Find tenants with expired trials.

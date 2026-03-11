@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
+import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
 import com.fabricmanagement.production.quality.result.dto.FiberTestResultDto;
 import com.fabricmanagement.production.quality.result.dto.UpdateApprovalRequest;
@@ -13,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ public class FiberTestResultService {
 
   private final FiberTestResultRepository testResultRepository;
   private final BatchRepository batchRepository;
+  private final ApplicationEventPublisher applicationEventPublisher;
 
   @Transactional
   public FiberTestResultDto create(CreateFiberTestResultRequest request) {
@@ -114,6 +117,13 @@ public class FiberTestResultService {
     FiberTestResult saved = testResultRepository.save(result);
     log.info(
         "Test result approval updated: id={}, status={}", saved.getId(), saved.getApprovalStatus());
+
+    applicationEventPublisher.publishEvent(
+        new FiberTestResultApprovedEvent(
+            tenantId,
+            saved.getBatchId(),
+            saved.getApprovalStatus(),
+            TenantContext.getCurrentUserId()));
 
     return FiberTestResultDto.from(saved);
   }

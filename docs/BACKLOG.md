@@ -1,6 +1,6 @@
 # FabriCodeOS Backend Backlog
 
-> Son güncelleme: 2026-02-02
+> Son güncelleme: 2026-03-11
 
 ## Tamamlanan Fazlar
 
@@ -72,9 +72,10 @@
 
 #### Notification System
 
-- [ ] `NotificationService` için event listener entegrasyonu
+- [x] `NotificationService` için event listener entegrasyonu
 - [ ] Email/SMS template system
-- [ ] In-app notifications
+- [x] In-app notifications
+- [x] **Task C.2** — Notify relevant MANAGERs when `CONDITIONAL_ACCEPT` → `QUARANTINE` transition occurs (FiberTestResult → BatchQcEventListener).
 
 #### Cross-Tenant Features
 
@@ -85,6 +86,14 @@
 ---
 
 ## Teknik Borç
+
+### Notification Modülü (N4/N8/N9 sonrası)
+
+| ID   | Açıklama                                                                 | Tetikleyici                                      |
+| ---- | ------------------------------------------------------------------------ | ------------------------------------------------ |
+| TB-1 | **NotificationChannel + NotificationDeliveryChannel birleştirme** — Mevcut `NotificationChannel` (WHATSAPP/EMAIL/SMS) ile yeni `NotificationDeliveryChannel` (IN_APP, EMAIL, BOTH) aynı domain'de; ileride karışıklık yaratır. Uzun vadede birleştirilmeli veya rename edilmeli. | Yeni kanal eklenirken veya refactor sırasında    |
+| TB-2 | **Polling → SSE geçişi** — Şu an 10 sn'de bir `getUnreadCount()` polling. 100 kullanıcı ≈ 600 istek/dakika. Server-Sent Events (SSE) ile gerçek zamanlı bildirim güncellemesi daha verimli. | Kullanıcı sayısı arttığında, performans sorunu   |
+| TB-3 | **Broadcast notification için recipientId=null optimizasyonu** — `sendToTenantRoles()` N kullanıcıya N bildirim kaydı yazıyor. İleride `recipientId=null` + tenant-scoped sorgu ile tek kayıt + sorgu zamanında expand daha verimli olabilir. | Çok sayıda rol/recipient olduğunda               |
 
 ### Temizlenecekler (Sonraki Sprint)
 

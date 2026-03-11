@@ -1,15 +1,19 @@
 package com.fabricmanagement.common.platform.admin.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PageRequestDto;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.common.platform.admin.app.PlatformAdminService;
 import com.fabricmanagement.common.platform.admin.dto.TenantStatistics;
 import com.fabricmanagement.common.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.common.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.common.platform.user.dto.UserDto;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -47,21 +51,29 @@ public class PlatformAdminController {
   private final PlatformAdminService platformAdminService;
 
   /**
-   * Get all tenants in the system.
+   * Get all tenants in the system (paginated).
    *
    * <p><b>Security:</b> PLATFORM_ADMIN role required
    *
-   * @return List of all tenants
+   * <p>Supports query params: page, size, sortBy, sortDirection (default: createdAt,DESC)
+   *
+   * @param pageRequest pagination parameters
+   * @return Paginated list of tenants
    */
   @GetMapping("/tenants")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-  public ResponseEntity<ApiResponse<List<TenantDto>>> getAllTenants() {
-    log.info("Platform admin: Listing all tenants");
+  public ResponseEntity<ApiResponse<PagedResponse<TenantDto>>> getAllTenants(
+      @Valid PageRequestDto pageRequest) {
+    log.info(
+        "Platform admin: Listing tenants (page={}, size={})",
+        pageRequest.getPage(),
+        pageRequest.getSize());
 
-    List<TenantDto> tenants = platformAdminService.getAllTenants();
+    var page =
+        platformAdminService.getAllTenants(
+            pageRequest.toPageable(Sort.by(Sort.Direction.DESC, "createdAt")));
 
-    return ResponseEntity.ok(
-        ApiResponse.success(tenants, String.format("Found %d tenants", tenants.size())));
+    return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(page)));
   }
 
   /**
@@ -164,6 +176,24 @@ public class PlatformAdminController {
         platformAdminService.getTenantOrganization(tenantId, organizationId);
 
     return ResponseEntity.ok(ApiResponse.success(organization));
+  }
+
+  /**
+   * Get specific organization (company) from a tenant.
+   *
+   * <p>Alias for /organizations/{organizationId} – frontend uses "companies" terminology.
+   *
+   * <p><b>Security:</b> PLATFORM_ADMIN role required
+   *
+   * @param tenantId The tenant ID
+   * @param companyId The organization/company ID
+   * @return Organization details
+   */
+  @GetMapping("/tenants/{tenantId}/companies/{companyId}")
+  @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+  public ResponseEntity<ApiResponse<OrganizationDto>> getTenantCompany(
+      @PathVariable UUID tenantId, @PathVariable UUID companyId) {
+    return getTenantOrganization(tenantId, companyId);
   }
 
   /**

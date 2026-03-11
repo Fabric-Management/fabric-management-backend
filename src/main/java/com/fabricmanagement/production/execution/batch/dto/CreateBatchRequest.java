@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,6 +52,13 @@ public class CreateBatchRequest {
   private UUID locationId;
 
   private String remarks;
+
+  /**
+   * Batch-level composition override (FIBER only). When present, stored in attributes and takes
+   * precedence over Fiber.composition. Map of baseFiberId (UUID) → percentage (BigDecimal). Omit to
+   * use Fiber default.
+   */
+  private Map<UUID, BigDecimal> composition;
 
   // ── Optional fiber-specific fields (mapped to attributes with "fiber_" prefix when materialType
   // = FIBER) ──

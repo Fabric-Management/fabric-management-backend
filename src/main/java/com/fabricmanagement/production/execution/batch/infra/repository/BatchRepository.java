@@ -43,6 +43,9 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
   boolean existsByTenantIdAndBatchCode(UUID tenantId, String batchCode);
 
+  /** Count batches that are direct children of the given parent (for split code generation). */
+  long countByTenantIdAndParentBatchId(UUID tenantId, UUID parentBatchId);
+
   List<Batch> findByTenantIdAndStatus(UUID tenantId, BatchStatus status);
 
   List<Batch> findByTenantIdAndMaterialIdAndStatusIn(

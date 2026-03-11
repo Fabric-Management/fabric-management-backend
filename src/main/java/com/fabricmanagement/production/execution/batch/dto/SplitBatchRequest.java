@@ -1,29 +1,38 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Request for POST /batches/{id}/split.
+ *
+ * <p>Splits a batch: acceptedQuantity → new AVAILABLE batch; remainder stays in source with
+ * RETURNED or DESTROYED status.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class SplitBatchRequest {
 
-  @NotNull(message = "Split quantity is required")
-  @DecimalMin(value = "0.01", message = "Split quantity must be greater than 0")
-  private BigDecimal splitQuantity;
+  @NotNull(message = "Accepted quantity is required")
+  @DecimalMin(value = "0.01", message = "Accepted quantity must be greater than 0")
+  private BigDecimal acceptedQuantity;
 
-  @NotBlank(message = "New batch code is required")
-  private String newBatchCode;
+  @NotBlank(message = "Reason is required")
+  private String reason;
 
-  private UUID newLocationId;
-
-  private String remarks;
+  /**
+   * Status for the remainder in the source batch. Default RETURNED.
+   *
+   * <p>Must be one of: RETURNED, DESTROYED.
+   */
+  @Builder.Default private BatchStatus rejectedStatus = BatchStatus.RETURNED;
 }

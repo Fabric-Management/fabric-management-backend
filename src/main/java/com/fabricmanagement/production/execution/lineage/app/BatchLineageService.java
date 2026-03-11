@@ -3,10 +3,10 @@ package com.fabricmanagement.production.execution.lineage.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
+import com.fabricmanagement.production.execution.batch.app.BatchService;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
-import com.fabricmanagement.production.execution.batch.dto.BatchDto;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.lineage.domain.BatchLineage;
 import com.fabricmanagement.production.execution.lineage.domain.event.BatchLineageCreatedEvent;
@@ -40,6 +40,7 @@ public class BatchLineageService {
 
   private final BatchLineageRepository batchLineageRepository;
   private final BatchRepository batchRepository;
+  private final BatchService batchService;
   private final ApplicationEventPublisher eventPublisher;
 
   private Batch loadBatchForUpdate(UUID batchId, UUID tenantId, String label) {
@@ -209,7 +210,7 @@ public class BatchLineageService {
             .toList();
 
     return BatchLineageDetailDto.builder()
-        .batch(BatchDto.from(focalBatch))
+        .batch(batchService.toBatchDto(focalBatch))
         .parents(parents)
         .children(children)
         .build();

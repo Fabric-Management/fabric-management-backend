@@ -19,6 +19,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,7 +56,7 @@ public class PlatformAdminService {
   private final EmployeeService employeeService;
 
   /**
-   * Get all tenants in the system.
+   * Get all tenants in the system (unpaginated).
    *
    * <p><b>Platform Admin Only:</b> Returns all tenants regardless of tenant context.
    *
@@ -69,6 +71,28 @@ public class PlatformAdminService {
     log.info("Found {} tenants in system", tenants.size());
 
     return tenants.stream().map(TenantDto::from).collect(Collectors.toList());
+  }
+
+  /**
+   * Get all tenants in the system with pagination.
+   *
+   * <p><b>Platform Admin Only:</b> Returns paginated tenants regardless of tenant context.
+   *
+   * @param pageable page, size and sort parameters
+   * @return Page of tenants
+   */
+  @Transactional(readOnly = true)
+  public Page<TenantDto> getAllTenants(Pageable pageable) {
+    log.info(
+        "Platform admin: Listing tenants (page={}, size={})",
+        pageable.getPageNumber(),
+        pageable.getPageSize());
+
+    Page<Tenant> page = tenantRepository.findAllActive(pageable);
+
+    log.debug("Found {} tenants on page {}", page.getNumberOfElements(), page.getNumber());
+
+    return page.map(TenantDto::from);
   }
 
   /**

@@ -41,11 +41,11 @@ public class Fiber extends BaseEntity {
   private Material material;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "fiber_category_id")
+  @JoinColumn(name = "fiber_category_id", nullable = false)
   private FiberCategory fiberCategory;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "fiber_iso_code_id")
+  @JoinColumn(name = "fiber_iso_code_id", nullable = false)
   private FiberIsoCode fiberIsoCode;
 
   // Helper methods for accessing IDs without loading entities
@@ -63,9 +63,6 @@ public class Fiber extends BaseEntity {
 
   @Column(name = "fiber_name", nullable = false, length = 255)
   private String fiberName;
-
-  @Column(name = "fiber_grade", length = 50)
-  private String fiberGrade;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
@@ -105,18 +102,13 @@ public class Fiber extends BaseEntity {
   }
 
   public static Fiber createPureFiber(
-      Material material,
-      FiberCategory fiberCategory,
-      FiberIsoCode fiberIsoCode,
-      String fiberName,
-      String fiberGrade) {
+      Material material, FiberCategory fiberCategory, FiberIsoCode fiberIsoCode, String fiberName) {
 
     return Fiber.builder()
         .material(material)
         .fiberCategory(fiberCategory)
         .fiberIsoCode(fiberIsoCode)
         .fiberName(fiberName)
-        .fiberGrade(fiberGrade)
         .composition(new HashMap<>())
         .status(FiberStatus.ACTIVE)
         .build();
@@ -127,7 +119,6 @@ public class Fiber extends BaseEntity {
       FiberCategory fiberCategory,
       FiberIsoCode fiberIsoCode,
       String fiberName,
-      String fiberGrade,
       Map<UUID, BigDecimal> composition) {
 
     return Fiber.builder()
@@ -135,16 +126,14 @@ public class Fiber extends BaseEntity {
         .fiberCategory(fiberCategory)
         .fiberIsoCode(fiberIsoCode)
         .fiberName(fiberName)
-        .fiberGrade(fiberGrade)
         .composition(composition != null ? composition : new HashMap<>())
         .status(FiberStatus.ACTIVE)
         .build();
   }
 
   /** Update fiber properties (excluding status - use lifecycle methods instead). */
-  public void update(String fiberName, String fiberGrade, String remarks) {
+  public void update(String fiberName, String remarks) {
     this.fiberName = fiberName;
-    this.fiberGrade = fiberGrade;
     this.remarks = remarks;
   }
 

@@ -87,6 +87,9 @@ public class Batch extends BaseEntity {
   @Column(name = "location_id")
   private UUID locationId;
 
+  @Column(name = "parent_batch_id")
+  private UUID parentBatchId;
+
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;
 
@@ -119,7 +122,7 @@ public class Batch extends BaseEntity {
     batch.setUnit(unit);
     batch.setProductionDate(productionDate);
     batch.setExpiryDate(expiryDate);
-    batch.setStatus(BatchStatus.AVAILABLE);
+    batch.setStatus(BatchStatus.PENDING_QC);
     batch.setLocationId(locationId);
     batch.setRemarks(remarks);
     batch.setAttributes(attributes != null ? attributes : new java.util.HashMap<>());
@@ -133,10 +136,34 @@ public class Batch extends BaseEntity {
     return quantity.subtract(reservedQuantity).subtract(consumedQuantity);
   }
 
+  /**
+   * Transition batch to a target status. Validates allowed transitions per BatchStatus rules.
+   *
+   * @param target the desired status
+   * @param actorId the user performing the transition (for audit; may be stored in future)
+   * @throws IllegalStateException if transition from current status to target is not allowed
+   */
+  public void transitionStatus(BatchStatus target, UUID actorId) {
+    if (this.status == target) {
+      return;
+    }
+    if (!this.status.canTransitionTo(target)) {
+      throw new IllegalStateException(
+          String.format(
+              "Invalid batch status transition: %s → %s (batch %s). Actor: %s",
+              this.status, target, batchCode, actorId));
+    }
+    this.status = target;
+    onUpdate();
+  }
+
   /** Reserve quantity for a production order. */
   public void reserve(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Reservation amount must be positive");
+    }
+    if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
+      throw new InvalidStatusTransitionException("Batch", this.status.name(), "RESERVED");
     }
     if (this.status == BatchStatus.DEPLETED) {
       throw new InvalidStatusTransitionException("Batch", "DEPLETED", "RESERVED");
@@ -232,6 +259,9 @@ public class Batch extends BaseEntity {
   private void validateConsumptionPreconditions(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Consumption amount must be positive");
+    }
+    if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
+      throw new InvalidStatusTransitionException("Batch", this.status.name(), "IN_PROGRESS");
     }
     if (this.status == BatchStatus.DEPLETED) {
       throw new InvalidStatusTransitionException("Batch", "DEPLETED", "IN_PROGRESS");

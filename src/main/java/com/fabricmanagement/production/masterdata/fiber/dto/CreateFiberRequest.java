@@ -3,7 +3,6 @@ package com.fabricmanagement.production.masterdata.fiber.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -52,12 +51,11 @@ public class CreateFiberRequest {
   @NotNull(message = "Fiber Category ID is required")
   private UUID fiberCategoryId;
 
+  @NotNull(message = "Fiber ISO Code ID is required")
   private UUID fiberIsoCodeId;
 
   @NotBlank(message = "Fiber name is required")
   private String fiberName;
-
-  private String fiberGrade;
 
   /**
    * Composition map: baseFiberId → percentage (optional).
@@ -69,10 +67,6 @@ public class CreateFiberRequest {
    * <p>Example: {cottonId: 60.0, viscoseId: 40.0}
    */
   private Map<UUID, BigDecimal> composition;
-
-  private List<UUID> attributeIds;
-
-  private List<UUID> certificationIds;
 
   private String remarks;
 }

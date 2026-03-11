@@ -3,17 +3,21 @@ package com.fabricmanagement.production.execution.batch.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchOverrideLog;
 import com.fabricmanagement.production.execution.batch.domain.BatchReservation;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.ReservationStatus;
 import com.fabricmanagement.production.execution.batch.domain.event.*;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.dto.*;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchOverrideLogRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.execution.warehouse.app.WarehouseLocationService;
 import com.fabricmanagement.production.execution.warehouse.domain.WarehouseLocationType;
 import com.fabricmanagement.production.execution.warehouse.dto.WarehouseLocationDto;
+import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
+import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -37,6 +41,9 @@ public class BatchService {
 
   private final BatchRepository batchRepository;
   private final BatchReservationRepository reservationRepository;
+  private final BatchOverrideLogRepository overrideLogRepository;
+  private final BatchCodeGenerator batchCodeGenerator;
+  private final FiberRepository fiberRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final WarehouseLocationService warehouseLocationService;
 
@@ -52,6 +59,13 @@ public class BatchService {
     }
 
     Map<String, Object> attributes = resolveAttributes(request);
+    if (request.getComposition() != null && !request.getComposition().isEmpty()) {
+      Map<String, Object> compMap = new HashMap<>();
+      for (Map.Entry<UUID, BigDecimal> e : request.getComposition().entrySet()) {
+        compMap.put(e.getKey().toString(), e.getValue());
+      }
+      attributes.put("composition", compMap);
+    }
 
     Batch batch =
         Batch.create(
@@ -76,7 +90,7 @@ public class BatchService {
 
     log.info("Created batch: id={}, batchCode={}", batch.getId(), batch.getBatchCode());
 
-    return BatchDto.from(batch);
+    return toBatchDto(batch);
   }
 
   /**
@@ -109,13 +123,60 @@ public class BatchService {
     return attrs;
   }
 
+  /**
+   * Resolve effective composition: Batch.attributes.composition if present, else Fiber.composition.
+   * Returns empty map for non-FIBER or when neither has composition.
+   */
+  @SuppressWarnings("unchecked")
+  private Map<UUID, BigDecimal> resolveComposition(Batch batch) {
+    if (batch.getMaterialType() != MaterialType.FIBER) {
+      return Map.of();
+    }
+    Object compObj =
+        batch.getAttributes() != null ? batch.getAttributes().get("composition") : null;
+    if (compObj instanceof Map) {
+      Map<?, ?> compMap = (Map<?, ?>) compObj;
+      if (!compMap.isEmpty()) {
+        Map<UUID, BigDecimal> result = new HashMap<>();
+        for (Map.Entry<?, ?> e : compMap.entrySet()) {
+          try {
+            UUID key =
+                e.getKey() instanceof UUID
+                    ? (UUID) e.getKey()
+                    : UUID.fromString(String.valueOf(e.getKey()));
+            BigDecimal val =
+                e.getValue() instanceof BigDecimal
+                    ? (BigDecimal) e.getValue()
+                    : new BigDecimal(String.valueOf(e.getValue()));
+            result.put(key, val);
+          } catch (Exception ignored) {
+            // skip invalid entries
+          }
+        }
+        return result;
+      }
+    }
+    // For FIBER, materialId references prod_fiber.id (see V061 migration)
+    return fiberRepository
+        .findById(batch.getMaterialId())
+        .map(Fiber::getComposition)
+        .orElse(Map.of());
+  }
+
+  /** Build BatchDto with resolved composition (for FIBER: batch override or fiber default). */
+  public BatchDto toBatchDto(Batch batch) {
+    BatchDto dto = BatchDto.from(batch);
+    dto.setComposition(resolveComposition(batch));
+    return dto;
+  }
+
   @Transactional(readOnly = true)
   public List<BatchDto> getAll() {
     UUID tenantId = TenantContext.getCurrentTenantId();
     log.debug("Getting all batches: tenantId={}", tenantId);
 
     return batchRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-        .map(BatchDto::from)
+        .map(this::toBatchDto)
         .toList();
   }
 
@@ -127,7 +188,7 @@ public class BatchService {
     return batchRepository
         .findById(id)
         .filter(batch -> batch.getTenantId().equals(tenantId))
-        .map(BatchDto::from);
+        .map(this::toBatchDto);
   }
 
   @Transactional(readOnly = true)
@@ -136,7 +197,7 @@ public class BatchService {
     log.debug("Getting batches by materialId: tenantId={}, materialId={}", tenantId, materialId);
 
     return batchRepository.findByTenantIdAndMaterialIdAndIsActiveTrue(tenantId, materialId).stream()
-        .map(BatchDto::from)
+        .map(this::toBatchDto)
         .toList();
   }
 
@@ -237,7 +298,7 @@ public class BatchService {
         releasedQty,
         saved.getAvailableQuantity());
 
-    return BatchDto.from(saved);
+    return toBatchDto(saved);
   }
 
   /**
@@ -285,7 +346,7 @@ public class BatchService {
         releasedQty,
         saved.getAvailableQuantity());
 
-    return BatchDto.from(saved);
+    return toBatchDto(saved);
   }
 
   /** List all reservations for a batch (active + partially consumed). */
@@ -364,7 +425,7 @@ public class BatchService {
         saved.getConsumedQuantity(),
         saved.getStatus());
 
-    return BatchDto.from(saved);
+    return toBatchDto(saved);
   }
 
   // ── Waste ──────────────────────────────────────────────────────────────────
@@ -388,7 +449,7 @@ public class BatchService {
         "Waste recorded: id={}, wasteQty={}, wastePercent={}%",
         saved.getId(), saved.getWasteQuantity(), saved.getWastePercentage());
 
-    return BatchDto.from(saved);
+    return toBatchDto(saved);
   }
 
   // ── Inventory Adjustment ───────────────────────────────────────────────────
@@ -429,68 +490,233 @@ public class BatchService {
         saved.getQuantity(),
         saved.getAvailableQuantity());
 
-    return BatchDto.from(saved);
+    return toBatchDto(saved);
   }
 
   // ── Split & Transfer ───────────────────────────────────────────────────────
 
+  /**
+   * Split batch: acceptedQuantity → new AVAILABLE batch; remainder stays in source with
+   * RETURNED/DESTROYED. Both operations in a single transaction.
+   *
+   * @return SplitBatchResponse with source batch (updated) and new batch
+   */
   @Transactional
-  public BatchDto splitBatch(UUID parentBatchId, SplitBatchRequest request) {
+  public SplitBatchResponse splitBatch(UUID batchId, SplitBatchRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     log.debug(
-        "Splitting batch: tenantId={}, parentBatchId={}, request={}",
+        "Splitting batch: tenantId={}, batchId={}, acceptedQty={}",
         tenantId,
-        parentBatchId,
-        request);
+        batchId,
+        request.getAcceptedQuantity());
 
-    Batch parentBatch = loadBatchWithLock(parentBatchId, tenantId);
+    Batch sourceBatch = loadBatchWithLock(batchId, tenantId);
 
-    if (batchRepository.existsByTenantIdAndBatchCode(tenantId, request.getNewBatchCode())) {
-      throw new BatchDomainException("Batch code already exists: " + request.getNewBatchCode());
+    if (!Set.of(BatchStatus.PENDING_QC, BatchStatus.QUARANTINE, BatchStatus.QC_REJECTED)
+        .contains(sourceBatch.getStatus())) {
+      throw new BatchDomainException(
+          "Split only allowed for PENDING_QC, QUARANTINE, or QC_REJECTED. Current: "
+              + sourceBatch.getStatus());
     }
 
-    // 1. Consume from parent
-    parentBatch.consumeFromAvailable(request.getSplitQuantity());
-    Batch savedParent = batchRepository.save(parentBatch);
+    BatchStatus rejectedStatus =
+        request.getRejectedStatus() != null ? request.getRejectedStatus() : BatchStatus.RETURNED;
+    if (!Set.of(BatchStatus.RETURNED, BatchStatus.DESTROYED).contains(rejectedStatus)) {
+      throw new BatchDomainException(
+          "rejectedStatus must be RETURNED or DESTROYED. Got: " + rejectedStatus);
+    }
 
-    // 2. Create child batch
+    BigDecimal acceptedQty = request.getAcceptedQuantity();
+    BigDecimal totalQty = sourceBatch.getQuantity();
+    if (acceptedQty.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new BatchDomainException("Accepted quantity must be greater than 0");
+    }
+    if (acceptedQty.compareTo(totalQty) >= 0) {
+      throw new BatchDomainException(
+          String.format(
+              "Accepted quantity (%.3f) must be less than source quantity (%.3f %s)",
+              acceptedQty, totalQty, sourceBatch.getUnit()));
+    }
+
+    // 1. Source batch: reduce quantity, set status to RETURNED or DESTROYED
+    sourceBatch.adjustQuantity(acceptedQty.negate());
+    sourceBatch.transitionStatus(rejectedStatus, actorId);
+    Batch savedSource = batchRepository.save(sourceBatch);
+
+    // 2. New batch: acceptedQuantity, AVAILABLE, parentBatchId = source, code = -P1, -P2, ...
+    String newBatchCode =
+        batchCodeGenerator.generateSplitCode(sourceBatch.getId(), sourceBatch.getBatchCode());
+
     Batch childBatch =
         Batch.create(
             tenantId,
-            parentBatch.getMaterialId(),
-            parentBatch.getMaterialType(),
-            request.getNewBatchCode(),
-            parentBatch.getSupplierBatchCode(),
-            request.getSplitQuantity(),
-            parentBatch.getUnit(),
+            sourceBatch.getMaterialId(),
+            sourceBatch.getMaterialType(),
+            newBatchCode,
+            sourceBatch.getSupplierBatchCode(),
+            acceptedQty,
+            sourceBatch.getUnit(),
             Instant.now(),
-            parentBatch.getExpiryDate(),
-            request.getNewLocationId(),
-            request.getRemarks(),
-            parentBatch.getAttributes() != null
-                ? new java.util.HashMap<>(parentBatch.getAttributes())
-                : new java.util.HashMap<>());
+            sourceBatch.getExpiryDate(),
+            sourceBatch.getLocationId(),
+            request.getReason(),
+            sourceBatch.getAttributes() != null
+                ? new HashMap<>(sourceBatch.getAttributes())
+                : new HashMap<>());
+    childBatch.setParentBatchId(sourceBatch.getId());
+    childBatch.setStatus(BatchStatus.AVAILABLE);
     Batch savedChild = batchRepository.save(childBatch);
 
-    // 3. Publish event
-    applicationEventPublisher.publishEvent(
-        new BatchSplitEvent(
+    log.info(
+        "Split batch: source {} → {} ({} {}), child {} ({} {} AVAILABLE)",
+        sourceBatch.getBatchCode(),
+        rejectedStatus,
+        savedSource.getQuantity(),
+        sourceBatch.getUnit(),
+        savedChild.getBatchCode(),
+        acceptedQty,
+        sourceBatch.getUnit());
+
+    return SplitBatchResponse.builder()
+        .sourceBatch(toBatchDto(savedSource))
+        .newBatch(toBatchDto(savedChild))
+        .build();
+  }
+
+  /**
+   * Partial acceptance split (QC kısmi kabul). Source batch remainder gets rejectedStatus; new
+   * batch with acceptedQuantity is AVAILABLE.
+   *
+   * <p>Source must be PENDING_QC or QUARANTINE. Both operations run in a single transaction.
+   */
+  @Transactional
+  public BatchDto splitPartialAcceptance(UUID batchId, PartialAcceptanceSplitRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
+    log.debug(
+        "Partial acceptance split: tenantId={}, batchId={}, acceptedQty={}",
+        tenantId,
+        batchId,
+        request.getAcceptedQuantity());
+
+    Batch sourceBatch = loadBatchWithLock(batchId, tenantId);
+
+    if (!Set.of(BatchStatus.PENDING_QC, BatchStatus.QUARANTINE, BatchStatus.QC_REJECTED)
+        .contains(sourceBatch.getStatus())) {
+      throw new BatchDomainException(
+          "Partial acceptance split only allowed for PENDING_QC, QUARANTINE, or QC_REJECTED. Current: "
+              + sourceBatch.getStatus());
+    }
+
+    BatchStatus rejectedStatus =
+        request.getRejectedStatus() != null ? request.getRejectedStatus() : BatchStatus.QC_REJECTED;
+    if (!Set.of(BatchStatus.QC_REJECTED, BatchStatus.RETURNED, BatchStatus.DESTROYED)
+        .contains(rejectedStatus)) {
+      throw new BatchDomainException(
+          "rejectedStatus must be QC_REJECTED, RETURNED, or DESTROYED. Got: " + rejectedStatus);
+    }
+    if (sourceBatch.getStatus() == BatchStatus.PENDING_QC
+        && rejectedStatus != BatchStatus.QC_REJECTED) {
+      throw new BatchDomainException(
+          "From PENDING_QC, rejectedStatus must be QC_REJECTED. Use QUARANTINE first for RETURNED/DESTROYED.");
+    }
+    // For QC_REJECTED source, remainder stays QC_REJECTED
+    if (sourceBatch.getStatus() == BatchStatus.QC_REJECTED) {
+      rejectedStatus = BatchStatus.QC_REJECTED;
+    }
+
+    BigDecimal acceptedQty = request.getAcceptedQuantity();
+    BigDecimal available = sourceBatch.getAvailableQuantity();
+    if (acceptedQty.compareTo(available) > 0) {
+      throw new BatchDomainException(
+          String.format(
+              "Accepted quantity (%.3f %s) exceeds available (%.3f %s) for batch %s",
+              acceptedQty,
+              sourceBatch.getUnit(),
+              available,
+              sourceBatch.getUnit(),
+              sourceBatch.getBatchCode()));
+    }
+    if (acceptedQty.compareTo(sourceBatch.getQuantity()) >= 0) {
+      throw new BatchDomainException(
+          "Accepted quantity must be less than total quantity so remainder stays in source batch.");
+    }
+
+    // 1. Reduce source batch quantity (remainder stays)
+    sourceBatch.adjustQuantity(acceptedQty.negate());
+    sourceBatch.transitionStatus(rejectedStatus, actorId);
+    batchRepository.save(sourceBatch);
+
+    // 2. Create new batch with accepted quantity, AVAILABLE, parentBatchId = source
+    String newBatchCode =
+        batchCodeGenerator.generateSplitCode(sourceBatch.getId(), sourceBatch.getBatchCode());
+
+    Batch childBatch =
+        Batch.create(
             tenantId,
-            savedParent.getId(),
-            savedChild.getId(),
-            request.getSplitQuantity(),
-            savedParent.getUnit(),
-            savedParent.getLocationId(),
-            savedChild.getLocationId(),
-            savedParent.getBatchCode(),
-            savedChild.getBatchCode(),
-            request.getRemarks()));
+            sourceBatch.getMaterialId(),
+            sourceBatch.getMaterialType(),
+            newBatchCode,
+            sourceBatch.getSupplierBatchCode(),
+            acceptedQty,
+            sourceBatch.getUnit(),
+            Instant.now(),
+            sourceBatch.getExpiryDate(),
+            sourceBatch.getLocationId(),
+            request.getReason(),
+            sourceBatch.getAttributes() != null
+                ? new HashMap<>(sourceBatch.getAttributes())
+                : new HashMap<>());
+    childBatch.setParentBatchId(sourceBatch.getId());
+    childBatch.setStatus(BatchStatus.AVAILABLE);
+    Batch savedChild = batchRepository.save(childBatch);
 
     log.info(
-        "Successfully split batch {} into {}",
-        savedParent.getBatchCode(),
-        savedChild.getBatchCode());
-    return BatchDto.from(savedChild);
+        "Partial acceptance split: source {} → {} ({} {} rejected), child {} ({} {} accepted)",
+        sourceBatch.getBatchCode(),
+        rejectedStatus,
+        sourceBatch.getQuantity(),
+        sourceBatch.getUnit(),
+        savedChild.getBatchCode(),
+        acceptedQty,
+        sourceBatch.getUnit());
+
+    return toBatchDto(savedChild);
+  }
+
+  /**
+   * Override batch status (QC_REJECTED or QUARANTINE → AVAILABLE). Logs to override_log for audit.
+   */
+  @Transactional
+  public BatchDto overrideStatus(UUID batchId, OverrideStatusRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
+    log.debug("Override batch status: tenantId={}, batchId={}", tenantId, batchId);
+
+    Batch batch = loadBatchWithLock(batchId, tenantId);
+
+    if (!Set.of(BatchStatus.QC_REJECTED, BatchStatus.QUARANTINE).contains(batch.getStatus())) {
+      throw new BatchDomainException(
+          "Override only allowed for QC_REJECTED or QUARANTINE. Current: " + batch.getStatus());
+    }
+
+    BatchStatus fromStatus = batch.getStatus();
+    batch.transitionStatus(BatchStatus.AVAILABLE, actorId);
+    batchRepository.save(batch);
+
+    BatchOverrideLog logEntry =
+        BatchOverrideLog.create(
+            batchId, fromStatus.name(), BatchStatus.AVAILABLE.name(), actorId, request.getReason());
+    overrideLogRepository.save(logEntry);
+
+    log.info(
+        "Batch status overridden: batchId={}, {} → AVAILABLE, reason={}",
+        batchId,
+        fromStatus,
+        request.getReason());
+
+    return toBatchDto(batch);
   }
 
   @Transactional
@@ -519,7 +745,7 @@ public class BatchService {
         "Successfully transferred batch {} to location {}",
         batch.getBatchCode(),
         request.getNewLocationId());
-    return BatchDto.from(saved);
+    return toBatchDto(saved);
   }
 
   // ── Start Production (WIP) ─────────────────────────────────────────────────
@@ -583,7 +809,7 @@ public class BatchService {
         machineLocation.getCode(),
         saved.getStatus());
 
-    return BatchDto.from(saved);
+    return toBatchDto(saved);
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
