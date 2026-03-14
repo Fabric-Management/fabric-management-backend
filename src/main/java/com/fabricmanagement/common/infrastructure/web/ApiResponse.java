@@ -2,6 +2,8 @@ package com.fabricmanagement.common.infrastructure.web;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,6 +22,20 @@ import lombok.NoArgsConstructor;
  *   "success": true,
  *   "data": { "id": "123", "name": "Material A" },
  *   "message": "Material created successfully",
+ *   "timestamp": "2025-01-27T10:30:00Z"
+ * }
+ * }</pre>
+ *
+ * <h2>Success with Warnings (e.g. batch certification):</h2>
+ *
+ * <p>{@code warnings} is an optional string array, present when the operation succeeded but the
+ * client should be informed (e.g. referenced supplier/facility certification expired for GOTS).
+ *
+ * <pre>{@code
+ * {
+ *   "success": true,
+ *   "data": { "id": "...", ... },
+ *   "warnings": [ "Referenced supplier certification has expired (validUntil: 2024-01-15)." ],
  *   "timestamp": "2025-01-27T10:30:00Z"
  * }
  * }</pre>
@@ -59,6 +75,11 @@ public class ApiResponse<T> {
   private boolean success;
   private T data;
   private String message;
+
+  /** Optional warnings (e.g. expired referenced certification). Omitted when null or empty. */
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private List<String> warnings;
+
   private ErrorDetail error;
 
   @Builder.Default private Instant timestamp = Instant.now();
@@ -72,6 +93,16 @@ public class ApiResponse<T> {
         .success(true)
         .data(data)
         .message(message)
+        .timestamp(Instant.now())
+        .build();
+  }
+
+  /** Success with optional warnings (e.g. GOTS: referenced supplier/facility cert expired). */
+  public static <T> ApiResponse<T> success(T data, List<String> warnings) {
+    return ApiResponse.<T>builder()
+        .success(true)
+        .data(data)
+        .warnings(warnings != null ? warnings : Collections.emptyList())
         .timestamp(Instant.now())
         .build();
   }

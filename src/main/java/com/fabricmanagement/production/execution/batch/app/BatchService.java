@@ -460,6 +460,9 @@ public class BatchService {
             saved.getLocationId(),
             referenceId,
             referenceType));
+    if (saved.getStatus() == BatchStatus.DEPLETED) {
+      applicationEventPublisher.publishEvent(new BatchCompletedEvent(tenantId, saved.getId()));
+    }
 
     log.info(
         "Consumed from batch: id={}, consumedQty={}, status={}",
@@ -524,6 +527,9 @@ public class BatchService {
             saved.getLocationId(),
             request.getReason(),
             request.getRemarks()));
+    if (saved.getStatus() == BatchStatus.DEPLETED) {
+      applicationEventPublisher.publishEvent(new BatchCompletedEvent(tenantId, saved.getId()));
+    }
 
     log.info(
         "Batch adjusted: id={}, delta={}, newQty={}, available={}",

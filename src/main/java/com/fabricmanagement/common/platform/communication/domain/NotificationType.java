@@ -33,5 +33,10 @@ public enum NotificationType {
   BATCH_OVERRIDE_REQUIRED,
 
   /** No quality standard defined for ISO code; batch stays PENDING_QC, manual review required */
-  BATCH_NO_QUALITY_STANDARD
+  BATCH_NO_QUALITY_STANDARD,
+
+  /**
+   * Batch certification(s) expired or expiring within configured days; notify for GOTS awareness
+   */
+  BATCH_CERTIFICATION_EXPIRING
 }

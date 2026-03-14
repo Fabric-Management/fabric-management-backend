@@ -21,6 +21,7 @@ public class BatchEventListener {
 
   private final InventoryTransactionCommandService inventoryTransactionCommandService;
   private final BatchLineageService batchLineageService;
+  private final BatchCertificationService batchCertificationService;
 
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onBatchCreated(BatchCreatedEvent event) {
@@ -244,5 +245,11 @@ public class BatchEventListener {
           InventoryTransactionReasonCode.NORMAL_OPERATION,
           event.getEventId().toString());
     }
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+  public void onBatchCompleted(BatchCompletedEvent event) {
+    log.debug("Handling BatchCompletedEvent for batchId={}", event.getBatchId());
+    batchCertificationService.snapshotCertificationsForCompletedBatch(event.getBatchId());
   }
 }

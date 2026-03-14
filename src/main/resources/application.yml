@@ -219,6 +219,11 @@ application:
     app-secret: ${WHATSAPP_APP_SECRET:}
     webhook-signature-enabled: ${WHATSAPP_WEBHOOK_SIGNATURE_ENABLED:true}
 
+  # Batch certification expiry warning (scheduled job)
+  batch-certification:
+    expiry-warning-days: ${BATCH_CERT_EXPIRY_WARNING_DAYS:30}
+    expiry-check-cron: ${BATCH_CERT_EXPIRY_CHECK_CRON:0 0 2 * * ?}
+
 # Feature Flags
 feature:
   trading-partner:

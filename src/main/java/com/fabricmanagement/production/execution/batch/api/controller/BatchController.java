@@ -212,12 +212,38 @@ public class BatchController {
     return ResponseEntity.ok(ApiResponse.success(list));
   }
 
+  @PostMapping("/{id}/certifications/copy-from/{sourceBatchId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Copy certifications from another batch",
+      description =
+          "Copies all active certifications from the source batch to this batch (target)."
+              + " changeReason is INITIAL. Fails with a clear message if the target already has any"
+              + " of the same certifications (same cert + scope + partner/facility). Tenant and"
+              + " WRITE permission enforced.")
+  public ResponseEntity<ApiResponse<List<BatchCertificationDto>>> copyCertificationsFromBatch(
+      @Parameter(description = "Target batch ID") @PathVariable UUID id,
+      @Parameter(description = "Source batch ID") @PathVariable UUID sourceBatchId) {
+    List<BatchCertificationDto> copied = batchCertificationService.copyFromBatch(id, sourceBatchId);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(copied));
+  }
+
   @PostMapping("/{id}/certifications")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Add batch certification",
+      description =
+          "Adds a certification to a batch. When scope is SUPPLIER or FACILITY, the response may"
+              + " include a **warnings** array (e.g. referenced supplier/facility certification has"
+              + " expired). Operation still succeeds; warnings are for GOTS compliance awareness.")
   public ResponseEntity<ApiResponse<BatchCertificationDto>> addCertification(
       @PathVariable UUID id, @Valid @RequestBody AddBatchCertificationRequest request) {
-    BatchCertificationDto created = batchCertificationService.add(id, request);
-    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
+    var result = batchCertificationService.add(id, request);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            result.getWarnings().isEmpty()
+                ? ApiResponse.success(result.getData())
+                : ApiResponse.success(result.getData(), result.getWarnings()));
   }
 
   @PutMapping("/{id}/certifications/{certificationId}")
@@ -226,14 +252,18 @@ public class BatchController {
       summary = "Update batch certification",
       description =
           "Updates an existing batch certification (partial update). changeReason is required;"
-              + " other fields are optional. Soft-deleted records cannot be updated.")
+              + " other fields are optional. Soft-deleted records cannot be updated. Response may"
+              + " include a **warnings** array when the referenced supplier/facility certification"
+              + " has expired (GOTS compliance).")
   public ResponseEntity<ApiResponse<BatchCertificationDto>> updateCertification(
       @Parameter(description = "Batch ID") @PathVariable UUID id,
       @Parameter(description = "Batch certification record ID") @PathVariable UUID certificationId,
       @Valid @RequestBody UpdateBatchCertificationRequest request) {
-    BatchCertificationDto updated =
-        batchCertificationService.update(id, certificationId, request);
-    return ResponseEntity.ok(ApiResponse.success(updated));
+    var result = batchCertificationService.update(id, certificationId, request);
+    return ResponseEntity.ok(
+        result.getWarnings().isEmpty()
+            ? ApiResponse.success(result.getData())
+            : ApiResponse.success(result.getData(), result.getWarnings()));
   }
 
   @DeleteMapping("/{id}/certifications/{certificationId}")
@@ -243,7 +273,8 @@ public class BatchController {
       description = "Soft-deletes a batch certification. Already deleted records return 404.")
   public ResponseEntity<Void> deleteCertification(
       @Parameter(description = "Batch ID") @PathVariable UUID id,
-      @Parameter(description = "Batch certification record ID") @PathVariable UUID certificationId) {
+      @Parameter(description = "Batch certification record ID") @PathVariable
+          UUID certificationId) {
     batchCertificationService.delete(id, certificationId);
     return ResponseEntity.noContent().build();
   }

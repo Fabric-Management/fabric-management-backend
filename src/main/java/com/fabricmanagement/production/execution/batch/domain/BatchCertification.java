@@ -75,6 +75,28 @@ public class BatchCertification extends BaseEntity {
   @Builder.Default
   private BatchCertificationChangeReason changeReason = BatchCertificationChangeReason.INITIAL;
 
+  /**
+   * Snapshot at batch completion (DEPLETED). GOTS TC: cert number as of completion time. Set when
+   * batch status becomes DEPLETED.
+   */
+  @Column(name = "cert_number_at_completion", length = 100)
+  private String certNumberAtCompletion;
+
+  /**
+   * Snapshot at batch completion (DEPLETED). GOTS TC: valid-until as of completion time. Set when
+   * batch status becomes DEPLETED.
+   */
+  @Column(name = "valid_until_at_completion")
+  private LocalDate validUntilAtCompletion;
+
+  /**
+   * True if this record was initially created from autoFill (partner/facility cert). Set to false
+   * when user updates any field. GOTS audit: distinguishes system-filled vs user-edited.
+   */
+  @Column(name = "is_auto_filled", nullable = false)
+  @Builder.Default
+  private Boolean isAutoFilled = false;
+
   @Override
   protected String getModuleCode() {
     return "BC";

@@ -3,6 +3,7 @@ package com.fabricmanagement.common.infrastructure.web.exception;
 import com.fabricmanagement.common.platform.subscription.domain.exception.FeatureNotAvailableException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.QuotaExceededException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.SubscriptionRequiredException;
+import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.common.exception.ForbiddenOperationException;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
@@ -84,6 +85,15 @@ public class GlobalExceptionHandler {
     details.put("blockedBy", "RESERVED, IN_PROGRESS");
     return ApiError.of(
         409, "Conflict", "RECIPE_IN_USE", ex.getMessage(), req.getRequestURI(), details);
+  }
+
+  @ExceptionHandler(BatchCertificationOverlapException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiError handleBatchCertificationOverlap(
+      BatchCertificationOverlapException ex, HttpServletRequest req) {
+    log.info("Batch certification date overlap: {}", ex.getMessage());
+    return ApiError.of(
+        409, "Conflict", "BATCH_CERTIFICATION_OVERLAP", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler(ProductionDomainException.class)
