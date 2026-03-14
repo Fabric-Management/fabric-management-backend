@@ -1,12 +1,15 @@
 package com.fabricmanagement.common.platform.auth.api.controller;
 
+import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.RegistrationService;
 import com.fabricmanagement.common.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.common.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.common.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.fabricmanagement.common.util.WebRequestUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class RegistrationController {
 
   private final RegistrationService registrationService;
+  private final AuthCookieSupport authCookieSupport;
 
   @PostMapping("/check")
   public ResponseEntity<ApiResponse<String>> checkRegistrationEligibility(
@@ -38,21 +42,23 @@ public class RegistrationController {
 
   @PostMapping("/verify")
   public ResponseEntity<ApiResponse<LoginResponse>> verifyAndRegister(
-      @Valid @RequestBody VerifyAndRegisterRequest request, HttpServletRequest httpRequest) {
+      @Valid @RequestBody VerifyAndRegisterRequest request,
+      HttpServletRequest httpRequest,
+      HttpServletResponse httpResponse) {
     log.info(
         "Verify and register: contactValue={}",
         PiiMaskingUtil.maskEmail(request.getContactValue()));
-    String ipAddress = getClientIpAddress(httpRequest);
+    String ipAddress = WebRequestUtils.getClientIpAddress(httpRequest);
     String userAgent = httpRequest.getHeader("User-Agent");
     LoginResponse response = registrationService.verifyAndRegister(request, ipAddress, userAgent);
-    return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
-  }
 
-  private String getClientIpAddress(HttpServletRequest request) {
-    String xForwardedFor = request.getHeader("X-Forwarded-For");
-    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-      return xForwardedFor.split(",")[0].trim();
+    if (response.getAccessToken() != null || response.getRefreshToken() != null) {
+      authCookieSupport.addAuthCookies(
+          httpResponse, response.getAccessToken(), response.getRefreshToken());
+      response.setAccessToken(null);
+      response.setRefreshToken(null);
     }
-    return request.getRemoteAddr();
+
+    return ResponseEntity.ok(ApiResponse.success(response, "Registration completed successfully"));
   }
 }

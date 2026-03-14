@@ -6,6 +6,8 @@ import com.fabricmanagement.production.execution.batch.app.BatchCertificationSer
 import com.fabricmanagement.production.execution.batch.app.BatchService;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
 import com.fabricmanagement.production.execution.batch.dto.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -218,10 +220,30 @@ public class BatchController {
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
   }
 
+  @PutMapping("/{id}/certifications/{certificationId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Update batch certification",
+      description =
+          "Updates an existing batch certification (partial update). changeReason is required;"
+              + " other fields are optional. Soft-deleted records cannot be updated.")
+  public ResponseEntity<ApiResponse<BatchCertificationDto>> updateCertification(
+      @Parameter(description = "Batch ID") @PathVariable UUID id,
+      @Parameter(description = "Batch certification record ID") @PathVariable UUID certificationId,
+      @Valid @RequestBody UpdateBatchCertificationRequest request) {
+    BatchCertificationDto updated =
+        batchCertificationService.update(id, certificationId, request);
+    return ResponseEntity.ok(ApiResponse.success(updated));
+  }
+
   @DeleteMapping("/{id}/certifications/{certificationId}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Delete batch certification",
+      description = "Soft-deletes a batch certification. Already deleted records return 404.")
   public ResponseEntity<Void> deleteCertification(
-      @PathVariable UUID id, @PathVariable UUID certificationId) {
+      @Parameter(description = "Batch ID") @PathVariable UUID id,
+      @Parameter(description = "Batch certification record ID") @PathVariable UUID certificationId) {
     batchCertificationService.delete(id, certificationId);
     return ResponseEntity.noContent().build();
   }
@@ -249,5 +271,39 @@ public class BatchController {
       @PathVariable UUID id, @PathVariable UUID attributeId) {
     batchAttributeService.delete(id, attributeId);
     return ResponseEntity.noContent().build();
+  }
+
+  // ── Treatments (stub – returns empty until full implementation) ──────────
+
+  /** Treatment catalog reference. Returns empty list until treatment master data exists. */
+  @GetMapping("/treatments")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<List<?>>> getTreatmentCatalog() {
+    return ResponseEntity.ok(ApiResponse.success(List.of()));
+  }
+
+  /** Batch treatments. Returns empty list until full implementation. */
+  @GetMapping("/{id}/treatments")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<List<?>>> getBatchTreatments(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(List.of()));
+  }
+
+  /** Add treatment – 501 until full implementation. */
+  @PostMapping("/{id}/treatments")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<Void>> addBatchTreatment(
+      @PathVariable UUID id, @RequestBody(required = false) Object request) {
+    return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+        .body(ApiResponse.error("NOT_IMPLEMENTED", "Batch treatments not yet implemented"));
+  }
+
+  /** Remove treatment – 501 until full implementation. */
+  @DeleteMapping("/{id}/treatments/{treatmentId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<Void>> removeBatchTreatment(
+      @PathVariable UUID id, @PathVariable UUID treatmentId) {
+    return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+        .body(ApiResponse.error("NOT_IMPLEMENTED", "Batch treatments not yet implemented"));
   }
 }

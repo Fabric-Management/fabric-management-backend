@@ -4,7 +4,7 @@
 
 .SHELLFLAGS := -eu -o pipefail -c
 .ONESHELL:
-.PHONY: help setup build compile check run format lint test verify verify-coverage up down logs status db-migrate db-repair db-reset db-shell clean dev-reset info
+.PHONY: help setup build compile check run format lint test verify verify-coverage up down logs status db-migrate db-repair db-reset db-reset-local db-shell clean dev-reset info
 
 .DEFAULT_GOAL := help
 
@@ -13,6 +13,9 @@ APP_PORT ?= 8080
 BASE_URL := http://localhost:$(APP_PORT)
 POSTGRES_SERVICE := postgres
 POSTGRES_CONTAINER := fabric-postgres
+POSTGRES_LOCAL_USER ?= postgres
+# psql: use PATH, or common macOS locations. Override: make db-reset-local PSQL=/path/to/psql
+PSQL ?= $(shell which psql 2>/dev/null || ( [ -x /usr/local/opt/postgresql@16/bin/psql ] && echo /usr/local/opt/postgresql@16/bin/psql ) || ( [ -x /usr/local/opt/postgresql/bin/psql ] && echo /usr/local/opt/postgresql/bin/psql ) || ( [ -x /opt/homebrew/opt/postgresql@16/bin/psql ] && echo /opt/homebrew/opt/postgresql@16/bin/psql ) || ( [ -x /opt/homebrew/opt/postgresql/bin/psql ] && echo /opt/homebrew/opt/postgresql/bin/psql ) || ( [ -x /Applications/Postgres.app/Contents/Versions/latest/bin/psql ] && echo /Applications/Postgres.app/Contents/Versions/latest/bin/psql ) || echo psql)
 MVN := $(if $(wildcard mvnw),./mvnw,mvn)
 # Auto-detect JAVA_HOME for Homebrew OpenJDK when not set (prefer Java 21 for project compatibility)
 export JAVA_HOME ?= $(or $(shell [ -d /usr/local/opt/openjdk@21 ] && echo /usr/local/opt/openjdk@21),$(shell [ -d /opt/homebrew/opt/openjdk@21 ] && echo /opt/homebrew/opt/openjdk@21),$(shell [ -d /usr/local/opt/openjdk ] && echo /usr/local/opt/openjdk),$(shell [ -d /opt/homebrew/opt/openjdk ] && echo /opt/homebrew/opt/openjdk))
@@ -124,10 +127,10 @@ db-reset: ## Reset database volume completely (Docker) - DESTRUCTIVE!
 	docker compose up -d $(POSTGRES_SERVICE)
 	@echo "$(GREEN)✅ DB reset complete. Flyway will run on next app start.$(NC)"
 
-db-reset-local: ## Reset DB when using local PostgreSQL (no Docker). Run: psql -U postgres -f scripts/db-reset-local.sql
-	@echo "$(YELLOW)Run in pgAdmin or terminal:$(NC)"
-	@echo "  psql -U postgres -f scripts/db-reset-local.sql"
-	@echo "Then: make run"
+db-reset-local: ## Reset local PostgreSQL DB (drop + recreate fabric_management). Uses POSTGRES_LOCAL_USER (default: postgres). On Homebrew use: POSTGRES_LOCAL_USER=$(whoami)
+	@echo "$(RED)⚠️  Resetting local database fabric_management...$(NC)"
+	@$(PSQL) -U $(POSTGRES_LOCAL_USER) -d postgres -f "$(CURDIR)/scripts/db-reset-local.sql"
+	@echo "$(GREEN)✅ DB reset complete. Run: make run$(NC)"
 
 db-shell: ## Open PostgreSQL shell
 	docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_user -d fabric_management

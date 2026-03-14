@@ -15,8 +15,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LoginResponse {
 
+  /** Omitted from JSON when null (tokens are sent via Set-Cookie). */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String accessToken;
+
+  /** Omitted from JSON when null (tokens are sent via Set-Cookie). */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private String refreshToken;
+
   private Long expiresIn;
   private UserDto user;
 

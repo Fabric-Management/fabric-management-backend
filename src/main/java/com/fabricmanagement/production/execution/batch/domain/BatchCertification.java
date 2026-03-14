@@ -70,6 +70,11 @@ public class BatchCertification extends BaseEntity {
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "change_reason", nullable = false, length = 30)
+  @Builder.Default
+  private BatchCertificationChangeReason changeReason = BatchCertificationChangeReason.INITIAL;
+
   @Override
   protected String getModuleCode() {
     return "BC";

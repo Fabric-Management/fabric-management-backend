@@ -3,12 +3,14 @@ package com.fabricmanagement.common.infrastructure.security;
 import com.fabricmanagement.common.platform.auth.app.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -22,12 +24,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * JWT Authentication Filter.
  *
- * <p>Reads the JWT token from the {@code Authorization: Bearer <token>} header, validates it, and
- * populates Spring Security's {@link SecurityContextHolder} with an authenticated principal and the
- * user's roles as {@link SimpleGrantedAuthority} objects.
+ * <p>Reads the JWT token from (1) the {@code access_token} cookie, or (2) the {@code Authorization:
+ * Bearer <token>} header as fallback for transition period. Validates the token and populates
+ * Spring Security's {@link SecurityContextHolder} with an authenticated principal and the user's
+ * roles as {@link SimpleGrantedAuthority} objects.
  *
  * <p>Without this filter, {@code @PreAuthorize} annotations see every request as anonymous, causing
  * {@code AccessDeniedException} even when a valid JWT is present.
+ *
+ * <h2>Token resolution order:</h2>
+ *
+ * <ol>
+ *   <li>Cookie {@value #ACCESS_TOKEN_COOKIE_NAME} (HttpOnly cookie support)
+ *   <li>Header {@code Authorization: Bearer <token>} (fallback)
+ * </ol>
  *
  * <h2>Role mapping:</h2>
  *
@@ -42,6 +52,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+  /** Cookie name for access token (HttpOnly cookie). */
+  public static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
 
   private final JwtService jwtService;
 
@@ -87,8 +100,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       // can evaluate role + department without additional DB calls.
       List<String> departmentCodes = jwtService.getDepartmentCodesFromToken(token);
       String primaryDepartment = jwtService.getPrimaryDepartmentFromToken(token);
+      UUID tenantId = null;
+      try {
+        tenantId = jwtService.getTenantIdFromToken(token);
+      } catch (Exception e) {
+        log.debug("No tenant_id in token: {}", e.getMessage());
+      }
       AuthenticatedUserContext userContext =
-          new AuthenticatedUserContext(userId, roleCode, departmentCodes, primaryDepartment);
+          new AuthenticatedUserContext(
+              userId, roleCode, departmentCodes, primaryDepartment, tenantId);
 
       UsernamePasswordAuthenticationToken authentication =
           new UsernamePasswordAuthenticationToken(userId.toString(), null, authorities);
@@ -122,11 +142,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
+  /**
+   * Extract JWT from request: first from {@value #ACCESS_TOKEN_COOKIE_NAME} cookie, then from
+   * {@code Authorization: Bearer} header (fallback for transition period).
+   */
   private String extractToken(HttpServletRequest request) {
+    // 1. Prefer access_token cookie (HttpOnly cookie support)
+    Cookie[] cookies = request.getCookies();
+    if (cookies != null) {
+      String fromCookie =
+          Arrays.stream(cookies)
+              .filter(cookie -> ACCESS_TOKEN_COOKIE_NAME.equals(cookie.getName()))
+              .findFirst()
+              .map(Cookie::getValue)
+              .filter(StringUtils::hasText)
+              .orElse(null);
+      if (fromCookie != null) {
+        return fromCookie;
+      }
+    }
+
+    // 2. Fallback: Authorization Bearer header (transition period)
     String header = request.getHeader("Authorization");
     if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
       return header.substring(7);
     }
+
     return null;
   }
 
@@ -140,18 +181,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
    * </ul>
    */
   private List<SimpleGrantedAuthority> buildAuthorities(String roleCode, String userType) {
-    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+    Stream<SimpleGrantedAuthority> partnerAuthorities =
+        "PARTNER".equals(userType)
+            ? Stream.of(
+                new SimpleGrantedAuthority("ROLE_PARTNER_USER"),
+                new SimpleGrantedAuthority("PARTNER_USER"))
+            : Stream.empty();
 
-    if ("PARTNER".equals(userType)) {
-      authorities.add(new SimpleGrantedAuthority("ROLE_PARTNER_USER"));
-      authorities.add(new SimpleGrantedAuthority("PARTNER_USER"));
-    }
+    Stream<SimpleGrantedAuthority> roleAuthorities =
+        roleCode == null
+            ? Stream.empty()
+            : Stream.of(
+                new SimpleGrantedAuthority("ROLE_" + roleCode.toUpperCase()),
+                new SimpleGrantedAuthority(roleCode.toUpperCase()));
 
-    if (roleCode == null) return authorities;
-
-    String upper = roleCode.toUpperCase();
-    authorities.add(new SimpleGrantedAuthority("ROLE_" + upper));
-    authorities.add(new SimpleGrantedAuthority(upper));
-    return authorities;
+    return Stream.concat(partnerAuthorities, roleAuthorities).toList();
   }
 }

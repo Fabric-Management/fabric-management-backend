@@ -1,7 +1,6 @@
 package com.fabricmanagement.human.core.employee.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -32,9 +31,6 @@ import lombok.Setter;
           columnList = "tenant_id,employee_number",
           unique = true)
     })
-@AttributeOverride(
-    name = "uid",
-    column = @Column(name = "employee_number", insertable = false, updatable = false))
 @Getter
 @Setter
 @Builder

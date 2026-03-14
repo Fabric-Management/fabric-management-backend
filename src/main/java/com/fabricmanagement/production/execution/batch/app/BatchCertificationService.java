@@ -7,10 +7,12 @@ import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartner
 import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
+import com.fabricmanagement.production.execution.batch.domain.BatchCertificationChangeReason;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
 import com.fabricmanagement.production.execution.batch.dto.AddBatchCertificationRequest;
 import com.fabricmanagement.production.execution.batch.dto.BatchCertificationAutoFillResponse;
 import com.fabricmanagement.production.execution.batch.dto.BatchCertificationDto;
+import com.fabricmanagement.production.execution.batch.dto.UpdateBatchCertificationRequest;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
@@ -41,7 +43,9 @@ public class BatchCertificationService {
             .findByIdAndTenantId(batchId, tenantId)
             .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
 
-    return certificationRepository.findByBatch_IdAndIsActiveTrue(batch.getId()).stream()
+    return certificationRepository
+        .findByBatch_IdAndIsActiveTrueWithAssociations(batch.getId())
+        .stream()
         .map(BatchCertificationDto::from)
         .toList();
   }
@@ -68,7 +72,7 @@ public class BatchCertificationService {
       partnerCert =
           partnerCertificationRepository
               .findById(request.getPartnerCertificationId())
-              .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+              .filter(pc -> Boolean.TRUE.equals(pc.getIsActive()))
               .orElseThrow(
                   () ->
                       new IllegalArgumentException(
@@ -81,7 +85,7 @@ public class BatchCertificationService {
       orgCert =
           orgCertificationRepository
               .findById(request.getOrgCertificationId())
-              .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+              .filter(oc -> Boolean.TRUE.equals(oc.getIsActive()))
               .orElseThrow(
                   () ->
                       new IllegalArgumentException(
@@ -105,6 +109,7 @@ public class BatchCertificationService {
             .certifyingBodyRef(request.getCertifyingBodyRef())
             .documentUrl(request.getDocumentUrl())
             .remarks(request.getRemarks())
+            .changeReason(BatchCertificationChangeReason.INITIAL)
             .build();
 
     BatchCertification saved = certificationRepository.save(entity);
@@ -136,75 +141,146 @@ public class BatchCertificationService {
     if (scope == BatchCertificationScope.SUPPLIER && partnerCertificationId != null) {
       return partnerCertificationRepository
           .findById(partnerCertificationId)
-          .filter(c -> tenantId.equals(c.getTenantId()))
-          .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
-          .map(
-              pc ->
-                  BatchCertificationAutoFillResponse.builder()
-                      .certificationId(pc.getCertification().getId())
-                      .certificationCode(pc.getCertification().getCertificationCode())
-                      .certificationName(pc.getCertification().getCertificationName())
-                      .scope(BatchCertificationScope.SUPPLIER)
-                      .partnerCertificationId(pc.getId())
-                      .certNumber(pc.getLicenseNo())
-                      .validFrom(pc.getIssuedAt())
-                      .validUntil(pc.getValidUntil())
-                      .certifyingBodyRef(pc.getCertification().getCertifyingBody())
-                      .documentUrl(null)
-                      .remarks(
-                          pc.getDocumentRef() != null ? "Doc ref: " + pc.getDocumentRef() : null)
-                      .build())
+          .filter(partnerCert -> tenantId.equals(partnerCert.getTenantId()))
+          .filter(partnerCert -> Boolean.TRUE.equals(partnerCert.getIsActive()))
+          .map(this::buildAutoFillFromPartnerCert)
           .orElse(null);
     }
 
     if (scope == BatchCertificationScope.FACILITY && orgCertificationId != null) {
       return orgCertificationRepository
           .findById(orgCertificationId)
-          .filter(c -> tenantId.equals(c.getTenantId()))
-          .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
-          .map(
-              oc ->
-                  BatchCertificationAutoFillResponse.builder()
-                      .certificationId(oc.getCertification().getId())
-                      .certificationCode(oc.getCertification().getCertificationCode())
-                      .certificationName(oc.getCertification().getCertificationName())
-                      .scope(BatchCertificationScope.FACILITY)
-                      .orgCertificationId(oc.getId())
-                      .certNumber(oc.getLicenseNo())
-                      .validFrom(oc.getIssuedAt())
-                      .validUntil(oc.getValidUntil())
-                      .certifyingBodyRef(oc.getCertification().getCertifyingBody())
-                      .documentUrl(null)
-                      .remarks(
-                          oc.getDocumentRef() != null ? "Doc ref: " + oc.getDocumentRef() : null)
-                      .build())
+          .filter(orgCert -> tenantId.equals(orgCert.getTenantId()))
+          .filter(orgCert -> Boolean.TRUE.equals(orgCert.getIsActive()))
+          .map(this::buildAutoFillFromOrgCert)
           .orElse(null);
     }
 
     return null;
   }
 
-  @Transactional
-  public void delete(UUID batchId, UUID certificationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+  private BatchCertificationAutoFillResponse buildAutoFillFromPartnerCert(
+      TradingPartnerCertification partnerCert) {
+    var cert = partnerCert.getCertification();
+    return BatchCertificationAutoFillResponse.builder()
+        .certificationId(cert.getId())
+        .certificationCode(cert.getCertificationCode())
+        .certificationName(cert.getCertificationName())
+        .scope(BatchCertificationScope.SUPPLIER)
+        .partnerCertificationId(partnerCert.getId())
+        .certNumber(partnerCert.getLicenseNo())
+        .validFrom(partnerCert.getIssuedAt())
+        .validUntil(partnerCert.getValidUntil())
+        .certifyingBodyRef(cert.getCertifyingBody())
+        .documentUrl(null)
+        .remarks(
+            partnerCert.getDocumentRef() != null
+                ? "Doc ref: " + partnerCert.getDocumentRef()
+                : null)
+        .build();
+  }
 
+  private BatchCertificationAutoFillResponse buildAutoFillFromOrgCert(
+      OrganizationCertification orgCert) {
+    var cert = orgCert.getCertification();
+    return BatchCertificationAutoFillResponse.builder()
+        .certificationId(cert.getId())
+        .certificationCode(cert.getCertificationCode())
+        .certificationName(cert.getCertificationName())
+        .scope(BatchCertificationScope.FACILITY)
+        .orgCertificationId(orgCert.getId())
+        .certNumber(orgCert.getLicenseNo())
+        .validFrom(orgCert.getIssuedAt())
+        .validUntil(orgCert.getValidUntil())
+        .certifyingBodyRef(cert.getCertifyingBody())
+        .documentUrl(null)
+        .remarks(
+            orgCert.getDocumentRef() != null ? "Doc ref: " + orgCert.getDocumentRef() : null)
+        .build();
+  }
+
+  private BatchCertification findBatchCertificationOrThrow(
+      Batch batch, UUID certificationId, UUID tenantId, boolean requireActive) {
+    var byBatchAndTenant =
+        certificationRepository
+            .findById(certificationId)
+            .filter(batchCert -> batchCert.getBatch().getId().equals(batch.getId()))
+            .filter(batchCert -> tenantId.equals(batchCert.getTenantId()));
+    if (requireActive) {
+      byBatchAndTenant =
+          byBatchAndTenant.filter(batchCert -> Boolean.TRUE.equals(batchCert.getIsActive()));
+    }
+    return byBatchAndTenant.orElseThrow(
+        () ->
+            new IllegalArgumentException(
+                "Batch certification not found: "
+                    + certificationId
+                    + " for batch "
+                    + batch.getId()
+                    + (requireActive ? " (or record is deleted)" : "")));
+  }
+
+  /**
+   * Updates an existing batch certification (partial update). Only non-null request fields are
+   * applied. changeReason is always updated. Soft-deleted records cannot be updated.
+   *
+   * @param batchId batch ID (must belong to current tenant)
+   * @param certificationId batch certification record ID
+   * @param request update request; changeReason required, other fields optional
+   * @return updated DTO
+   * @throws IllegalArgumentException if batch not found, certification not found, or record is
+   *     soft-deleted
+   */
+  @Transactional
+  public BatchCertificationDto update(
+      UUID batchId, UUID certificationId, UpdateBatchCertificationRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
     Batch batch =
         batchRepository
             .findByIdAndTenantId(batchId, tenantId)
             .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
-
     BatchCertification entity =
-        certificationRepository
-            .findById(certificationId)
-            .filter(c -> c.getBatch().getId().equals(batch.getId()))
-            .filter(c -> tenantId.equals(c.getTenantId()))
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "Batch certification not found: "
-                            + certificationId
-                            + " for batch "
-                            + batchId));
+        findBatchCertificationOrThrow(batch, certificationId, tenantId, true);
+
+    entity.setChangeReason(request.getChangeReason());
+    if (request.getCertNumber() != null) {
+      entity.setCertNumber(request.getCertNumber());
+    }
+    if (request.getValidFrom() != null) {
+      entity.setValidFrom(request.getValidFrom());
+    }
+    if (request.getValidUntil() != null) {
+      entity.setValidUntil(request.getValidUntil());
+    }
+    if (request.getCertifyingBodyRef() != null) {
+      entity.setCertifyingBodyRef(request.getCertifyingBodyRef());
+    }
+    if (request.getDocumentUrl() != null) {
+      entity.setDocumentUrl(request.getDocumentUrl());
+    }
+    if (request.getRemarks() != null) {
+      entity.setRemarks(request.getRemarks());
+    }
+
+    BatchCertification saved = certificationRepository.save(entity);
+    log.info(
+        "Updated batch certification: batch={}, cert={}, reason={}",
+        batch.getBatchCode(),
+        certificationId,
+        request.getChangeReason());
+
+    return BatchCertificationDto.from(saved);
+  }
+
+  @Transactional
+  public void delete(UUID batchId, UUID certificationId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    Batch batch =
+        batchRepository
+            .findByIdAndTenantId(batchId, tenantId)
+            .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
+    BatchCertification entity =
+        findBatchCertificationOrThrow(batch, certificationId, tenantId, true);
 
     entity.delete();
     certificationRepository.save(entity);

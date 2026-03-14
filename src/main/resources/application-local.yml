@@ -81,6 +81,11 @@ application:
     expiration: 3600000 # 1 hour for local development
     refresh-expiration: 2592000000 # 30 days for local development
 
+  # Auth cookies: Secure=false so cookies work over http://localhost
+  auth:
+    cookie:
+      secure: false
+
   mail:
     from-email: ${MAIL_FROM_EMAIL:info@storeandsale.shop}
     from-name: ${MAIL_FROM_NAME:Fabricode}
