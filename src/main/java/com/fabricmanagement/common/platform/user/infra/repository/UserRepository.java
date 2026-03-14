@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.user.infra.repository;
 
 import com.fabricmanagement.common.platform.user.domain.User;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -142,6 +143,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + "WHERE u.tenantId = :tenantId AND (u.firstName LIKE %:search% OR u.lastName LIKE"
           + " %:search% OR CONCAT(u.firstName, ' ', u.lastName) LIKE %:search%)")
   List<User> searchByName(@Param("tenantId") UUID tenantId, @Param("search") String search);
+
+  /**
+   * Find active users with given role codes in a tenant (e.g. ADMIN, PLATFORM_ADMIN for admin
+   * notifications).
+   */
+  @Query(
+      "SELECT u FROM User u "
+          + "LEFT JOIN FETCH u.role r "
+          + "WHERE u.tenantId = :tenantId AND u.isActive = true "
+          + "AND r.roleCode IN :roleCodes")
+  List<User> findByTenantIdAndRole_RoleCodeIn(
+      @Param("tenantId") UUID tenantId, @Param("roleCodes") Collection<String> roleCodes);
 
   /** Get active users belonging to specific departments (for department-scoped access). */
   @Query(

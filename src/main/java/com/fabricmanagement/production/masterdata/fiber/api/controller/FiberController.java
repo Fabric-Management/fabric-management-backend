@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.masterdata.fiber.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.production.masterdata.fiber.app.FiberIsoCodeService;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
@@ -13,7 +14,6 @@ import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -38,8 +38,8 @@ import org.springframework.web.bind.annotation.*;
 public class FiberController {
 
   private final FiberService fiberService;
+  private final FiberIsoCodeService fiberIsoCodeService;
   private final FiberCategoryRepository fiberCategoryRepository;
-  private final FiberIsoCodeRepository fiberIsoCodeRepository;
   private final FiberAttributeRepository fiberAttributeRepository;
   private final FiberCertificationRepository fiberCertificationRepository;
 
@@ -138,11 +138,17 @@ public class FiberController {
     return ResponseEntity.ok(ApiResponse.success(categories));
   }
 
+  /**
+   * Task F1: ISO codes with optional baseOnly filter.
+   *
+   * <p>When baseOnly=true, returns only official ISO 2076 codes (52 records). When false, returns
+   * all active codes.
+   */
   @GetMapping("/iso-codes")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
-  public ResponseEntity<ApiResponse<List<FiberIsoCodeDto>>> getIsoCodes() {
-    List<FiberIsoCodeDto> isoCodes =
-        fiberIsoCodeRepository.findByIsActiveTrue().stream().map(FiberIsoCodeDto::from).toList();
+  public ResponseEntity<ApiResponse<List<FiberIsoCodeDto>>> getIsoCodes(
+      @RequestParam(defaultValue = "false") boolean baseOnly) {
+    List<FiberIsoCodeDto> isoCodes = fiberIsoCodeService.getIsoCodes(baseOnly);
     return ResponseEntity.ok(ApiResponse.success(isoCodes));
   }
 

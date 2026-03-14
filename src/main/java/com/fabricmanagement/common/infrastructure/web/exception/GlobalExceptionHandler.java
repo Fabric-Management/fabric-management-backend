@@ -3,6 +3,7 @@ package com.fabricmanagement.common.infrastructure.web.exception;
 import com.fabricmanagement.common.platform.subscription.domain.exception.FeatureNotAvailableException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.QuotaExceededException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.SubscriptionRequiredException;
+import com.fabricmanagement.production.common.exception.ForbiddenOperationException;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
 import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
@@ -288,6 +289,14 @@ public class GlobalExceptionHandler {
         ex.getMessage(),
         req.getRequestURI(),
         details);
+  }
+
+  @ExceptionHandler(ForbiddenOperationException.class)
+  @ResponseStatus(HttpStatus.FORBIDDEN)
+  public ApiError handleForbiddenOperation(ForbiddenOperationException ex, HttpServletRequest req) {
+    log.info("Forbidden operation: {}", ex.getMessage());
+    return ApiError.of(
+        403, "Forbidden", "FORBIDDEN_OPERATION", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler(AccessDeniedException.class)

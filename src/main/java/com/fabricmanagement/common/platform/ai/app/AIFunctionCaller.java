@@ -833,8 +833,6 @@ public class AIFunctionCaller {
     info.append(String.format("📊 Fiber details: %s\n\n", f.getFiberName()));
     info.append(String.format("UID: %s\n", f.getUid()));
     info.append(String.format("Status: %s\n", f.getStatus() != null ? f.getStatus() : "N/A"));
-    info.append(
-        String.format("Grade: %s\n", f.getFiberGrade() != null ? f.getFiberGrade() : "N/A"));
 
     if (f.getComposition() != null && !f.getComposition().isEmpty()) {
       info.append("\nComposition (Blended Fiber):\n");
@@ -1015,10 +1013,11 @@ public class AIFunctionCaller {
    *
    * <p><b>USER-FRIENDLY:</b> Material can be auto-created if materialId is not provided.
    *
-   * <p>Required: fiberCategoryId (UUID), fiberName, unit (if materialId is null)
+   * <p>Required: fiberCategoryId (UUID), fiberIsoCodeId (UUID), fiberName, unit (if materialId is
+   * null)
    *
-   * <p>Optional: materialId (if provided, existing Material will be used), fiberGrade, composition
-   * (for blended fibers), remarks
+   * <p>Optional: materialId (if provided, existing Material will be used), composition (for blended
+   * fibers), remarks
    */
   private String createFiber(UUID tenantId, Map<String, Object> parameters) {
     try {
@@ -1039,12 +1038,18 @@ public class AIFunctionCaller {
         return "❌ Fiber Category ID is required.";
       }
 
+      String fiberIsoCodeIdStr = (String) parameters.get("fiberIsoCodeId");
+      if (fiberIsoCodeIdStr == null || fiberIsoCodeIdStr.isBlank()) {
+        return "❌ Fiber ISO Code ID is required.";
+      }
+
       if (fiberName == null || fiberName.isBlank()) {
         return "❌ Fiber Name is required.";
       }
 
       UUID materialId = null;
       UUID fiberCategoryId;
+      UUID fiberIsoCodeId;
       try {
         if (materialIdStr != null && !materialIdStr.isBlank()) {
           materialId = UUID.fromString(materialIdStr);
@@ -1063,16 +1068,12 @@ public class AIFunctionCaller {
         }
 
         fiberCategoryId = UUID.fromString(fiberCategoryIdStr);
+        fiberIsoCodeId = UUID.fromString(fiberIsoCodeIdStr);
       } catch (IllegalArgumentException e) {
-        return "❌ Invalid UUID format for materialId or fiberCategoryId.";
+        return "❌ Invalid UUID format for materialId, fiberCategoryId, or fiberIsoCodeId.";
       }
 
       // Optional fields
-      UUID fiberIsoCodeId =
-          parameters.get("fiberIsoCodeId") != null
-              ? UUID.fromString(parameters.get("fiberIsoCodeId").toString())
-              : null;
-      String fiberGrade = (String) parameters.get("fiberGrade");
       String remarks = (String) parameters.get("remarks");
 
       // Composition for blended fibers (optional)
@@ -1086,7 +1087,6 @@ public class AIFunctionCaller {
               .fiberCategoryId(fiberCategoryId)
               .fiberIsoCodeId(fiberIsoCodeId)
               .fiberName(fiberName)
-              .fiberGrade(fiberGrade)
               .composition(composition)
               .remarks(remarks)
               .build();
@@ -1098,12 +1098,10 @@ public class AIFunctionCaller {
               + "Fiber ID: %s\n"
               + "UID: %s\n"
               + "Name: %s\n"
-              + "Grade: %s\n"
               + "Status: %s",
           created.getId(),
           created.getUid(),
           created.getFiberName(),
-          created.getFiberGrade() != null ? created.getFiberGrade() : "N/A",
           created.getStatus() != null ? created.getStatus() : "N/A");
     } catch (Exception e) {
       log.error("Error creating fiber", e);

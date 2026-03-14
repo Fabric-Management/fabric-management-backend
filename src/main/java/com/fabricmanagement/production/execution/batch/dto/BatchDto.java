@@ -4,6 +4,7 @@ import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,40 +38,52 @@ public class BatchDto {
   private Instant expiryDate;
   private BatchStatus status;
   private UUID locationId;
+  private UUID parentBatchId;
+  private UUID qualityStandardId;
   private String remarks;
+
+  /**
+   * Resolved composition: Batch.attributes.composition if present, else Fiber.composition. Map of
+   * baseFiberId → percentage. Empty for pure fibers. Only meaningful when materialType = FIBER.
+   */
+  private Map<UUID, BigDecimal> composition;
+
   private Boolean isActive;
   private Long version;
   private Instant createdAt;
   private Instant updatedAt;
 
-  /** Map entity to DTO. */
+  /** Map entity to DTO (composition not resolved; set separately). */
   public static BatchDto from(Batch entity) {
-    return BatchDto.builder()
-        .id(entity.getId())
-        .tenantId(entity.getTenantId())
-        .uid(entity.getUid())
-        .materialId(entity.getMaterialId())
-        .materialType(entity.getMaterialType())
-        .attributes(entity.getAttributes())
-        .batchCode(entity.getBatchCode())
-        .supplierBatchCode(entity.getSupplierBatchCode())
-        .quantity(entity.getQuantity())
-        .reservedQuantity(entity.getReservedQuantity())
-        .consumedQuantity(entity.getConsumedQuantity())
-        .wasteQuantity(entity.getWasteQuantity())
-        .availableQuantity(entity.getAvailableQuantity())
-        .netOutputQuantity(entity.getNetOutputQuantity())
-        .wastePercentage(entity.getWastePercentage())
-        .unit(entity.getUnit())
-        .productionDate(entity.getProductionDate())
-        .expiryDate(entity.getExpiryDate())
-        .status(entity.getStatus())
-        .locationId(entity.getLocationId())
-        .remarks(entity.getRemarks())
-        .version(entity.getVersion())
-        .isActive(entity.getIsActive())
-        .createdAt(entity.getCreatedAt())
-        .updatedAt(entity.getUpdatedAt())
-        .build();
+    BatchDto.BatchDtoBuilder b =
+        BatchDto.builder()
+            .id(entity.getId())
+            .tenantId(entity.getTenantId())
+            .uid(entity.getUid())
+            .materialId(entity.getMaterialId())
+            .materialType(entity.getMaterialType())
+            .attributes(entity.getAttributes())
+            .batchCode(entity.getBatchCode())
+            .supplierBatchCode(entity.getSupplierBatchCode())
+            .quantity(entity.getQuantity())
+            .reservedQuantity(entity.getReservedQuantity())
+            .consumedQuantity(entity.getConsumedQuantity())
+            .wasteQuantity(entity.getWasteQuantity())
+            .availableQuantity(entity.getAvailableQuantity())
+            .netOutputQuantity(entity.getNetOutputQuantity())
+            .wastePercentage(entity.getWastePercentage())
+            .unit(entity.getUnit())
+            .productionDate(entity.getProductionDate())
+            .expiryDate(entity.getExpiryDate())
+            .status(entity.getStatus())
+            .locationId(entity.getLocationId())
+            .parentBatchId(entity.getParentBatchId())
+            .qualityStandardId(entity.getQualityStandardId())
+            .remarks(entity.getRemarks())
+            .version(entity.getVersion())
+            .isActive(entity.getIsActive())
+            .createdAt(entity.getCreatedAt())
+            .updatedAt(entity.getUpdatedAt());
+    return b.build();
   }
 }

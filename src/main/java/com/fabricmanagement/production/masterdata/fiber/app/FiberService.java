@@ -2,13 +2,12 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.common.exception.ForbiddenOperationException;
 import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
-import com.fabricmanagement.production.masterdata.fiber.domain.FiberAttributeLink;
-import com.fabricmanagement.production.masterdata.fiber.domain.FiberCertificationLink;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberStatus;
 import com.fabricmanagement.production.masterdata.fiber.domain.event.FiberCreatedEvent;
 import com.fabricmanagement.production.masterdata.fiber.domain.exception.FiberDomainException;
@@ -23,10 +22,8 @@ import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDt
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeLinkRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationLinkRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
@@ -61,8 +58,6 @@ public class FiberService implements FiberFacade {
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
   private final FiberAttributeRepository fiberAttributeRepository;
   private final FiberCertificationRepository fiberCertificationRepository;
-  private final FiberAttributeLinkRepository fiberAttributeLinkRepository;
-  private final FiberCertificationLinkRepository fiberCertificationLinkRepository;
   private final DomainEventPublisher eventPublisher;
   private final FiberValidationService validationService;
   private final BatchRepository batchRepository;
@@ -85,15 +80,13 @@ public class FiberService implements FiberFacade {
     boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
     log.info("Creating {} fiber: name={}", isBlended ? "blended" : "pure", request.getFiberName());
 
-    // Check if this is a pure 100% fiber being recreated
-    if (!isBlended && request.getFiberIsoCodeId() != null) {
-      throw new IllegalArgumentException(
-          "Pure 100% fibers are pre-defined by the system. "
-              + "You can only create blended fibers (combinations of existing fibers). "
-              + "If you need a custom fiber, please use the default fiber types available.");
-    }
-
     UUID tenantId = TenantContext.getCurrentTenantId();
+
+    // PF4: Tenants cannot create pure fibers — only platform (FiberRequest approve flow) or R__001
+    if (!isBlended && !TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
+      throw new ForbiddenOperationException(
+          "Pure fibers can only be created by the platform. Submit a fiber request instead.");
+    }
 
     // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation
     // reduces user
@@ -146,26 +139,9 @@ public class FiberService implements FiberFacade {
       validateBlendedFiber(request);
     }
 
-    // Load reference entities
-    FiberCategory category =
-        request.getFiberCategoryId() != null
-            ? fiberCategoryRepository
-                .findById(request.getFiberCategoryId())
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "Fiber category not found: " + request.getFiberCategoryId()))
-            : null;
-
-    FiberIsoCode isoCode =
-        request.getFiberIsoCodeId() != null
-            ? fiberIsoCodeRepository
-                .findById(request.getFiberIsoCodeId())
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "Fiber ISO code not found: " + request.getFiberIsoCodeId()))
-            : null;
+    // Resolve category and ISO code (backend derives for blends)
+    FiberCategory category = resolveFiberCategory(request);
+    FiberIsoCode isoCode = resolveFiberIsoCode(request);
 
     // Generate suggested name for blended fiber if not provided
     String fiberName = request.getFiberName();
@@ -188,38 +164,13 @@ public class FiberService implements FiberFacade {
     if (isBlended) {
       fiber =
           Fiber.createBlendedFiber(
-              material,
-              category,
-              isoCode,
-              fiberName,
-              request.getFiberGrade(),
-              request.getComposition());
+              material, category, isoCode, fiberName, request.getComposition());
     } else {
-      fiber =
-          Fiber.createPureFiber(material, category, isoCode, fiberName, request.getFiberGrade());
+      fiber = Fiber.createPureFiber(material, category, isoCode, fiberName);
     }
 
     fiber.setRemarks(request.getRemarks());
     Fiber saved = fiberRepository.save(fiber);
-
-    // Save attributes
-    if (request.getAttributeIds() != null && !request.getAttributeIds().isEmpty()) {
-      for (UUID attrId : request.getAttributeIds()) {
-        fiberAttributeLinkRepository.save(
-            FiberAttributeLink.builder().fiberId(saved.getId()).attributeId(attrId).build());
-      }
-    }
-
-    // Save certifications
-    if (request.getCertificationIds() != null && !request.getCertificationIds().isEmpty()) {
-      for (UUID certId : request.getCertificationIds()) {
-        fiberCertificationLinkRepository.save(
-            FiberCertificationLink.builder()
-                .fiberId(saved.getId())
-                .certificationId(certId)
-                .build());
-      }
-    }
 
     // Publish domain event
     eventPublisher.publish(
@@ -236,42 +187,7 @@ public class FiberService implements FiberFacade {
         saved.getId(),
         saved.getUid());
 
-    return enrichFiberDto(FiberDto.from(saved));
-  }
-
-  private FiberDto enrichFiberDto(FiberDto dto) {
-    if (dto == null || dto.getId() == null) {
-      return dto;
-    }
-
-    List<FiberAttributeDto> attributes =
-        fiberAttributeLinkRepository.findByFiberId(dto.getId()).stream()
-            .map(
-                link -> {
-                  // We need to fetch the actual attribute if it's lazy loaded and not initialized
-                  // Or we can just fetch all attributes and map them
-                  return fiberAttributeRepository
-                      .findById(link.getAttributeId())
-                      .map(FiberAttributeDto::from)
-                      .orElse(null);
-                })
-            .filter(java.util.Objects::nonNull)
-            .toList();
-    dto.setAttributes(attributes);
-
-    List<FiberCertificationDto> certifications =
-        fiberCertificationLinkRepository.findByFiberId(dto.getId()).stream()
-            .map(
-                link ->
-                    fiberCertificationRepository
-                        .findById(link.getCertificationId())
-                        .map(FiberCertificationDto::from)
-                        .orElse(null))
-            .filter(java.util.Objects::nonNull)
-            .toList();
-    dto.setCertifications(certifications);
-
-    return dto;
+    return FiberDto.from(saved);
   }
 
   /** Validate blended fiber composition. */
@@ -304,6 +220,107 @@ public class FiberService implements FiberFacade {
     validationService.validateTenantConsistency(composition, currentTenantId);
   }
 
+  /** Resolve FiberCategory: for blends use MIXED_BLEND; for pure fibers use request value. */
+  private FiberCategory resolveFiberCategory(CreateFiberRequest request) {
+    boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
+
+    if (isBlended) {
+      return fiberCategoryRepository
+          .findByCategoryCode("MIXED_BLEND")
+          .orElseGet(
+              () ->
+                  fiberCategoryRepository.findByIsActiveTrue().stream()
+                      .filter(
+                          c ->
+                              c.getCategoryCode() != null
+                                  && (c.getCategoryCode().contains("MIXED")
+                                      || c.getCategoryCode().contains("BLEND")))
+                      .findFirst()
+                      .orElseThrow(
+                          () ->
+                              new IllegalArgumentException(
+                                  "No MIXED_BLEND category found. Run V008 migration.")));
+    }
+
+    if (request.getFiberCategoryId() == null) {
+      throw new IllegalArgumentException("Fiber category ID is required for pure fibers.");
+    }
+    return fiberCategoryRepository
+        .findById(request.getFiberCategoryId())
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Fiber category not found: " + request.getFiberCategoryId()));
+  }
+
+  /**
+   * Resolve FiberIsoCode: for blends use primary (highest-percentage) base fiber's ISO; for pure
+   * fibers use request value.
+   */
+  private FiberIsoCode resolveFiberIsoCode(CreateFiberRequest request) {
+    boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
+
+    if (isBlended) {
+      Map<UUID, BigDecimal> composition = request.getComposition();
+      // Order by percentage desc, then by ISO code asc (tie-breaker for equal %)
+      List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
+      if (baseFibers.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Blend composition is empty. Cannot resolve primary ISO code.");
+      }
+      Map<UUID, String> fiberIdToIso =
+          baseFibers.stream()
+              .collect(
+                  Collectors.toMap(
+                      Fiber::getId,
+                      f ->
+                          f.getFiberIsoCode() != null && f.getFiberIsoCode().getIsoCode() != null
+                              ? f.getFiberIsoCode().getIsoCode()
+                              : ""));
+
+      UUID primaryFiberId =
+          composition.entrySet().stream()
+              .sorted(
+                  Map.Entry.<UUID, BigDecimal>comparingByValue()
+                      .reversed()
+                      .thenComparing(e -> fiberIdToIso.getOrDefault(e.getKey(), "")))
+              .map(Map.Entry::getKey)
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "Blend composition is empty. Cannot resolve primary ISO code."));
+
+      Fiber primaryFiber =
+          fiberRepository
+              .findById(primaryFiberId)
+              .orElseThrow(
+                  () -> new IllegalArgumentException("Base fiber not found: " + primaryFiberId));
+
+      if (primaryFiber.getFiberIsoCodeId() == null) {
+        throw new IllegalArgumentException("Primary base fiber has no ISO code: " + primaryFiberId);
+      }
+
+      return fiberIsoCodeRepository
+          .findById(primaryFiber.getFiberIsoCodeId())
+          .orElseThrow(
+              () ->
+                  new IllegalArgumentException(
+                      "Fiber ISO code not found for primary component: "
+                          + primaryFiber.getFiberIsoCodeId()));
+    }
+
+    if (request.getFiberIsoCodeId() == null) {
+      throw new IllegalArgumentException("Fiber ISO code ID is required for pure fibers.");
+    }
+    return fiberIsoCodeRepository
+        .findById(request.getFiberIsoCodeId())
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Fiber ISO code not found: " + request.getFiberIsoCodeId()));
+  }
+
   @Transactional(readOnly = true)
   public Optional<FiberDto> getById(UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();
@@ -312,18 +329,14 @@ public class FiberService implements FiberFacade {
     return fiberRepository
         .findByTenantIdAndId(tenantId, id)
         .or(() -> fiberRepository.findByTenantIdAndId(TenantContext.SYSTEM_TENANT_ID, id))
-        .map(FiberDto::from)
-        .map(this::enrichFiberDto);
+        .map(FiberDto::from);
   }
 
   @Transactional(readOnly = true)
   public Optional<FiberDto> getByMaterialId(UUID materialId) {
     log.debug("Getting fiber by materialId: materialId={}", materialId);
 
-    return fiberRepository
-        .findByMaterialId(materialId)
-        .map(FiberDto::from)
-        .map(this::enrichFiberDto);
+    return fiberRepository.findByMaterialId(materialId).map(FiberDto::from);
   }
 
   @Transactional(readOnly = true)
@@ -338,7 +351,6 @@ public class FiberService implements FiberFacade {
     }
     return fiberRepository.findByTenantIdInAndIsActiveTrueOrderByFiberName(tenantIds).stream()
         .map(FiberDto::from)
-        .map(this::enrichFiberDto)
         .toList();
   }
 
@@ -385,7 +397,6 @@ public class FiberService implements FiberFacade {
             tenantIds, fiberName)
         .stream()
         .map(FiberDto::from)
-        .map(this::enrichFiberDto)
         .toList();
   }
 
@@ -411,7 +422,7 @@ public class FiberService implements FiberFacade {
           "Fiber", id, request.getVersion(), fiber.getVersion());
     }
 
-    fiber.update(request.getFiberName(), request.getFiberGrade(), request.getRemarks());
+    fiber.update(request.getFiberName(), request.getRemarks());
 
     // Composition (recipe) change requires extra guards:
     // 1) Block if batches are RESERVED or IN_PROGRESS on the production floor
@@ -423,43 +434,22 @@ public class FiberService implements FiberFacade {
           tenantId, fiber.getMaterial().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
         throw new RecipeInUseException(id, fiber.getFiberName());
       }
-      validateCompositionUpdate(request.getComposition(), id);
+      validateCompositionUpdate(request.getComposition());
       fiber.setComposition(request.getComposition());
     }
 
     Fiber saved = fiberRepository.save(fiber);
 
-    // Update attributes
-    if (request.getAttributeIds() != null) {
-      fiberAttributeLinkRepository.deleteByFiberId(saved.getId());
-      for (UUID attrId : request.getAttributeIds()) {
-        fiberAttributeLinkRepository.save(
-            FiberAttributeLink.builder().fiberId(saved.getId()).attributeId(attrId).build());
-      }
-    }
-
-    // Update certifications
-    if (request.getCertificationIds() != null) {
-      fiberCertificationLinkRepository.deleteByFiberId(saved.getId());
-      for (UUID certId : request.getCertificationIds()) {
-        fiberCertificationLinkRepository.save(
-            FiberCertificationLink.builder()
-                .fiberId(saved.getId())
-                .certificationId(certId)
-                .build());
-      }
-    }
-
     log.info("Fiber updated: id={}", saved.getId());
 
-    return enrichFiberDto(FiberDto.from(saved));
+    return FiberDto.from(saved);
   }
 
   /**
    * Validate composition on update — same business rules as creation, excluding duplicate check
    * against self.
    */
-  private void validateCompositionUpdate(Map<UUID, BigDecimal> composition, UUID currentFiberId) {
+  private void validateCompositionUpdate(Map<UUID, BigDecimal> composition) {
     validationService.validateCompositionPercentages(composition);
     validationService.validateMinimumRatio(composition, FiberConstants.MIN_COMPONENT_PERCENTAGE);
     validationService.validateMaxComponents(composition, FiberConstants.MAX_BLEND_COMPONENTS);
@@ -508,10 +498,7 @@ public class FiberService implements FiberFacade {
   @Transactional(readOnly = true)
   public Optional<FiberDto> findByMaterialId(UUID materialId) {
     log.debug("FiberFacade: Finding fiber by materialId: materialId={}", materialId);
-    return fiberRepository
-        .findByMaterialId(materialId)
-        .map(FiberDto::from)
-        .map(this::enrichFiberDto);
+    return fiberRepository.findByMaterialId(materialId).map(FiberDto::from);
   }
 
   @Override
@@ -614,7 +601,14 @@ public class FiberService implements FiberFacade {
   private String generateFiberName(
       Map<UUID, BigDecimal> composition, Map<UUID, String> baseFiberNames) {
     return composition.entrySet().stream()
-        .sorted((a, b) -> b.getValue().compareTo(a.getValue())) // Sort by percentage descending
+        .sorted(
+            (a, b) -> {
+              int cmp = b.getValue().compareTo(a.getValue());
+              if (cmp != 0) return cmp;
+              String nameA = baseFiberNames.getOrDefault(a.getKey(), "");
+              String nameB = baseFiberNames.getOrDefault(b.getKey(), "");
+              return nameA.compareToIgnoreCase(nameB);
+            })
         .map(
             entry -> {
               String fiberName = baseFiberNames.get(entry.getKey());

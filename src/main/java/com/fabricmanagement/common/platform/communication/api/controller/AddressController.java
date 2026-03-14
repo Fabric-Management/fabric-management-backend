@@ -29,18 +29,7 @@ public class AddressController {
       @Valid @RequestBody CreateAddressRequest request) {
     log.info("Creating address: type={}, city={}", request.getAddressType(), request.getCity());
 
-    Address address =
-        addressService.createAddress(
-            request.getStreetAddress(),
-            request.getCity(),
-            request.getState(),
-            request.getDistrict(),
-            request.getPostalCode(),
-            request.getCountry(),
-            request.getCountryCode(),
-            request.getAddressType(),
-            request.getLabel(),
-            request.getAddressLine2());
+    Address address = addressService.createAddress(request);
 
     return ResponseEntity.ok(
         ApiResponse.success(AddressDto.from(address), "Address created successfully"));

@@ -149,19 +149,19 @@ public class AIToolBuilder {
                             Map.of(
                                 "type", "string",
                                 "description", "Fiber Category ID (UUID) - required"),
+                        "fiberIsoCodeId",
+                            Map.of(
+                                "type", "string",
+                                "description", "Fiber ISO Code ID (UUID) - required"),
                         "fiberName",
                             Map.of(
                                 "type", "string",
                                 "description", "Fiber name (required)"),
-                        "fiberGrade",
-                            Map.of(
-                                "type", "string",
-                                "description", "Fiber grade (optional)"),
                         "remarks",
                             Map.of(
                                 "type", "string",
                                 "description", "Additional remarks (optional)")),
-                "required", List.of("fiberCategoryId", "fiberName")
+                "required", List.of("fiberCategoryId", "fiberIsoCodeId", "fiberName")
                 // Note: materialId OR unit is required (handled in AIFunctionCaller)
                 )));
   }

@@ -12,5 +12,11 @@ public interface FiberIsoCodeRepository extends JpaRepository<FiberIsoCode, UUID
 
   List<FiberIsoCode> findByIsActiveTrue();
 
+  /** Task F1: Only official ISO 2076 codes (52 records). Used when baseOnly=true. */
+  List<FiberIsoCode> findByIsOfficialIsoTrueAndIsActiveTrue();
+
   Optional<FiberIsoCode> findByIsoCode(String isoCode);
+
+  /** Case-insensitive check: ISO code already exists in catalog. */
+  boolean existsByIsoCodeIgnoreCase(String isoCode);
 }

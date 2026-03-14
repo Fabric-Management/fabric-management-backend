@@ -16,18 +16,20 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Batch represents a physical production lot/batch of fiber.
+ * Universal physical batch entity for all material types (Fiber, Yarn, Fabric, etc.).
  *
- * <p>A Batch is created when fiber is received from a supplier or produced internally. It tracks
- * the actual inventory of fiber that can be used in production.
+ * <p>Replaces the previous module-specific batch tables (e.g. FiberBatch). All physical lots are
+ * stored in {@code production_execution_batch} with {@code material_id} and {@code material_type};
+ * material-specific properties live in the JSONB {@code attributes} column.
  *
- * <p>Key Concepts:
+ * <p>Key concepts:
  *
  * <ul>
- *   <li>Links to Fiber (masterdata) via materialId
- *   <li>Has a unique batchCode for traceability
- *   <li>Tracks quantity and supplierBatch information
- *   <li>Supports status tracking (AVAILABLE, RESERVED, IN_PROGRESS, DEPLETED)
+ *   <li>Links to Material (masterdata) via materialId; materialType indicates the kind of lot
+ *   <li>Unique batchCode per tenant for traceability
+ *   <li>Tracks quantity, reserved/consumed/waste, and status (AVAILABLE, RESERVED, IN_PROGRESS,
+ *       etc.)
+ *   <li>Flexible attributes (JSONB) for module-specific fields (e.g. fiber_micronaire, yarn_count)
  * </ul>
  */
 @Entity
@@ -48,7 +50,8 @@ public class Batch extends BaseEntity {
 
   @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.json.JsonType.class)
   @Column(name = "attributes", columnDefinition = "jsonb")
-  private java.util.Map<String, Object> attributes;
+  @Builder.Default
+  private java.util.Map<String, Object> attributes = new java.util.HashMap<>();
 
   @Column(name = "batch_code", nullable = false)
   private String batchCode;
@@ -84,6 +87,15 @@ public class Batch extends BaseEntity {
   @Column(name = "location_id")
   private UUID locationId;
 
+  @Column(name = "parent_batch_id")
+  private UUID parentBatchId;
+
+  /**
+   * Optional FiberQualityStandard for QC. When null, default profile for batch's ISO code is used.
+   */
+  @Column(name = "quality_standard_id")
+  private UUID qualityStandardId;
+
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;
 
@@ -99,6 +111,7 @@ public class Batch extends BaseEntity {
       Instant productionDate,
       Instant expiryDate,
       UUID locationId,
+      UUID qualityStandardId,
       String remarks,
       java.util.Map<String, Object> attributes) {
 
@@ -116,8 +129,9 @@ public class Batch extends BaseEntity {
     batch.setUnit(unit);
     batch.setProductionDate(productionDate);
     batch.setExpiryDate(expiryDate);
-    batch.setStatus(BatchStatus.AVAILABLE);
+    batch.setStatus(BatchStatus.PENDING_QC);
     batch.setLocationId(locationId);
+    batch.setQualityStandardId(qualityStandardId);
     batch.setRemarks(remarks);
     batch.setAttributes(attributes != null ? attributes : new java.util.HashMap<>());
     batch.onCreate();
@@ -130,10 +144,34 @@ public class Batch extends BaseEntity {
     return quantity.subtract(reservedQuantity).subtract(consumedQuantity);
   }
 
+  /**
+   * Transition batch to a target status. Validates allowed transitions per BatchStatus rules.
+   *
+   * @param target the desired status
+   * @param actorId the user performing the transition (for audit; may be stored in future)
+   * @throws IllegalStateException if transition from current status to target is not allowed
+   */
+  public void transitionStatus(BatchStatus target, UUID actorId) {
+    if (this.status == target) {
+      return;
+    }
+    if (!this.status.canTransitionTo(target)) {
+      throw new IllegalStateException(
+          String.format(
+              "Invalid batch status transition: %s → %s (batch %s). Actor: %s",
+              this.status, target, batchCode, actorId));
+    }
+    this.status = target;
+    onUpdate();
+  }
+
   /** Reserve quantity for a production order. */
   public void reserve(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Reservation amount must be positive");
+    }
+    if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
+      throw new InvalidStatusTransitionException("Batch", this.status.name(), "RESERVED");
     }
     if (this.status == BatchStatus.DEPLETED) {
       throw new InvalidStatusTransitionException("Batch", "DEPLETED", "RESERVED");
@@ -229,6 +267,9 @@ public class Batch extends BaseEntity {
   private void validateConsumptionPreconditions(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Consumption amount must be positive");
+    }
+    if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
+      throw new InvalidStatusTransitionException("Batch", this.status.name(), "IN_PROGRESS");
     }
     if (this.status == BatchStatus.DEPLETED) {
       throw new InvalidStatusTransitionException("Batch", "DEPLETED", "IN_PROGRESS");

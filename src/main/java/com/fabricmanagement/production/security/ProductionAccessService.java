@@ -101,7 +101,8 @@ public class ProductionAccessService {
    * modules.
    */
   private static final Set<String> FIBER_MASTERDATA_WRITE_DEPARTMENTS =
-      Set.of("RDPRODUCTDEVELOPMENT", "PRODUCTIONPLANNING", "FIBERRAWMATERIAL");
+      Set.of(
+          "RDPRODUCTDEVELOPMENT", "PRODUCTIONPLANNING", "FIBERRAWMATERIAL", "ADMINISTRATIONOFFICE");
 
   /** All production-adjacent departments: entitled to READ/WRITE on BATCH (execution layer). */
   private static final Set<String> BATCH_WRITE_DEPARTMENTS =
@@ -217,6 +218,82 @@ public class ProductionAccessService {
         normalizedAction,
         granted);
     return granted;
+  }
+
+  /**
+   * Evaluate whether the authenticated user has <em>manager-level</em> permission for the given
+   * module.
+   *
+   * <p>Rules:
+   *
+   * <ul>
+   *   <li>ADMIN / PLATFORM_ADMIN — always granted regardless of department
+   *   <li>MANAGER — granted only if user is in any production department authorized for that module
+   *   <li>Other roles — denied
+   * </ul>
+   *
+   * <p>Designed for use in {@code @PreAuthorize} SpEL:
+   *
+   * <pre>
+   * {@code @PreAuthorize("@productionAccessService.hasManagerPermission(authentication, 'BATCH')")}
+   * </pre>
+   *
+   * @param authentication current Spring Security Authentication (injected by SpEL)
+   * @param module one of {@link #MODULE_FIBER}, {@link #MODULE_MATERIAL}, {@link #MODULE_BATCH},
+   *     {@link #MODULE_QUALITY_TEST}, {@link #MODULE_WAREHOUSE_LOCATION}
+   * @return {@code true} if manager-level access is granted
+   */
+  public boolean hasManagerPermission(Authentication authentication, String module) {
+    if (authentication == null || !authentication.isAuthenticated()) {
+      log.debug("hasManagerPermission denied: no valid authentication");
+      return false;
+    }
+
+    if (module == null) {
+      log.warn("hasManagerPermission denied: module is null");
+      return false;
+    }
+
+    String normalizedModule = module.toUpperCase();
+    if (!KNOWN_MODULES.contains(normalizedModule)) {
+      log.warn("hasManagerPermission denied: unknown module '{}'", module);
+      return false;
+    }
+
+    AuthenticatedUserContext ctx = extractContext(authentication);
+    if (ctx == null) {
+      log.warn("AuthenticatedUserContext not set on Authentication; hasManagerPermission denied");
+      return false;
+    }
+
+    boolean granted = evaluateManagerPermission(ctx, normalizedModule);
+    log.debug(
+        "hasManagerPermission: userId={}, role={}, depts={}, module={} → {}",
+        ctx.userId(),
+        ctx.roleCode(),
+        ctx.departmentCodes(),
+        normalizedModule,
+        granted);
+    return granted;
+  }
+
+  /**
+   * Manager permission: ADMIN/PLATFORM_ADMIN always pass; MANAGER must be in a department
+   * authorized for the module.
+   */
+  private boolean evaluateManagerPermission(AuthenticatedUserContext ctx, String module) {
+    String role = ctx.roleCode();
+
+    if (role != null && SUPER_ROLES.contains(role)) {
+      return true;
+    }
+
+    if (!"MANAGER".equals(role)) {
+      return false;
+    }
+
+    Set<String> authorizedDepts = WRITE_DEPARTMENTS_BY_MODULE.getOrDefault(module, Set.of());
+    return ctx.isInAnyDepartment(authorizedDepts);
   }
 
   // ── Internal evaluation ────────────────────────────────────────────────────
