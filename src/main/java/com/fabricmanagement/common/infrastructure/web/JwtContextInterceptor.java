@@ -1,10 +1,13 @@
 package com.fabricmanagement.common.infrastructure.web;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.JwtAuthenticationFilter;
 import com.fabricmanagement.common.platform.auth.app.JwtService;
 import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Arrays;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -160,12 +163,27 @@ public class JwtContextInterceptor implements HandlerInterceptor {
   }
 
   /**
-   * Extract JWT token from Authorization header.
+   * Extract JWT token from request: first from access_token cookie, then from Authorization header.
    *
    * @param request HTTP request
    * @return JWT token string, or null if not found
    */
   private String extractTokenFromRequest(HttpServletRequest request) {
+    // 1. Prefer access_token cookie (match JwtAuthenticationFilter for cookie-based auth)
+    Cookie[] cookies = request.getCookies();
+    if (cookies != null) {
+      String fromCookie =
+          Arrays.stream(cookies)
+              .filter(c -> JwtAuthenticationFilter.ACCESS_TOKEN_COOKIE_NAME.equals(c.getName()))
+              .findFirst()
+              .map(Cookie::getValue)
+              .filter(StringUtils::hasText)
+              .orElse(null);
+      if (fromCookie != null) {
+        return fromCookie;
+      }
+    }
+    // 2. Fallback: Authorization Bearer header
     String bearerToken = request.getHeader("Authorization");
     if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
       return bearerToken.substring(7);

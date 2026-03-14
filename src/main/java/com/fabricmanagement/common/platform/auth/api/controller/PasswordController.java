@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.auth.api.controller;
 
+import com.fabricmanagement.common.infrastructure.security.AuthCookieSupport;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.platform.auth.app.PasswordResetService;
 import com.fabricmanagement.common.platform.auth.app.PasswordSetupService;
@@ -9,7 +10,9 @@ import com.fabricmanagement.common.platform.auth.dto.PasswordResetVerifyRequest;
 import com.fabricmanagement.common.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.common.platform.auth.dto.UserContactInfoResponse;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.fabricmanagement.common.util.WebRequestUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,15 +32,26 @@ public class PasswordController {
 
   private final PasswordSetupService passwordSetupService;
   private final PasswordResetService passwordResetService;
+  private final AuthCookieSupport authCookieSupport;
 
   @PostMapping("/setup-password")
   public ResponseEntity<ApiResponse<LoginResponse>> setupPassword(
-      @Valid @RequestBody PasswordSetupRequest request, HttpServletRequest httpRequest) {
+      @Valid @RequestBody PasswordSetupRequest request,
+      HttpServletRequest httpRequest,
+      HttpServletResponse httpResponse) {
     log.info(
         "Password setup request: token={}...",
         request.getToken().substring(0, Math.min(8, request.getToken().length())));
-    String ipAddress = getClientIpAddress(httpRequest);
+    String ipAddress = WebRequestUtils.getClientIpAddress(httpRequest);
     LoginResponse response = passwordSetupService.setupPassword(request, ipAddress);
+
+    if (response.getAccessToken() != null || response.getRefreshToken() != null) {
+      authCookieSupport.addAuthCookies(
+          httpResponse, response.getAccessToken(), response.getRefreshToken());
+      response.setAccessToken(null);
+      response.setRefreshToken(null);
+    }
+
     return ResponseEntity.ok(
         ApiResponse.success(
             response,
@@ -67,22 +81,24 @@ public class PasswordController {
 
   @PostMapping("/password-reset/verify")
   public ResponseEntity<ApiResponse<LoginResponse>> verifyPasswordReset(
-      @Valid @RequestBody PasswordResetVerifyRequest request, HttpServletRequest httpRequest) {
+      @Valid @RequestBody PasswordResetVerifyRequest request,
+      HttpServletRequest httpRequest,
+      HttpServletResponse httpResponse) {
     log.info("Password reset verification: authUserId={}, code=***", request.getAuthUserId());
-    String ipAddress = getClientIpAddress(httpRequest);
+    String ipAddress = WebRequestUtils.getClientIpAddress(httpRequest);
     String userAgent = httpRequest.getHeader("User-Agent");
     LoginResponse response =
         passwordResetService.verifyAndResetPassword(request, ipAddress, userAgent);
+
+    if (response.getAccessToken() != null || response.getRefreshToken() != null) {
+      authCookieSupport.addAuthCookies(
+          httpResponse, response.getAccessToken(), response.getRefreshToken());
+      response.setAccessToken(null);
+      response.setRefreshToken(null);
+    }
+
     return ResponseEntity.ok(
         ApiResponse.success(
             response, "Password reset successful! You have been automatically logged in."));
-  }
-
-  private String getClientIpAddress(HttpServletRequest request) {
-    String xForwardedFor = request.getHeader("X-Forwarded-For");
-    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-      return xForwardedFor.split(",")[0].trim();
-    }
-    return request.getRemoteAddr();
   }
 }

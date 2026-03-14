@@ -27,4 +27,7 @@ public class AddBatchCertificationRequest {
   private String certifyingBodyRef;
   private String documentUrl;
   private String remarks;
+
+  /** Set true when form was populated from autoFill (partner/facility cert). GOTS audit. */
+  private Boolean isAutoFilled;
 }

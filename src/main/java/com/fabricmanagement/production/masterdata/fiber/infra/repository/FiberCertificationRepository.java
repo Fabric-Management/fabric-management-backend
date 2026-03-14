@@ -12,5 +12,8 @@ public interface FiberCertificationRepository extends JpaRepository<FiberCertifi
 
   List<FiberCertification> findByIsActiveTrue();
 
+  /** Find certification by id only if it is active (used when adding to batch). */
+  Optional<FiberCertification> findByIdAndIsActiveTrue(UUID id);
+
   Optional<FiberCertification> findByCertificationCode(String certificationCode);
 }

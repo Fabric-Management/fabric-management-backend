@@ -379,6 +379,15 @@
     </dependencyManagement>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <!-- Flyway runs db/migration/*.sql only; consolidated/ is source backup, must not be on classpath -->
+                    <exclude>db/migration/consolidated/**</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <!-- Maven Wrapper (generate with: mvn -N wrapper:wrapper) -->
             <plugin>

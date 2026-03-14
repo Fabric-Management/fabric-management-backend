@@ -27,7 +27,7 @@ public class LogoutService {
   private final DomainEventPublisher eventPublisher;
 
   /**
-   * Logout user by revoking refresh token.
+   * Logout user by revoking refresh token (requires authenticated context for userId).
    *
    * @param refreshToken The refresh token to revoke
    * @param userId User ID from security context
@@ -65,6 +65,37 @@ public class LogoutService {
     eventPublisher.publish(new UserLogoutEvent(tenantId, userId));
 
     log.info("✅ Logout successful: userId={}", userId);
+  }
+
+  /**
+   * Logout by refresh token only (e.g. when request has only refresh cookie, no access token).
+   * Finds the token, revokes it, and publishes logout event using tenantId/userId from the token.
+   *
+   * @param refreshToken The refresh token from cookie
+   */
+  @Transactional
+  public void logoutByRefreshToken(String refreshToken) {
+    log.info("Logout by refresh token (cookie)");
+    refreshTokenRepository
+        .findByToken(refreshToken)
+        .ifPresentOrElse(
+            token -> {
+              UUID tenantId = token.getTenantId();
+              UUID userId = token.getUserId();
+              token.revoke();
+              refreshTokenRepository.save(token);
+              eventPublisher.publish(new UserLogoutEvent(tenantId, userId));
+              log.info(
+                  "✅ Refresh token revoked (cookie logout): tokenId={}, userId={}",
+                  token.getId(),
+                  userId);
+            },
+            () ->
+                log.warn(
+                    "Refresh token not found on logout: token={}***",
+                    refreshToken != null && !refreshToken.isEmpty()
+                        ? refreshToken.substring(0, Math.min(8, refreshToken.length()))
+                        : ""));
   }
 
   /**

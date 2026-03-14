@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
+import com.fabricmanagement.production.execution.batch.domain.BatchCertificationChangeReason;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import java.time.Instant;
@@ -30,6 +31,16 @@ public class BatchCertificationDto {
   private String certifyingBodyRef;
   private String documentUrl;
   private String remarks;
+  private BatchCertificationChangeReason changeReason;
+
+  /** Snapshot at batch completion (GOTS TC). Filled when batch becomes DEPLETED. */
+  private String certNumberAtCompletion;
+
+  private LocalDate validUntilAtCompletion;
+
+  /** True if initially from autoFill; false after any user edit. GOTS audit. */
+  private Boolean isAutoFilled;
+
   private Boolean isActive;
   private Long version;
   private Instant createdAt;
@@ -58,6 +69,10 @@ public class BatchCertificationDto {
         .certifyingBodyRef(entity.getCertifyingBodyRef())
         .documentUrl(entity.getDocumentUrl())
         .remarks(entity.getRemarks())
+        .changeReason(entity.getChangeReason())
+        .certNumberAtCompletion(entity.getCertNumberAtCompletion())
+        .validUntilAtCompletion(entity.getValidUntilAtCompletion())
+        .isAutoFilled(entity.getIsAutoFilled())
         .isActive(entity.getIsActive())
         .version(entity.getVersion())
         .createdAt(entity.getCreatedAt())

@@ -206,10 +206,13 @@ public class FiberQcAutoEvaluator {
     return TestApprovalStatus.APPROVED;
   }
 
-  /** Value outside [min, max] → rejected. */
+  /** Value outside [min, max] or missing when standard enforces bounds → rejected. */
   private boolean checkRejected(Double value, Double min, Double target, Double max) {
-    if (value == null || (min == null && max == null)) {
+    if (min == null && max == null) {
       return false;
+    }
+    if (value == null) {
+      return true;
     }
     if (min != null && value < min) {
       return true;
@@ -220,10 +223,16 @@ public class FiberQcAutoEvaluator {
     return false;
   }
 
-  /** Value within [min, max] but outside target → conditional. */
+  /**
+   * Value within [min, max] but outside target, or missing when only target is defined →
+   * conditional.
+   */
   private boolean checkConditional(Double value, Double min, Double target, Double max) {
-    if (value == null || target == null || (min == null && max == null)) {
+    if (target == null) {
       return false;
+    }
+    if (value == null) {
+      return true;
     }
     boolean withinRange = (min == null || value >= min) && (max == null || value <= max);
     if (!withinRange) {

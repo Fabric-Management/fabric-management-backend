@@ -19,7 +19,8 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST API for fiber quality standards (ISO code based target tolerances).
  *
- * <p>Manages min/target/max standard profiles per ISO code. All endpoints require FIBER WRITE.
+ * <p>Manages min/target/max standard profiles per ISO code. GET requires FIBER READ;
+ * create/update/delete require FIBER WRITE.
  */
 @RestController
 @RequestMapping("/api/production/fiber-quality-standards")
@@ -30,13 +31,13 @@ public class FiberQualityStandardController {
   private final FiberQualityStandardService standardService;
 
   @GetMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberQualityStandardGroupDto>>> getAll() {
     return ResponseEntity.ok(ApiResponse.success(standardService.getAllGroupedByIsoCode()));
   }
 
   @GetMapping("/iso-code/{isoCodeId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberQualityStandardDto>>> getByIsoCodeId(
       @PathVariable UUID isoCodeId) {
     return ResponseEntity.ok(ApiResponse.success(standardService.getByIsoCodeId(isoCodeId)));

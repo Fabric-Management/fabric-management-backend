@@ -130,6 +130,11 @@ application:
     expiration: ${JWT_EXPIRATION:900000} # 15 minutes
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
 
+  # Auth cookies (HttpOnly). Set secure=false for local HTTP (e.g. http://localhost).
+  auth:
+    cookie:
+      secure: ${AUTH_COOKIE_SECURE:true}
+
   # Tenant Configuration
   tenant:
     default-tenant-id: ${DEFAULT_TENANT_ID:00000000-0000-0000-0000-000000000000}
@@ -213,6 +218,11 @@ application:
     timeout: ${WHATSAPP_TIMEOUT:5000}
     app-secret: ${WHATSAPP_APP_SECRET:}
     webhook-signature-enabled: ${WHATSAPP_WEBHOOK_SIGNATURE_ENABLED:true}
+
+  # Batch certification expiry warning (scheduled job)
+  batch-certification:
+    expiry-warning-days: ${BATCH_CERT_EXPIRY_WARNING_DAYS:30}
+    expiry-check-cron: ${BATCH_CERT_EXPIRY_CHECK_CRON:0 0 2 * * ?}
 
 # Feature Flags
 feature:

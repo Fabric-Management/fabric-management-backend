@@ -18,10 +18,15 @@ import java.util.UUID;
  *   <li>{@code role_code} → {@link #roleCode}
  *   <li>{@code department_codes} → {@link #departmentCodes}
  *   <li>{@code primary_department} → {@link #primaryDepartmentCode}
+ *   <li>{@code tenant_id} → {@link #tenantId}
  * </ul>
  */
 public record AuthenticatedUserContext(
-    UUID userId, String roleCode, List<String> departmentCodes, String primaryDepartmentCode) {
+    UUID userId,
+    String roleCode,
+    List<String> departmentCodes,
+    String primaryDepartmentCode,
+    UUID tenantId) {
 
   public AuthenticatedUserContext {
     departmentCodes = departmentCodes != null ? List.copyOf(departmentCodes) : List.of();

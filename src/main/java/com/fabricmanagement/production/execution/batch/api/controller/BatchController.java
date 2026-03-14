@@ -6,6 +6,8 @@ import com.fabricmanagement.production.execution.batch.app.BatchCertificationSer
 import com.fabricmanagement.production.execution.batch.app.BatchService;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
 import com.fabricmanagement.production.execution.batch.dto.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -210,18 +212,69 @@ public class BatchController {
     return ResponseEntity.ok(ApiResponse.success(list));
   }
 
+  @PostMapping("/{id}/certifications/copy-from/{sourceBatchId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Copy certifications from another batch",
+      description =
+          "Copies all active certifications from the source batch to this batch (target)."
+              + " changeReason is INITIAL. Fails with a clear message if the target already has any"
+              + " of the same certifications (same cert + scope + partner/facility). Tenant and"
+              + " WRITE permission enforced.")
+  public ResponseEntity<ApiResponse<List<BatchCertificationDto>>> copyCertificationsFromBatch(
+      @Parameter(description = "Target batch ID") @PathVariable UUID id,
+      @Parameter(description = "Source batch ID") @PathVariable UUID sourceBatchId) {
+    List<BatchCertificationDto> copied = batchCertificationService.copyFromBatch(id, sourceBatchId);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(copied));
+  }
+
   @PostMapping("/{id}/certifications")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Add batch certification",
+      description =
+          "Adds a certification to a batch. When scope is SUPPLIER or FACILITY, the response may"
+              + " include a **warnings** array (e.g. referenced supplier/facility certification has"
+              + " expired). Operation still succeeds; warnings are for GOTS compliance awareness.")
   public ResponseEntity<ApiResponse<BatchCertificationDto>> addCertification(
       @PathVariable UUID id, @Valid @RequestBody AddBatchCertificationRequest request) {
-    BatchCertificationDto created = batchCertificationService.add(id, request);
-    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
+    var result = batchCertificationService.add(id, request);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            result.getWarnings().isEmpty()
+                ? ApiResponse.success(result.getData())
+                : ApiResponse.success(result.getData(), result.getWarnings()));
+  }
+
+  @PutMapping("/{id}/certifications/{certificationId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Update batch certification",
+      description =
+          "Updates an existing batch certification (partial update). changeReason is required;"
+              + " other fields are optional. Soft-deleted records cannot be updated. Response may"
+              + " include a **warnings** array when the referenced supplier/facility certification"
+              + " has expired (GOTS compliance).")
+  public ResponseEntity<ApiResponse<BatchCertificationDto>> updateCertification(
+      @Parameter(description = "Batch ID") @PathVariable UUID id,
+      @Parameter(description = "Batch certification record ID") @PathVariable UUID certificationId,
+      @Valid @RequestBody UpdateBatchCertificationRequest request) {
+    var result = batchCertificationService.update(id, certificationId, request);
+    return ResponseEntity.ok(
+        result.getWarnings().isEmpty()
+            ? ApiResponse.success(result.getData())
+            : ApiResponse.success(result.getData(), result.getWarnings()));
   }
 
   @DeleteMapping("/{id}/certifications/{certificationId}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(
+      summary = "Delete batch certification",
+      description = "Soft-deletes a batch certification. Already deleted records return 404.")
   public ResponseEntity<Void> deleteCertification(
-      @PathVariable UUID id, @PathVariable UUID certificationId) {
+      @Parameter(description = "Batch ID") @PathVariable UUID id,
+      @Parameter(description = "Batch certification record ID") @PathVariable
+          UUID certificationId) {
     batchCertificationService.delete(id, certificationId);
     return ResponseEntity.noContent().build();
   }
@@ -249,5 +302,39 @@ public class BatchController {
       @PathVariable UUID id, @PathVariable UUID attributeId) {
     batchAttributeService.delete(id, attributeId);
     return ResponseEntity.noContent().build();
+  }
+
+  // ── Treatments (stub – returns empty until full implementation) ──────────
+
+  /** Treatment catalog reference. Returns empty list until treatment master data exists. */
+  @GetMapping("/treatments")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<List<?>>> getTreatmentCatalog() {
+    return ResponseEntity.ok(ApiResponse.success(List.of()));
+  }
+
+  /** Batch treatments. Returns empty list until full implementation. */
+  @GetMapping("/{id}/treatments")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  public ResponseEntity<ApiResponse<List<?>>> getBatchTreatments(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(List.of()));
+  }
+
+  /** Add treatment – 501 until full implementation. */
+  @PostMapping("/{id}/treatments")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<Void>> addBatchTreatment(
+      @PathVariable UUID id, @RequestBody(required = false) Object request) {
+    return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+        .body(ApiResponse.error("NOT_IMPLEMENTED", "Batch treatments not yet implemented"));
+  }
+
+  /** Remove treatment – 501 until full implementation. */
+  @DeleteMapping("/{id}/treatments/{treatmentId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  public ResponseEntity<ApiResponse<Void>> removeBatchTreatment(
+      @PathVariable UUID id, @PathVariable UUID treatmentId) {
+    return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+        .body(ApiResponse.error("NOT_IMPLEMENTED", "Batch treatments not yet implemented"));
   }
 }
