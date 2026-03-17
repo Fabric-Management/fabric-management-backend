@@ -28,6 +28,14 @@ public class GoodsReceiptService {
 
   private final GoodsReceiptRepository receiptRepository;
   private final GoodsReceiptItemRepository itemRepository;
+  private final com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository
+      batchRepository;
+  private final com.fabricmanagement.procurement.purchaseorder.infra.repository
+          .PurchaseOrderRepository
+      poRepository;
+  private final com.fabricmanagement.procurement.subcontract.infra.repository
+          .SubcontractOrderRepository
+      scRepository;
 
   /** Retrieves a GoodsReceipt with its items by ID. */
   public GoodsReceiptResponse getGoodsReceipt(UUID id) {
@@ -60,12 +68,15 @@ public class GoodsReceiptService {
 
     GoodsReceipt saved = receiptRepository.save(receipt);
 
+    // Look up the source identifier (Batch code, PO number, SC number)
+    String sourceIdentifier = getSourceIdentifier(request.getSourceType(), request.getSourceId());
+
     // Generate items with auto-barcodes
     List<GoodsReceiptItem> items = new ArrayList<>();
     AtomicInteger seq = new AtomicInteger(1);
     for (CreateGoodsReceiptRequest.GoodsReceiptItemRequest itemReq : request.getItems()) {
       int seqNo = seq.getAndIncrement();
-      String barcode = generateBarcode(saved.getReceiptNumber(), seqNo);
+      String barcode = generateBarcode(sourceIdentifier, seqNo);
       GoodsReceiptItem item =
           GoodsReceiptItem.builder()
               .goodsReceiptId(saved.getId())
@@ -151,9 +162,52 @@ public class GoodsReceiptService {
     return String.format("GR-%s-%s", year, suffix);
   }
 
-  /** Generates item barcode. Format: {receiptNumber}-{3-digit-seq} → e.g. GR-2026-ABC12345-001 */
-  private String generateBarcode(String receiptNumber, int sequenceNo) {
-    return String.format("%s-%03d", receiptNumber, sequenceNo);
+  /**
+   * Retrieves the logical identifier (code/number) of the source entity to be used as the prefix
+   * for item barcodes.
+   *
+   * <p>Rule:
+   *
+   * <ul>
+   *   <li>BATCH → batchCode (BCH-...)
+   *   <li>PURCHASE_ORDER → poNumber (PO-...)
+   *   <li>SUBCONTRACT_ORDER → scNumber (SC-...)
+   * </ul>
+   */
+  private String getSourceIdentifier(
+      com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType
+          sourceType,
+      UUID sourceId) {
+    return switch (sourceType) {
+      case BATCH ->
+          batchRepository
+              .findById(sourceId)
+              .orElseThrow(
+                  () ->
+                      new GoodsReceiptDomainException("Batch not found for sourceId: " + sourceId))
+              .getBatchCode();
+      case PURCHASE_ORDER ->
+          poRepository
+              .findById(sourceId)
+              .orElseThrow(
+                  () ->
+                      new GoodsReceiptDomainException(
+                          "PurchaseOrder not found for sourceId: " + sourceId))
+              .getPoNumber();
+      case SUBCONTRACT_ORDER ->
+          scRepository
+              .findById(sourceId)
+              .orElseThrow(
+                  () ->
+                      new GoodsReceiptDomainException(
+                          "SubcontractOrder not found for sourceId: " + sourceId))
+              .getScNumber();
+    };
+  }
+
+  /** Generates item barcode from source identifier. Format: {sourceIdentifier}-{3-digit-seq} */
+  private String generateBarcode(String sourceIdentifier, int sequenceNo) {
+    return String.format("%s-%03d", sourceIdentifier, sequenceNo);
   }
 
   private GoodsReceiptResponse mapToResponse(GoodsReceipt receipt, List<GoodsReceiptItem> items) {

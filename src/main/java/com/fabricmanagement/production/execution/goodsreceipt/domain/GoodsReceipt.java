@@ -87,4 +87,21 @@ public class GoodsReceipt extends BaseEntity {
   protected String getModuleCode() {
     return "GR";
   }
+
+  /**
+   * Ensures the receipt is still in DRAFT state. Should be called before applying any mutations.
+   *
+   * @throws
+   *     com.fabricmanagement.production.execution.goodsreceipt.domain.exception.GoodsReceiptDomainException
+   *     if not in DRAFT
+   */
+  public void assertIsDraft() {
+    if (this.status != GoodsReceiptStatus.DRAFT) {
+      throw new com.fabricmanagement.production.execution.goodsreceipt.domain.exception
+          .GoodsReceiptDomainException(
+          String.format(
+              "GoodsReceipt %s is %s; modifications are not allowed.",
+              this.receiptNumber, this.status));
+    }
+  }
 }
