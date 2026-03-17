@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,12 +27,15 @@ public class PurchaseOrderController {
   private final PurchaseOrderService purchaseOrderService;
 
   @GetMapping("/{id}")
+  @PreAuthorize("@procurementAccessService.hasPermission(authentication, 'PURCHASE_ORDER', 'READ')")
   public PurchaseOrderResponse getPurchaseOrder(@PathVariable UUID id) {
     return purchaseOrderService.getPurchaseOrder(id);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize(
+      "@procurementAccessService.hasPermission(authentication, 'PURCHASE_ORDER', 'WRITE')")
   public PurchaseOrderResponse createPurchaseOrder(
       @RequestBody @Valid CreatePurchaseOrderRequest request) {
     return purchaseOrderService.createPurchaseOrder(request);
@@ -42,6 +46,8 @@ public class PurchaseOrderController {
    * ...→CANCELLED
    */
   @PatchMapping("/{id}/status")
+  @PreAuthorize(
+      "@procurementAccessService.hasPermission(authentication, 'PURCHASE_ORDER', 'WRITE')")
   public PurchaseOrderResponse changeStatus(
       @PathVariable UUID id, @RequestParam PurchaseOrderStatus status) {
     return purchaseOrderService.changeStatus(id, status);

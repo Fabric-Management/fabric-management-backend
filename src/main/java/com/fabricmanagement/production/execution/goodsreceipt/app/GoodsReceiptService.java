@@ -59,8 +59,6 @@ public class GoodsReceiptService {
             .receivedById(request.getReceivedById())
             .receivedAt(request.getReceivedAt() != null ? request.getReceivedAt() : Instant.now())
             .packageCount(request.getPackageCount())
-            .grossWeight(request.getGrossWeight())
-            .netWeight(request.getNetWeight())
             .vehicleInfo(request.getVehicleInfo())
             .damageNotes(request.getDamageNotes())
             .status(GoodsReceiptStatus.DRAFT)
@@ -90,6 +88,22 @@ public class GoodsReceiptService {
       items.add(item);
     }
     List<GoodsReceiptItem> savedItems = itemRepository.saveAll(items);
+
+    java.math.BigDecimal totalNet =
+        savedItems.stream()
+            .map(GoodsReceiptItem::getNetWeight)
+            .filter(java.util.Objects::nonNull)
+            .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+    java.math.BigDecimal totalGross =
+        savedItems.stream()
+            .map(GoodsReceiptItem::getGrossWeight)
+            .filter(java.util.Objects::nonNull)
+            .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+    receipt.setNetWeight(totalNet);
+    receipt.setGrossWeight(totalGross.compareTo(java.math.BigDecimal.ZERO) > 0 ? totalGross : null);
+    saved = receiptRepository.save(receipt);
 
     log.info(
         "GoodsReceipt created: {} [source={}/{}] with {} items",
