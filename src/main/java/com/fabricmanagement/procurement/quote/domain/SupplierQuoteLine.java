@@ -19,7 +19,11 @@ import org.hibernate.annotations.Type;
 @NoArgsConstructor
 public class SupplierQuoteLine extends BaseEntity {
 
-  @Column(name = "supplier_quote_id", nullable = false)
+  /**
+   * Fix #12 — JPA double-management: parent OneToMany @JoinColumn yönettiği için child'ta
+   * insertable=false, updatable=false.
+   */
+  @Column(name = "supplier_quote_id", nullable = false, insertable = false, updatable = false)
   private UUID supplierQuoteId;
 
   @Column(name = "rfq_line_id", nullable = false)

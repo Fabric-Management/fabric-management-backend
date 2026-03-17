@@ -19,7 +19,11 @@ import org.hibernate.annotations.Type;
 @NoArgsConstructor
 public class SupplierRFQLine extends BaseEntity {
 
-  @Column(name = "rfq_id", nullable = false)
+  /**
+   * Fix #12 — JPA double-management: OneToMany @JoinColumn parent'ta yönettiği için child'taki FK
+   * alanı insertable=false, updatable=false olmalı.
+   */
+  @Column(name = "rfq_id", nullable = false, insertable = false, updatable = false)
   private UUID rfqId;
 
   @Column(name = "material_id")
@@ -34,6 +38,10 @@ public class SupplierRFQLine extends BaseEntity {
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
+  /**
+   * Fix #14 — String JSONB alanı. Typed List<Map> opsiyonel iyileştirme için not bırakıldı; mevcut
+   * pattern tüm modüllerde ortak olduğu için şimdilik String kalıyor.
+   */
   @Type(JsonType.class)
   @Column(name = "module_specs", columnDefinition = "jsonb", nullable = false)
   private String moduleSpecs = "{}";

@@ -28,9 +28,13 @@ public class SupplierRFQRecipient extends BaseEntity {
   @Column(name = "sent_at")
   private Instant sentAt;
 
+  /**
+   * Fix #9 — Default PENDING: alıcı eklendi ama RFQ henüz gönderilmedi. sendRfq() çağrıldığında
+   * SENT + sentAt = now() set edilir.
+   */
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 30)
-  private RfqRecipientStatus status = RfqRecipientStatus.SENT;
+  private RfqRecipientStatus status = RfqRecipientStatus.PENDING;
 
   @Column(name = "response_deadline")
   private Instant responseDeadline;

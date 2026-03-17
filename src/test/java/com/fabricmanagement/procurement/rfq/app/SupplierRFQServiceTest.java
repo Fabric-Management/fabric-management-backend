@@ -9,10 +9,15 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
+import com.fabricmanagement.procurement.rfq.domain.RfqRecipientStatus;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQLine;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQModuleType;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQRecipient;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQStatus;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQType;
+import com.fabricmanagement.procurement.rfq.dto.AddRecipientRequest;
+import com.fabricmanagement.procurement.rfq.dto.AddRfqLineRequest;
 import com.fabricmanagement.procurement.rfq.dto.CreateSupplierRFQRequest;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.math.BigDecimal;
@@ -61,19 +66,18 @@ class SupplierRFQServiceTest {
   void shouldCreateRfq() {
     CreateSupplierRFQRequest req = new CreateSupplierRFQRequest();
     req.setWorkOrderId(UUID.randomUUID());
-    req.setModuleType("FIBER");
+    req.setModuleType(SupplierRFQModuleType.FIBER); // Fix #13 — artık enum
     req.setRfqType(SupplierRFQType.PURCHASE);
     req.setDeadline(Instant.now().plus(7, ChronoUnit.DAYS));
 
-    when(rfqRepository.save(any(SupplierRFQ.class)))
-        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(rfqRepository.save(any(SupplierRFQ.class))).thenAnswer(inv -> inv.getArgument(0));
 
     SupplierRFQ created = rfqService.createRfq(req);
 
     assertNotNull(created);
     assertEquals(tenantId, created.getTenantId());
     assertNotNull(created.getRfqNumber());
-    assertEquals("FIBER", created.getModuleType());
+    assertEquals(SupplierRFQModuleType.FIBER, created.getModuleType());
     assertEquals(SupplierRFQStatus.DRAFT, created.getStatus());
   }
 
@@ -82,14 +86,14 @@ class SupplierRFQServiceTest {
   void shouldAddLineToDraftRfq() {
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.of(mockRfq));
-    when(rfqRepository.save(any(SupplierRFQ.class)))
-        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(rfqRepository.save(any(SupplierRFQ.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    SupplierRFQLine line = new SupplierRFQLine();
-    line.setRequestedQty(new BigDecimal("1000"));
-    line.setUnit("KG");
+    // Fix #2 — DTO ile gönderilir artık
+    AddRfqLineRequest req = new AddRfqLineRequest();
+    req.setRequestedQty(new BigDecimal("1000"));
+    req.setUnit("KG");
 
-    SupplierRFQ updated = rfqService.addLine(rfqId, line);
+    SupplierRFQ updated = rfqService.addLine(rfqId, req);
 
     assertEquals(1, updated.getLines().size());
     assertEquals(new BigDecimal("1000"), updated.getLines().get(0).getRequestedQty());
@@ -104,12 +108,15 @@ class SupplierRFQServiceTest {
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.of(mockRfq));
 
-    SupplierRFQLine line = new SupplierRFQLine();
+    // Fix #6 — DRAFT guard'ı "not found" benzeri bir mesaj döner değil, statü mesajı döner
+    AddRfqLineRequest req = new AddRfqLineRequest();
+    req.setRequestedQty(new BigDecimal("100"));
+    req.setUnit("KG");
 
     ProcurementDomainException ex =
-        assertThrows(ProcurementDomainException.class, () -> rfqService.addLine(rfqId, line));
+        assertThrows(ProcurementDomainException.class, () -> rfqService.addLine(rfqId, req));
 
-    assertEquals("Cannot add line to RFQ in status: SENT", ex.getMessage());
+    assertEquals("Operation not allowed on RFQ in status: SENT", ex.getMessage());
   }
 
   @Test
@@ -117,14 +124,19 @@ class SupplierRFQServiceTest {
   void shouldAddRecipientToDraftRfq() {
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.of(mockRfq));
-    when(rfqRepository.save(any(SupplierRFQ.class)))
-        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(rfqRepository.save(any(SupplierRFQ.class))).thenAnswer(inv -> inv.getArgument(0));
 
     UUID partnerId = UUID.randomUUID();
-    SupplierRFQ updated = rfqService.addRecipient(rfqId, partnerId);
+    // Fix #10 — AddRecipientRequest DTO
+    AddRecipientRequest req = new AddRecipientRequest();
+    req.setTradingPartnerId(partnerId);
+
+    SupplierRFQ updated = rfqService.addRecipient(rfqId, req);
 
     assertEquals(1, updated.getRecipients().size());
     assertEquals(partnerId, updated.getRecipients().get(0).getTradingPartnerId());
+    // Fix #9 — Default PENDING
+    assertEquals(RfqRecipientStatus.PENDING, updated.getRecipients().get(0).getStatus());
   }
 
   @Test
@@ -140,19 +152,37 @@ class SupplierRFQServiceTest {
   }
 
   @Test
-  @DisplayName("Should send RFQ successfully when validation passes")
+  @DisplayName("Should send RFQ successfully: recipients get sentAt + status SENT")
   void shouldSendRfqSuccessfully() {
-    // Add one line and one recipient
-    mockRfq.getLines().add(new SupplierRFQLine());
-    mockRfq.addRecipient(new com.fabricmanagement.procurement.rfq.domain.SupplierRFQRecipient());
+    SupplierRFQLine line = new SupplierRFQLine();
+    SupplierRFQRecipient recipient = new SupplierRFQRecipient();
+    mockRfq.addLine(line);
+    mockRfq.addRecipient(recipient);
 
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.of(mockRfq));
-    when(rfqRepository.save(any(SupplierRFQ.class)))
-        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(rfqRepository.save(any(SupplierRFQ.class))).thenAnswer(inv -> inv.getArgument(0));
 
     SupplierRFQ updated = rfqService.sendRfq(rfqId);
 
     assertEquals(SupplierRFQStatus.SENT, updated.getStatus());
+    // Fix #8 — sentAt set edilmeli
+    assertNotNull(updated.getRecipients().get(0).getSentAt());
+    // Fix #9 — SENT yapılmış olmalı
+    assertEquals(RfqRecipientStatus.SENT, updated.getRecipients().get(0).getStatus());
+  }
+
+  @Test
+  @DisplayName("Should throw when trying to send an already SENT RFQ (Fix #6)")
+  void shouldThrowWhenSendingAlreadySentRfq() {
+    mockRfq.setStatus(SupplierRFQStatus.SENT);
+
+    when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
+        .thenReturn(Optional.of(mockRfq));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> rfqService.sendRfq(rfqId));
+
+    assertEquals("Operation not allowed on RFQ in status: SENT", ex.getMessage());
   }
 }

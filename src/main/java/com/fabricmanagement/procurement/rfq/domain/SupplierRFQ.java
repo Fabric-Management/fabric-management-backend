@@ -32,8 +32,13 @@ public class SupplierRFQ extends BaseEntity {
   @Column(name = "work_order_id", nullable = false)
   private UUID workOrderId;
 
+  /**
+   * Fix #13 — moduleType artık String değil enum. DB'de STRING olarak tutulur, compile-time
+   * güvenlik kazanılır.
+   */
+  @Enumerated(EnumType.STRING)
   @Column(name = "module_type", nullable = false, length = 50)
-  private String moduleType;
+  private SupplierRFQModuleType moduleType;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "rfq_type", nullable = false, length = 30)
