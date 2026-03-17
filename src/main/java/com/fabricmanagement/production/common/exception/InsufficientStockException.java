@@ -46,14 +46,18 @@ public class InsufficientStockException extends ProductionDomainException {
 
   public InsufficientStockException(
       String batchId, BigDecimal requested, BigDecimal available, String unit) {
-    super(
-        String.format(
-            "Insufficient stock in batch %s: requested %.2f %s, available %.2f %s.",
-            batchId, requested, unit, available, unit));
+    super(buildMessage(batchId, requested, available, unit), "INSUFFICIENT_STOCK", 422);
     this.batchId = batchId;
     this.requested = requested;
     this.available = available;
     this.unit = unit;
+  }
+
+  private static String buildMessage(
+      String batchId, BigDecimal requested, BigDecimal available, String unit) {
+    return String.format(
+        "Insufficient stock in batch %s: requested %.2f %s, available %.2f %s.",
+        batchId, requested, unit, available, unit);
   }
 
   public String getBatchId() {
