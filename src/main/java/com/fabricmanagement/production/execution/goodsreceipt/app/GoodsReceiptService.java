@@ -1,8 +1,13 @@
 package com.fabricmanagement.production.execution.goodsreceipt.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.procurement.purchaseorder.api.query.PurchaseOrderQueryService;
+import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQueryService;
+import com.fabricmanagement.production.execution.batch.api.query.BatchQueryService;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceipt;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptItem;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptStatus;
+import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.exception.GoodsReceiptDomainException;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.CreateGoodsReceiptRequest;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.GoodsReceiptResponse;
@@ -17,6 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,14 +34,10 @@ public class GoodsReceiptService {
 
   private final GoodsReceiptRepository receiptRepository;
   private final GoodsReceiptItemRepository itemRepository;
-  private final com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository
-      batchRepository;
-  private final com.fabricmanagement.procurement.purchaseorder.infra.repository
-          .PurchaseOrderRepository
-      poRepository;
-  private final com.fabricmanagement.procurement.subcontract.infra.repository
-          .SubcontractOrderRepository
-      scRepository;
+  private final BatchQueryService batchQueryService;
+  private final PurchaseOrderQueryService poQueryService;
+  private final SubcontractOrderQueryService scQueryService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /** Retrieves a GoodsReceipt with its items by ID. */
   public GoodsReceiptResponse getGoodsReceipt(UUID id) {
@@ -144,15 +146,34 @@ public class GoodsReceiptService {
     receipt.setStatus(GoodsReceiptStatus.CONFIRMED);
     GoodsReceipt saved = receiptRepository.save(receipt);
 
+    List<GoodsReceiptConfirmedEvent.ReceiptItemData> eventItems =
+        items.stream()
+            .map(
+                i ->
+                    GoodsReceiptConfirmedEvent.ReceiptItemData.builder()
+                        .itemId(i.getId())
+                        .barcode(i.getBarcode())
+                        .netWeight(i.getNetWeight())
+                        .grossWeight(i.getGrossWeight())
+                        .build())
+            .toList();
+
+    eventPublisher.publishEvent(
+        GoodsReceiptConfirmedEvent.builder()
+            .tenantId(TenantContext.getCurrentTenantId())
+            .receiptId(saved.getId())
+            .receiptNumber(saved.getReceiptNumber())
+            .sourceType(saved.getSourceType())
+            .sourceId(saved.getSourceId())
+            .confirmedAt(Instant.now())
+            .items(eventItems)
+            .build());
+
     log.info(
-        "GoodsReceipt confirmed: {} [source={}/{}]",
+        "GoodsReceipt confirmed and event published: {} [source={}/{}]",
         saved.getReceiptNumber(),
         saved.getSourceType(),
         saved.getSourceId());
-
-    // TODO Phase 3.2+: publish GoodsReceiptConfirmed event
-    // → IWM StockTransaction(RECEIPT) for each item
-    // → Update PurchaseOrder / SubcontractOrder status
 
     return mapToResponse(saved, items);
   }
@@ -193,29 +214,9 @@ public class GoodsReceiptService {
           sourceType,
       UUID sourceId) {
     return switch (sourceType) {
-      case BATCH ->
-          batchRepository
-              .findById(sourceId)
-              .orElseThrow(
-                  () ->
-                      new GoodsReceiptDomainException("Batch not found for sourceId: " + sourceId))
-              .getBatchCode();
-      case PURCHASE_ORDER ->
-          poRepository
-              .findById(sourceId)
-              .orElseThrow(
-                  () ->
-                      new GoodsReceiptDomainException(
-                          "PurchaseOrder not found for sourceId: " + sourceId))
-              .getPoNumber();
-      case SUBCONTRACT_ORDER ->
-          scRepository
-              .findById(sourceId)
-              .orElseThrow(
-                  () ->
-                      new GoodsReceiptDomainException(
-                          "SubcontractOrder not found for sourceId: " + sourceId))
-              .getScNumber();
+      case BATCH -> batchQueryService.getBatchCode(sourceId);
+      case PURCHASE_ORDER -> poQueryService.getPurchaseOrderNumber(sourceId);
+      case SUBCONTRACT_ORDER -> scQueryService.getSubcontractOrderNumber(sourceId);
     };
   }
 
