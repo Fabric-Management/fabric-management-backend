@@ -36,6 +36,10 @@ public class WarehouseLocation extends BaseEntity {
   private WarehouseLocationType type;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "warehouse_type")
+  private WarehouseType warehouseType;
+
+  @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false)
   private LocationStatus status;
 

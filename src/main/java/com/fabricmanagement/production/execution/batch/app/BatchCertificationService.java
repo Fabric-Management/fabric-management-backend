@@ -50,6 +50,19 @@ public class BatchCertificationService {
         .toList();
   }
 
+  /**
+   * Returns true if the batch has at least one active GOTS certification that is still valid
+   * (validUntil is null or validUntil >= today). Used for enforce-on-reserve checks; callers may
+   * use this or query via repository to avoid circular dependency.
+   */
+  @Transactional(readOnly = true)
+  public boolean hasValidGotsCertification(UUID batchId) {
+    LocalDate today = LocalDate.now();
+    return certificationRepository.findByBatch_IdAndIsActiveTrueWithAssociations(batchId).stream()
+        .filter(cert -> BatchCertificationPredicates.isCertificationStillValid(cert, today))
+        .anyMatch(BatchCertificationPredicates::isGotsCertification);
+  }
+
   @Transactional
   public BatchCertificationResult add(UUID batchId, AddBatchCertificationRequest request) {
     Batch batch = getBatchOrThrow(batchId);

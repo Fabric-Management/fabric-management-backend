@@ -2,17 +2,23 @@ package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
 import com.fabricmanagement.production.execution.batch.domain.BatchOverrideLog;
 import com.fabricmanagement.production.execution.batch.domain.BatchReservation;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.ReservationStatus;
 import com.fabricmanagement.production.execution.batch.domain.event.*;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchCertificationExpiredException;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.dto.*;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchOverrideLogRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
+import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
+import com.fabricmanagement.production.execution.lineage.dto.CreateBatchLineageRequest;
 import com.fabricmanagement.production.execution.warehouse.app.WarehouseLocationService;
 import com.fabricmanagement.production.execution.warehouse.domain.WarehouseLocationType;
 import com.fabricmanagement.production.execution.warehouse.dto.WarehouseLocationDto;
@@ -23,14 +29,18 @@ import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRe
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,14 +51,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BatchService {
 
+  private static final BigDecimal BLEND_PERCENT_TOTAL = new BigDecimal("100");
+
   private final BatchRepository batchRepository;
   private final BatchReservationRepository reservationRepository;
   private final BatchOverrideLogRepository overrideLogRepository;
+  private final BatchCertificationRepository batchCertificationRepository;
   private final BatchCodeGenerator batchCodeGenerator;
   private final FiberRepository fiberRepository;
   private final FiberQualityStandardRepository qualityStandardRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final WarehouseLocationService warehouseLocationService;
+  private final BatchLineageService batchLineageService;
+
+  @Value("${batch.certification.enforce-on-reserve:true}")
+  private boolean certEnforceOnReserve;
 
   // ── CRUD ───────────────────────────────────────────────────────────────────
 
@@ -260,6 +277,7 @@ public class BatchService {
         request.getReferenceType());
 
     Batch batch = loadBatchWithLock(batchId, tenantId);
+    assertGotsCertificationValid(batch);
     batch.reserve(request.getQuantity());
 
     BatchReservation reservation =
@@ -477,24 +495,152 @@ public class BatchService {
 
   /** Record production waste (fire/telef) against a batch. */
   @Transactional
-  public BatchDto recordWaste(UUID batchId, BigDecimal quantity) {
+  public BatchDto recordWaste(UUID batchId, RecordWasteRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Recording waste: tenantId={}, batchId={}, quantity={}", tenantId, batchId, quantity);
+    log.debug(
+        "Recording waste: tenantId={}, batchId={}, quantity={}, category={}",
+        tenantId,
+        batchId,
+        request.getQuantity(),
+        request.getWasteCategory());
 
     Batch batch = loadBatchWithLock(batchId, tenantId);
-    batch.recordWaste(quantity);
+    batch.recordWaste(request.getQuantity());
 
     Batch saved = batchRepository.save(batch);
 
     applicationEventPublisher.publishEvent(
         new BatchWasteRecordedEvent(
-            tenantId, batchId, quantity, saved.getUnit(), saved.getLocationId()));
+            tenantId,
+            batchId,
+            request.getQuantity(),
+            saved.getUnit(),
+            saved.getLocationId(),
+            request.getWasteCategory(),
+            request.getReason()));
 
     log.info(
-        "Waste recorded: id={}, wasteQty={}, wastePercent={}%",
-        saved.getId(), saved.getWasteQuantity(), saved.getWastePercentage());
+        "Waste recorded: id={}, wasteQty={}, category={}, wastePercent={}%",
+        saved.getId(),
+        saved.getWasteQuantity(),
+        request.getWasteCategory(),
+        saved.getWastePercentage());
 
     return toBatchDto(saved);
+  }
+
+  /**
+   * Create a blended batch atomically: one child batch from multiple parent batches (e.g. blending
+   * fiber lots into one yarn batch). Ensures lineage records and parent consumption in a single
+   * transaction. Child batch has {@code parentBatchId = null}; lineage is stored in
+   * production_execution_batch_lineage.
+   */
+  @Transactional
+  public BatchDto createBlendedBatch(CreateBlendedBatchRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.debug(
+        "Creating blended batch: tenantId={}, batchCode={}, parents={}",
+        tenantId,
+        request.getBatchCode(),
+        request.getParents().size());
+
+    if (request.getParents() == null || request.getParents().size() < 2) {
+      throw new BatchDomainException("Blending requires at least 2 parent batches");
+    }
+
+    BigDecimal pctSum =
+        request.getParents().stream()
+            .map(BlendParentRequest::getConsumptionPercentage)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    if (pctSum.compareTo(BLEND_PERCENT_TOTAL) != 0) {
+      throw new BatchDomainException(
+          String.format(
+              "Consumption percentages must sum to 100%%, got %s%%", pctSum.stripTrailingZeros()));
+    }
+
+    List<Batch> parentBatches = new ArrayList<>();
+    for (BlendParentRequest p : request.getParents()) {
+      Batch parent = loadBatchWithLock(p.getParentBatchId(), tenantId);
+      if (parent.getStatus() != BatchStatus.AVAILABLE) {
+        throw new BatchDomainException(
+            String.format(
+                "Parent batch %s must be AVAILABLE for blending, current status: %s",
+                parent.getBatchCode(), parent.getStatus()));
+      }
+      if (parent.getAvailableQuantity().compareTo(p.getConsumedQuantity()) < 0) {
+        throw new InsufficientStockException(
+            parent.getBatchCode(),
+            p.getConsumedQuantity(),
+            parent.getAvailableQuantity(),
+            parent.getUnit());
+      }
+      parentBatches.add(parent);
+    }
+
+    if (batchRepository.existsByTenantIdAndBatchCode(tenantId, request.getBatchCode())) {
+      throw new BatchDomainException("Batch code already exists: " + request.getBatchCode());
+    }
+
+    Batch childBatch =
+        Batch.create(
+            tenantId,
+            request.getMaterialId(),
+            request.getMaterialType(),
+            request.getBatchCode(),
+            null,
+            request.getQuantity(),
+            request.getUnit(),
+            Instant.now(),
+            null,
+            request.getLocationId(),
+            null,
+            request.getRemarks(),
+            new HashMap<>());
+    childBatch.setStatus(BatchStatus.AVAILABLE);
+    Batch savedChild = batchRepository.save(childBatch);
+
+    for (int i = 0; i < request.getParents().size(); i++) {
+      BlendParentRequest p = request.getParents().get(i);
+      Batch parent = parentBatches.get(i);
+
+      batchLineageService.create(
+          CreateBatchLineageRequest.builder()
+              .parentBatchId(parent.getId())
+              .childBatchId(savedChild.getId())
+              .consumedQuantity(p.getConsumedQuantity())
+              .unit(parent.getUnit())
+              .consumptionPercentage(p.getConsumptionPercentage())
+              .consumedAt(Instant.now())
+              .processReference("BLEND")
+              .remarks(request.getRemarks())
+              .build());
+
+      parent.consumeFromAvailable(p.getConsumedQuantity());
+      batchRepository.save(parent);
+
+      applicationEventPublisher.publishEvent(
+          new BatchConsumedEvent(
+              tenantId,
+              parent.getId(),
+              p.getConsumedQuantity(),
+              parent.getUnit(),
+              parent.getLocationId(),
+              savedChild.getId(),
+              "BLEND"));
+    }
+
+    List<UUID> parentIds =
+        request.getParents().stream().map(BlendParentRequest::getParentBatchId).toList();
+    applicationEventPublisher.publishEvent(
+        new BlendedBatchCreatedEvent(
+            tenantId, savedChild.getId(), parentIds, request.getQuantity(), request.getUnit()));
+
+    log.info(
+        "Blended batch created: childId={}, batchCode={}, parentCount={}",
+        savedChild.getId(),
+        savedChild.getBatchCode(),
+        request.getParents().size());
+    return toBatchDto(savedChild);
   }
 
   // ── Inventory Adjustment ───────────────────────────────────────────────────
@@ -627,6 +773,19 @@ public class BatchService {
         acceptedQty,
         sourceBatch.getUnit());
 
+    applicationEventPublisher.publishEvent(
+        new BatchSplitEvent(
+            tenantId,
+            sourceBatch.getId(),
+            savedChild.getId(),
+            acceptedQty,
+            sourceBatch.getUnit(),
+            sourceBatch.getLocationId(),
+            savedChild.getLocationId(),
+            sourceBatch.getBatchCode(),
+            savedChild.getBatchCode(),
+            request.getReason()));
+
     return SplitBatchResponse.builder()
         .sourceBatch(toBatchDto(savedSource))
         .newBatch(toBatchDto(savedChild))
@@ -732,6 +891,19 @@ public class BatchService {
         acceptedQty,
         sourceBatch.getUnit());
 
+    applicationEventPublisher.publishEvent(
+        new BatchSplitEvent(
+            tenantId,
+            sourceBatch.getId(),
+            savedChild.getId(),
+            acceptedQty,
+            sourceBatch.getUnit(),
+            sourceBatch.getLocationId(),
+            savedChild.getLocationId(),
+            sourceBatch.getBatchCode(),
+            savedChild.getBatchCode(),
+            request.getReason()));
+
     return toBatchDto(savedChild);
   }
 
@@ -817,6 +989,7 @@ public class BatchService {
         request.getMachineLocationId());
 
     Batch batch = loadBatchWithLock(batchId, tenantId);
+    assertGotsCertificationValid(batch);
 
     if (batch.getStatus() == BatchStatus.DEPLETED) {
       throw new BatchDomainException(
@@ -863,6 +1036,44 @@ public class BatchService {
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
+
+  /**
+   * When {@code batch.certification.enforce-on-reserve} is true, blocks reserve/start-production
+   * for organic FIBER batches (fiber_organic_cert_no present) that have no valid GOTS certification
+   * (validUntil null or >= today). Uses repository directly to avoid circular dependency with
+   * BatchCertificationService.
+   *
+   * <p>Technical debt: organic detection is based on attributes key; consider BatchAttribute
+   * ORGANIC=true in future.
+   */
+  private void assertGotsCertificationValid(Batch batch) {
+    if (!certEnforceOnReserve) return;
+    if (batch.getMaterialType() != MaterialType.FIBER) return;
+    boolean isOrganic =
+        batch.getAttributes() != null && batch.getAttributes().containsKey("fiber_organic_cert_no");
+    if (!isOrganic) return;
+
+    LocalDate today = LocalDate.now();
+    List<BatchCertification> certs =
+        batchCertificationRepository.findByBatch_IdAndIsActiveTrueWithAssociations(batch.getId());
+    boolean hasValid =
+        certs.stream()
+            .filter(cert -> BatchCertificationPredicates.isCertificationStillValid(cert, today))
+            .anyMatch(BatchCertificationPredicates::isGotsCertification);
+    if (hasValid) return;
+
+    LocalDate expiredDate = findLatestExpiredDateAmongGots(certs);
+    throw new BatchCertificationExpiredException(batch.getBatchCode(), "GOTS", expiredDate);
+  }
+
+  private static LocalDate findLatestExpiredDateAmongGots(List<BatchCertification> certs) {
+    return certs.stream()
+        .filter(BatchCertificationPredicates::isGotsCertification)
+        .map(BatchCertification::getValidUntil)
+        .filter(Objects::nonNull)
+        .max(LocalDate::compareTo)
+        .orElse(null);
+  }
 
   private Batch loadBatchWithLock(UUID id, UUID tenantId) {
     return batchRepository

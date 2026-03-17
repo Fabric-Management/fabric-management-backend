@@ -84,6 +84,13 @@ public class Batch extends BaseEntity {
   @Column(name = "status", nullable = false)
   private BatchStatus status;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "source_type")
+  private BatchSourceType sourceType;
+
+  @Column(name = "source_id")
+  private UUID sourceId;
+
   @Column(name = "location_id")
   private UUID locationId;
 
@@ -117,7 +124,6 @@ public class Batch extends BaseEntity {
 
     Batch batch = new Batch();
     batch.setTenantId(tenantId);
-    batch.setUid(generateUid(batchCode, materialType));
     batch.setMaterialId(materialId);
     batch.setMaterialType(materialType);
     batch.setBatchCode(batchCode);
@@ -362,13 +368,9 @@ public class Batch extends BaseEntity {
         .divide(consumedQuantity, 2, java.math.RoundingMode.HALF_UP);
   }
 
-  private static String generateUid(String batchCode, MaterialType materialType) {
-    return materialType.name() + "-BATCH-" + batchCode;
-  }
-
   /** Get module code for UID generation. */
   @Override
   protected String getModuleCode() {
-    return "EXEC-FB";
+    return "BATCH";
   }
 }

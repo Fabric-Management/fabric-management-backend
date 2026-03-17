@@ -1,5 +1,7 @@
 package com.fabricmanagement.production.common.exception;
 
+import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
+
 /**
  * Base exception for all production domain rule violations.
  *
@@ -12,37 +14,24 @@ package com.fabricmanagement.production.common.exception;
  *
  * <pre>
  * RuntimeException
- * └── ProductionDomainException          ← this class (400)
- *     ├── InsufficientStockException     (422)
- *     ├── InvalidStatusTransitionException (409)
- *     ├── FiberDomainException           (fiber master data)
- *     ├── RecipeDomainException          (BOM / formula)
- *     ├── BatchDomainException      (batch execution)
- *     ├── YarnDomainException            (yarn production — future)
- *     └── ProcessDomainException         (dye &amp; finishing — future)
+ * └── DomainException                      ← common abstract base
+ *     └── ProductionDomainException        ← this class (400)
+ *         ├── InsufficientStockException   (422)
+ *         ├── InvalidStatusTransitionException (409)
+ *         ├── FiberDomainException
+ *         ├── RecipeDomainException
+ *         ├── BatchDomainException
+ *         ├── YarnDomainException          (future)
+ *         └── ProcessDomainException       (future)
  * </pre>
- *
- * <h2>Usage</h2>
- *
- * <pre>{@code
- * // Direct use for generic production rule violations
- * throw new ProductionDomainException("Fiber composition percentages must sum to 100.");
- *
- * // Module-specific subclass (preferred)
- * throw new FiberDomainException("Fiber is already inactive and cannot be updated.");
- * }</pre>
- *
- * <p>For resource-not-found cases (404), use {@link
- * com.fabricmanagement.common.infrastructure.web.exception.NotFoundException} directly or extend it
- * within the module (e.g. {@code YarnNotFoundException extends NotFoundException}).
  */
-public class ProductionDomainException extends RuntimeException {
+public class ProductionDomainException extends DomainException {
 
   public ProductionDomainException(String message) {
-    super(message);
+    super(message, "PRODUCTION_RULE_VIOLATION", 400);
   }
 
   public ProductionDomainException(String message, Throwable cause) {
-    super(message, cause);
+    super(message, "PRODUCTION_RULE_VIOLATION", 400, cause);
   }
 }

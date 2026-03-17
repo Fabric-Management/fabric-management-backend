@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
+import com.fabricmanagement.common.infrastructure.web.exception.CommonDomainException;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
 import com.fabricmanagement.common.platform.communication.infra.repository.ContactRepository;
@@ -60,21 +60,21 @@ public class ContactService {
     validateContactValue(normalizedValue, resolvedType);
 
     if (resolvedType == ContactType.PHONE_EXTENSION && parentContactId == null) {
-      throw new DomainException("PHONE_EXTENSION requires parentContactId");
+      throw new CommonDomainException("PHONE_EXTENSION requires parentContactId");
     }
 
     if (resolvedType == ContactType.PHONE_EXTENSION) {
       Contact parent =
           contactRepository
               .findById(parentContactId)
-              .orElseThrow(() -> new DomainException("Parent contact not found"));
+              .orElseThrow(() -> new CommonDomainException("Parent contact not found"));
 
       if (!parent.getContactType().isLandline()) {
-        throw new DomainException("Parent contact must be of type LANDLINE");
+        throw new CommonDomainException("Parent contact must be of type LANDLINE");
       }
 
       if (!parent.getTenantId().equals(tenantId)) {
-        throw new DomainException("Parent contact must belong to same tenant");
+        throw new CommonDomainException("Parent contact must belong to same tenant");
       }
     }
 
@@ -200,7 +200,7 @@ public class ContactService {
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
     if (!contact.getTenantId().equals(tenantId)) {
-      throw new DomainException("Contact does not belong to current tenant");
+      throw new CommonDomainException("Contact does not belong to current tenant");
     }
 
     String normalizedValue =
@@ -226,7 +226,7 @@ public class ContactService {
     log.debug("Updating contact: tenantId={}, contactId={}", tenantId, contact.getId());
 
     if (!contact.getTenantId().equals(tenantId)) {
-      throw new DomainException("Contact does not belong to current tenant");
+      throw new CommonDomainException("Contact does not belong to current tenant");
     }
 
     return contactRepository.save(contact);
@@ -243,7 +243,7 @@ public class ContactService {
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
     if (!contact.getTenantId().equals(tenantId)) {
-      throw new DomainException("Contact does not belong to current tenant");
+      throw new CommonDomainException("Contact does not belong to current tenant");
     }
 
     if (contact.getContactType() == ContactType.LANDLINE) {
@@ -284,7 +284,7 @@ public class ContactService {
             .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
 
     if (!contact.getTenantId().equals(tenantId)) {
-      throw new DomainException("Contact does not belong to current tenant");
+      throw new CommonDomainException("Contact does not belong to current tenant");
     }
 
     boolean changed = false;
@@ -333,33 +333,33 @@ public class ContactService {
 
   private void validateContactValue(String contactValue, ContactType contactType) {
     if (contactValue == null || contactValue.isBlank()) {
-      throw new DomainException("Contact value cannot be empty");
+      throw new CommonDomainException("Contact value cannot be empty");
     }
     if (contactType == null) {
-      throw new DomainException("Contact type is required");
+      throw new CommonDomainException("Contact type is required");
     }
     String trimmed = contactValue.trim();
     switch (contactType) {
       case EMAIL -> {
         if (!EMAIL_PATTERN.matcher(trimmed).matches()) {
-          throw new DomainException("Invalid email format");
+          throw new CommonDomainException("Invalid email format");
         }
       }
       case MOBILE -> {
         PhoneValidationUtil.ValidationResult result = PhoneValidationUtil.validateMobile(trimmed);
         if (!result.isValid()) {
-          throw new DomainException(result.getErrorMessage());
+          throw new CommonDomainException(result.getErrorMessage());
         }
       }
       case LANDLINE, FAX -> {
         PhoneValidationUtil.ValidationResult result = PhoneValidationUtil.validateLandline(trimmed);
         if (!result.isValid()) {
-          throw new DomainException(result.getErrorMessage());
+          throw new CommonDomainException(result.getErrorMessage());
         }
       }
       case PHONE_EXTENSION -> {
         if (!EXTENSION_PATTERN.matcher(trimmed).matches()) {
-          throw new DomainException("Phone extension must be 1-10 digits");
+          throw new CommonDomainException("Phone extension must be 1-10 digits");
         }
       }
       default -> {
@@ -386,7 +386,7 @@ public class ContactService {
 
   private ContactType inferContactType(String contactValue) {
     if (contactValue == null || contactValue.isBlank()) {
-      throw new DomainException("Unable to infer contact type from empty value");
+      throw new CommonDomainException("Unable to infer contact type from empty value");
     }
     String trimmed = contactValue.trim();
     if (EMAIL_PATTERN.matcher(trimmed).matches()) {
@@ -398,7 +398,7 @@ public class ContactService {
     if (PhoneValidationUtil.validateLandline(trimmed).isValid()) {
       return ContactType.LANDLINE;
     }
-    throw new DomainException("Unable to infer contact type from value: " + trimmed);
+    throw new CommonDomainException("Unable to infer contact type from value: " + trimmed);
   }
 
   /**

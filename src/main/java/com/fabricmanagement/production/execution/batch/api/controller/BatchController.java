@@ -131,8 +131,8 @@ public class BatchController {
   @PostMapping("/{id}/waste")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<BatchDto>> recordWaste(
-      @PathVariable UUID id, @Valid @RequestBody QuantityRequest request) {
-    BatchDto batch = batchService.recordWaste(id, request.getQuantity());
+      @PathVariable UUID id, @Valid @RequestBody RecordWasteRequest request) {
+    BatchDto batch = batchService.recordWaste(id, request);
     return ResponseEntity.ok(ApiResponse.success(batch));
   }
 
@@ -157,6 +157,19 @@ public class BatchController {
   }
 
   // ── Split & Transfer ───────────────────────────────────────────────────────
+
+  /**
+   * Create a blended batch from multiple parent batches. Consumption percentages must sum to 100%.
+   * Returns the created child batch (201 Created).
+   */
+  @PostMapping("/blend")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(summary = "Create a blended batch from multiple parent batches")
+  public ResponseEntity<ApiResponse<BatchDto>> createBlendedBatch(
+      @Valid @RequestBody CreateBlendedBatchRequest request) {
+    BatchDto batch = batchService.createBlendedBatch(request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(batch));
+  }
 
   /**
    * Split batch: acceptedQuantity → new AVAILABLE batch; remainder stays in source with

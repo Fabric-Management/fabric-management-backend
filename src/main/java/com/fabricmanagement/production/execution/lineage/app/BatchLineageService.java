@@ -25,16 +25,15 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class BatchLineageService {
 
@@ -42,6 +41,17 @@ public class BatchLineageService {
   private final BatchRepository batchRepository;
   private final BatchService batchService;
   private final ApplicationEventPublisher eventPublisher;
+
+  public BatchLineageService(
+      BatchLineageRepository batchLineageRepository,
+      BatchRepository batchRepository,
+      @Lazy BatchService batchService,
+      ApplicationEventPublisher eventPublisher) {
+    this.batchLineageRepository = batchLineageRepository;
+    this.batchRepository = batchRepository;
+    this.batchService = batchService;
+    this.eventPublisher = eventPublisher;
+  }
 
   private Batch loadBatchForUpdate(UUID batchId, UUID tenantId, String label) {
     return batchRepository

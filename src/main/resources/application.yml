@@ -224,6 +224,12 @@ application:
     expiry-warning-days: ${BATCH_CERT_EXPIRY_WARNING_DAYS:30}
     expiry-check-cron: ${BATCH_CERT_EXPIRY_CHECK_CRON:0 0 2 * * ?}
 
+# Batch certification enforcement (reserve / start-production)
+# When true, organic FIBER batches must have a valid GOTS cert (validUntil null or >= today).
+batch:
+  certification:
+    enforce-on-reserve: ${BATCH_CERT_ENFORCE_ON_RESERVE:true}
+
 # Feature Flags
 feature:
   trading-partner:
