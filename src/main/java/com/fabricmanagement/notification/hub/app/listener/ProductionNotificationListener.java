@@ -1,0 +1,145 @@
+package com.fabricmanagement.notification.hub.app.listener;
+
+import com.fabricmanagement.notification.hub.app.NotificationContext;
+import com.fabricmanagement.notification.hub.app.NotificationHubService;
+import com.fabricmanagement.notification.hub.domain.NotificationEventType;
+import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
+import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
+import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderPendingApprovalEvent;
+import com.fabricmanagement.production.quality.result.domain.event.BatchQcFailedEvent;
+import com.fabricmanagement.production.quality.result.domain.event.BatchQcPendingEvent;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+/**
+ * Üretim zinciri event listener'ları.
+ *
+ * <p>Dinlenen eventler (event-catalog.md):
+ *
+ * <ul>
+ *   <li>BatchQcFailedEvent → CRITICAL
+ *   <li>BatchQcPendingEvent → NORMAL
+ *   <li>WorkOrderPendingApproval → HIGH
+ *   <li>WorkOrderApproved → NORMAL
+ *   <li>GoodsReceiptConfirmed → NORMAL (alıcı çözümlemesi bekliyor)
+ * </ul>
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class ProductionNotificationListener {
+
+  private final NotificationHubService notificationHubService;
+
+  // ---- CRITICAL ----
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Async
+  public void onBatchQcFailed(BatchQcFailedEvent event) {
+    log.info("NotificationHub ← BatchQcFailed: batch={}", event.getBatchCode());
+
+    var payload =
+        Map.of(
+            "batchCode",
+            event.getBatchCode(),
+            "reason",
+            event.getFailureReason() != null ? event.getFailureReason() : "",
+            "referenceId",
+            event.getBatchId().toString(),
+            "referenceType",
+            "BATCH");
+
+    notificationHubService.notify(
+        NotificationContext.of(
+            event.getTenantId(),
+            event.getQualityResponsibleUserId(),
+            NotificationEventType.BATCH_QC_FAILED,
+            payload,
+            event.getBatchId(),
+            "BATCH"));
+  }
+
+  // ---- HIGH ----
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Async
+  public void onWorkOrderPendingApproval(WorkOrderPendingApprovalEvent event) {
+    log.info("NotificationHub ← WorkOrderPendingApproval: wo={}", event.getWorkOrderNumber());
+
+    var payload =
+        Map.of(
+            "workOrderNumber", event.getWorkOrderNumber(),
+            "referenceId", event.getWorkOrderId().toString(),
+            "referenceType", "WORK_ORDER");
+
+    notificationHubService.notify(
+        NotificationContext.of(
+            event.getTenantId(),
+            event.getAssignedToUserId(),
+            NotificationEventType.WORK_ORDER_PENDING_APPROVAL,
+            payload,
+            event.getWorkOrderId(),
+            "WORK_ORDER"));
+  }
+
+  // ---- NORMAL ----
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Async
+  public void onBatchQcPending(BatchQcPendingEvent event) {
+    log.info("NotificationHub ← BatchQcPending: batch={}", event.getBatchCode());
+
+    var payload =
+        Map.of(
+            "batchCode", event.getBatchCode(),
+            "referenceId", event.getBatchId().toString(),
+            "referenceType", "BATCH");
+
+    notificationHubService.notify(
+        NotificationContext.of(
+            event.getTenantId(),
+            event.getQualityResponsibleUserId(),
+            NotificationEventType.BATCH_QC_PENDING,
+            payload,
+            event.getBatchId(),
+            "BATCH"));
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Async
+  public void onWorkOrderApproved(WorkOrderApprovedEvent event) {
+    log.info("NotificationHub ← WorkOrderApproved: wo={}", event.getWorkOrderNumber());
+
+    var payload =
+        Map.of(
+            "workOrderNumber", event.getWorkOrderNumber(),
+            "referenceId", event.getWorkOrderId().toString(),
+            "referenceType", "WORK_ORDER");
+
+    notificationHubService.notify(
+        NotificationContext.of(
+            event.getTenantId(),
+            event.getApprovedByUserId(),
+            NotificationEventType.WORK_ORDER_APPROVED,
+            payload,
+            event.getWorkOrderId(),
+            "WORK_ORDER"));
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Async
+  public void onGoodsReceiptConfirmed(GoodsReceiptConfirmedEvent event) {
+    log.info(
+        "NotificationHub ← GoodsReceiptConfirmed: receipt={} items={}",
+        event.receiptNumber(),
+        event.items().size());
+
+    // TODO: FlowBoard entegrasyonu sonrası warehouse departman sorumlusuna NORMAL bildirim
+    // Şimdilik log seviyesinde takip
+  }
+}
