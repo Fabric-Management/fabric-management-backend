@@ -143,6 +143,30 @@ public class SalesOrder extends BaseEntity {
   private String shippingMethod;
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Faz 2 — Module & Traceability
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Production module type for this order (FIBER / YARN / FABRIC / DYE_FINISHING). Drives
+   * moduleSpecs validation on SalesOrderLine level.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "module_type", length = 20)
+  private ModuleType moduleType;
+
+  /** Customer-requested deadline for delivery of all lines. */
+  @Column(name = "deadline")
+  private LocalDate deadline;
+
+  /** FK → Quote — populated when order was converted from a quote. */
+  @Column(name = "quote_id")
+  private UUID quoteId;
+
+  /** FK → SampleRequest — populated when order originated from a sample request. */
+  @Column(name = "sample_request_id")
+  private UUID sampleRequestId;
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Metadata
   // ═══════════════════════════════════════════════════════════════════════════
 

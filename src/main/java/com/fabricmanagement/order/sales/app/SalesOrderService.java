@@ -35,6 +35,9 @@ public class SalesOrderService {
   private final SalesOrderRepository orderRepository;
   private final TradingPartnerResolver partnerResolver;
   private final TradingPartnerService partnerService;
+  private final com.fabricmanagement.order.sales.infra.repository.SalesOrderLineRepository
+      lineRepository;
+  private final com.fabricmanagement.order.sales.app.ruleengine.SalesOrderRuleEngine ruleEngine;
 
   private static final DateTimeFormatter ORDER_NUMBER_DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -220,6 +223,10 @@ public class SalesOrderService {
     SalesOrder saved = orderRepository.save(order);
 
     log.info("Sales order confirmed: uid={}", saved.getUid());
+
+    // Faz 2.2 — trigger RuleEngine: recipe matching + WorkOrder DRAFT creation per line
+    ruleEngine.processConfirmedOrder(saved);
+
     return SalesOrderDto.from(saved);
   }
 

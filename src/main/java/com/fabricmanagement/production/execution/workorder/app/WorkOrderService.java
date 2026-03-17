@@ -62,6 +62,47 @@ public class WorkOrderService {
   }
 
   /**
+   * Creates a DRAFT WorkOrder from a {@link CreateWorkOrderRequest}.
+   *
+   * <p>Used internally by {@code SalesOrderRuleEngine}. LocalDate deadline is converted to midnight
+   * UTC Instant.
+   */
+  @Transactional
+  public WorkOrderResponse createWorkOrder(
+      com.fabricmanagement.production.execution.workorder.dto.CreateWorkOrderRequest request) {
+    java.time.Instant deadlineInstant =
+        request.getDeadline() != null
+            ? request.getDeadline().atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
+            : null;
+
+    com.fabricmanagement.production.execution.workorder.domain.FulfillmentType fulfillmentType =
+        request.getFulfillmentType() != null
+            ? request.getFulfillmentType()
+            : com.fabricmanagement.production.execution.workorder.domain.FulfillmentType.INTERNAL;
+
+    WorkOrder workOrder =
+        WorkOrder.builder()
+            .workOrderNumber(generateWorkOrderNumber())
+            .recipeId(request.getRecipeId())
+            .tradingPartnerId(request.getTradingPartnerId())
+            .salesOrderLineId(request.getSalesOrderLineId())
+            .fulfillmentType(fulfillmentType)
+            .plannedQty(request.getPlannedQty())
+            .unit(request.getUnit())
+            .unitCost(request.getUnitCost())
+            .currency(request.getCurrency())
+            .deadline(deadlineInstant)
+            .notes(request.getNotes())
+            .attachments(
+                request.getAttachments() == null ? java.util.List.of() : request.getAttachments())
+            .status(WorkOrderStatus.DRAFT)
+            .build();
+
+    WorkOrder saved = workOrderRepository.save(workOrder);
+    return mapToResponse(saved);
+  }
+
+  /**
    * Transitions a WorkOrder to a new status. Validates against the full state machine defined in
    * WorkOrderStatus.
    */
