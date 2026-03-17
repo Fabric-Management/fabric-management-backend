@@ -569,6 +569,7 @@ public class BatchService {
       }
       if (parent.getAvailableQuantity().compareTo(p.getConsumedQuantity()) < 0) {
         throw new InsufficientStockException(
+            parent.getId(),
             parent.getBatchCode(),
             p.getConsumedQuantity(),
             parent.getAvailableQuantity(),

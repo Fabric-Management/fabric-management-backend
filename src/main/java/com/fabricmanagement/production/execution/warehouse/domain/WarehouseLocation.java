@@ -13,6 +13,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+// TODO(iwm-migration): location.md v2.0 → target table is iwm.warehouse_location.
+// Pending schema migration: production.production_execution_warehouse_location →
+// iwm.warehouse_location
+// Update @Table(schema="iwm", name="warehouse_location") when migration is executed.
 @Entity
 @Table(name = "production_execution_warehouse_location", schema = "production")
 @Getter
@@ -28,7 +32,7 @@ public class WarehouseLocation extends BaseEntity {
   @Column(name = "name", nullable = false, length = 255)
   private String name;
 
-  @Column(name = "description", length = 500)
+  @Column(name = "description", columnDefinition = "TEXT")
   private String description;
 
   @Enumerated(EnumType.STRING)

@@ -27,9 +27,10 @@ public abstract class DomainException extends RuntimeException {
     this.details = new HashMap<>();
   }
 
-  public DomainException withDetail(String key, Object value) {
+  @SuppressWarnings("unchecked")
+  public <T extends DomainException> T withDetail(String key, Object value) {
     this.details.put(key, value);
-    return this;
+    return (T) this;
   }
 
   public String getErrorCode() {

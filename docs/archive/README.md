@@ -1,12 +1,19 @@
-# Architecture Documentation
+# FabricOS Documentation
 
-Technical design and system structure.
+This folder contains all project documentation, organized by purpose.
 
-| Document | Description |
-|----------|-------------|
-| [FIBER_ENTITY_REPORT.md](FIBER_ENTITY_REPORT.md) | Fiber entity and related entities, tables, and fields (reference; Turkish) |
-| [FIBER_BACKEND_OZET_RAPOR.md](FIBER_BACKEND_OZET_RAPOR.md) | Fiber backend özet: entity, tablo, DTO, Material–Fiber ilişkisi |
-| [UNIVERSAL_BATCH_ROADMAP.md](UNIVERSAL_BATCH_ROADMAP.md) | Fiber → Yarn evrensel Batch geçişi: Genişlet–Daralt (5 aşama) yol haritası |
-| [LINEAGE_ARCHITECTURE.md](LINEAGE_ARCHITECTURE.md) | Lineage (traceability) module design and integration points |
+## Structure
 
-For backlog and TODOs related to these areas, see [../todo/](../todo/).
+| Folder | Purpose | Audience |
+|--------|---------|----------|
+| **[features/](features/)** | User-facing feature descriptions, how-to guides, and marketing-ready copy. Use for support pages or product website. | End users, support, marketing |
+| **[architecture/](architecture/)** | Technical design, entity reports, and system architecture. | Developers, architects |
+| **[todo/](todo/)** | Backlog items, TODOs, and roadmap per module. | Product, developers |
+
+## Quick links
+
+- [Production modules – User guide (EN)](features/USER_GUIDE_PRODUCTION.md) – How to use Batch, Inventory, Lineage, and Warehouse in the UI
+- [Production modules – Kullanım kılavuzu (TR)](features/USER_GUIDE_PRODUCTION_TR.md) – Aynı kılavuz Türkçe; destek ve eğitim için
+- [Production features – Marketing](features/MARKETING_FEATURES.md) – Feature highlights for website or sales
+- [Lineage architecture](LINEAGE_ARCHITECTURE_TODO.md) – Traceability design and TODO
+- [Fiber entity report](FIBER_ENTITY_REPORT.md) – Fiber module entity and field reference

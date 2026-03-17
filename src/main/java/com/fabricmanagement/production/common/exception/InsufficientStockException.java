@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.common.exception;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
  * Exception thrown when a stock operation cannot be fulfilled due to insufficient available
@@ -15,12 +16,13 @@ import java.math.BigDecimal;
  * <pre>
  * {
  *   "code": "INSUFFICIENT_STOCK",
- *   "message": "Insufficient stock in batch abc-123: requested 50.00 kg, available 30.00 kg.",
+ *   "message": "Insufficient stock in batch FB-001 (id: ...): requested 50.00 kg, available 30.00 kg.",
  *   "details": {
- *     "batchId": "abc-123",
+ *     "batchId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+ *     "batchCode": "FB-001",
  *     "requested": 50.00,
  *     "available": 30.00,
- *     "unit": "kg"
+ *     "unit": "KG"
  *   }
  * }
  * </pre>
@@ -30,38 +32,51 @@ import java.math.BigDecimal;
  * <pre>{@code
  * if (batch.getAvailableQuantity().compareTo(requested) < 0) {
  *   throw new InsufficientStockException(
- *       batch.getId().toString(),
+ *       batch.getId(),
+ *       batch.getBatchCode(),
  *       requested,
  *       batch.getAvailableQuantity(),
- *       batch.getUnit().name());
+ *       batch.getUnit());
  * }
  * }</pre>
  */
 public class InsufficientStockException extends ProductionDomainException {
 
-  private final String batchId;
+  /** UUID of the batch — for frontend deep-link navigation. */
+  private final UUID batchId;
+
+  /** Human-readable batch code — displayed in error messages. */
+  private final String batchCode;
+
   private final BigDecimal requested;
   private final BigDecimal available;
   private final String unit;
 
   public InsufficientStockException(
-      String batchId, BigDecimal requested, BigDecimal available, String unit) {
-    super(buildMessage(batchId, requested, available, unit), "INSUFFICIENT_STOCK", 422);
+      UUID batchId, String batchCode, BigDecimal requested, BigDecimal available, String unit) {
+    super(buildMessage(batchCode, requested, available, unit), "INSUFFICIENT_STOCK", 422);
     this.batchId = batchId;
+    this.batchCode = batchCode;
     this.requested = requested;
     this.available = available;
     this.unit = unit;
   }
 
   private static String buildMessage(
-      String batchId, BigDecimal requested, BigDecimal available, String unit) {
+      String batchCode, BigDecimal requested, BigDecimal available, String unit) {
     return String.format(
         "Insufficient stock in batch %s: requested %.2f %s, available %.2f %s.",
-        batchId, requested, unit, available, unit);
+        batchCode, requested, unit, available, unit);
   }
 
-  public String getBatchId() {
+  /** UUID of the batch for frontend deep-link. */
+  public UUID getBatchId() {
     return batchId;
+  }
+
+  /** Human-readable batch code for display. */
+  public String getBatchCode() {
+    return batchCode;
   }
 
   public BigDecimal getRequested() {

@@ -87,6 +87,7 @@ public class BatchLineageService {
     if (parentBatch.getStatus() == BatchStatus.DEPLETED
         && parentBatch.getAvailableQuantity().compareTo(BigDecimal.ZERO) <= 0) {
       throw new InsufficientStockException(
+          parentBatch.getId(),
           parentBatch.getBatchCode(),
           request.getConsumedQuantity(),
           parentBatch.getAvailableQuantity(),

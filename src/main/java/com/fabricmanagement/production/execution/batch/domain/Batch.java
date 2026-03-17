@@ -71,7 +71,7 @@ public class Batch extends BaseEntity {
   @Column(name = "waste_quantity", nullable = false, precision = 15, scale = 3)
   private BigDecimal wasteQuantity;
 
-  @Column(name = "unit", nullable = false)
+  @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
   @Column(name = "production_date")
@@ -145,7 +145,13 @@ public class Batch extends BaseEntity {
     return batch;
   }
 
-  /** Get available quantity (quantity - reserved - consumed). */
+  /**
+   * Get available quantity (quantity - reservedQuantity - consumedQuantity).
+   *
+   * <p>Note: {@code wasteQuantity} is a subset of {@code consumedQuantity} (you can only waste what
+   * was consumed), so it is intentionally NOT subtracted separately here — it is already accounted
+   * for within {@code consumedQuantity}.
+   */
   public BigDecimal getAvailableQuantity() {
     return quantity.subtract(reservedQuantity).subtract(consumedQuantity);
   }
@@ -162,10 +168,7 @@ public class Batch extends BaseEntity {
       return;
     }
     if (!this.status.canTransitionTo(target)) {
-      throw new IllegalStateException(
-          String.format(
-              "Invalid batch status transition: %s → %s (batch %s). Actor: %s",
-              this.status, target, batchCode, actorId));
+      throw new InvalidStatusTransitionException("Batch", this.status.name(), target.name());
     }
     this.status = target;
     onUpdate();
@@ -174,7 +177,7 @@ public class Batch extends BaseEntity {
   /** Reserve quantity for a production order. */
   public void reserve(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Reservation amount must be positive");
+      throw new BatchDomainException("Reservation amount must be positive for batch " + batchCode);
     }
     if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
       throw new InvalidStatusTransitionException("Batch", this.status.name(), "RESERVED");
@@ -183,7 +186,7 @@ public class Batch extends BaseEntity {
       throw new InvalidStatusTransitionException("Batch", "DEPLETED", "RESERVED");
     }
     if (getAvailableQuantity().compareTo(qty) < 0) {
-      throw new InsufficientStockException(batchCode, qty, getAvailableQuantity(), unit);
+      throw new InsufficientStockException(getId(), batchCode, qty, getAvailableQuantity(), unit);
     }
     this.reservedQuantity = this.reservedQuantity.add(qty);
     if (this.status == BatchStatus.AVAILABLE) {
@@ -195,7 +198,7 @@ public class Batch extends BaseEntity {
   /** Release reserved quantity (production order cancellation). */
   public void release(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Release amount must be positive");
+      throw new BatchDomainException("Release amount must be positive for batch " + batchCode);
     }
     if (this.reservedQuantity.compareTo(qty) < 0) {
       throw new BatchDomainException(
@@ -262,7 +265,7 @@ public class Batch extends BaseEntity {
     validateConsumptionPreconditions(qty);
 
     if (getAvailableQuantity().compareTo(qty) < 0) {
-      throw new InsufficientStockException(batchCode, qty, getAvailableQuantity(), unit);
+      throw new InsufficientStockException(getId(), batchCode, qty, getAvailableQuantity(), unit);
     }
 
     this.consumedQuantity = this.consumedQuantity.add(qty);
@@ -272,7 +275,7 @@ public class Batch extends BaseEntity {
 
   private void validateConsumptionPreconditions(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Consumption amount must be positive");
+      throw new BatchDomainException("Consumption amount must be positive for batch " + batchCode);
     }
     if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
       throw new InvalidStatusTransitionException("Batch", this.status.name(), "IN_PROGRESS");
@@ -298,7 +301,7 @@ public class Batch extends BaseEntity {
    */
   public void recordWaste(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Waste amount must be positive");
+      throw new BatchDomainException("Waste amount must be positive for batch " + batchCode);
     }
     BigDecimal newWaste = this.wasteQuantity.add(qty);
     if (newWaste.compareTo(this.consumedQuantity) > 0) {
@@ -321,7 +324,7 @@ public class Batch extends BaseEntity {
    */
   public void adjustQuantity(BigDecimal delta) {
     if (delta.compareTo(BigDecimal.ZERO) == 0) {
-      throw new IllegalArgumentException("Adjustment delta must be non-zero");
+      throw new BatchDomainException("Adjustment delta must be non-zero for batch " + batchCode);
     }
     BigDecimal newQuantity = this.quantity.add(delta);
     BigDecimal committed = this.reservedQuantity.add(this.consumedQuantity);
