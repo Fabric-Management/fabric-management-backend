@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
-import com.fabricmanagement.production.execution.batch.app.BatchService;
+import com.fabricmanagement.production.execution.batch.app.BatchOperationsService;
 import com.fabricmanagement.production.execution.batch.dto.BlendParentRequest;
 import com.fabricmanagement.production.execution.batch.dto.CreateBlendedBatchRequest;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkOrderService {
 
   private final WorkOrderRepository workOrderRepository;
-  private final BatchService batchService;
+  private final BatchOperationsService batchOperationsService;
 
   /** Retrieves a work order by its UUID. */
   public WorkOrderResponse getWorkOrder(UUID id) {
@@ -178,7 +178,7 @@ public class WorkOrderService {
             .parents(parentBatches)
             .build();
 
-    batchService.createBlendedBatch(blendReq);
+    batchOperationsService.createBlendedBatch(blendReq);
 
     return mapToResponse(workOrder);
   }

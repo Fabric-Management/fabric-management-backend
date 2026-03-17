@@ -106,7 +106,43 @@ public class Batch extends BaseEntity {
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;
 
-  /** Create a new batch. */
+  /**
+   * Create a new batch from a {@link CreateBatchCommand}.
+   *
+   * <p>Preferred factory method — replaces the 13-parameter version. Input validation is performed
+   * in the {@code CreateBatchCommand} compact constructor before this method is called.
+   */
+  public static Batch create(CreateBatchCommand cmd) {
+    Batch batch = new Batch();
+    batch.setTenantId(cmd.tenantId());
+    batch.setMaterialId(cmd.materialId());
+    batch.setMaterialType(cmd.materialType());
+    batch.setBatchCode(cmd.batchCode());
+    batch.setSupplierBatchCode(cmd.supplierBatchCode());
+    batch.setQuantity(cmd.quantity());
+    batch.setReservedQuantity(BigDecimal.ZERO);
+    batch.setConsumedQuantity(BigDecimal.ZERO);
+    batch.setWasteQuantity(BigDecimal.ZERO);
+    batch.setUnit(cmd.unit());
+    batch.setProductionDate(cmd.productionDate());
+    batch.setExpiryDate(cmd.expiryDate());
+    batch.setStatus(BatchStatus.PENDING_QC);
+    batch.setLocationId(cmd.locationId());
+    batch.setQualityStandardId(cmd.qualityStandardId());
+    batch.setRemarks(cmd.remarks());
+    batch.setAttributes(
+        cmd.attributes() != null
+            ? new java.util.HashMap<>(cmd.attributes())
+            : new java.util.HashMap<>());
+    batch.onCreate();
+    return batch;
+  }
+
+  /**
+   * @deprecated Use {@link #create(CreateBatchCommand)} instead. This overload is kept for backward
+   *     compatibility during migration and will be removed.
+   */
+  @Deprecated(forRemoval = true)
   public static Batch create(
       UUID tenantId,
       UUID materialId,
@@ -121,28 +157,21 @@ public class Batch extends BaseEntity {
       UUID qualityStandardId,
       String remarks,
       java.util.Map<String, Object> attributes) {
-
-    Batch batch = new Batch();
-    batch.setTenantId(tenantId);
-    batch.setMaterialId(materialId);
-    batch.setMaterialType(materialType);
-    batch.setBatchCode(batchCode);
-    batch.setSupplierBatchCode(supplierBatchCode);
-    batch.setQuantity(quantity);
-    batch.setReservedQuantity(BigDecimal.ZERO);
-    batch.setConsumedQuantity(BigDecimal.ZERO);
-    batch.setWasteQuantity(BigDecimal.ZERO);
-    batch.setUnit(unit);
-    batch.setProductionDate(productionDate);
-    batch.setExpiryDate(expiryDate);
-    batch.setStatus(BatchStatus.PENDING_QC);
-    batch.setLocationId(locationId);
-    batch.setQualityStandardId(qualityStandardId);
-    batch.setRemarks(remarks);
-    batch.setAttributes(attributes != null ? attributes : new java.util.HashMap<>());
-    batch.onCreate();
-
-    return batch;
+    return create(
+        new CreateBatchCommand(
+            tenantId,
+            materialId,
+            materialType,
+            batchCode,
+            supplierBatchCode,
+            quantity,
+            unit,
+            productionDate,
+            expiryDate,
+            locationId,
+            qualityStandardId,
+            remarks,
+            attributes));
   }
 
   /**
