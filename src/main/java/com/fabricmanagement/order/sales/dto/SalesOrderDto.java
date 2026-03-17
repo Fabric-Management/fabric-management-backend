@@ -1,18 +1,21 @@
 package com.fabricmanagement.order.sales.dto;
 
 import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.order.sales.domain.ModuleType;
 import com.fabricmanagement.order.sales.domain.OrderStatus;
 import com.fabricmanagement.order.sales.domain.OrderType;
 import com.fabricmanagement.order.sales.domain.SalesOrder;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
 
-/** DTO for SalesOrder entity. */
+/** DTO for SalesOrder entity — includes embedded SalesOrderLine list. */
 @Data
 @Builder
 public class SalesOrderDto {
@@ -42,13 +45,28 @@ public class SalesOrderDto {
   private Instant createdAt;
   private Instant updatedAt;
 
-  /** Create DTO from entity. */
+  // ── Faz 2 ────────────────────────────────────────────────────────────────
+  private ModuleType moduleType;
+  private LocalDate deadline;
+  private UUID quoteId;
+  private UUID sampleRequestId;
+
+  /** Embedded order lines — populated by SalesOrderService.findById (not findAll for perf). */
+  @Builder.Default private List<SalesOrderLineResponse> lines = Collections.emptyList();
+
+  /** Create DTO from entity (no lines — used for list queries). */
   public static SalesOrderDto from(SalesOrder order) {
-    return from(order, null);
+    return from(order, null, Collections.emptyList());
   }
 
-  /** Create DTO from entity with partner info. */
+  /** Create DTO from entity with partner info (no lines — used for list queries). */
   public static SalesOrderDto from(SalesOrder order, TradingPartnerDto partner) {
+    return from(order, partner, Collections.emptyList());
+  }
+
+  /** Create DTO from entity with partner info and embedded lines. */
+  public static SalesOrderDto from(
+      SalesOrder order, TradingPartnerDto partner, List<SalesOrderLineResponse> lines) {
     return SalesOrderDto.builder()
         .id(order.getId())
         .uid(order.getUid())
@@ -75,6 +93,11 @@ public class SalesOrderDto {
         .isActive(order.getIsActive())
         .createdAt(order.getCreatedAt())
         .updatedAt(order.getUpdatedAt())
+        .moduleType(order.getModuleType())
+        .deadline(order.getDeadline())
+        .quoteId(order.getQuoteId())
+        .sampleRequestId(order.getSampleRequestId())
+        .lines(lines != null ? lines : Collections.emptyList())
         .build();
   }
 }

@@ -1,9 +1,13 @@
 package com.fabricmanagement.order.sales.dto;
 
+import com.fabricmanagement.order.sales.domain.ModuleType;
 import com.fabricmanagement.order.sales.domain.OrderType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
@@ -61,4 +65,24 @@ public class CreateSalesOrderRequest {
 
   /** Additional metadata. */
   private Map<String, Object> metadata;
+
+  // ── Faz 2 additions ─────────────────────────────────────────────────────
+
+  /** Production module type for this order (FIBER / YARN / FABRIC / DYE_FINISHING). */
+  private ModuleType moduleType;
+
+  /** Customer-requested production and delivery deadline. */
+  private LocalDate deadline;
+
+  /** FK to Quote — when order originated from a converted quote. */
+  private UUID quoteId;
+
+  /** FK to SampleRequest — when order originated from a sample request. */
+  private UUID sampleRequestId;
+
+  /**
+   * Order lines to create together with the order. Can be empty — lines can be added separately via
+   * the line API. Each line is validated via {@code @Valid}.
+   */
+  @Valid private List<SalesOrderLineRequest> lines = new ArrayList<>();
 }

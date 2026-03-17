@@ -123,8 +123,10 @@ public class SalesOrderLine extends BaseEntity {
   /** Assigns a recipe and transitions status to RECIPE_ASSIGNED. */
   public void assignRecipe(UUID recipeId) {
     if (!this.lineStatus.canTransitionTo(SalesOrderLineStatus.RECIPE_ASSIGNED)) {
-      throw new IllegalStateException(
-          String.format("Cannot assign recipe: line is in status %s", this.lineStatus));
+      throw new com.fabricmanagement.order.common.exception.OrderDomainException(
+          String.format(
+              "Cannot assign recipe to SalesOrderLine %s: current status %s does not allow recipe assignment",
+              this.getId(), this.lineStatus));
     }
     this.recipeId = recipeId;
     this.lineStatus = SalesOrderLineStatus.RECIPE_ASSIGNED;
