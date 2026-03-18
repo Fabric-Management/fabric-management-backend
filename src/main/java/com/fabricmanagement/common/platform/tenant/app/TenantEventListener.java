@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.tenant.app;
 
+import com.fabricmanagement.common.platform.audit.app.AuditService;
 import com.fabricmanagement.common.platform.tenant.domain.event.TenantCreatedEvent;
 import com.fabricmanagement.common.platform.tenant.domain.event.TenantStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +23,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class TenantEventListener {
 
-  // TODO: Inject AuditService when available
-  // private final AuditService auditService;
+  private final AuditService auditService;
 
   /**
    * Handle tenant created event.
@@ -46,8 +46,13 @@ public class TenantEventListener {
         event.getStatus(),
         event.getTrialEndsAt());
 
-    // TODO: Save to audit table
-    // auditService.logTenantCreation(event);
+    auditService.logAction(
+        "TENANT_CREATED",
+        "tenant",
+        event.getTenantId().toString(),
+        String.format(
+            "Tenant created: uid=%s, name=%s, status=%s",
+            event.getUid(), event.getName(), event.getStatus()));
   }
 
   /**
@@ -70,9 +75,12 @@ public class TenantEventListener {
         event.getNewStatus(),
         event.getReason());
 
-    // TODO: Trigger notifications based on status change
-    // if (event.getNewStatus() == TenantStatus.SUSPENDED) {
-    //   notificationService.notifyTenantSuspended(event);
-    // }
+    auditService.logAction(
+        "TENANT_STATUS_CHANGED",
+        "tenant",
+        event.getTenantId().toString(),
+        String.format(
+            "Status changed: %s → %s, reason=%s",
+            event.getPreviousStatus(), event.getNewStatus(), event.getReason()));
   }
 }

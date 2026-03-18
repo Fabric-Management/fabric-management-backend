@@ -3,6 +3,7 @@ package com.fabricmanagement.common.infrastructure.web.exception;
 import com.fabricmanagement.common.platform.subscription.domain.exception.FeatureNotAvailableException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.QuotaExceededException;
 import com.fabricmanagement.common.platform.subscription.domain.exception.SubscriptionRequiredException;
+import com.fabricmanagement.flowboard.task.app.WipLimitExceededException;
 import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.common.exception.ForbiddenOperationException;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
@@ -206,6 +207,25 @@ public class GlobalExceptionHandler {
     log.info("Signup conflict (contact): {}", ex.getMessage());
     return ApiError.of(
         400, "Bad Request", "CONTACT_ALREADY_REGISTERED", ex.getMessage(), req.getRequestURI());
+  }
+
+  // ---------------------------------------------------------------------------
+  // FlowBoard exceptions
+  // ---------------------------------------------------------------------------
+
+  @ExceptionHandler(WipLimitExceededException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiError handleWipLimitExceeded(WipLimitExceededException ex, HttpServletRequest req) {
+    log.info("WIP limit exceeded: {}", ex.getMessage());
+    return ApiError.of(409, "Conflict", "WIP_LIMIT_EXCEEDED", ex.getMessage(), req.getRequestURI());
+  }
+
+  @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiError handleEntityNotFound(
+      jakarta.persistence.EntityNotFoundException ex, HttpServletRequest req) {
+    log.info("Entity not found: {}", ex.getMessage());
+    return ApiError.of(404, "Not Found", "ENTITY_NOT_FOUND", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})

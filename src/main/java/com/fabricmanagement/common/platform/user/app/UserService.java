@@ -126,6 +126,15 @@ public class UserService implements UserFacade {
   @Transactional
   public void deactivateUser(UUID userId, String reason) {
     UUID tenantId = TenantContext.getCurrentTenantId();
+    deactivateUser(tenantId, userId, reason);
+  }
+
+  /**
+   * TenantContext'e bağımlı olmayan, scheduler/background güvenli versiyon. Event listener veya
+   * scheduled task gibi HTTP request context'i olmayan süreçlerden çağrılmalıdır.
+   */
+  @Transactional
+  public void deactivateUser(UUID tenantId, UUID userId, String reason) {
     log.info("Deactivating user: tenantId={}, userId={}, reason={}", tenantId, userId, reason);
 
     User user =

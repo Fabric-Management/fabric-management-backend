@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.organization.app;
 
+import com.fabricmanagement.common.platform.audit.app.AuditService;
 import com.fabricmanagement.common.platform.organization.domain.event.OrganizationCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,8 +22,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class OrganizationEventListener {
 
-  // TODO: Inject AuditService when available
-  // private final AuditService auditService;
+  private final AuditService auditService;
 
   /**
    * Handle organization created event.
@@ -44,7 +44,12 @@ public class OrganizationEventListener {
         event.getName(),
         event.getOrganizationType());
 
-    // TODO: Save to audit table
-    // auditService.logOrganizationCreation(event);
+    auditService.logAction(
+        "ORGANIZATION_CREATED",
+        "organization",
+        event.getOrganizationId().toString(),
+        String.format(
+            "Organization created: name=%s, type=%s",
+            event.getName(), event.getOrganizationType()));
   }
 }

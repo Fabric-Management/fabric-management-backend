@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -36,6 +37,7 @@ public class ShipmentController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Create a new shipment")
   public ResponseEntity<ShipmentDto> createShipment(
       @Valid @RequestBody CreateShipmentRequest request) {
@@ -44,6 +46,7 @@ public class ShipmentController {
   }
 
   @GetMapping("/{id}")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipment by ID")
   public ResponseEntity<ShipmentDto> getShipment(@PathVariable UUID id) {
     return shipmentService
@@ -53,6 +56,7 @@ public class ShipmentController {
   }
 
   @GetMapping("/tracking/{trackingNumber}")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipment by tracking number")
   public ResponseEntity<ShipmentDto> getShipmentByTracking(@PathVariable String trackingNumber) {
     return shipmentService
@@ -62,6 +66,7 @@ public class ShipmentController {
   }
 
   @GetMapping
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get all shipments (paginated)")
   public ResponseEntity<Page<ShipmentDto>> getAllShipments(
       @PageableDefault(size = 20, sort = "shipDate") Pageable pageable) {
@@ -69,6 +74,7 @@ public class ShipmentController {
   }
 
   @DeleteMapping("/{id}")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Delete shipment (soft delete)")
   public ResponseEntity<Void> deleteShipment(@PathVariable UUID id) {
     shipmentService.deleteShipment(id);
@@ -80,18 +86,21 @@ public class ShipmentController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @GetMapping("/partner/{partnerId}")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipments by partner ID")
   public ResponseEntity<List<ShipmentDto>> getShipmentsByPartner(@PathVariable UUID partnerId) {
     return ResponseEntity.ok(shipmentService.findByPartner(partnerId));
   }
 
   @GetMapping("/partner/{partnerId}/in-transit")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get in-transit shipments by partner")
   public ResponseEntity<List<ShipmentDto>> getInTransitByPartner(@PathVariable UUID partnerId) {
     return ResponseEntity.ok(shipmentService.findInTransitByPartner(partnerId));
   }
 
   @GetMapping("/status/{status}")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipments by status")
   public ResponseEntity<List<ShipmentDto>> getShipmentsByStatus(
       @PathVariable ShipmentStatus status) {
@@ -99,36 +108,42 @@ public class ShipmentController {
   }
 
   @GetMapping("/in-transit")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get all in-transit shipments")
   public ResponseEntity<List<ShipmentDto>> getInTransit() {
     return ResponseEntity.ok(shipmentService.findInTransit());
   }
 
   @GetMapping("/pending")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get pending shipments (not yet dispatched)")
   public ResponseEntity<List<ShipmentDto>> getPendingShipments() {
     return ResponseEntity.ok(shipmentService.findPendingShipments());
   }
 
   @GetMapping("/late")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get late shipments")
   public ResponseEntity<List<ShipmentDto>> getLateShipments() {
     return ResponseEntity.ok(shipmentService.findLateShipments());
   }
 
   @GetMapping("/outbound")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get outbound shipments")
   public ResponseEntity<List<ShipmentDto>> getOutboundShipments() {
     return ResponseEntity.ok(shipmentService.findOutboundShipments());
   }
 
   @GetMapping("/inbound")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get inbound shipments")
   public ResponseEntity<List<ShipmentDto>> getInboundShipments() {
     return ResponseEntity.ok(shipmentService.findInboundShipments());
   }
 
   @GetMapping("/order/{orderReference}")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipments by order reference")
   public ResponseEntity<List<ShipmentDto>> getShipmentsByOrder(
       @PathVariable String orderReference) {
@@ -140,18 +155,21 @@ public class ShipmentController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{id}/prepare")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Start preparing a shipment")
   public ResponseEntity<ShipmentDto> startPreparing(@PathVariable UUID id) {
     return ResponseEntity.ok(shipmentService.startPreparing(id));
   }
 
   @PostMapping("/{id}/ready")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Mark shipment as ready for pickup")
   public ResponseEntity<ShipmentDto> markReady(@PathVariable UUID id) {
     return ResponseEntity.ok(shipmentService.markReady(id));
   }
 
   @PostMapping("/{id}/pickup")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Record pickup by carrier")
   public ResponseEntity<ShipmentDto> recordPickup(
       @PathVariable UUID id,
@@ -161,18 +179,21 @@ public class ShipmentController {
   }
 
   @PostMapping("/{id}/in-transit")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Mark shipment as in transit")
   public ResponseEntity<ShipmentDto> markInTransit(@PathVariable UUID id) {
     return ResponseEntity.ok(shipmentService.markInTransit(id));
   }
 
   @PostMapping("/{id}/out-for-delivery")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Mark shipment as out for delivery")
   public ResponseEntity<ShipmentDto> markOutForDelivery(@PathVariable UUID id) {
     return ResponseEntity.ok(shipmentService.markOutForDelivery(id));
   }
 
   @PostMapping("/{id}/deliver")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Record delivery")
   public ResponseEntity<ShipmentDto> recordDelivery(
       @PathVariable UUID id,
@@ -182,6 +203,7 @@ public class ShipmentController {
   }
 
   @PostMapping("/{id}/delivery-failed")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Record delivery failure")
   public ResponseEntity<ShipmentDto> recordDeliveryFailure(
       @PathVariable UUID id, @RequestParam String reason) {
@@ -189,12 +211,14 @@ public class ShipmentController {
   }
 
   @PostMapping("/{id}/cancel")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Cancel a shipment")
   public ResponseEntity<ShipmentDto> cancelShipment(@PathVariable UUID id) {
     return ResponseEntity.ok(shipmentService.cancelShipment(id));
   }
 
   @PutMapping("/{id}/tracking")
+  @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Update tracking info")
   public ResponseEntity<ShipmentDto> updateTracking(
       @PathVariable UUID id,

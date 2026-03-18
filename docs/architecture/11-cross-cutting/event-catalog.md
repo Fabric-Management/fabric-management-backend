@@ -90,9 +90,15 @@ Bu döküman sistemdeki tüm event'leri, yayınlayan modülü, dinleyen modülle
 |---|---|---|---|---|
 | `TaskAssigned` | FlowBoard | NotificationHub | NORMAL | Task birine atandı |
 | `TaskBlocked` | FlowBoard | NotificationHub | CRITICAL | Task engellendi |
+| `TaskCompleted` | FlowBoard | NotificationHub | NORMAL | Task tamamlandı (DONE) |
 | `TaskDeadlineNear` | FlowBoard (Scheduler) | NotificationHub | HIGH | Task deadline'ına 24 saat kala |
 | `TaskDeadlinePassed` | FlowBoard (Scheduler) | NotificationHub | CRITICAL | Task deadline'ı geçti |
 | `TaskUnassignedTooLong` | FlowBoard (Scheduler) | NotificationHub | HIGH | Task 2 saat atanmamış |
+| `TaskTimerExceeded` | FlowBoard | NotificationHub | HIGH | Task tahmini süreyi %150 aştı |
+| `TaskReminderTriggered` | FlowBoard (Scheduler) | NotificationHub | NORMAL | Kullanıcı hatırlatması tetiklendi |
+| `AutomationRuleExecuted` | AutomationEngine | NotificationHub | NORMAL | Otomasyon kuralı çalıştı (loglanır) |
+| `TaskLabelChanged` | FlowBoard | NotificationHub | NORMAL | Task etiketi eklendi/kaldırıldı |
+| `TaskMentioned` | FlowBoard | NotificationHub | HIGH | Yorumda @mention yapıldı |
 | `EscalationTriggered` | EscalationLog | NotificationHub | CRITICAL | Eskalasyon tetiklendi |
 
 ### Zamanlayıcı Event'leri
@@ -104,7 +110,7 @@ Bu döküman sistemdeki tüm event'leri, yayınlayan modülü, dinleyen modülle
 
 ---
 
-## Toplam: 38 Event
+## Toplam: 54 Event
 
 | Kategori | Sayı |
 |---|---|
@@ -114,9 +120,9 @@ Bu döküman sistemdeki tüm event'leri, yayınlayan modülü, dinleyen modülle
 | IWM | 9 |
 | Maliyet | 3 |
 | Onay Sistemi | 5 |
-| FlowBoard | 6 |
+| FlowBoard | 12 |
 | Zamanlayıcı | 2 |
-| **Toplam** | **47** |
+| **Toplam** | **53** |
 
 ---
 
@@ -156,4 +162,5 @@ Bu döküman sistemdeki tüm event'leri, yayınlayan modülü, dinleyen modülle
 
 | Versiyon | Tarih | Değişiklik |
 |---|---|---|
+| 1.1 | 2026-03-17 | FlowBoard v2.0 event'leri eklendi — TaskCompleted, TaskTimerExceeded, TaskReminderTriggered, AutomationRuleExecuted, TaskLabelChanged, TaskMentioned (6 yeni event). Toplam: 53 |
 | 1.0 | 2026-03-17 | İlk versiyon — 47 event, 8 kategori, Procurement/IWM/Costing event'leri eklendi |

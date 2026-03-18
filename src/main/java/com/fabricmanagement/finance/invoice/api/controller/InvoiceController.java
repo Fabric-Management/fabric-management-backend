@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -37,6 +38,7 @@ public class InvoiceController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Create a new invoice")
   public ResponseEntity<InvoiceDto> createInvoice(
       @Valid @RequestBody CreateInvoiceRequest request) {
@@ -45,6 +47,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/{id}")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get invoice by ID")
   public ResponseEntity<InvoiceDto> getInvoice(@PathVariable UUID id) {
     return invoiceService
@@ -54,6 +57,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/number/{invoiceNumber}")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get invoice by invoice number")
   public ResponseEntity<InvoiceDto> getInvoiceByNumber(@PathVariable String invoiceNumber) {
     return invoiceService
@@ -63,6 +67,7 @@ public class InvoiceController {
   }
 
   @GetMapping
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get all invoices (paginated)")
   public ResponseEntity<Page<InvoiceDto>> getAllInvoices(
       @PageableDefault(size = 20, sort = "issueDate") Pageable pageable) {
@@ -70,6 +75,7 @@ public class InvoiceController {
   }
 
   @DeleteMapping("/{id}")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Delete invoice (soft delete)")
   public ResponseEntity<Void> deleteInvoice(@PathVariable UUID id) {
     invoiceService.deleteInvoice(id);
@@ -81,48 +87,56 @@ public class InvoiceController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @GetMapping("/partner/{partnerId}")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get invoices by partner ID")
   public ResponseEntity<List<InvoiceDto>> getInvoicesByPartner(@PathVariable UUID partnerId) {
     return ResponseEntity.ok(invoiceService.findByPartner(partnerId));
   }
 
   @GetMapping("/partner/{partnerId}/unpaid")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get unpaid invoices by partner")
   public ResponseEntity<List<InvoiceDto>> getUnpaidByPartner(@PathVariable UUID partnerId) {
     return ResponseEntity.ok(invoiceService.findUnpaidByPartner(partnerId));
   }
 
   @GetMapping("/partner/{partnerId}/outstanding")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get outstanding amount for partner")
   public ResponseEntity<BigDecimal> getOutstandingAmount(@PathVariable UUID partnerId) {
     return ResponseEntity.ok(invoiceService.getOutstandingAmount(partnerId));
   }
 
   @GetMapping("/status/{status}")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get invoices by status")
   public ResponseEntity<List<InvoiceDto>> getInvoicesByStatus(@PathVariable InvoiceStatus status) {
     return ResponseEntity.ok(invoiceService.findByStatus(status));
   }
 
   @GetMapping("/overdue")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get overdue invoices")
   public ResponseEntity<List<InvoiceDto>> getOverdueInvoices() {
     return ResponseEntity.ok(invoiceService.findOverdueInvoices());
   }
 
   @GetMapping("/awaiting-payment")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get invoices awaiting payment")
   public ResponseEntity<List<InvoiceDto>> getAwaitingPayment() {
     return ResponseEntity.ok(invoiceService.findAwaitingPayment());
   }
 
   @GetMapping("/ar")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get accounts receivable (sales invoices)")
   public ResponseEntity<List<InvoiceDto>> getAccountsReceivable() {
     return ResponseEntity.ok(invoiceService.findAccountsReceivable());
   }
 
   @GetMapping("/ap")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'READ')")
   @Operation(summary = "Get accounts payable (purchase invoices)")
   public ResponseEntity<List<InvoiceDto>> getAccountsPayable() {
     return ResponseEntity.ok(invoiceService.findAccountsPayable());
@@ -133,18 +147,21 @@ public class InvoiceController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{id}/issue")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Issue an invoice")
   public ResponseEntity<InvoiceDto> issueInvoice(@PathVariable UUID id) {
     return ResponseEntity.ok(invoiceService.issueInvoice(id));
   }
 
   @PostMapping("/{id}/send")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Send an invoice")
   public ResponseEntity<InvoiceDto> sendInvoice(@PathVariable UUID id) {
     return ResponseEntity.ok(invoiceService.sendInvoice(id));
   }
 
   @PostMapping("/{id}/payment")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Record a payment")
   public ResponseEntity<InvoiceDto> recordPayment(
       @PathVariable UUID id, @RequestParam BigDecimal amount) {
@@ -152,12 +169,14 @@ public class InvoiceController {
   }
 
   @PostMapping("/{id}/cancel")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Cancel an invoice")
   public ResponseEntity<InvoiceDto> cancelInvoice(@PathVariable UUID id) {
     return ResponseEntity.ok(invoiceService.cancelInvoice(id));
   }
 
   @PostMapping("/{id}/void")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Void an invoice")
   public ResponseEntity<InvoiceDto> voidInvoice(@PathVariable UUID id) {
     return ResponseEntity.ok(invoiceService.voidInvoice(id));
@@ -168,6 +187,7 @@ public class InvoiceController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/batch/mark-overdue")
+  @PreAuthorize("@financeAccessService.hasPermission(authentication, 'INVOICE', 'WRITE')")
   @Operation(summary = "Mark overdue invoices (batch job)")
   public ResponseEntity<Integer> markOverdueInvoices() {
     return ResponseEntity.ok(invoiceService.markOverdueInvoices());

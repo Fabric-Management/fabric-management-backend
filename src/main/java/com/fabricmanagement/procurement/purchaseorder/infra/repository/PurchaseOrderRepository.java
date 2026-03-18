@@ -18,4 +18,6 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
   List<PurchaseOrder> findByStatusAndIsActiveTrue(PurchaseOrderStatus status);
 
   boolean existsByPoNumberAndIsActiveTrue(String poNumber);
+
+  boolean existsBySupplierQuoteIdAndIsActiveTrue(UUID supplierQuoteId);
 }

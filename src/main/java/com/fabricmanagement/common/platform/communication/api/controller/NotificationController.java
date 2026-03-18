@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
  *
  * <p>Users can only see and manage their own notifications (recipientId = current user).
  */
-@RestController
+@RestController("commonNotificationController")
 @RequestMapping("/api/common/notifications")
 @RequiredArgsConstructor
 @Slf4j

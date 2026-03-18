@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
+import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerCertificationService;
 import com.fabricmanagement.production.execution.batch.app.BatchOperationsService;
 import com.fabricmanagement.production.execution.batch.dto.BlendParentRequest;
 import com.fabricmanagement.production.execution.batch.dto.CreateBlendedBatchRequest;
@@ -16,16 +17,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class WorkOrderService {
 
   private final WorkOrderRepository workOrderRepository;
   private final BatchOperationsService batchOperationsService;
+  private final TradingPartnerCertificationService certificationService;
 
   /** Retrieves a work order by its UUID. */
   public WorkOrderResponse getWorkOrder(UUID id) {
@@ -54,8 +58,7 @@ public class WorkOrderService {
             .status(WorkOrderStatus.DRAFT)
             .build();
 
-    // TODO: supplier snapshot — when tradingPartnerId is present, load TradingPartner and
-    // snapshot: supplierCertificationCode, supplierLicenseNo, supplierLicenseValidUntil
+    applySupplierSnapshot(workOrder);
 
     WorkOrder saved = workOrderRepository.save(workOrder);
     return mapToResponse(saved);
@@ -97,6 +100,8 @@ public class WorkOrderService {
                 request.getAttachments() == null ? java.util.List.of() : request.getAttachments())
             .status(WorkOrderStatus.DRAFT)
             .build();
+
+    applySupplierSnapshot(workOrder);
 
     WorkOrder saved = workOrderRepository.save(workOrder);
     return mapToResponse(saved);
@@ -195,6 +200,27 @@ public class WorkOrderService {
     String year = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy"));
     String uniqueExt = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     return String.format("WO-%s-%s", year, uniqueExt);
+  }
+
+  private void applySupplierSnapshot(WorkOrder workOrder) {
+    if (workOrder.getTradingPartnerId() != null) {
+      try {
+        var certs = certificationService.findByPartnerId(workOrder.getTradingPartnerId());
+        if (certs != null && !certs.isEmpty()) {
+          var cert = certs.get(0);
+          if (cert.getCertification() != null) {
+            workOrder.setSupplierCertificationCode(cert.getCertification().getCertificationCode());
+          }
+          workOrder.setSupplierLicenseNo(cert.getLicenseNo());
+          workOrder.setSupplierLicenseValidUntil(cert.getValidUntil());
+        }
+      } catch (Exception e) {
+        log.warn(
+            "Failed to load supplier certifications for trading partner {}",
+            workOrder.getTradingPartnerId(),
+            e);
+      }
+    }
   }
 
   private WorkOrderResponse mapToResponse(WorkOrder workOrder) {

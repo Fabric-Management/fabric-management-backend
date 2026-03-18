@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -43,8 +44,7 @@ public class CostingController {
   // COST CALCULATIONS
   // ============================================================
 
-  // TODO: @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('SALES_MANAGER')")
-  // Authorization will be implemented in Phase 12 (Security & RBAC module)
+  @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('SALES_MANAGER')")
   @PostMapping("/calculations/estimated")
   @ResponseStatus(HttpStatus.CREATED)
   public CostCalculationResponse computeEstimated(
@@ -61,7 +61,7 @@ public class CostingController {
     return CostCalculationResponse.from(calc);
   }
 
-  // TODO: @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
+  @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
   @PostMapping("/calculations/planned")
   @ResponseStatus(HttpStatus.CREATED)
   public CostCalculationResponse computePlanned(@Valid @RequestBody ComputePlannedCostRequest req) {
@@ -77,7 +77,7 @@ public class CostingController {
     return CostCalculationResponse.from(calc);
   }
 
-  // TODO: @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
+  @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
   @PostMapping("/calculations/actual")
   @ResponseStatus(HttpStatus.CREATED)
   public CostCalculationResponse computeActual(@Valid @RequestBody ComputeActualCostRequest req) {
@@ -97,7 +97,7 @@ public class CostingController {
   // PRICE LISTS
   // ============================================================
 
-  // TODO: @PreAuthorize("hasRole('COSTING_ADMIN')")
+  @PreAuthorize("hasRole('COSTING_ADMIN')")
   @PostMapping("/price-lists")
   @ResponseStatus(HttpStatus.CREATED)
   public PriceListResponse createPriceList(@Valid @RequestBody CreatePriceListRequest req) {
@@ -114,7 +114,7 @@ public class CostingController {
     return PriceListResponse.from(pl);
   }
 
-  // TODO: @PreAuthorize("hasRole('COSTING_READ')")
+  @PreAuthorize("hasRole('COSTING_READ')")
   @GetMapping("/price-lists")
   public List<PriceListResponse> listPriceLists(@RequestParam String moduleType) {
     UUID tenantId = TenantContext.getCurrentTenantId();
@@ -123,7 +123,7 @@ public class CostingController {
         .toList();
   }
 
-  // TODO: @PreAuthorize("hasRole('COSTING_ADMIN')")
+  @PreAuthorize("hasRole('COSTING_ADMIN')")
   @DeleteMapping("/price-lists/{priceListId}")
   public ResponseEntity<Void> deactivatePriceList(@PathVariable UUID priceListId) {
     priceListService.deactivatePriceList(priceListId);
@@ -134,7 +134,7 @@ public class CostingController {
   // EXCHANGE RATES
   // ============================================================
 
-  // TODO: @PreAuthorize("hasRole('FINANCE_MANAGER')")
+  @PreAuthorize("hasRole('FINANCE_MANAGER')")
   @PostMapping("/exchange-rates")
   @ResponseStatus(HttpStatus.CREATED)
   public ExchangeRateResponse captureExchangeRate(

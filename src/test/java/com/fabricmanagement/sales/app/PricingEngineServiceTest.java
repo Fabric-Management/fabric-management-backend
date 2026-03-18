@@ -2,9 +2,10 @@ package com.fabricmanagement.sales.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fabricmanagement.sales.app.PricingEngineService.PricingResult;
-import com.fabricmanagement.sales.domain.policy.DiscountPolicy;
-import com.fabricmanagement.sales.domain.quote.QuotePriceZone;
+import com.fabricmanagement.sales.pricing.app.PricingEngineService;
+import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
+import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
+import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

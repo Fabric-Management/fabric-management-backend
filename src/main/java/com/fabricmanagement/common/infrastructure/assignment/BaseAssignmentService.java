@@ -43,11 +43,9 @@ public abstract class BaseAssignmentService<J extends Assignable> {
   protected abstract J buildJunction(UUID parentId, UUID childId, Boolean primaryFlag);
 
   /** Optional hook to validate assignment rules (e.g. "only one headquarters"). Default no-op. */
-  @SuppressWarnings("unused")
   protected void validateAssignment(UUID parentId, UUID childId) {}
 
   /** Optional hook after assign (e.g. publish event). Default no-op. */
-  @SuppressWarnings("unused")
   protected void onAfterAssign(J junction) {}
 
   @Transactional

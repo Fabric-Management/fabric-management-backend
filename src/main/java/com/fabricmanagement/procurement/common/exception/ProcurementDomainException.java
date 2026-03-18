@@ -1,6 +1,6 @@
 package com.fabricmanagement.procurement.common.exception;
 
-import com.fabricmanagement.order.common.exception.OrderDomainException;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 
 /** Thrown for procurement domain rule violations (PurchaseOrder, SubcontractOrder, RFQ). */
 public class ProcurementDomainException extends OrderDomainException {

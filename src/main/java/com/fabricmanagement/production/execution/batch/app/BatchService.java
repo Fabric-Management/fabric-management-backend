@@ -13,11 +13,8 @@ import com.fabricmanagement.production.execution.batch.domain.exception.BatchCer
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.dto.*;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchOverrideLogRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
-import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
-import com.fabricmanagement.production.execution.warehouse.app.WarehouseLocationService;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
@@ -46,18 +43,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BatchService {
 
-  private static final BigDecimal BLEND_PERCENT_TOTAL = new BigDecimal("100");
-
   private final BatchRepository batchRepository;
   private final BatchReservationRepository reservationRepository;
-  private final BatchOverrideLogRepository overrideLogRepository;
   private final BatchCertificationRepository batchCertificationRepository;
-  private final BatchCodeGenerator batchCodeGenerator;
   private final FiberRepository fiberRepository;
   private final FiberQualityStandardRepository qualityStandardRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
-  private final WarehouseLocationService warehouseLocationService;
-  private final BatchLineageService batchLineageService;
 
   @Value("${batch.certification.enforce-on-reserve:true}")
   private boolean certEnforceOnReserve;
@@ -182,7 +173,6 @@ public class BatchService {
    * Resolve effective composition: Batch.attributes.composition if present, else Fiber.composition.
    * Returns empty map for non-FIBER or when neither has composition.
    */
-  @SuppressWarnings("unchecked")
   private Map<UUID, BigDecimal> resolveComposition(Batch batch) {
     if (batch.getMaterialType() != MaterialType.FIBER) {
       return Map.of();

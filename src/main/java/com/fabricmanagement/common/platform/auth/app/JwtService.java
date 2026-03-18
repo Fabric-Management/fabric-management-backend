@@ -352,7 +352,6 @@ public class JwtService {
    * @param token JWT access token
    * @return unmodifiable list of department codes; empty list if claim is absent
    */
-  @SuppressWarnings("unchecked")
   public List<String> getDepartmentCodesFromToken(String token) {
     Claims claims = extractClaims(token);
     Object raw = claims.get("department_codes");

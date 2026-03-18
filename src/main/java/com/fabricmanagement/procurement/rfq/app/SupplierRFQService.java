@@ -1,5 +1,6 @@
 package com.fabricmanagement.procurement.rfq.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.rfq.domain.RfqRecipientStatus;
@@ -7,6 +8,7 @@ import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQLine;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQRecipient;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQStatus;
+import com.fabricmanagement.procurement.rfq.domain.event.RfqSentEvent;
 import com.fabricmanagement.procurement.rfq.dto.AddRecipientRequest;
 import com.fabricmanagement.procurement.rfq.dto.AddRfqLineRequest;
 import com.fabricmanagement.procurement.rfq.dto.CreateSupplierRFQRequest;
@@ -14,6 +16,7 @@ import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQReposito
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupplierRFQService {
 
   private final SupplierRFQRepository rfqRepository;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public SupplierRFQ createRfq(CreateSupplierRFQRequest req) {
@@ -110,9 +114,14 @@ public class SupplierRFQService {
             });
 
     rfq.setStatus(SupplierRFQStatus.SENT);
-    // TODO(phase-7): NotificationHub event emit — RfqSentEvent per recipient
-
     SupplierRFQ saved = rfqRepository.save(rfq);
+
+    List<UUID> supplierIds =
+        saved.getRecipients().stream().map(SupplierRFQRecipient::getTradingPartnerId).toList();
+
+    eventPublisher.publish(
+        new RfqSentEvent(saved.getTenantId(), saved.getId(), saved.getRfqNumber(), supplierIds));
+
     log.info(
         "SupplierRFQ sent: {} to {} recipients",
         saved.getRfqNumber(),
