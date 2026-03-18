@@ -3,7 +3,7 @@ package com.fabricmanagement.common.platform.organization.app;
 import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentService;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.infrastructure.web.exception.DomainException;
+import com.fabricmanagement.common.infrastructure.web.exception.CommonDomainException;
 import com.fabricmanagement.common.platform.communication.app.ContactService;
 import com.fabricmanagement.common.platform.communication.domain.Contact;
 import com.fabricmanagement.common.platform.communication.domain.ContactType;
@@ -191,7 +191,7 @@ public class OrganizationContactAssignmentService
             .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
 
     if (Boolean.TRUE.equals(oc.getIsDefault())) {
-      throw new DomainException(
+      throw new CommonDomainException(
           "Cannot remove the default contact. Please set another contact as default first.");
     }
 
@@ -254,7 +254,7 @@ public class OrganizationContactAssignmentService
             .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
 
     if (!oc.getTenantId().equals(tenantId)) {
-      throw new DomainException("Contact assignment does not belong to current tenant");
+      throw new CommonDomainException("Contact assignment does not belong to current tenant");
     }
 
     Contact contact =
@@ -274,7 +274,8 @@ public class OrganizationContactAssignmentService
               });
       oc.setIsDefault(true);
     } else if (Boolean.FALSE.equals(isDefault) && Boolean.TRUE.equals(oc.getIsDefault())) {
-      oc.setIsDefault(false);
+      throw new CommonDomainException(
+          "Cannot unset the default contact without assigning another contact as default first.");
     }
 
     OrganizationContact saved = organizationContactRepository.save(oc);

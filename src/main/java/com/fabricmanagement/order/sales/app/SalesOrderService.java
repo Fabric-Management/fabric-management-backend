@@ -6,8 +6,12 @@ import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerSer
 import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.order.sales.domain.OrderStatus;
 import com.fabricmanagement.order.sales.domain.SalesOrder;
+import com.fabricmanagement.order.sales.domain.SalesOrderLine;
+import com.fabricmanagement.order.sales.domain.SalesOrderLineStatus;
 import com.fabricmanagement.order.sales.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.order.sales.dto.SalesOrderDto;
+import com.fabricmanagement.order.sales.dto.SalesOrderLineRequest;
+import com.fabricmanagement.order.sales.dto.SalesOrderLineResponse;
 import com.fabricmanagement.order.sales.infra.repository.SalesOrderRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -35,6 +39,10 @@ public class SalesOrderService {
   private final SalesOrderRepository orderRepository;
   private final TradingPartnerResolver partnerResolver;
   private final TradingPartnerService partnerService;
+  private final com.fabricmanagement.order.sales.infra.repository.SalesOrderLineRepository
+      lineRepository;
+  private final com.fabricmanagement.order.sales.app.ruleengine.SalesOrderRuleEngine ruleEngine;
+  private final ModuleSpecsValidator moduleSpecsValidator;
 
   private static final DateTimeFormatter ORDER_NUMBER_DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -77,14 +85,35 @@ public class SalesOrderService {
             .shippingMethod(request.getShippingMethod())
             .notes(request.getNotes())
             .metadata(request.getMetadata())
+            .moduleType(request.getModuleType())
+            .deadline(request.getDeadline())
+            .quoteId(request.getQuoteId())
+            .sampleRequestId(request.getSampleRequestId())
             .build();
 
     SalesOrder saved = orderRepository.save(order);
 
+    // Persist embedded lines (validated + moduleSpecs checked)
+    if (request.getLines() != null && !request.getLines().isEmpty()) {
+      List<SalesOrderLine> lines =
+          request.getLines().stream()
+              .map(
+                  lineReq -> {
+                    moduleSpecsValidator.validate(lineReq);
+                    return mapLineRequestToEntity(lineReq, saved.getId());
+                  })
+              .toList();
+      lineRepository.saveAll(lines);
+    }
+
     // Get partner details for response
     TradingPartnerDto partner = partnerService.findById(tenantId, tradingPartnerId).orElse(null);
 
-    log.info("Sales order created: uid={}, partner={}", saved.getUid(), tradingPartnerId);
+    log.info(
+        "Sales order created: uid={}, partner={}, lines={}",
+        saved.getUid(),
+        tradingPartnerId,
+        request.getLines() == null ? 0 : request.getLines().size());
     return SalesOrderDto.from(saved, partner);
   }
 
@@ -108,7 +137,14 @@ public class SalesOrderService {
             order -> {
               TradingPartnerDto partner =
                   partnerService.findById(tenantId, order.getTradingPartnerId()).orElse(null);
-              return SalesOrderDto.from(order, partner);
+              // Load embedded lines for detail view
+              List<SalesOrderLineResponse> lineResponses =
+                  lineRepository
+                      .findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId())
+                      .stream()
+                      .map(this::mapLineToResponse)
+                      .toList();
+              return SalesOrderDto.from(order, partner, lineResponses);
             });
   }
 
@@ -220,6 +256,10 @@ public class SalesOrderService {
     SalesOrder saved = orderRepository.save(order);
 
     log.info("Sales order confirmed: uid={}", saved.getUid());
+
+    // Faz 2.2 — trigger RuleEngine: recipe matching + WorkOrder DRAFT creation per line
+    ruleEngine.processConfirmedOrder(saved);
+
     return SalesOrderDto.from(saved);
   }
 
@@ -306,6 +346,16 @@ public class SalesOrderService {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+
+    // Cascade soft-delete all active lines first
+    List<SalesOrderLine> lines =
+        lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId());
+    lines.forEach(SalesOrderLine::delete);
+    if (!lines.isEmpty()) {
+      lineRepository.saveAll(lines);
+      log.info("Soft-deleted {} SalesOrderLine(s) for order uid={}", lines.size(), order.getUid());
+    }
+
     order.delete();
     orderRepository.save(order);
 
@@ -319,7 +369,45 @@ public class SalesOrderService {
   private SalesOrder getOrderOrThrow(UUID tenantId, UUID orderId) {
     return orderRepository
         .findByTenantIdAndId(tenantId, orderId)
-        .orElseThrow(() -> new IllegalArgumentException("Sales order not found: " + orderId));
+        .orElseThrow(
+            () ->
+                new com.fabricmanagement.order.common.exception.OrderDomainException(
+                    "Sales order not found: " + orderId));
+  }
+
+  // ── Line mapping helpers ─────────────────────────────────────────────────
+
+  private SalesOrderLine mapLineRequestToEntity(SalesOrderLineRequest req, UUID salesOrderId) {
+    return SalesOrderLine.builder()
+        .salesOrderId(salesOrderId)
+        .materialId(req.getMaterialId())
+        .productDesc(req.getProductDesc())
+        .requestedQty(req.getRequestedQty())
+        .unit(req.getUnit())
+        .unitPrice(req.getUnitPrice())
+        .currency(req.getCurrency())
+        .moduleType(req.getModuleType())
+        .moduleSpecs(req.getModuleSpecs())
+        .lineStatus(SalesOrderLineStatus.PENDING)
+        .build();
+  }
+
+  private SalesOrderLineResponse mapLineToResponse(SalesOrderLine line) {
+    return SalesOrderLineResponse.builder()
+        .id(line.getId())
+        .uid(line.getUid())
+        .salesOrderId(line.getSalesOrderId())
+        .materialId(line.getMaterialId())
+        .productDesc(line.getProductDesc())
+        .requestedQty(line.getRequestedQty())
+        .unit(line.getUnit())
+        .unitPrice(line.getUnitPrice())
+        .currency(line.getCurrency())
+        .moduleType(line.getModuleType())
+        .moduleSpecs(line.getModuleSpecs())
+        .lineStatus(line.getLineStatus())
+        .recipeId(line.getRecipeId())
+        .build();
   }
 
   private String generateOrderNumber(UUID tenantId, LocalDate orderDate) {

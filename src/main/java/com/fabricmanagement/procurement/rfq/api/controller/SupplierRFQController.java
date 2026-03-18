@@ -1,0 +1,60 @@
+package com.fabricmanagement.procurement.rfq.api.controller;
+
+import com.fabricmanagement.procurement.rfq.app.SupplierRFQService;
+import com.fabricmanagement.procurement.rfq.dto.AddRecipientRequest;
+import com.fabricmanagement.procurement.rfq.dto.AddRfqLineRequest;
+import com.fabricmanagement.procurement.rfq.dto.CreateSupplierRFQRequest;
+import com.fabricmanagement.procurement.rfq.dto.SupplierRFQResponse;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Fix #1 — Entity değil SupplierRFQResponse dönüyor. Fix #2 — addLine: SupplierRFQLine entity değil
+ * AddRfqLineRequest DTO ile alınıyor. Fix #3 — Tüm endpoint'lerde @PreAuthorize eklendi. Fix #10 —
+ * addRecipient: @RequestParam → AddRecipientRequest DTO.
+ */
+@RestController
+@RequestMapping("/api/v1/procurement/rfqs")
+@RequiredArgsConstructor
+public class SupplierRFQController {
+
+  private final SupplierRFQService rfqService;
+
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("@procurementAccessService.hasPermission(authentication, 'SUPPLIER_RFQ', 'WRITE')")
+  public SupplierRFQResponse createRfq(@Valid @RequestBody CreateSupplierRFQRequest req) {
+    return SupplierRFQResponse.from(rfqService.createRfq(req));
+  }
+
+  @PostMapping("/{rfqId}/lines")
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("@procurementAccessService.hasPermission(authentication, 'SUPPLIER_RFQ', 'WRITE')")
+  public SupplierRFQResponse addLine(
+      @PathVariable UUID rfqId, @Valid @RequestBody AddRfqLineRequest req) {
+    return SupplierRFQResponse.from(rfqService.addLine(rfqId, req));
+  }
+
+  @PostMapping("/{rfqId}/recipients")
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("@procurementAccessService.hasPermission(authentication, 'SUPPLIER_RFQ', 'WRITE')")
+  public SupplierRFQResponse addRecipient(
+      @PathVariable UUID rfqId, @Valid @RequestBody AddRecipientRequest req) {
+    return SupplierRFQResponse.from(rfqService.addRecipient(rfqId, req));
+  }
+
+  @PostMapping("/{rfqId}/send")
+  @PreAuthorize("@procurementAccessService.hasPermission(authentication, 'SUPPLIER_RFQ', 'WRITE')")
+  public SupplierRFQResponse sendRfq(@PathVariable UUID rfqId) {
+    return SupplierRFQResponse.from(rfqService.sendRfq(rfqId));
+  }
+}

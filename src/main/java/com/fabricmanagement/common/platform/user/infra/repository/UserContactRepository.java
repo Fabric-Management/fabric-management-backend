@@ -54,4 +54,10 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
           + "WHERE uc.tenantId = :tenantId AND uc.contactId = :contactId")
   List<UserContact> findByTenantIdAndContactId(
       @Param("tenantId") UUID tenantId, @Param("contactId") UUID contactId);
+
+  @Query(
+      "SELECT uc FROM UserContact uc "
+          + "LEFT JOIN FETCH uc.contact "
+          + "WHERE uc.userId = :userId")
+  List<UserContact> findAllByUserId(@Param("userId") UUID userId);
 }

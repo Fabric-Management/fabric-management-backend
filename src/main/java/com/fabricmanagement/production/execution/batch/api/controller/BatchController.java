@@ -3,6 +3,7 @@ package com.fabricmanagement.production.execution.batch.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.production.execution.batch.app.BatchAttributeService;
 import com.fabricmanagement.production.execution.batch.app.BatchCertificationService;
+import com.fabricmanagement.production.execution.batch.app.BatchOperationsService;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
 import com.fabricmanagement.production.execution.batch.dto.*;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 public class BatchController {
 
   private final BatchService batchService;
+  private final BatchOperationsService batchOperationsService;
   private final BatchCertificationService batchCertificationService;
   private final BatchAttributeService batchAttributeService;
 
@@ -131,8 +133,8 @@ public class BatchController {
   @PostMapping("/{id}/waste")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<BatchDto>> recordWaste(
-      @PathVariable UUID id, @Valid @RequestBody QuantityRequest request) {
-    BatchDto batch = batchService.recordWaste(id, request.getQuantity());
+      @PathVariable UUID id, @Valid @RequestBody RecordWasteRequest request) {
+    BatchDto batch = batchService.recordWaste(id, request);
     return ResponseEntity.ok(ApiResponse.success(batch));
   }
 
@@ -142,7 +144,7 @@ public class BatchController {
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<BatchDto>> adjust(
       @PathVariable UUID id, @Valid @RequestBody AdjustmentRequest request) {
-    BatchDto batch = batchService.adjust(id, request);
+    BatchDto batch = batchOperationsService.adjust(id, request);
     return ResponseEntity.ok(ApiResponse.success(batch));
   }
 
@@ -152,11 +154,24 @@ public class BatchController {
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<BatchDto>> startProduction(
       @PathVariable UUID id, @Valid @RequestBody StartProductionRequest request) {
-    BatchDto batch = batchService.startProduction(id, request);
+    BatchDto batch = batchOperationsService.startProduction(id, request);
     return ResponseEntity.ok(ApiResponse.success(batch));
   }
 
   // ── Split & Transfer ───────────────────────────────────────────────────────
+
+  /**
+   * Create a blended batch from multiple parent batches. Consumption percentages must sum to 100%.
+   * Returns the created child batch (201 Created).
+   */
+  @PostMapping("/blend")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @Operation(summary = "Create a blended batch from multiple parent batches")
+  public ResponseEntity<ApiResponse<BatchDto>> createBlendedBatch(
+      @Valid @RequestBody CreateBlendedBatchRequest request) {
+    BatchDto batch = batchOperationsService.createBlendedBatch(request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(batch));
+  }
 
   /**
    * Split batch: acceptedQuantity → new AVAILABLE batch; remainder stays in source with
@@ -166,7 +181,7 @@ public class BatchController {
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<SplitBatchResponse>> splitBatch(
       @PathVariable UUID id, @Valid @RequestBody SplitBatchRequest request) {
-    SplitBatchResponse response = batchService.splitBatch(id, request);
+    SplitBatchResponse response = batchOperationsService.splitBatch(id, request);
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
   }
 
@@ -178,7 +193,7 @@ public class BatchController {
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<BatchDto>> splitPartialAcceptance(
       @PathVariable UUID id, @Valid @RequestBody PartialAcceptanceSplitRequest request) {
-    BatchDto batch = batchService.splitPartialAcceptance(id, request);
+    BatchDto batch = batchOperationsService.splitPartialAcceptance(id, request);
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(batch));
   }
 
@@ -186,7 +201,7 @@ public class BatchController {
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
   public ResponseEntity<ApiResponse<BatchDto>> transferBatch(
       @PathVariable UUID id, @Valid @RequestBody TransferBatchRequest request) {
-    BatchDto batch = batchService.transferBatch(id, request);
+    BatchDto batch = batchOperationsService.transferBatch(id, request);
     return ResponseEntity.ok(ApiResponse.success(batch));
   }
 
@@ -198,7 +213,7 @@ public class BatchController {
   @PreAuthorize("@productionAccessService.hasManagerPermission(authentication, 'BATCH')")
   public ResponseEntity<ApiResponse<BatchDto>> overrideStatus(
       @PathVariable UUID id, @Valid @RequestBody OverrideStatusRequest request) {
-    BatchDto batch = batchService.overrideStatus(id, request);
+    BatchDto batch = batchOperationsService.overrideStatus(id, request);
     return ResponseEntity.ok(ApiResponse.success(batch));
   }
 

@@ -94,6 +94,13 @@ public class BatchEventListener {
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onBatchWasteRecorded(BatchWasteRecordedEvent event) {
     log.debug("Handling BatchWasteRecordedEvent for batchId={}", event.getBatchId());
+    String description =
+        "Waste ["
+            + event.getWasteCategory()
+            + "]"
+            + (event.getReason() != null && !event.getReason().isBlank()
+                ? " — " + event.getReason()
+                : "");
     inventoryTransactionCommandService.logTransaction(
         event.getTenantId(),
         event.getBatchId(),
@@ -103,7 +110,7 @@ public class BatchEventListener {
         event.getLocationId(),
         null,
         null,
-        "Production waste",
+        description,
         InventoryTransactionReasonCode.NORMAL_OPERATION,
         event.getEventId().toString());
   }

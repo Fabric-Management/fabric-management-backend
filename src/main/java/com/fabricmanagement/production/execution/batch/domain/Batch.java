@@ -71,7 +71,7 @@ public class Batch extends BaseEntity {
   @Column(name = "waste_quantity", nullable = false, precision = 15, scale = 3)
   private BigDecimal wasteQuantity;
 
-  @Column(name = "unit", nullable = false)
+  @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
   @Column(name = "production_date")
@@ -83,6 +83,13 @@ public class Batch extends BaseEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false)
   private BatchStatus status;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "source_type")
+  private BatchSourceType sourceType;
+
+  @Column(name = "source_id")
+  private UUID sourceId;
 
   @Column(name = "location_id")
   private UUID locationId;
@@ -99,7 +106,43 @@ public class Batch extends BaseEntity {
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;
 
-  /** Create a new batch. */
+  /**
+   * Create a new batch from a {@link CreateBatchCommand}.
+   *
+   * <p>Preferred factory method — replaces the 13-parameter version. Input validation is performed
+   * in the {@code CreateBatchCommand} compact constructor before this method is called.
+   */
+  public static Batch create(CreateBatchCommand cmd) {
+    Batch batch = new Batch();
+    batch.setTenantId(cmd.tenantId());
+    batch.setMaterialId(cmd.materialId());
+    batch.setMaterialType(cmd.materialType());
+    batch.setBatchCode(cmd.batchCode());
+    batch.setSupplierBatchCode(cmd.supplierBatchCode());
+    batch.setQuantity(cmd.quantity());
+    batch.setReservedQuantity(BigDecimal.ZERO);
+    batch.setConsumedQuantity(BigDecimal.ZERO);
+    batch.setWasteQuantity(BigDecimal.ZERO);
+    batch.setUnit(cmd.unit());
+    batch.setProductionDate(cmd.productionDate());
+    batch.setExpiryDate(cmd.expiryDate());
+    batch.setStatus(BatchStatus.PENDING_QC);
+    batch.setLocationId(cmd.locationId());
+    batch.setQualityStandardId(cmd.qualityStandardId());
+    batch.setRemarks(cmd.remarks());
+    batch.setAttributes(
+        cmd.attributes() != null
+            ? new java.util.HashMap<>(cmd.attributes())
+            : new java.util.HashMap<>());
+    batch.onCreate();
+    return batch;
+  }
+
+  /**
+   * @deprecated Use {@link #create(CreateBatchCommand)} instead. This overload is kept for backward
+   *     compatibility during migration and will be removed.
+   */
+  @Deprecated(forRemoval = true)
   public static Batch create(
       UUID tenantId,
       UUID materialId,
@@ -114,32 +157,30 @@ public class Batch extends BaseEntity {
       UUID qualityStandardId,
       String remarks,
       java.util.Map<String, Object> attributes) {
-
-    Batch batch = new Batch();
-    batch.setTenantId(tenantId);
-    batch.setUid(generateUid(batchCode, materialType));
-    batch.setMaterialId(materialId);
-    batch.setMaterialType(materialType);
-    batch.setBatchCode(batchCode);
-    batch.setSupplierBatchCode(supplierBatchCode);
-    batch.setQuantity(quantity);
-    batch.setReservedQuantity(BigDecimal.ZERO);
-    batch.setConsumedQuantity(BigDecimal.ZERO);
-    batch.setWasteQuantity(BigDecimal.ZERO);
-    batch.setUnit(unit);
-    batch.setProductionDate(productionDate);
-    batch.setExpiryDate(expiryDate);
-    batch.setStatus(BatchStatus.PENDING_QC);
-    batch.setLocationId(locationId);
-    batch.setQualityStandardId(qualityStandardId);
-    batch.setRemarks(remarks);
-    batch.setAttributes(attributes != null ? attributes : new java.util.HashMap<>());
-    batch.onCreate();
-
-    return batch;
+    return create(
+        new CreateBatchCommand(
+            tenantId,
+            materialId,
+            materialType,
+            batchCode,
+            supplierBatchCode,
+            quantity,
+            unit,
+            productionDate,
+            expiryDate,
+            locationId,
+            qualityStandardId,
+            remarks,
+            attributes));
   }
 
-  /** Get available quantity (quantity - reserved - consumed). */
+  /**
+   * Get available quantity (quantity - reservedQuantity - consumedQuantity).
+   *
+   * <p>Note: {@code wasteQuantity} is a subset of {@code consumedQuantity} (you can only waste what
+   * was consumed), so it is intentionally NOT subtracted separately here — it is already accounted
+   * for within {@code consumedQuantity}.
+   */
   public BigDecimal getAvailableQuantity() {
     return quantity.subtract(reservedQuantity).subtract(consumedQuantity);
   }
@@ -156,10 +197,7 @@ public class Batch extends BaseEntity {
       return;
     }
     if (!this.status.canTransitionTo(target)) {
-      throw new IllegalStateException(
-          String.format(
-              "Invalid batch status transition: %s → %s (batch %s). Actor: %s",
-              this.status, target, batchCode, actorId));
+      throw new InvalidStatusTransitionException("Batch", this.status.name(), target.name());
     }
     this.status = target;
     onUpdate();
@@ -168,7 +206,7 @@ public class Batch extends BaseEntity {
   /** Reserve quantity for a production order. */
   public void reserve(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Reservation amount must be positive");
+      throw new BatchDomainException("Reservation amount must be positive for batch " + batchCode);
     }
     if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
       throw new InvalidStatusTransitionException("Batch", this.status.name(), "RESERVED");
@@ -177,7 +215,7 @@ public class Batch extends BaseEntity {
       throw new InvalidStatusTransitionException("Batch", "DEPLETED", "RESERVED");
     }
     if (getAvailableQuantity().compareTo(qty) < 0) {
-      throw new InsufficientStockException(batchCode, qty, getAvailableQuantity(), unit);
+      throw new InsufficientStockException(getId(), batchCode, qty, getAvailableQuantity(), unit);
     }
     this.reservedQuantity = this.reservedQuantity.add(qty);
     if (this.status == BatchStatus.AVAILABLE) {
@@ -189,7 +227,7 @@ public class Batch extends BaseEntity {
   /** Release reserved quantity (production order cancellation). */
   public void release(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Release amount must be positive");
+      throw new BatchDomainException("Release amount must be positive for batch " + batchCode);
     }
     if (this.reservedQuantity.compareTo(qty) < 0) {
       throw new BatchDomainException(
@@ -256,7 +294,7 @@ public class Batch extends BaseEntity {
     validateConsumptionPreconditions(qty);
 
     if (getAvailableQuantity().compareTo(qty) < 0) {
-      throw new InsufficientStockException(batchCode, qty, getAvailableQuantity(), unit);
+      throw new InsufficientStockException(getId(), batchCode, qty, getAvailableQuantity(), unit);
     }
 
     this.consumedQuantity = this.consumedQuantity.add(qty);
@@ -266,7 +304,7 @@ public class Batch extends BaseEntity {
 
   private void validateConsumptionPreconditions(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Consumption amount must be positive");
+      throw new BatchDomainException("Consumption amount must be positive for batch " + batchCode);
     }
     if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(this.status)) {
       throw new InvalidStatusTransitionException("Batch", this.status.name(), "IN_PROGRESS");
@@ -292,7 +330,7 @@ public class Batch extends BaseEntity {
    */
   public void recordWaste(BigDecimal qty) {
     if (qty.compareTo(BigDecimal.ZERO) <= 0) {
-      throw new IllegalArgumentException("Waste amount must be positive");
+      throw new BatchDomainException("Waste amount must be positive for batch " + batchCode);
     }
     BigDecimal newWaste = this.wasteQuantity.add(qty);
     if (newWaste.compareTo(this.consumedQuantity) > 0) {
@@ -315,7 +353,7 @@ public class Batch extends BaseEntity {
    */
   public void adjustQuantity(BigDecimal delta) {
     if (delta.compareTo(BigDecimal.ZERO) == 0) {
-      throw new IllegalArgumentException("Adjustment delta must be non-zero");
+      throw new BatchDomainException("Adjustment delta must be non-zero for batch " + batchCode);
     }
     BigDecimal newQuantity = this.quantity.add(delta);
     BigDecimal committed = this.reservedQuantity.add(this.consumedQuantity);
@@ -362,13 +400,9 @@ public class Batch extends BaseEntity {
         .divide(consumedQuantity, 2, java.math.RoundingMode.HALF_UP);
   }
 
-  private static String generateUid(String batchCode, MaterialType materialType) {
-    return materialType.name() + "-BATCH-" + batchCode;
-  }
-
   /** Get module code for UID generation. */
   @Override
   protected String getModuleCode() {
-    return "EXEC-FB";
+    return "BATCH";
   }
 }

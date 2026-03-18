@@ -36,10 +36,14 @@ public class InvalidStatusTransitionException extends ProductionDomainException 
   private final String to;
 
   public InvalidStatusTransitionException(String entityType, String from, String to) {
-    super(String.format("%s cannot transition from %s to %s.", entityType, from, to));
+    super(buildMessage(entityType, from, to), "INVALID_STATUS_TRANSITION", 409);
     this.entityType = entityType;
     this.from = from;
     this.to = to;
+  }
+
+  private static String buildMessage(String entityType, String from, String to) {
+    return String.format("%s cannot transition from %s to %s.", entityType, from, to);
   }
 
   public String getEntityType() {

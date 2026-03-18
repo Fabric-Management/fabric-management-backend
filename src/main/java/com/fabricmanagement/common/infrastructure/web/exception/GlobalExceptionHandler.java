@@ -8,7 +8,7 @@ import com.fabricmanagement.production.common.exception.ForbiddenOperationExcept
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
 import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
-import com.fabricmanagement.production.common.exception.ProductionDomainException;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchCertificationExpiredException;
 import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeInUseException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -96,12 +97,13 @@ public class GlobalExceptionHandler {
         409, "Conflict", "BATCH_CERTIFICATION_OVERLAP", ex.getMessage(), req.getRequestURI());
   }
 
-  @ExceptionHandler(ProductionDomainException.class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public ApiError handleProductionDomain(ProductionDomainException ex, HttpServletRequest req) {
-    log.info("Production rule violation: {}", ex.getMessage());
+  @ExceptionHandler(BatchCertificationExpiredException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiError handleBatchCertificationExpired(
+      BatchCertificationExpiredException ex, HttpServletRequest req) {
+    log.info("Batch GOTS certification expired or missing: {}", ex.getMessage());
     return ApiError.of(
-        400, "Bad Request", "PRODUCTION_RULE_VIOLATION", ex.getMessage(), req.getRequestURI());
+        409, "Conflict", "BATCH_CERTIFICATION_EXPIRED", ex.getMessage(), req.getRequestURI());
   }
 
   // ---------------------------------------------------------------------------
@@ -176,11 +178,17 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(DomainException.class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public ApiError handleDomain(DomainException ex, HttpServletRequest req) {
-    log.info("Domain rule violation: {}", ex.getMessage());
-    return ApiError.of(
-        400, "Bad Request", "DOMAIN_RULE_VIOLATION", ex.getMessage(), req.getRequestURI());
+  public ResponseEntity<ApiError> handleDomain(DomainException ex, HttpServletRequest req) {
+    log.info("Domain rule violation [{}]: {}", ex.getErrorCode(), ex.getMessage());
+    ApiError error =
+        ApiError.of(
+            ex.getHttpStatus(),
+            HttpStatus.valueOf(ex.getHttpStatus()).getReasonPhrase(),
+            ex.getErrorCode(),
+            ex.getMessage(),
+            req.getRequestURI(),
+            ex.getDetails());
+    return ResponseEntity.status(ex.getHttpStatus()).body(error);
   }
 
   @ExceptionHandler(TaxIdAlreadyExistsException.class)

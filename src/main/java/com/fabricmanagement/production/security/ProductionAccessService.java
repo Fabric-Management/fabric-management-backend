@@ -82,6 +82,9 @@ public class ProductionAccessService {
   /** Warehouse location masterdata ({@code /api/production/warehouse-locations}). */
   public static final String MODULE_WAREHOUSE_LOCATION = "WAREHOUSE_LOCATION";
 
+  /** Physical goods receiving transactions ({@code /api/production/goods-receipts}). */
+  public static final String MODULE_GOODS_RECEIPT = "GOODS_RECEIPT";
+
   // ── Supported actions ──────────────────────────────────────────────────────
 
   public static final String ACTION_READ = "READ";
@@ -130,6 +133,9 @@ public class ProductionAccessService {
   private static final Set<String> WAREHOUSE_LOCATION_WRITE_DEPARTMENTS =
       Set.of("WAREHOUSE", "PRODUCTIONPLANNING");
 
+  /** Goods receipt WRITE departments: the Warehouse team physically receives goods. */
+  private static final Set<String> GOODS_RECEIPT_WRITE_DEPARTMENTS = Set.of("WAREHOUSE");
+
   /**
    * READ is open to any production-related department (includes QC and Warehouse who consume fiber
    * data).
@@ -154,7 +160,8 @@ public class ProductionAccessService {
           MODULE_MATERIAL, FIBER_MASTERDATA_WRITE_DEPARTMENTS,
           MODULE_BATCH, BATCH_WRITE_DEPARTMENTS,
           MODULE_QUALITY_TEST, QUALITY_TEST_WRITE_DEPARTMENTS,
-          MODULE_WAREHOUSE_LOCATION, WAREHOUSE_LOCATION_WRITE_DEPARTMENTS);
+          MODULE_WAREHOUSE_LOCATION, WAREHOUSE_LOCATION_WRITE_DEPARTMENTS,
+          MODULE_GOODS_RECEIPT, GOODS_RECEIPT_WRITE_DEPARTMENTS);
 
   /** All known modules — used to reject unknown module names early. */
   private static final Set<String> KNOWN_MODULES =
@@ -163,7 +170,8 @@ public class ProductionAccessService {
           MODULE_MATERIAL,
           MODULE_BATCH,
           MODULE_QUALITY_TEST,
-          MODULE_WAREHOUSE_LOCATION);
+          MODULE_WAREHOUSE_LOCATION,
+          MODULE_GOODS_RECEIPT);
 
   // ── Public API (SpEL entry point) ──────────────────────────────────────────
 
@@ -353,7 +361,8 @@ public class ProductionAccessService {
     if ("SUPERVISOR".equals(role)
         && (MODULE_BATCH.equals(module)
             || MODULE_QUALITY_TEST.equals(module)
-            || MODULE_WAREHOUSE_LOCATION.equals(module))) {
+            || MODULE_WAREHOUSE_LOCATION.equals(module)
+            || MODULE_GOODS_RECEIPT.equals(module))) {
       return ctx.isInAnyDepartment(authorizedDepts);
     }
 

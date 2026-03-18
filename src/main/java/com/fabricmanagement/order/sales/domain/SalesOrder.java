@@ -143,6 +143,30 @@ public class SalesOrder extends BaseEntity {
   private String shippingMethod;
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Faz 2 — Module & Traceability
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Production module type for this order (FIBER / YARN / FABRIC / DYE_FINISHING). Drives
+   * moduleSpecs validation on SalesOrderLine level.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "module_type", length = 20)
+  private ModuleType moduleType;
+
+  /** Customer-requested deadline for delivery of all lines. */
+  @Column(name = "deadline")
+  private LocalDate deadline;
+
+  /** FK → Quote — populated when order was converted from a quote. */
+  @Column(name = "quote_id")
+  private UUID quoteId;
+
+  /** FK → SampleRequest — populated when order originated from a sample request. */
+  @Column(name = "sample_request_id")
+  private UUID sampleRequestId;
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Metadata
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -171,15 +195,21 @@ public class SalesOrder extends BaseEntity {
   /** Confirm the order (DRAFT → CONFIRMED). */
   public void confirm() {
     if (status != OrderStatus.DRAFT) {
-      throw new IllegalStateException("Can only confirm orders in DRAFT status");
+      throw new com.fabricmanagement.order.common.exception.OrderDomainException(
+          String.format(
+              "Cannot confirm order %s: current status is %s (must be DRAFT)",
+              orderNumber, status));
     }
     this.status = OrderStatus.CONFIRMED;
   }
 
-  /** Start processing (CONFIRMED → IN_PROGRESS). */
+  /** Start processing (CONFIRMED → IN_PRODUCTION). */
   public void startProcessing() {
     if (status != OrderStatus.CONFIRMED) {
-      throw new IllegalStateException("Can only start processing CONFIRMED orders");
+      throw new com.fabricmanagement.order.common.exception.OrderDomainException(
+          String.format(
+              "Cannot start processing order %s: current status is %s (must be CONFIRMED)",
+              orderNumber, status));
     }
     this.status = OrderStatus.IN_PROGRESS;
   }
@@ -187,7 +217,10 @@ public class SalesOrder extends BaseEntity {
   /** Mark as shipped. */
   public void ship() {
     if (!status.canShip()) {
-      throw new IllegalStateException("Cannot ship order in status: " + status);
+      throw new com.fabricmanagement.order.common.exception.OrderDomainException(
+          String.format(
+              "Cannot ship order %s: current status %s does not allow shipping",
+              orderNumber, status));
     }
     this.status = OrderStatus.SHIPPED;
   }
@@ -195,7 +228,10 @@ public class SalesOrder extends BaseEntity {
   /** Mark as delivered. */
   public void deliver(LocalDate deliveryDate) {
     if (status != OrderStatus.SHIPPED) {
-      throw new IllegalStateException("Can only deliver SHIPPED orders");
+      throw new com.fabricmanagement.order.common.exception.OrderDomainException(
+          String.format(
+              "Cannot deliver order %s: current status is %s (must be SHIPPED)",
+              orderNumber, status));
     }
     this.status = OrderStatus.DELIVERED;
     this.actualDeliveryDate = deliveryDate;
@@ -204,7 +240,10 @@ public class SalesOrder extends BaseEntity {
   /** Cancel the order. */
   public void cancel() {
     if (!status.canCancel()) {
-      throw new IllegalStateException("Cannot cancel order in status: " + status);
+      throw new com.fabricmanagement.order.common.exception.OrderDomainException(
+          String.format(
+              "Cannot cancel order %s: current status %s does not allow cancellation",
+              orderNumber, status));
     }
     this.status = OrderStatus.CANCELLED;
   }
@@ -212,7 +251,8 @@ public class SalesOrder extends BaseEntity {
   /** Put order on hold. */
   public void hold() {
     if (status.isTerminal()) {
-      throw new IllegalStateException("Cannot hold order in terminal status: " + status);
+      throw new com.fabricmanagement.order.common.exception.OrderDomainException(
+          String.format("Cannot hold order %s: status %s is terminal", orderNumber, status));
     }
     this.status = OrderStatus.ON_HOLD;
   }

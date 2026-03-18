@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BinaryOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -102,8 +103,8 @@ public class BatchAttributeInheritanceEngine implements BatchAttributeInheritanc
 
       switch (rule.action()) {
         case WEIGHTED_AVERAGE -> applyWeightedAverage(result, rule, parentAttributes);
-        case MIN -> applyMin(result, rule, parentAttributes);
-        case MAX -> applyMax(result, rule, parentAttributes);
+        case MIN -> applyMinMax(result, rule, parentAttributes, true);
+        case MAX -> applyMinMax(result, rule, parentAttributes, false);
         case COLLECT_TO_ARRAY -> applyCollectToArray(result, rule, parentAttributes);
         case REQUIRE_EQUAL -> applyRequireEqual(result, rule, parentAttributes);
         case PASS_THROUGH -> applyPassThrough(result, rule, parentAttributes);
@@ -138,26 +139,21 @@ public class BatchAttributeInheritanceEngine implements BatchAttributeInheritanc
     result.put(rule.targetAttribute(), avg);
   }
 
-  private void applyMin(
-      Map<String, Object> result, InheritanceRule rule, List<BatchAttributes> parents) {
-    Optional<BigDecimal> min =
+  private void applyMinMax(
+      Map<String, Object> result,
+      InheritanceRule rule,
+      List<BatchAttributes> parents,
+      boolean useMin) {
+    Optional<BigDecimal> value =
         parents.stream()
             .map(parent -> parent.attributes().get(rule.sourceAttribute()))
             .filter(Objects::nonNull)
             .map(this::toBigDecimal)
-            .min(BigDecimal::compareTo);
-    min.ifPresent(value -> result.put(rule.targetAttribute(), value));
-  }
-
-  private void applyMax(
-      Map<String, Object> result, InheritanceRule rule, List<BatchAttributes> parents) {
-    Optional<BigDecimal> max =
-        parents.stream()
-            .map(parent -> parent.attributes().get(rule.sourceAttribute()))
-            .filter(Objects::nonNull)
-            .map(this::toBigDecimal)
-            .max(BigDecimal::compareTo);
-    max.ifPresent(value -> result.put(rule.targetAttribute(), value));
+            .reduce(
+                useMin
+                    ? BinaryOperator.minBy(BigDecimal::compareTo)
+                    : BinaryOperator.maxBy(BigDecimal::compareTo));
+    value.ifPresent(v -> result.put(rule.targetAttribute(), v));
   }
 
   private void applyCollectToArray(

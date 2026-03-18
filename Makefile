@@ -4,7 +4,7 @@
 
 .SHELLFLAGS := -eu -o pipefail -c
 .ONESHELL:
-.PHONY: help setup build compile check run format lint test verify verify-coverage up down logs status db-migrate db-repair db-reset db-reset-local db-shell clean dev-reset info
+.PHONY: help setup build compile check check-run run format lint test verify verify-coverage up down logs status db-migrate db-repair db-repair-checksum db-reset db-reset-local db-shell clean dev-reset info
 
 .DEFAULT_GOAL := help
 
@@ -57,10 +57,16 @@ compile: ## Compile only (fast; catches compile errors)
 	$(MVN) compile -q
 	@echo "$(GREEN)✅ Compile OK.$(NC)"
 
-check: compile test ## Compile + run tests (catches context/JPQL errors before make run)
+check: compile test ## Compile + unit tests (no Docker). For startup verification use check-run.
 	@echo "$(GREEN)✅ Check passed. Safe to run 'make run'.$(NC)"
 
-run: ## Run the Spring Boot application (local profile). Tip: run 'make check' first to catch context/query errors.
+check-run: check ## Verify app starts with local PostgreSQL (no Docker). Catches circular deps, Flyway, bean errors.
+	@echo "$(YELLOW)🔍 Verifying application startup (local DB)...$(NC)"
+	@chmod +x "$(CURDIR)/scripts/check-run.sh"
+	@$(CURDIR)/scripts/check-run.sh
+	@echo "$(GREEN)✅ Check-run passed. App starts successfully.$(NC)"
+
+run: ## Run the Spring Boot application (local profile). Tip: run 'make check-run' before to catch startup errors.
 	@echo "$(YELLOW)🚀 Running application (local profile)...$(NC)"
 	$(MVN) spring-boot:run -Dspring-boot.run.profiles=local
 
@@ -115,10 +121,21 @@ db-migrate: ## Run Flyway database migrations
 	$(MVN) flyway:migrate
 	@echo "$(GREEN)✅ Migrations completed.$(NC)"
 
+# DB connection for repair (match flyway.conf / application-local)
+REPAIR_DB_HOST ?= localhost
+REPAIR_DB_PORT ?= 5432
+REPAIR_DB_USER ?= fabric_user
+REPAIR_DB_NAME ?= fabric_management
+REPAIR_DB_PASSWORD ?= local_dev_2026
+
 db-repair: ## Fix Flyway checksum mismatches (when migration files were edited after apply). Then run 'make run'.
 	@echo "$(YELLOW)🔧 Repairing Flyway schema history (updating checksums)...$(NC)"
-	$(MVN) flyway:repair
-	@echo "$(GREEN)✅ Repair done. Start app with: make run$(NC)"
+	@( $(MVN) flyway:repair -q 2>/dev/null ) || ( echo "$(YELLOW)Maven repair failed (e.g. duplicate versions). Trying SQL repair...$(NC)"; $(MAKE) db-repair-checksum )
+
+db-repair-checksum: ## Fix checksum for V20250314190000 via SQL (run if make db-repair fails). Requires psql.
+	@echo "$(YELLOW)🔧 Updating Flyway checksum for V20250314190000...$(NC)"
+	@PGPASSWORD=$(REPAIR_DB_PASSWORD) $(PSQL) -h $(REPAIR_DB_HOST) -p $(REPAIR_DB_PORT) -U $(REPAIR_DB_USER) -d $(REPAIR_DB_NAME) -f "$(CURDIR)/scripts/flyway-repair-checksum.sql"
+	@echo "$(GREEN)✅ Checksum repaired. Start app with: make run$(NC)"
 
 db-reset: ## Reset database volume completely (Docker) - DESTRUCTIVE!
 	@echo "$(RED)⚠️  Resetting database volume...$(NC)"
