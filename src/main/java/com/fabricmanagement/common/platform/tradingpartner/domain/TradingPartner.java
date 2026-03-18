@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.platform.tradingpartner.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.offline.domain.OfflineMetadata;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.util.HashMap;
@@ -146,6 +147,8 @@ public class TradingPartner extends BaseEntity {
    */
   @Column(name = "legacy_company_id")
   private UUID legacyCompanyId;
+
+  @Embedded private OfflineMetadata offlineMetadata;
 
   @Override
   protected String getModuleCode() {

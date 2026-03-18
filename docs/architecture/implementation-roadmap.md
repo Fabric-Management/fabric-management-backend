@@ -82,6 +82,7 @@ Seviye 7 — Operasyon (tüm event kaynakları gerekli)
 Seviye 8 — Kontrol (FlowBoard/NotificationHub gerekli)
   ApprovalSystem ← FlowBoard (APPROVAL task), NotificationHub
   IWM genişletme ← GoodsReceipt, SalesOrder, Batch event'leri
+  DashboardConfig ← FlowBoard (tüm metrikleri toplar)
 
 Seviye 9 — İleri (tüm temel akışlar gerekli)
   Offline sync ← SalesOrder, Quote, ProductCatalog
@@ -429,42 +430,85 @@ UserNotificationPreference
 ---
 
 ## FAZ 8 — FlowBoard: Operasyonel Görev Yönetimi
-**Süre tahmini: 3-4 hafta**  
+**Süre tahmini: 6-7 hafta**  
 **Bağımlılık: Faz 7 tamamlanmış olmalı (bildirim), Faz 1-3 (event kaynakları)**  
-**İş değeri: ÇOK YÜKSEK — işletmenin operasyonel nabzı**
+**İş değeri: ÇOK YÜKSEK — işletmenin operasyonel nabzı**  
+**İlham: Monday.com Work OS + Tekstil Domain Gereksinimleri**
 
-### 8.1 — Board + Task + TaskAssignee
-> **Döküman:** `07-flowboard/board-task.md`
-
-```
-Board (modül bazlı), Task (14 TaskType), TaskAssignee (3 atama yolu)
-WIP limiti, PriorityScore, Kanban akışı
-```
-
-### 8.2 — SmartTaskGenerator + TaskTemplate
-> **Döküman:** `07-flowboard/smart-task-generator.md`
+### 8.1 — Board + Task + Grup + Etiket (Çekirdek) — 2 hafta
+> **Döküman:** `07-flowboard/board-task.md` (v2.0)
 
 ```
-Event → TaskTemplate eşleşme → Task oluştur → ata → bildirim gönder
-Stok kontrol motoru (SalesOrderConfirmed için)
-Otomatik bağımlılıklar (PLANNING → PRODUCTION → QUALITY → WAREHOUSE → SHIPMENT)
+Yeni entity'ler:
+  Board (flowboard.board) — modül bazlı, defaultViewType
+  BoardGroup (flowboard.board_group) — 4 gruplama tipi, renk kodlu
+  BoardView (flowboard.board_view) — 5 görünüm (KANBAN/TABLE/TIMELINE/CALENDAR/WORKLOAD)
+  Task (flowboard.task) — 14 TaskType, PriorityScore, boardGroupId/actualHours
+  TaskAssignee (flowboard.task_assignee) — 3 atama yolu, WIP kontrol
+  TaskLabel (flowboard.task_label) — global + board-spesifik etiketler
+  TaskLabelAssignment (flowboard.task_label_assignment) — M:N
+
+Seed data: 6 etiket, 3 grup, 3 görünüm
+API: boards, tasks, labels, groups, views CRUD
+WebSocket: Board canlı güncellemeler (STOMP — 12 event tipi)
 ```
 
-### 8.3 — Task Detayları
-> **Döküman:** `07-flowboard/task-details.md` + `07-flowboard/escalation.md`
+### 8.2 — SmartTaskGenerator + AutomationEngine — 2 hafta
+> **Döküman:** `07-flowboard/smart-task-generator.md` (v2.0)
 
 ```
-TaskChecklist, TaskComment, TaskActivityLog, TaskDependency
-EscalationLog — 4 kural (deadline, untouched, blocked, unassigned)
+Yeni entity'ler:
+  TaskTemplate (flowboard.task_template) — Event → Task eşleme + autoLabels
+  AutomationRule (flowboard.automation_rule) — If-Then-That (10 trigger, 10 aksiyon)
+
+Servisler:
+  SmartTaskGeneratorListener — Event → Task oluşturma + atama
+  StockControlEngine — SalesOrderConfirmed stok analizi
+  AutomationEngine — kural değerlendirme, sonsuz döngü koruması (max 3 derinlik)
+  TaskDependencyBuilder — otomatik PLANNING→PRODUCTION→QUALITY→WAREHOUSE→SHIPMENT
+
+Seed data: 15 TaskTemplate, 8 AutomationRule
 ```
 
-### 8.4 — Performans + RecurringTasks
-> **Döküman:** `07-flowboard/performance.md` + `07-flowboard/recurring-tasks.md`
+### 8.3 — Task Detayları + Zaman Takip + Eskalasyon — 1.5 hafta
+> **Döküman:** `07-flowboard/task-details.md` (v2.0) + `07-flowboard/escalation.md` (v2.0)
 
 ```
-UserPerformanceSnapshot (haftalık job)
-RecurringTaskTemplate — "bir önceki kapanınca yenisi açılsın"
-Manager Dashboard (5 panel)
+Yeni entity'ler:
+  TaskChecklist — completedAt/completedByUserId, CHECKLIST_COMPLETED event
+  TaskComment — @mention desteği (mentionedUserIds JSONB)
+  TaskActivityLog — 19 aksiyon tipi (AUTOMATION_EXECUTED dahil)
+  TaskDependency — 3 bağımlılık tipi (FINISH_TO_START/START_TO_START/PARALLEL)
+  TaskTimeEntry — Start/stop timer, manuel giriş, timesheet raporu
+  TaskAttachment — Dosya yükleme (S3/MinIO, maks 25MB)
+  TaskReminder — 3 tip (MANUAL/DEADLINE_OFFSET/FOLLOW_UP)
+  TaskRelation — Cross-board ilişki (RELATED/DUPLICATES/CAUSED_BY/PARENT_CHILD)
+  EscalationLog — 6 eskalasyon tipi, 3 seviyeli zincir
+
+Scheduler job'ları:
+  FlowBoardEscalationJob (15 dk) — 6 kural, debounce
+  FlowBoardReminderJob (5 dk) — hatırlatma gönderimi
+
+API: timer, attachments, reminders, relations, timesheet
+```
+
+### 8.4 — Performans + Dashboard + Tekrarlayan Görevler — 1.5 hafta
+> **Döküman:** `07-flowboard/performance.md` (v2.0) + `07-flowboard/recurring-tasks.md` (v2.0)
+
+```
+Yeni entity'ler:
+  DashboardConfig — özelleştirilebilir dashboard (grid layout JSONB)
+  DashboardWidget — 12 widget tipi (TASK_COUNT→LEADERBOARD)
+  UserPerformanceSnapshot — genişletilmiş + rozet sistemi (8 rozet)
+  RecurringTaskTemplate — 6 sıklık tipi + otomatik oluşturma
+
+Servisler:
+  FlowBoardPerformanceJob (haftalık) — snapshot + rozet hesaplama
+  FlowBoardRecurringJob (saatlik) — "önceki kapanınca yenisi açılsın"
+  WorkloadService — kişi/departman kapasite (AVAILABLE/OPTIMAL/OVERLOADED)
+
+Seed data: Varsayılan Manager Dashboard (9 widget), 6 RecurringTaskTemplate
+API: dashboards, workload, performance, leaderboard
 ```
 
 ---
@@ -550,7 +594,7 @@ Faz 4                    ██████                                    M
 Faz 5                         ████████                             Quote + Katalog
 Faz 6                              ██████                          RFQ + Supplier Portal
 Faz 7                                   ████████                   Bildirim + i18n
-Faz 8                                        ██████████████        FlowBoard
+Faz 8                                        ██████████████████████████  FlowBoard (genişletilmiş)
 Faz 9                                                  ██████     Onay Sistemi
 Faz 10                                                 ████████   IWM Genişletme
 Faz 11                                                      ██████████ Mobil
@@ -597,7 +641,7 @@ MVP = Minimum Viable Product — ilk kullanılabilir versiyon.
 | Faz 4 | Orta | Döviz kuru + 3 aşamalı maliyet | İlk sürümde tek para birimi (TRY), ileride multi-currency |
 | Faz 5 | Yüksek | DiscountPolicy fiyat bölgeleri | Formül doğrulanmış — sıralı kontrol, toplama yok |
 | Faz 7 | Orta | 47 event entegrasyonu | Aşamalı — önce CRITICAL event'ler, sonra diğerleri |
-| Faz 8 | Yüksek | FlowBoard karmaşıklığı | Faz 8.1 (Board+Task) ile başla, 8.4 (perf) ileride |
+| Faz 8 | Yüksek | FlowBoard karmaşıklığı (22 entity) | Faz 8.1 (çekirdek) ile başla, 8.4 (dashboard/perf) ileri |
 | Faz 11 | Yüksek | Offline sync çakışma yönetimi | 4 çakışma tipi tanımlı — manager kararı fallback |
 
 ---
@@ -634,7 +678,7 @@ Her faz hangi dökümanları kullanır:
 | 5 | `product-catalog.md`, `discount-policy.md`, `quote-approval.md`, `sample-management.md` |
 | 6 | `supplier-rfq.md`, `supplier-quote.md` |
 | 7 | `i18n.md`, `notification-hub.md`, `event-catalog.md` |
-| 8 | `board-task.md`, `smart-task-generator.md`, `task-details.md`, `escalation.md`, `performance.md`, `recurring-tasks.md` |
+| 8 | `board-task.md` (v2.0), `smart-task-generator.md` (v2.0), `task-details.md` (v2.0), `escalation.md` (v2.0), `performance.md` (v2.0), `recurring-tasks.md` (v2.0) |
 | 9 | `trust-level-policy.md`, `approval-request.md` |
 | 10 | `location.md`, `stock-reservation.md`, `stock-rules.md`, `stock-count.md`, `transfer.md`, `rma.md`, `manual-adjustment.md` |
 | 11 | `offline-sync.md` |
@@ -646,4 +690,5 @@ Her faz hangi dökümanları kullanır:
 
 | Versiyon | Tarih | Değişiklik |
 |---|---|---|
+| 1.1 | 2026-03-17 | Faz 8 genişletildi — Monday.com ilhamlı 12 özellik, 22 entity, 6-7 hafta süre, BoardGroup/BoardView/TaskLabel/AutomationRule/TaskTimeEntry/TaskAttachment/TaskReminder/TaskRelation/DashboardConfig/DashboardWidget eklendi |
 | 1.0 | 2026-03-17 | İlk versiyon — 13 faz, bağımlılık haritası, MVP tanımı, Gantt, risk analizi |

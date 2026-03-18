@@ -78,6 +78,9 @@ public class InventoryBalanceUpdater {
 
       case QUALITY_TEST:
         break;
+
+      default:
+        break;
     }
 
     balance.setLastTransactionId(event.getTransactionId());

@@ -30,6 +30,7 @@ public class UserDto {
   private String departmentName; // Primary department name for display
   private String userType;
   private Boolean isActive;
+  private Integer wipLimit;
   private Instant lastActiveAt;
   private Instant onboardingCompletedAt;
   private Boolean hasCompletedOnboarding;
@@ -113,6 +114,7 @@ public class UserDto {
                                         : null)
                             .orElse(null)))
             .isActive(user.getIsActive())
+            .wipLimit(user.getWipLimit())
             .lastActiveAt(user.getLastActiveAt())
             .onboardingCompletedAt(user.getOnboardingCompletedAt())
             .hasCompletedOnboarding(user.hasCompletedOnboarding())

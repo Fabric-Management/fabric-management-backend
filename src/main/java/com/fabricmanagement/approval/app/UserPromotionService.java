@@ -1,0 +1,154 @@
+package com.fabricmanagement.approval.app;
+
+import com.fabricmanagement.approval.domain.PromotionTriggerType;
+import com.fabricmanagement.approval.domain.UserPromotionRequest;
+import com.fabricmanagement.approval.domain.UserTrustLevel;
+import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
+import com.fabricmanagement.approval.infra.repository.UserPromotionRequestRepository;
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.platform.approval.domain.event.PromotionEscalationEvent;
+import com.fabricmanagement.common.platform.user.app.UserService;
+import com.fabricmanagement.common.platform.user.domain.User;
+import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Kullanıcı seviyesinin (PROBATION -> STANDARD vb) yükseltilmesini ve 3 Red eskalasyon kurallarını
+ * uygulayan servis katmanı.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserPromotionService {
+
+  private final UserPromotionRequestRepository promotionRepo;
+  private final ApprovalRequestRepository requestRepo;
+  private final UserRepository userRepo;
+  private final UserService userService;
+  private final DomainEventPublisher eventPublisher;
+
+  /**
+   * Bir işlem başarılı onaylandığında çağrılır (ApprovalEvent listener tarafından). Kullanıcının
+   * onaylanan işlemleri promotion_threshold'u geçtiyse sistem terfi talebi fırlatır.
+   */
+  @Transactional
+  public void checkAndTriggerPromotion(UUID tenantId, UUID userId, int threshold) {
+    User user =
+        userRepo
+            .findByTenantIdAndId(tenantId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+    // TRUSTED olanların daha yükseleceği yer yok
+    if (user.getTrustLevel() == UserTrustLevel.TRUSTED) return;
+
+    int approvedCount = requestRepo.countApprovedRequestsForUser(tenantId, userId);
+
+    if (approvedCount >= threshold) {
+      log.info(
+          "User {} (Level: {}) reached promotion threshold ({}). Creating UP request...",
+          userId,
+          user.getTrustLevel(),
+          threshold);
+
+      UserPromotionRequest existing =
+          promotionRepo
+              .findByTenantIdAndUserIdAndStatusAndDeletedAtIsNull(
+                  tenantId,
+                  userId,
+                  com.fabricmanagement.approval.domain.PromotionRequestStatus.PENDING)
+              .orElse(null);
+
+      // Zaten bir terfi talebi beklemedeyse yenisi açılmaz
+      if (existing == null) {
+        // Hedef Level
+        UserTrustLevel target =
+            user.getTrustLevel() == UserTrustLevel.PROBATION
+                ? UserTrustLevel.STANDARD
+                : UserTrustLevel.TRUSTED;
+
+        // Geçmiş rejection sayısını hesapla (eskiden hardcoded 0 idi)
+        int currentRejection =
+            promotionRepo.countByTenantIdAndUserIdAndStatusAndDeletedAtIsNull(
+                tenantId,
+                userId,
+                com.fabricmanagement.approval.domain.PromotionRequestStatus.REJECTED);
+
+        UserPromotionRequest promotion =
+            new UserPromotionRequest(
+                tenantId,
+                userId,
+                user.getTrustLevel(),
+                target,
+                PromotionTriggerType.SYSTEM,
+                currentRejection,
+                approvedCount);
+
+        promotionRepo.save(promotion);
+      }
+    }
+  }
+
+  @Transactional
+  public void approvePromotion(UUID tenantId, UUID promotionId, UUID adminUserId) {
+    UserPromotionRequest req =
+        promotionRepo
+            .findById(promotionId)
+            .filter(r -> r.getTenantId().equals(tenantId))
+            .orElseThrow(() -> new IllegalArgumentException("Promotion not found"));
+
+    req.approve(adminUserId);
+    promotionRepo.save(req);
+
+    // Asıl user'ın trust level'ı güncelleme
+    User user =
+        userRepo
+            .findByTenantIdAndId(tenantId, req.getUserId())
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    user.setTrustLevel(req.getToLevel());
+    userRepo.save(user);
+
+    log.info("User {} promoted to {} by Admin {}", req.getUserId(), req.getToLevel(), adminUserId);
+  }
+
+  @Transactional
+  public void rejectPromotion(UUID tenantId, UUID promotionId, UUID adminUserId, String adminNote) {
+    UserPromotionRequest req =
+        promotionRepo
+            .findById(promotionId)
+            .filter(r -> r.getTenantId().equals(tenantId))
+            .orElseThrow(() -> new IllegalArgumentException("Promotion not found"));
+
+    int attemptNumber = req.getRejectionCount() + 1;
+
+    // Kural: 2. Redde not zorunlu
+    if (attemptNumber >= 2 && (adminNote == null || adminNote.isBlank())) {
+      throw new IllegalArgumentException(
+          "Admin note is strictly required on 2nd or further rejections.");
+    }
+
+    req.reject(adminUserId, adminNote);
+    promotionRepo.save(req);
+
+    log.warn(
+        "User {} promotion to {} REJECTED ({}. attempt). Note: {}",
+        req.getUserId(),
+        req.getToLevel(),
+        attemptNumber,
+        adminNote);
+
+    // Kural: 3. Redde hesap askıya alınacak ve HR bildirimi tetiklenecek
+    if (attemptNumber >= 3) {
+      log.error("ESCALATION: User {} rejected 3 times! Suspending account...", req.getUserId());
+      userService.deactivateUser(
+          tenantId, req.getUserId(), "System: 3 times promotion rejection escalation");
+
+      eventPublisher.publish(
+          new PromotionEscalationEvent(
+              tenantId, req.getUserId(), attemptNumber, "3 times promotion rejection"));
+    }
+  }
+}

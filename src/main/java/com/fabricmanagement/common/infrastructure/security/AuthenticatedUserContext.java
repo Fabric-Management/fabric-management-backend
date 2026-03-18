@@ -2,7 +2,9 @@ package com.fabricmanagement.common.infrastructure.security;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Immutable snapshot of the authenticated user's identity, role and department memberships.
@@ -48,21 +50,25 @@ public record AuthenticatedUserContext(
   /** Returns true if the user is a member of the given department code (case-insensitive). */
   public boolean isInDepartment(String departmentCode) {
     if (departmentCode == null) return false;
-    return departmentCodes.stream().anyMatch(departmentCode::equalsIgnoreCase);
+    return normalizedDepartmentCodes().contains(departmentCode.toUpperCase());
   }
 
   /**
    * Returns true if the user is a member of at least one department in the given set.
    *
-   * <p>Comparison is case-insensitive so callers don't need to worry about normalization. Both the
-   * JWT-sourced codes and the {@code TenantSeedService} output are uppercase, but this method is
-   * defensive.
+   * <p>Uses O(1) Set-based lookup instead of O(n×m) nested stream (CR-12-05). Both the JWT-sourced
+   * codes and the {@code TenantSeedService} output are uppercase, but this method is defensive by
+   * normalizing to upper-case.
    */
   public boolean isInAnyDepartment(Collection<String> allowedCodes) {
     if (allowedCodes == null || allowedCodes.isEmpty()) return false;
+    Set<String> normalized = normalizedDepartmentCodes();
+    return allowedCodes.stream().anyMatch(code -> normalized.contains(code.toUpperCase()));
+  }
+
+  private Set<String> normalizedDepartmentCodes() {
     return departmentCodes.stream()
-        .anyMatch(
-            userDept ->
-                allowedCodes.stream().anyMatch(allowed -> allowed.equalsIgnoreCase(userDept)));
+        .map(String::toUpperCase)
+        .collect(Collectors.toUnmodifiableSet());
   }
 }

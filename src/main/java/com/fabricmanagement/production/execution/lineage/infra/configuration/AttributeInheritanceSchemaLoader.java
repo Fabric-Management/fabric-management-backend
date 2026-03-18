@@ -1,14 +1,21 @@
 package com.fabricmanagement.production.execution.lineage.infra.configuration;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.lineage.domain.rule.AttributeInheritanceSchema;
+import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceRule;
+import com.fabricmanagement.production.execution.lineage.infra.persistence.AttributeInheritanceSchemaRepository;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
@@ -29,15 +36,17 @@ import org.springframework.stereotype.Component;
  * silently overwritten. If a single file fails to parse, an error is logged and that schema is
  * omitted; other schemas still load.
  *
- * <p>TODO Phase 5: Refactor this loader into a Database Repository once a Rule Management UI is
- * implemented. Schemas may then be stored in a table (e.g. {@code inheritance_rule_schema}) and
- * loaded/cached from the database instead of classpath resources.
+ * <p>Phase 5 Implemented: This loader now acts as a dual-layer provider. First, it queries the
+ * {@code inheritance_rule_schema} database table for tenant-specific rule overrides via the
+ * repository. If no tenant-specific rule exists, it gracefully falls back to the in-memory
+ * classpath defaults.
  */
 @Component
 public class AttributeInheritanceSchemaLoader {
 
   private static final String RULES_LOCATION = "classpath:inheritance-rules/*.json";
   private static final Logger log = LoggerFactory.getLogger(AttributeInheritanceSchemaLoader.class);
+  private static final long CACHE_TTL_MS = 10 * 60 * 1000L; // 10 minutes
 
   private final ResourcePatternResolver resourceResolver;
   private final ObjectMapper objectMapper;
@@ -48,10 +57,20 @@ public class AttributeInheritanceSchemaLoader {
    */
   private volatile Map<String, AttributeInheritanceSchema> cache = Collections.emptyMap();
 
+  private final AttributeInheritanceSchemaRepository repository;
+
+  /**
+   * Tenant-level DB schema cache to avoid per-call DB queries on high-frequency production paths.
+   */
+  private final ConcurrentHashMap<String, CachedSchema> dbSchemaCache = new ConcurrentHashMap<>();
+
   public AttributeInheritanceSchemaLoader(
-      ResourcePatternResolver resourceResolver, ObjectMapper objectMapper) {
+      ResourcePatternResolver resourceResolver,
+      ObjectMapper objectMapper,
+      AttributeInheritanceSchemaRepository repository) {
     this.resourceResolver = resourceResolver;
     this.objectMapper = objectMapper;
+    this.repository = repository;
   }
 
   /**
@@ -106,13 +125,52 @@ public class AttributeInheritanceSchemaLoader {
   }
 
   /**
-   * Returns the schema for the given source→target material type pair, if one was loaded.
+   * Returns the schema for the given source→target material type pair. First checks the database
+   * for tenant-specific overrides (loaded via repository). If not found, falls back to the
+   * classpath-loaded generic schemas.
    *
    * @param source material type of the consumed parent batch(es) (e.g. FIBER)
    * @param target material type of the batch being produced (e.g. YARN)
-   * @return the schema, or empty if no matching JSON file was loaded or the pair is not configured
+   * @return the schema, or empty if no matching JSON file or DB record was found
    */
   public Optional<AttributeInheritanceSchema> getSchema(MaterialType source, MaterialType target) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    if (tenantId != null) {
+      String dbKey = tenantId + "_" + cacheKey(source, target);
+      CachedSchema cached = dbSchemaCache.get(dbKey);
+
+      if (cached != null && !cached.isExpired()) {
+        return cached.schema;
+      }
+
+      var dbSchema =
+          repository.findByTenantIdAndSourceTypeAndTargetTypeAndIsActiveTrue(
+              tenantId, source, target);
+
+      if (dbSchema.isPresent()) {
+        try {
+          List<InheritanceRule> rules =
+              objectMapper.readValue(
+                  dbSchema.get().getRulesJson(), new TypeReference<List<InheritanceRule>>() {});
+          Optional<AttributeInheritanceSchema> result =
+              Optional.of(new AttributeInheritanceSchema(source, target, rules));
+          dbSchemaCache.put(dbKey, new CachedSchema(result));
+          return result;
+        } catch (Exception e) {
+          log.error(
+              "Failed to parse tenant {} inheritance rule from DB for {} -> {}",
+              tenantId,
+              source,
+              target,
+              e);
+        }
+      } else {
+        // Cache the 'not found' to avoid repeated DB queries
+        dbSchemaCache.put(dbKey, new CachedSchema(Optional.empty()));
+      }
+    }
+
     String key = cacheKey(source, target);
     return Optional.ofNullable(cache.get(key));
   }
@@ -136,6 +194,21 @@ public class AttributeInheritanceSchemaLoader {
       log.error(
           "Failed to load attribute inheritance schema from '{}'. Schema skipped.", filename, e);
       return Optional.empty();
+    }
+  }
+
+  /** Time-boxed cache entry for DB schema lookups. */
+  private class CachedSchema {
+    final Optional<AttributeInheritanceSchema> schema;
+    final long createdAt;
+
+    CachedSchema(Optional<AttributeInheritanceSchema> schema) {
+      this.schema = schema;
+      this.createdAt = System.currentTimeMillis();
+    }
+
+    boolean isExpired() {
+      return System.currentTimeMillis() - createdAt > CACHE_TTL_MS;
     }
   }
 }

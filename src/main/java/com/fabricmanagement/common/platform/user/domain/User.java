@@ -73,9 +73,19 @@ public class User extends BaseEntity {
   @Builder.Default
   private UserType userType = UserType.INTERNAL;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "trust_level", nullable = false, length = 50)
+  @Builder.Default
+  private com.fabricmanagement.approval.domain.UserTrustLevel trustLevel =
+      com.fabricmanagement.approval.domain.UserTrustLevel.PROBATION;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "role_id")
   private Role role;
+
+  @Column(name = "wip_limit")
+  @Builder.Default
+  private Integer wipLimit = 5;
 
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   @Builder.Default

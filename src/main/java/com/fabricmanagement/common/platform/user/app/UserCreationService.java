@@ -82,7 +82,6 @@ public class UserCreationService {
             request.getAdditionalContacts(),
             request.getAddresses());
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
     UUID assignedBy = TenantContext.getCurrentUserId();
 
     // Step 2: Assign role

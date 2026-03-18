@@ -1,0 +1,25 @@
+package com.fabricmanagement.flowboard.task.domain;
+
+/** Task loglarında kaydedilen aksiyon tipleri. */
+public enum TaskAction {
+  STATUS_CHANGED,
+  ASSIGNED,
+  REASSIGNED,
+  COMMENTED,
+  REOPENED,
+  BLOCKED,
+  UNBLOCKED,
+  DEPENDENCY_OVERRIDDEN,
+  CHECKLIST_ADDED,
+  LABEL_ADDED,
+  LABEL_REMOVED,
+  TIMER_STARTED,
+  TIMER_STOPPED,
+  CHECKLIST_COMPLETED,
+  ATTACHMENT_ADDED,
+  PRIORITY_CHANGED,
+  GROUP_CHANGED,
+  AUTOMATION_EXECUTED,
+  REMINDER_SET,
+  DEADLINE_CHANGED
+}

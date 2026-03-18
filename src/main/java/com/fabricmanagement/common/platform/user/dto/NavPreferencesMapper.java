@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.ReportingPolicy;
 
 /**
  * MapStruct mapper for UserNavPreferences entity and nav preferences DTOs.
@@ -14,7 +15,7 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
  * entity, all BaseEntity audit/infrastructure fields and {@code user} are ignored; only {@code
  * sortOrder} and {@code hiddenItemIds} are updated.
  */
-@Mapper(config = MapStructConfig.class)
+@Mapper(config = MapStructConfig.class, unmappedSourcePolicy = ReportingPolicy.IGNORE)
 public interface NavPreferencesMapper {
 
   NavPreferencesResponse toResponse(UserNavPreferences entity);

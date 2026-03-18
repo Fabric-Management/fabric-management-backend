@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.platform.tradingpartner.app;
 
+import com.fabricmanagement.common.platform.audit.app.AuditService;
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerCreatedEvent;
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerLinkedEvent;
 import com.fabricmanagement.common.platform.tradingpartner.domain.event.TradingPartnerRegistryCreatedEvent;
@@ -34,11 +35,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class TradingPartnerEventListener {
 
-  // TODO: Inject AuditService when available
-  // private final AuditService auditService;
-
-  // TODO: Inject NotificationService for portal notifications
-  // private final NotificationService notificationService;
+  private final AuditService auditService;
 
   /**
    * Handle trading partner created event.
@@ -61,8 +58,13 @@ public class TradingPartnerEventListener {
         event.getTenantId(),
         event.getDisplayName());
 
-    // TODO: Save to audit table
-    // auditService.logPartnerCreation(event);
+    auditService.logAction(
+        "TRADING_PARTNER_CREATED",
+        "trading_partner",
+        event.getTradingPartnerId().toString(),
+        String.format(
+            "Partner created: name=%s, type=%s, registryId=%s",
+            event.getDisplayName(), event.getPartnerType(), event.getRegistryId()));
 
     // Check if this is a migrated partner (has legacy ID)
     if (event.getLegacyCompanyId() != null) {
@@ -87,8 +89,13 @@ public class TradingPartnerEventListener {
         event.getOfficialName(),
         event.getCountry());
 
-    // TODO: Platform-level audit
-    // auditService.logRegistryCreation(event);
+    auditService.logAction(
+        "TRADING_PARTNER_REGISTRY_CREATED",
+        "trading_partner_registry",
+        event.getRegistryId().toString(),
+        String.format(
+            "Registry created: name=%s, taxId=%s, country=%s",
+            event.getOfficialName(), event.getTaxId(), event.getCountry()));
   }
 
   /**
@@ -114,20 +121,22 @@ public class TradingPartnerEventListener {
         event.getLinkedTenantId(),
         event.getAffectedTenantIds().size());
 
+    auditService.logAction(
+        "TRADING_PARTNER_LINKED",
+        "trading_partner_registry",
+        event.getRegistryId().toString(),
+        String.format(
+            "Registry linked to tenant %s, %d affected tenants",
+            event.getLinkedTenantId(), event.getAffectedTenantIds().size()));
+
     // Notify each affected tenant
     for (var tenantId : event.getAffectedTenantIds()) {
       log.debug(
           "[NOTIFICATION] Tenant {} will be notified: partner linked (registry={})",
           tenantId,
           event.getRegistryId());
-
-      // TODO: Send notification
-      // notificationService.notifyPartnerLinked(tenantId, event.getRegistryId(),
-      // event.getLinkedTenantId());
+      // NOTE: NotificationService entegrasyonu ileride eklenecek — şimdilik audit kaydı yeterli
     }
-
-    // TODO: Platform-level audit
-    // auditService.logRegistryLinked(event);
   }
 
   /**
@@ -151,13 +160,21 @@ public class TradingPartnerEventListener {
         event.getTenantId(),
         event.getPartnerDisplayName());
 
-    // TODO: Send notification for critical status changes (BLOCKED)
-    // if ("BLOCKED".equals(event.getNewStatus())) {
-    //   notificationService.notifyPartnerBlocked(event.getTenantId(),
-    // event.getTradingPartnerId());
-    // }
+    auditService.logAction(
+        "TRADING_PARTNER_STATUS_CHANGED",
+        "trading_partner",
+        event.getTradingPartnerId().toString(),
+        String.format(
+            "Status changed: %s → %s, partner=%s",
+            event.getPreviousStatus(), event.getNewStatus(), event.getPartnerDisplayName()));
 
-    // TODO: Save to audit table
-    // auditService.logPartnerStatusChange(event);
+    if ("BLOCKED".equals(event.getNewStatus())) {
+      log.warn(
+          "[SECURITY] TradingPartner BLOCKED: id={}, tenant={}, name={}",
+          event.getTradingPartnerId(),
+          event.getTenantId(),
+          event.getPartnerDisplayName());
+      // NOTE: NotificationService ile BLOCKED bildirimi ileride eklenecek
+    }
   }
 }

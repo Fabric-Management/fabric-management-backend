@@ -2,6 +2,9 @@ package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
+import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
+import com.fabricmanagement.iwm.location.dto.WarehouseLocationDto;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchOverrideLog;
@@ -14,9 +17,6 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchOve
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
 import com.fabricmanagement.production.execution.lineage.dto.CreateBatchLineageRequest;
-import com.fabricmanagement.production.execution.warehouse.app.WarehouseLocationService;
-import com.fabricmanagement.production.execution.warehouse.domain.WarehouseLocationType;
-import com.fabricmanagement.production.execution.warehouse.dto.WarehouseLocationDto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;

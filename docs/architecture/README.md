@@ -54,11 +54,13 @@ Bu dizin, Fabric Management Backend sisteminin tüm mimari dökümanlarını iç
 │   VolumePriceBreak · CostCalculation · CostCalculationLine      │
 │   ExchangeRateSnapshot · CostHistory                            │
 ├─────────────────────────────────────────────────────────────────┤
-│                     07 — FLOWBOARD (Görev Yönetimi)             │
-│   Board · Task · TaskAssignee · TaskChecklist · TaskComment      │
-│   TaskActivityLog · TaskTemplate · TaskDependency               │
-│   RecurringTaskTemplate · EscalationLog                         │
-│   UserPerformanceSnapshot                                       │
+│                     07 — FLOWBOARD (Görev Yönetimi) — v2.0       │
+│   Board · BoardGroup · BoardView · Task · TaskAssignee            │
+│   TaskLabel · TaskLabelAssignment · TaskChecklist · TaskComment    │
+│   TaskActivityLog · TaskTemplate · TaskDependency · TaskRelation   │
+│   TaskTimeEntry · TaskAttachment · TaskReminder · AutomationRule   │
+│   RecurringTaskTemplate · EscalationLog                           │
+│   DashboardConfig · DashboardWidget · UserPerformanceSnapshot     │
 ├─────────────────────────────────────────────────────────────────┤
 │                     08 — BİLDİRİM & i18n                        │
 │   SupportedLocale · TranslationKey · TranslationValue           │
@@ -145,16 +147,16 @@ Bu dizin, Fabric Management Backend sisteminin tüm mimari dökümanlarını iç
 | `cost-calculation.md` | 3 aşamalı maliyet hesabı | CostCalculation, CostCalculationLine |
 | `exchange-rate-history.md` | Döviz kuru & tarihsel kayıt | ExchangeRateSnapshot, CostHistory |
 
-### 07-flowboard/ — Görev Yönetimi
+### 07-flowboard/ — Görev Yönetimi (v2.0 — Monday.com İlhamlı)
 
 | Döküman | Kapsam | Entity'ler |
 |---|---|---|
-| `board-task.md` | Board & task yapısı | Board, Task, TaskAssignee |
-| `smart-task-generator.md` | Event → task zinciri | SmartTaskGenerator, TaskTemplate |
-| `task-details.md` | Task detayları | TaskChecklist, TaskComment, TaskActivityLog, TaskDependency |
+| `board-task.md` | Board, grup, görünüm, etiket yapısı | Board, BoardGroup, BoardView, Task, TaskAssignee, TaskLabel, TaskLabelAssignment |
+| `smart-task-generator.md` | Event → task zinciri + otomasyon | SmartTaskGenerator, TaskTemplate, AutomationRule |
+| `task-details.md` | Task detayları, zaman, dosya, ilişki | TaskChecklist, TaskComment, TaskActivityLog, TaskDependency, TaskTimeEntry, TaskAttachment, TaskReminder, TaskRelation |
 | `recurring-tasks.md` | Tekrarlayan görevler | RecurringTaskTemplate |
-| `escalation.md` | Eskalasyon | EscalationLog |
-| `performance.md` | Performans takibi | UserPerformanceSnapshot |
+| `escalation.md` | Eskalasyon (6 kural, 3 seviye) | EscalationLog |
+| `performance.md` | Performans, dashboard, workload | UserPerformanceSnapshot, DashboardConfig, DashboardWidget |
 
 ### 08-notification-i18n/ — Bildirim & Çok Dil
 

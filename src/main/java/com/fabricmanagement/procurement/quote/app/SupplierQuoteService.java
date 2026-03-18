@@ -1,10 +1,12 @@
 package com.fabricmanagement.procurement.quote.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteLine;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteStatus;
+import com.fabricmanagement.procurement.quote.domain.event.SupplierQuoteAcceptedEvent;
 import com.fabricmanagement.procurement.quote.dto.AddQuoteLineRequest;
 import com.fabricmanagement.procurement.quote.dto.CreateSupplierQuoteRequest;
 import com.fabricmanagement.procurement.quote.infra.repository.SupplierQuoteRepository;
@@ -25,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupplierQuoteService {
 
   private final SupplierQuoteRepository quoteRepository;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public SupplierQuote createQuote(CreateSupplierQuoteRequest req) {
@@ -108,7 +111,9 @@ public class SupplierQuoteService {
     SupplierQuote saved = quoteRepository.save(quote);
     log.info("SupplierQuote accepted: {} [rfq={}]", saved.getQuoteNumber(), saved.getRfqId());
 
-    // TODO(phase-6+): SupplierQuoteAcceptedEvent → PurchaseOrder veya SubcontractOrder oluştur
+    eventPublisher.publish(
+        new SupplierQuoteAcceptedEvent(saved.getTenantId(), saved.getId(), saved.getRfqId()));
+
     return saved;
   }
 
