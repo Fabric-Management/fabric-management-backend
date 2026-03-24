@@ -1,0 +1,28 @@
+package com.fabricmanagement.finance.invoice.mapper;
+
+import com.fabricmanagement.common.infrastructure.mapping.MapStructConfig;
+import com.fabricmanagement.finance.invoice.domain.Invoice;
+import com.fabricmanagement.finance.invoice.domain.InvoiceLine;
+import com.fabricmanagement.finance.invoice.dto.InvoiceDto;
+import com.fabricmanagement.finance.invoice.dto.InvoiceLineDto;
+import java.util.List;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+@Mapper(config = MapStructConfig.class, unmappedSourcePolicy = ReportingPolicy.IGNORE)
+public interface InvoiceMapper {
+
+  @Mapping(target = "tradingPartnerName", ignore = true)
+  @Mapping(target = "overdue", expression = "java(entity.isOverdue())")
+  @Mapping(target = "daysOverdue", expression = "java(entity.getDaysOverdue())")
+  @Mapping(target = "invoiceType", expression = "java(entity.getInvoiceType().name())")
+  @Mapping(target = "status", expression = "java(entity.getStatus().name())")
+  InvoiceDto toDto(Invoice entity);
+
+  List<InvoiceDto> toDtoList(List<Invoice> entities);
+
+  InvoiceLineDto toLineDto(InvoiceLine line);
+
+  List<InvoiceLineDto> toLineDtoList(List<InvoiceLine> lines);
+}
