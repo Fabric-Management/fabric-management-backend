@@ -25,4 +25,8 @@ public interface InvoiceMapper {
   InvoiceLineDto toLineDto(InvoiceLine line);
 
   List<InvoiceLineDto> toLineDtoList(List<InvoiceLine> lines);
+
+  default java.math.BigDecimal map(com.fabricmanagement.common.util.Money value) {
+    return value != null ? value.getAmount() : null;
+  }
 }
