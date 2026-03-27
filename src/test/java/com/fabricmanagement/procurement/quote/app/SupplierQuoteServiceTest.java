@@ -34,6 +34,9 @@ class SupplierQuoteServiceTest {
 
   @Mock private SupplierQuoteRepository quoteRepository;
 
+  @Mock
+  private com.fabricmanagement.common.infrastructure.events.DomainEventPublisher eventPublisher;
+
   @InjectMocks private SupplierQuoteService quoteService;
 
   private final UUID tenantId = UUID.randomUUID();

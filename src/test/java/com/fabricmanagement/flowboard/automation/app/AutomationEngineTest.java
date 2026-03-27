@@ -3,11 +3,11 @@ package com.fabricmanagement.flowboard.automation.app;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fabricmanagement.flowboard.automation.application.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.automation.domain.AutomationActionType;
 import com.fabricmanagement.flowboard.automation.domain.AutomationContext;
 import com.fabricmanagement.flowboard.automation.domain.AutomationRule;
 import com.fabricmanagement.flowboard.automation.domain.AutomationTriggerType;
+import com.fabricmanagement.flowboard.automation.domain.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.automation.infra.repository.AutomationRuleRepository;
 import com.fabricmanagement.flowboard.task.app.EscalationService;
 import com.fabricmanagement.flowboard.task.app.TaskLabelService;

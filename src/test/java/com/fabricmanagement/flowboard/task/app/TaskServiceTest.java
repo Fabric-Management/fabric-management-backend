@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository;
 import com.fabricmanagement.flowboard.task.domain.*;
 import com.fabricmanagement.flowboard.task.dto.CreateTaskRequest;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,6 +37,7 @@ class TaskServiceTest {
   @Mock private BoardRepository boardRepo;
   @Mock private PriorityScoreCalculator scoreCalculator;
   @Mock private DomainEventPublisher eventPublisher;
+  @Mock private com.fabricmanagement.platform.user.api.facade.UserFacade userFacade;
 
   @InjectMocks private TaskService taskService;
 
@@ -44,6 +47,7 @@ class TaskServiceTest {
 
   @BeforeEach
   void setUp() {
+    TenantContext.setCurrentTenantId(UUID.randomUUID());
     // Default stub'lar
     when(boardRepo.findById(BOARD_ID))
         .thenReturn(Optional.of(mock(com.fabricmanagement.flowboard.board.domain.Board.class)));
@@ -51,6 +55,15 @@ class TaskServiceTest {
     when(scoreCalculator.calculate(any())).thenReturn(50);
     when(taskRepo.getNextTaskNumber()).thenReturn(1L);
     doNothing().when(eventPublisher).publish(any());
+    // UserDto stub: wipLimit = 5 (DEFAULT_WIP_LIMIT) olarak set edilmiş
+    com.fabricmanagement.platform.user.dto.UserDto userDto =
+        com.fabricmanagement.platform.user.dto.UserDto.builder().wipLimit(5).build();
+    when(userFacade.findById(any(), any())).thenReturn(java.util.Optional.of(userDto));
+  }
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
   }
 
   // =========================================================================

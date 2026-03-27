@@ -1,6 +1,6 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
-import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;

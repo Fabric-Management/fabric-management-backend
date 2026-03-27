@@ -2,9 +2,9 @@ package com.fabricmanagement.human.payroll.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.human.core.employee.application.EmployeeService;
+import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.human.core.employee.domain.Employee;
-import com.fabricmanagement.human.payroll.api.dto.SalarySlipDto;
+import com.fabricmanagement.human.payroll.dto.SalarySlipDto;
 import com.fabricmanagement.human.payroll.infra.repository.PayRunPayoutRepository;
 import java.util.List;
 import java.util.Optional;

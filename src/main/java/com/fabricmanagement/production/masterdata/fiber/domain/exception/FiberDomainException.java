@@ -28,4 +28,8 @@ public class FiberDomainException extends ProductionDomainException {
   public FiberDomainException(String message, Throwable cause) {
     super(message, cause);
   }
+
+  protected FiberDomainException(String message, String errorCode, int httpStatus) {
+    super(message, errorCode, httpStatus);
+  }
 }

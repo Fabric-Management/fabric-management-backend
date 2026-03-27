@@ -1,11 +1,11 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.common.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.common.platform.communication.domain.NotificationType;
-import com.fabricmanagement.common.platform.communication.dto.NotificationRequest;
-import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
+import com.fabricmanagement.platform.communication.app.InAppNotificationService;
+import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
+import com.fabricmanagement.platform.communication.domain.NotificationType;
+import com.fabricmanagement.platform.communication.dto.NotificationRequest;
+import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequestStatus;
@@ -222,8 +222,8 @@ public class FiberRequestService {
         tenantRepository.findAllById(tenantIds).stream()
             .collect(
                 Collectors.toMap(
-                    com.fabricmanagement.common.platform.tenant.domain.Tenant::getId,
-                    com.fabricmanagement.common.platform.tenant.domain.Tenant::getName));
+                    com.fabricmanagement.platform.tenant.domain.Tenant::getId,
+                    com.fabricmanagement.platform.tenant.domain.Tenant::getName));
 
     return page.map(
         e ->
@@ -247,7 +247,7 @@ public class FiberRequestService {
               String tenantName =
                   tenantRepository
                       .findById(e.getTenantId())
-                      .map(com.fabricmanagement.common.platform.tenant.domain.Tenant::getName)
+                      .map(com.fabricmanagement.platform.tenant.domain.Tenant::getName)
                       .orElse(e.getTenantId().toString());
               return FiberRequestDto.from(e, tenantName);
             });

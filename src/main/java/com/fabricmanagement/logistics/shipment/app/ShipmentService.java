@@ -1,15 +1,15 @@
 package com.fabricmanagement.logistics.shipment.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerResolver;
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerService;
-import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.logistics.shipment.domain.Shipment;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentStatus;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentType;
 import com.fabricmanagement.logistics.shipment.dto.CreateShipmentRequest;
 import com.fabricmanagement.logistics.shipment.dto.ShipmentDto;
 import com.fabricmanagement.logistics.shipment.infra.repository.ShipmentRepository;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
+import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;

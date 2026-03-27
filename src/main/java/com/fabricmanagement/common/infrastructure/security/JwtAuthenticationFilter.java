@@ -1,13 +1,11 @@
 package com.fabricmanagement.common.infrastructure.security;
 
-import com.fabricmanagement.common.platform.auth.app.JwtService;
+import com.fabricmanagement.platform.auth.app.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -18,7 +16,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -53,9 +50,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-  /** Cookie name for access token (HttpOnly cookie). */
-  public static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
-
   private final JwtService jwtService;
 
   @Override
@@ -75,7 +69,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       return;
     }
 
-    String token = extractToken(request);
+    String token = JwtTokenExtractor.extract(request);
     if (token == null || !jwtService.validateToken(token)) {
       filterChain.doFilter(request, response);
       return;
@@ -140,35 +134,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(request, response);
-  }
-
-  /**
-   * Extract JWT from request: first from {@value #ACCESS_TOKEN_COOKIE_NAME} cookie, then from
-   * {@code Authorization: Bearer} header (fallback for transition period).
-   */
-  private String extractToken(HttpServletRequest request) {
-    // 1. Prefer access_token cookie (HttpOnly cookie support)
-    Cookie[] cookies = request.getCookies();
-    if (cookies != null) {
-      String fromCookie =
-          Arrays.stream(cookies)
-              .filter(cookie -> ACCESS_TOKEN_COOKIE_NAME.equals(cookie.getName()))
-              .findFirst()
-              .map(Cookie::getValue)
-              .filter(StringUtils::hasText)
-              .orElse(null);
-      if (fromCookie != null) {
-        return fromCookie;
-      }
-    }
-
-    // 2. Fallback: Authorization Bearer header (transition period)
-    String header = request.getHeader("Authorization");
-    if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
-      return header.substring(7);
-    }
-
-    return null;
   }
 
   /**

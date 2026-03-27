@@ -39,6 +39,9 @@ class SupplierRFQServiceTest {
 
   @Mock private SupplierRFQRepository rfqRepository;
 
+  @Mock
+  private com.fabricmanagement.common.infrastructure.events.DomainEventPublisher eventPublisher;
+
   @InjectMocks private SupplierRFQService rfqService;
 
   private final UUID tenantId = UUID.randomUUID();
@@ -156,6 +159,8 @@ class SupplierRFQServiceTest {
   void shouldSendRfqSuccessfully() {
     SupplierRFQLine line = new SupplierRFQLine();
     SupplierRFQRecipient recipient = new SupplierRFQRecipient();
+    recipient.setTradingPartnerId(
+        UUID.randomUUID()); // RfqSentEvent List.copyOf null-element NPE'yi önler
     mockRfq.addLine(line);
     mockRfq.addRecipient(recipient);
 

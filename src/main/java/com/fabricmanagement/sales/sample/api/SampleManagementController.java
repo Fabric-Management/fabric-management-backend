@@ -1,10 +1,10 @@
 package com.fabricmanagement.sales.sample.api;
 
-import com.fabricmanagement.sales.sample.api.dto.DispatchSampleRequest;
-import com.fabricmanagement.sales.sample.api.dto.MarkDeliveredRequest;
 import com.fabricmanagement.sales.sample.app.SampleManagementService;
 import com.fabricmanagement.sales.sample.domain.SampleDelivery;
 import com.fabricmanagement.sales.sample.domain.SampleRequest;
+import com.fabricmanagement.sales.sample.dto.DispatchSampleRequest;
+import com.fabricmanagement.sales.sample.dto.MarkDeliveredRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

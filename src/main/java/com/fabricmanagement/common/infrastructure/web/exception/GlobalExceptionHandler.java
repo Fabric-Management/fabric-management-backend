@@ -1,20 +1,8 @@
 package com.fabricmanagement.common.infrastructure.web.exception;
 
-import com.fabricmanagement.common.platform.subscription.domain.exception.FeatureNotAvailableException;
-import com.fabricmanagement.common.platform.subscription.domain.exception.QuotaExceededException;
-import com.fabricmanagement.common.platform.subscription.domain.exception.SubscriptionRequiredException;
-import com.fabricmanagement.flowboard.task.app.WipLimitExceededException;
-import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
-import com.fabricmanagement.production.common.exception.ForbiddenOperationException;
-import com.fabricmanagement.production.common.exception.InsufficientStockException;
-import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
-import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
-import com.fabricmanagement.production.execution.batch.domain.exception.BatchCertificationExpiredException;
-import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeInUseException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -31,145 +19,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/** Global exception handler for all controllers. */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-
-  // ---------------------------------------------------------------------------
-  // Production domain exceptions
-  // Order matters: specific subclasses must be declared BEFORE the base class.
-  // ---------------------------------------------------------------------------
-
-  @ExceptionHandler(InsufficientStockException.class)
-  @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-  public ApiError handleInsufficientStock(InsufficientStockException ex, HttpServletRequest req) {
-    log.info("Insufficient stock: {}", ex.getMessage());
-    Map<String, Object> details = new LinkedHashMap<>();
-    details.put("batchId", ex.getBatchId());
-    details.put("requested", ex.getRequested());
-    details.put("available", ex.getAvailable());
-    details.put("unit", ex.getUnit());
-    return ApiError.of(
-        422,
-        "Unprocessable Entity",
-        "INSUFFICIENT_STOCK",
-        ex.getMessage(),
-        req.getRequestURI(),
-        details);
-  }
-
-  @ExceptionHandler(InvalidStatusTransitionException.class)
-  @ResponseStatus(HttpStatus.CONFLICT)
-  public ApiError handleInvalidStatusTransition(
-      InvalidStatusTransitionException ex, HttpServletRequest req) {
-    log.info("Invalid status transition: {}", ex.getMessage());
-    Map<String, Object> details = new LinkedHashMap<>();
-    details.put("entityType", ex.getEntityType());
-    details.put("from", ex.getFrom());
-    details.put("to", ex.getTo());
-    return ApiError.of(
-        409,
-        "Conflict",
-        "INVALID_STATUS_TRANSITION",
-        ex.getMessage(),
-        req.getRequestURI(),
-        details);
-  }
-
-  @ExceptionHandler(RecipeInUseException.class)
-  @ResponseStatus(HttpStatus.CONFLICT)
-  public ApiError handleRecipeInUse(RecipeInUseException ex, HttpServletRequest req) {
-    log.info("Recipe in use — fiber={}, id={}", ex.getFiberName(), ex.getFiberId());
-    Map<String, Object> details = new LinkedHashMap<>();
-    details.put("fiberId", ex.getFiberId());
-    details.put("fiberName", ex.getFiberName());
-    details.put("blockedBy", "RESERVED, IN_PROGRESS");
-    return ApiError.of(
-        409, "Conflict", "RECIPE_IN_USE", ex.getMessage(), req.getRequestURI(), details);
-  }
-
-  @ExceptionHandler(BatchCertificationOverlapException.class)
-  @ResponseStatus(HttpStatus.CONFLICT)
-  public ApiError handleBatchCertificationOverlap(
-      BatchCertificationOverlapException ex, HttpServletRequest req) {
-    log.info("Batch certification date overlap: {}", ex.getMessage());
-    return ApiError.of(
-        409, "Conflict", "BATCH_CERTIFICATION_OVERLAP", ex.getMessage(), req.getRequestURI());
-  }
-
-  @ExceptionHandler(BatchCertificationExpiredException.class)
-  @ResponseStatus(HttpStatus.CONFLICT)
-  public ApiError handleBatchCertificationExpired(
-      BatchCertificationExpiredException ex, HttpServletRequest req) {
-    log.info("Batch GOTS certification expired or missing: {}", ex.getMessage());
-    return ApiError.of(
-        409, "Conflict", "BATCH_CERTIFICATION_EXPIRED", ex.getMessage(), req.getRequestURI());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Subscription / quota exceptions
-  // ---------------------------------------------------------------------------
-
-  @ExceptionHandler(SubscriptionRequiredException.class)
-  @ResponseStatus(HttpStatus.PAYMENT_REQUIRED)
-  public ApiError handleSubscriptionRequired(
-      SubscriptionRequiredException ex, HttpServletRequest req) {
-    log.info(
-        "Subscription required: requiredOs={}, path={}", ex.getRequiredOs(), req.getRequestURI());
-    Map<String, Object> details = new LinkedHashMap<>();
-    if (ex.getRequiredOs() != null) {
-      details.put("requiredOs", ex.getRequiredOs());
-      details.put("upgradeUrl", "/subscriptions/add/" + ex.getRequiredOs());
-    }
-    return ApiError.of(
-        402,
-        "Payment Required",
-        "SUBSCRIPTION_REQUIRED",
-        ex.getMessage(),
-        req.getRequestURI(),
-        details);
-  }
-
-  @ExceptionHandler(FeatureNotAvailableException.class)
-  @ResponseStatus(HttpStatus.PAYMENT_REQUIRED)
-  public ApiError handleFeatureNotAvailable(
-      FeatureNotAvailableException ex, HttpServletRequest req) {
-    log.info(
-        "Feature not available: featureId={}, minimumTier={}",
-        ex.getFeatureId(),
-        ex.getMinimumTier());
-    Map<String, Object> details = new LinkedHashMap<>();
-    if (ex.getFeatureId() != null) details.put("featureId", ex.getFeatureId());
-    if (ex.getMinimumTier() != null) details.put("minimumTier", ex.getMinimumTier());
-    return ApiError.of(
-        402,
-        "Payment Required",
-        "FEATURE_NOT_AVAILABLE",
-        ex.getMessage(),
-        req.getRequestURI(),
-        details);
-  }
-
-  @ExceptionHandler(QuotaExceededException.class)
-  @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-  public ApiError handleQuotaExceeded(QuotaExceededException ex, HttpServletRequest req) {
-    log.warn(
-        "Quota exceeded: quotaType={}, limit={}, used={}",
-        ex.getQuotaType(),
-        ex.getLimit(),
-        ex.getUsed());
-    Map<String, Object> details = new LinkedHashMap<>();
-    if (ex.getQuotaType() != null) details.put("quotaType", ex.getQuotaType());
-    if (ex.getLimit() != null) details.put("limit", ex.getLimit());
-    if (ex.getUsed() != null) details.put("used", ex.getUsed());
-    return ApiError.of(
-        429, "Too Many Requests", "QUOTA_EXCEEDED", ex.getMessage(), req.getRequestURI(), details);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Common exceptions
-  // ---------------------------------------------------------------------------
 
   @ExceptionHandler(NotFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -207,17 +59,6 @@ public class GlobalExceptionHandler {
     log.info("Signup conflict (contact): {}", ex.getMessage());
     return ApiError.of(
         400, "Bad Request", "CONTACT_ALREADY_REGISTERED", ex.getMessage(), req.getRequestURI());
-  }
-
-  // ---------------------------------------------------------------------------
-  // FlowBoard exceptions
-  // ---------------------------------------------------------------------------
-
-  @ExceptionHandler(WipLimitExceededException.class)
-  @ResponseStatus(HttpStatus.CONFLICT)
-  public ApiError handleWipLimitExceeded(WipLimitExceededException ex, HttpServletRequest req) {
-    log.info("WIP limit exceeded: {}", ex.getMessage());
-    return ApiError.of(409, "Conflict", "WIP_LIMIT_EXCEEDED", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
@@ -303,38 +144,6 @@ public class GlobalExceptionHandler {
         "OPTIMISTIC_LOCK",
         "This record was modified by another user. Please refresh and try again.",
         req.getRequestURI());
-  }
-
-  @ExceptionHandler(OptimisticLockConflictException.class)
-  @ResponseStatus(HttpStatus.CONFLICT)
-  public ApiError handleOptimisticLockConflict(
-      OptimisticLockConflictException ex, HttpServletRequest req) {
-    log.warn(
-        "Application Optimistic lock conflict: entity={}, id={}, clientV={}, currentV={}",
-        ex.getEntityType(),
-        ex.getEntityId(),
-        ex.getClientVersion(),
-        ex.getCurrentVersion());
-    Map<String, Object> details = new LinkedHashMap<>();
-    details.put("entityType", ex.getEntityType());
-    details.put("entityId", ex.getEntityId());
-    details.put("clientVersion", ex.getClientVersion());
-    details.put("currentVersion", ex.getCurrentVersion());
-    return ApiError.of(
-        HttpStatus.CONFLICT.value(),
-        "Conflict",
-        "OPTIMISTIC_LOCK",
-        ex.getMessage(),
-        req.getRequestURI(),
-        details);
-  }
-
-  @ExceptionHandler(ForbiddenOperationException.class)
-  @ResponseStatus(HttpStatus.FORBIDDEN)
-  public ApiError handleForbiddenOperation(ForbiddenOperationException ex, HttpServletRequest req) {
-    log.info("Forbidden operation: {}", ex.getMessage());
-    return ApiError.of(
-        403, "Forbidden", "FORBIDDEN_OPERATION", ex.getMessage(), req.getRequestURI());
   }
 
   @ExceptionHandler(AccessDeniedException.class)

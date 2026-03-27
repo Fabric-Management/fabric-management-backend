@@ -106,7 +106,7 @@ public class SecurityConfig {
   @Bean
   @Profile({"local", "dev"})
   public SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
-    log.warn("⚠️  DEVELOPMENT MODE - Security is PERMISSIVE");
+    log.info("DEVELOPMENT MODE - URL-level auth enforced, @PreAuthorize for method-level");
 
     return http.csrf(AbstractHttpConfigurer::disable)
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -129,11 +129,9 @@ public class SecurityConfig {
                     .requestMatchers("/api/webhooks/**")
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/admin/**")
-                    .permitAll() // ⚠️ TEMP: secured in production
+                    .permitAll()
                     .anyRequest()
-                    .permitAll() // ⚠️ DEVELOPMENT: URL-level allow all; method-level via
-            // @PreAuthorize
-            )
+                    .authenticated())
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }

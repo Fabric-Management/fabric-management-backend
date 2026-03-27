@@ -1,6 +1,7 @@
 package com.fabricmanagement.flowboard.board.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
 import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -82,7 +83,7 @@ public class Board extends BaseEntity {
   /** WIP limitini günceller. */
   public void updateWipLimit(Integer wipLimit) {
     if (wipLimit == null || wipLimit < 1) {
-      throw new IllegalArgumentException("WIP limit must be a positive integer, got: " + wipLimit);
+      throw new FlowBoardDomainException("WIP limit must be a positive integer, got: " + wipLimit);
     }
     this.wipLimitDefault = wipLimit;
   }

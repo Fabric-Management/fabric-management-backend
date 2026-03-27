@@ -2,11 +2,11 @@ package com.fabricmanagement.flowboard.dashboard.api.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fabricmanagement.flowboard.dashboard.api.dto.response.DashboardConfigDto;
-import com.fabricmanagement.flowboard.dashboard.api.dto.response.DashboardWidgetDto;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardConfig;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardWidget;
 import com.fabricmanagement.flowboard.dashboard.domain.WidgetType;
+import com.fabricmanagement.flowboard.dashboard.dto.DashboardConfigDto;
+import com.fabricmanagement.flowboard.dashboard.dto.DashboardWidgetDto;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

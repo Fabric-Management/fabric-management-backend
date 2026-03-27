@@ -40,6 +40,9 @@ public class InvalidStatusTransitionException extends ProductionDomainException 
     this.entityType = entityType;
     this.from = from;
     this.to = to;
+    withDetail("entityType", entityType);
+    withDetail("from", from);
+    withDetail("to", to);
   }
 
   private static String buildMessage(String entityType, String from, String to) {

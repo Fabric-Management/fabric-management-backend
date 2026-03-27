@@ -1,6 +1,7 @@
 package com.fabricmanagement.flowboard.task.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.flowboard.common.exception.TaskStatusTransitionException;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -94,6 +95,10 @@ public class Task extends BaseEntity {
   @Column(name = "completed_at")
   private Instant completedAt;
 
+  @Version
+  @Column(name = "version", nullable = false)
+  private Long version = 0L;
+
   @Override
   protected String getModuleCode() {
     return "TSK";
@@ -153,7 +158,9 @@ public class Task extends BaseEntity {
    * @throws IllegalStateException geçersiz geçiş durumunda
    */
   public void startTodo() {
-    requireStatus(TaskStatus.BACKLOG);
+    if (this.status != TaskStatus.BACKLOG) {
+      throw new TaskStatusTransitionException(this.status, TaskStatus.TODO);
+    }
     this.status = TaskStatus.TODO;
   }
 
@@ -166,23 +173,21 @@ public class Task extends BaseEntity {
     if (this.status != TaskStatus.TODO
         && this.status != TaskStatus.BLOCKED
         && this.status != TaskStatus.DONE) {
-      throw new IllegalStateException(
-          "Cannot start progress from status: "
-              + this.status
-              + ". Allowed: TODO, BLOCKED, DONE (reopen)");
+      throw new TaskStatusTransitionException(
+          this.status, TaskStatus.IN_PROGRESS, "Allowed from: TODO, BLOCKED, DONE (reopen)");
     }
     this.status = TaskStatus.IN_PROGRESS;
-    // startedAt sadece ilk IN_PROGRESS geçişinde set olur
     if (this.startedAt == null) {
       this.startedAt = Instant.now();
     }
-    // Reopen: completedAt temizlenir
     this.completedAt = null;
   }
 
   /** Task'ı IN_REVIEW durumuna alır — IN_PROGRESS'ten. */
   public void submitForReview() {
-    requireStatus(TaskStatus.IN_PROGRESS);
+    if (this.status != TaskStatus.IN_PROGRESS) {
+      throw new TaskStatusTransitionException(this.status, TaskStatus.IN_REVIEW);
+    }
     this.status = TaskStatus.IN_REVIEW;
   }
 
@@ -193,8 +198,8 @@ public class Task extends BaseEntity {
    */
   public void markDone() {
     if (this.status != TaskStatus.IN_REVIEW && this.status != TaskStatus.IN_PROGRESS) {
-      throw new IllegalStateException(
-          "Cannot mark DONE from status: " + this.status + ". Allowed: IN_REVIEW, IN_PROGRESS");
+      throw new TaskStatusTransitionException(
+          this.status, TaskStatus.DONE, "Allowed from: IN_REVIEW, IN_PROGRESS");
     }
     this.status = TaskStatus.DONE;
     this.completedAt = Instant.now();
@@ -207,15 +212,14 @@ public class Task extends BaseEntity {
    */
   public void block() {
     if (this.status == TaskStatus.DONE || this.status == TaskStatus.CANCELLED) {
-      throw new IllegalStateException("Cannot block a task in status: " + this.status);
+      throw new TaskStatusTransitionException(this.status, TaskStatus.BLOCKED);
     }
     this.status = TaskStatus.BLOCKED;
   }
 
-  /** Task'ı CANCELLED durumuna alır — herhangi bir aktif durumdan. */
   public void cancel() {
     if (this.status == TaskStatus.DONE || this.status == TaskStatus.CANCELLED) {
-      throw new IllegalStateException("Cannot cancel a task in status: " + this.status);
+      throw new TaskStatusTransitionException(this.status, TaskStatus.CANCELLED);
     }
     this.status = TaskStatus.CANCELLED;
   }
@@ -302,10 +306,4 @@ public class Task extends BaseEntity {
   // =========================================================================
   // PRIVATE HELPERS
   // =========================================================================
-
-  private void requireStatus(TaskStatus expected) {
-    if (this.status != expected) {
-      throw new IllegalStateException("Expected status " + expected + " but was: " + this.status);
-    }
-  }
 }

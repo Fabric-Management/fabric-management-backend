@@ -1,10 +1,9 @@
 package com.fabricmanagement.flowboard.automation.app;
 
-import com.fabricmanagement.common.platform.user.domain.SystemUser;
-import com.fabricmanagement.flowboard.automation.application.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.automation.domain.AutomationContext;
 import com.fabricmanagement.flowboard.automation.domain.AutomationRule;
 import com.fabricmanagement.flowboard.automation.domain.AutomationTriggerType;
+import com.fabricmanagement.flowboard.automation.domain.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.automation.infra.repository.AutomationRuleRepository;
 import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository;
 import com.fabricmanagement.flowboard.task.app.EscalationService;
@@ -17,6 +16,7 @@ import com.fabricmanagement.flowboard.task.domain.TaskType;
 import com.fabricmanagement.flowboard.task.dto.CreateTaskRequest;
 import com.fabricmanagement.flowboard.task.dto.UpdateTaskStatusRequest;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

@@ -3,8 +3,8 @@ package com.fabricmanagement.approval.dto;
 import com.fabricmanagement.approval.domain.ApprovalEntityType;
 import com.fabricmanagement.approval.domain.ApprovalRequest;
 import com.fabricmanagement.approval.domain.ApprovalRequestStatus;
-import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
@@ -24,7 +24,7 @@ public class ApprovalRequestResponse {
   private OffsetDateTime approvedAt;
   private String rejectionReason;
   private OffsetDateTime expiresAt;
-  private Instant createdAt;
+  private OffsetDateTime createdAt;
 
   public static ApprovalRequestResponse from(ApprovalRequest entity) {
     return ApprovalRequestResponse.builder()
@@ -39,7 +39,8 @@ public class ApprovalRequestResponse {
         .approvedAt(entity.getApprovedAt())
         .rejectionReason(entity.getRejectionReason())
         .expiresAt(entity.getExpiresAt())
-        .createdAt(entity.getCreatedAt())
+        .createdAt(
+            entity.getCreatedAt() != null ? entity.getCreatedAt().atOffset(ZoneOffset.UTC) : null)
         .build();
   }
 }

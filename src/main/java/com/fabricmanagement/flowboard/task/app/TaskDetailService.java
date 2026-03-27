@@ -11,6 +11,7 @@ import com.fabricmanagement.flowboard.task.infra.repository.TaskChecklistReposit
 import com.fabricmanagement.flowboard.task.infra.repository.TaskCommentRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTimeEntryRepository;
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -61,7 +62,7 @@ public class TaskDetailService {
 
   @Transactional
   public TaskComment addComment(
-      UUID tenantId, UUID taskId, UUID userId, String content, String mentionedUserIds) {
+      UUID tenantId, UUID taskId, UUID userId, String content, List<UUID> mentionedUserIds) {
     var comment = new TaskComment(tenantId, taskId, userId, content, mentionedUserIds);
     commentRepo.save(comment);
     activityService.logActivity(tenantId, taskId, userId, TaskAction.COMMENTED, null, null, null);

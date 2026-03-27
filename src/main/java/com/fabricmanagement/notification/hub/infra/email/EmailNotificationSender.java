@@ -1,6 +1,6 @@
 package com.fabricmanagement.notification.hub.infra.email;
 
-import com.fabricmanagement.common.platform.communication.app.EmailOutboxService;
+import com.fabricmanagement.platform.communication.app.EmailOutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -41,8 +41,8 @@ DECLARE
     platform_user_id UUID;
     platform_contact_id UUID;
     platform_auth_id UUID;
-    platform_admin_email VARCHAR := 'akkaya64@hotmail.com';
-    platform_admin_password_hash VARCHAR := '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+    platform_admin_email VARCHAR := 'superadmin@fabricmanagement.com';
+    platform_admin_password_hash VARCHAR := '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'; -- user's existing hash
 BEGIN
     -- Organization: Platform System (idempotent by uk_organization_tenant_tax_id)
     INSERT INTO common_company.common_organization (

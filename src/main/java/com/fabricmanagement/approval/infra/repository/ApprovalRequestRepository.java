@@ -3,6 +3,7 @@ package com.fabricmanagement.approval.infra.repository;
 import com.fabricmanagement.approval.domain.ApprovalEntityType;
 import com.fabricmanagement.approval.domain.ApprovalRequest;
 import com.fabricmanagement.approval.domain.ApprovalRequestStatus;
+import com.fabricmanagement.approval.domain.ApproverRole;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -27,15 +28,21 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
       UUID tenantId, ApprovalEntityType entityType, UUID entityId, ApprovalRequestStatus status);
 
   @Query(
-      "SELECT a FROM ApprovalRequest a WHERE a.status = 'PENDING' AND a.expiresAt < :now AND a.deletedAt IS NULL")
-  List<ApprovalRequest> findExpiredPendingRequests(@Param("now") OffsetDateTime now);
+      "SELECT a FROM ApprovalRequest a WHERE a.status = :status AND a.expiresAt < :now AND a.deletedAt IS NULL")
+  List<ApprovalRequest> findExpiredPendingRequests(
+      @Param("status") ApprovalRequestStatus status, @Param("now") OffsetDateTime now);
 
   @Query(
-      "SELECT COUNT(a) FROM ApprovalRequest a WHERE a.tenantId = :tenantId AND a.requestedBy = :userId AND a.status = 'APPROVED' AND a.deletedAt IS NULL")
-  int countApprovedRequestsForUser(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
+      "SELECT COUNT(a) FROM ApprovalRequest a WHERE a.tenantId = :tenantId AND a.requestedBy = :userId AND a.status = :status AND a.deletedAt IS NULL")
+  int countApprovedRequestsForUser(
+      @Param("tenantId") UUID tenantId,
+      @Param("userId") UUID userId,
+      @Param("status") ApprovalRequestStatus status);
 
   @Query(
-      "SELECT a FROM ApprovalRequest a JOIN a.policy p WHERE a.tenantId = :tenantId AND a.status = 'PENDING' AND a.deletedAt IS NULL AND p.approverRole = :approverRole ORDER BY a.createdAt DESC")
+      "SELECT a FROM ApprovalRequest a JOIN a.policy p WHERE a.tenantId = :tenantId AND a.status = :status AND a.deletedAt IS NULL AND p.approverRole = :approverRole ORDER BY a.createdAt DESC")
   List<ApprovalRequest> findPendingRequestsByApproverRole(
-      @Param("tenantId") UUID tenantId, @Param("approverRole") String approverRole);
+      @Param("tenantId") UUID tenantId,
+      @Param("status") ApprovalRequestStatus status,
+      @Param("approverRole") ApproverRole approverRole);
 }

@@ -1,9 +1,9 @@
 package com.fabricmanagement.iwm.rules.app;
 
-import com.fabricmanagement.iwm.rules.app.event.MinStockAlertEvent;
-import com.fabricmanagement.iwm.rules.app.event.ReturnRateExceededEvent;
 import com.fabricmanagement.iwm.rules.domain.MinStockRule;
 import com.fabricmanagement.iwm.rules.domain.ReturnRateRule;
+import com.fabricmanagement.iwm.rules.domain.event.MinStockAlertEvent;
+import com.fabricmanagement.iwm.rules.domain.event.ReturnRateExceededEvent;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;

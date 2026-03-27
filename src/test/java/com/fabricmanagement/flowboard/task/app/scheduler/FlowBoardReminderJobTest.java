@@ -8,7 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fabricmanagement.flowboard.automation.application.port.out.AutomationNotificationPort;
+import com.fabricmanagement.flowboard.automation.domain.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.task.domain.Task;
 import com.fabricmanagement.flowboard.task.domain.TaskReminder;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskReminderRepository;

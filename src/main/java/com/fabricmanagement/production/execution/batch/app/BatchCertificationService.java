@@ -2,10 +2,10 @@ package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
-import com.fabricmanagement.common.platform.organization.domain.OrganizationCertification;
-import com.fabricmanagement.common.platform.organization.infra.repository.OrganizationCertificationRepository;
-import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartnerCertification;
-import com.fabricmanagement.common.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
+import com.fabricmanagement.platform.organization.domain.OrganizationCertification;
+import com.fabricmanagement.platform.organization.infra.repository.OrganizationCertificationRepository;
+import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerCertification;
+import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
 import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;

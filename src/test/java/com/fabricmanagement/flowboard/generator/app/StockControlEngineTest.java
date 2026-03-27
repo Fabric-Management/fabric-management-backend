@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.fabricmanagement.flowboard.generator.application.port.out.StockQueryPort;
+import com.fabricmanagement.flowboard.generator.domain.port.out.StockQueryPort;
 import com.fabricmanagement.flowboard.task.domain.TaskType;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import java.math.BigDecimal;

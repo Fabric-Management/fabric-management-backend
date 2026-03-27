@@ -1,0 +1,31 @@
+package com.fabricmanagement.platform.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Password setup request - Complete registration with secure token.
+ *
+ * <p><b>Flow:</b> Token + password only (email verified by link click)
+ *
+ * <p><b>Note:</b> Both SALES_LED and SELF_SERVICE tokens work the same way. No verification code
+ * needed - email link click verifies ownership. Verification codes are only used for unverified
+ * contacts during login flows.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class PasswordSetupRequest {
+
+  @NotBlank(message = "Token is required")
+  private String token;
+
+  @NotBlank(message = "Password is required")
+  @Size(min = 8, message = "Password must be at least 8 characters")
+  private String password;
+}

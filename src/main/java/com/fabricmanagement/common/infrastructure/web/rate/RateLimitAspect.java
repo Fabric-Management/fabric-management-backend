@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -62,5 +63,26 @@ public class RateLimitAspect {
     }
     String name = auth.getName();
     return "rate:" + (name != null ? name : "anonymous");
+  }
+
+  @Scheduled(fixedRate = 300_000)
+  public void evictStaleEntries() {
+    Instant threshold = Instant.now().minusSeconds(300);
+    int removed =
+        (int)
+            windowByKey.entrySet().stream()
+                .filter(
+                    entry -> {
+                      Window w = entry.getValue();
+                      synchronized (w.lock) {
+                        w.timestamps.removeIf(t -> t.isBefore(threshold));
+                        return w.timestamps.isEmpty();
+                      }
+                    })
+                .peek(entry -> windowByKey.remove(entry.getKey()))
+                .count();
+    if (removed > 0) {
+      log.debug("Rate limit cleanup: evicted {} stale entries", removed);
+    }
   }
 }

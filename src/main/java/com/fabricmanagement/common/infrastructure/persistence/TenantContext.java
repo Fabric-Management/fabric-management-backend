@@ -58,20 +58,20 @@ public final class TenantContext {
       UUID.fromString("00000000-0000-0000-0000-000000000000");
 
   /** ThreadLocal storage for current tenant ID */
-  private static final ThreadLocal<UUID> CURRENT_TENANT_ID = new InheritableThreadLocal<>();
+  private static final ThreadLocal<UUID> CURRENT_TENANT_ID = new ThreadLocal<>();
 
   /** ThreadLocal storage for current tenant UID (human-readable) */
-  private static final ThreadLocal<String> CURRENT_TENANT_UID = new InheritableThreadLocal<>();
+  private static final ThreadLocal<String> CURRENT_TENANT_UID = new ThreadLocal<>();
 
   /** ThreadLocal storage for current user ID */
-  private static final ThreadLocal<UUID> CURRENT_USER_ID = new InheritableThreadLocal<>();
+  private static final ThreadLocal<UUID> CURRENT_USER_ID = new ThreadLocal<>();
 
   /**
    * ThreadLocal storage for current tenant primary country code (ISO 3166-1 alpha-2).
    *
    * <p>Optional - defaults to {@code null} when not provided.
    */
-  private static final ThreadLocal<String> CURRENT_TENANT_COUNTRY = new InheritableThreadLocal<>();
+  private static final ThreadLocal<String> CURRENT_TENANT_COUNTRY = new ThreadLocal<>();
 
   /** Private constructor to prevent instantiation */
   private TenantContext() {

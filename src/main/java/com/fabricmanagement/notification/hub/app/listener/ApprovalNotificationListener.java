@@ -1,11 +1,11 @@
 package com.fabricmanagement.notification.hub.app.listener;
 
-import com.fabricmanagement.common.platform.approval.domain.event.ApprovalApprovedEvent;
-import com.fabricmanagement.common.platform.approval.domain.event.ApprovalPendingEvent;
-import com.fabricmanagement.common.platform.approval.domain.event.ApprovalRejectedEvent;
 import com.fabricmanagement.notification.hub.app.NotificationContext;
 import com.fabricmanagement.notification.hub.app.NotificationHubService;
 import com.fabricmanagement.notification.hub.domain.NotificationEventType;
+import com.fabricmanagement.platform.approval.domain.event.ApprovalApprovedEvent;
+import com.fabricmanagement.platform.approval.domain.event.ApprovalPendingEvent;
+import com.fabricmanagement.platform.approval.domain.event.ApprovalRejectedEvent;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

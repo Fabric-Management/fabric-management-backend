@@ -48,44 +48,37 @@ public class RecurringTaskService {
   private void spawnTaskFromTemplate(RecurringTaskTemplate template, OffsetDateTime now) {
     log.info("Spawning task from template: {}", template.getId());
 
-    // Geçici olarak context içine tenantId yerleştiriliyor
-    UUID originalTenant = TenantContext.getCurrentTenantId();
-    try {
-      TenantContext.setCurrentTenantId(template.getTenantId());
+    TenantContext.executeInTenantContext(
+        template.getTenantId(),
+        () -> {
+          CreateTaskRequest request =
+              new CreateTaskRequest(
+                  template.getBoardId(),
+                  template.getTitle(),
+                  template.getDescription(),
+                  template.getTaskType(),
+                  ModuleType.GENERAL,
+                  template.getPriority(),
+                  null,
+                  null,
+                  null,
+                  null);
+          Task newTask = taskService.createTask(request);
 
-      CreateTaskRequest request =
-          new CreateTaskRequest(
-              template.getBoardId(),
-              template.getTitle(),
-              template.getDescription(),
-              template.getTaskType(),
-              ModuleType.GENERAL,
-              template.getPriority(),
-              null, // deadline
-              null, // estimatedHours
-              null, // entityType
-              null // entityId
-              );
-      Task newTask = taskService.createTask(request);
+          if (template.getTargetAssigneeId() != null) {
+            taskService.assignToUser(
+                newTask.getId(),
+                template.getTargetAssigneeId(),
+                com.fabricmanagement.flowboard.task.domain.AssignedBy.SYSTEM,
+                com.fabricmanagement.platform.user.domain.SystemUser.ID);
+          }
 
-      if (template.getTargetAssigneeId() != null) {
-        taskService.assignToUser(
-            newTask.getId(),
-            template.getTargetAssigneeId(),
-            com.fabricmanagement.flowboard.task.domain.AssignedBy.SYSTEM,
-            com.fabricmanagement.common.platform.user.domain.SystemUser.ID);
-      }
-
-      // Sonraki çalışma tarihini hesapla
-      OffsetDateTime nextTrigger = calculateNextTrigger(template, now);
-      template.markAsSpawned(newTask.getId(), nextTrigger, clock);
-      templateRepo.save(template);
-    } finally {
-      TenantContext.setCurrentTenantId(originalTenant);
-    }
+          OffsetDateTime nextTrigger = calculateNextTrigger(template, now);
+          template.markAsSpawned(newTask.getId(), nextTrigger, clock);
+          templateRepo.save(template);
+        });
   }
 
-  // [K3 FIX] Tüm takvim bazlı frekanslar için nextTrigger hesaplaması
   private OffsetDateTime calculateNextTrigger(RecurringTaskTemplate template, OffsetDateTime now) {
     int interval = template.getIntervalValue() != null ? template.getIntervalValue() : 1;
     return switch (template.getFrequency()) {

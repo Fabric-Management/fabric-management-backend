@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerCertificationService;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
 import com.fabricmanagement.production.execution.batch.app.BatchOperationsService;
 import com.fabricmanagement.production.execution.batch.dto.BlendParentRequest;
 import com.fabricmanagement.production.execution.batch.dto.CreateBlendedBatchRequest;

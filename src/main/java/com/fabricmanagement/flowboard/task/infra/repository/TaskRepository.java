@@ -115,33 +115,79 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
       @Param("thresholdTime") java.time.Instant thresholdTime,
       Pageable pageable);
 
-  // [K4 FIX] WorkloadService için gerçek sorgular
+  // WorkloadService icin: kullanicinin aktif task sayisi (TaskAssignee join)
   @Query(
-      "SELECT COUNT(t) FROM Task t WHERE t.tenantId = :tenantId AND t.isActive = true AND t.assigneeUserId = :userId AND t.status NOT IN (com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE, com.fabricmanagement.flowboard.task.domain.TaskStatus.CANCELLED)")
+      """
+      SELECT COUNT(DISTINCT t) FROM Task t
+      JOIN TaskAssignee ta ON ta.taskId = t.id
+      WHERE t.tenantId = :tenantId
+        AND ta.userId = :userId
+        AND ta.isActive = true
+        AND t.isActive = true
+        AND t.status NOT IN (
+          com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE,
+          com.fabricmanagement.flowboard.task.domain.TaskStatus.CANCELLED)
+      """)
   long countActiveTasksForUser(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
 
+  // WorkloadService icin: kullanicinin aktif task toplam tahmini saat (TaskAssignee join)
   @Query(
-      "SELECT COALESCE(SUM(t.estimatedHours), 0) FROM Task t WHERE t.tenantId = :tenantId AND t.isActive = true AND t.assigneeUserId = :userId AND t.status NOT IN (com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE, com.fabricmanagement.flowboard.task.domain.TaskStatus.CANCELLED)")
+      """
+      SELECT COALESCE(SUM(t.estimatedHours), 0) FROM Task t
+      JOIN TaskAssignee ta ON ta.taskId = t.id
+      WHERE t.tenantId = :tenantId
+        AND ta.userId = :userId
+        AND ta.isActive = true
+        AND t.isActive = true
+        AND t.status NOT IN (
+          com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE,
+          com.fabricmanagement.flowboard.task.domain.TaskStatus.CANCELLED)
+      """)
   java.math.BigDecimal sumEstimatedHoursForUser(
       @Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
 
-  // [K2 FIX] PerformanceJob: Tüm aktif kullanıcıları bul
+  // PerformanceJob icin: tenant'taki tum atanmis benzersiz kullanici ID'leri (TaskAssignee join)
   @Query(
-      "SELECT DISTINCT t.assigneeUserId FROM Task t WHERE t.tenantId = :tenantId AND t.isActive = true AND t.assigneeUserId IS NOT NULL")
+      """
+      SELECT DISTINCT ta.userId FROM Task t
+      JOIN TaskAssignee ta ON ta.taskId = t.id
+      WHERE t.tenantId = :tenantId
+        AND t.isActive = true
+        AND ta.isActive = true
+        AND ta.userId IS NOT NULL
+      """)
   List<UUID> findDistinctAssigneeUserIds(@Param("tenantId") UUID tenantId);
 
-  // [K2 FIX] Kullanıcının belirli tarih aralığında tamamladığı task sayısı
+  // PerformanceJob icin: donem icinde tamamlanan task sayisi (TaskAssignee join)
   @Query(
-      "SELECT COUNT(t) FROM Task t WHERE t.tenantId = :tenantId AND t.assigneeUserId = :userId AND t.status = com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE AND t.updatedAt BETWEEN :startDate AND :endDate")
+      """
+      SELECT COUNT(DISTINCT t) FROM Task t
+      JOIN TaskAssignee ta ON ta.taskId = t.id
+      WHERE t.tenantId = :tenantId
+        AND ta.userId = :userId
+        AND ta.isActive = true
+        AND t.status = com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE
+        AND t.updatedAt BETWEEN :startDate AND :endDate
+      """)
   int countCompletedTasksInPeriod(
       @Param("tenantId") UUID tenantId,
       @Param("userId") UUID userId,
       @Param("startDate") java.time.Instant startDate,
       @Param("endDate") java.time.Instant endDate);
 
-  // [K2 FIX] Kullanıcının belirli tarih aralığında geciken task sayısı
+  // PerformanceJob icin: donem icinde gecikmiş tamamlanan task sayisi (TaskAssignee join)
   @Query(
-      "SELECT COUNT(t) FROM Task t WHERE t.tenantId = :tenantId AND t.assigneeUserId = :userId AND t.status = com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE AND t.deadline < CAST(t.updatedAt AS LocalDate) AND t.updatedAt BETWEEN :startDate AND :endDate")
+      """
+      SELECT COUNT(DISTINCT t) FROM Task t
+      JOIN TaskAssignee ta ON ta.taskId = t.id
+      WHERE t.tenantId = :tenantId
+        AND ta.userId = :userId
+        AND ta.isActive = true
+        AND t.status = com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE
+        AND t.deadline IS NOT NULL
+        AND t.deadline < CAST(t.updatedAt AS LocalDate)
+        AND t.updatedAt BETWEEN :startDate AND :endDate
+      """)
   int countOverdueCompletedTasksInPeriod(
       @Param("tenantId") UUID tenantId,
       @Param("userId") UUID userId,

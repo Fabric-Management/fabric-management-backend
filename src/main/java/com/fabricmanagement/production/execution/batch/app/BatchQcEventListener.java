@@ -1,8 +1,8 @@
 package com.fabricmanagement.production.execution.batch.app;
 
-import com.fabricmanagement.common.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.common.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.common.platform.communication.domain.NotificationType;
+import com.fabricmanagement.platform.communication.app.InAppNotificationService;
+import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
+import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;

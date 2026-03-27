@@ -94,7 +94,7 @@ logging:
     org.hibernate.SQL: WARN
     org.hibernate.type.descriptor.sql.BasicBinder: OFF
     # Reduce log noise from background jobs
-    com.fabricmanagement.common.platform.communication.app.EmailOutboxService: INFO
+    com.fabricmanagement.platform.communication.app.EmailOutboxService: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

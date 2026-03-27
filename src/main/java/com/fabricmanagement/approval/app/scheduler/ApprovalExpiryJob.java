@@ -1,9 +1,10 @@
 package com.fabricmanagement.approval.app.scheduler;
 
 import com.fabricmanagement.approval.domain.ApprovalRequest;
+import com.fabricmanagement.approval.domain.ApprovalRequestStatus;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.common.platform.approval.domain.event.ApprovalExpiredEvent;
+import com.fabricmanagement.platform.approval.domain.event.ApprovalExpiredEvent;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -32,7 +33,8 @@ public class ApprovalExpiryJob {
     log.info("Starting ApprovalExpiryJob to find and cancel expired requests...");
     OffsetDateTime now = OffsetDateTime.now(clock);
 
-    List<ApprovalRequest> expired = requestRepo.findExpiredPendingRequests(now);
+    List<ApprovalRequest> expired =
+        requestRepo.findExpiredPendingRequests(ApprovalRequestStatus.PENDING, now);
 
     if (!expired.isEmpty()) {
       expired.forEach(ApprovalRequest::cancel);
