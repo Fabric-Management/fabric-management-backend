@@ -84,7 +84,7 @@ public class UIDGenerator {
    *
    * @param moduleCode short module code
    * @param entityType entity type
-   * @param sequenceLength length of sequence part (default: 5)
+   * @param suffixLength length of sequence part (default: 5)
    * @return generated UID
    */
   public String generate(String moduleCode, String entityType, int suffixLength) {
