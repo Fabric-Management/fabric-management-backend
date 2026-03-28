@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.LocalizationService;
 import com.fabricmanagement.platform.auth.domain.RegistrationToken;
 import com.fabricmanagement.platform.auth.domain.RegistrationTokenType;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
@@ -38,6 +39,7 @@ public class UserInvitationEventListener {
   private final NotificationService notificationService;
   private final EmailTemplateRenderer emailTemplateRenderer;
   private final FrontendUrlProvider frontendUrlProvider;
+  private final LocalizationService localizationService;
 
   /**
    * Handle UserCreatedEvent - send invitation email if user doesn't have AuthUser yet.
@@ -93,7 +95,9 @@ public class UserInvitationEventListener {
     String displayName = event.getDisplayName() != null ? event.getDisplayName() : "";
     String firstName = displayName.contains(" ") ? displayName.split(" ")[0] : displayName;
 
-    String subject = "You've been invited to FabricOS";
+    // Resolve locale from UserLocaleConfig cascade: user → tenant → EN
+    var locale = localizationService.resolveLocaleForUser(event.getTenantId(), event.getUserId());
+    String subject = localizationService.getMessage("email.invitation.subject", null, locale);
     String message =
         emailTemplateRenderer.renderSetupPassword(firstName, "", event.getContactValue(), setupUrl);
 

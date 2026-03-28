@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
@@ -65,7 +66,8 @@ public class RefreshTokenService {
     // Validate token
     if (!token.isValid()) {
       log.warn("Refresh token expired or revoked: tokenId={}", token.getId());
-      throw new IllegalArgumentException("Refresh token expired or revoked");
+      throw new PlatformDomainException(
+          "Refresh token expired or revoked", "AUTH_REFRESH_TOKEN_INVALID", 401);
     }
 
     UUID tenantId = TenantContext.getCurrentTenantId();
@@ -79,7 +81,8 @@ public class RefreshTokenService {
 
     // Check user status
     if (!user.getIsActive()) {
-      throw new IllegalArgumentException("User account is deactivated");
+      throw new PlatformDomainException(
+          "User account is deactivated", "AUTH_USER_DEACTIVATED", 403);
     }
 
     // Revoke old refresh token (token rotation)

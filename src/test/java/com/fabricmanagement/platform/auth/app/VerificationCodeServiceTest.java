@@ -87,7 +87,8 @@ class VerificationCodeServiceTest {
           .thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> service.validateAndConsume(CONTACT, TYPE, "123456"))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("invalid or expired");
     }
 
@@ -107,7 +108,8 @@ class VerificationCodeServiceTest {
           .thenReturn(Optional.of(code));
 
       assertThatThrownBy(() -> service.validateAndConsume(CONTACT, TYPE, "123456"))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("expired");
       verify(verificationCodeRepository).save(code);
     }
@@ -128,7 +130,8 @@ class VerificationCodeServiceTest {
           .thenReturn(Optional.of(code));
 
       assertThatThrownBy(() -> service.validateAndConsume(CONTACT, TYPE, "123456"))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("already been used");
     }
 
@@ -171,7 +174,8 @@ class VerificationCodeServiceTest {
       when(passwordEncoder.matches(eq("123456"), eq("hash"))).thenReturn(false);
 
       assertThatThrownBy(() -> service.validateAndConsume(CONTACT, TYPE, "123456"))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("invalid or expired");
       verify(verificationCodeRepository).save(code);
       assertThat(code.getAttemptCount()).isEqualTo(1);

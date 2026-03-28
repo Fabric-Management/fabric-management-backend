@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentServi
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.CommonDomainException;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
@@ -67,7 +68,8 @@ public class OrganizationContactAssignmentService
     UUID tenantId = TenantContext.getCurrentTenantId();
     organizationRepository
         .findByTenantIdAndId(tenantId, parentId)
-        .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        .orElseThrow(
+            () -> new PlatformDomainException("Organization not found", "ORG_NOT_FOUND", 404));
   }
 
   @Override
@@ -76,9 +78,12 @@ public class OrganizationContactAssignmentService
     Contact contact =
         contactRepository
             .findById(childId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException("Contact not found", "ORG_CONTACT_NOT_FOUND", 404));
     if (!contact.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Contact does not belong to current tenant");
+      throw new PlatformDomainException(
+          "Contact does not belong to current tenant", "ORG_CONTACT_TENANT_MISMATCH", 403);
     }
   }
 
@@ -127,7 +132,8 @@ public class OrganizationContactAssignmentService
     if (organizationContactRepository
         .findByOrganizationIdAndContactId(organizationId, contactId)
         .isPresent()) {
-      throw new IllegalArgumentException("Contact is already assigned to this organization");
+      throw new PlatformDomainException(
+          "Contact is already assigned to this organization", "ORG_CONTACT_ALREADY_ASSIGNED", 409);
     }
 
     if (Boolean.TRUE.equals(isDefault)) {
@@ -171,10 +177,16 @@ public class OrganizationContactAssignmentService
     OrganizationContact oc =
         organizationContactRepository
             .findByOrganizationIdAndContactId(organizationId, contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Contact assignment not found", "ORG_CONTACT_ASSIGNMENT_NOT_FOUND", 404));
 
     if (!oc.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Contact assignment does not belong to current tenant");
+      throw new PlatformDomainException(
+          "Contact assignment does not belong to current tenant",
+          "ORG_CONTACT_ASSIGNMENT_MISMATCH",
+          403);
     }
 
     oc.setDepartment(department == null || department.isBlank() ? null : department.trim());
@@ -188,7 +200,10 @@ public class OrganizationContactAssignmentService
     OrganizationContact oc =
         organizationContactRepository
             .findByOrganizationIdAndContactId(organizationId, contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Contact assignment not found", "ORG_CONTACT_ASSIGNMENT_NOT_FOUND", 404));
 
     if (Boolean.TRUE.equals(oc.getIsDefault())) {
       throw new CommonDomainException(
@@ -251,7 +266,10 @@ public class OrganizationContactAssignmentService
     OrganizationContact oc =
         organizationContactRepository
             .findByOrganizationIdAndContactId(organizationId, contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Contact assignment not found", "ORG_CONTACT_ASSIGNMENT_NOT_FOUND", 404));
 
     if (!oc.getTenantId().equals(tenantId)) {
       throw new CommonDomainException("Contact assignment does not belong to current tenant");

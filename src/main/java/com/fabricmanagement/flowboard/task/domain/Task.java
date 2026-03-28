@@ -87,13 +87,24 @@ public class Task extends BaseEntity {
   @Column(name = "entity_id")
   private UUID entityId;
 
+  /** Task'ı oluşturan kaynak tipi (örn: MANUAL, TEMPLATE, AUTOMATION_RULE) - Phase 3 Audit Trail */
+  @Column(name = "source_type", length = 30)
+  private String sourceType = "MANUAL";
+
+  /** Task'ı oluşturan kaynağın ID'si (örn: Template ID veya Rule ID) - Phase 3 Audit Trail */
+  @Column(name = "source_id")
+  private UUID sourceId;
+
   /** İlk IN_PROGRESS geçişinde set edilir. */
   @Column(name = "started_at")
   private Instant startedAt;
 
-  /** DONE geçişinde set edilir. DONE → IN_PROGRESS (reopen) durumunda null yapılır. */
   @Column(name = "completed_at")
   private Instant completedAt;
+
+  /** Phase 3.1: Idempotency flag for approaching deadline warnings. */
+  @Column(name = "is_deadline_warning_fired", nullable = false)
+  private Boolean isDeadlineWarningFired = false;
 
   @Version
   @Column(name = "version", nullable = false)
@@ -253,9 +264,19 @@ public class Task extends BaseEntity {
     this.description = description;
   }
 
-  /** Deadline'ı günceller. */
+  /** Deadline'ı günceller. IsDeadlineWarningFired flag'ini sıfırlar. */
   public void updateDeadline(LocalDate deadline) {
+    if (this.deadline != null && !this.deadline.equals(deadline)) {
+      this.isDeadlineWarningFired = false;
+    } else if (this.deadline == null && deadline != null) {
+      this.isDeadlineWarningFired = false;
+    }
     this.deadline = deadline;
+  }
+
+  /** Phase 3.1: Deadline uyarı flag'ini işaretler. */
+  public void markDeadlineWarningFired() {
+    this.isDeadlineWarningFired = true;
   }
 
   /** Priority günceller. */
@@ -266,6 +287,14 @@ public class Task extends BaseEntity {
   /** Başlık günceller. */
   public void updateTitle(String title) {
     this.title = title;
+  }
+
+  /** Phase 3: Audit Trail için kaynak ataması. */
+  public void assignSource(String sourceType, UUID sourceId) {
+    if (sourceType != null && !sourceType.isBlank()) {
+      this.sourceType = sourceType;
+    }
+    this.sourceId = sourceId;
   }
 
   // =========================================================================

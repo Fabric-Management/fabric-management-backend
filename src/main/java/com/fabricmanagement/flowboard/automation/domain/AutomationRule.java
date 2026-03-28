@@ -109,4 +109,27 @@ public class AutomationRule extends BaseEntity {
   protected String getModuleCode() {
     return "ARULE";
   }
+
+  public void update(
+      String name,
+      String description,
+      AutomationTriggerType triggerType,
+      String triggerConfig,
+      String conditionConfig,
+      AutomationActionType actionType,
+      String actionConfig,
+      UUID boardId) {
+    this.name = name;
+    this.description = description;
+    this.triggerType = triggerType;
+    this.triggerConfig = triggerConfig;
+    this.conditionConfig = conditionConfig;
+    this.actionType = actionType;
+    this.actionConfig = actionConfig;
+    this.boardId = boardId;
+  }
+
+  public void toggleActive(boolean isActive) {
+    this.isActive = isActive;
+  }
 }

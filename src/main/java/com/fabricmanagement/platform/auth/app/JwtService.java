@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
@@ -77,7 +78,10 @@ public class JwtService {
     String contactValue =
         user.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "User has no verified contact", "AUTH_NO_VERIFIED_CONTACT", 400));
 
     log.debug("Generating access token for user: {}", contactValue);
 
@@ -144,7 +148,10 @@ public class JwtService {
     String contactValue =
         user.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "User has no verified contact", "AUTH_NO_VERIFIED_CONTACT", 400));
 
     log.debug("Generating MFA pre-auth token for user: {}", contactValue);
 
@@ -178,7 +185,10 @@ public class JwtService {
     String contactValue =
         user.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "User has no verified contact", "AUTH_NO_VERIFIED_CONTACT", 400));
 
     log.debug(
         "Generating partner access token for user: {}, partnerId: {}", contactValue, partnerId);
@@ -237,7 +247,10 @@ public class JwtService {
     String contactValue =
         user.getAnyVerifiedContact()
             .map(contact -> contact.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User has no verified contact"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "User has no verified contact", "AUTH_NO_VERIFIED_CONTACT", 400));
 
     log.debug("Generating refresh token for user: {}", contactValue);
 
@@ -290,7 +303,8 @@ public class JwtService {
     Claims claims = extractClaims(token);
     String tenantId = claims.get("tenant_id", String.class);
     if (tenantId == null || tenantId.isBlank()) {
-      throw new IllegalArgumentException("JWT missing tenant_id claim");
+      throw new PlatformDomainException(
+          "JWT missing tenant_id claim", "AUTH_JWT_MISSING_CLAIM", 401);
     }
     return UUID.fromString(tenantId);
   }
@@ -304,7 +318,7 @@ public class JwtService {
     Claims claims = extractClaims(token);
     String userId = claims.get("user_id", String.class);
     if (userId == null || userId.isBlank()) {
-      throw new IllegalArgumentException("JWT missing user_id claim");
+      throw new PlatformDomainException("JWT missing user_id claim", "AUTH_JWT_MISSING_CLAIM", 401);
     }
     return UUID.fromString(userId);
   }

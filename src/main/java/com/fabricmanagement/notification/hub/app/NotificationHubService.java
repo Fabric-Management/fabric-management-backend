@@ -106,6 +106,24 @@ public class NotificationHubService {
     return logRepo.countUnreadByRecipient(recipientId);
   }
 
+  /** Kullanıcının bildirim tercihini günceller. */
+  @Transactional
+  public void updatePreference(
+      UUID tenantId, UUID userId, String eventType, boolean inApp, boolean email, boolean push) {
+    prefRepo
+        .findByUserIdAndEventType(userId, eventType)
+        .ifPresentOrElse(
+            pref -> {
+              pref.update(inApp, email, push);
+              prefRepo.save(pref);
+            },
+            () -> {
+              var pref = UserNotificationPreference.createDefault(tenantId, userId, eventType);
+              pref.update(inApp, email, push);
+              prefRepo.save(pref);
+            });
+  }
+
   // ---- Yardımcı metodlar ----
 
   private boolean shouldSend(UserNotificationPreference preference, NotificationTemplate template) {

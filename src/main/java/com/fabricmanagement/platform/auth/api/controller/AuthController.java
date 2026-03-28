@@ -13,6 +13,7 @@ import com.fabricmanagement.platform.auth.app.MfaSetupService;
 import com.fabricmanagement.platform.auth.app.RefreshTokenService;
 import com.fabricmanagement.platform.auth.dto.*;
 import com.fabricmanagement.platform.auth.dto.ActiveSessionDto;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -219,15 +220,17 @@ public class AuthController {
             .orElse(null);
 
     if (token == null) {
-      throw new IllegalArgumentException("MFA token required");
+      throw new PlatformDomainException("MFA token required", "AUTH_MFA_TOKEN_REQUIRED", 401);
     }
 
     if (!jwtService.validateToken(token)) {
-      throw new IllegalArgumentException("Invalid or expired MFA token");
+      throw new PlatformDomainException(
+          "Invalid or expired MFA token", "AUTH_MFA_TOKEN_INVALID", 401);
     }
 
     if (!jwtService.isPreAuthToken(token)) {
-      throw new IllegalArgumentException("Only pre-auth MFA tokens can subscribe to MFA events");
+      throw new PlatformDomainException(
+          "Only pre-auth MFA tokens can subscribe to MFA events", "AUTH_MFA_TOKEN_INVALID", 400);
     }
 
     UUID userId = jwtService.getUserIdFromToken(token);
@@ -252,7 +255,7 @@ public class AuthController {
   private UUID getCurrentUserId() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof String)) {
-      throw new IllegalArgumentException("Not authenticated");
+      throw new PlatformDomainException("Not authenticated", "AUTH_NOT_AUTHENTICATED", 401);
     }
     return UUID.fromString((String) auth.getPrincipal());
   }
@@ -264,11 +267,12 @@ public class AuthController {
   private UUID getCurrentTenantId() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth == null || !(auth.getDetails() instanceof AuthenticatedUserContext)) {
-      throw new IllegalArgumentException("Not authenticated");
+      throw new PlatformDomainException("Not authenticated", "AUTH_NOT_AUTHENTICATED", 401);
     }
     UUID tenantId = ((AuthenticatedUserContext) auth.getDetails()).tenantId();
     if (tenantId == null) {
-      throw new IllegalArgumentException("Tenant context not available");
+      throw new PlatformDomainException(
+          "Tenant context not available", "AUTH_TENANT_CONTEXT_MISSING", 401);
     }
     return tenantId;
   }

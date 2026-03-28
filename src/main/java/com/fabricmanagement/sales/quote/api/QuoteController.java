@@ -2,11 +2,12 @@ package com.fabricmanagement.sales.quote.api;
 
 import com.fabricmanagement.sales.quote.app.QuoteApprovalService;
 import com.fabricmanagement.sales.quote.app.QuoteService;
-import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.CustomerApprovalRequest;
 import com.fabricmanagement.sales.quote.dto.GenerateQuoteTokenRequest;
+import com.fabricmanagement.sales.quote.dto.QuoteApprovalTokenDto;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
+import com.fabricmanagement.sales.quote.mapper.QuoteMapper;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class QuoteController {
 
   private final QuoteService quoteService;
   private final QuoteApprovalService quoteApprovalService;
+  private final QuoteMapper mapper;
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
@@ -58,9 +60,10 @@ public class QuoteController {
 
   @PostMapping("/{quoteId}/tokens")
   @ResponseStatus(HttpStatus.CREATED)
-  public QuoteApprovalToken generateToken(
+  public QuoteApprovalTokenDto generateToken(
       @PathVariable UUID quoteId, @Valid @RequestBody GenerateQuoteTokenRequest req) {
-    return quoteApprovalService.generateTokenForQuote(quoteId, req.getChannel(), req.getSentTo());
+    return mapper.toDto(
+        quoteApprovalService.generateTokenForQuote(quoteId, req.getChannel(), req.getSentTo()));
   }
 
   /** Public endpoint intended for the customer-facing frontend. */

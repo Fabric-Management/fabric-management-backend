@@ -5,6 +5,7 @@ import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.auth.domain.VerificationCode;
 import com.fabricmanagement.platform.auth.domain.VerificationType;
 import com.fabricmanagement.platform.auth.infra.repository.VerificationCodeRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import java.security.SecureRandom;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -73,7 +74,8 @@ public class VerificationCodeService {
                       tenantId,
                       maskContact(contactValue),
                       type);
-                  return new IllegalArgumentException("Verification code is invalid or expired");
+                  return new com.fabricmanagement.platform.common.exception.PlatformDomainException(
+                      "Verification code is invalid or expired");
                 });
 
     if (verificationCode.isExpired()) {
@@ -84,7 +86,7 @@ public class VerificationCodeService {
           type);
       verificationCode.markAsUsed();
       verificationCodeRepository.save(verificationCode);
-      throw new IllegalArgumentException(
+      throw new com.fabricmanagement.platform.common.exception.PlatformDomainException(
           "Verification code has expired. Please request a new code.");
     }
 
@@ -94,7 +96,8 @@ public class VerificationCodeService {
           tenantId,
           maskContact(contactValue),
           type);
-      throw new IllegalArgumentException("Verification code has already been used.");
+      throw new PlatformDomainException(
+          "Verification code has already been used.", "AUTH_VERIFICATION_CODE_USED", 400);
     }
 
     if (verificationCode.getAttemptCount() >= maxAttempts) {
@@ -103,7 +106,7 @@ public class VerificationCodeService {
           tenantId,
           maskContact(contactValue),
           type);
-      throw new IllegalArgumentException(
+      throw new com.fabricmanagement.platform.common.exception.PlatformDomainException(
           "Too many verification attempts. Please request a new code.");
     }
 
@@ -116,7 +119,8 @@ public class VerificationCodeService {
           maskContact(contactValue),
           type,
           verificationCode.getAttemptCount());
-      throw new IllegalArgumentException("Verification code is invalid or expired");
+      throw new PlatformDomainException(
+          "Verification code is invalid or expired", "AUTH_VERIFICATION_CODE_INVALID", 400);
     }
 
     verificationCode.markAsUsed();

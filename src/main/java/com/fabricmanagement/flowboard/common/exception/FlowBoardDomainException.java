@@ -13,7 +13,11 @@ public class FlowBoardDomainException extends DomainException {
     super(message, "FLOWBOARD_RULE_VIOLATION", 400, cause);
   }
 
-  protected FlowBoardDomainException(String message, String errorCode, int httpStatus) {
+  public FlowBoardDomainException(String message, String errorCode, int httpStatus) {
     super(message, errorCode, httpStatus);
+  }
+
+  public FlowBoardDomainException(String message, String errorCode, int httpStatus, Object[] args) {
+    super(message, errorCode, httpStatus, args);
   }
 }

@@ -55,27 +55,84 @@ public class BoardController {
   @Operation(summary = "Board'daki task'ları sayfalı getir — priorityScore DESC sıralı")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<PagedResponse<TaskResponse>>> getTasksByBoard(
-      @PathVariable UUID id, @PageableDefault(size = 30) Pageable pageable) {
+      @PathVariable UUID id,
+      @RequestParam(required = false) UUID assigneeId,
+      @RequestParam(required = false) com.fabricmanagement.flowboard.task.domain.Priority priority,
+      @RequestParam(required = false)
+          com.fabricmanagement.flowboard.task.domain.ModuleType moduleType,
+      @RequestParam(defaultValue = "false") boolean onlyMine,
+      @PageableDefault(size = 30) Pageable pageable,
+      org.springframework.security.core.Authentication authentication) {
     LocalDate today = LocalDate.now(clock);
-    PagedResponse<TaskResponse> paged =
-        PagedResponse.from(
-            taskService.getTasksByBoard(id, pageable).map(t -> TaskResponse.from(t, today)));
-    return ResponseEntity.ok(ApiResponse.success(paged));
+
+    // Resolve assigneeId if onlyMine is true
+    UUID effectiveAssigneeId = assigneeId;
+    if (onlyMine && authentication != null) {
+      if (authentication.getDetails()
+          instanceof
+          com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext ctx) {
+        effectiveAssigneeId = ctx.userId();
+      }
+    }
+
+    var taskPage =
+        taskService.getTasksByBoard(id, priority, moduleType, effectiveAssigneeId, pageable);
+    var responses = taskService.mapToTaskResponses(taskPage.getContent(), today);
+    var mappedPage =
+        new org.springframework.data.domain.PageImpl<>(
+            responses, pageable, taskPage.getTotalElements());
+    return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(mappedPage)));
   }
 
   @GetMapping("/{id}/kanban")
   @Operation(summary = "Kanban view — status bazlı task grupları")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Map<String, List<TaskResponse>>>> getKanbanView(
-      @PathVariable UUID id) {
-    var kanban = taskService.getKanbanView(id);
-    LocalDate today = LocalDate.now(clock);
-    Map<String, List<TaskResponse>> response = new LinkedHashMap<>();
-    for (TaskStatus status : TaskStatus.values()) {
-      var tasks = kanban.getOrDefault(status, List.of());
-      response.put(status.name(), tasks.stream().map(t -> TaskResponse.from(t, today)).toList());
+      @PathVariable UUID id,
+      @RequestParam(required = false) UUID assigneeId,
+      @RequestParam(required = false) com.fabricmanagement.flowboard.task.domain.Priority priority,
+      @RequestParam(required = false)
+          com.fabricmanagement.flowboard.task.domain.ModuleType moduleType,
+      @RequestParam(defaultValue = "false") boolean onlyMine,
+      org.springframework.security.core.Authentication authentication) {
+
+    // Resolve assigneeId if onlyMine is true
+    UUID effectiveAssigneeId = assigneeId;
+    if (onlyMine && authentication != null) {
+      if (authentication.getDetails()
+          instanceof
+          com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext ctx) {
+        effectiveAssigneeId = ctx.userId();
+      }
     }
+
+    LocalDate today = LocalDate.now(clock);
+    var pagedTasks =
+        taskService.getTasksByBoard(
+            id,
+            priority,
+            moduleType,
+            effectiveAssigneeId,
+            org.springframework.data.domain.Pageable.unpaged());
+    var populatedResponses = taskService.mapToTaskResponses(pagedTasks.getContent(), today);
+
+    Map<String, List<TaskResponse>> response = new LinkedHashMap<>();
+    for (TaskStatus status : TaskStatus.values())
+      response.put(status.name(), new java.util.ArrayList<>());
+    for (TaskResponse tr : populatedResponses) response.get(tr.status().name()).add(tr);
+
     return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
+  @GetMapping("/{id}/eligible-assignees")
+  @Operation(summary = "Pano için atanabilecek kullanıcıları getir")
+  @PreAuthorize(
+      "isAuthenticated()") // Or use @PreAuthorize("@flowBoardAccessService.canRead(authentication,
+  // 'BOARD')")
+  public ResponseEntity<
+          ApiResponse<java.util.List<com.fabricmanagement.flowboard.common.dto.UserSummaryDto>>>
+      getEligibleAssignees(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(boardService.getEligibleAssignees(id)));
   }
 
   @PostMapping

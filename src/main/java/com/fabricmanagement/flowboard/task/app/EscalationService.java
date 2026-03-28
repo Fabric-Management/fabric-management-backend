@@ -1,5 +1,6 @@
 package com.fabricmanagement.flowboard.task.app;
 
+import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
 import com.fabricmanagement.flowboard.task.domain.EscalationLog;
 import com.fabricmanagement.flowboard.task.domain.EscalationType;
 import com.fabricmanagement.flowboard.task.domain.event.EscalationTriggeredEvent;
@@ -84,7 +85,11 @@ public class EscalationService {
                         "EscalationLog not found: " + escalationLogId));
 
     if (logEntry.getResolvedAt() != null) {
-      throw new IllegalStateException("Escalation already resolved: " + escalationLogId);
+      throw new FlowBoardDomainException(
+          "Escalation already resolved",
+          "FLOWBOARD_ESCALATION_ALREADY_RESOLVED",
+          409,
+          new Object[] {escalationLogId});
     }
 
     logEntry.resolve(resolvedByUserId, resolutionNote, clock);

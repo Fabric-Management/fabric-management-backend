@@ -3,6 +3,7 @@ package com.fabricmanagement.flowboard.task.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository;
+import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
 import com.fabricmanagement.flowboard.task.domain.*;
 import com.fabricmanagement.flowboard.task.domain.event.TaskAssignedEvent;
 import com.fabricmanagement.flowboard.task.domain.event.TaskCreatedEvent;
@@ -45,6 +46,8 @@ public class TaskService {
 
   private final TaskRepository taskRepo;
   private final TaskAssigneeRepository assigneeRepo;
+  private final TaskLabelAssignmentRepository taskLabelAssignmentRepo;
+  private final TaskLabelRepository taskLabelRepo;
   private final BoardRepository boardRepo;
   private final PriorityScoreCalculator scoreCalculator;
   private final DomainEventPublisher eventPublisher;
@@ -86,6 +89,10 @@ public class TaskService {
     if (req.description() != null) {
       task.updateDescription(req.description());
     }
+
+    // [Faz 3 FIX] Audit Trail ataması (sourceType, sourceId)
+    String sourceType = req.sourceType() != null ? req.sourceType() : "MANUAL";
+    task.assignSource(sourceType, req.sourceId());
 
     // PriorityScore hesapla
     int score = scoreCalculator.calculateWithLabels(task, List.of());
@@ -201,10 +208,104 @@ public class TaskService {
     return taskRepo.findAllByBoardIdAndIsActiveTrueOrderByPriorityScoreDesc(boardId);
   }
 
-  /** [P2 FIX] Board'daki task'ları sayfalı getirir — büyük board'lar için. */
+  /** Board'daki task'ları sayfalı ve filtreli getirir. */
+  @Transactional(readOnly = true)
+  public Page<Task> getTasksByBoard(
+      UUID boardId,
+      com.fabricmanagement.flowboard.task.domain.Priority priority,
+      com.fabricmanagement.flowboard.task.domain.ModuleType moduleType,
+      UUID assigneeId,
+      Pageable pageable) {
+    return taskRepo.findAllFiltered(boardId, priority, moduleType, assigneeId, pageable);
+  }
+
+  /** [P2 FIX] Board'daki task'ları sayfalı getirir — büyük board'lar için (Geriye Uyumluluk). */
   @Transactional(readOnly = true)
   public Page<Task> getTasksByBoard(UUID boardId, Pageable pageable) {
-    return taskRepo.findAllByBoardIdAndIsActiveTrue(boardId, pageable);
+    return getTasksByBoard(boardId, null, null, null, pageable);
+  }
+
+  /** Task dökümlerini (TaskResponse) assignees ile N+1 olmadan oluşturur. */
+  @Transactional(readOnly = true)
+  public List<TaskResponse> mapToTaskResponses(List<Task> tasks, java.time.LocalDate today) {
+    if (tasks.isEmpty()) return List.of();
+
+    List<UUID> taskIds = tasks.stream().map(Task::getId).toList();
+    List<TaskAssignee> allAssignees = assigneeRepo.findAllByTaskIdInAndIsActiveTrue(taskIds);
+
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    List<com.fabricmanagement.platform.user.dto.UserDto> allTenantUsers =
+        userFacade.findByTenant(tenantId);
+    Map<UUID, com.fabricmanagement.platform.user.dto.UserDto> userMap = new HashMap<>();
+    for (var u : allTenantUsers) {
+      userMap.put(u.getId(), u);
+    }
+
+    Map<UUID, List<TaskAssigneeResponse>> assigneesByTask = new HashMap<>();
+    for (TaskAssignee a : allAssignees) {
+      if (a.getUserId() == null) continue;
+      com.fabricmanagement.platform.user.dto.UserDto u = userMap.get(a.getUserId());
+      String fullName =
+          u != null
+              ? (u.getDisplayName() != null
+                  ? u.getDisplayName()
+                  : u.getFirstName() + " " + u.getLastName())
+              : "Unknown User";
+      String initials = "U";
+      if (u != null) {
+        if (u.getFirstName() != null && !u.getFirstName().isBlank())
+          initials = String.valueOf(u.getFirstName().charAt(0)).toUpperCase();
+        else if (u.getDisplayName() != null && !u.getDisplayName().isBlank())
+          initials = String.valueOf(u.getDisplayName().charAt(0)).toUpperCase();
+      }
+      TaskAssigneeResponse resp =
+          TaskAssigneeResponse.builder()
+              .userId(a.getUserId())
+              .fullName(fullName)
+              .avatarInitials(initials)
+              .assignedBy(a.getAssignedBy().name())
+              .assignedAt(a.getAssignedAt())
+              .build();
+      assigneesByTask.computeIfAbsent(a.getTaskId(), k -> new ArrayList<>()).add(resp);
+    }
+
+    List<TaskLabelAssignment> allLabelAssignments =
+        taskLabelAssignmentRepo.findAllByTaskIdIn(taskIds);
+    Set<UUID> labelIdSet = new HashSet<>();
+    for (TaskLabelAssignment la : allLabelAssignments) {
+      labelIdSet.add(la.getLabelId());
+    }
+    Map<UUID, TaskLabel> labelById = new HashMap<>();
+    if (!labelIdSet.isEmpty()) {
+      for (TaskLabel tl : taskLabelRepo.findAllById(labelIdSet)) {
+        if (Boolean.TRUE.equals(tl.getIsActive())) {
+          labelById.put(tl.getId(), tl);
+        }
+      }
+    }
+    Map<UUID, List<LabelResponse>> labelsByTask = new HashMap<>();
+    for (TaskLabelAssignment la : allLabelAssignments) {
+      TaskLabel tl = labelById.get(la.getLabelId());
+      if (tl == null) {
+        continue;
+      }
+      labelsByTask
+          .computeIfAbsent(la.getTaskId(), k -> new ArrayList<>())
+          .add(LabelResponse.from(tl));
+    }
+    for (List<LabelResponse> labelList : labelsByTask.values()) {
+      labelList.sort(Comparator.comparing(LabelResponse::name, String.CASE_INSENSITIVE_ORDER));
+    }
+
+    return tasks.stream()
+        .map(
+            task ->
+                TaskResponse.from(
+                    task,
+                    today,
+                    assigneesByTask.getOrDefault(task.getId(), List.of()),
+                    labelsByTask.getOrDefault(task.getId(), List.of())))
+        .toList();
   }
 
   /**
@@ -213,16 +314,16 @@ public class TaskService {
    * @return Her TaskStatus için task listesi (boş status'ler boş liste ile döner)
    */
   @Transactional(readOnly = true)
-  public Map<TaskStatus, List<Task>> getKanbanView(UUID boardId) {
-    // Tüm status'leri başlat — boş board'da bile tüm kolonlar görünsün
-    Map<TaskStatus, List<Task>> kanban = new LinkedHashMap<>();
-    for (TaskStatus status : TaskStatus.values()) {
-      kanban.put(status, new ArrayList<>());
-    }
-    // Task'ları ilgili kolona dağıt
+  public Map<TaskStatus, List<TaskResponse>> getKanbanViewResponses(
+      UUID boardId, java.time.LocalDate today) {
+    Map<TaskStatus, List<TaskResponse>> kanban = new LinkedHashMap<>();
+    for (TaskStatus status : TaskStatus.values()) kanban.put(status, new ArrayList<>());
+
     List<Task> tasks = getTasksByBoard(boardId);
-    for (Task task : tasks) {
-      kanban.get(task.getStatus()).add(task);
+    List<TaskResponse> populatedResponses = mapToTaskResponses(tasks, today);
+
+    for (TaskResponse tr : populatedResponses) {
+      kanban.get(tr.status()).add(tr);
     }
     return kanban;
   }
@@ -246,7 +347,7 @@ public class TaskService {
    * @param userId Atanacak kullanıcı
    * @param assignedBy Atama yapan (SYSTEM/MANAGER/SELF)
    * @param requestedByUserId Atama işlemini gerçekleştiren kullanıcı
-   * @throws IllegalStateException aynı kullanıcı zaten atanmışsa
+   * @throws FlowBoardDomainException aynı kullanıcı zaten atanmışsa
    */
   @Transactional
   public void assignToUser(
@@ -258,7 +359,11 @@ public class TaskService {
 
     // [L4 FIX] Duplicate assignment koruması
     if (assigneeRepo.findByTaskIdAndUserIdAndIsActiveTrue(taskId, userId).isPresent()) {
-      throw new IllegalStateException("User " + userId + " is already assigned to task " + taskId);
+      throw new FlowBoardDomainException(
+          "User is already assigned to task",
+          "FLOWBOARD_USER_ALREADY_ASSIGNED",
+          409,
+          new Object[] {userId, taskId});
     }
 
     var assignee = TaskAssignee.assignToUser(taskId, userId, assignedBy);
@@ -272,6 +377,70 @@ public class TaskService {
             TenantContext.getCurrentTenantId(), taskId, userId, assignedByUserId));
 
     log.info("Task assigned: taskId={} userId={} assignedBy={}", taskId, userId, assignedBy);
+  }
+
+  /** Task atamalarını getirir. */
+  @Transactional(readOnly = true)
+  public List<TaskAssigneeResponse> getTaskAssignees(UUID taskId) {
+    if (!taskRepo.existsById(taskId)) {
+      throw new EntityNotFoundException("Task not found: " + taskId);
+    }
+
+    return assigneeRepo.findAllByTaskIdAndIsActiveTrue(taskId).stream()
+        .map(
+            a -> {
+              if (a.getUserId() == null) return null;
+              var userOpt = userFacade.findById(TenantContext.getCurrentTenantId(), a.getUserId());
+
+              String fullName =
+                  userOpt
+                      .map(
+                          u ->
+                              (u.getDisplayName() != null
+                                  ? u.getDisplayName()
+                                  : u.getFirstName() + " " + u.getLastName()))
+                      .orElse("Unknown User");
+              String initials = "U";
+              if (userOpt.isPresent()) {
+                var u = userOpt.get();
+                if (u.getFirstName() != null && !u.getFirstName().isBlank())
+                  initials = String.valueOf(u.getFirstName().charAt(0)).toUpperCase();
+                else if (u.getDisplayName() != null && !u.getDisplayName().isBlank())
+                  initials = String.valueOf(u.getDisplayName().charAt(0)).toUpperCase();
+              }
+
+              return TaskAssigneeResponse.builder()
+                  .userId(a.getUserId())
+                  .fullName(fullName)
+                  .avatarInitials(initials)
+                  .assignedBy(a.getAssignedBy().name())
+                  .assignedAt(a.getAssignedAt())
+                  .build();
+            })
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  /** Kullanıcının atamasını kaldırır. */
+  @Transactional
+  public void unassignUser(UUID taskId, UUID userId, UUID requestedByUserId) {
+    if (!taskRepo.existsById(taskId)) {
+      throw new EntityNotFoundException("Task not found: " + taskId);
+    }
+
+    TaskAssignee assignee =
+        assigneeRepo
+            .findByTaskIdAndUserIdAndIsActiveTrue(taskId, userId)
+            .orElseThrow(() -> new EntityNotFoundException("Assignee not found for task"));
+
+    assigneeRepo.delete(assignee);
+
+    eventPublisher.publish(
+        new com.fabricmanagement.flowboard.task.domain.event.TaskUnassignedEvent(
+            TenantContext.getCurrentTenantId(), taskId, userId, requestedByUserId));
+
+    log.info(
+        "Task unassigned: taskId={} userId={} unassignedBy={}", taskId, userId, requestedByUserId);
   }
 
   // =========================================================================
@@ -320,7 +489,12 @@ public class TaskService {
       case DONE -> task.markDone();
       case BLOCKED -> task.block();
       case CANCELLED -> task.cancel();
-      default -> throw new IllegalArgumentException("Unsupported status transition to: " + target);
+      default ->
+          throw new FlowBoardDomainException(
+              "Unsupported status transition",
+              "FLOWBOARD_UNSUPPORTED_STATUS_TRANSITION",
+              400,
+              new Object[] {target.name()});
     }
   }
 

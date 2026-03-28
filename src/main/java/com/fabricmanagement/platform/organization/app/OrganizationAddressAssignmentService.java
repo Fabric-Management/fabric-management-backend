@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.organization.app;
 import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentService;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
@@ -67,7 +68,8 @@ public class OrganizationAddressAssignmentService
     UUID tenantId = TenantContext.getCurrentTenantId();
     organizationRepository
         .findByTenantIdAndId(tenantId, parentId)
-        .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        .orElseThrow(
+            () -> new PlatformDomainException("Organization not found", "ORG_NOT_FOUND", 404));
   }
 
   @Override
@@ -76,9 +78,12 @@ public class OrganizationAddressAssignmentService
     Address address =
         addressRepository
             .findById(childId)
-            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException("Address not found", "ORG_ADDRESS_NOT_FOUND", 404));
     if (!address.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Address does not belong to current tenant");
+      throw new PlatformDomainException(
+          "Address does not belong to current tenant", "ORG_ADDRESS_TENANT_MISMATCH", 403);
     }
   }
 
@@ -127,7 +132,8 @@ public class OrganizationAddressAssignmentService
     if (organizationAddressRepository
         .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
         .isPresent()) {
-      throw new IllegalArgumentException("Address is already assigned to this organization");
+      throw new PlatformDomainException(
+          "Address is already assigned to this organization", "ORG_ADDRESS_ALREADY_ASSIGNED", 409);
     }
 
     if (Boolean.TRUE.equals(isPrimary)) {
@@ -171,7 +177,10 @@ public class OrganizationAddressAssignmentService
     setPrimary(organizationId, addressId);
     return organizationAddressRepository
         .findActiveWithAddressByOrganizationIdAndAddressId(organizationId, addressId)
-        .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Address assignment not found", "ORG_ADDRESS_ASSIGNMENT_NOT_FOUND", 404));
   }
 
   @Transactional
@@ -180,7 +189,10 @@ public class OrganizationAddressAssignmentService
     OrganizationAddress junction =
         organizationAddressRepository
             .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Address assignment not found", "ORG_ADDRESS_ASSIGNMENT_NOT_FOUND", 404));
     organizationAddressRepository
         .findHeadquartersByOrganizationId(organizationId)
         .ifPresent(
@@ -194,7 +206,10 @@ public class OrganizationAddressAssignmentService
     organizationAddressRepository.save(junction);
     return organizationAddressRepository
         .findActiveWithAddressByOrganizationIdAndAddressId(organizationId, addressId)
-        .orElseThrow(() -> new IllegalArgumentException("Address assignment not found"));
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Address assignment not found", "ORG_ADDRESS_ASSIGNMENT_NOT_FOUND", 404));
   }
 
   @Transactional(readOnly = true)
@@ -228,12 +243,17 @@ public class OrganizationAddressAssignmentService
     OrganizationAddress orgAddress =
         organizationAddressRepository
             .findActiveByOrganizationIdAndAddressId(organizationId, addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Organization address not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Organization address not found", "ORG_ADDRESS_NOT_FOUND", 404));
 
     Address address =
         addressRepository
             .findById(addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException("Address not found", "ORG_ADDRESS_NOT_FOUND", 404));
 
     List<UserWorkLocation> affectedLocations =
         userWorkLocationRepository.findByOrgAddressId(orgAddress.getAddressId());
@@ -281,15 +301,21 @@ public class OrganizationAddressAssignmentService
     OrganizationAddress orgAddress =
         organizationAddressRepository
             .findByOrganizationIdAndAddressId(organizationId, addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Organization address not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Organization address not found", "ORG_ADDRESS_NOT_FOUND", 404));
 
     Address address =
         addressRepository
             .findById(addressId)
-            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException("Address not found", "ORG_ADDRESS_NOT_FOUND", 404));
 
     if (!address.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Address does not belong to current tenant");
+      throw new PlatformDomainException(
+          "Address does not belong to current tenant", "ORG_ADDRESS_TENANT_MISMATCH", 403);
     }
 
     long affectedCount = userWorkLocationRepository.countByOrgAddressId(orgAddress.getAddressId());

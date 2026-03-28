@@ -11,6 +11,7 @@ import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationChangeReason;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertificationScope;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.dto.AddBatchCertificationRequest;
 import com.fabricmanagement.production.execution.batch.dto.BatchCertificationAutoFillResponse;
 import com.fabricmanagement.production.execution.batch.dto.BatchCertificationDto;
@@ -80,7 +81,7 @@ public class BatchCertificationService {
               .filter(pc -> Boolean.TRUE.equals(pc.getIsActive()))
               .orElseThrow(
                   () ->
-                      new IllegalArgumentException(
+                      new NotFoundException(
                           "Partner certification not found: "
                               + request.getPartnerCertificationId()));
     }
@@ -93,7 +94,7 @@ public class BatchCertificationService {
               .filter(oc -> Boolean.TRUE.equals(oc.getIsActive()))
               .orElseThrow(
                   () ->
-                      new IllegalArgumentException(
+                      new NotFoundException(
                           "Organization certification not found: "
                               + request.getOrgCertificationId()));
     }
@@ -159,7 +160,8 @@ public class BatchCertificationService {
     Batch target = getBatchOrThrow(targetBatchId);
     Batch source = getBatchOrThrow(sourceBatchId);
     if (source.getId().equals(target.getId())) {
-      throw new IllegalArgumentException("Source and target batch must be different.");
+      throw new BatchDomainException(
+          "Source and target batch must be different.", "BATCH_CERT_COPY_SAME_SOURCE_TARGET", 400);
     }
 
     List<BatchCertification> sourceCerts =
@@ -390,7 +392,7 @@ public class BatchCertificationService {
     UUID tenantId = TenantContext.getCurrentTenantId();
     return batchRepository
         .findByIdAndTenantId(batchId, tenantId)
-        .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
+        .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
   }
 
   private BatchCertification findBatchCertificationOrThrow(
@@ -404,7 +406,7 @@ public class BatchCertificationService {
     }
     return byBatchAndTenant.orElseThrow(
         () ->
-            new IllegalArgumentException(
+            new NotFoundException(
                 "Batch certification not found: "
                     + certificationId
                     + " for batch "

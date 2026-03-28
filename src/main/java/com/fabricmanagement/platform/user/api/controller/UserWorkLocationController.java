@@ -1,14 +1,12 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.user.app.UserWorkLocationService;
-import com.fabricmanagement.platform.user.domain.UserWorkLocation;
+import com.fabricmanagement.platform.user.api.facade.UserWorkLocationFacade;
 import com.fabricmanagement.platform.user.dto.AssignWorkLocationRequest;
 import com.fabricmanagement.platform.user.dto.UserWorkLocationDto;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -20,17 +18,14 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class UserWorkLocationController {
 
-  private final UserWorkLocationService userWorkLocationService;
+  private final UserWorkLocationFacade userWorkLocationFacade;
 
   @GetMapping
   public ResponseEntity<ApiResponse<List<UserWorkLocationDto>>> getUserWorkLocations(
       @PathVariable UUID userId) {
     log.debug("Getting work locations: userId={}", userId);
 
-    List<UserWorkLocationDto> locations =
-        userWorkLocationService.getUserLocations(userId).stream()
-            .map(UserWorkLocationDto::from)
-            .collect(Collectors.toList());
+    List<UserWorkLocationDto> locations = userWorkLocationFacade.getUserLocations(userId);
 
     return ResponseEntity.ok(ApiResponse.success(locations));
   }
@@ -40,9 +35,9 @@ public class UserWorkLocationController {
       @PathVariable UUID userId) {
     log.debug("Getting primary work location: userId={}", userId);
 
-    return userWorkLocationService
+    return userWorkLocationFacade
         .getPrimaryLocation(userId)
-        .map(primary -> ResponseEntity.ok(ApiResponse.success(UserWorkLocationDto.from(primary))))
+        .map(primary -> ResponseEntity.ok(ApiResponse.success(primary)))
         .orElseGet(() -> ResponseEntity.ok(ApiResponse.<UserWorkLocationDto>success(null)));
   }
 
@@ -55,12 +50,11 @@ public class UserWorkLocationController {
         request.getOrgAddressId(),
         request.getIsPrimary());
 
-    UserWorkLocation wl =
-        userWorkLocationService.assignLocation(
+    UserWorkLocationDto wl =
+        userWorkLocationFacade.assignLocation(
             userId, request.getOrgAddressId(), request.getIsPrimary(), request.getNotes());
 
-    return ResponseEntity.ok(
-        ApiResponse.success(UserWorkLocationDto.from(wl), "Work location assigned successfully"));
+    return ResponseEntity.ok(ApiResponse.success(wl, "Work location assigned successfully"));
   }
 
   @PutMapping("/{orgAddressId}/primary")
@@ -68,11 +62,9 @@ public class UserWorkLocationController {
       @PathVariable UUID userId, @PathVariable UUID orgAddressId) {
     log.info("Setting primary work location: userId={}, orgAddressId={}", userId, orgAddressId);
 
-    UserWorkLocation wl = userWorkLocationService.setPrimary(userId, orgAddressId);
+    UserWorkLocationDto wl = userWorkLocationFacade.setPrimary(userId, orgAddressId);
 
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            UserWorkLocationDto.from(wl), "Primary work location set successfully"));
+    return ResponseEntity.ok(ApiResponse.success(wl, "Primary work location set successfully"));
   }
 
   @DeleteMapping("/{orgAddressId}")
@@ -80,7 +72,7 @@ public class UserWorkLocationController {
       @PathVariable UUID userId, @PathVariable UUID orgAddressId) {
     log.info("Removing work location: userId={}, orgAddressId={}", userId, orgAddressId);
 
-    userWorkLocationService.removeLocation(userId, orgAddressId);
+    userWorkLocationFacade.removeLocation(userId, orgAddressId);
 
     return ResponseEntity.ok(ApiResponse.success(null, "Work location removed successfully"));
   }

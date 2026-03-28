@@ -37,6 +37,12 @@ public class UserDto {
   private Instant createdAt;
   private Instant updatedAt;
 
+  /** User-level locale preference (e.g. "tr-TR"). Null = inherits from tenant settings. */
+  private String preferredLocale;
+
+  /** User-level timezone preference (e.g. "Europe/Istanbul"). Null = inherits from tenant. */
+  private String preferredTimezone;
+
   // Work location label — populated from user's primary work location address
   private String workLocationLabel;
 
@@ -119,7 +125,9 @@ public class UserDto {
             .onboardingCompletedAt(user.getOnboardingCompletedAt())
             .hasCompletedOnboarding(user.hasCompletedOnboarding())
             .createdAt(user.getCreatedAt())
-            .updatedAt(user.getUpdatedAt());
+            .updatedAt(user.getUpdatedAt())
+            .preferredLocale(user.getPreferredLocale())
+            .preferredTimezone(user.getPreferredTimezone());
 
     if (employee != null) {
       builder

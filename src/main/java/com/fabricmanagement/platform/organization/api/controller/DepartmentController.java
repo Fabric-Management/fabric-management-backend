@@ -2,9 +2,9 @@ package com.fabricmanagement.platform.organization.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.organization.domain.Department;
+import com.fabricmanagement.platform.organization.app.DepartmentService;
 import com.fabricmanagement.platform.organization.dto.DepartmentDto;
-import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
+import com.fabricmanagement.platform.organization.mapper.DepartmentMapper;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -19,7 +19,8 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class DepartmentController {
 
-  private final DepartmentRepository departmentRepository;
+  private final DepartmentService departmentService;
+  private final DepartmentMapper departmentMapper;
 
   /**
    * Get all departments for current tenant.
@@ -37,8 +38,8 @@ public class DepartmentController {
 
     // Tenant-level departments only (platform-level departments are reference, not shown)
     List<DepartmentDto> departments =
-        departmentRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-            .map(DepartmentDto::from)
+        departmentService.getActiveDepartmentsByTenant(tenantId).stream()
+            .map(departmentMapper::toDto)
             .collect(Collectors.toList());
 
     return ResponseEntity.ok(ApiResponse.success(departments));
@@ -55,10 +56,8 @@ public class DepartmentController {
         organizationId);
 
     List<DepartmentDto> departments =
-        departmentRepository
-            .findByTenantIdAndOrganizationIdAndIsActiveTrue(tenantId, organizationId)
-            .stream()
-            .map(DepartmentDto::from)
+        departmentService.getActiveDepartmentsByOrganization(tenantId, organizationId).stream()
+            .map(departmentMapper::toDto)
             .collect(Collectors.toList());
 
     return ResponseEntity.ok(ApiResponse.success(departments));
@@ -70,11 +69,12 @@ public class DepartmentController {
     UUID tenantId = TenantContext.getCurrentTenantId();
     log.debug("Getting department: tenantId={}, id={}", tenantId, id);
 
-    Department department =
-        departmentRepository
-            .findByTenantIdAndId(tenantId, id)
+    DepartmentDto department =
+        departmentService
+            .getDepartmentByTenantAndId(tenantId, id)
+            .map(departmentMapper::toDto)
             .orElseThrow(() -> new IllegalArgumentException("Department not found"));
 
-    return ResponseEntity.ok(ApiResponse.success(DepartmentDto.from(department)));
+    return ResponseEntity.ok(ApiResponse.success(department));
   }
 }

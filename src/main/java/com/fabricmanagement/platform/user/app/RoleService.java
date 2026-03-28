@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.RoleScope;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
@@ -76,15 +77,21 @@ public class RoleService {
           forTenantIdLogging);
       return internalRoles.get(0);
     }
-    throw new IllegalStateException(
-        "Platform roles not initialized. Ensure role seed migration has been executed.");
+    throw new PlatformDomainException(
+        "Platform roles not initialized. Ensure role seed migration has been executed.",
+        "PLATFORM_ROLES_NOT_INITIALIZED",
+        500);
   }
 
   @Transactional
   public Role create(String roleName, String roleCode, String description) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     if (roleRepository.existsByTenantIdAndRoleCode(tenantId, roleCode)) {
-      throw new IllegalArgumentException("Role with code '" + roleCode + "' already exists");
+      throw new PlatformDomainException(
+          "Role with code already exists",
+          "USER_ROLE_ALREADY_EXISTS",
+          409,
+          new Object[] {roleCode});
     }
     Role role = Role.create(roleName, roleCode, description);
     return roleRepository.save(role);
@@ -96,7 +103,8 @@ public class RoleService {
     Role role =
         roleRepository
             .findByTenantIdAndId(tenantId, roleId)
-            .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("Role not found", "USER_ROLE_NOT_FOUND", 404));
     role.setRoleName(roleName);
     role.setDescription(description);
     return roleRepository.save(role);
@@ -108,7 +116,8 @@ public class RoleService {
     Role role =
         roleRepository
             .findByTenantIdAndId(tenantId, roleId)
-            .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("Role not found", "USER_ROLE_NOT_FOUND", 404));
     role.delete();
     roleRepository.save(role);
   }

@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.user.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.AddressService;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Address;
@@ -88,7 +89,10 @@ public class UserCreationService {
       Role role =
           roleService
               .findById(request.getRoleId())
-              .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+              .orElseThrow(
+                  () ->
+                      new PlatformDomainException(
+                          "Role not found", "USER_CREATION_ROLE_NOT_FOUND", 404));
       userEntity.setRole(role);
     }
 
@@ -205,7 +209,10 @@ public class UserCreationService {
         () -> {
           if (userRepository.existsByTenantIdAndContactValue(
               request.getTenantId(), normalizedContact)) {
-            throw new IllegalArgumentException("Contact value already registered for this tenant");
+            throw new PlatformDomainException(
+                "Contact value already registered for this tenant",
+                "USER_CONTACT_ALREADY_REGISTERED",
+                409);
           }
 
           User user =
@@ -291,10 +298,11 @@ public class UserCreationService {
     validateContactFormat(normalizedContact, contactType);
 
     if (userRepository.existsByTenantIdAndContactValue(tenantId, normalizedContact)) {
-      throw new IllegalArgumentException("Contact value already registered");
+      throw new PlatformDomainException(
+          "Contact value already registered", "USER_CONTACT_ALREADY_REGISTERED", 409);
     }
     if (!organizationFacade.exists(tenantId, organizationId)) {
-      throw new IllegalArgumentException("Organization not found");
+      throw new PlatformDomainException("Organization not found", "ORG_NOT_FOUND", 404);
     }
 
     // Validate primary contact is not duplicated in additional contacts
@@ -308,9 +316,11 @@ public class UserCreationService {
         validateContactFormat(normalized, cd.getContactType());
 
         if (!seenContacts.add(normalized)) {
-          throw new IllegalArgumentException(
-              "Duplicate contact value detected: "
-                  + PiiMaskingUtil.maskEmail(cd.getContactValue()));
+          throw new PlatformDomainException(
+              "Duplicate contact value detected",
+              "USER_CONTACT_DUPLICATE",
+              400,
+              new Object[] {PiiMaskingUtil.maskEmail(cd.getContactValue())});
         }
       }
     }
@@ -356,7 +366,8 @@ public class UserCreationService {
       return saved;
     } catch (DataIntegrityViolationException e) {
       log.warn("Concurrent duplicate contact detected: {}", normalizedContact);
-      throw new IllegalArgumentException("Contact value already registered");
+      throw new PlatformDomainException(
+          "Contact value already registered", "USER_CONTACT_ALREADY_REGISTERED", 409);
     }
   }
 
@@ -473,13 +484,18 @@ public class UserCreationService {
       String contactValue, com.fabricmanagement.platform.user.domain.ContactType contactType) {
     if (contactType == com.fabricmanagement.platform.user.domain.ContactType.EMAIL) {
       if (!EMAIL_PATTERN.matcher(contactValue).matches()) {
-        throw new IllegalArgumentException(
-            "Invalid email format: " + PiiMaskingUtil.maskEmail(contactValue));
+        throw new PlatformDomainException(
+            "Invalid email format",
+            "USER_CONTACT_INVALID_EMAIL",
+            400,
+            new Object[] {PiiMaskingUtil.maskEmail(contactValue)});
       }
     } else if (contactType == com.fabricmanagement.platform.user.domain.ContactType.PHONE) {
       if (!PHONE_PATTERN.matcher(contactValue).matches()) {
-        throw new IllegalArgumentException(
-            "Invalid phone format. Must be E.164 format (e.g., +905551234567)");
+        throw new PlatformDomainException(
+            "Invalid phone format. Must be E.164 format (e.g., +905551234567)",
+            "USER_CONTACT_INVALID_PHONE",
+            400);
       }
     }
   }

@@ -1,8 +1,7 @@
 package com.fabricmanagement.platform.policy.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.policy.app.PolicyService;
-import com.fabricmanagement.platform.policy.domain.Policy;
+import com.fabricmanagement.platform.policy.api.facade.PolicyFacade;
 import com.fabricmanagement.platform.policy.dto.CreatePolicyRequest;
 import com.fabricmanagement.platform.policy.dto.PolicyDto;
 import com.fabricmanagement.platform.policy.dto.UpdatePolicyRequest;
@@ -20,94 +19,54 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class PolicyController {
 
-  private final PolicyService policyService;
+  private final PolicyFacade facade;
 
   @PostMapping
   public ResponseEntity<ApiResponse<PolicyDto>> createPolicy(
       @Valid @RequestBody CreatePolicyRequest request) {
     log.info("Creating policy: policyId={}", request.getPolicyId());
-
-    Policy policy =
-        Policy.builder()
-            .policyId(request.getPolicyId())
-            .resource(request.getResource())
-            .action(request.getAction())
-            .priority(request.getPriority())
-            .effect(request.getEffect())
-            .conditions(request.getConditions())
-            .description(request.getDescription())
-            .build();
-
-    Policy created = policyService.createPolicy(policy);
-
     return ResponseEntity.ok(
-        ApiResponse.success(PolicyDto.from(created), "Policy created successfully"));
+        ApiResponse.success(facade.createPolicy(request), "Policy created successfully"));
   }
 
   @GetMapping
   public ResponseEntity<ApiResponse<List<PolicyDto>>> getAllPolicies() {
     log.debug("Getting all policies");
-
-    List<PolicyDto> policies =
-        policyService.getAllPolicies().stream().map(PolicyDto::from).toList();
-
-    return ResponseEntity.ok(ApiResponse.success(policies));
+    return ResponseEntity.ok(ApiResponse.success(facade.getAllPolicies()));
   }
 
-  /** Get policy by ID. */
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<PolicyDto>> getPolicy(@PathVariable UUID id) {
     log.debug("Getting policy: id={}", id);
-
-    Policy policy =
-        policyService
-            .getPolicyById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Policy not found: " + id));
-
-    return ResponseEntity.ok(ApiResponse.success(PolicyDto.from(policy)));
+    return ResponseEntity.ok(ApiResponse.success(facade.getPolicy(id)));
   }
 
-  /** Update policy. */
   @PutMapping("/{id}")
   public ResponseEntity<ApiResponse<PolicyDto>> updatePolicy(
       @PathVariable UUID id, @Valid @RequestBody UpdatePolicyRequest request) {
     log.info("Updating policy: id={}", id);
-
-    Policy updated = policyService.updatePolicy(id, request);
-
     return ResponseEntity.ok(
-        ApiResponse.success(PolicyDto.from(updated), "Policy updated successfully"));
+        ApiResponse.success(facade.updatePolicy(id, request), "Policy updated successfully"));
   }
 
-  /** Delete policy (soft delete - disables it). */
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<Void>> deletePolicy(@PathVariable UUID id) {
     log.info("Deleting policy: id={}", id);
-
-    policyService.deletePolicy(id);
-
+    facade.deletePolicy(id);
     return ResponseEntity.ok(ApiResponse.success(null, "Policy deleted successfully"));
   }
 
-  /** Enable policy. */
   @PutMapping("/{id}/enable")
   public ResponseEntity<ApiResponse<PolicyDto>> enablePolicy(@PathVariable UUID id) {
     log.info("Enabling policy: id={}", id);
-
-    Policy enabled = policyService.enablePolicy(id);
-
     return ResponseEntity.ok(
-        ApiResponse.success(PolicyDto.from(enabled), "Policy enabled successfully"));
+        ApiResponse.success(facade.enablePolicy(id), "Policy enabled successfully"));
   }
 
-  /** Disable policy. */
   @PutMapping("/{id}/disable")
   public ResponseEntity<ApiResponse<PolicyDto>> disablePolicy(@PathVariable UUID id) {
     log.info("Disabling policy: id={}", id);
-
-    Policy disabled = policyService.disablePolicy(id);
-
     return ResponseEntity.ok(
-        ApiResponse.success(PolicyDto.from(disabled), "Policy disabled successfully"));
+        ApiResponse.success(facade.disablePolicy(id), "Policy disabled successfully"));
   }
 }

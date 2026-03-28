@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tenant.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.events.TenantSettingsUpdatedEvent;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
@@ -218,6 +219,11 @@ public class TenantService {
             .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
     tenant.setSettings(settings);
     Tenant saved = tenantRepository.save(tenant);
+
+    eventPublisher.publish(
+        new TenantSettingsUpdatedEvent(
+            saved.getId(), settings.getTimezone(), settings.getLocale(), settings.getCurrency()));
+
     log.info("Tenant settings updated: id={}", tenantId);
     return saved.getSettings();
   }
@@ -414,5 +420,34 @@ public class TenantService {
   @Transactional(readOnly = true)
   public Optional<Tenant> getTenantEntity(UUID tenantId) {
     return tenantRepository.findById(tenantId);
+  }
+
+  // ========================================
+  // MIGRATION / SYNC
+  // ========================================
+
+  /**
+   * Manually trigger settings synchronization for all tenants. Usually invoked via admin endpoints
+   * for one-time migrations.
+   *
+   * @return Number of tenants synchronized
+   */
+  @Transactional
+  public int syncAllTenantSettings() {
+    List<Tenant> tenants = tenantRepository.findAll();
+    int count = 0;
+    for (Tenant t : tenants) {
+      if (t.getSettings() != null) {
+        eventPublisher.publish(
+            new TenantSettingsUpdatedEvent(
+                t.getId(),
+                t.getSettings().getTimezone(),
+                t.getSettings().getLocale(),
+                t.getSettings().getCurrency()));
+        count++;
+      }
+    }
+    log.info("Synced settings for {} tenants to downstream modules", count);
+    return count;
   }
 }

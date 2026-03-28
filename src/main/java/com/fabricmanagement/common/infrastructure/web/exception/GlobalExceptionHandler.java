@@ -34,10 +34,12 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiError> handleDomain(DomainException ex, HttpServletRequest req) {
     log.info("Domain rule violation [{}]: {}", ex.getErrorCode(), ex.getMessage());
     ApiError error =
-        ApiError.of(
+        new ApiError(
+            java.time.Instant.now(),
             ex.getHttpStatus(),
             HttpStatus.valueOf(ex.getHttpStatus()).getReasonPhrase(),
             ex.getErrorCode(),
+            ex.getArgs(),
             ex.getMessage(),
             req.getRequestURI(),
             ex.getDetails());

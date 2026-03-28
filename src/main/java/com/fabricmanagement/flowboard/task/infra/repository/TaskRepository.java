@@ -28,6 +28,26 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
       """)
   Page<Task> findAllByBoardIdAndIsActiveTrue(@Param("boardId") UUID boardId, Pageable pageable);
 
+  /** Server-side filter için dinamik sorgu. */
+  @Query(
+      """
+      SELECT t FROM Task t
+      WHERE t.boardId = :boardId AND t.isActive = true
+        AND (cast(:priority as string) IS NULL OR t.priority = :priority)
+        AND (cast(:moduleType as string) IS NULL OR t.moduleType = :moduleType)
+        AND (cast(:assigneeId as string) IS NULL OR EXISTS (
+            SELECT 1 FROM TaskAssignee ta
+            WHERE ta.taskId = t.id AND ta.isActive = true AND ta.userId = :assigneeId
+        ))
+      ORDER BY t.priorityScore DESC
+      """)
+  Page<Task> findAllFiltered(
+      @Param("boardId") UUID boardId,
+      @Param("priority") com.fabricmanagement.flowboard.task.domain.Priority priority,
+      @Param("moduleType") com.fabricmanagement.flowboard.task.domain.ModuleType moduleType,
+      @Param("assigneeId") UUID assigneeId,
+      Pageable pageable);
+
   /** Belirli status'e göre board task'larını getirir. */
   List<Task> findAllByBoardIdAndStatusAndIsActiveTrue(UUID boardId, TaskStatus status);
 
@@ -98,6 +118,18 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
       @Param("tenantId") UUID tenantId,
       @Param("currentDate") java.time.LocalDate currentDate,
       Pageable pageable);
+
+  /** Phase 3.1: Yaklaşan deadline'ı olan ve henüz uyarılmamış açık task'ları getirir. */
+  @Query(
+      """
+      SELECT t FROM Task t
+      WHERE t.isActive = true
+        AND t.status NOT IN (com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE, com.fabricmanagement.flowboard.task.domain.TaskStatus.CANCELLED)
+        AND t.isDeadlineWarningFired = false
+        AND t.deadline <= :thresholdDate
+      """)
+  List<Task> findTasksApproachingDeadline(
+      @Param("thresholdDate") java.time.LocalDate thresholdDate);
 
   /**
    * Schedulers: Uzun süredir BLOCKED olan tasklar [K3 FIX: tenant filtresi] [O9 FIX: pagination]
@@ -193,4 +225,49 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
       @Param("userId") UUID userId,
       @Param("startDate") java.time.Instant startDate,
       @Param("endDate") java.time.Instant endDate);
+
+  // Dashboard: Task durum, öncelik ve gecikme gruplamalı anlık snapshot
+  @Query(
+      """
+      SELECT t.status, t.priority,
+             (CASE WHEN t.deadline IS NOT NULL AND t.deadline < CURRENT_DATE THEN true ELSE false END),
+             COUNT(t)
+      FROM Task t
+      WHERE t.boardId = :boardId AND t.tenantId = :tenantId AND t.isActive = true
+      GROUP BY t.status, t.priority,
+             (CASE WHEN t.deadline IS NOT NULL AND t.deadline < CURRENT_DATE THEN true ELSE false END)
+  """)
+  List<Object[]> findTaskMetricsSnapshot(
+      @Param("tenantId") UUID tenantId, @Param("boardId") UUID boardId);
+
+  // Dashboard: Zaman bazlı trend metrikleri (Oluşturma ve Tamamlama)
+  @Query(
+      """
+      SELECT
+          SUM(CASE WHEN t.createdAt >= :currStart THEN 1 ELSE 0 END),
+          SUM(CASE WHEN t.createdAt >= :prevStart AND t.createdAt < :currStart THEN 1 ELSE 0 END),
+          SUM(CASE WHEN t.status = com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE AND t.updatedAt >= :currStart THEN 1 ELSE 0 END),
+          SUM(CASE WHEN t.status = com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE AND t.updatedAt >= :prevStart AND t.updatedAt < :currStart THEN 1 ELSE 0 END)
+      FROM Task t
+      WHERE t.boardId = :boardId AND t.tenantId = :tenantId AND t.isActive = true
+  """)
+  Object[] findTaskTrends(
+      @Param("tenantId") UUID tenantId,
+      @Param("boardId") UUID boardId,
+      @Param("currStart") java.time.Instant currStart,
+      @Param("prevStart") java.time.Instant prevStart);
+
+  // Dashboard: Kişi Bazlı İş Yükü (Assignee Workload)
+  @Query(
+      """
+      SELECT ta.userId, COUNT(t)
+      FROM Task t
+      JOIN TaskAssignee ta ON ta.taskId = t.id
+      WHERE t.boardId = :boardId AND t.tenantId = :tenantId
+        AND t.isActive = true AND ta.isActive = true
+        AND t.status NOT IN (com.fabricmanagement.flowboard.task.domain.TaskStatus.DONE, com.fabricmanagement.flowboard.task.domain.TaskStatus.CANCELLED)
+      GROUP BY ta.userId
+  """)
+  List<Object[]> findAssigneeWorkloadSnapshot(
+      @Param("tenantId") UUID tenantId, @Param("boardId") UUID boardId);
 }

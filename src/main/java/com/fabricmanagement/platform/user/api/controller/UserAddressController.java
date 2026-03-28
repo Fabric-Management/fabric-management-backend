@@ -1,17 +1,13 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.communication.app.AddressService;
-import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.dto.AssignAddressRequest;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
-import com.fabricmanagement.platform.user.app.UserAddressAssignmentService;
-import com.fabricmanagement.platform.user.domain.UserAddress;
+import com.fabricmanagement.platform.user.api.facade.UserAddressFacade;
 import com.fabricmanagement.platform.user.dto.UserAddressDto;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -23,18 +19,14 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class UserAddressController {
 
-  private final UserAddressAssignmentService userAddressAssignmentService;
-  private final AddressService addressService;
+  private final UserAddressFacade userAddressFacade;
 
   @GetMapping
   public ResponseEntity<ApiResponse<List<UserAddressDto>>> getUserAddresses(
       @PathVariable UUID userId) {
     log.debug("Getting user addresses: userId={}", userId);
 
-    List<UserAddressDto> addresses =
-        userAddressAssignmentService.getUserAddresses(userId).stream()
-            .map(UserAddressDto::from)
-            .collect(Collectors.toList());
+    List<UserAddressDto> addresses = userAddressFacade.getUserAddresses(userId);
 
     return ResponseEntity.ok(ApiResponse.success(addresses));
   }
@@ -43,12 +35,12 @@ public class UserAddressController {
   public ResponseEntity<ApiResponse<UserAddressDto>> getPrimaryAddress(@PathVariable UUID userId) {
     log.debug("Getting primary address: userId={}", userId);
 
-    UserAddress primaryAddress =
-        userAddressAssignmentService
+    UserAddressDto primaryAddress =
+        userAddressFacade
             .getPrimaryAddress(userId)
             .orElseThrow(() -> new IllegalArgumentException("No primary address found"));
 
-    return ResponseEntity.ok(ApiResponse.success(UserAddressDto.from(primaryAddress)));
+    return ResponseEntity.ok(ApiResponse.success(primaryAddress));
   }
 
   @GetMapping("/work")
@@ -56,10 +48,7 @@ public class UserAddressController {
       @PathVariable UUID userId) {
     log.debug("Getting work addresses: userId={}", userId);
 
-    List<UserAddressDto> addresses =
-        userAddressAssignmentService.getWorkAddresses(userId).stream()
-            .map(UserAddressDto::from)
-            .collect(Collectors.toList());
+    List<UserAddressDto> addresses = userAddressFacade.getWorkAddresses(userId);
 
     return ResponseEntity.ok(ApiResponse.success(addresses));
   }
@@ -74,12 +63,11 @@ public class UserAddressController {
         request.getIsPrimary(),
         request.getIsWorkAddress());
 
-    UserAddress userAddress =
-        userAddressAssignmentService.assignAddress(
+    UserAddressDto userAddress =
+        userAddressFacade.assignAddress(
             userId, request.getAddressId(), request.getIsPrimary(), request.getIsWorkAddress());
 
-    return ResponseEntity.ok(
-        ApiResponse.success(UserAddressDto.from(userAddress), "Address assigned successfully"));
+    return ResponseEntity.ok(ApiResponse.success(userAddress, "Address assigned successfully"));
   }
 
   @PostMapping("/create-and-assign")
@@ -93,14 +81,11 @@ public class UserAddressController {
         userId,
         createRequest.getAddressType());
 
-    Address address = addressService.createAddress(createRequest);
-    UserAddress userAddress =
-        userAddressAssignmentService.assignAddress(
-            userId, address.getId(), isPrimary, isWorkAddress);
+    UserAddressDto userAddress =
+        userAddressFacade.createAndAssignAddress(userId, createRequest, isPrimary, isWorkAddress);
 
     return ResponseEntity.ok(
-        ApiResponse.success(
-            UserAddressDto.from(userAddress), "Address created and assigned successfully"));
+        ApiResponse.success(userAddress, "Address created and assigned successfully"));
   }
 
   @PutMapping("/{addressId}/primary")
@@ -108,10 +93,9 @@ public class UserAddressController {
       @PathVariable UUID userId, @PathVariable UUID addressId) {
     log.info("Setting primary address: userId={}, addressId={}", userId, addressId);
 
-    UserAddress userAddress = userAddressAssignmentService.setAsPrimary(userId, addressId);
+    UserAddressDto userAddress = userAddressFacade.setAsPrimary(userId, addressId);
 
-    return ResponseEntity.ok(
-        ApiResponse.success(UserAddressDto.from(userAddress), "Primary address set successfully"));
+    return ResponseEntity.ok(ApiResponse.success(userAddress, "Primary address set successfully"));
   }
 
   @DeleteMapping("/{addressId}")
@@ -119,7 +103,7 @@ public class UserAddressController {
       @PathVariable UUID userId, @PathVariable UUID addressId) {
     log.info("Removing address from user: userId={}, addressId={}", userId, addressId);
 
-    userAddressAssignmentService.removeAddress(userId, addressId);
+    userAddressFacade.removeAddress(userId, addressId);
 
     return ResponseEntity.ok(ApiResponse.success(null, "Address removed successfully"));
   }

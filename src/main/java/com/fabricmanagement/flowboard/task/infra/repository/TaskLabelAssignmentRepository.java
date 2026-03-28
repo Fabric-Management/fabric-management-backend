@@ -1,6 +1,7 @@
 package com.fabricmanagement.flowboard.task.infra.repository;
 
 import com.fabricmanagement.flowboard.task.domain.TaskLabelAssignment;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,9 @@ public interface TaskLabelAssignmentRepository extends JpaRepository<TaskLabelAs
 
   /** Task'ın tüm etiket atamalarını getirir. */
   List<TaskLabelAssignment> findAllByTaskId(UUID taskId);
+
+  /** Birden fazla task için tüm atamalar — list/map işlemlerinde N+1 önlemi. */
+  List<TaskLabelAssignment> findAllByTaskIdIn(Collection<UUID> taskIds);
 
   /** Belirli task + label atamasını bulur. */
   Optional<TaskLabelAssignment> findByTaskIdAndLabelId(UUID taskId, UUID labelId);

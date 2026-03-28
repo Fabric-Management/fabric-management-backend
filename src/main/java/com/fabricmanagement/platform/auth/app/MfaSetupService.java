@@ -1,11 +1,13 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.common.infrastructure.web.LocalizationService;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.domain.MfaType;
 import com.fabricmanagement.platform.auth.dto.MfaSetupResponse;
 import com.fabricmanagement.platform.auth.dto.MfaStatusResponse;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.auth.infra.repository.TrustedDeviceRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.UUID;
@@ -28,6 +30,7 @@ public class MfaSetupService {
   private final TrustedDeviceRepository trustedDeviceRepository;
   private final TotpMfaService totpMfaService;
   private final UserRepository userRepository;
+  private final LocalizationService localizationService;
 
   /**
    * Initiate MFA setup for user.
@@ -44,14 +47,16 @@ public class MfaSetupService {
     AuthUser authUser =
         authUserRepository
             .findByTenantIdAndUserId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("User not found", "AUTH_USER_NOT_FOUND", 404));
 
     if (mfaType == MfaType.TOTP) {
       return setupTotpMfa(authUser);
     } else if (mfaType == MfaType.EMAIL || mfaType == MfaType.SMS || mfaType == MfaType.WHATSAPP) {
       return setupOtpMfa(authUser, mfaType);
     } else {
-      throw new IllegalArgumentException("Invalid MFA type: " + mfaType);
+      throw new PlatformDomainException(
+          "Invalid MFA type: " + mfaType, "AUTH_INVALID_MFA_TYPE", 400);
     }
   }
 
@@ -95,9 +100,7 @@ public class MfaSetupService {
         .mfaType(MfaType.TOTP)
         .secret(secret)
         .qrCodeUri(qrCodeUri)
-        .message(
-            "TOTP setup initiated. Scan QR code with authenticator app and confirm with 6-digit"
-                + " code.")
+        .message(localizationService.getMessage("mfa.setup.totp.initiated", null))
         .build();
   }
 
@@ -120,10 +123,8 @@ public class MfaSetupService {
     return MfaSetupResponse.builder()
         .mfaType(mfaType)
         .message(
-            mfaType
-                + " MFA setup initiated. You will receive verification codes via "
-                + mfaType
-                + " during login.")
+            localizationService.getMessage(
+                "mfa.setup.otp.initiated", new Object[] {mfaType, mfaType}))
         .build();
   }
 
@@ -141,24 +142,27 @@ public class MfaSetupService {
     AuthUser authUser =
         authUserRepository
             .findByTenantIdAndUserId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("User not found", "AUTH_USER_NOT_FOUND", 404));
 
     if (authUser.getPrimaryMfaType() == null || authUser.getPrimaryMfaType() == MfaType.NONE) {
-      throw new IllegalArgumentException("MFA setup not initiated");
+      throw new PlatformDomainException("MFA setup not initiated", "AUTH_MFA_NOT_INITIATED", 400);
     }
 
     if (authUser.getPrimaryMfaType() == MfaType.TOTP) {
       if (authUser.getMfaSecret() == null) {
-        throw new IllegalArgumentException("TOTP secret not found");
+        throw new PlatformDomainException("TOTP secret not found", "AUTH_MFA_SECRET_MISSING", 400);
       }
 
       boolean isValid = totpMfaService.verifyCode(authUser.getMfaSecret(), code);
       if (!isValid) {
-        throw new IllegalArgumentException("Invalid TOTP code");
+        throw new PlatformDomainException("Invalid TOTP code", "AUTH_MFA_INVALID_CODE", 400);
       }
     } else {
-      throw new IllegalArgumentException(
-          "Confirmation not required for " + authUser.getPrimaryMfaType());
+      throw new PlatformDomainException(
+          "Confirmation not required for " + authUser.getPrimaryMfaType(),
+          "AUTH_MFA_CONFIRM_NOT_REQUIRED",
+          400);
     }
 
     authUser.setIsMfaEnabled(true);
@@ -180,7 +184,8 @@ public class MfaSetupService {
     AuthUser authUser =
         authUserRepository
             .findByTenantIdAndUserId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("User not found", "AUTH_USER_NOT_FOUND", 404));
 
     authUser.setIsMfaEnabled(false);
     authUser.setPrimaryMfaType(MfaType.NONE);
@@ -205,7 +210,8 @@ public class MfaSetupService {
     AuthUser authUser =
         authUserRepository
             .findByTenantIdAndUserId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("User not found", "AUTH_USER_NOT_FOUND", 404));
 
     int trustedDeviceCount = trustedDeviceRepository.countByUserId(userId);
 

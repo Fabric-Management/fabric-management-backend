@@ -65,12 +65,11 @@ public class BatchAttributeInheritanceEngine implements BatchAttributeInheritanc
             .getSchema(sourceType, targetType)
             .orElseThrow(
                 () ->
-                    new IllegalStateException(
-                        "No inheritance schema found for ["
-                            + sourceType
-                            + "] → ["
-                            + targetType
-                            + "]"));
+                    new BatchDomainException(
+                        "No inheritance schema found",
+                        "BATCH_INHERITANCE_SCHEMA_NOT_FOUND",
+                        500,
+                        new Object[] {sourceType, targetType}));
 
     Map<String, Object> result = new java.util.HashMap<>();
 
@@ -220,6 +219,10 @@ public class BatchAttributeInheritanceEngine implements BatchAttributeInheritanc
     if (value instanceof Number num) {
       return BigDecimal.valueOf(num.doubleValue());
     }
-    throw new IllegalArgumentException("Attribute value is not numeric: " + value);
+    throw new BatchDomainException(
+        "Attribute value is not numeric",
+        "BATCH_INHERITANCE_NON_NUMERIC_VALUE",
+        400,
+        new Object[] {value});
   }
 }

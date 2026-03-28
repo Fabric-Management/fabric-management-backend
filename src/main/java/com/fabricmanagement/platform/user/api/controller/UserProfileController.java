@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.app.ProfileUpdateRequestService;
 import com.fabricmanagement.platform.user.app.TeamAccessService;
 import com.fabricmanagement.platform.user.app.UserService;
@@ -53,7 +54,7 @@ public class UserProfileController {
     UUID requesterId = TenantContext.getCurrentUserId();
 
     if (requesterId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     if (!teamAccessService.canManageMembers(requesterId)) {
@@ -78,7 +79,7 @@ public class UserProfileController {
     UUID userId = TenantContext.getCurrentUserId();
 
     if (userId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     log.info(
@@ -100,7 +101,7 @@ public class UserProfileController {
     UUID userId = TenantContext.getCurrentUserId();
 
     if (userId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     log.debug("Getting profile update requests: userId={}", userId);
@@ -135,7 +136,7 @@ public class UserProfileController {
     UUID reviewerId = TenantContext.getCurrentUserId();
 
     if (reviewerId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     log.info(
@@ -161,7 +162,7 @@ public class UserProfileController {
     UUID reviewerId = TenantContext.getCurrentUserId();
 
     if (reviewerId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     log.info(

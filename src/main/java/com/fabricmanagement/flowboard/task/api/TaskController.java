@@ -1,12 +1,16 @@
 package com.fabricmanagement.flowboard.task.api;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
+import com.fabricmanagement.flowboard.task.app.TaskDetailService;
 import com.fabricmanagement.flowboard.task.app.TaskService;
 import com.fabricmanagement.flowboard.task.domain.AssignedBy;
+import com.fabricmanagement.flowboard.task.dto.AddTaskCommentRequest;
 import com.fabricmanagement.flowboard.task.dto.CreateTaskRequest;
+import com.fabricmanagement.flowboard.task.dto.TaskCommentResponse;
 import com.fabricmanagement.flowboard.task.dto.TaskResponse;
 import com.fabricmanagement.flowboard.task.dto.UpdateTaskStatusRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,14 +36,40 @@ import org.springframework.web.bind.annotation.*;
 public class TaskController {
 
   private final TaskService taskService;
+  private final TaskDetailService taskDetailService;
   private final Clock clock;
+
+  @GetMapping("/{id}/comments")
+  @Operation(summary = "Task yorumlarını listele")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<List<TaskCommentResponse>>> getTaskComments(
+      @PathVariable UUID id) {
+    return ResponseEntity.ok(
+        ApiResponse.success(taskDetailService.getComments(TenantContext.getCurrentTenantId(), id)));
+  }
+
+  @PostMapping("/{id}/comments")
+  @Operation(summary = "Task'a yorum ekle")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<TaskCommentResponse>> addTaskComment(
+      @PathVariable UUID id, @Valid @RequestBody AddTaskCommentRequest req) {
+    var userCtx = currentUser();
+    var created =
+        taskDetailService.addCommentFromRequest(
+            TenantContext.getCurrentTenantId(), id, userCtx.userId(), req);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
+  }
 
   @GetMapping("/{id}")
   @Operation(summary = "Task detayı")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<TaskResponse>> getTask(@PathVariable UUID id) {
+    var task = taskService.getTask(id);
     return ResponseEntity.ok(
-        ApiResponse.success(TaskResponse.from(taskService.getTask(id), LocalDate.now(clock))));
+        ApiResponse.success(
+            taskService
+                .mapToTaskResponses(java.util.List.of(task), LocalDate.now(clock))
+                .getFirst()));
   }
 
   @PostMapping
@@ -46,10 +77,13 @@ public class TaskController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<TaskResponse>> createTask(
       @Valid @RequestBody CreateTaskRequest req) {
+    var task = taskService.createTask(req);
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
             ApiResponse.success(
-                TaskResponse.from(taskService.createTask(req), LocalDate.now(clock))));
+                taskService
+                    .mapToTaskResponses(java.util.List.of(task), LocalDate.now(clock))
+                    .getFirst()));
   }
 
   @PutMapping("/{id}/status")
@@ -59,11 +93,12 @@ public class TaskController {
       @PathVariable UUID id, @Valid @RequestBody UpdateTaskStatusRequest req) {
     var userCtx = currentUser();
     boolean isManager = hasRole("ROLE_MANAGER") || hasRole("ROLE_ADMIN");
+    var task = taskService.updateStatus(id, req, userCtx.userId(), isManager);
     return ResponseEntity.ok(
         ApiResponse.success(
-            TaskResponse.from(
-                taskService.updateStatus(id, req, userCtx.userId(), isManager),
-                LocalDate.now(clock))));
+            taskService
+                .mapToTaskResponses(java.util.List.of(task), LocalDate.now(clock))
+                .getFirst()));
   }
 
   @PutMapping("/{id}/assign")
@@ -81,6 +116,25 @@ public class TaskController {
       throw new AccessDeniedException("Only managers or admins can assign tasks as MANAGER");
     }
     taskService.assignToUser(id, userId, assignedBy, userCtx.userId());
+    return ResponseEntity.ok(ApiResponse.success(null));
+  }
+
+  @GetMapping("/{id}/assignees")
+  @Operation(summary = "Task'a atanmış kişileri getir")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<
+          ApiResponse<java.util.List<com.fabricmanagement.flowboard.task.dto.TaskAssigneeResponse>>>
+      getAssignees(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(taskService.getTaskAssignees(id)));
+  }
+
+  @DeleteMapping("/{id}/assignees/{userId}")
+  @Operation(summary = "Task'tan atamayı kaldır")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<Void>> unassignUser(
+      @PathVariable UUID id, @PathVariable UUID userId) {
+    var userCtx = currentUser();
+    taskService.unassignUser(id, userId, userCtx.userId());
     return ResponseEntity.ok(ApiResponse.success(null));
   }
 

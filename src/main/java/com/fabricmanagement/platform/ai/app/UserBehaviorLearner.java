@@ -49,17 +49,17 @@ public class UserBehaviorLearner {
 
     // Track function usage
     if (functionName != null) {
-      functionUsage
-          .computeIfAbsent(userId, k -> new ConcurrentHashMap<>())
-          .merge(functionName, 1, Integer::sum);
+      Map<String, Integer> usage =
+          functionUsage.computeIfAbsent(userId, k -> new ConcurrentHashMap<>());
+      usage.put(functionName, usage.getOrDefault(functionName, 0) + 1);
     }
 
     // Track query patterns (normalize for pattern matching)
     String pattern = extractPattern(query);
     if (pattern != null) {
-      queryPatterns
-          .computeIfAbsent(userId, k -> new ConcurrentHashMap<>())
-          .merge(pattern, 1, Integer::sum);
+      Map<String, Integer> patterns =
+          queryPatterns.computeIfAbsent(userId, k -> new ConcurrentHashMap<>());
+      patterns.put(pattern, patterns.getOrDefault(pattern, 0) + 1);
     }
 
     log.debug(

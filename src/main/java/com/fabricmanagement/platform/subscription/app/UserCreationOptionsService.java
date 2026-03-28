@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.user.app.RoleService;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.RoleScope;
 import com.fabricmanagement.platform.user.dto.RoleDto;
+import com.fabricmanagement.platform.user.mapper.RoleMapper;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserCreationOptionsService {
 
   private final RoleService roleService;
+  private final RoleMapper roleMapper;
   private final DepartmentRepository departmentRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
   private final TenantSeedService tenantSeedService;
@@ -78,7 +80,7 @@ public class UserCreationOptionsService {
         organizationAddressRepository.findWithAddressByTenantIdAndOrganizationId(
             tenantId, organizationId);
 
-    List<RoleDto> roleDtos = roles.stream().map(RoleDto::from).collect(Collectors.toList());
+    List<RoleDto> roleDtos = roles.stream().map(roleMapper::toDto).collect(Collectors.toList());
     List<DepartmentDto> departmentDtos =
         departments.stream().map(DepartmentDto::from).collect(Collectors.toList());
     List<OrganizationAddressDto> addressDtos =

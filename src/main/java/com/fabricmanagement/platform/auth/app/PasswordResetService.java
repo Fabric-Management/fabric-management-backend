@@ -15,6 +15,7 @@ import com.fabricmanagement.platform.auth.dto.PasswordResetVerifyRequest;
 import com.fabricmanagement.platform.auth.dto.UserContactInfoResponse;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
@@ -267,7 +268,8 @@ public class PasswordResetService {
             .orElseThrow(() -> new IllegalArgumentException("Invalid authentication information"));
 
     if (!authUser.getIsVerified()) {
-      throw new IllegalArgumentException("Account is not verified");
+      throw new PlatformDomainException(
+          "Account is not verified", "AUTH_ACCOUNT_NOT_VERIFIED", 400);
     }
 
     // ✅ Public endpoint: resolve contact in user's tenant context
@@ -322,7 +324,8 @@ public class PasswordResetService {
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     if (!user.getIsActive()) {
-      throw new IllegalArgumentException("User account is deactivated");
+      throw new PlatformDomainException(
+          "User account is deactivated", "AUTH_USER_DEACTIVATED", 403);
     }
 
     // Get User entity with contacts/departments for JWT generation

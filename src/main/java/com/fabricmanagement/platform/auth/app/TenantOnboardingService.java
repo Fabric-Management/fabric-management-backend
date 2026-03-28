@@ -7,6 +7,7 @@ import com.fabricmanagement.platform.auth.app.onboarding.TenantOnboardingOrchest
 import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import java.util.List;
@@ -85,7 +86,8 @@ public class TenantOnboardingService {
     log.info("Creating self-service tenant: organization={}", request.getOrganizationName());
     validateTenantCreation(request.getTaxId(), request.getEmail());
     if (!Boolean.TRUE.equals(request.getAcceptedTerms())) {
-      throw new IllegalArgumentException("Terms and conditions must be accepted");
+      throw new PlatformDomainException(
+          "Terms and conditions must be accepted", "AUTH_TERMS_NOT_ACCEPTED", 400);
     }
 
     OnboardingContext context = new OnboardingContext();

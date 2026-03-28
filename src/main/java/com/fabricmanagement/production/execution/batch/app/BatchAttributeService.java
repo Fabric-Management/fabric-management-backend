@@ -1,8 +1,10 @@
 package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
+import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.execution.batch.dto.AddBatchAttributeRequest;
 import com.fabricmanagement.production.execution.batch.dto.BatchAttributeDto;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchAttributeRepository;
@@ -31,7 +33,7 @@ public class BatchAttributeService {
     Batch batch =
         batchRepository
             .findByIdAndTenantId(batchId, tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
+            .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
 
     return attributeRepository.findByBatch_IdAndIsActiveTrue(batch.getId()).stream()
         .map(BatchAttributeDto::from)
@@ -45,21 +47,22 @@ public class BatchAttributeService {
     Batch batch =
         batchRepository
             .findByIdAndTenantId(batchId, tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
+            .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
 
     FiberAttribute attribute =
         fiberAttributeRepository
             .findById(request.getAttributeId())
             .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "Attribute not found: " + request.getAttributeId()));
+                () -> new NotFoundException("Attribute not found: " + request.getAttributeId()));
 
     if (attributeRepository
         .findByBatch_IdAndAttribute_Id(batch.getId(), attribute.getId())
         .isPresent()) {
-      throw new IllegalStateException(
-          "Batch already has attribute " + attribute.getAttributeCode());
+      throw new BatchDomainException(
+          "Batch already has this attribute",
+          "BATCH_ATTRIBUTE_DUPLICATE",
+          409,
+          new Object[] {attribute.getAttributeCode()});
     }
 
     BatchAttribute entity =
@@ -86,7 +89,7 @@ public class BatchAttributeService {
     Batch batch =
         batchRepository
             .findByIdAndTenantId(batchId, tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
+            .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
 
     BatchAttribute entity =
         attributeRepository
@@ -95,7 +98,7 @@ public class BatchAttributeService {
             .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(
                 () ->
-                    new IllegalArgumentException(
+                    new NotFoundException(
                         "Batch attribute not found: " + attributeId + " for batch " + batchId));
 
     entity.delete();

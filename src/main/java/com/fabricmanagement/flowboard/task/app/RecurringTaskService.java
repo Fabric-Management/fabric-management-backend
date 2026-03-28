@@ -62,7 +62,9 @@ public class RecurringTaskService {
                   null,
                   null,
                   null,
-                  null);
+                  null,
+                  "TEMPLATE",
+                  template.getId());
           Task newTask = taskService.createTask(request);
 
           if (template.getTargetAssigneeId() != null) {

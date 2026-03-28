@@ -2,8 +2,8 @@ package com.fabricmanagement.platform.communication.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.InternalEndpoint;
+import com.fabricmanagement.platform.communication.api.facade.AddressValidationFacade;
 import com.fabricmanagement.platform.communication.app.AddressValidationService;
-import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.dto.AddressDto;
 import com.fabricmanagement.platform.communication.dto.AddressValidationResponse;
 import com.fabricmanagement.platform.communication.dto.AutocompleteResponse;
@@ -37,6 +37,7 @@ public class AddressValidationController {
 
   private final GoogleMapsClient googleMapsClient;
   private final AddressValidationService addressValidationService;
+  private final AddressValidationFacade addressValidationFacade;
   private final PostcodeValidator postcodeValidator;
 
   /**
@@ -111,11 +112,10 @@ public class AddressValidationController {
         request.getPlaceId(),
         request.getAddressType());
 
-    Address address = addressValidationService.validateAndCreateAddress(request);
+    AddressDto address = addressValidationFacade.validateAndCreateAddress(request);
 
     return ResponseEntity.ok(
-        ApiResponse.success(
-            AddressDto.from(address), "Address validated and created successfully"));
+        ApiResponse.success(address, "Address validated and created successfully"));
   }
 
   /**
@@ -127,10 +127,9 @@ public class AddressValidationController {
   public ResponseEntity<ApiResponse<AddressDto>> revalidateAddress(@PathVariable UUID addressId) {
     log.info("Revalidate request: addressId={}", addressId);
 
-    Address address = addressValidationService.revalidateAddress(addressId);
+    AddressDto address = addressValidationFacade.revalidateAddress(addressId);
 
-    return ResponseEntity.ok(
-        ApiResponse.success(AddressDto.from(address), "Address revalidated successfully"));
+    return ResponseEntity.ok(ApiResponse.success(address, "Address revalidated successfully"));
   }
 
   /**

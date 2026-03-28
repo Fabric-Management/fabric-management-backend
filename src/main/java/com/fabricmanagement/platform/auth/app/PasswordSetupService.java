@@ -15,6 +15,7 @@ import com.fabricmanagement.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RegistrationTokenRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.organization.domain.Organization;
@@ -104,7 +105,8 @@ public class PasswordSetupService {
 
     if (!token.isValid()) {
       log.warn("Token invalid or expired: token={}", request.getToken().substring(0, 8) + "...");
-      throw new IllegalArgumentException("Registration token is invalid or expired");
+      throw new PlatformDomainException(
+          "Registration token is invalid or expired", "AUTH_TOKEN_INVALID", 400);
     }
 
     log.debug("Token type: {}", token.getTokenType());
@@ -119,7 +121,8 @@ public class PasswordSetupService {
 
     // ✅ Check if user already has AuthUser (user-based authentication)
     if (authUserRepository.existsByUserId(user.getId())) {
-      throw new IllegalArgumentException("User already has password set");
+      throw new PlatformDomainException(
+          "User already has password set", "AUTH_PASSWORD_ALREADY_SET", 409);
     }
 
     // Tenant status guard: ensure tenant is active before allowing registration

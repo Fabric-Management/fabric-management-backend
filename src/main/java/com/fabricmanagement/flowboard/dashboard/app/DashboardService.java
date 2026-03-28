@@ -1,5 +1,6 @@
 package com.fabricmanagement.flowboard.dashboard.app;
 
+import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardConfig;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardWidget;
 import com.fabricmanagement.flowboard.dashboard.domain.WidgetType;
@@ -58,10 +59,14 @@ public class DashboardService {
     DashboardConfig dashboard =
         dashboardRepo
             .findById(dashboardId)
-            .orElseThrow(() -> new IllegalArgumentException("Dashboard not found"));
+            .orElseThrow(
+                () ->
+                    new FlowBoardDomainException(
+                        "Dashboard not found", "FLOWBOARD_DASHBOARD_NOT_FOUND", 404));
 
     if (!dashboard.getTenantId().equals(tenantId)) {
-      throw new IllegalStateException("Tenant mismatch");
+      throw new FlowBoardDomainException(
+          "Dashboard tenant mismatch", "FLOWBOARD_DASHBOARD_TENANT_MISMATCH", 403);
     }
 
     DashboardWidget widget =

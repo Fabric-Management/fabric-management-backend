@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.user.app;
 import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentService;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.user.domain.UserContact;
@@ -59,7 +60,7 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
     UUID tenantId = TenantContext.getCurrentTenantId();
     userRepository
         .findByTenantIdAndId(tenantId, parentId)
-        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        .orElseThrow(() -> new PlatformDomainException("User not found", "USER_NOT_FOUND", 404));
   }
 
   @Override
@@ -68,9 +69,13 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
     Contact contact =
         contactRepository
             .findById(childId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Contact not found", "USER_CONTACT_NOT_FOUND", 404));
     if (!contact.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Contact does not belong to current tenant");
+      throw new PlatformDomainException(
+          "Contact does not belong to current tenant", "USER_CONTACT_TENANT_MISMATCH", 403);
     }
   }
 
@@ -110,12 +115,18 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
     UserContact userContact =
         userContactRepository
             .findByUserIdAndContactId(userId, contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact assignment not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Contact assignment not found", "USER_CONTACT_ASSIGNMENT_NOT_FOUND", 404));
 
     Contact contact =
         contactRepository
             .findById(contactId)
-            .orElseThrow(() -> new IllegalArgumentException("Contact not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Contact not found", "USER_CONTACT_NOT_FOUND", 404));
 
     if (Boolean.TRUE.equals(contact.getIsVerified())) {
       long verifiedCount =
@@ -130,8 +141,10 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
             "Attempt to remove last verified contact prevented: userId={}, contactId={}",
             userId,
             contactId);
-        throw new IllegalStateException(
-            "Cannot remove the last verified contact. Add another verified contact first.");
+        throw new PlatformDomainException(
+            "Cannot remove the last verified contact. Add another verified contact first.",
+            "USER_CONTACT_ASSIGNMENT_ERROR",
+            400);
       }
     }
 

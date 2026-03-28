@@ -2,14 +2,10 @@ package com.fabricmanagement.human.payroll.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
-import com.fabricmanagement.human.core.employee.domain.Employee;
+import com.fabricmanagement.human.payroll.app.PayrollSelfServiceAppService;
 import com.fabricmanagement.human.payroll.dto.SalarySlipDto;
-import com.fabricmanagement.human.payroll.infra.repository.PayRunPayoutRepository;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -24,8 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class PayrollSelfServiceController {
 
-  private final EmployeeService employeeService;
-  private final PayRunPayoutRepository payRunPayoutRepository;
+  private final PayrollSelfServiceAppService selfServiceAppService;
 
   /**
    * Get current authenticated user's salary slips (payouts).
@@ -42,19 +37,7 @@ public class PayrollSelfServiceController {
     }
 
     log.debug("Getting self-service salary slips for user ID: {}", userId);
-
-    Optional<Employee> employeeOpt = employeeService.getEmployeeByUserId(userId);
-    if (employeeOpt.isEmpty()) {
-      return ResponseEntity.ok(ApiResponse.success(List.of()));
-    }
-
-    Employee employee = employeeOpt.get();
-
-    List<SalarySlipDto> slips =
-        payRunPayoutRepository.findDescByEmployeeId(employee.getId()).stream()
-            .map(SalarySlipDto::from)
-            .collect(Collectors.toList());
-
+    List<SalarySlipDto> slips = selfServiceAppService.getSalarySlipsForUser(userId);
     return ResponseEntity.ok(ApiResponse.success(slips));
   }
 }

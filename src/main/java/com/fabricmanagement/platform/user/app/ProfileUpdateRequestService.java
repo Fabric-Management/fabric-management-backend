@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.ProfileUpdateRequest;
 import com.fabricmanagement.platform.user.domain.event.ProfileUpdateRequestApprovedEvent;
 import com.fabricmanagement.platform.user.domain.event.ProfileUpdateRequestCreatedEvent;
@@ -59,12 +60,18 @@ public class ProfileUpdateRequestService {
     // Verify user exists
     userRepository
         .findByTenantIdAndId(tenantId, userId)
-        .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "User not found: " + userId, "USER_NOT_FOUND", 404, new Object[] {userId}));
 
     // Validate that user is requesting for themselves (self-update prevention at creation time)
     UUID currentUserId = TenantContext.getCurrentUserId();
     if (!userId.equals(currentUserId)) {
-      throw new IllegalArgumentException("Users can only create requests for themselves");
+      throw new PlatformDomainException(
+          "Users can only create requests for themselves",
+          "USER_PROFILE_REQUEST_INVALID_OWNER",
+          403);
     }
 
     // Convert requestedChanges to JSON string
@@ -74,7 +81,8 @@ public class ProfileUpdateRequestService {
         requestedChangesJson = objectMapper.writeValueAsString(requestDto.getRequestedChanges());
       } catch (Exception e) {
         log.error("Failed to serialize requestedChanges: {}", e.getMessage());
-        throw new IllegalArgumentException("Invalid requestedChanges format");
+        throw new PlatformDomainException(
+            "Invalid requestedChanges format", "USER_PROFILE_REQUEST_INVALID_FORMAT", 400);
       }
     }
 
@@ -122,21 +130,31 @@ public class ProfileUpdateRequestService {
     List<ProfileUpdateRequest> requests =
         requestRepository.findByTenantIdAndId(tenantId, requestId);
     if (requests.isEmpty()) {
-      throw new IllegalArgumentException("Profile update request not found: " + requestId);
+      throw new PlatformDomainException(
+          "Profile update request not found",
+          "USER_PROFILE_REQUEST_NOT_FOUND",
+          404,
+          new Object[] {requestId});
     }
 
     ProfileUpdateRequest request = requests.get(0);
 
     // Validate request is pending
     if (!request.isPending()) {
-      throw new IllegalStateException(
-          "Request is not pending. Current status: " + request.getStatus());
+      throw new PlatformDomainException(
+          "Request is not pending",
+          "USER_PROFILE_REQUEST_NOT_PENDING",
+          400,
+          new Object[] {request.getStatus()});
     }
 
     // Validate reviewer has permission
     if (!permissionService.canUpdateWorkProfile(reviewerId, request.getUserId())
         && !permissionService.canUpdatePersonalProfile(reviewerId, request.getUserId())) {
-      throw new IllegalArgumentException("You don't have permission to approve this request");
+      throw new PlatformDomainException(
+          "You don't have permission to approve this request",
+          "USER_PROFILE_REQUEST_UNAUTHORIZED",
+          403);
     }
 
     // Approve request
@@ -150,7 +168,11 @@ public class ProfileUpdateRequestService {
       log.error("Failed to apply profile changes after approval: requestId={}", requestId, e);
       // Note: Request is already approved, but changes failed. This should trigger a
       // notification/alert.
-      throw new IllegalStateException("Failed to apply profile changes: " + e.getMessage());
+      throw new PlatformDomainException(
+          "Failed to apply profile changes",
+          "USER_PROFILE_UPDATE_FAILED",
+          500,
+          new Object[] {e.getMessage()});
     }
 
     // Publish event
@@ -192,21 +214,31 @@ public class ProfileUpdateRequestService {
     List<ProfileUpdateRequest> requests =
         requestRepository.findByTenantIdAndId(tenantId, requestId);
     if (requests.isEmpty()) {
-      throw new IllegalArgumentException("Profile update request not found: " + requestId);
+      throw new PlatformDomainException(
+          "Profile update request not found",
+          "USER_PROFILE_REQUEST_NOT_FOUND",
+          404,
+          new Object[] {requestId});
     }
 
     ProfileUpdateRequest request = requests.get(0);
 
     // Validate request is pending
     if (!request.isPending()) {
-      throw new IllegalStateException(
-          "Request is not pending. Current status: " + request.getStatus());
+      throw new PlatformDomainException(
+          "Request is not pending",
+          "USER_PROFILE_REQUEST_NOT_PENDING",
+          400,
+          new Object[] {request.getStatus()});
     }
 
     // Validate reviewer has permission
     if (!permissionService.canUpdateWorkProfile(reviewerId, request.getUserId())
         && !permissionService.canUpdatePersonalProfile(reviewerId, request.getUserId())) {
-      throw new IllegalArgumentException("You don't have permission to reject this request");
+      throw new PlatformDomainException(
+          "You don't have permission to reject this request",
+          "USER_PROFILE_REQUEST_UNAUTHORIZED",
+          403);
     }
 
     // Reject request
@@ -293,7 +325,11 @@ public class ProfileUpdateRequestService {
           request.getUserId());
     } catch (Exception e) {
       log.error("Failed to apply profile changes: requestId={}", request.getId(), e);
-      throw new IllegalStateException("Failed to apply profile changes: " + e.getMessage(), e);
+      throw new PlatformDomainException(
+          "Failed to apply profile changes",
+          "USER_PROFILE_UPDATE_FAILED",
+          500,
+          new Object[] {e.getMessage()});
     }
   }
 }

@@ -51,4 +51,9 @@ public class ProductionDomainException extends DomainException {
       String message, String errorCode, int httpStatus, Throwable cause) {
     super(message, errorCode, httpStatus, cause);
   }
+
+  protected ProductionDomainException(
+      String message, String errorCode, int httpStatus, Object[] args) {
+    super(message, errorCode, httpStatus, args);
+  }
 }

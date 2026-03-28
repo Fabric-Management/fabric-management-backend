@@ -1,6 +1,5 @@
 package com.fabricmanagement.platform.user.dto;
 
-import com.fabricmanagement.platform.user.domain.UserDepartment;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -19,14 +18,4 @@ public class UserDepartmentDto {
   private Boolean isPrimary;
   private Instant assignedAt;
   private UUID assignedBy;
-
-  public static UserDepartmentDto from(UserDepartment userDepartment) {
-    return UserDepartmentDto.builder()
-        .userId(userDepartment.getUserId())
-        .departmentId(userDepartment.getDepartmentId())
-        .isPrimary(userDepartment.getIsPrimary())
-        .assignedAt(userDepartment.getAssignedAt())
-        .assignedBy(userDepartment.getAssignedBy())
-        .build();
-  }
 }

@@ -99,16 +99,17 @@ public class FiberService implements FiberFacade {
               .findByTenantIdAndId(tenantId, request.getMaterialId())
               .orElseThrow(
                   () ->
-                      new IllegalArgumentException(
-                          String.format(
-                              "Material not found: %s (or not accessible for current tenant)",
-                              request.getMaterialId())));
+                      new FiberDomainException(
+                          "Material not found or not accessible",
+                          "FIBER_MATERIAL_NOT_FOUND",
+                          404,
+                          new Object[] {request.getMaterialId()}));
     } else {
       // Auto-create Material (USER-FRIENDLY: System handles Material creation
       // automatically)
       if (request.getUnit() == null || request.getUnit().isBlank()) {
-        throw new IllegalArgumentException(
-            "Unit is required when materialId is not provided. Material will be auto-created with type=FIBER.");
+        throw new FiberDomainException(
+            "Unit is required when materialId is not provided", "FIBER_UNIT_REQUIRED", 400);
       }
 
       log.info("Auto-creating Material: type=FIBER, unit={}", request.getUnit());
@@ -123,15 +124,18 @@ public class FiberService implements FiberFacade {
     // Validate material type is FIBER
     if (material.getMaterialType()
         != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
-      throw new IllegalArgumentException(
-          "Material type must be FIBER, got: " + material.getMaterialType());
+      throw new FiberDomainException(
+          "Material type must be FIBER",
+          "FIBER_MATERIAL_TYPE_INVALID",
+          400,
+          new Object[] {material.getMaterialType()});
     }
 
     // Check if material already has a fiber detail
     UUID materialIdToCheck = material.getId();
     if (fiberRepository.findByMaterialId(materialIdToCheck).isPresent()) {
-      throw new IllegalArgumentException(
-          "Material already has fiber details. Each material can only have one fiber.");
+      throw new FiberDomainException(
+          "Material already has fiber details", "FIBER_MATERIAL_ALREADY_USED", 409);
     }
 
     // Validate composition if blended
@@ -152,7 +156,12 @@ public class FiberService implements FiberFacade {
             fiberRepository
                 .findById(baseFiberId)
                 .orElseThrow(
-                    () -> new IllegalArgumentException("Base fiber not found: " + baseFiberId));
+                    () ->
+                        new FiberDomainException(
+                            "Base fiber not found",
+                            "FIBER_BASE_NOT_FOUND",
+                            404,
+                            new Object[] {baseFiberId}));
         baseFiberNames.put(baseFiberId, baseFiber.getFiberName());
       }
       fiberName = generateFiberName(request.getComposition(), baseFiberNames);
@@ -208,8 +217,8 @@ public class FiberService implements FiberFacade {
 
     // Check if a fiber with identical composition already exists
     if (isDuplicateComposition(composition)) {
-      throw new IllegalArgumentException(
-          "A fiber with this exact composition already exists. Cannot create duplicate blend.");
+      throw new FiberDomainException(
+          "Fiber with identical composition exists", "FIBER_DUPLICATE_COMPOSITION", 409);
     }
 
     // Validate circular references
@@ -238,19 +247,25 @@ public class FiberService implements FiberFacade {
                       .findFirst()
                       .orElseThrow(
                           () ->
-                              new IllegalArgumentException(
-                                  "No MIXED_BLEND category found. Run V008 migration.")));
+                              new FiberDomainException(
+                                  "No MIXED_BLEND category found",
+                                  "FIBER_CATEGORY_MIXED_BLEND_MISSING",
+                                  500)));
     }
 
     if (request.getFiberCategoryId() == null) {
-      throw new IllegalArgumentException("Fiber category ID is required for pure fibers.");
+      throw new FiberDomainException(
+          "Fiber category ID is required for pure fibers", "FIBER_CATEGORY_REQUIRED", 400);
     }
     return fiberCategoryRepository
         .findById(request.getFiberCategoryId())
         .orElseThrow(
             () ->
-                new IllegalArgumentException(
-                    "Fiber category not found: " + request.getFiberCategoryId()));
+                new FiberDomainException(
+                    "Fiber category not found",
+                    "FIBER_CATEGORY_NOT_FOUND",
+                    404,
+                    new Object[] {request.getFiberCategoryId()}));
   }
 
   /**
@@ -265,8 +280,8 @@ public class FiberService implements FiberFacade {
       // Order by percentage desc, then by ISO code asc (tie-breaker for equal %)
       List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
       if (baseFibers.isEmpty()) {
-        throw new IllegalArgumentException(
-            "Blend composition is empty. Cannot resolve primary ISO code.");
+        throw new FiberDomainException(
+            "Blend composition is empty", "FIBER_COMPOSITION_EMPTY", 400);
       }
       Map<UUID, String> fiberIdToIso =
           baseFibers.stream()
@@ -288,37 +303,51 @@ public class FiberService implements FiberFacade {
               .findFirst()
               .orElseThrow(
                   () ->
-                      new IllegalArgumentException(
-                          "Blend composition is empty. Cannot resolve primary ISO code."));
+                      new FiberDomainException(
+                          "Blend composition is empty", "FIBER_COMPOSITION_EMPTY", 400));
 
       Fiber primaryFiber =
           fiberRepository
               .findById(primaryFiberId)
               .orElseThrow(
-                  () -> new IllegalArgumentException("Base fiber not found: " + primaryFiberId));
+                  () ->
+                      new FiberDomainException(
+                          "Base fiber not found",
+                          "FIBER_BASE_NOT_FOUND",
+                          404,
+                          new Object[] {primaryFiberId}));
 
       if (primaryFiber.getFiberIsoCodeId() == null) {
-        throw new IllegalArgumentException("Primary base fiber has no ISO code: " + primaryFiberId);
+        throw new FiberDomainException(
+            "Primary base fiber has no ISO code",
+            "FIBER_BASE_ISO_MISSING",
+            400,
+            new Object[] {primaryFiberId});
       }
 
       return fiberIsoCodeRepository
           .findById(primaryFiber.getFiberIsoCodeId())
           .orElseThrow(
               () ->
-                  new IllegalArgumentException(
-                      "Fiber ISO code not found for primary component: "
-                          + primaryFiber.getFiberIsoCodeId()));
+                  new FiberDomainException(
+                      "Fiber ISO code not found",
+                      "FIBER_ISO_NOT_FOUND",
+                      404,
+                      new Object[] {primaryFiber.getFiberIsoCodeId()}));
     }
 
     if (request.getFiberIsoCodeId() == null) {
-      throw new IllegalArgumentException("Fiber ISO code ID is required for pure fibers.");
+      throw new FiberDomainException("Fiber ISO code required", "FIBER_ISO_REQUIRED", 400);
     }
     return fiberIsoCodeRepository
         .findById(request.getFiberIsoCodeId())
         .orElseThrow(
             () ->
-                new IllegalArgumentException(
-                    "Fiber ISO code not found: " + request.getFiberIsoCodeId()));
+                new FiberDomainException(
+                    "Fiber ISO code not found",
+                    "FIBER_ISO_NOT_FOUND",
+                    404,
+                    new Object[] {request.getFiberIsoCodeId()}));
   }
 
   @Transactional(readOnly = true)
@@ -407,7 +436,7 @@ public class FiberService implements FiberFacade {
     Fiber fiber =
         fiberRepository
             .findByTenantIdAndId(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
+            .orElseThrow(() -> new FiberDomainException("Fiber not found", "FIBER_NOT_FOUND", 404));
 
     if (fiber.getStatus() == FiberStatus.OBSOLETE) {
       throw new FiberDomainException(
@@ -467,7 +496,7 @@ public class FiberService implements FiberFacade {
     Fiber fiber =
         fiberRepository
             .findByTenantIdAndId(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Fiber not found"));
+            .orElseThrow(() -> new FiberDomainException("Fiber not found", "FIBER_NOT_FOUND", 404));
 
     if (batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
         tenantId, fiber.getMaterial().getId(), BatchStatus.PRODUCTION_ACTIVE)) {

@@ -144,13 +144,9 @@ class ModernJavaArchTest {
     }
 
     @Test
-    @DisplayName("CC-2: Controllers must not directly depend on @Entity classes [TRACKER]")
-    @org.junit.jupiter.api.Disabled(
-        "TRACKER: ~55 violations across all modules. Controllers return entities"
-            + " instead of DTOs. Enable per-module as DTO refactoring progresses."
-            + " Target: 0 violations. See AGENTS.md §5 'Never expose entities'.")
+    @DisplayName("CC-2: Controllers must not directly depend on @Entity classes")
     void controllersShouldNotDependOnEntities() {
-      // SYSTEMIC ISSUE: ~55 violations across many modules.
+      // SYSTEMIC ISSUE: tracking violations across many modules.
       // Controllers return entities directly instead of DTOs.
       //
       // This is a known anti-pattern causing:
@@ -165,6 +161,8 @@ class ModernJavaArchTest {
           noClasses()
               .that()
               .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+              .and()
+              .resideOutsideOfPackage("com.fabricmanagement.platform.dev..")
               .should()
               .dependOnClassesThat()
               .areAnnotatedWith(jakarta.persistence.Entity.class)

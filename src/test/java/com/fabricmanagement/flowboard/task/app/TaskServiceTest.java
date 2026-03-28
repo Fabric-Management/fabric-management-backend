@@ -34,6 +34,8 @@ class TaskServiceTest {
 
   @Mock private TaskRepository taskRepo;
   @Mock private TaskAssigneeRepository assigneeRepo;
+  @Mock private TaskLabelAssignmentRepository taskLabelAssignmentRepo;
+  @Mock private TaskLabelRepository taskLabelRepo;
   @Mock private BoardRepository boardRepo;
   @Mock private PriorityScoreCalculator scoreCalculator;
   @Mock private DomainEventPublisher eventPublisher;
@@ -54,6 +56,7 @@ class TaskServiceTest {
     when(scoreCalculator.calculateWithLabels(any(), any())).thenReturn(50);
     when(scoreCalculator.calculate(any())).thenReturn(50);
     when(taskRepo.getNextTaskNumber()).thenReturn(1L);
+    when(taskLabelAssignmentRepo.findAllByTaskIdIn(any())).thenReturn(java.util.List.of());
     doNothing().when(eventPublisher).publish(any());
     // UserDto stub: wipLimit = 5 (DEFAULT_WIP_LIMIT) olarak set edilmiş
     com.fabricmanagement.platform.user.dto.UserDto userDto =
@@ -250,6 +253,8 @@ class TaskServiceTest {
               LocalDate.now().plusDays(5),
               new BigDecimal("8.0"),
               null,
+              null,
+              "MANUAL",
               null);
 
       // Task.getId() == null before JPA persist → save() returns a spy with id set
@@ -289,6 +294,8 @@ class TaskServiceTest {
               LocalDate.now().plusDays(1),
               null,
               null,
+              null,
+              "MANUAL",
               null);
 
       when(taskRepo.save(any()))

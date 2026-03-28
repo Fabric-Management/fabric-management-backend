@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.platform.auth.dto.VerifyAndRegisterRequest;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
@@ -94,14 +95,17 @@ public class RegistrationService {
     if (user == null) {
       log.warn(
           "Contact not found in system: {}", PiiMaskingUtil.maskEmail(request.getContactValue()));
-      throw new IllegalArgumentException(
-          "Your information is not registered. Our representative will contact you.");
+      throw new PlatformDomainException(
+          "Your information is not registered. Our representative will contact you.",
+          "AUTH_NOT_REGISTERED",
+          400);
     }
 
     // Check if user already has AuthUser (user-based authentication)
     if (authUserRepository.existsByUserId(user.getId())) {
       log.warn("User already registered: userId={}", user.getId());
-      throw new IllegalArgumentException("This account is already registered. Please login.");
+      throw new PlatformDomainException(
+          "This account is already registered. Please login.", "AUTH_ALREADY_REGISTERED", 409);
     }
 
     verificationCodeManager.issueCode(request.getContactValue(), VerificationType.REGISTRATION);
@@ -126,11 +130,13 @@ public class RegistrationService {
     UserDto user =
         userFacade
             .findByContactValue(request.getContactValue())
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("User not found", "AUTH_USER_NOT_FOUND", 404));
 
     // TOCTOU guard: re-check AuthUser doesn't exist (may have been created between check & verify)
     if (authUserRepository.existsByUserId(user.getId())) {
-      throw new IllegalArgumentException("This account is already registered. Please login.");
+      throw new PlatformDomainException(
+          "This account is already registered. Please login.", "AUTH_ALREADY_REGISTERED", 409);
     }
 
     // Tenant status guard: ensure tenant is active before allowing registration
@@ -139,11 +145,15 @@ public class RegistrationService {
             .findActiveById(user.getTenantId())
             .orElseThrow(
                 () ->
-                    new IllegalStateException(
-                        "Tenant is not active. Registration is not allowed."));
+                    new PlatformDomainException(
+                        "Tenant is not active. Registration is not allowed.",
+                        "AUTH_TENANT_INACTIVE",
+                        403));
     if (!tenant.getStatus().hasAccess()) {
-      throw new IllegalStateException(
-          "Tenant account is " + tenant.getStatus() + ". Registration is not allowed.");
+      throw new PlatformDomainException(
+          "Tenant account is " + tenant.getStatus() + ". Registration is not allowed.",
+          "AUTH_TENANT_INACTIVE",
+          403);
     }
 
     com.fabricmanagement.platform.communication.domain.Contact contact =
@@ -163,7 +173,10 @@ public class RegistrationService {
     com.fabricmanagement.platform.user.domain.User userEntity =
         userRepository
             .findByTenantIdAndId(user.getTenantId(), user.getId())
-            .orElseThrow(() -> new IllegalStateException("User not found after registration"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "User not found after registration", "AUTH_USER_NOT_FOUND", 404));
 
     String accessToken = jwtService.generateAccessToken(userEntity);
     String refreshToken = jwtService.generateRefreshToken(userEntity);
@@ -232,6 +245,9 @@ public class RegistrationService {
         .filter(c -> c.getContactValue().equalsIgnoreCase(contactValue))
         .findFirst()
         .or(() -> contactService.findByValue(contactValue))
-        .orElseThrow(() -> new IllegalStateException("Contact not found for user"));
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Contact not found for user", "AUTH_CONTACT_NOT_FOUND", 404));
   }
 }

@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.auth.app;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.auth.domain.VerificationType;
 import com.fabricmanagement.platform.auth.infra.repository.VerificationCodeRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +58,8 @@ public class VerificationThrottleService {
           tenantId,
           maskContact(contactValue),
           type);
-      throw new IllegalArgumentException("Too many verification requests. Please try again later.");
+      throw new PlatformDomainException(
+          "Too many verification requests. Please try again later.", "AUTH_THROTTLE_CONTACT", 429);
     }
 
     Instant genericWindowStart = Instant.now().minusSeconds(throttleWindowSeconds);
@@ -66,14 +68,17 @@ public class VerificationThrottleService {
             tenantId, type, genericWindowStart);
     if (perTenant >= maxPerTenantWindow) {
       log.warn("Verification throttle exceeded (tenant): tenantId={}, type={}", tenantId, type);
-      throw new IllegalArgumentException(
-          "Verification temporarily limited for your organisation. Please try later.");
+      throw new PlatformDomainException(
+          "Verification temporarily limited for your organisation. Please try later.",
+          "AUTH_THROTTLE_TENANT",
+          429);
     }
 
     long globalCount = verificationCodeRepository.countByCreatedAtAfter(genericWindowStart);
     if (globalCount >= maxGlobalWindow) {
       log.error("Verification throttle exceeded (global): type={} count={}", type, globalCount);
-      throw new IllegalStateException("Verification system is busy. Please try again shortly.");
+      throw new PlatformDomainException(
+          "Verification system is busy. Please try again shortly.", "AUTH_THROTTLE_GLOBAL", 429);
     }
   }
 

@@ -1,18 +1,14 @@
 package com.fabricmanagement.platform.organization.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.communication.app.AddressService;
-import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.dto.AssignAddressRequest;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
-import com.fabricmanagement.platform.organization.app.OrganizationAddressAssignmentService;
-import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
+import com.fabricmanagement.platform.organization.api.facade.OrganizationAddressFacade;
 import com.fabricmanagement.platform.organization.dto.AddressDeletionImpactDto;
 import com.fabricmanagement.platform.organization.dto.OrganizationAddressDto;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -24,46 +20,27 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class OrganizationAddressController {
 
-  private final OrganizationAddressAssignmentService organizationAddressAssignmentService;
-  private final AddressService addressService;
+  private final OrganizationAddressFacade facade;
 
   @GetMapping
   public ResponseEntity<ApiResponse<List<OrganizationAddressDto>>> getOrganizationAddresses(
       @PathVariable UUID organizationId) {
     log.debug("Getting organization addresses: organizationId={}", organizationId);
-
-    List<OrganizationAddressDto> addresses =
-        organizationAddressAssignmentService.getOrganizationAddresses(organizationId).stream()
-            .map(OrganizationAddressDto::from)
-            .collect(Collectors.toList());
-
-    return ResponseEntity.ok(ApiResponse.success(addresses));
+    return ResponseEntity.ok(ApiResponse.success(facade.getOrganizationAddresses(organizationId)));
   }
 
   @GetMapping("/primary")
   public ResponseEntity<ApiResponse<OrganizationAddressDto>> getPrimaryAddress(
       @PathVariable UUID organizationId) {
     log.debug("Getting primary address: organizationId={}", organizationId);
-
-    OrganizationAddress primaryAddress =
-        organizationAddressAssignmentService
-            .getPrimaryAddress(organizationId)
-            .orElseThrow(() -> new IllegalArgumentException("No primary address found"));
-
-    return ResponseEntity.ok(ApiResponse.success(OrganizationAddressDto.from(primaryAddress)));
+    return ResponseEntity.ok(ApiResponse.success(facade.getPrimaryAddress(organizationId)));
   }
 
   @GetMapping("/headquarters")
   public ResponseEntity<ApiResponse<OrganizationAddressDto>> getHeadquarters(
       @PathVariable UUID organizationId) {
     log.debug("Getting headquarters: organizationId={}", organizationId);
-
-    OrganizationAddress hqAddress =
-        organizationAddressAssignmentService
-            .getHeadquarters(organizationId)
-            .orElseThrow(() -> new IllegalArgumentException("No headquarters found"));
-
-    return ResponseEntity.ok(ApiResponse.success(OrganizationAddressDto.from(hqAddress)));
+    return ResponseEntity.ok(ApiResponse.success(facade.getHeadquarters(organizationId)));
   }
 
   @PostMapping
@@ -75,17 +52,9 @@ public class OrganizationAddressController {
         request.getAddressId(),
         request.getIsPrimary(),
         request.getIsHeadquarters());
-
-    OrganizationAddress organizationAddress =
-        organizationAddressAssignmentService.assignAddress(
-            organizationId,
-            request.getAddressId(),
-            request.getIsPrimary(),
-            request.getIsHeadquarters());
-
     return ResponseEntity.ok(
         ApiResponse.success(
-            OrganizationAddressDto.from(organizationAddress), "Address assigned successfully"));
+            facade.assignAddress(organizationId, request), "Address assigned successfully"));
   }
 
   @PostMapping("/create-and-assign")
@@ -98,15 +67,9 @@ public class OrganizationAddressController {
         "Creating and assigning address to organization: organizationId={}, type={}",
         organizationId,
         createRequest.getAddressType());
-
-    Address address = addressService.createAddress(createRequest);
-    OrganizationAddress organizationAddress =
-        organizationAddressAssignmentService.assignAddress(
-            organizationId, address.getId(), isPrimary, isHeadquarters);
-
     return ResponseEntity.ok(
         ApiResponse.success(
-            OrganizationAddressDto.from(organizationAddress),
+            facade.createAndAssignAddress(organizationId, createRequest, isPrimary, isHeadquarters),
             "Address created and assigned successfully"));
   }
 
@@ -114,26 +77,18 @@ public class OrganizationAddressController {
   public ResponseEntity<ApiResponse<OrganizationAddressDto>> setAsPrimary(
       @PathVariable UUID organizationId, @PathVariable UUID addressId) {
     log.info("Setting primary address: organizationId={}, addressId={}", organizationId, addressId);
-
-    OrganizationAddress organizationAddress =
-        organizationAddressAssignmentService.setAsPrimary(organizationId, addressId);
-
     return ResponseEntity.ok(
         ApiResponse.success(
-            OrganizationAddressDto.from(organizationAddress), "Primary address set successfully"));
+            facade.setAsPrimary(organizationId, addressId), "Primary address set successfully"));
   }
 
   @PutMapping("/{addressId}/headquarters")
   public ResponseEntity<ApiResponse<OrganizationAddressDto>> setAsHeadquarters(
       @PathVariable UUID organizationId, @PathVariable UUID addressId) {
     log.info("Setting headquarters: organizationId={}, addressId={}", organizationId, addressId);
-
-    OrganizationAddress organizationAddress =
-        organizationAddressAssignmentService.setAsHeadquarters(organizationId, addressId);
-
     return ResponseEntity.ok(
         ApiResponse.success(
-            OrganizationAddressDto.from(organizationAddress), "Headquarters set successfully"));
+            facade.setAsHeadquarters(organizationId, addressId), "Headquarters set successfully"));
   }
 
   @GetMapping("/{addressId}/deletion-impact")
@@ -141,11 +96,8 @@ public class OrganizationAddressController {
       @PathVariable UUID organizationId, @PathVariable UUID addressId) {
     log.debug(
         "Getting deletion impact: organizationId={}, addressId={}", organizationId, addressId);
-
-    AddressDeletionImpactDto impact =
-        organizationAddressAssignmentService.getAddressDeletionImpact(organizationId, addressId);
-
-    return ResponseEntity.ok(ApiResponse.success(impact));
+    return ResponseEntity.ok(
+        ApiResponse.success(facade.getAddressDeletionImpact(organizationId, addressId)));
   }
 
   @DeleteMapping("/{addressId}")
@@ -155,9 +107,7 @@ public class OrganizationAddressController {
         "Safe-removing address from organization: organizationId={}, addressId={}",
         organizationId,
         addressId);
-
-    organizationAddressAssignmentService.safeRemoveAddress(organizationId, addressId);
-
+    facade.safeRemoveAddress(organizationId, addressId);
     return ResponseEntity.ok(ApiResponse.success(null, "Address removed successfully"));
   }
 }

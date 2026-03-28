@@ -105,6 +105,22 @@ public class User extends BaseEntity {
   @Column(name = "onboarding_completed_at")
   private Instant onboardingCompletedAt;
 
+  /**
+   * User's preferred locale tag (e.g. "tr-TR", "en-US").
+   *
+   * <p>Null = inherit from tenant settings (3-tier cascade: user → tenant → system default EN).
+   */
+  @Column(name = "preferred_locale", length = 10)
+  private String preferredLocale;
+
+  /**
+   * User's preferred IANA timezone (e.g. "Europe/Istanbul", "UTC").
+   *
+   * <p>Null = inherit from tenant settings.
+   */
+  @Column(name = "preferred_timezone", length = 50)
+  private String preferredTimezone;
+
   public static User create(String firstName, String lastName, UUID organizationId) {
     return create(firstName, lastName, organizationId, UserType.INTERNAL);
   }
@@ -130,6 +146,17 @@ public class User extends BaseEntity {
 
   public void updateLastActive() {
     this.lastActiveAt = Instant.now();
+  }
+
+  /**
+   * Update locale and timezone preferences for this user.
+   *
+   * @param locale IETF BCP 47 language tag (e.g. "tr-TR"). Null clears override (inherits tenant).
+   * @param timezone IANA timezone identifier (e.g. "Europe/Istanbul"). Null clears override.
+   */
+  public void updateLocalePreferences(String locale, String timezone) {
+    this.preferredLocale = locale;
+    this.preferredTimezone = timezone;
   }
 
   public boolean hasCompletedOnboarding() {

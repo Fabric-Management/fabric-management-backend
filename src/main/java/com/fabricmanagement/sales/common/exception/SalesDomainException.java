@@ -9,6 +9,11 @@ public class SalesDomainException extends DomainException {
     super(message, errorCode, httpStatus.value());
   }
 
+  public SalesDomainException(
+      String message, String errorCode, HttpStatus httpStatus, Object[] args) {
+    super(message, errorCode, httpStatus.value(), args);
+  }
+
   public static SalesDomainException invalidPriceZone(String message) {
     return new SalesDomainException(message, "SALES_001_INVALID_PRICE_ZONE", HttpStatus.FORBIDDEN);
   }

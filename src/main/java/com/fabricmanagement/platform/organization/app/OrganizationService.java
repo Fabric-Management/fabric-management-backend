@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.organization.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.TaxIdAlreadyExistsException;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.domain.event.OrganizationCreatedEvent;
@@ -45,7 +46,10 @@ public class OrganizationService {
   public OrganizationDto createOrganization(CreateOrganizationRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantIdOrNull();
     if (tenantId == null) {
-      throw new IllegalStateException("Tenant context must be set to create an organization");
+      throw new PlatformDomainException(
+          "Tenant context must be set to create an organization",
+          "ORG_TENANT_CONTEXT_MISSING",
+          400);
     }
 
     // Validate tax ID uniqueness within tenant
@@ -58,7 +62,8 @@ public class OrganizationService {
     if (request.getParentOrganizationId() != null) {
       if (!organizationRepository.existsByTenantIdAndId(
           tenantId, request.getParentOrganizationId())) {
-        throw new IllegalArgumentException("Parent organization not found");
+        throw new PlatformDomainException(
+            "Parent organization not found", "ORG_PARENT_NOT_FOUND", 404);
       }
     }
 
@@ -280,7 +285,10 @@ public class OrganizationService {
     Organization organization =
         organizationRepository
             .findByTenantIdAndId(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Organization not found: " + id));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Organization not found", "ORG_NOT_FOUND", 404, new Object[] {id}));
 
     // Validate tax ID uniqueness if changed
     if (!organization.getTaxId().equals(taxId)
@@ -310,7 +318,10 @@ public class OrganizationService {
     Organization organization =
         organizationRepository
             .findByTenantIdAndId(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Organization not found: " + id));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Organization not found", "ORG_NOT_FOUND", 404, new Object[] {id}));
 
     organization.delete();
     organizationRepository.save(organization);
@@ -341,8 +352,10 @@ public class OrganizationService {
   public OrganizationDto createPartnerOrganization(String name, String taxId, String partnerUid) {
     UUID tenantId = TenantContext.getCurrentTenantIdOrNull();
     if (tenantId == null) {
-      throw new IllegalStateException(
-          "Tenant context must be set to create a partner organization");
+      throw new PlatformDomainException(
+          "Tenant context must be set to create a partner organization",
+          "ORG_TENANT_CONTEXT_MISSING",
+          400);
     }
 
     // Use placeholder tax ID for partners without one (foreign/unregistered)

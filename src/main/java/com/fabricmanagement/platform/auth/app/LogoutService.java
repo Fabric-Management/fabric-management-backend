@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.platform.auth.domain.event.UserLogoutEvent;
 import com.fabricmanagement.platform.auth.dto.ActiveSessionDto;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +48,8 @@ public class LogoutService {
                     "Token user mismatch: tokenUserId={}, requestUserId={}",
                     token.getUserId(),
                     userId);
-                throw new IllegalArgumentException("Invalid token for user");
+                throw new PlatformDomainException(
+                    "Invalid token for user", "AUTH_INVALID_TOKEN", 401);
               }
 
               token.revoke();
@@ -152,7 +154,10 @@ public class LogoutService {
     RefreshToken token =
         refreshTokenRepository
             .findByIdAndUserId(sessionId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Session not found", "AUTH_SESSION_NOT_FOUND", 404));
 
     if (token.getIsRevoked()) {
       log.info("Session already revoked: sessionId={}", sessionId);

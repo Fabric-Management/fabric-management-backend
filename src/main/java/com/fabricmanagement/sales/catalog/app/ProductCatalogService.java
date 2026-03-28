@@ -2,9 +2,13 @@ package com.fabricmanagement.sales.catalog.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.catalog.domain.ProductCatalog;
+import com.fabricmanagement.sales.catalog.dto.CreateProductCatalogRequest;
+import com.fabricmanagement.sales.catalog.dto.ProductCatalogDto;
 import com.fabricmanagement.sales.catalog.infra.repository.ProductCatalogRepository;
+import com.fabricmanagement.sales.catalog.mapper.ProductCatalogMapper;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,21 +18,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductCatalogService {
 
   private final ProductCatalogRepository repository;
+  private final ProductCatalogMapper mapper;
 
   @Transactional(readOnly = true)
-  public List<ProductCatalog> getActiveCatalogForModule(String moduleType) {
+  public List<ProductCatalogDto> getActiveCatalogForModule(String moduleType) {
     UUID tenantId = TenantContext.getCurrentTenantId();
+    List<ProductCatalog> catalogs;
     if (moduleType == null || moduleType.isEmpty()) {
-      return repository.findAllByTenantIdAndIsActiveTrue(tenantId);
+      catalogs = repository.findAllByTenantIdAndIsActiveTrue(tenantId);
+    } else {
+      catalogs = repository.findAllByTenantIdAndModuleTypeAndIsActiveTrue(tenantId, moduleType);
     }
-    return repository.findAllByTenantIdAndModuleTypeAndIsActiveTrue(tenantId, moduleType);
+    return catalogs.stream().map(mapper::toDto).collect(Collectors.toList());
   }
 
   @Transactional(readOnly = true)
-  public ProductCatalog getActiveByMaterialId(UUID materialId) {
+  public ProductCatalogDto getActiveByMaterialId(UUID materialId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     return repository
         .findActiveByMaterialId(tenantId, materialId)
+        .map(mapper::toDto)
         .orElseThrow(
             () ->
                 new IllegalArgumentException(
@@ -36,9 +45,12 @@ public class ProductCatalogService {
   }
 
   @Transactional
-  public ProductCatalog createEntry(ProductCatalog entry) {
+  public ProductCatalogDto createEntry(CreateProductCatalogRequest request) {
+    ProductCatalog entry = mapper.toEntity(request);
     entry.setTenantId(TenantContext.getCurrentTenantId());
-    return repository.save(entry);
+    if (entry.getSpecs() == null) entry.setSpecs("{}");
+    if (entry.getPhotos() == null) entry.setPhotos("[]");
+    return mapper.toDto(repository.save(entry));
   }
 
   @Transactional

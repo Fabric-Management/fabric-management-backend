@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
@@ -52,10 +53,12 @@ public class MfaRateLimitService {
           userId,
           counter.get(),
           lockoutSeconds);
-      throw new IllegalArgumentException(
+      throw new PlatformDomainException(
           "Too many failed MFA attempts. Please try again in "
               + (lockoutSeconds / 60)
-              + " minutes.");
+              + " minutes.",
+          "AUTH_MFA_RATE_LIMIT",
+          429);
     }
   }
 

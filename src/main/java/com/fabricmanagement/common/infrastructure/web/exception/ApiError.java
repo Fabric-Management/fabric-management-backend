@@ -22,6 +22,7 @@ import java.util.Map;
  *   "status":    409,
  *   "error":     "Conflict",
  *   "code":      "RECIPE_IN_USE",
+ *   "args":      [],
  *   "message":   "Fiber 'COT60_LIN40' composition cannot be changed ...",
  *   "path":      "/api/production/fibers/3fa85f64-...",
  *   "details": {
@@ -40,6 +41,8 @@ import java.util.Map;
  *   <li>{@code error} — HTTP status phrase (e.g. "Bad Request", "Conflict")
  *   <li>{@code code} — machine-readable error code for frontend switch/dispatch (e.g.
  *       "RECIPE_IN_USE"). Never null.
+ *   <li>{@code args} — dynamic arguments for parameterized frontend messages. Frontend usage:
+ *       {@code t(error.code, { min: error.args[0] })}. Never null (may be empty array).
  *   <li>{@code message} — human-readable description, safe to show to the end user
  *   <li>{@code path} — request URI that produced the error
  *   <li>{@code details} — optional structured payload with context-specific fields. Always an
@@ -52,6 +55,7 @@ public record ApiError(
     int status,
     String error,
     String code,
+    Object[] args,
     String message,
     String path,
     Map<String, Object> details) {
@@ -65,18 +69,32 @@ public record ApiError(
         details != null
             ? Collections.unmodifiableMap(new LinkedHashMap<>(details))
             : Collections.emptyMap();
+    args = args != null ? args.clone() : new Object[0];
   }
 
-  /** Create an error response without extra details. */
+  /** Create an error response without extra details (no args). */
   public static ApiError of(int status, String error, String code, String message, String path) {
-    return new ApiError(Instant.now(), status, error, code, message, path, null);
+    return new ApiError(Instant.now(), status, error, code, new Object[0], message, path, null);
   }
 
-  /** Create an error response with a structured details payload. */
+  /** Create an error response with dynamic args for parameterized frontend messages. */
+  public static ApiError of(
+      int status, String error, String code, Object[] args, String message, String path) {
+    return new ApiError(Instant.now(), status, error, code, args, message, path, null);
+  }
+
+  /** Create an error response with a structured details payload (no args). */
   @SuppressWarnings("unchecked")
   public static ApiError of(
       int status, String error, String code, String message, String path, Map<String, ?> details) {
     return new ApiError(
-        Instant.now(), status, error, code, message, path, (Map<String, Object>) details);
+        Instant.now(),
+        status,
+        error,
+        code,
+        new Object[0],
+        message,
+        path,
+        (Map<String, Object>) details);
   }
 }

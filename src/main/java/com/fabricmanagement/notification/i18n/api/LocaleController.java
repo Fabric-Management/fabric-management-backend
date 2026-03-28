@@ -4,13 +4,9 @@ import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserCont
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.notification.hub.dto.UpdateLocalePreferenceRequest;
 import com.fabricmanagement.notification.i18n.app.TranslationService;
-import com.fabricmanagement.notification.i18n.domain.UserLocaleConfig;
-import com.fabricmanagement.notification.i18n.infra.repository.TenantLocaleConfigRepository;
-import com.fabricmanagement.notification.i18n.infra.repository.UserLocaleConfigRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -31,8 +27,6 @@ import org.springframework.web.bind.annotation.*;
 public class LocaleController {
 
   private final TranslationService translationService;
-  private final UserLocaleConfigRepository userLocaleConfigRepo;
-  private final TenantLocaleConfigRepository tenantLocaleConfigRepo;
 
   @GetMapping("/my-locale")
   @Operation(summary = "Kullanıcının aktif locale konfigürasyonunu getir")
@@ -40,16 +34,7 @@ public class LocaleController {
     var ctx = currentUser();
     String locale = translationService.resolveLocaleForUser(ctx.tenantId(), ctx.userId());
 
-    Map<String, Object> userCfg =
-        userLocaleConfigRepo
-            .findByUserId(ctx.userId())
-            .map(
-                cfg ->
-                    Map.<String, Object>of(
-                        "locale", cfg.getLocale(),
-                        "dateFormat", cfg.getDateFormat() != null ? cfg.getDateFormat() : "",
-                        "timezone", cfg.getTimezone() != null ? cfg.getTimezone() : ""))
-            .orElse(Map.of());
+    Map<String, Object> userCfg = translationService.getUserLocaleConfig(ctx.userId());
 
     var response =
         Map.<String, Object>of(
@@ -64,20 +49,8 @@ public class LocaleController {
   @Operation(summary = "Kullanıcının locale tercihini güncelle")
   public ApiResponse<Void> updateMyLocale(@Valid @RequestBody UpdateLocalePreferenceRequest req) {
     var ctx = currentUser();
-
-    userLocaleConfigRepo
-        .findByUserId(ctx.userId())
-        .ifPresentOrElse(
-            cfg -> {
-              cfg.updateLocale(req.locale(), req.dateFormat(), req.timezone());
-              userLocaleConfigRepo.save(cfg);
-            },
-            () -> {
-              var cfg = UserLocaleConfig.create(ctx.tenantId(), ctx.userId(), req.locale());
-              cfg.updateLocale(req.locale(), req.dateFormat(), req.timezone());
-              userLocaleConfigRepo.save(cfg);
-            });
-
+    translationService.updateUserLocale(
+        ctx.tenantId(), ctx.userId(), req.locale(), req.dateFormat(), req.timezone());
     return ApiResponse.success(null);
   }
 
@@ -98,21 +71,7 @@ public class LocaleController {
   @Operation(summary = "Tenant'ın locale konfigürasyonunu getir")
   public ApiResponse<Map<String, Object>> getTenantLocale() {
     var ctx = currentUser();
-    Map<String, Object> result =
-        tenantLocaleConfigRepo
-            .findByTenantId(ctx.tenantId())
-            .map(
-                cfg ->
-                    Map.<String, Object>of(
-                        "defaultLocale", cfg.getDefaultLocale(),
-                        "supportedLocales", cfg.getSupportedLocales(),
-                        "dateFormat", cfg.getDateFormat(),
-                        "timeFormat", cfg.getTimeFormat(),
-                        "timezone", cfg.getTimezone(),
-                        "currency", cfg.getCurrency()))
-            .orElse(Map.of("defaultLocale", "TR", "supportedLocales", List.of("TR", "EN")));
-
-    return ApiResponse.success(result);
+    return ApiResponse.success(translationService.getTenantLocaleConfig(ctx.tenantId()));
   }
 
   // ---- Yardımcı ----

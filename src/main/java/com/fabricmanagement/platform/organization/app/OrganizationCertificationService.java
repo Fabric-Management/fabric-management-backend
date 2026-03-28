@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.organization.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationCertification;
 import com.fabricmanagement.platform.organization.dto.AddOrganizationCertificationRequest;
@@ -33,7 +34,12 @@ public class OrganizationCertificationService {
         organizationRepository
             .findByTenantIdAndId(tenantId, organizationId)
             .orElseThrow(
-                () -> new IllegalArgumentException("Organization not found: " + organizationId));
+                () ->
+                    new PlatformDomainException(
+                        "Organization not found",
+                        "ORG_NOT_FOUND",
+                        404,
+                        new Object[] {organizationId}));
 
     return certificationRepository.findByOrganizationIdAndIsActiveTrue(org.getId()).stream()
         .map(OrganizationCertificationDto::from)
@@ -47,7 +53,12 @@ public class OrganizationCertificationService {
         organizationRepository
             .findByTenantIdAndId(tenantId, organizationId)
             .orElseThrow(
-                () -> new IllegalArgumentException("Organization not found: " + organizationId));
+                () ->
+                    new PlatformDomainException(
+                        "Organization not found",
+                        "ORG_NOT_FOUND",
+                        404,
+                        new Object[] {organizationId}));
 
     return certificationRepository
         .findById(certificationId)
@@ -57,11 +68,11 @@ public class OrganizationCertificationService {
         .map(OrganizationCertificationDto::from)
         .orElseThrow(
             () ->
-                new IllegalArgumentException(
-                    "Certification not found: "
-                        + certificationId
-                        + " for organization "
-                        + organizationId));
+                new PlatformDomainException(
+                    "Certification not found for organization",
+                    "ORG_CERTIFICATION_NOT_FOUND",
+                    404,
+                    new Object[] {certificationId, organizationId}));
   }
 
   @Transactional
@@ -73,15 +84,23 @@ public class OrganizationCertificationService {
         organizationRepository
             .findByTenantIdAndId(tenantId, organizationId)
             .orElseThrow(
-                () -> new IllegalArgumentException("Organization not found: " + organizationId));
+                () ->
+                    new PlatformDomainException(
+                        "Organization not found",
+                        "ORG_NOT_FOUND",
+                        404,
+                        new Object[] {organizationId}));
 
     FiberCertification certification =
         fiberCertificationRepository
             .findById(request.getCertificationId())
             .orElseThrow(
                 () ->
-                    new IllegalArgumentException(
-                        "Certification not found: " + request.getCertificationId()));
+                    new PlatformDomainException(
+                        "Certification not found",
+                        "ORG_CERTIFICATION_NOT_FOUND",
+                        404,
+                        new Object[] {request.getCertificationId()}));
 
     OrganizationCertification entity =
         OrganizationCertification.builder()
@@ -112,7 +131,12 @@ public class OrganizationCertificationService {
         organizationRepository
             .findByTenantIdAndId(tenantId, organizationId)
             .orElseThrow(
-                () -> new IllegalArgumentException("Organization not found: " + organizationId));
+                () ->
+                    new PlatformDomainException(
+                        "Organization not found",
+                        "ORG_NOT_FOUND",
+                        404,
+                        new Object[] {organizationId}));
 
     OrganizationCertification entity =
         certificationRepository
@@ -121,14 +145,17 @@ public class OrganizationCertificationService {
             .filter(c -> tenantId.equals(c.getTenantId()))
             .orElseThrow(
                 () ->
-                    new IllegalArgumentException(
-                        "Certification not found: "
-                            + certificationId
-                            + " for organization "
-                            + organizationId));
+                    new PlatformDomainException(
+                        "Certification not found for organization",
+                        "ORG_CERTIFICATION_NOT_FOUND",
+                        404,
+                        new Object[] {certificationId, organizationId}));
 
     if (request.getVersion() != null && !request.getVersion().equals(entity.getVersion())) {
-      throw new IllegalStateException("Version conflict - record was modified by another user");
+      throw new PlatformDomainException(
+          "Version conflict - record was modified by another user",
+          "ORG_CERTIFICATE_VERSION_CONFLICT",
+          409);
     }
 
     if (request.getCertificationId() != null) {
@@ -137,8 +164,11 @@ public class OrganizationCertificationService {
               .findById(request.getCertificationId())
               .orElseThrow(
                   () ->
-                      new IllegalArgumentException(
-                          "Certification not found: " + request.getCertificationId()));
+                      new PlatformDomainException(
+                          "Certification not found",
+                          "ORG_CERTIFICATION_NOT_FOUND",
+                          404,
+                          new Object[] {request.getCertificationId()}));
       entity.setCertification(certification);
     }
     if (request.getLicenseNo() != null) entity.setLicenseNo(request.getLicenseNo());
@@ -160,7 +190,12 @@ public class OrganizationCertificationService {
         organizationRepository
             .findByTenantIdAndId(tenantId, organizationId)
             .orElseThrow(
-                () -> new IllegalArgumentException("Organization not found: " + organizationId));
+                () ->
+                    new PlatformDomainException(
+                        "Organization not found",
+                        "ORG_NOT_FOUND",
+                        404,
+                        new Object[] {organizationId}));
 
     OrganizationCertification entity =
         certificationRepository
@@ -169,11 +204,11 @@ public class OrganizationCertificationService {
             .filter(c -> tenantId.equals(c.getTenantId()))
             .orElseThrow(
                 () ->
-                    new IllegalArgumentException(
-                        "Certification not found: "
-                            + certificationId
-                            + " for organization "
-                            + organizationId));
+                    new PlatformDomainException(
+                        "Certification not found for organization",
+                        "ORG_CERTIFICATION_NOT_FOUND",
+                        404,
+                        new Object[] {certificationId, organizationId}));
 
     entity.delete();
     certificationRepository.save(entity);

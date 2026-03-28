@@ -3,16 +3,12 @@ package com.fabricmanagement.human.compliance.localization.api;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.InternalEndpoint;
-import com.fabricmanagement.human.compliance.localization.app.HrCountryPackMappingService;
+import com.fabricmanagement.human.compliance.localization.api.facade.HrPolicyPackFacade;
 import com.fabricmanagement.human.compliance.localization.app.HrPolicyPackCommandService;
-import com.fabricmanagement.human.compliance.localization.app.HrPolicyPackMapper;
-import com.fabricmanagement.human.compliance.localization.app.HrPolicyPackResolver;
-import com.fabricmanagement.human.compliance.localization.app.HrPolicyPackService;
 import com.fabricmanagement.human.compliance.localization.domain.HrPolicyPackStatus;
 import com.fabricmanagement.human.compliance.localization.dto.AssignCountryPackRequest;
 import com.fabricmanagement.human.compliance.localization.dto.CreateHrPolicyPackRequest;
 import com.fabricmanagement.human.compliance.localization.dto.HrCountryPackMappingResponse;
-import com.fabricmanagement.human.compliance.localization.dto.HrInheritanceModeDto;
 import com.fabricmanagement.human.compliance.localization.dto.HrPolicyPackLineageResponse;
 import com.fabricmanagement.human.compliance.localization.dto.HrPolicyPackResponse;
 import com.fabricmanagement.human.compliance.localization.dto.PublishHrPolicyPackRequest;
@@ -26,7 +22,6 @@ import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,9 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HrPolicyPackController {
 
   private final HrPolicyPackCommandService commandService;
-  private final HrPolicyPackService policyPackService;
-  private final HrPolicyPackResolver policyPackResolver;
-  private final HrCountryPackMappingService countryPackMappingService;
+  private final HrPolicyPackFacade policyPackFacade;
 
   @PostMapping
   @InternalEndpoint(
@@ -123,12 +116,11 @@ public class HrPolicyPackController {
     String normalizedCountry = countryCode != null ? countryCode.toUpperCase(Locale.ROOT) : null;
     String normalizedRegion = regionCode != null ? regionCode.toUpperCase(Locale.ROOT) : null;
     List<HrPolicyPackResponse> packs =
-        HrPolicyPackMapper.toResponseList(
-            policyPackService.listPacks(
-                TenantContext.getCurrentTenantId(),
-                normalizedCountry,
-                normalizedRegion,
-                resolvedStatus));
+        policyPackFacade.listPacks(
+            TenantContext.getCurrentTenantId(),
+            normalizedCountry,
+            normalizedRegion,
+            resolvedStatus);
     return ResponseEntity.ok(ApiResponse.success(packs));
   }
 
@@ -139,9 +131,7 @@ public class HrPolicyPackController {
   public ResponseEntity<ApiResponse<List<HrPolicyPackResponse>>> history(
       @PathVariable String packCode) {
     List<HrPolicyPackResponse> history =
-        HrPolicyPackMapper.toResponseList(
-            policyPackService.getHistory(
-                TenantContext.getCurrentTenantId(), packCode.toUpperCase(Locale.ROOT)));
+        policyPackFacade.getHistory(TenantContext.getCurrentTenantId(), packCode);
     return ResponseEntity.ok(ApiResponse.success(history));
   }
 
@@ -151,39 +141,8 @@ public class HrPolicyPackController {
       calledBy = {"hr-admin-ui"})
   public ResponseEntity<ApiResponse<HrPolicyPackLineageResponse>> lineage(
       @PathVariable String packCode, @RequestParam(required = false) Integer packVersion) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    String normalizedCode = packCode.toUpperCase(Locale.ROOT);
-
-    var pack =
-        (packVersion != null
-                ? policyPackService.findByPackCodeAndVersion(tenantId, normalizedCode, packVersion)
-                : policyPackService
-                    .findActiveByPackCode(tenantId, normalizedCode)
-                    .or(() -> policyPackService.findLatestByPackCode(tenantId, normalizedCode)))
-            .orElse(null);
-
-    if (pack == null) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND)
-          .body(
-              ApiResponse.error(
-                  "POLICY_PACK_NOT_FOUND",
-                  "No policy pack found for code %s (version %s)"
-                      .formatted(normalizedCode, packVersion != null ? packVersion : "latest")));
-    }
-
-    var resolved = policyPackResolver.resolve(tenantId, pack);
     HrPolicyPackLineageResponse response =
-        new HrPolicyPackLineageResponse(
-            pack.getPackCode(),
-            pack.getPackVersion(),
-            pack.getCountryCode(),
-            pack.getRegionCode(),
-            pack.getParentPackCode(),
-            pack.getInheritanceMode() != null
-                ? HrInheritanceModeDto.valueOf(pack.getInheritanceMode().name())
-                : null,
-            resolved.lineageCodes(),
-            resolved.resolvedPayload());
+        policyPackFacade.getLineage(TenantContext.getCurrentTenantId(), packCode, packVersion);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
@@ -193,10 +152,7 @@ public class HrPolicyPackController {
       calledBy = {"hr-admin-ui"})
   public ResponseEntity<ApiResponse<HrCountryPackMappingResponse>> assignCountryPack(
       @Valid @RequestBody AssignCountryPackRequest request) {
-    var mapping = countryPackMappingService.assign(request.countryCode(), request.packCode());
-    HrCountryPackMappingResponse response =
-        new HrCountryPackMappingResponse(
-            mapping.getId(), mapping.getCountryCode(), mapping.getPackCode());
+    HrCountryPackMappingResponse response = policyPackFacade.assignCountryPack(request);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
@@ -206,13 +162,7 @@ public class HrPolicyPackController {
       calledBy = {"hr-admin-ui"})
   public ResponseEntity<ApiResponse<List<HrCountryPackMappingResponse>>> listMappings() {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    List<HrCountryPackMappingResponse> responses =
-        countryPackMappingService.listMappings(tenantId).stream()
-            .map(
-                mapping ->
-                    new HrCountryPackMappingResponse(
-                        mapping.getId(), mapping.getCountryCode(), mapping.getPackCode()))
-            .toList();
+    List<HrCountryPackMappingResponse> responses = policyPackFacade.listMappings(tenantId);
     return ResponseEntity.ok(ApiResponse.success(responses));
   }
 }

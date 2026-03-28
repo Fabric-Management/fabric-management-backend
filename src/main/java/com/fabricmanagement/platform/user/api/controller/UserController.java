@@ -6,13 +6,16 @@ import com.fabricmanagement.common.infrastructure.web.exception.NotFoundExceptio
 import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.human.core.employee.app.EmployeeService;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactSuggestionService;
 import com.fabricmanagement.platform.communication.dto.ContactSuggestionsDto;
 import com.fabricmanagement.platform.subscription.app.UserCreationOptionsService;
 import com.fabricmanagement.platform.user.app.TeamAccessService;
+import com.fabricmanagement.platform.user.app.UserLocaleService;
 import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
+import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import jakarta.validation.Valid;
@@ -37,6 +40,7 @@ public class UserController {
   private final EmployeeService employeeService;
   private final UserCreationOptionsService userCreationOptionsService;
   private final TeamAccessService teamAccessService;
+  private final UserLocaleService userLocaleService;
 
   /**
    * Create internal employee (own staff with HR data).
@@ -227,7 +231,7 @@ public class UserController {
     UUID userId = TenantContext.getCurrentUserId();
 
     if (userId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     log.debug("Getting current user profile: userId={}", userId);
@@ -241,6 +245,31 @@ public class UserController {
   }
 
   /**
+   * Update the authenticated user's own locale and timezone preferences (self-service).
+   *
+   * <p>Cascade order: User preference → Tenant settings → System default (EN / UTC)
+   */
+  @PatchMapping("/me/locale")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<UserDto>> updateMyLocalePreferences(
+      @Valid @RequestBody UpdateLocalePreferencesRequest request) {
+    UUID userId = TenantContext.getCurrentUserId();
+    if (userId == null) {
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
+    }
+
+    log.info(
+        "Updating locale preferences: userId={}, locale={}, timezone={}",
+        userId,
+        request.preferredLocale(),
+        request.preferredTimezone());
+
+    UserDto updated = userLocaleService.updateLocalePreferences(userId, request);
+    return ResponseEntity.ok(
+        ApiResponse.success(updated, "Locale preferences updated successfully"));
+  }
+
+  /**
    * Get the current user's access level for team member management.
    *
    * <p>Returns: FULL_ACCESS, READ_ALL, DEPARTMENT_ONLY, or NO_ACCESS.
@@ -249,7 +278,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<String>> getMyTeamAccess() {
     UUID requesterId = TenantContext.getCurrentUserId();
     if (requesterId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     TeamAccessService.AccessLevel level = teamAccessService.resolveAccessLevel(requesterId);

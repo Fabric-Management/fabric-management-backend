@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.tradingpartner.app;
 
 import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.LocalizationService;
 import com.fabricmanagement.platform.auth.domain.RegistrationToken;
 import com.fabricmanagement.platform.auth.domain.RegistrationTokenType;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
@@ -35,6 +36,7 @@ public class PartnerUserInvitationEventListener {
   private final NotificationService notificationService;
   private final EmailTemplateRenderer emailTemplateRenderer;
   private final FrontendUrlProvider frontendUrlProvider;
+  private final LocalizationService localizationService;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onPartnerUserCreated(PartnerUserCreatedEvent event) {
@@ -84,7 +86,10 @@ public class PartnerUserInvitationEventListener {
     String displayName = event.getDisplayName() != null ? event.getDisplayName() : "";
     String firstName = displayName.contains(" ") ? displayName.split(" ")[0] : displayName;
 
-    String subject = "You've been invited to the Partner Portal";
+    // Resolve locale from UserLocaleConfig cascade: user → tenant → EN
+    var locale = localizationService.resolveLocaleForUser(event.getTenantId(), event.getUserId());
+    String subject =
+        localizationService.getMessage("email.partner.invitation.subject", null, locale);
     String message =
         emailTemplateRenderer.renderPartnerInvitation(
             firstName, event.getPartnerDisplayName(), event.getContactValue(), setupUrl);

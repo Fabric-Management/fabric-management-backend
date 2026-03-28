@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.user.app;
 import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentService;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.infra.repository.AddressRepository;
 import com.fabricmanagement.platform.user.domain.UserAddress;
@@ -58,7 +59,7 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
     UUID tenantId = TenantContext.getCurrentTenantId();
     userRepository
         .findByTenantIdAndId(tenantId, parentId)
-        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        .orElseThrow(() -> new PlatformDomainException("User not found", "USER_NOT_FOUND", 404));
   }
 
   @Override
@@ -67,9 +68,13 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
     Address address =
         addressRepository
             .findById(childId)
-            .orElseThrow(() -> new IllegalArgumentException("Address not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Address not found", "USER_ADDRESS_NOT_FOUND", 404));
     if (!address.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Address does not belong to current tenant");
+      throw new PlatformDomainException(
+          "Address does not belong to current tenant", "USER_ADDRESS_TENANT_MISMATCH", 403);
     }
   }
 
@@ -114,7 +119,8 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
     validateAssignment(userId, addressId);
 
     if (userAddressRepository.findByUserIdAndAddressId(userId, addressId).isPresent()) {
-      throw new IllegalArgumentException("Address is already assigned to this user");
+      throw new PlatformDomainException(
+          "Address is already assigned to this user", "USER_ADDRESS_ALREADY_ASSIGNED", 409);
     }
 
     if (Boolean.TRUE.equals(isPrimary)) {

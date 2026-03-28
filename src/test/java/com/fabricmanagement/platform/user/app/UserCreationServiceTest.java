@@ -90,7 +90,8 @@ class UserCreationServiceTest {
                       null,
                       null,
                       null))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("already registered");
     }
 
@@ -111,7 +112,8 @@ class UserCreationServiceTest {
                       null,
                       null,
                       null))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("Organization not found");
     }
 

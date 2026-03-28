@@ -2,7 +2,7 @@ package com.fabricmanagement.sales.quote.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.catalog.app.ProductCatalogService;
-import com.fabricmanagement.sales.catalog.domain.ProductCatalog;
+import com.fabricmanagement.sales.catalog.dto.ProductCatalogDto;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
@@ -52,7 +52,7 @@ public class QuoteService {
           "Cannot add lines to a quote in " + quote.getStatus() + " status");
     }
 
-    ProductCatalog catalogItem = catalogService.getActiveByMaterialId(materialId);
+    ProductCatalogDto catalogItem = catalogService.getActiveByMaterialId(materialId);
     DiscountPolicy policy = policyService.getActivePolicy(quote.getModuleType());
 
     // Evaluate Pricing Zone

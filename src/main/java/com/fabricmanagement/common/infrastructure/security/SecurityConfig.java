@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.security;
 
+import com.fabricmanagement.common.infrastructure.web.LocalizationFilter;
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final LocalizationFilter localizationFilter;
 
   @Value("${spring.profiles.active:local}")
   private String activeProfile;
@@ -70,6 +72,7 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .hasRole("PARTNER_USER"))
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
@@ -96,6 +99,7 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .hasRole("PARTNER_USER"))
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
@@ -132,6 +136,7 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
@@ -169,6 +174,7 @@ public class SecurityConfig {
                     .hasRole("PLATFORM_ADMIN")
                     .anyRequest()
                     .authenticated())
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }

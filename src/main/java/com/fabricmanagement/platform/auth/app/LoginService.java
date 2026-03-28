@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.dto.VerifyMfaRequest;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
@@ -122,7 +123,8 @@ public class LoginService {
           "Auth validation failed: contactValue={}, reason={}",
           PiiMaskingUtil.maskEmail(request.getContactValue()),
           validation.getReason());
-      throw new IllegalArgumentException(validation.getReason());
+      throw new PlatformDomainException(
+          validation.getReason(), "AUTH_LOGIN_VALIDATION_FAILED", 400);
     }
 
     if (!passwordEncoder.matches(request.getPassword(), authUser.getPasswordHash())) {
@@ -131,7 +133,7 @@ public class LoginService {
           "Invalid password: contactValue={}, attempts={}",
           PiiMaskingUtil.maskEmail(request.getContactValue()),
           authUser.getFailedLoginAttempts());
-      throw new IllegalArgumentException("Invalid credentials");
+      throw new PlatformDomainException("Invalid credentials", "AUTH_INVALID_CREDENTIALS", 401);
     }
 
     resolutionService.resetFailedAttempts(authUser);
@@ -145,7 +147,8 @@ public class LoginService {
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     if (!user.getIsActive()) {
-      throw new IllegalArgumentException("User account is deactivated");
+      throw new PlatformDomainException(
+          "User account is deactivated", "AUTH_USER_DEACTIVATED", 403);
     }
 
     // Get User entity with contacts/departments loaded for JWT generation
@@ -241,11 +244,13 @@ public class LoginService {
   @Transactional
   public LoginResponse verifyMfa(VerifyMfaRequest request, String ipAddress, String userAgent) {
     if (!jwtService.validateToken(request.getMfaToken())) {
-      throw new IllegalArgumentException("Invalid or expired MFA token");
+      throw new PlatformDomainException(
+          "Invalid or expired MFA token", "AUTH_MFA_TOKEN_INVALID", 401);
     }
 
     if (!jwtService.isPreAuthToken(request.getMfaToken())) {
-      throw new IllegalArgumentException("Provided token is not a valid MFA temporary token");
+      throw new PlatformDomainException(
+          "Provided token is not a valid MFA temporary token", "AUTH_MFA_TOKEN_INVALID", 401);
     }
 
     UUID userId = jwtService.getUserIdFromToken(request.getMfaToken());
@@ -270,14 +275,15 @@ public class LoginService {
       if (mfaType == MfaType.TOTP) {
         boolean isValid = totpMfaService.verifyCode(authUser.getMfaSecret(), request.getCode());
         if (!isValid) {
-          throw new IllegalArgumentException("Invalid TOTP code");
+          throw new PlatformDomainException("Invalid TOTP code", "AUTH_MFA_INVALID_CODE", 400);
         }
       } else if (mfaType == MfaType.EMAIL
           || mfaType == MfaType.SMS
           || mfaType == MfaType.WHATSAPP) {
         verificationCodeManager.validateMfaCode(userId, tenantId, mfaType, request.getCode());
       } else {
-        throw new IllegalArgumentException("MFA is not enabled or type is invalid");
+        throw new PlatformDomainException(
+            "MFA is not enabled or type is invalid", "AUTH_MFA_NOT_ENABLED", 400);
       }
     } catch (IllegalArgumentException e) {
       mfaRateLimitService.recordFailedAttempt(userId);

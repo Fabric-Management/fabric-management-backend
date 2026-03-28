@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserNavPreferences;
 import com.fabricmanagement.platform.user.dto.NavPreferencesMapper;
@@ -38,7 +39,8 @@ public class UserNavPreferencesService {
   @Transactional(readOnly = true)
   public NavPreferencesResponse getPreferences(UUID tenantId, UUID userId) {
     if (tenantId == null || userId == null) {
-      throw new IllegalArgumentException("tenantId and userId must not be null");
+      throw new PlatformDomainException(
+          "tenantId and userId must not be null", "USER_PREF_INVALID_ARGS", 400);
     }
     return preferencesRepository
         .findByTenantIdAndUser_Id(tenantId, userId)
@@ -59,7 +61,8 @@ public class UserNavPreferencesService {
   public NavPreferencesResponse upsertPreferences(
       UUID tenantId, UUID userId, NavPreferencesRequest request) {
     if (tenantId == null || userId == null) {
-      throw new IllegalArgumentException("tenantId and userId must not be null");
+      throw new PlatformDomainException(
+          "tenantId and userId must not be null", "USER_PREF_INVALID_ARGS", 400);
     }
     User user =
         userRepository

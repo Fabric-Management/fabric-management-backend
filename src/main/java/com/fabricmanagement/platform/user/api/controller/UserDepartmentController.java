@@ -2,14 +2,12 @@ package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.user.app.UserDepartmentService;
-import com.fabricmanagement.platform.user.domain.UserDepartment;
+import com.fabricmanagement.platform.user.api.facade.UserDepartmentFacade;
 import com.fabricmanagement.platform.user.dto.AssignDepartmentRequest;
 import com.fabricmanagement.platform.user.dto.UserDepartmentDto;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class UserDepartmentController {
 
-  private final UserDepartmentService userDepartmentService;
+  private final UserDepartmentFacade userDepartmentFacade;
 
   /**
    * Get all departments assigned to a user.
@@ -33,10 +31,7 @@ public class UserDepartmentController {
       @PathVariable UUID userId) {
     log.debug("Getting user departments: userId={}", userId);
 
-    List<UserDepartmentDto> assignments =
-        userDepartmentService.getUserDepartments(userId).stream()
-            .map(UserDepartmentDto::from)
-            .collect(Collectors.toList());
+    List<UserDepartmentDto> assignments = userDepartmentFacade.getUserDepartments(userId);
 
     return ResponseEntity.ok(ApiResponse.success(assignments));
   }
@@ -46,12 +41,12 @@ public class UserDepartmentController {
       @PathVariable UUID userId) {
     log.debug("Getting primary department: userId={}", userId);
 
-    UserDepartment primary =
-        userDepartmentService
+    UserDepartmentDto primary =
+        userDepartmentFacade
             .getPrimaryDepartment(userId)
             .orElseThrow(() -> new IllegalArgumentException("No primary department found"));
 
-    return ResponseEntity.ok(ApiResponse.success(UserDepartmentDto.from(primary)));
+    return ResponseEntity.ok(ApiResponse.success(primary));
   }
 
   @PostMapping
@@ -63,16 +58,14 @@ public class UserDepartmentController {
         request.getDepartmentId(),
         request.getIsPrimary());
 
-    UserDepartment assignment =
-        userDepartmentService.assignDepartment(
+    UserDepartmentDto assignment =
+        userDepartmentFacade.assignDepartment(
             userId,
             request.getDepartmentId(),
             request.getIsPrimary() != null && request.getIsPrimary(),
             TenantContext.getCurrentUserId());
 
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            UserDepartmentDto.from(assignment), "Department assigned successfully"));
+    return ResponseEntity.ok(ApiResponse.success(assignment, "Department assigned successfully"));
   }
 
   @PutMapping("/{departmentId}/primary")
@@ -80,16 +73,14 @@ public class UserDepartmentController {
       @PathVariable UUID userId, @PathVariable UUID departmentId) {
     log.info("Setting primary department: userId={}, departmentId={}", userId, departmentId);
 
-    userDepartmentService.setPrimaryDepartment(userId, departmentId);
+    userDepartmentFacade.setPrimaryDepartment(userId, departmentId);
 
-    UserDepartment primary =
-        userDepartmentService
+    UserDepartmentDto primary =
+        userDepartmentFacade
             .getPrimaryDepartment(userId)
             .orElseThrow(() -> new IllegalArgumentException("Primary department not found"));
 
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            UserDepartmentDto.from(primary), "Primary department set successfully"));
+    return ResponseEntity.ok(ApiResponse.success(primary, "Primary department set successfully"));
   }
 
   @DeleteMapping("/{departmentId}")
@@ -97,7 +88,7 @@ public class UserDepartmentController {
       @PathVariable UUID userId, @PathVariable UUID departmentId) {
     log.info("Removing department assignment: userId={}, departmentId={}", userId, departmentId);
 
-    userDepartmentService.removeAssignment(userId, departmentId);
+    userDepartmentFacade.removeAssignment(userId, departmentId);
 
     return ResponseEntity.ok(
         ApiResponse.success(null, "Department assignment removed successfully"));

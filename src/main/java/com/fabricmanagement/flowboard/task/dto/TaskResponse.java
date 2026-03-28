@@ -8,30 +8,13 @@ import com.fabricmanagement.flowboard.task.domain.TaskType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * Task detay yanıtı.
  *
- * @param id Task UUID
- * @param taskNumber TSK-XXXX
- * @param boardId Board UUID
- * @param boardGroupId Board grubu UUID (opsiyonel)
- * @param title Başlık
- * @param description Açıklama
- * @param taskType Task tipi
- * @param moduleType Modül tipi
- * @param priority Öncelik
- * @param priorityScore Hesaplanan skor
- * @param status Mevcut status
- * @param deadline Deadline
- * @param estimatedHours Tahmini süre
- * @param actualHours Gerçekleşen süre
- * @param isOverdue Deadline geçmiş mi
- * @param startedAt İlk IN_PROGRESS zamanı
- * @param completedAt DONE zamanı
- * @param entityType Polimorfik referans tipi
- * @param entityId Polimorfik referans ID
+ * @param labels Aktif etiketler (TaskLabelAssignment + TaskLabel)
  */
 public record TaskResponse(
     UUID id,
@@ -52,15 +35,15 @@ public record TaskResponse(
     Instant startedAt,
     Instant completedAt,
     String entityType,
-    UUID entityId) {
+    UUID entityId,
+    List<TaskAssigneeResponse> assignees,
+    List<LabelResponse> labels) {
 
-  /**
-   * Task entity'sinden DTO oluşturur — Clock-aware.
-   *
-   * @param task kaynak entity
-   * @param today Clock'tan alınan bugünkü tarih
-   */
-  public static TaskResponse from(Task task, LocalDate today) {
+  public static TaskResponse from(
+      Task task,
+      LocalDate today,
+      List<TaskAssigneeResponse> assignees,
+      List<LabelResponse> labels) {
     return new TaskResponse(
         task.getId(),
         task.getTaskNumber(),
@@ -80,14 +63,15 @@ public record TaskResponse(
         task.getStartedAt(),
         task.getCompletedAt(),
         task.getEntityType(),
-        task.getEntityId());
+        task.getEntityId(),
+        assignees != null ? assignees : List.of(),
+        labels != null ? labels : List.of());
   }
 
-  /**
-   * Task entity'sinden DTO oluşturur.
-   *
-   * @deprecated Deterministic değildir — {@link #from(Task, LocalDate)} kullanın.
-   */
+  public static TaskResponse from(Task task, LocalDate today) {
+    return from(task, today, List.of(), List.of());
+  }
+
   @Deprecated(forRemoval = true)
   public static TaskResponse from(Task task) {
     return from(task, LocalDate.now());

@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.user.domain.User;
@@ -66,15 +67,20 @@ public class UserDepartmentService {
     User user =
         userRepository
             .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(
+                () -> new PlatformDomainException("User not found", "USER_NOT_FOUND", 404));
 
     Department department =
         departmentRepository
             .findByTenantIdAndId(tenantId, departmentId)
-            .orElseThrow(() -> new IllegalArgumentException("Department not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Department not found", "USER_DEPT_NOT_FOUND", 404));
 
     if (userDepartmentRepository.findByUserIdAndDepartmentId(userId, departmentId).isPresent()) {
-      throw new IllegalArgumentException("User is already assigned to this department");
+      throw new PlatformDomainException(
+          "User is already assigned to this department", "USER_DEPT_ALREADY_ASSIGNED", 409);
     }
 
     if (isPrimary) {
@@ -107,7 +113,10 @@ public class UserDepartmentService {
     UserDepartment assignment =
         userDepartmentRepository
             .findByUserIdAndDepartmentId(userId, departmentId)
-            .orElseThrow(() -> new IllegalArgumentException("Department assignment not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Department assignment not found", "USER_DEPT_ASSIGNMENT_NOT_FOUND", 404));
 
     userDepartmentRepository.delete(assignment);
 
@@ -126,7 +135,10 @@ public class UserDepartmentService {
     UserDepartment assignment =
         userDepartmentRepository
             .findByUserIdAndDepartmentId(userId, departmentId)
-            .orElseThrow(() -> new IllegalArgumentException("Department assignment not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Department assignment not found", "USER_DEPT_ASSIGNMENT_NOT_FOUND", 404));
 
     userDepartmentRepository
         .findByUserIdAndIsPrimaryTrue(userId)

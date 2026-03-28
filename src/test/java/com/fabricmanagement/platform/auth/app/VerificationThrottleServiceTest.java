@@ -69,7 +69,8 @@ class VerificationThrottleServiceTest {
           .thenReturn(5L);
 
       assertThatThrownBy(() -> service.checkThrottle(CONTACT, TENANT_ID, TYPE))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("Too many verification requests");
     }
 
@@ -83,7 +84,8 @@ class VerificationThrottleServiceTest {
           .thenReturn(100L);
 
       assertThatThrownBy(() -> service.checkThrottle(CONTACT, TENANT_ID, TYPE))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("temporarily limited");
     }
 
@@ -98,7 +100,8 @@ class VerificationThrottleServiceTest {
       when(verificationCodeRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(1000L);
 
       assertThatThrownBy(() -> service.checkThrottle(CONTACT, TENANT_ID, TYPE))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(
+              com.fabricmanagement.platform.common.exception.PlatformDomainException.class)
           .hasMessageContaining("busy");
     }
   }

@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.assignment.BaseAssignmentService;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.platform.user.domain.UserWorkLocation;
@@ -43,7 +44,7 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
     UUID tenantId = TenantContext.getCurrentTenantId();
     userRepository
         .findByTenantIdAndId(tenantId, parentId)
-        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        .orElseThrow(() -> new PlatformDomainException("User not found", "USER_NOT_FOUND", 404));
   }
 
   @Override
@@ -52,10 +53,16 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
     OrganizationAddress oa =
         organizationAddressRepository
             .findByAddressId(childId)
-            .orElseThrow(() -> new IllegalArgumentException("Organization address not found"));
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Organization address not found", "USER_LOCATION_NOT_FOUND", 404));
 
     if (!oa.getTenantId().equals(tenantId)) {
-      throw new IllegalArgumentException("Organization address does not belong to current tenant");
+      throw new PlatformDomainException(
+          "Organization address does not belong to current tenant",
+          "USER_LOCATION_TENANT_MISMATCH",
+          403);
     }
   }
 
@@ -96,7 +103,8 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
     validateChildExists(orgAddressId);
 
     if (userWorkLocationRepository.findByUserIdAndOrgAddressId(userId, orgAddressId).isPresent()) {
-      throw new IllegalArgumentException("Work location is already assigned to this user");
+      throw new PlatformDomainException(
+          "Work location is already assigned to this user", "USER_LOCATION_ALREADY_ASSIGNED", 409);
     }
 
     if (Boolean.TRUE.equals(isPrimary)) {

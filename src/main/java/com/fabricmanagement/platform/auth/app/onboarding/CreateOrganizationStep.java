@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.auth.app.onboarding;
 
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
@@ -34,7 +35,8 @@ public class CreateOrganizationStep implements OnboardingStep {
     log.debug("CreateOrganizationStep: Creating organization for tenant {}", context.getTenantId());
 
     if (context.getTenantId() == null) {
-      throw new IllegalStateException("Tenant must be created before organization");
+      throw new PlatformDomainException(
+          "Tenant must be created before organization", "AUTH_ONBOARDING_INVALID_STATE", 400);
     }
 
     // Context already holds OrganizationType directly

@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.OnboardingStatusResponse;
@@ -32,7 +33,7 @@ public class UserOnboardingController {
     UUID userId = TenantContext.getCurrentUserId();
 
     if (userId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     log.debug("Getting onboarding status: userId={}", userId);
@@ -57,7 +58,7 @@ public class UserOnboardingController {
     UUID userId = TenantContext.getCurrentUserId();
 
     if (userId == null) {
-      throw new IllegalStateException("User not authenticated");
+      throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
     log.info("Completing onboarding: userId={}", userId);

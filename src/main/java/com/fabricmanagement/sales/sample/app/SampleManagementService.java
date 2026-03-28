@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.sample.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.sample.domain.DeliveryMethod;
 import com.fabricmanagement.sales.sample.domain.SampleDelivery;
@@ -11,6 +12,7 @@ import com.fabricmanagement.sales.sample.infra.repository.SampleRequestRepositor
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +42,10 @@ public class SampleManagementService {
 
     if (request.getStatus() != SampleRequestStatus.REQUESTED
         && request.getStatus() != SampleRequestStatus.PREPARING) {
-      throw new IllegalStateException("Sample is already dispatched or in an invalid state.");
+      throw new SalesDomainException(
+          "Sample is already dispatched or in an invalid state.",
+          "SALES_SAMPLE_INVALID_STATE",
+          HttpStatus.BAD_REQUEST);
     }
 
     request.setStatus(SampleRequestStatus.DISPATCHED);
@@ -69,9 +74,7 @@ public class SampleManagementService {
     SampleDelivery delivery =
         deliveryRepository
             .findByTenantIdAndIdAndIsActiveTrue(tenantId, deliveryId)
-            .orElseThrow(
-                () ->
-                    SalesDomainException.quoteNotFound("Sample delivery not found: " + deliveryId));
+            .orElseThrow(() -> new NotFoundException("Sample delivery not found: " + deliveryId));
 
     delivery.setDeliveredAt(Instant.now());
     delivery.setRecipientName(recipientName);
@@ -89,6 +92,6 @@ public class SampleManagementService {
     UUID tenantId = TenantContext.getCurrentTenantId();
     return requestRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId)
-        .orElseThrow(() -> new IllegalArgumentException("Sample request not found: " + requestId));
+        .orElseThrow(() -> new NotFoundException("Sample request not found: " + requestId));
   }
 }

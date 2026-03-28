@@ -1,17 +1,13 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.communication.app.ContactService;
-import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.dto.AssignContactRequest;
 import com.fabricmanagement.platform.communication.dto.CreateContactRequest;
-import com.fabricmanagement.platform.user.app.UserContactAssignmentService;
-import com.fabricmanagement.platform.user.domain.UserContact;
+import com.fabricmanagement.platform.user.api.facade.UserContactFacade;
 import com.fabricmanagement.platform.user.dto.UserContactDto;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -23,18 +19,14 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class UserContactController {
 
-  private final UserContactAssignmentService userContactAssignmentService;
-  private final ContactService contactService;
+  private final UserContactFacade userContactFacade;
 
   @GetMapping
   public ResponseEntity<ApiResponse<List<UserContactDto>>> getUserContacts(
       @PathVariable UUID userId) {
     log.debug("Getting user contacts: userId={}", userId);
 
-    List<UserContactDto> contacts =
-        userContactAssignmentService.getUserContacts(userId).stream()
-            .map(UserContactDto::from)
-            .collect(Collectors.toList());
+    List<UserContactDto> contacts = userContactFacade.getUserContacts(userId);
 
     return ResponseEntity.ok(ApiResponse.success(contacts));
   }
@@ -43,12 +35,12 @@ public class UserContactController {
   public ResponseEntity<ApiResponse<UserContactDto>> getDefaultContact(@PathVariable UUID userId) {
     log.debug("Getting default contact: userId={}", userId);
 
-    UserContact defaultContact =
-        userContactAssignmentService
+    UserContactDto defaultContact =
+        userContactFacade
             .getDefaultContact(userId)
             .orElseThrow(() -> new IllegalArgumentException("No default contact found"));
 
-    return ResponseEntity.ok(ApiResponse.success(UserContactDto.from(defaultContact)));
+    return ResponseEntity.ok(ApiResponse.success(defaultContact));
   }
 
   @GetMapping("/authentication")
@@ -56,12 +48,12 @@ public class UserContactController {
       @PathVariable UUID userId) {
     log.debug("Getting verified contact for authentication: userId={}", userId);
 
-    UserContact authContact =
-        userContactAssignmentService
+    UserContactDto authContact =
+        userContactFacade
             .getAuthenticationContact(userId)
             .orElseThrow(() -> new IllegalArgumentException("No verified contact found"));
 
-    return ResponseEntity.ok(ApiResponse.success(UserContactDto.from(authContact)));
+    return ResponseEntity.ok(ApiResponse.success(authContact));
   }
 
   @PostMapping
@@ -69,12 +61,10 @@ public class UserContactController {
       @PathVariable UUID userId, @Valid @RequestBody AssignContactRequest request) {
     log.info("Assigning contact to user: userId={}, request={}", userId, request);
 
-    UserContact userContact =
-        userContactAssignmentService.assignContact(
-            userId, request.getContactId(), request.getIsDefault());
+    UserContactDto userContact =
+        userContactFacade.assignContact(userId, request.getContactId(), request.getIsDefault());
 
-    return ResponseEntity.ok(
-        ApiResponse.success(UserContactDto.from(userContact), "Contact assigned successfully"));
+    return ResponseEntity.ok(ApiResponse.success(userContact, "Contact assigned successfully"));
   }
 
   @PostMapping("/create-and-assign")
@@ -87,20 +77,11 @@ public class UserContactController {
         userId,
         createRequest.getContactType());
 
-    Contact contact =
-        contactService.createContact(
-            createRequest.getContactValue(),
-            createRequest.getContactType(),
-            createRequest.getLabel(),
-            createRequest.getIsPersonal(),
-            createRequest.getParentContactId());
-
-    UserContact userContact =
-        userContactAssignmentService.assignContact(userId, contact.getId(), isDefault);
+    UserContactDto userContact =
+        userContactFacade.createAndAssignContact(userId, createRequest, isDefault);
 
     return ResponseEntity.ok(
-        ApiResponse.success(
-            UserContactDto.from(userContact), "Contact created and assigned successfully"));
+        ApiResponse.success(userContact, "Contact created and assigned successfully"));
   }
 
   @PutMapping("/{contactId}/default")
@@ -108,10 +89,9 @@ public class UserContactController {
       @PathVariable UUID userId, @PathVariable UUID contactId) {
     log.info("Setting default contact: userId={}, contactId={}", userId, contactId);
 
-    UserContact userContact = userContactAssignmentService.setAsDefault(userId, contactId);
+    UserContactDto userContact = userContactFacade.setAsDefault(userId, contactId);
 
-    return ResponseEntity.ok(
-        ApiResponse.success(UserContactDto.from(userContact), "Default contact set successfully"));
+    return ResponseEntity.ok(ApiResponse.success(userContact, "Default contact set successfully"));
   }
 
   @DeleteMapping("/{contactId}")
@@ -119,7 +99,7 @@ public class UserContactController {
       @PathVariable UUID userId, @PathVariable UUID contactId) {
     log.info("Removing contact from user: userId={}, contactId={}", userId, contactId);
 
-    userContactAssignmentService.removeContact(userId, contactId);
+    userContactFacade.removeContact(userId, contactId);
 
     return ResponseEntity.ok(ApiResponse.success(null, "Contact removed successfully"));
   }
