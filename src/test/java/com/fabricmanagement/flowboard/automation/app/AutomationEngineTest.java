@@ -41,12 +41,20 @@ class AutomationEngineTest {
   @Mock private AutomationNotificationPort notificationPort;
   @Mock private TaskLabelService taskLabelService;
   @Mock private EscalationService escalationService;
+  @Mock private com.fabricmanagement.flowboard.board.infra.repository.BoardRepository boardRepo;
 
   @Spy
   private com.fasterxml.jackson.databind.ObjectMapper objectMapper =
       new com.fasterxml.jackson.databind.ObjectMapper();
 
-  @InjectMocks private AutomationEngine automationEngine;
+  @InjectMocks private AutomationActionExecutor actionExecutor;
+
+  private AutomationEngine automationEngine;
+
+  @org.junit.jupiter.api.BeforeEach
+  void setUp() {
+    automationEngine = new AutomationEngine(ruleRepo, actionExecutor, objectMapper);
+  }
 
   private static final UUID TASK_ID = UUID.randomUUID();
   private static final UUID BOARD_ID = UUID.randomUUID();

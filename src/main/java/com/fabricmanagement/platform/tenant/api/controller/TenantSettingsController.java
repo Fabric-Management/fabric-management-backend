@@ -49,7 +49,7 @@ public class TenantSettingsController {
   /**
    * Update settings for the current tenant.
    *
-   * @param settings New settings
+   * @param request New settings
    * @return Updated TenantSettings
    */
   @PutMapping

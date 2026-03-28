@@ -45,6 +45,9 @@ class TaskDetailServiceTest {
   @Mock private TaskAttachmentRepository attachmentRepo;
   @Mock private TaskActivityService activityService;
 
+  @Mock
+  private com.fabricmanagement.common.infrastructure.events.DomainEventPublisher eventPublisher;
+
   @org.mockito.Spy
   private java.time.Clock clock =
       java.time.Clock.fixed(java.time.Instant.now(), java.time.ZoneId.of("UTC"));
@@ -190,6 +193,10 @@ class TaskDetailServiceTest {
       TaskChecklist checklist = new TaskChecklist(tenantId, taskId, "Alt görev", 1);
       UUID checklistId = UUID.randomUUID();
       when(checklistRepo.findById(checklistId)).thenReturn(Optional.of(checklist));
+
+      Task task = org.mockito.Mockito.mock(Task.class);
+      org.mockito.Mockito.when(task.getBoardId()).thenReturn(UUID.randomUUID());
+      when(taskRepo.findById(taskId)).thenReturn(Optional.of(task));
 
       detailService.completeChecklist(tenantId, taskId, checklistId, userId);
 
