@@ -3,11 +3,11 @@ package com.fabricmanagement.flowboard.automation.app;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fabricmanagement.flowboard.automation.application.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.automation.domain.AutomationActionType;
 import com.fabricmanagement.flowboard.automation.domain.AutomationContext;
 import com.fabricmanagement.flowboard.automation.domain.AutomationRule;
 import com.fabricmanagement.flowboard.automation.domain.AutomationTriggerType;
+import com.fabricmanagement.flowboard.automation.domain.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.automation.infra.repository.AutomationRuleRepository;
 import com.fabricmanagement.flowboard.task.app.EscalationService;
 import com.fabricmanagement.flowboard.task.app.TaskLabelService;
@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -40,6 +41,10 @@ class AutomationEngineTest {
   @Mock private AutomationNotificationPort notificationPort;
   @Mock private TaskLabelService taskLabelService;
   @Mock private EscalationService escalationService;
+
+  @Spy
+  private com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+      new com.fasterxml.jackson.databind.ObjectMapper();
 
   @InjectMocks private AutomationEngine automationEngine;
 
@@ -86,7 +91,8 @@ class AutomationEngineTest {
       when(rule.getName()).thenReturn("test-rule");
       when(rule.getExecutionCount()).thenReturn(0L);
 
-      when(ruleRepo.findActiveByTriggerTypeAndBoard(AutomationTriggerType.STATUS_CHANGED, BOARD_ID))
+      when(ruleRepo.findActiveByTenantAndTriggerTypeAndBoard(
+              any(), eq(AutomationTriggerType.STATUS_CHANGED), eq(BOARD_ID)))
           .thenReturn(List.of(rule));
       when(ruleRepo.save(any())).thenReturn(rule);
 
@@ -112,7 +118,8 @@ class AutomationEngineTest {
       when(rule.getName()).thenReturn("quality-only-rule");
       when(rule.getExecutionCount()).thenReturn(0L);
 
-      when(ruleRepo.findActiveByTriggerTypeAndBoard(any(), any())).thenReturn(List.of(rule));
+      when(ruleRepo.findActiveByTenantAndTriggerTypeAndBoard(any(), any(), any()))
+          .thenReturn(List.of(rule));
 
       automationEngine.evaluate(
           task,
@@ -138,7 +145,8 @@ class AutomationEngineTest {
       when(rule.getName()).thenReturn("done-only-rule");
       when(rule.getExecutionCount()).thenReturn(0L);
 
-      when(ruleRepo.findActiveByTriggerTypeAndBoard(any(), any())).thenReturn(List.of(rule));
+      when(ruleRepo.findActiveByTenantAndTriggerTypeAndBoard(any(), any(), any()))
+          .thenReturn(List.of(rule));
 
       // Ama gerçek transition: TO_DO → IN_PROGRESS (DONE değil)
       automationEngine.evaluate(
@@ -163,7 +171,8 @@ class AutomationEngineTest {
       when(rule.getName()).thenReturn("exhausted-rule");
       when(rule.getExecutionCount()).thenReturn(10_000L); // MAX_EXECUTION_COUNT
 
-      when(ruleRepo.findActiveByTriggerTypeAndBoard(any(), any())).thenReturn(List.of(rule));
+      when(ruleRepo.findActiveByTenantAndTriggerTypeAndBoard(any(), any(), any()))
+          .thenReturn(List.of(rule));
 
       automationEngine.evaluate(
           task,
@@ -195,7 +204,8 @@ class AutomationEngineTest {
       when(rule.getName()).thenReturn("vip-priority");
       when(rule.getExecutionCount()).thenReturn(0L);
 
-      when(ruleRepo.findActiveByTriggerTypeAndBoard(any(), any())).thenReturn(List.of(rule));
+      when(ruleRepo.findActiveByTenantAndTriggerTypeAndBoard(any(), any(), any()))
+          .thenReturn(List.of(rule));
       when(ruleRepo.save(any())).thenReturn(rule);
       when(taskRepo.save(any())).thenReturn(task);
 
@@ -214,6 +224,7 @@ class AutomationEngineTest {
   private Task buildMockTask(TaskType type, TaskStatus status) {
     Task task = mock(Task.class);
     when(task.getId()).thenReturn(TASK_ID);
+    when(task.getTenantId()).thenReturn(UUID.randomUUID());
     when(task.getBoardId()).thenReturn(BOARD_ID);
     when(task.getTaskType()).thenReturn(type);
     when(task.getStatus()).thenReturn(status);

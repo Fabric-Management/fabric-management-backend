@@ -62,7 +62,7 @@ logging:
   level:
     root: INFO
     com.fabricmanagement: INFO  # DEBUG yerine INFO - daha az log
-    com.fabricmanagement.common.platform.communication.app.EmailOutboxService: WARN  # Email worker loglarını azalt
+    com.fabricmanagement.platform.communication.app.EmailOutboxService: WARN  # Email worker loglarını azalt
     org.springframework.web: WARN  # Sadece uyarılar
     org.springframework.security: INFO  # DEBUG yerine INFO
     org.hibernate.SQL: OFF  # SQL loglarını tamamen kapat (çok fazla log üretiyor)

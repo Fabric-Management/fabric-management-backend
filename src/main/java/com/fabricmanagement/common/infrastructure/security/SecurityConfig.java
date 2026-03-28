@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.security;
 
+import com.fabricmanagement.common.infrastructure.web.LocalizationFilter;
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final LocalizationFilter localizationFilter;
 
   @Value("${spring.profiles.active:local}")
   private String activeProfile;
@@ -70,6 +72,7 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .hasRole("PARTNER_USER"))
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
@@ -96,6 +99,7 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .hasRole("PARTNER_USER"))
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
@@ -106,7 +110,7 @@ public class SecurityConfig {
   @Bean
   @Profile({"local", "dev"})
   public SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
-    log.warn("⚠️  DEVELOPMENT MODE - Security is PERMISSIVE");
+    log.info("DEVELOPMENT MODE - URL-level auth enforced, @PreAuthorize for method-level");
 
     return http.csrf(AbstractHttpConfigurer::disable)
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -129,11 +133,10 @@ public class SecurityConfig {
                     .requestMatchers("/api/webhooks/**")
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/admin/**")
-                    .permitAll() // ⚠️ TEMP: secured in production
+                    .permitAll()
                     .anyRequest()
-                    .permitAll() // ⚠️ DEVELOPMENT: URL-level allow all; method-level via
-            // @PreAuthorize
-            )
+                    .authenticated())
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
@@ -171,6 +174,7 @@ public class SecurityConfig {
                     .hasRole("PLATFORM_ADMIN")
                     .anyRequest()
                     .authenticated())
+        .addFilterBefore(localizationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }

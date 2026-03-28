@@ -1,8 +1,8 @@
 package com.fabricmanagement.production.execution.batch.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.common.platform.organization.domain.OrganizationCertification;
-import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartnerCertification;
+import com.fabricmanagement.platform.organization.domain.OrganizationCertification;
+import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerCertification;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
 import jakarta.persistence.*;
 import java.time.LocalDate;

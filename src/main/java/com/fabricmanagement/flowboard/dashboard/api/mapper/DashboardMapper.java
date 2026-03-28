@@ -1,9 +1,9 @@
 package com.fabricmanagement.flowboard.dashboard.api.mapper;
 
-import com.fabricmanagement.flowboard.dashboard.api.dto.response.DashboardConfigDto;
-import com.fabricmanagement.flowboard.dashboard.api.dto.response.DashboardWidgetDto;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardConfig;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardWidget;
+import com.fabricmanagement.flowboard.dashboard.dto.DashboardConfigDto;
+import com.fabricmanagement.flowboard.dashboard.dto.DashboardWidgetDto;
 
 public class DashboardMapper {
 

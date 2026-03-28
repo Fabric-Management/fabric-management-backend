@@ -1,6 +1,6 @@
 package com.fabricmanagement.flowboard.task.app.scheduler;
 
-import com.fabricmanagement.flowboard.automation.application.port.out.AutomationNotificationPort;
+import com.fabricmanagement.flowboard.automation.domain.port.out.AutomationNotificationPort;
 import com.fabricmanagement.flowboard.task.domain.Task;
 import com.fabricmanagement.flowboard.task.domain.TaskReminder;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskReminderRepository;

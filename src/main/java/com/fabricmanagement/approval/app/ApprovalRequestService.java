@@ -2,10 +2,11 @@ package com.fabricmanagement.approval.app;
 
 import com.fabricmanagement.approval.domain.ApprovalRequest;
 import com.fabricmanagement.approval.domain.ApprovalRequestStatus;
+import com.fabricmanagement.approval.domain.ApproverRole;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.common.platform.approval.domain.event.ApprovalApprovedEvent;
-import com.fabricmanagement.common.platform.approval.domain.event.ApprovalRejectedEvent;
+import com.fabricmanagement.platform.approval.domain.event.ApprovalApprovedEvent;
+import com.fabricmanagement.platform.approval.domain.event.ApprovalRejectedEvent;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -33,9 +34,10 @@ public class ApprovalRequestService {
    * @param approverRole İsteğe bağlı. Belirtilirse sadece bu role ait talepler döner.
    */
   @Transactional(readOnly = true)
-  public List<ApprovalRequest> getPendingRequests(UUID tenantId, String approverRole) {
-    if (approverRole != null && !approverRole.isBlank()) {
-      return requestRepo.findPendingRequestsByApproverRole(tenantId, approverRole);
+  public List<ApprovalRequest> getPendingRequests(UUID tenantId, ApproverRole approverRole) {
+    if (approverRole != null) {
+      return requestRepo.findPendingRequestsByApproverRole(
+          tenantId, ApprovalRequestStatus.PENDING, approverRole);
     }
     return requestRepo.findByTenantIdAndStatusAndDeletedAtIsNull(
         tenantId, ApprovalRequestStatus.PENDING);
@@ -44,7 +46,7 @@ public class ApprovalRequestService {
   /** Geriye uyumluluk: filtre olmadan tüm pending request'leri getirir. */
   @Transactional(readOnly = true)
   public List<ApprovalRequest> getPendingRequests(UUID tenantId) {
-    return getPendingRequests(tenantId, null);
+    return getPendingRequests(tenantId, (ApproverRole) null);
   }
 
   @Transactional

@@ -1,8 +1,8 @@
 package com.fabricmanagement.sales.salesorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.common.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
+import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;

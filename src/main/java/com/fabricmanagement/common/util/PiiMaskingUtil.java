@@ -1,7 +1,10 @@
 package com.fabricmanagement.common.util;
 
+import java.util.Arrays;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.env.Environment;
 
 /**
  * Utility for masking Personally Identifiable Information (PII) in logs.
@@ -20,23 +23,32 @@ import lombok.extern.slf4j.Slf4j;
 public class PiiMaskingUtil {
 
   private static final String MASK = "***";
-  private static final boolean MASKING_ENABLED = !isLocalProfile();
+  private static volatile Boolean maskingEnabled;
 
   /**
-   * Mask email address for logging.
-   *
-   * <p>Examples:
-   *
-   * <ul>
-   *   <li>john.doe@example.com → jo***@example.com
-   *   <li>a@test.com → a***@test.com
-   * </ul>
-   *
-   * @param email Email address to mask
-   * @return Masked email or original if masking disabled
+   * Initialize masking state from Spring Environment. Called automatically via {@link
+   * PiiMaskingInitializer}.
    */
+  static void init(ApplicationContext ctx) {
+    Environment env = ctx.getEnvironment();
+    String[] activeProfiles = env.getActiveProfiles();
+    boolean isLocal = Arrays.stream(activeProfiles).anyMatch(p -> "local".equalsIgnoreCase(p));
+    maskingEnabled = !isLocal;
+    log.info(
+        "PII masking initialized: enabled={}, activeProfiles={}",
+        maskingEnabled,
+        Arrays.toString(activeProfiles));
+  }
+
+  private static boolean isMaskingActive() {
+    if (maskingEnabled != null) {
+      return maskingEnabled;
+    }
+    return !isLocalProfileFallback();
+  }
+
   public static String maskEmail(String email) {
-    if (!MASKING_ENABLED || email == null || email.isBlank()) {
+    if (!isMaskingActive() || email == null || email.isBlank()) {
       return email;
     }
 
@@ -52,27 +64,13 @@ public class PiiMaskingUtil {
     String localPart = parts[0];
     String domain = parts[1];
 
-    // Show first 2 chars, mask the rest
     String maskedLocal = localPart.length() <= 2 ? localPart : localPart.substring(0, 2) + MASK;
 
     return maskedLocal + "@" + domain;
   }
 
-  /**
-   * Mask phone number for logging.
-   *
-   * <p>Examples:
-   *
-   * <ul>
-   *   <li>+905551234567 → +905***4567
-   *   <li>05551234567 → 055***4567
-   * </ul>
-   *
-   * @param phone Phone number to mask
-   * @return Masked phone or original if masking disabled
-   */
   public static String maskPhone(String phone) {
-    if (!MASKING_ENABLED || phone == null || phone.isBlank()) {
+    if (!isMaskingActive() || phone == null || phone.isBlank()) {
       return phone;
     }
 
@@ -80,23 +78,14 @@ public class PiiMaskingUtil {
       return MASK;
     }
 
-    // Show first 3 and last 4 digits
     String prefix = phone.substring(0, 3);
     String suffix = phone.substring(phone.length() - 4);
 
     return prefix + MASK + suffix;
   }
 
-  /**
-   * Mask credit card number for logging.
-   *
-   * <p>Example: 1234567890123456 → 1234***3456
-   *
-   * @param cardNumber Card number to mask
-   * @return Masked card number or original if masking disabled
-   */
   public static String maskCardNumber(String cardNumber) {
-    if (!MASKING_ENABLED || cardNumber == null || cardNumber.isBlank()) {
+    if (!isMaskingActive() || cardNumber == null || cardNumber.isBlank()) {
       return cardNumber;
     }
 
@@ -104,23 +93,14 @@ public class PiiMaskingUtil {
       return MASK;
     }
 
-    // Show first 4 and last 4 digits (PCI DSS compliant)
     String prefix = cardNumber.substring(0, 4);
     String suffix = cardNumber.substring(cardNumber.length() - 4);
 
     return prefix + MASK + suffix;
   }
 
-  /**
-   * Mask generic sensitive data.
-   *
-   * <p>Shows only first and last char.
-   *
-   * @param sensitive Sensitive data to mask
-   * @return Masked data or original if masking disabled
-   */
   public static String mask(String sensitive) {
-    if (!MASKING_ENABLED || sensitive == null || sensitive.isBlank()) {
+    if (!isMaskingActive() || sensitive == null || sensitive.isBlank()) {
       return sensitive;
     }
 
@@ -131,25 +111,11 @@ public class PiiMaskingUtil {
     return sensitive.charAt(0) + MASK + sensitive.charAt(sensitive.length() - 1);
   }
 
-  /**
-   * Check if masking is enabled.
-   *
-   * <p>Masking is DISABLED in local/dev profiles for debugging.
-   *
-   * <p>Masking is ENABLED in production.
-   *
-   * @return true if masking is enabled
-   */
   public static boolean isMaskingEnabled() {
-    return MASKING_ENABLED;
+    return isMaskingActive();
   }
 
-  /**
-   * Detect if running in local profile.
-   *
-   * @return true if local profile is active
-   */
-  private static boolean isLocalProfile() {
+  private static boolean isLocalProfileFallback() {
     String activeProfile = System.getProperty("spring.profiles.active");
     if (activeProfile == null) {
       activeProfile = System.getenv("SPRING_PROFILES_ACTIVE");

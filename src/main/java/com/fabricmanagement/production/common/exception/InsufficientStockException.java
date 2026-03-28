@@ -60,6 +60,11 @@ public class InsufficientStockException extends ProductionDomainException {
     this.requested = requested;
     this.available = available;
     this.unit = unit;
+    withDetail("batchId", batchId);
+    withDetail("batchCode", batchCode);
+    withDetail("requested", requested);
+    withDetail("available", available);
+    withDetail("unit", unit);
   }
 
   private static String buildMessage(

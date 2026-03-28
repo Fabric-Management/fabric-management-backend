@@ -1,443 +1,367 @@
 package com.fabricmanagement.finance.invoice.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerResolver;
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerService;
-import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.common.exception.FinanceDomainException;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
+import com.fabricmanagement.finance.invoice.domain.InvoiceLine;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
-import com.fabricmanagement.finance.invoice.dto.CreateInvoiceRequest;
-import com.fabricmanagement.finance.invoice.dto.InvoiceDto;
+import com.fabricmanagement.finance.invoice.domain.event.*;
+import com.fabricmanagement.finance.invoice.dto.*;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.finance.invoice.mapper.InvoiceMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for managing invoices.
- *
- * <p>Uses TradingPartnerResolver for partner ID resolution (Faz 1.5 pattern). Supports both AR
- * (Accounts Receivable) and AP (Accounts Payable) invoices.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class InvoiceService {
 
   private final InvoiceRepository invoiceRepository;
-  private final TradingPartnerResolver partnerResolver;
-  private final TradingPartnerService partnerService;
+  private final InvoiceMapper invoiceMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
-  private static final DateTimeFormatter INVOICE_NUMBER_DATE_FORMAT =
-      DateTimeFormatter.ofPattern("yyyyMMdd");
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getAllInvoices(Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository.findByTenantId(tenantId, pageable).map(invoiceMapper::toDto);
+  }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CREATION
-  // ═══════════════════════════════════════════════════════════════════════════
+  @Transactional(readOnly = true)
+  public InvoiceDto getInvoice(UUID invoiceId) {
+    Invoice invoice = getInvoiceOrThrow(TenantContext.getCurrentTenantId(), invoiceId);
+    return invoiceMapper.toDto(invoice);
+  }
 
-  /**
-   * Create a new invoice.
-   *
-   * @param request Invoice creation request
-   * @return Created invoice DTO
-   */
-  @Transactional
   public InvoiceDto createInvoice(CreateInvoiceRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-
-    // Resolve partner ID (handles both new and legacy IDs)
-    UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
-
-    // Generate invoice number
-    String invoiceNumber =
-        generateInvoiceNumber(tenantId, request.getIssueDate(), request.getInvoiceType());
+    String invoiceNumber = generateInvoiceNumber(request.invoiceType());
 
     Invoice invoice =
         Invoice.builder()
-            .tradingPartnerId(tradingPartnerId)
+            .tradingPartnerId(request.tradingPartnerId())
             .invoiceNumber(invoiceNumber)
-            .orderReference(request.getOrderReference())
-            .externalReference(request.getExternalReference())
-            .invoiceType(request.getInvoiceType())
-            .issueDate(request.getIssueDate())
-            .dueDate(request.getDueDate())
-            .subtotal(request.getSubtotal())
-            .taxAmount(request.getTaxAmount())
-            .discountAmount(request.getDiscountAmount())
-            .currency(request.getCurrency())
-            .taxRate(request.getTaxRate())
-            .billingAddress(request.getBillingAddress())
-            .notes(request.getNotes())
-            .metadata(request.getMetadata())
+            .orderReference(request.orderReference())
+            .externalReference(request.externalReference())
+            .invoiceType(InvoiceType.valueOf(request.invoiceType()))
+            .issueDate(request.issueDate())
+            .dueDate(request.dueDate())
+            .subtotal(
+                Money.of(
+                    request.subtotal(), request.currency() != null ? request.currency() : "TRY"))
+            .taxAmount(
+                Money.of(
+                    request.taxAmount() != null ? request.taxAmount() : BigDecimal.ZERO,
+                    request.currency() != null ? request.currency() : "TRY"))
+            .discountAmount(
+                Money.of(
+                    request.discountAmount() != null ? request.discountAmount() : BigDecimal.ZERO,
+                    request.currency() != null ? request.currency() : "TRY"))
+            .totalAmount(
+                Money.of(
+                    request.totalAmount(), request.currency() != null ? request.currency() : "TRY"))
+            .taxRate(request.taxRate())
+            .billingAddress(request.billingAddress())
+            .notes(request.notes())
+            .originalInvoiceId(request.originalInvoiceId())
             .build();
 
-    // Calculate amounts
+    invoice.setTenantId(tenantId);
     invoice.calculateAmounts();
+
+    if (request.lines() != null && !request.lines().isEmpty()) {
+      int lineNumber = 1;
+      for (CreateInvoiceLineRequest lineReq : request.lines()) {
+        InvoiceLine line =
+            InvoiceLine.builder()
+                .lineNumber(lineNumber++)
+                .description(lineReq.description())
+                .productCode(lineReq.productCode())
+                .unit(lineReq.unit() != null ? lineReq.unit() : "PCS")
+                .quantity(lineReq.quantity())
+                .unitPrice(lineReq.unitPrice())
+                .discountRate(
+                    lineReq.discountRate() != null ? lineReq.discountRate() : BigDecimal.ZERO)
+                .taxRate(lineReq.taxRate() != null ? lineReq.taxRate() : BigDecimal.ZERO)
+                .lineSubtotal(BigDecimal.ZERO)
+                .lineTotal(BigDecimal.ZERO)
+                .notes(lineReq.notes())
+                .build();
+        line.setTenantId(tenantId);
+        line.calculate();
+        invoice.getLines().add(line);
+      }
+      invoice.recalculateFromLines();
+    }
 
     Invoice saved = invoiceRepository.save(invoice);
 
-    // Get partner details for response
-    TradingPartnerDto partner = partnerService.findById(tenantId, tradingPartnerId).orElse(null);
+    eventPublisher.publishEvent(
+        new InvoiceCreatedEvent(
+            tenantId,
+            saved.getId(),
+            saved.getTradingPartnerId(),
+            saved.getInvoiceNumber(),
+            saved.getInvoiceType().name(),
+            saved.getTotalAmount().getAmount(),
+            saved.getCurrency()));
 
-    log.info(
-        "Invoice created: uid={}, partner={}, type={}",
-        saved.getUid(),
-        tradingPartnerId,
-        saved.getInvoiceType());
-    return InvoiceDto.from(saved, partner);
+    log.info("Invoice created: {} ({})", saved.getInvoiceNumber(), saved.getId());
+    return invoiceMapper.toDto(saved);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // QUERIES
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Find invoice by ID.
-   *
-   * @param invoiceId Invoice ID
-   * @return Invoice DTO if found
-   */
-  @Transactional(readOnly = true)
-  public Optional<InvoiceDto> findById(UUID invoiceId) {
+  public InvoiceDto updateInvoice(UUID invoiceId, UpdateInvoiceRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
+    Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
 
-    return invoiceRepository
-        .findByTenantIdAndId(tenantId, invoiceId)
-        .map(
-            invoice -> {
-              TradingPartnerDto partner =
-                  partnerService.findById(tenantId, invoice.getTradingPartnerId()).orElse(null);
-              return InvoiceDto.from(invoice, partner);
-            });
+    if (invoice.getStatus() != InvoiceStatus.DRAFT) {
+      throw new FinanceDomainException("Can only update invoices in DRAFT status");
+    }
+
+    if (request.orderReference() != null) invoice.setOrderReference(request.orderReference());
+    if (request.externalReference() != null)
+      invoice.setExternalReference(request.externalReference());
+    if (request.issueDate() != null) invoice.setIssueDate(request.issueDate());
+    if (request.dueDate() != null) invoice.setDueDate(request.dueDate());
+    String curr = invoice.getCurrency();
+    if (request.subtotal() != null) invoice.setSubtotal(Money.of(request.subtotal(), curr));
+    if (request.taxAmount() != null) invoice.setTaxAmount(Money.of(request.taxAmount(), curr));
+    if (request.discountAmount() != null)
+      invoice.setDiscountAmount(Money.of(request.discountAmount(), curr));
+    if (request.totalAmount() != null)
+      invoice.setTotalAmount(Money.of(request.totalAmount(), curr));
+    if (request.taxRate() != null) invoice.setTaxRate(request.taxRate());
+    if (request.billingAddress() != null) invoice.setBillingAddress(request.billingAddress());
+    if (request.notes() != null) invoice.setNotes(request.notes());
+
+    invoice.calculateAmounts();
+    Invoice saved = invoiceRepository.save(invoice);
+    return invoiceMapper.toDto(saved);
   }
 
-  /**
-   * Find invoice by invoice number.
-   *
-   * @param invoiceNumber Invoice number
-   * @return Invoice DTO if found
-   */
-  @Transactional(readOnly = true)
-  public Optional<InvoiceDto> findByInvoiceNumber(String invoiceNumber) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    return invoiceRepository
-        .findByTenantIdAndInvoiceNumber(tenantId, invoiceNumber)
-        .map(InvoiceDto::from);
-  }
-
-  /**
-   * Find invoices by partner ID.
-   *
-   * @param partnerId Partner ID (can be TradingPartner.id or legacy Company.id)
-   * @return List of invoices
-   */
-  @Transactional(readOnly = true)
-  public List<InvoiceDto> findByPartner(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    // Resolve partner ID
-    UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
-
-    return invoiceRepository.findActiveByPartner(tenantId, tradingPartnerId).stream()
-        .map(InvoiceDto::from)
-        .toList();
-  }
-
-  /**
-   * Find unpaid invoices by partner.
-   *
-   * @param partnerId Partner ID
-   * @return List of unpaid invoices
-   */
-  @Transactional(readOnly = true)
-  public List<InvoiceDto> findUnpaidByPartner(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
-
-    return invoiceRepository.findUnpaidByPartner(tenantId, tradingPartnerId).stream()
-        .map(InvoiceDto::from)
-        .toList();
-  }
-
-  /**
-   * Get outstanding amount for a partner.
-   *
-   * @param partnerId Partner ID
-   * @return Total outstanding amount
-   */
-  @Transactional(readOnly = true)
-  public BigDecimal getOutstandingAmount(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
-
-    return invoiceRepository.sumOutstandingByPartner(tenantId, tradingPartnerId);
-  }
-
-  /**
-   * Find invoices by status.
-   *
-   * @param status Invoice status
-   * @return List of invoices
-   */
-  @Transactional(readOnly = true)
-  public List<InvoiceDto> findByStatus(InvoiceStatus status) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    return invoiceRepository.findByTenantIdAndStatus(tenantId, status).stream()
-        .map(InvoiceDto::from)
-        .toList();
-  }
-
-  /**
-   * Find overdue invoices.
-   *
-   * @return List of overdue invoices
-   */
-  @Transactional(readOnly = true)
-  public List<InvoiceDto> findOverdueInvoices() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    return invoiceRepository.findOverdueInvoices(tenantId, LocalDate.now()).stream()
-        .map(InvoiceDto::from)
-        .toList();
-  }
-
-  /**
-   * Find invoices awaiting payment.
-   *
-   * @return List of invoices awaiting payment
-   */
-  @Transactional(readOnly = true)
-  public List<InvoiceDto> findAwaitingPayment() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    return invoiceRepository.findAwaitingPayment(tenantId).stream().map(InvoiceDto::from).toList();
-  }
-
-  /**
-   * Find AR invoices (sales).
-   *
-   * @return List of AR invoices
-   */
-  @Transactional(readOnly = true)
-  public List<InvoiceDto> findAccountsReceivable() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    return invoiceRepository.findAccountsReceivable(tenantId).stream()
-        .map(InvoiceDto::from)
-        .toList();
-  }
-
-  /**
-   * Find AP invoices (purchases).
-   *
-   * @return List of AP invoices
-   */
-  @Transactional(readOnly = true)
-  public List<InvoiceDto> findAccountsPayable() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    return invoiceRepository.findAccountsPayable(tenantId).stream().map(InvoiceDto::from).toList();
-  }
-
-  /**
-   * Get all invoices with pagination.
-   *
-   * @param pageable Pagination info
-   * @return Page of invoices
-   */
-  @Transactional(readOnly = true)
-  public Page<InvoiceDto> findAll(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-
-    return invoiceRepository
-        .findByTenantIdAndIsActiveTrue(tenantId, pageable)
-        .map(InvoiceDto::from);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LIFECYCLE
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Issue an invoice.
-   *
-   * @param invoiceId Invoice ID
-   * @return Updated invoice DTO
-   */
-  @Transactional
   public InvoiceDto issueInvoice(UUID invoiceId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.issue();
     Invoice saved = invoiceRepository.save(invoice);
 
-    log.info("Invoice issued: uid={}", saved.getUid());
-    return InvoiceDto.from(saved);
+    eventPublisher.publishEvent(
+        new InvoiceIssuedEvent(
+            tenantId, saved.getId(), saved.getInvoiceNumber(), saved.getTotalAmount().getAmount()));
+
+    log.info("Invoice issued: {}", saved.getInvoiceNumber());
+    return invoiceMapper.toDto(saved);
   }
 
-  /**
-   * Send an invoice.
-   *
-   * @param invoiceId Invoice ID
-   * @return Updated invoice DTO
-   */
-  @Transactional
   public InvoiceDto sendInvoice(UUID invoiceId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.send();
     Invoice saved = invoiceRepository.save(invoice);
 
-    log.info("Invoice sent: uid={}", saved.getUid());
-    return InvoiceDto.from(saved);
+    eventPublisher.publishEvent(
+        new InvoiceSentEvent(
+            tenantId, saved.getId(), saved.getInvoiceNumber(), saved.getTradingPartnerId()));
+
+    log.info("Invoice sent: {}", saved.getInvoiceNumber());
+    return invoiceMapper.toDto(saved);
   }
 
-  /**
-   * Record a payment.
-   *
-   * @param invoiceId Invoice ID
-   * @param amount Payment amount
-   * @return Updated invoice DTO
-   */
-  @Transactional
   public InvoiceDto recordPayment(UUID invoiceId, BigDecimal amount) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
-    invoice.recordPayment(amount);
+    invoice.recordPayment(Money.of(amount, invoice.getCurrency()));
     Invoice saved = invoiceRepository.save(invoice);
 
+    eventPublisher.publishEvent(
+        new PaymentRecordedEvent(
+            tenantId,
+            saved.getId(),
+            saved.getInvoiceNumber(),
+            amount,
+            saved.getAmountPaid().getAmount(),
+            saved.getAmountDue().getAmount(),
+            saved.getStatus() == InvoiceStatus.PAID));
+
     log.info(
-        "Payment recorded: uid={}, amount={}, newStatus={}",
-        saved.getUid(),
+        "Payment recorded for invoice {}: {} (remaining: {})",
+        saved.getInvoiceNumber(),
         amount,
-        saved.getStatus());
-    return InvoiceDto.from(saved);
+        saved.getAmountDue());
+    return invoiceMapper.toDto(saved);
   }
 
-  /**
-   * Cancel an invoice.
-   *
-   * @param invoiceId Invoice ID
-   * @return Updated invoice DTO
-   */
-  @Transactional
   public InvoiceDto cancelInvoice(UUID invoiceId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.cancel();
     Invoice saved = invoiceRepository.save(invoice);
 
-    log.info("Invoice cancelled: uid={}", saved.getUid());
-    return InvoiceDto.from(saved);
+    eventPublisher.publishEvent(
+        new InvoiceCancelledEvent(tenantId, saved.getId(), saved.getInvoiceNumber()));
+
+    log.info("Invoice cancelled: {}", saved.getInvoiceNumber());
+    return invoiceMapper.toDto(saved);
   }
 
-  /**
-   * Void an invoice.
-   *
-   * @param invoiceId Invoice ID
-   * @return Updated invoice DTO
-   */
-  @Transactional
   public InvoiceDto voidInvoice(UUID invoiceId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.voidInvoice();
     Invoice saved = invoiceRepository.save(invoice);
-
-    log.info("Invoice voided: uid={}", saved.getUid());
-    return InvoiceDto.from(saved);
+    log.info("Invoice voided: {}", saved.getInvoiceNumber());
+    return invoiceMapper.toDto(saved);
   }
 
-  /**
-   * Soft delete an invoice.
-   *
-   * @param invoiceId Invoice ID
-   */
-  @Transactional
+  public InvoiceDto disputeInvoice(UUID invoiceId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
+    invoice.dispute();
+    Invoice saved = invoiceRepository.save(invoice);
+
+    eventPublisher.publishEvent(
+        new InvoiceDisputedEvent(
+            tenantId, saved.getId(), saved.getInvoiceNumber(), saved.getTradingPartnerId()));
+
+    log.info("Invoice disputed: {}", saved.getInvoiceNumber());
+    return invoiceMapper.toDto(saved);
+  }
+
+  public InvoiceDto resolveDispute(UUID invoiceId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
+    invoice.resolveDispute();
+    Invoice saved = invoiceRepository.save(invoice);
+    log.info("Invoice dispute resolved: {}", saved.getInvoiceNumber());
+    return invoiceMapper.toDto(saved);
+  }
+
   public void deleteInvoice(UUID invoiceId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
+    if (invoice.getStatus() != InvoiceStatus.DRAFT) {
+      throw new FinanceDomainException("Can only delete invoices in DRAFT status");
+    }
     invoice.delete();
     invoiceRepository.save(invoice);
-
-    log.info("Invoice deleted (soft): uid={}", invoice.getUid());
+    log.info("Invoice soft-deleted: {}", invoice.getInvoiceNumber());
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // BATCH OPERATIONS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Mark overdue invoices (batch job).
-   *
-   * @return Number of invoices marked as overdue
-   */
-  @Transactional
-  public int markOverdueInvoices() {
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getByPartner(UUID partnerId, Pageable pageable) {
     UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository
+        .findByTenantIdAndTradingPartnerId(tenantId, partnerId, pageable)
+        .map(invoiceMapper::toDto);
+  }
 
-    List<Invoice> overdueInvoices =
-        invoiceRepository.findOverdueInvoices(tenantId, LocalDate.now());
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getUnpaidByPartner(UUID partnerId, Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository
+        .findByTenantIdAndTradingPartnerIdAndStatusNot(
+            tenantId, partnerId, InvoiceStatus.PAID, pageable)
+        .map(invoiceMapper::toDto);
+  }
 
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getByStatus(InvoiceStatus status, Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository
+        .findByTenantIdAndStatus(tenantId, status, pageable)
+        .map(invoiceMapper::toDto);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getOverdue(Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository
+        .findOverdue(tenantId, LocalDate.now(), pageable)
+        .map(invoiceMapper::toDto);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getAwaitingPayment(Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository.findAwaitingPayment(tenantId, pageable).map(invoiceMapper::toDto);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getAccountsReceivable(Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository.findAccountsReceivable(tenantId, pageable).map(invoiceMapper::toDto);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<InvoiceDto> getAccountsPayable(Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return invoiceRepository.findAccountsPayable(tenantId, pageable).map(invoiceMapper::toDto);
+  }
+
+  public int markOverdueInvoices(UUID tenantId) {
+    List<Invoice> eligibles =
+        invoiceRepository.findInvoicesEligibleForOverdue(tenantId, LocalDate.now());
     int count = 0;
-    for (Invoice invoice : overdueInvoices) {
-      if (invoice.getStatus() != InvoiceStatus.OVERDUE) {
-        invoice.markOverdue();
-        invoiceRepository.save(invoice);
-        count++;
-      }
-    }
+    for (Invoice invoice : eligibles) {
+      invoice.markOverdue();
+      invoiceRepository.save(invoice);
 
+      eventPublisher.publishEvent(
+          new InvoiceOverdueEvent(
+              tenantId,
+              invoice.getId(),
+              invoice.getInvoiceNumber(),
+              invoice.getTradingPartnerId(),
+              invoice.getDaysOverdue()));
+      count++;
+    }
     if (count > 0) {
-      log.info("Marked {} invoices as overdue", count);
+      log.info("Marked {} invoices as overdue for tenant {}", count, tenantId);
     }
-
     return count;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // HELPERS
-  // ═══════════════════════════════════════════════════════════════════════════
+  private String generateInvoiceNumber(String invoiceType) {
+    String prefix;
+    switch (invoiceType) {
+      case "PURCHASE" -> prefix = "PF";
+      case "CREDIT_NOTE" -> prefix = "CN";
+      case "DEBIT_NOTE" -> prefix = "DN";
+      case "PROFORMA" -> prefix = "PQ";
+      default -> prefix = "SF";
+    }
+
+    Long seq = invoiceRepository.getNextInvoiceSequence();
+    String number = String.format("%s-%06d", prefix, seq);
+
+    int attempt = 0;
+    while (invoiceRepository.existsByTenantIdAndInvoiceNumber(
+            TenantContext.getCurrentTenantId(), number)
+        && attempt < 10) {
+      seq = invoiceRepository.getNextInvoiceSequence();
+      number = String.format("%s-%06d", prefix, seq);
+      attempt++;
+    }
+
+    return number;
+  }
 
   private Invoice getInvoiceOrThrow(UUID tenantId, UUID invoiceId) {
     return invoiceRepository
         .findByTenantIdAndId(tenantId, invoiceId)
-        .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + invoiceId));
-  }
-
-  private String generateInvoiceNumber(UUID tenantId, LocalDate issueDate, InvoiceType type) {
-    String prefix =
-        (type == InvoiceType.SALES ? "INV" : "PINV")
-            + "-"
-            + issueDate.format(INVOICE_NUMBER_DATE_FORMAT)
-            + "-";
-    String maxNumber =
-        invoiceRepository.findMaxInvoiceNumber(tenantId, prefix).orElse(prefix + "00000");
-
-    // Extract sequence number and increment
-    String sequencePart = maxNumber.substring(prefix.length());
-    int sequence = Integer.parseInt(sequencePart) + 1;
-
-    return prefix + String.format("%05d", sequence);
+        .orElseThrow(() -> new NotFoundException("Invoice not found: " + invoiceId));
   }
 }

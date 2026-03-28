@@ -1,6 +1,7 @@
 package com.fabricmanagement.flowboard.task.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.flowboard.common.exception.TaskStatusTransitionException;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -86,13 +87,28 @@ public class Task extends BaseEntity {
   @Column(name = "entity_id")
   private UUID entityId;
 
+  /** Task'ı oluşturan kaynak tipi (örn: MANUAL, TEMPLATE, AUTOMATION_RULE) - Phase 3 Audit Trail */
+  @Column(name = "source_type", length = 30)
+  private String sourceType = "MANUAL";
+
+  /** Task'ı oluşturan kaynağın ID'si (örn: Template ID veya Rule ID) - Phase 3 Audit Trail */
+  @Column(name = "source_id")
+  private UUID sourceId;
+
   /** İlk IN_PROGRESS geçişinde set edilir. */
   @Column(name = "started_at")
   private Instant startedAt;
 
-  /** DONE geçişinde set edilir. DONE → IN_PROGRESS (reopen) durumunda null yapılır. */
   @Column(name = "completed_at")
   private Instant completedAt;
+
+  /** Phase 3.1: Idempotency flag for approaching deadline warnings. */
+  @Column(name = "is_deadline_warning_fired", nullable = false)
+  private Boolean isDeadlineWarningFired = false;
+
+  @Version
+  @Column(name = "version", nullable = false)
+  private Long version = 0L;
 
   @Override
   protected String getModuleCode() {
@@ -153,7 +169,9 @@ public class Task extends BaseEntity {
    * @throws IllegalStateException geçersiz geçiş durumunda
    */
   public void startTodo() {
-    requireStatus(TaskStatus.BACKLOG);
+    if (this.status != TaskStatus.BACKLOG) {
+      throw new TaskStatusTransitionException(this.status, TaskStatus.TODO);
+    }
     this.status = TaskStatus.TODO;
   }
 
@@ -166,23 +184,21 @@ public class Task extends BaseEntity {
     if (this.status != TaskStatus.TODO
         && this.status != TaskStatus.BLOCKED
         && this.status != TaskStatus.DONE) {
-      throw new IllegalStateException(
-          "Cannot start progress from status: "
-              + this.status
-              + ". Allowed: TODO, BLOCKED, DONE (reopen)");
+      throw new TaskStatusTransitionException(
+          this.status, TaskStatus.IN_PROGRESS, "Allowed from: TODO, BLOCKED, DONE (reopen)");
     }
     this.status = TaskStatus.IN_PROGRESS;
-    // startedAt sadece ilk IN_PROGRESS geçişinde set olur
     if (this.startedAt == null) {
       this.startedAt = Instant.now();
     }
-    // Reopen: completedAt temizlenir
     this.completedAt = null;
   }
 
   /** Task'ı IN_REVIEW durumuna alır — IN_PROGRESS'ten. */
   public void submitForReview() {
-    requireStatus(TaskStatus.IN_PROGRESS);
+    if (this.status != TaskStatus.IN_PROGRESS) {
+      throw new TaskStatusTransitionException(this.status, TaskStatus.IN_REVIEW);
+    }
     this.status = TaskStatus.IN_REVIEW;
   }
 
@@ -193,8 +209,8 @@ public class Task extends BaseEntity {
    */
   public void markDone() {
     if (this.status != TaskStatus.IN_REVIEW && this.status != TaskStatus.IN_PROGRESS) {
-      throw new IllegalStateException(
-          "Cannot mark DONE from status: " + this.status + ". Allowed: IN_REVIEW, IN_PROGRESS");
+      throw new TaskStatusTransitionException(
+          this.status, TaskStatus.DONE, "Allowed from: IN_REVIEW, IN_PROGRESS");
     }
     this.status = TaskStatus.DONE;
     this.completedAt = Instant.now();
@@ -207,15 +223,14 @@ public class Task extends BaseEntity {
    */
   public void block() {
     if (this.status == TaskStatus.DONE || this.status == TaskStatus.CANCELLED) {
-      throw new IllegalStateException("Cannot block a task in status: " + this.status);
+      throw new TaskStatusTransitionException(this.status, TaskStatus.BLOCKED);
     }
     this.status = TaskStatus.BLOCKED;
   }
 
-  /** Task'ı CANCELLED durumuna alır — herhangi bir aktif durumdan. */
   public void cancel() {
     if (this.status == TaskStatus.DONE || this.status == TaskStatus.CANCELLED) {
-      throw new IllegalStateException("Cannot cancel a task in status: " + this.status);
+      throw new TaskStatusTransitionException(this.status, TaskStatus.CANCELLED);
     }
     this.status = TaskStatus.CANCELLED;
   }
@@ -249,9 +264,19 @@ public class Task extends BaseEntity {
     this.description = description;
   }
 
-  /** Deadline'ı günceller. */
+  /** Deadline'ı günceller. IsDeadlineWarningFired flag'ini sıfırlar. */
   public void updateDeadline(LocalDate deadline) {
+    if (this.deadline != null && !this.deadline.equals(deadline)) {
+      this.isDeadlineWarningFired = false;
+    } else if (this.deadline == null && deadline != null) {
+      this.isDeadlineWarningFired = false;
+    }
     this.deadline = deadline;
+  }
+
+  /** Phase 3.1: Deadline uyarı flag'ini işaretler. */
+  public void markDeadlineWarningFired() {
+    this.isDeadlineWarningFired = true;
   }
 
   /** Priority günceller. */
@@ -262,6 +287,14 @@ public class Task extends BaseEntity {
   /** Başlık günceller. */
   public void updateTitle(String title) {
     this.title = title;
+  }
+
+  /** Phase 3: Audit Trail için kaynak ataması. */
+  public void assignSource(String sourceType, UUID sourceId) {
+    if (sourceType != null && !sourceType.isBlank()) {
+      this.sourceType = sourceType;
+    }
+    this.sourceId = sourceId;
   }
 
   // =========================================================================
@@ -302,10 +335,4 @@ public class Task extends BaseEntity {
   // =========================================================================
   // PRIVATE HELPERS
   // =========================================================================
-
-  private void requireStatus(TaskStatus expected) {
-    if (this.status != expected) {
-      throw new IllegalStateException("Expected status " + expected + " but was: " + this.status);
-    }
-  }
 }

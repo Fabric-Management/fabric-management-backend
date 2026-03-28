@@ -14,9 +14,11 @@ import com.fabricmanagement.approval.domain.PolicyTargetLevel;
 import com.fabricmanagement.approval.domain.UserTrustLevel;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.common.platform.user.domain.User;
-import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -36,7 +39,7 @@ class ApprovalGuardServiceTest {
   @Mock private ApprovalRequestRepository requestRepo;
   @Mock private UserRepository userRepo;
   @Mock private DomainEventPublisher eventPublisher;
-  @Mock private Clock clock;
+  @Spy private Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
 
   @InjectMocks private ApprovalGuardService guardService;
 

@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -57,6 +58,11 @@ public class UserPromotionRequest extends BaseEntity {
       PromotionTriggerType triggeredBy,
       int rejectionCount,
       int approvedTransactionCount) {
+    Objects.requireNonNull(tenantId, "tenantId cannot be null");
+    Objects.requireNonNull(userId, "userId cannot be null");
+    Objects.requireNonNull(fromLevel, "fromLevel cannot be null");
+    Objects.requireNonNull(toLevel, "toLevel cannot be null");
+    Objects.requireNonNull(triggeredBy, "triggeredBy cannot be null");
     this.setTenantId(tenantId);
     this.userId = userId;
     this.fromLevel = fromLevel;

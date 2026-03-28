@@ -1,13 +1,13 @@
 package com.fabricmanagement.notification.hub.app.listener;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.organization.domain.Department;
-import com.fabricmanagement.common.platform.organization.infra.repository.DepartmentRepository;
-import com.fabricmanagement.common.platform.user.app.UserQueryService;
-import com.fabricmanagement.common.platform.user.dto.UserDto;
 import com.fabricmanagement.notification.hub.app.NotificationContext;
 import com.fabricmanagement.notification.hub.app.NotificationHubService;
 import com.fabricmanagement.notification.hub.domain.NotificationEventType;
+import com.fabricmanagement.platform.organization.domain.Department;
+import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
+import com.fabricmanagement.platform.user.app.UserQueryService;
+import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderPendingApprovalEvent;

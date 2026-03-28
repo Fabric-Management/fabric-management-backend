@@ -12,4 +12,8 @@ public class FinanceDomainException extends DomainException {
   public FinanceDomainException(String message, Throwable cause) {
     super(message, "FINANCE_RULE_VIOLATION", 400, cause);
   }
+
+  protected FinanceDomainException(String message, String errorCode, int httpStatus) {
+    super(message, errorCode, httpStatus);
+  }
 }

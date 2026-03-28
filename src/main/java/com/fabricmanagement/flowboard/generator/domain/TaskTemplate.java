@@ -24,6 +24,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TaskTemplate extends BaseEntity {
 
+  @Column(name = "name", nullable = false, length = 255)
+  private String name;
+
+  @Column(name = "description", length = 1000)
+  private String description;
+
   /** Tetikleyici event tipi — "SalesOrderConfirmed", "BatchQcFailed", vb. */
   @Column(name = "event_type", nullable = false, length = 100)
   private String eventType;
@@ -77,14 +83,20 @@ public class TaskTemplate extends BaseEntity {
   // =========================================================================
 
   public static TaskTemplate create(
+      String name,
+      String description,
       String eventType,
       String titleTemplate,
       TaskType taskType,
       ModuleType moduleType,
       Priority defaultPriority,
       AssigneeRole defaultAssigneeRole,
-      BigDecimal estimatedHours) {
+      BigDecimal estimatedHours,
+      String autoLabels,
+      String checklistTemplate) {
     var t = new TaskTemplate();
+    t.name = name;
+    t.description = description;
     t.eventType = eventType;
     t.titleTemplate = titleTemplate;
     t.taskType = taskType;
@@ -92,12 +104,43 @@ public class TaskTemplate extends BaseEntity {
     t.defaultPriority = defaultPriority;
     t.defaultAssigneeRole = defaultAssigneeRole;
     t.estimatedHours = estimatedHours;
+    t.autoLabels = autoLabels;
+    t.checklistTemplate = checklistTemplate;
     t.isActive = true;
     return t;
   }
 
+  public void update(
+      String name,
+      String description,
+      String eventType,
+      String titleTemplate,
+      TaskType taskType,
+      ModuleType moduleType,
+      Priority defaultPriority,
+      AssigneeRole defaultAssigneeRole,
+      BigDecimal estimatedHours,
+      String autoLabels,
+      String checklistTemplate) {
+    this.name = name;
+    this.description = description;
+    this.eventType = eventType;
+    this.titleTemplate = titleTemplate;
+    this.taskType = taskType;
+    this.moduleType = moduleType;
+    this.defaultPriority = defaultPriority;
+    this.defaultAssigneeRole = defaultAssigneeRole;
+    this.estimatedHours = estimatedHours;
+    this.autoLabels = autoLabels;
+    this.checklistTemplate = checklistTemplate;
+  }
+
   public void deactivate() {
     this.isActive = false;
+  }
+
+  public void activate() {
+    this.isActive = true;
   }
 
   @Override

@@ -13,8 +13,9 @@ import com.fabricmanagement.approval.domain.UserPromotionRequest;
 import com.fabricmanagement.approval.domain.UserTrustLevel;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.approval.infra.repository.UserPromotionRequestRepository;
-import com.fabricmanagement.common.platform.user.app.UserService;
-import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.platform.user.app.UserService;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,7 @@ class UserPromotionServiceTest {
   @Mock private ApprovalRequestRepository requestRepo;
   @Mock private UserRepository userRepo;
   @Mock private UserService userService;
+  @Mock private DomainEventPublisher eventPublisher;
 
   @InjectMocks private UserPromotionService promotionService;
 
@@ -90,6 +92,6 @@ class UserPromotionServiceTest {
     assertThat(req.getAdminNote()).isEqualTo("Hala kurallara uymuyor.");
 
     // Eskalasyon kuralı gereği servis hesabın dondurulması için UserService'i çağırmalı
-    verify(userService).deactivateUser(eq(userId), anyString());
+    verify(userService).deactivateUser(eq(tenantId), eq(userId), anyString());
   }
 }

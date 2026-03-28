@@ -4,7 +4,8 @@ import com.fabricmanagement.approval.domain.ApprovalEntityType;
 import com.fabricmanagement.approval.domain.ApprovalPolicy;
 import com.fabricmanagement.approval.domain.ApproverRole;
 import com.fabricmanagement.approval.domain.PolicyTargetLevel;
-import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
@@ -23,8 +24,8 @@ public class ApprovalPolicyResponse {
   private ApproverRole approverRole;
   private int promotionThreshold;
   private boolean active;
-  private Instant createdAt;
-  private Instant updatedAt;
+  private OffsetDateTime createdAt;
+  private OffsetDateTime updatedAt;
 
   public static ApprovalPolicyResponse from(ApprovalPolicy entity) {
     return ApprovalPolicyResponse.builder()
@@ -35,8 +36,10 @@ public class ApprovalPolicyResponse {
         .approverRole(entity.getApproverRole())
         .promotionThreshold(entity.getPromotionThreshold())
         .active(entity.isActive())
-        .createdAt(entity.getCreatedAt())
-        .updatedAt(entity.getUpdatedAt())
+        .createdAt(
+            entity.getCreatedAt() != null ? entity.getCreatedAt().atOffset(ZoneOffset.UTC) : null)
+        .updatedAt(
+            entity.getUpdatedAt() != null ? entity.getUpdatedAt().atOffset(ZoneOffset.UTC) : null)
         .build();
   }
 }

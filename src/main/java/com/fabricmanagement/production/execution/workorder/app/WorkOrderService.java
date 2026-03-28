@@ -1,11 +1,14 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerCertificationService;
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
 import com.fabricmanagement.production.execution.batch.app.BatchOperationsService;
 import com.fabricmanagement.production.execution.batch.dto.BlendParentRequest;
 import com.fabricmanagement.production.execution.batch.dto.CreateBlendedBatchRequest;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
+import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
@@ -30,6 +33,7 @@ public class WorkOrderService {
   private final WorkOrderRepository workOrderRepository;
   private final BatchOperationsService batchOperationsService;
   private final TradingPartnerCertificationService certificationService;
+  private final DomainEventPublisher domainEventPublisher;
 
   /** Retrieves a work order by its UUID. */
   public WorkOrderResponse getWorkOrder(UUID id) {
@@ -124,6 +128,14 @@ public class WorkOrderService {
 
     workOrder.setStatus(newStatus);
     WorkOrder saved = workOrderRepository.save(workOrder);
+    if (newStatus == WorkOrderStatus.APPROVED) {
+      domainEventPublisher.publish(
+          new WorkOrderApprovedEvent(
+              saved.getTenantId(),
+              saved.getId(),
+              saved.getWorkOrderNumber(),
+              TenantContext.getCurrentUserId()));
+    }
     return mapToResponse(saved);
   }
 

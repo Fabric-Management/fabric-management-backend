@@ -177,7 +177,8 @@ class EscalationServiceTest {
 
       org.assertj.core.api.Assertions.assertThatThrownBy(
               () -> escalationService.resolveEscalation(logId, managerId, "İkinci çözüm"))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(
+              com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException.class)
           .hasMessageContaining("already resolved");
 
       verify(logRepo, never()).save(any());

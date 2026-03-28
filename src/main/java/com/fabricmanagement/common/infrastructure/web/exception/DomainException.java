@@ -13,11 +13,30 @@ public abstract class DomainException extends RuntimeException {
   private final int httpStatus;
   private final Map<String, Object> details;
 
+  /**
+   * Dynamic arguments for parameterized error messages.
+   *
+   * <p>Frontend can use these to build localized messages: <code>
+   * t(error.code, { min: error.args[0] })</code>
+   *
+   * <p>Example: {@code new DomainException(msg, "ERROR_MIN_VALUE", 400, new Object[]{8})}
+   */
+  private final Object[] args;
+
   protected DomainException(String message, String errorCode, int httpStatus) {
     super(message);
     this.errorCode = errorCode;
     this.httpStatus = httpStatus;
     this.details = new HashMap<>();
+    this.args = new Object[0];
+  }
+
+  protected DomainException(String message, String errorCode, int httpStatus, Object[] args) {
+    super(message);
+    this.errorCode = errorCode;
+    this.httpStatus = httpStatus;
+    this.details = new HashMap<>();
+    this.args = args != null ? args.clone() : new Object[0];
   }
 
   protected DomainException(String message, String errorCode, int httpStatus, Throwable cause) {
@@ -25,6 +44,7 @@ public abstract class DomainException extends RuntimeException {
     this.errorCode = errorCode;
     this.httpStatus = httpStatus;
     this.details = new HashMap<>();
+    this.args = new Object[0];
   }
 
   @SuppressWarnings("unchecked")
@@ -39,6 +59,11 @@ public abstract class DomainException extends RuntimeException {
 
   public int getHttpStatus() {
     return httpStatus;
+  }
+
+  /** Dynamic arguments for parameterized frontend messages. Never null (may be empty). */
+  public Object[] getArgs() {
+    return args.clone();
   }
 
   public Map<String, Object> getDetails() {

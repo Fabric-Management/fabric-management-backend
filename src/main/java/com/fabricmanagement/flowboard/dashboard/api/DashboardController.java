@@ -1,13 +1,15 @@
 package com.fabricmanagement.flowboard.dashboard.api;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.flowboard.dashboard.api.dto.request.AddWidgetRequest;
-import com.fabricmanagement.flowboard.dashboard.api.dto.response.DashboardConfigDto;
-import com.fabricmanagement.flowboard.dashboard.api.dto.response.DashboardWidgetDto;
 import com.fabricmanagement.flowboard.dashboard.api.mapper.DashboardMapper;
 import com.fabricmanagement.flowboard.dashboard.app.DashboardService;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardConfig;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardWidget;
+import com.fabricmanagement.flowboard.dashboard.dto.AddWidgetRequest;
+import com.fabricmanagement.flowboard.dashboard.dto.DashboardConfigDto;
+import com.fabricmanagement.flowboard.dashboard.dto.DashboardWidgetDto;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -37,11 +39,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/flowboard/dashboards")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
+@Tag(
+    name = "FlowBoard — Dashboard",
+    description = "Kullanici dashboard yapilandirmasi ve widget yonetimi")
 public class DashboardController {
 
   private final DashboardService dashboardService;
 
   @GetMapping("/default")
+  @Operation(summary = "Varsayilan dashboard'u getir")
   public ResponseEntity<DashboardConfigDto> getDefaultDashboard(
       @RequestParam("userId") @NotNull UUID userId) {
     UUID tenantId = TenantContext.getCurrentTenantId();

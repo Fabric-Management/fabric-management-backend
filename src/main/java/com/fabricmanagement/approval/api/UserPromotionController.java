@@ -1,8 +1,11 @@
 package com.fabricmanagement.approval.api;
 
 import com.fabricmanagement.approval.app.UserPromotionService;
-import com.fabricmanagement.approval.dto.RejectRequestDto;
+import com.fabricmanagement.approval.dto.PromotionRejectDto;
+import com.fabricmanagement.approval.dto.UserPromotionResponse;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +22,17 @@ public class UserPromotionController {
 
   private final UserPromotionService promotionService;
 
+  @GetMapping("/pending")
+  @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
+  public ResponseEntity<List<UserPromotionResponse>> getPendingPromotions() {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    List<UserPromotionResponse> response =
+        promotionService.getPendingPromotions(tenantId).stream()
+            .map(UserPromotionResponse::from)
+            .toList();
+    return ResponseEntity.ok(response);
+  }
+
   @PostMapping("/{promotionId}/approve")
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
   public ResponseEntity<Void> approvePromotion(@PathVariable UUID promotionId) {
@@ -31,9 +45,9 @@ public class UserPromotionController {
 
   @PostMapping("/{promotionId}/reject")
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
-  // dto.reason zorunluluğu servis katmanında (2. red için) ele alınmıştır
   public ResponseEntity<Void> rejectPromotion(
-      @PathVariable UUID promotionId, @RequestBody(required = false) RejectRequestDto dto) {
+      @PathVariable UUID promotionId,
+      @RequestBody(required = false) @Valid PromotionRejectDto dto) {
 
     UUID tenantId = TenantContext.getCurrentTenantId();
     UUID adminId = TenantContext.getCurrentUserId();

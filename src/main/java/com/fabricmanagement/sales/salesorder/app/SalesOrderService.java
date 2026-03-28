@@ -1,21 +1,25 @@
 package com.fabricmanagement.sales.salesorder.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerResolver;
-import com.fabricmanagement.common.platform.tradingpartner.app.TradingPartnerService;
-import com.fabricmanagement.common.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
+import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
+import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineResponse;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +48,7 @@ public class SalesOrderService {
   private final com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine
       ruleEngine;
   private final ModuleSpecsValidator moduleSpecsValidator;
+  private final DomainEventPublisher domainEventPublisher;
 
   private static final DateTimeFormatter ORDER_NUMBER_DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -260,6 +265,22 @@ public class SalesOrderService {
 
     // Faz 2.2 — trigger RuleEngine: recipe matching + WorkOrder DRAFT creation per line
     ruleEngine.processConfirmedOrder(saved);
+
+    BigDecimal totalQuantity =
+        lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId()).stream()
+            .map(SalesOrderLine::getRequestedQty)
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    domainEventPublisher.publish(
+        new SalesOrderConfirmedEvent(
+            tenantId,
+            saved.getId(),
+            saved.getOrderNumber(),
+            null,
+            null,
+            totalQuantity,
+            null,
+            saved.getRequestedDeliveryDate()));
 
     return SalesOrderDto.from(saved);
   }

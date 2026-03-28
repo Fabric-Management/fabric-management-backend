@@ -11,6 +11,6 @@ package com.fabricmanagement.production.common.exception;
 public class BatchCertificationOverlapException extends ProductionDomainException {
 
   public BatchCertificationOverlapException(String message) {
-    super(message);
+    super(message, "BATCH_CERTIFICATION_OVERLAP", 409);
   }
 }

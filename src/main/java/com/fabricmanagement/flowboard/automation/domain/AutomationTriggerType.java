@@ -7,6 +7,9 @@ package com.fabricmanagement.flowboard.automation.domain;
  */
 public enum AutomationTriggerType {
 
+  /** Task oluşturulduğunda */
+  TASK_CREATED,
+
   /**
    * Task statüsü değiştiğinde — triggerConfig: {"fromStatus": "IN_PROGRESS", "toStatus": "DONE"}
    */

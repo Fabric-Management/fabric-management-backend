@@ -1,6 +1,7 @@
 package com.fabricmanagement.approval.api;
 
 import com.fabricmanagement.approval.app.ApprovalRequestService;
+import com.fabricmanagement.approval.domain.ApproverRole;
 import com.fabricmanagement.approval.dto.ApprovalRequestResponse;
 import com.fabricmanagement.approval.dto.RejectRequestDto;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -25,7 +26,7 @@ public class ApprovalRequestController {
   @GetMapping("/pending")
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR') or hasAuthority('MANAGER')")
   public ResponseEntity<List<ApprovalRequestResponse>> getPendingRequests(
-      @RequestParam(required = false) String approverRole) {
+      @RequestParam(required = false) ApproverRole approverRole) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     List<ApprovalRequestResponse> response =
         requestService.getPendingRequests(tenantId, approverRole).stream()

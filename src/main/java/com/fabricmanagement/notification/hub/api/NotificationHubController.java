@@ -4,11 +4,9 @@ import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserCont
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.notification.hub.app.NotificationHubService;
-import com.fabricmanagement.notification.hub.domain.UserNotificationPreference;
 import com.fabricmanagement.notification.hub.dto.NotificationLogResponse;
 import com.fabricmanagement.notification.hub.dto.UpdateNotificationPreferenceRequest;
 import com.fabricmanagement.notification.hub.infra.repository.NotificationLogRepository;
-import com.fabricmanagement.notification.hub.infra.repository.UserNotificationPreferenceRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -37,7 +35,6 @@ public class NotificationHubController {
 
   private final NotificationHubService notificationHubService;
   private final NotificationLogRepository logRepo;
-  private final UserNotificationPreferenceRepository prefRepo;
 
   @GetMapping
   @Operation(summary = "Kullanıcının bildirimlerini listele")
@@ -74,23 +71,8 @@ public class NotificationHubController {
   public ResponseEntity<Void> updatePreference(
       @Valid @RequestBody UpdateNotificationPreferenceRequest req) {
     var ctx = currentUser();
-    UUID userId = ctx.userId();
-    UUID tenantId = ctx.tenantId();
-
-    prefRepo
-        .findByUserIdAndEventType(userId, req.eventType())
-        .ifPresentOrElse(
-            pref -> {
-              pref.update(req.inApp(), req.email(), req.push());
-              prefRepo.save(pref);
-            },
-            () -> {
-              var pref =
-                  UserNotificationPreference.createDefault(tenantId, userId, req.eventType());
-              pref.update(req.inApp(), req.email(), req.push());
-              prefRepo.save(pref);
-            });
-
+    notificationHubService.updatePreference(
+        ctx.tenantId(), ctx.userId(), req.eventType(), req.inApp(), req.email(), req.push());
     return ResponseEntity.noContent().build();
   }
 

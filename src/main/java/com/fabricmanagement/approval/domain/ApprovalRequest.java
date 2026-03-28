@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -63,6 +64,11 @@ public class ApprovalRequest extends BaseEntity {
       ApprovalPolicy policy,
       UUID requestedBy,
       OffsetDateTime expiresAt) {
+    Objects.requireNonNull(tenantId, "tenantId cannot be null");
+    Objects.requireNonNull(entityType, "entityType cannot be null");
+    Objects.requireNonNull(entityId, "entityId cannot be null");
+    Objects.requireNonNull(policy, "policy cannot be null");
+    Objects.requireNonNull(requestedBy, "requestedBy cannot be null");
     this.setTenantId(tenantId);
     this.entityType = entityType;
     this.entityId = entityId;

@@ -14,4 +14,7 @@ public interface TaskAssigneeRepository extends JpaRepository<TaskAssignee, UUID
 
   /** Task'ın belirli kullanıcıya olan aktif atamasını getirir. */
   Optional<TaskAssignee> findByTaskIdAndUserIdAndIsActiveTrue(UUID taskId, UUID userId);
+
+  /** Birden fazla Task için aktif atamaları getirir. (N+1 önlemek için) */
+  List<TaskAssignee> findAllByTaskIdInAndIsActiveTrue(List<UUID> taskIds);
 }

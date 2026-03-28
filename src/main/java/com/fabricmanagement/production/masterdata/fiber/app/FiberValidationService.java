@@ -2,6 +2,7 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
+import com.fabricmanagement.production.masterdata.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import java.math.BigDecimal;
 import java.util.List;
@@ -43,15 +44,16 @@ public class FiberValidationService {
   @Transactional(readOnly = true)
   public void validateCompositionPercentages(Map<UUID, BigDecimal> composition) {
     if (composition == null || composition.isEmpty()) {
-      throw new IllegalArgumentException("Composition cannot be empty");
+      throw new FiberDomainException("Composition cannot be empty", "FIBER_COMPOSITION_EMPTY", 400);
     }
 
     // Check total is 100%
     double total = composition.values().stream().mapToDouble(BigDecimal::doubleValue).sum();
 
     if (Math.abs(total - FiberConstants.TOTAL_PERCENTAGE) > FiberConstants.PERCENTAGE_TOLERANCE) {
-      throw new IllegalArgumentException(
-          String.format("Composition percentages must sum to exactly 100%%, got: %.2f%%", total));
+      throw new FiberDomainException(
+          "Composition percentages must sum to exactly 100%",
+          "FIBER_COMPOSITION_TOTAL_NOT_100", 400, new Object[] {total});
     }
 
     // Check each percentage
@@ -60,20 +62,25 @@ public class FiberValidationService {
 
       // No negative percentages
       if (percentage.compareTo(BigDecimal.ZERO) < 0) {
-        throw new IllegalArgumentException(
-            String.format("Percentage cannot be negative: %.2f%%", percentage));
+        throw new FiberDomainException(
+            "Percentage cannot be negative",
+            "FIBER_COMPOSITION_NEGATIVE_PERCENTAGE",
+            400,
+            new Object[] {percentage});
       }
 
       // No zero percentages (use composition at all)
       if (percentage.compareTo(BigDecimal.ZERO) == 0) {
-        throw new IllegalArgumentException("Composition entries cannot be 0%");
+        throw new FiberDomainException(
+            "Composition entries cannot be 0%", "FIBER_COMPOSITION_ZERO_PERCENTAGE", 400);
       }
 
       // No percentages over 100%
       BigDecimal maxPercentage = BigDecimal.valueOf(FiberConstants.TOTAL_PERCENTAGE);
       if (percentage.compareTo(maxPercentage) > 0) {
-        throw new IllegalArgumentException(
-            String.format("Percentage cannot exceed 100%%: %.2f%%", percentage));
+        throw new FiberDomainException(
+            "Percentage cannot exceed 100%",
+            "FIBER_COMPOSITION_MAX_EXCEEDED", 400, new Object[] {percentage});
       }
     }
   }
@@ -89,10 +96,11 @@ public class FiberValidationService {
       BigDecimal percentage = entry.getValue();
 
       if (percentage.doubleValue() < minPercentage) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Fiber percentage too low (minimum %.1f%%): %.2f%%",
-                minPercentage, percentage.doubleValue()));
+        throw new FiberDomainException(
+            "Fiber percentage too low",
+            "FIBER_COMPOSITION_MIN_RATIO_NOT_MET",
+            400,
+            new Object[] {minPercentage, percentage.doubleValue()});
       }
     }
   }
@@ -105,10 +113,11 @@ public class FiberValidationService {
   @Transactional(readOnly = true)
   public void validateMaxComponents(Map<UUID, BigDecimal> composition, int maxComponents) {
     if (composition.size() > maxComponents) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Blend cannot have more than %d components, got: %d",
-              maxComponents, composition.size()));
+      throw new FiberDomainException(
+          "Blend cannot have more than maximum allowed components",
+          "FIBER_COMPOSITION_MAX_COMPONENTS_EXCEEDED",
+          400,
+          new Object[] {maxComponents, composition.size()});
     }
   }
 

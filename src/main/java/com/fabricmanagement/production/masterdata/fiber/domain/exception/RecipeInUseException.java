@@ -43,9 +43,14 @@ public class RecipeInUseException extends FiberDomainException {
         "Fiber '"
             + fiberName
             + "' composition cannot be changed: it has batches currently RESERVED or IN_PROGRESS"
-            + " on the production floor. Complete or cancel those batches first.");
+            + " on the production floor. Complete or cancel those batches first.",
+        "RECIPE_IN_USE",
+        409);
     this.fiberId = fiberId;
     this.fiberName = fiberName;
+    withDetail("fiberId", fiberId);
+    withDetail("fiberName", fiberName);
+    withDetail("blockedBy", "RESERVED, IN_PROGRESS");
   }
 
   public UUID getFiberId() {

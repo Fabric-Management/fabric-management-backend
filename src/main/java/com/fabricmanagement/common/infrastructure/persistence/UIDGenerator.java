@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.persistence;
 
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -69,9 +70,10 @@ public class UIDGenerator {
       tenantUid = "SYS-000"; // System tenant fallback
     }
 
-    long sequence = System.currentTimeMillis() % 100000;
+    String uniqueSuffix =
+        UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
 
-    String uid = String.format("%s-%s-%05d", tenantUid, moduleCode.toUpperCase(), sequence);
+    String uid = String.format("%s-%s-%s", tenantUid, moduleCode.toUpperCase(), uniqueSuffix);
 
     log.debug("Generated UID: {} for entity: {}", uid, entityType);
     return uid;
@@ -85,16 +87,17 @@ public class UIDGenerator {
    * @param sequenceLength length of sequence part (default: 5)
    * @return generated UID
    */
-  public String generate(String moduleCode, String entityType, int sequenceLength) {
+  public String generate(String moduleCode, String entityType, int suffixLength) {
     String tenantUid = TenantContext.getCurrentTenantUid();
     if (tenantUid == null) {
       tenantUid = "SYS-000";
     }
 
-    long sequence = System.currentTimeMillis() % ((long) Math.pow(10, sequenceLength));
+    int len = Math.max(4, Math.min(suffixLength, 32));
+    String uniqueSuffix =
+        UUID.randomUUID().toString().replace("-", "").substring(0, len).toUpperCase();
 
-    String format = String.format("%%s-%%s-%%0%dd", sequenceLength);
-    String uid = String.format(format, tenantUid, moduleCode.toUpperCase(), sequence);
+    String uid = String.format("%s-%s-%s", tenantUid, moduleCode.toUpperCase(), uniqueSuffix);
 
     log.debug("Generated UID: {} for entity: {}", uid, entityType);
     return uid;
@@ -119,9 +122,8 @@ public class UIDGenerator {
       return false;
     }
 
-    // Last part should be numeric
-    String sequencePart = parts[parts.length - 1];
-    return sequencePart.matches("\\d+");
+    String lastPart = parts[parts.length - 1];
+    return lastPart.matches("[A-Fa-f0-9]+") || lastPart.matches("\\d+");
   }
 
   /**
@@ -174,10 +176,13 @@ public class UIDGenerator {
   }
 
   /**
-   * Extracts sequence number from a full UID
+   * Extracts the suffix (last segment) from a full UID.
+   *
+   * <p>For UUID-based UIDs this returns the hex suffix; for legacy numeric UIDs it parses as a
+   * long.
    *
    * @param uid the full UID
-   * @return sequence number, or -1 if invalid
+   * @return sequence number for legacy UIDs, or -1 for UUID-based / invalid UIDs
    */
   public long extractSequence(String uid) {
     if (!isValid(uid)) {
@@ -185,12 +190,27 @@ public class UIDGenerator {
     }
 
     String[] parts = uid.split("-");
-    String sequencePart = parts[parts.length - 1];
+    String suffixPart = parts[parts.length - 1];
 
     try {
-      return Long.parseLong(sequencePart);
+      return Long.parseLong(suffixPart);
     } catch (NumberFormatException e) {
       return -1;
     }
+  }
+
+  /**
+   * Extracts the suffix segment from a full UID (works for both UUID-hex and legacy numeric).
+   *
+   * @param uid the full UID
+   * @return suffix string, or null if invalid
+   */
+  public String extractSuffix(String uid) {
+    if (!isValid(uid)) {
+      return null;
+    }
+
+    String[] parts = uid.split("-");
+    return parts[parts.length - 1];
   }
 }

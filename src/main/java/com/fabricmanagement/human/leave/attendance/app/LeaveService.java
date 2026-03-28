@@ -6,7 +6,7 @@ import com.fabricmanagement.human.compliance.localization.app.HrPolicyPackServic
 import com.fabricmanagement.human.compliance.localization.app.ResolvedPolicyPack;
 import com.fabricmanagement.human.compliance.localization.domain.HrLocalizationConstants;
 import com.fabricmanagement.human.compliance.localization.domain.HrPolicyPack;
-import com.fabricmanagement.human.core.employee.application.EmployeeService;
+import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.human.leave.app.HolidayCalendarService;
 import com.fabricmanagement.human.leave.app.LeaveAccrualLogService;

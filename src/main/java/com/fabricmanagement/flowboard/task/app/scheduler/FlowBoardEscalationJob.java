@@ -1,14 +1,14 @@
 package com.fabricmanagement.flowboard.task.app.scheduler;
 
-import com.fabricmanagement.common.platform.tenant.app.TenantService;
-import com.fabricmanagement.common.platform.tenant.dto.TenantDto;
-import com.fabricmanagement.common.platform.user.domain.SystemUser;
 import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository;
 import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository.BoardManagerProjection;
 import com.fabricmanagement.flowboard.task.app.EscalationService;
 import com.fabricmanagement.flowboard.task.domain.EscalationType;
 import com.fabricmanagement.flowboard.task.domain.Task;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
+import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.dto.TenantDto;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;

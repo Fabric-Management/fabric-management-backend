@@ -21,10 +21,15 @@ public class BatchCertificationExpiredException extends BatchDomainException {
 
   public BatchCertificationExpiredException(
       String batchCode, String certCode, LocalDate validUntil) {
-    super(buildMessage(batchCode, certCode, validUntil));
+    super(buildMessage(batchCode, certCode, validUntil), "BATCH_CERTIFICATION_EXPIRED", 409);
     this.batchCode = batchCode;
     this.certCode = certCode;
     this.validUntil = validUntil;
+    withDetail("batchCode", batchCode);
+    withDetail("certCode", certCode);
+    if (validUntil != null) {
+      withDetail("validUntil", validUntil.toString());
+    }
   }
 
   private static String buildMessage(String batchCode, String certCode, LocalDate validUntil) {

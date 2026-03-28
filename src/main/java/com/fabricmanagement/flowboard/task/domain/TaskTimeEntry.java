@@ -1,6 +1,7 @@
 package com.fabricmanagement.flowboard.task.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -77,7 +78,8 @@ public class TaskTimeEntry extends BaseEntity {
 
   public void stopTimer(Clock clock) {
     if (this.endedAt != null) {
-      throw new IllegalStateException("Timer is already stopped");
+      throw new FlowBoardDomainException(
+          "Timer is already stopped", "FLOWBOARD_TIMER_ALREADY_STOPPED", 409);
     }
     this.endedAt = OffsetDateTime.now(clock);
     this.durationMinutes = Math.max(0, (int) Duration.between(startedAt, endedAt).toMinutes());

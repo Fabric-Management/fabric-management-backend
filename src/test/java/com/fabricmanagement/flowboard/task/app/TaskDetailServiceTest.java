@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.flowboard.task.domain.Task;
 import com.fabricmanagement.flowboard.task.domain.TaskAction;
 import com.fabricmanagement.flowboard.task.domain.TaskChecklist;
 import com.fabricmanagement.flowboard.task.domain.TaskComment;
@@ -16,7 +17,9 @@ import com.fabricmanagement.flowboard.task.domain.TaskTimeEntry;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskAttachmentRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskChecklistRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskCommentRepository;
+import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskTimeEntryRepository;
+import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +39,8 @@ class TaskDetailServiceTest {
 
   @Mock private TaskChecklistRepository checklistRepo;
   @Mock private TaskCommentRepository commentRepo;
+  @Mock private TaskRepository taskRepo;
+  @Mock private UserFacade userFacade;
   @Mock private TaskTimeEntryRepository timeEntryRepo;
   @Mock private TaskAttachmentRepository attachmentRepo;
   @Mock private TaskActivityService activityService;
@@ -94,7 +99,8 @@ class TaskDetailServiceTest {
       when(timeEntryRepo.findActiveTimerByUserId(userId)).thenReturn(Optional.of(activeTimer));
 
       assertThatThrownBy(() -> detailService.stopTimer(tenantId, taskId, userId))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(
+              com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException.class)
           .hasMessageContaining("different task");
     }
 
@@ -106,7 +112,8 @@ class TaskDetailServiceTest {
       when(timeEntryRepo.findActiveTimerByUserId(userId)).thenReturn(Optional.of(activeTimer));
 
       assertThatThrownBy(() -> detailService.stopTimer(tenantId, taskId, userId))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(
+              com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException.class)
           .hasMessageContaining("tenant");
     }
   }
@@ -118,6 +125,11 @@ class TaskDetailServiceTest {
     @Test
     @DisplayName("Yorum ekler ve activity log kaydeder")
     void addComment_savesAndLogs() {
+      Task task = org.mockito.Mockito.mock(Task.class);
+      org.mockito.Mockito.when(task.getId()).thenReturn(taskId);
+      org.mockito.Mockito.when(task.getTenantId()).thenReturn(tenantId);
+      when(taskRepo.findById(taskId)).thenReturn(Optional.of(task));
+
       TaskComment comment = detailService.addComment(tenantId, taskId, userId, "Test yorum", null);
 
       verify(commentRepo).save(any(TaskComment.class));
@@ -167,7 +179,8 @@ class TaskDetailServiceTest {
 
       assertThatThrownBy(
               () -> detailService.completeChecklist(tenantId, taskId, checklistId, userId))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(
+              com.fabricmanagement.flowboard.common.exception.FlowBoardDomainException.class)
           .hasMessageContaining("tenant");
     }
 

@@ -1,15 +1,17 @@
 package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.common.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.common.platform.communication.domain.NotificationType;
-import com.fabricmanagement.common.platform.tenant.domain.Tenant;
-import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
+import com.fabricmanagement.common.infrastructure.web.LocalizationService;
+import com.fabricmanagement.platform.communication.app.InAppNotificationService;
+import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
+import com.fabricmanagement.platform.communication.domain.NotificationType;
+import com.fabricmanagement.platform.tenant.domain.Tenant;
+import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ public class BatchCertificationExpiryCheckJob {
   private final TenantRepository tenantRepository;
   private final BatchCertificationRepository batchCertificationRepository;
   private final InAppNotificationService inAppNotificationService;
+  private final LocalizationService localizationService;
 
   /**
    * Runs every night at 2 AM by default; override with
@@ -83,20 +86,22 @@ public class BatchCertificationExpiryCheckJob {
   private void notifyTenantOfExpiringCerts(
       UUID tenantId, List<BatchCertification> expiring, LocalDate threshold) {
     int count = expiring.size();
-    String title = "Batch certification(s) expiring";
+
+    // Resolve tenant's preferred locale (scheduler has no HTTP request / user context)
+    Locale locale = localizationService.resolveLocaleForTenant(tenantId);
+    String title =
+        localizationService.getMessage(
+            "notification.batch.certification.expiry.title", null, locale);
     String message =
         count == 1
-            ? "1 batch certification is expired or expiring within "
-                + expiryWarningDays
-                + " days (by "
-                + threshold
-                + "). Check batch certifications."
-            : count
-                + " batch certifications are expired or expiring within "
-                + expiryWarningDays
-                + " days (by "
-                + threshold
-                + "). Check batch certifications.";
+            ? localizationService.getMessage(
+                "notification.batch.certification.expiry.message.single",
+                new Object[] {expiryWarningDays, threshold},
+                locale)
+            : localizationService.getMessage(
+                "notification.batch.certification.expiry.message.multiple",
+                new Object[] {count, expiryWarningDays, threshold},
+                locale);
 
     inAppNotificationService.sendToTenantRoles(
         tenantId,

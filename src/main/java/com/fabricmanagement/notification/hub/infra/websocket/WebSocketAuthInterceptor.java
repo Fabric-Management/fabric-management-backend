@@ -1,7 +1,7 @@
 package com.fabricmanagement.notification.hub.infra.websocket;
 
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
-import com.fabricmanagement.common.platform.auth.app.JwtService;
+import com.fabricmanagement.platform.auth.app.JwtService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

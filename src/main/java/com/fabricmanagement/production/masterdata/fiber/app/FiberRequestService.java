@@ -1,14 +1,15 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.platform.communication.app.InAppNotificationService;
-import com.fabricmanagement.common.platform.communication.domain.NotificationDeliveryChannel;
-import com.fabricmanagement.common.platform.communication.domain.NotificationType;
-import com.fabricmanagement.common.platform.communication.dto.NotificationRequest;
-import com.fabricmanagement.common.platform.tenant.infra.repository.TenantRepository;
+import com.fabricmanagement.platform.communication.app.InAppNotificationService;
+import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
+import com.fabricmanagement.platform.communication.domain.NotificationType;
+import com.fabricmanagement.platform.communication.dto.NotificationRequest;
+import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequestStatus;
+import com.fabricmanagement.production.masterdata.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequestRequest;
@@ -79,14 +80,20 @@ public class FiberRequestService {
     // Duplicate: PENDING or APPROVED with same isoCode for this tenant (case-insensitive)
     if (fiberRequestRepository.existsByTenantIdAndIsoCodeIgnoreCaseAndStatusIn(
         tenantId, isoCode, List.of(FiberRequestStatus.PENDING, FiberRequestStatus.APPROVED))) {
-      throw new IllegalArgumentException(
-          "A fiber request with ISO code '" + isoCode + "' already exists (PENDING or APPROVED).");
+      throw new FiberDomainException(
+          "A fiber request with this ISO code already exists (PENDING or APPROVED)",
+          "FIBER_REQUEST_DUPLICATE_PENDING",
+          409,
+          new Object[] {isoCode});
     }
 
     // FiberIsoCode already exists in catalog (case-insensitive)
     if (fiberIsoCodeRepository.existsByIsoCodeIgnoreCase(isoCode)) {
-      throw new IllegalArgumentException(
-          "ISO code '" + isoCode + "' already exists in the fiber catalog.");
+      throw new FiberDomainException(
+          "ISO code already exists in the fiber catalog",
+          "FIBER_REQUEST_DUPLICATE_CATALOG",
+          409,
+          new Object[] {isoCode});
     }
 
     FiberRequest entity =
@@ -126,11 +133,16 @@ public class FiberRequestService {
         fiberRequestRepository
             .findById(requestId)
             .orElseThrow(
-                () -> new IllegalArgumentException("Fiber request not found: " + requestId));
+                () ->
+                    new FiberDomainException(
+                        "Fiber request not found: " + requestId, "FIBER_REQUEST_NOT_FOUND", 404));
 
     if (request.getStatus() != FiberRequestStatus.PENDING) {
-      throw new IllegalStateException(
-          "Only PENDING requests can be approved. Current status: " + request.getStatus());
+      throw new FiberDomainException(
+          "Only PENDING requests can be approved.",
+          "FIBER_REQUEST_INVALID_STATUS",
+          409,
+          new Object[] {request.getStatus()});
     }
 
     createFiberFromRequest(request);
@@ -161,18 +173,24 @@ public class FiberRequestService {
         fiberRequestRepository
             .findById(requestId)
             .orElseThrow(
-                () -> new IllegalArgumentException("Fiber request not found: " + requestId));
+                () ->
+                    new FiberDomainException(
+                        "Fiber request not found: " + requestId, "FIBER_REQUEST_NOT_FOUND", 404));
 
     if (request.getStatus() != FiberRequestStatus.PENDING) {
-      throw new IllegalStateException(
-          "Only PENDING requests can be rejected. Current status: " + request.getStatus());
+      throw new FiberDomainException(
+          "Only PENDING requests can be rejected.",
+          "FIBER_REQUEST_INVALID_STATUS",
+          409,
+          new Object[] {request.getStatus()});
     }
 
     if (reviewNote == null || reviewNote.trim().length() < MIN_REVIEW_NOTE_LENGTH) {
-      throw new IllegalArgumentException(
-          "Review note is required and must be at least "
-              + MIN_REVIEW_NOTE_LENGTH
-              + " characters.");
+      throw new FiberDomainException(
+          "Review note is required and must be at least the minimum length.",
+          "FIBER_REQUEST_REVIEW_NOTE_TOO_SHORT",
+          400,
+          new Object[] {MIN_REVIEW_NOTE_LENGTH});
     }
 
     request.setStatus(FiberRequestStatus.REJECTED);
@@ -222,8 +240,8 @@ public class FiberRequestService {
         tenantRepository.findAllById(tenantIds).stream()
             .collect(
                 Collectors.toMap(
-                    com.fabricmanagement.common.platform.tenant.domain.Tenant::getId,
-                    com.fabricmanagement.common.platform.tenant.domain.Tenant::getName));
+                    com.fabricmanagement.platform.tenant.domain.Tenant::getId,
+                    com.fabricmanagement.platform.tenant.domain.Tenant::getName));
 
     return page.map(
         e ->
@@ -247,7 +265,7 @@ public class FiberRequestService {
               String tenantName =
                   tenantRepository
                       .findById(e.getTenantId())
-                      .map(com.fabricmanagement.common.platform.tenant.domain.Tenant::getName)
+                      .map(com.fabricmanagement.platform.tenant.domain.Tenant::getName)
                       .orElse(e.getTenantId().toString());
               return FiberRequestDto.from(e, tenantName);
             });

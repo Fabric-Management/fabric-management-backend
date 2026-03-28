@@ -1,8 +1,11 @@
 package com.fabricmanagement.common.util;
 
+import jakarta.persistence.Embeddable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Currency;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 
 /**
@@ -33,6 +36,8 @@ import lombok.Value;
  * }</pre>
  */
 @Value
+@Embeddable
+@NoArgsConstructor(access = AccessLevel.PROTECTED, force = true)
 public class Money {
 
   BigDecimal amount;

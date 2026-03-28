@@ -2,7 +2,7 @@ package com.fabricmanagement.human.core.employee.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.human.core.employee.application.EmployeeService;
+import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.human.core.employee.dto.EmployeeProfileDto;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

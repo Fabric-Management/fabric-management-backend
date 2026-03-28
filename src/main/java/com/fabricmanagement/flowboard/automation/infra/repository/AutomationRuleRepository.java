@@ -11,21 +11,43 @@ import org.springframework.data.repository.query.Param;
 /** AutomationRule repository. */
 public interface AutomationRuleRepository extends JpaRepository<AutomationRule, UUID> {
 
+  /** İlgili tenant'ın tüm kurallarını getirmek için (UI Liste ekranı). */
+  List<AutomationRule> findAllByTenantIdOrderByCreatedAtDesc(UUID tenantId);
+
+  /**
+   * İlgili tenant'a ve board'a ait kuralları getirmek için. boardId bulunamazsa null dönülüp global
+   * kurallar da isteneceğinden OR mantığı.
+   */
+  @Query(
+      """
+      SELECT r FROM AutomationRule r
+      WHERE r.tenantId = :tenantId
+        AND (r.boardId = :boardId OR r.boardId IS NULL)
+      ORDER BY r.createdAt DESC
+      """)
+  List<AutomationRule> findAllByTenantIdAndBoardId(
+      @Param("tenantId") UUID tenantId, @Param("boardId") UUID boardId);
+
+  /** Tenant filtresiyle spesifik bir kuralı getirmek için. */
+  java.util.Optional<AutomationRule> findByIdAndTenantId(UUID id, UUID tenantId);
+
   /**
    * Board'a özel + global (boardId=null) aktif kuralları getirir — trigger tipine göre filtreler.
-   *
-   * <p>Global kurallar (boardId IS NULL) tüm board'larda çalışır.
+   * [GÜVENLİK YAMASI] Tenant izolasyonu sağlandı.
    */
   @Query(
       """
       SELECT r FROM AutomationRule r
       WHERE r.isActive = true
+        AND r.tenantId = :tenantId
         AND r.triggerType = :triggerType
         AND (r.boardId = :boardId OR r.boardId IS NULL)
       ORDER BY r.createdAt ASC
       """)
-  List<AutomationRule> findActiveByTriggerTypeAndBoard(
-      @Param("triggerType") AutomationTriggerType triggerType, @Param("boardId") UUID boardId);
+  List<AutomationRule> findActiveByTenantAndTriggerTypeAndBoard(
+      @Param("tenantId") UUID tenantId,
+      @Param("triggerType") AutomationTriggerType triggerType,
+      @Param("boardId") UUID boardId);
 
   /** Tüm aktif kurallar (admin UI için). */
   List<AutomationRule> findAllByIsActiveTrueOrderByCreatedAtAsc();

@@ -33,4 +33,6 @@ public record CreateTaskRequest(
     LocalDate deadline,
     BigDecimal estimatedHours,
     String entityType,
-    UUID entityId) {}
+    UUID entityId,
+    String sourceType,
+    UUID sourceId) {}

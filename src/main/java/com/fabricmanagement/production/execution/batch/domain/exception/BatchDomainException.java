@@ -31,4 +31,12 @@ public class BatchDomainException extends ProductionDomainException {
   public BatchDomainException(String message, Throwable cause) {
     super(message, cause);
   }
+
+  public BatchDomainException(String message, String errorCode, int httpStatus) {
+    super(message, errorCode, httpStatus);
+  }
+
+  public BatchDomainException(String message, String errorCode, int httpStatus, Object[] args) {
+    super(message, errorCode, httpStatus, args);
+  }
 }

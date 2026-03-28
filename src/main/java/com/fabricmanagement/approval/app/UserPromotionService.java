@@ -1,18 +1,22 @@
 package com.fabricmanagement.approval.app;
 
+import com.fabricmanagement.approval.domain.ApprovalRequestStatus;
+import com.fabricmanagement.approval.domain.PromotionRequestStatus;
 import com.fabricmanagement.approval.domain.PromotionTriggerType;
 import com.fabricmanagement.approval.domain.UserPromotionRequest;
 import com.fabricmanagement.approval.domain.UserTrustLevel;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.approval.infra.repository.UserPromotionRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.common.platform.approval.domain.event.PromotionEscalationEvent;
-import com.fabricmanagement.common.platform.user.app.UserService;
-import com.fabricmanagement.common.platform.user.domain.User;
-import com.fabricmanagement.common.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.approval.domain.event.PromotionEscalationEvent;
+import com.fabricmanagement.platform.user.app.UserService;
+import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,7 +49,8 @@ public class UserPromotionService {
     // TRUSTED olanların daha yükseleceği yer yok
     if (user.getTrustLevel() == UserTrustLevel.TRUSTED) return;
 
-    int approvedCount = requestRepo.countApprovedRequestsForUser(tenantId, userId);
+    int approvedCount =
+        requestRepo.countApprovedRequestsForUser(tenantId, userId, ApprovalRequestStatus.APPROVED);
 
     if (approvedCount >= threshold) {
       log.info(
@@ -57,9 +62,7 @@ public class UserPromotionService {
       UserPromotionRequest existing =
           promotionRepo
               .findByTenantIdAndUserIdAndStatusAndDeletedAtIsNull(
-                  tenantId,
-                  userId,
-                  com.fabricmanagement.approval.domain.PromotionRequestStatus.PENDING)
+                  tenantId, userId, PromotionRequestStatus.PENDING)
               .orElse(null);
 
       // Zaten bir terfi talebi beklemedeyse yenisi açılmaz
@@ -73,9 +76,7 @@ public class UserPromotionService {
         // Geçmiş rejection sayısını hesapla (eskiden hardcoded 0 idi)
         int currentRejection =
             promotionRepo.countByTenantIdAndUserIdAndStatusAndDeletedAtIsNull(
-                tenantId,
-                userId,
-                com.fabricmanagement.approval.domain.PromotionRequestStatus.REJECTED);
+                tenantId, userId, PromotionRequestStatus.REJECTED);
 
         UserPromotionRequest promotion =
             new UserPromotionRequest(
@@ -87,7 +88,14 @@ public class UserPromotionService {
                 currentRejection,
                 approvedCount);
 
-        promotionRepo.save(promotion);
+        try {
+          promotionRepo.save(promotion);
+        } catch (DataIntegrityViolationException ex) {
+          log.warn(
+              "Duplicate PENDING promotion request for user={} in tenant={}, skipping.",
+              userId,
+              tenantId);
+        }
       }
     }
   }
@@ -150,5 +158,11 @@ public class UserPromotionService {
           new PromotionEscalationEvent(
               tenantId, req.getUserId(), attemptNumber, "3 times promotion rejection"));
     }
+  }
+
+  @Transactional(readOnly = true)
+  public List<UserPromotionRequest> getPendingPromotions(UUID tenantId) {
+    return promotionRepo.findByTenantIdAndStatusAndDeletedAtIsNull(
+        tenantId, PromotionRequestStatus.PENDING);
   }
 }

@@ -34,8 +34,7 @@ public class AuthCookieSupport {
   public void addAuthCookies(
       HttpServletResponse response, String accessToken, String refreshToken) {
     if (StringUtils.hasText(accessToken)) {
-      Cookie accessCookie =
-          new Cookie(JwtAuthenticationFilter.ACCESS_TOKEN_COOKIE_NAME, accessToken);
+      Cookie accessCookie = new Cookie(JwtTokenExtractor.ACCESS_TOKEN_COOKIE_NAME, accessToken);
       accessCookie.setHttpOnly(true);
       accessCookie.setSecure(secureCookie);
       accessCookie.setPath("/api");
@@ -59,7 +58,7 @@ public class AuthCookieSupport {
    * the browser removes them.
    */
   public void clearAuthCookies(HttpServletResponse response) {
-    Cookie accessCookie = new Cookie(JwtAuthenticationFilter.ACCESS_TOKEN_COOKIE_NAME, "");
+    Cookie accessCookie = new Cookie(JwtTokenExtractor.ACCESS_TOKEN_COOKIE_NAME, "");
     accessCookie.setHttpOnly(true);
     accessCookie.setSecure(secureCookie);
     accessCookie.setPath("/api");

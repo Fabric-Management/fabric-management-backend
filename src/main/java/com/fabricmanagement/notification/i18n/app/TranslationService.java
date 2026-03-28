@@ -135,6 +135,54 @@ public class TranslationService {
     return SYSTEM_DEFAULT_LOCALE;
   }
 
+  @Transactional(readOnly = true)
+  public Map<String, Object> getUserLocaleConfig(UUID userId) {
+    return userLocaleConfigRepo
+        .findByUserId(userId)
+        .map(
+            cfg ->
+                Map.<String, Object>of(
+                    "locale", cfg.getLocale(),
+                    "dateFormat", cfg.getDateFormat() != null ? cfg.getDateFormat() : "",
+                    "timezone", cfg.getTimezone() != null ? cfg.getTimezone() : ""))
+        .orElse(Map.of());
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> getTenantLocaleConfig(UUID tenantId) {
+    return tenantLocaleConfigRepo
+        .findByTenantId(tenantId)
+        .map(
+            cfg ->
+                Map.<String, Object>of(
+                    "defaultLocale", cfg.getDefaultLocale(),
+                    "supportedLocales", cfg.getSupportedLocales(),
+                    "dateFormat", cfg.getDateFormat(),
+                    "timeFormat", cfg.getTimeFormat(),
+                    "timezone", cfg.getTimezone(),
+                    "currency", cfg.getCurrency()))
+        .orElse(Map.of("defaultLocale", "TR", "supportedLocales", java.util.List.of("TR", "EN")));
+  }
+
+  @Transactional
+  public void updateUserLocale(
+      UUID tenantId, UUID userId, String locale, String dateFormat, String timezone) {
+    userLocaleConfigRepo
+        .findByUserId(userId)
+        .ifPresentOrElse(
+            cfg -> {
+              cfg.updateLocale(locale, dateFormat, timezone);
+              userLocaleConfigRepo.save(cfg);
+            },
+            () -> {
+              var cfg =
+                  com.fabricmanagement.notification.i18n.domain.UserLocaleConfig.create(
+                      tenantId, userId, locale);
+              cfg.updateLocale(locale, dateFormat, timezone);
+              userLocaleConfigRepo.save(cfg);
+            });
+  }
+
   /** Yeni bir çeviri anahtarı kaydeder (idempotent — aynı keyCode varsa atla). */
   @Transactional
   public TranslationKey registerKey(
