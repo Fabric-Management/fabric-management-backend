@@ -6,7 +6,10 @@ import com.fabricmanagement.notification.hub.domain.NotificationEventType;
 import com.fabricmanagement.platform.approval.domain.event.ApprovalApprovedEvent;
 import com.fabricmanagement.platform.approval.domain.event.ApprovalPendingEvent;
 import com.fabricmanagement.platform.approval.domain.event.ApprovalRejectedEvent;
+import com.fabricmanagement.platform.user.domain.SystemUser;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -32,6 +35,10 @@ public class ApprovalNotificationListener {
 
   private final NotificationHubService notificationHubService;
 
+  private static String nonNull(String value) {
+    return value != null ? value : "";
+  }
+
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
   public void onApprovalPending(ApprovalPendingEvent event) {
@@ -42,19 +49,37 @@ public class ApprovalNotificationListener {
 
     var payload =
         Map.of(
-            "entityType", event.getEntityType(),
-            "entityCode", event.getEntityCode(),
+            "entityType", nonNull(event.getEntityType()),
+            "entityCode", nonNull(event.getEntityCode()),
             "referenceId", event.getEntityId().toString(),
-            "referenceType", event.getEntityType());
+            "referenceType", nonNull(event.getEntityType()));
 
-    notificationHubService.notify(
-        NotificationContext.of(
-            event.getTenantId(),
-            event.getApproverId(),
-            NotificationEventType.APPROVAL_PENDING,
-            payload,
-            event.getEntityId(),
-            event.getEntityType()));
+    List<UUID> recipients = event.getNotifyRecipientIds();
+    if (recipients != null && !recipients.isEmpty()) {
+      notificationHubService.notifyAll(
+          recipients,
+          event.getTenantId(),
+          NotificationEventType.APPROVAL_PENDING,
+          payload,
+          event.getEntityId(),
+          event.getEntityType());
+      return;
+    }
+    if (event.getApproverId() != null) {
+      notificationHubService.notify(
+          NotificationContext.of(
+              event.getTenantId(),
+              event.getApproverId(),
+              NotificationEventType.APPROVAL_PENDING,
+              payload,
+              event.getEntityId(),
+              event.getEntityType()));
+      return;
+    }
+    log.warn(
+        "ApprovalPending: no recipients (entity={} {}) — skipping notification enqueue",
+        event.getEntityType(),
+        event.getEntityCode());
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -65,13 +90,20 @@ public class ApprovalNotificationListener {
         event.getEntityType(),
         event.getEntityCode());
 
+    if (!isRealTenantUser(event.getRequesterId())) {
+      log.debug(
+          "ApprovalRejected: requester not a DB user (id={}) — skipping notification",
+          event.getRequesterId());
+      return;
+    }
+
     var payload =
         Map.of(
-            "entityType", event.getEntityType(),
-            "entityCode", event.getEntityCode(),
-            "rejectionReason", event.getRejectionReason() != null ? event.getRejectionReason() : "",
+            "entityType", nonNull(event.getEntityType()),
+            "entityCode", nonNull(event.getEntityCode()),
+            "rejectionReason", nonNull(event.getRejectionReason()),
             "referenceId", event.getEntityId().toString(),
-            "referenceType", event.getEntityType());
+            "referenceType", nonNull(event.getEntityType()));
 
     notificationHubService.notify(
         NotificationContext.of(
@@ -91,12 +123,19 @@ public class ApprovalNotificationListener {
         event.getEntityType(),
         event.getEntityCode());
 
+    if (!isRealTenantUser(event.getRequesterId())) {
+      log.debug(
+          "ApprovalApproved: requester not a DB user (id={}) — skipping notification",
+          event.getRequesterId());
+      return;
+    }
+
     var payload =
         Map.of(
-            "entityType", event.getEntityType(),
-            "entityCode", event.getEntityCode(),
+            "entityType", nonNull(event.getEntityType()),
+            "entityCode", nonNull(event.getEntityCode()),
             "referenceId", event.getEntityId().toString(),
-            "referenceType", event.getEntityType());
+            "referenceType", nonNull(event.getEntityType()));
 
     notificationHubService.notify(
         NotificationContext.of(
@@ -106,5 +145,9 @@ public class ApprovalNotificationListener {
             payload,
             event.getEntityId(),
             event.getEntityType()));
+  }
+
+  private static boolean isRealTenantUser(UUID userId) {
+    return userId != null && !SystemUser.ID.equals(userId);
   }
 }

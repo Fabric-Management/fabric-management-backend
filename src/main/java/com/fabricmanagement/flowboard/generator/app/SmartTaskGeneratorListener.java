@@ -28,21 +28,21 @@ public class SmartTaskGeneratorListener {
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
-  @Transactional
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
   public void onSalesOrderConfirmed(SalesOrderConfirmedEvent event) {
     eventRouterService.route(event);
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
-  @Transactional
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
   public void onWorkOrderApproved(WorkOrderApprovedEvent event) {
     eventRouterService.route(event);
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
-  @Transactional
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
   public void onGoodsReceiptConfirmed(GoodsReceiptConfirmedEvent event) {
     eventRouterService.route(event);
   }

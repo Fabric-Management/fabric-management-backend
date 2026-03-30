@@ -266,11 +266,30 @@ public class SalesOrderService {
     // Faz 2.2 — trigger RuleEngine: recipe matching + WorkOrder DRAFT creation per line
     ruleEngine.processConfirmedOrder(saved);
 
+    List<SalesOrderLine> orderLines =
+        lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId());
+
     BigDecimal totalQuantity =
-        lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId()).stream()
+        orderLines.stream()
             .map(SalesOrderLine::getRequestedQty)
             .filter(Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    List<SalesOrderConfirmedEvent.SalesOrderLineSnapshot> snapshotLines =
+        orderLines.stream()
+            .map(
+                line ->
+                    new SalesOrderConfirmedEvent.SalesOrderLineSnapshot(
+                        line.getId(),
+                        line.getProductDesc() != null
+                            ? line.getProductDesc()
+                            : "MATERIAL_" + line.getMaterialId(), // Default product identifier
+                        line.getRequestedQty(),
+                        line.getUnit(),
+                        saved.getRequestedDeliveryDate() // Parent order requested delivery date
+                        ))
+            .toList();
+
     domainEventPublisher.publish(
         new SalesOrderConfirmedEvent(
             tenantId,
@@ -280,9 +299,14 @@ public class SalesOrderService {
             null,
             totalQuantity,
             null,
-            saved.getRequestedDeliveryDate()));
+            saved.getRequestedDeliveryDate(),
+            snapshotLines));
 
-    return SalesOrderDto.from(saved);
+    TradingPartnerDto partner =
+        partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
+    List<SalesOrderLineResponse> lineResponses =
+        orderLines.stream().map(this::mapLineToResponse).toList();
+    return SalesOrderDto.from(saved, partner, lineResponses);
   }
 
   /**

@@ -111,11 +111,14 @@ CREATE TABLE IF NOT EXISTS flowboard.task
     priority        VARCHAR(10)  NOT NULL    DEFAULT 'MEDIUM', -- LOW/MEDIUM/HIGH/CRITICAL
     priority_score  INT          NOT NULL    DEFAULT 0,
     deadline        DATE,
+    is_deadline_warning_fired BOOLEAN NOT NULL DEFAULT FALSE,
     estimated_hours NUMERIC(6,2),
     actual_hours    NUMERIC(6,2)             DEFAULT 0,        -- TaskTimeEntry'lerden toplam
     status          VARCHAR(20)  NOT NULL    DEFAULT 'BACKLOG',
     entity_type     VARCHAR(50),             -- SALES_ORDER/WORK_ORDER/BATCH/...
     entity_id       UUID,                   -- polimorfik FK
+    source_type     VARCHAR(30)  DEFAULT 'MANUAL',
+    source_id       UUID,
     started_at      TIMESTAMPTZ,            -- ilk IN_PROGRESS geçişi
     completed_at    TIMESTAMPTZ,            -- DONE geçişi
     is_active       BOOLEAN      NOT NULL    DEFAULT TRUE,

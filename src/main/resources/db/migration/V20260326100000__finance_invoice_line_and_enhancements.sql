@@ -36,11 +36,14 @@ CREATE TABLE IF NOT EXISTS finance.finance_invoice_line (
     line_discount   NUMERIC(19,4) DEFAULT 0,
     line_total      NUMERIC(19,4) NOT NULL,
     notes           VARCHAR(500),
-    is_active       BOOLEAN DEFAULT TRUE,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now(),
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by      UUID,
-    updated_by      UUID
+    updated_by      UUID,
+    deleted_at      TIMESTAMPTZ,
+    deleted_by      UUID,
+    version         BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_invl_invoice ON finance.finance_invoice_line(invoice_id);

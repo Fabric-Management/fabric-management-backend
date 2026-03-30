@@ -45,13 +45,13 @@ public class ApprovalRequest extends BaseEntity {
   private UUID approverId;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "status", nullable = false, length = 20)
+  @Column(name = "status", nullable = false, length = 32)
   private ApprovalRequestStatus status = ApprovalRequestStatus.PENDING;
 
   @Column(name = "approved_at")
   private OffsetDateTime approvedAt;
 
-  @Column(name = "rejection_reason", columnDefinition = "TEXT")
+  @Column(name = "rejection_reason")
   private String rejectionReason;
 
   @Column(name = "expires_at")

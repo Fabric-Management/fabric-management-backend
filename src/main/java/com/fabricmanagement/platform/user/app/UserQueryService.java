@@ -5,6 +5,7 @@ import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -96,6 +97,20 @@ public class UserQueryService {
   @Transactional(readOnly = true)
   public boolean exists(UUID tenantId, UUID userId) {
     return userRepository.existsByTenantIdAndId(tenantId, userId);
+  }
+
+  /**
+   * Aktif kullanıcıların id'lerini verilen rol kodlarına göre döner (ör. bildirim yedek alıcıları).
+   */
+  @Transactional(readOnly = true)
+  public List<UUID> findActiveUserIdsByRoleCodes(UUID tenantId, Collection<String> roleCodes) {
+    if (roleCodes == null || roleCodes.isEmpty()) {
+      return List.of();
+    }
+    return userRepository.findByTenantIdAndRole_RoleCodeIn(tenantId, roleCodes).stream()
+        .map(User::getId)
+        .distinct()
+        .toList();
   }
 
   /**

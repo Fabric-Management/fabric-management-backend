@@ -10,6 +10,7 @@ import com.fabricmanagement.approval.infra.repository.UserPromotionRequestReposi
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.platform.approval.domain.event.PromotionEscalationEvent;
 import com.fabricmanagement.platform.user.app.UserService;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.List;
@@ -41,10 +42,22 @@ public class UserPromotionService {
    */
   @Transactional
   public void checkAndTriggerPromotion(UUID tenantId, UUID userId, int threshold) {
-    User user =
-        userRepo
-            .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    if (userId == null || SystemUser.ID.equals(userId)) {
+      log.debug(
+          "Promotion check skipped: no real requester user (tenant={}, userId={})",
+          tenantId,
+          userId);
+      return;
+    }
+
+    User user = userRepo.findByTenantIdAndId(tenantId, userId).orElse(null);
+    if (user == null) {
+      log.debug(
+          "Promotion check skipped: user not found in tenant (tenant={}, userId={})",
+          tenantId,
+          userId);
+      return;
+    }
 
     // TRUSTED olanların daha yükseleceği yer yok
     if (user.getTrustLevel() == UserTrustLevel.TRUSTED) return;

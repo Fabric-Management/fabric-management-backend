@@ -43,15 +43,22 @@ class NotificationItemProcessorTest {
   private static final String EVENT_TYPE = "BATCH_QC_FAILED";
 
   private NotificationQueue createQueueItem(NotificationChannel channel) {
-    return NotificationQueue.create(
-        TENANT_ID,
-        RECIPIENT_ID,
-        EVENT_TYPE,
-        channel,
-        NotificationImportance.CRITICAL,
-        NotificationDeliveryType.INSTANT,
-        Map.of("batchCode", "B-001"),
-        "TR");
+    var q =
+        NotificationQueue.create(
+            TENANT_ID,
+            RECIPIENT_ID,
+            EVENT_TYPE,
+            channel,
+            NotificationImportance.CRITICAL,
+            NotificationDeliveryType.INSTANT,
+            Map.of("batchCode", "B-001"),
+            "TR");
+    q.setId(UUID.randomUUID());
+    return q;
+  }
+
+  private void stubLockedQueueRow(NotificationQueue item) {
+    when(queueRepo.findByIdWithWriteLock(item.getId())).thenReturn(Optional.of(item));
   }
 
   @Nested
@@ -68,8 +75,9 @@ class NotificationItemProcessorTest {
           .thenReturn(Optional.of(template));
       when(translationService.translateAndRender(any(), any(), any(), any()))
           .thenReturn("Rendered text");
+      stubLockedQueueRow(item);
 
-      processor.processItem(item);
+      processor.processItem(item.getId());
 
       assertThat(item.getStatus()).isEqualTo(NotificationQueueStatus.SENT);
       assertThat(item.getProcessedAt()).isNotNull();
@@ -91,8 +99,9 @@ class NotificationItemProcessorTest {
           .thenReturn("Email body");
       when(userQueryService.findEmailByUserId(RECIPIENT_ID))
           .thenReturn(Optional.of("user@test.com"));
+      stubLockedQueueRow(item);
 
-      processor.processItem(item);
+      processor.processItem(item.getId());
 
       verify(emailSender).send("user@test.com", "Email body", "Email body");
       assertThat(item.getStatus()).isEqualTo(NotificationQueueStatus.SENT);
@@ -103,8 +112,9 @@ class NotificationItemProcessorTest {
     void should_mark_failed_when_no_template() {
       var item = createQueueItem(NotificationChannel.IN_APP);
       when(templateRepo.findByEventTypeAndChannel(anyString(), any())).thenReturn(Optional.empty());
+      stubLockedQueueRow(item);
 
-      processor.processItem(item);
+      processor.processItem(item.getId());
 
       // İlk markFailed: retryCount=1 → hâlâ PENDING
       assertThat(item.getRetryCount()).isEqualTo(1);
@@ -122,8 +132,9 @@ class NotificationItemProcessorTest {
           .thenReturn(Optional.of(template));
       when(translationService.translateAndRender(any(), any(), any(), any())).thenReturn("Title");
       doThrow(new RuntimeException("WebSocket down")).when(inAppSender).send(any(), anyMap());
+      stubLockedQueueRow(item);
 
-      processor.processItem(item);
+      processor.processItem(item.getId());
 
       assertThat(item.getRetryCount()).isEqualTo(1);
       assertThat(item.getLastError()).contains("WebSocket down");
@@ -140,8 +151,9 @@ class NotificationItemProcessorTest {
       when(translationService.translateAndRender(any(), any(), any(), any())).thenReturn("Title");
       String longError = "X".repeat(600);
       doThrow(new RuntimeException(longError)).when(inAppSender).send(any(), anyMap());
+      stubLockedQueueRow(item);
 
-      processor.processItem(item);
+      processor.processItem(item.getId());
 
       assertThat(item.getLastError()).hasSize(503); // 500 + "..."
       assertThat(item.getLastError()).endsWith("...");
@@ -158,8 +170,9 @@ class NotificationItemProcessorTest {
       when(translationService.translateAndRender(any(), any(), any(), any()))
           .thenReturn("Push text");
       when(userQueryService.findPushTokenByUserId(RECIPIENT_ID)).thenReturn(Optional.empty());
+      stubLockedQueueRow(item);
 
-      processor.processItem(item);
+      processor.processItem(item.getId());
 
       assertThat(item.getStatus()).isEqualTo(NotificationQueueStatus.SENT);
       verify(logRepo).save(any(NotificationLog.class));
@@ -190,8 +203,10 @@ class NotificationItemProcessorTest {
       when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.IN_APP))
           .thenReturn(Optional.of(template));
       when(translationService.translateAndRender(any(), any(), any(), any())).thenReturn("Text");
+      item.setId(UUID.randomUUID());
+      stubLockedQueueRow(item);
 
-      processor.processItem(item);
+      processor.processItem(item.getId());
 
       ArgumentCaptor<NotificationLog> logCaptor = ArgumentCaptor.forClass(NotificationLog.class);
       verify(logRepo).save(logCaptor.capture());

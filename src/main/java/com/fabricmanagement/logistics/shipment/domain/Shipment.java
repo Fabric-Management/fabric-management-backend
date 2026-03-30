@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.*;
@@ -84,6 +86,14 @@ public class Shipment extends BaseEntity {
   @Column(name = "status", nullable = false, length = 30)
   @Builder.Default
   private ShipmentStatus status = ShipmentStatus.PENDING;
+
+  @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Builder.Default
+  private List<ShipmentLine> lines = new ArrayList<>();
+
+  public void addLine(ShipmentLine line) {
+    this.lines.add(line);
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Carrier & Tracking

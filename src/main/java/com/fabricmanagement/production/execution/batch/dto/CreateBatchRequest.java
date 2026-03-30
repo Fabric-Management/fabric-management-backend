@@ -74,4 +74,8 @@ public class CreateBatchRequest {
   private String fiberGrade;
   private String fiberShade;
   private String organicCertNo;
+
+  // ── Source Tracking ──
+  private com.fabricmanagement.production.execution.batch.domain.BatchSourceType sourceType;
+  private UUID sourceId;
 }

@@ -64,9 +64,18 @@ CREATE INDEX idx_count_line_count ON iwm.stock_count_line(stock_count_id);
 -- 3. StockCountAssignee
 CREATE TABLE IF NOT EXISTS iwm.stock_count_assignee (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    uid VARCHAR(100) UNIQUE,
     stock_count_id UUID NOT NULL,
     user_id UUID NOT NULL,
-    assigned_zone VARCHAR(100)
+    assigned_zone VARCHAR(100),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID,
+    updated_by UUID,
+    version BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX idx_count_assignee_count ON iwm.stock_count_assignee(stock_count_id);

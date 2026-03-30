@@ -74,7 +74,7 @@ public class User extends BaseEntity {
   private UserType userType = UserType.INTERNAL;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "trust_level", nullable = false, length = 50)
+  @Column(name = "trust_level", nullable = false, length = 32)
   @Builder.Default
   private com.fabricmanagement.approval.domain.UserTrustLevel trustLevel =
       com.fabricmanagement.approval.domain.UserTrustLevel.PROBATION;

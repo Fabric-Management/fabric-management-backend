@@ -23,25 +23,25 @@ public class UserPromotionRequest extends BaseEntity {
   private UUID userId;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "from_level", nullable = false, length = 50)
+  @Column(name = "from_level", nullable = false, length = 32)
   private UserTrustLevel fromLevel;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "to_level", nullable = false, length = 50)
+  @Column(name = "to_level", nullable = false, length = 32)
   private UserTrustLevel toLevel;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "status", nullable = false, length = 20)
+  @Column(name = "status", nullable = false, length = 32)
   private PromotionRequestStatus status = PromotionRequestStatus.PENDING;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "triggered_by", nullable = false, length = 50)
+  @Column(name = "triggered_by", nullable = false, length = 32)
   private PromotionTriggerType triggeredBy;
 
   @Column(name = "reviewed_by")
   private UUID reviewedBy;
 
-  @Column(name = "admin_note", columnDefinition = "TEXT")
+  @Column(name = "admin_note")
   private String adminNote;
 
   @Column(name = "rejection_count", nullable = false)

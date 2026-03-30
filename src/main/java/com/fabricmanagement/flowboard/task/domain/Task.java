@@ -106,10 +106,6 @@ public class Task extends BaseEntity {
   @Column(name = "is_deadline_warning_fired", nullable = false)
   private Boolean isDeadlineWarningFired = false;
 
-  @Version
-  @Column(name = "version", nullable = false)
-  private Long version = 0L;
-
   @Override
   protected String getModuleCode() {
     return "TSK";

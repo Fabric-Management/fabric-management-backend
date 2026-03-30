@@ -1,5 +1,7 @@
 -- PurchaseOrder + PurchaseOrderLine tables: V20260317141000
 
+CREATE SCHEMA IF NOT EXISTS procurement;
+
 CREATE TABLE IF NOT EXISTS procurement.purchase_order (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,

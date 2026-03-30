@@ -28,7 +28,9 @@ public record CreateBatchCommand(
     UUID locationId,
     UUID qualityStandardId,
     String remarks,
-    Map<String, Object> attributes) {
+    Map<String, Object> attributes,
+    BatchSourceType sourceType,
+    UUID sourceId) {
 
   /** Compact constructor — validates required fields eagerly. */
   public CreateBatchCommand {

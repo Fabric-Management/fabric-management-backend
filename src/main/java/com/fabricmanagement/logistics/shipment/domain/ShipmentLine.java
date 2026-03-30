@@ -46,6 +46,10 @@ public class ShipmentLine extends BaseEntity {
   @JoinColumn(name = "shipment_id", insertable = false, updatable = false)
   private Shipment shipment;
 
+  /** Sipariş satırı sırası (Ör: 1, 2, 3...) */
+  @Column(name = "line_number", nullable = false)
+  private Integer lineNumber;
+
   /** Neden sevk ediliyor? İlgili satış siparişi satırı referansı. */
   @Column(name = "sales_order_line_id", nullable = false)
   private UUID salesOrderLineId;
@@ -70,8 +74,13 @@ public class ShipmentLine extends BaseEntity {
 
   @Builder
   public ShipmentLine(
-      UUID shipmentId, UUID salesOrderLineId, BigDecimal quantity, ShipmentUnit unit) {
+      UUID shipmentId,
+      Integer lineNumber,
+      UUID salesOrderLineId,
+      BigDecimal quantity,
+      ShipmentUnit unit) {
     this.shipmentId = shipmentId;
+    this.lineNumber = lineNumber;
     this.salesOrderLineId = salesOrderLineId;
     this.quantity = quantity;
     this.unit = unit;
@@ -84,8 +93,15 @@ public class ShipmentLine extends BaseEntity {
     return "SHL";
   }
 
-  public void addBatch(UUID batchId, BigDecimal batchQuantity) {
-    ShipmentLineBatch lineBatch = new ShipmentLineBatch(this, batchId, batchQuantity);
+  public BigDecimal totalLoadedQuantity() {
+    return batches.stream()
+        .map(ShipmentLineBatch::getQuantity)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  public void addBatch(UUID batchId, BigDecimal batchQuantity, String qualityGradeSnapshot) {
+    ShipmentLineBatch lineBatch =
+        new ShipmentLineBatch(this, batchId, batchQuantity, qualityGradeSnapshot);
     this.batches.add(lineBatch);
   }
 

@@ -22,6 +22,14 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
   private final BigDecimal totalQuantity;
   private final String unit;
   private final LocalDate requestedDeliveryDate;
+  private final java.util.List<SalesOrderLineSnapshot> lines;
+
+  public record SalesOrderLineSnapshot(
+      UUID lineId,
+      String productCode,
+      BigDecimal quantity,
+      String unit,
+      LocalDate requestedDeliveryDate) {}
 
   public SalesOrderConfirmedEvent(
       UUID tenantId,
@@ -31,7 +39,8 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
       String customerName,
       BigDecimal totalQuantity,
       String unit,
-      LocalDate requestedDeliveryDate) {
+      LocalDate requestedDeliveryDate,
+      java.util.List<SalesOrderLineSnapshot> lines) {
     super(tenantId, "SalesOrderConfirmed");
     this.salesOrderId = salesOrderId;
     this.orderNumber = orderNumber;
@@ -40,5 +49,6 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
     this.totalQuantity = totalQuantity;
     this.unit = unit;
     this.requestedDeliveryDate = requestedDeliveryDate;
+    this.lines = lines != null ? lines : java.util.Collections.emptyList();
   }
 }

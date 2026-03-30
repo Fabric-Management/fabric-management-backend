@@ -7,8 +7,11 @@ import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
 
@@ -44,6 +47,7 @@ public class ShipmentDto {
   private String recipientName;
   private String notes;
   private Map<String, Object> metadata;
+  private List<ShipmentLineDto> lines;
   private Boolean isActive;
   private Boolean isLate;
   private Instant createdAt;
@@ -85,6 +89,12 @@ public class ShipmentDto {
         .recipientName(shipment.getRecipientName())
         .notes(shipment.getNotes())
         .metadata(shipment.getMetadata())
+        .lines(
+            shipment.getLines() != null
+                ? shipment.getLines().stream()
+                    .map(ShipmentLineDto::from)
+                    .collect(Collectors.toList())
+                : Collections.emptyList())
         .isActive(shipment.getIsActive())
         .isLate(shipment.isLate())
         .createdAt(shipment.getCreatedAt())

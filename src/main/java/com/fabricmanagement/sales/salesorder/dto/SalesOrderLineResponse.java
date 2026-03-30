@@ -18,6 +18,7 @@ public class SalesOrderLineResponse {
   UUID materialId;
   String productDesc;
   BigDecimal requestedQty;
+  BigDecimal shippedQty;
   String unit;
   BigDecimal unitPrice;
   String currency;

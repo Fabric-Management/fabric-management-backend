@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.inventory.app.command;
 
+import com.fabricmanagement.production.execution.inventory.api.facade.InventoryFacade;
 import com.fabricmanagement.production.execution.inventory.domain.InventoryTransaction;
 import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionReasonCode;
 import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionType;
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class InventoryTransactionCommandService {
+public class InventoryTransactionCommandService implements InventoryFacade {
 
   private final InventoryTransactionRepository inventoryTransactionRepository;
   private final ApplicationEventPublisher eventPublisher;

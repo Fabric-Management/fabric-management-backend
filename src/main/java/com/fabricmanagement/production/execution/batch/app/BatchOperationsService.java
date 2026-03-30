@@ -130,7 +130,9 @@ public class BatchOperationsService {
                 request.getLocationId(),
                 null,
                 request.getRemarks(),
-                new HashMap<>()));
+                new HashMap<>(),
+                request.getSourceType(),
+                request.getSourceId()));
     childBatch.setStatus(BatchStatus.AVAILABLE);
     Batch savedChild = batchRepository.save(childBatch);
 
@@ -290,7 +292,9 @@ public class BatchOperationsService {
                 request.getReason(),
                 sourceBatch.getAttributes() != null
                     ? new HashMap<>(sourceBatch.getAttributes())
-                    : new HashMap<>()));
+                    : new HashMap<>(),
+                sourceBatch.getSourceType(),
+                sourceBatch.getSourceId()));
     childBatch.setParentBatchId(sourceBatch.getId());
     childBatch.setStatus(BatchStatus.AVAILABLE);
     Batch savedChild = batchRepository.save(childBatch);
@@ -404,7 +408,9 @@ public class BatchOperationsService {
                 request.getReason(),
                 sourceBatch.getAttributes() != null
                     ? new HashMap<>(sourceBatch.getAttributes())
-                    : new HashMap<>()));
+                    : new HashMap<>(),
+                sourceBatch.getSourceType(),
+                sourceBatch.getSourceId()));
     childBatch.setParentBatchId(sourceBatch.getId());
     childBatch.setStatus(BatchStatus.AVAILABLE);
     Batch savedChild = batchRepository.save(childBatch);

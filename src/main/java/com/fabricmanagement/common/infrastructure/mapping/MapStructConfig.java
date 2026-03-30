@@ -14,7 +14,7 @@ import org.mapstruct.ReportingPolicy;
  * <ul>
  *   <li><b>componentModel = "spring":</b> Generate Spring beans (@Component)
  *   <li><b>unmappedTargetPolicy = ERROR:</b> Fail on unmapped fields (safety)
- *   <li><b>unmappedSourcePolicy = WARN:</b> Warn on unmapped source fields
+ *   <li><b>unmappedSourcePolicy = IGNORE:</b> Ignore unmapped source fields to prevent warning spam
  * </ul>
  *
  * <h2>Usage Example:</h2>
@@ -43,5 +43,5 @@ import org.mapstruct.ReportingPolicy;
 @MapperConfig(
     componentModel = "spring",
     unmappedTargetPolicy = ReportingPolicy.ERROR,
-    unmappedSourcePolicy = ReportingPolicy.WARN)
+    unmappedSourcePolicy = ReportingPolicy.IGNORE)
 public interface MapStructConfig {}

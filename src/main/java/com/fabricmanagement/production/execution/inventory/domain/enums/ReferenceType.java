@@ -10,5 +10,6 @@ public enum ReferenceType {
   RESERVATION,
   BATCH,
   WAREHOUSE_LOCATION,
-  PRODUCTION
+  PRODUCTION,
+  SHIPMENT
 }

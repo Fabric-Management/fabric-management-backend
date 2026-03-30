@@ -2,6 +2,7 @@ package com.fabricmanagement.approval.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -19,8 +20,10 @@ import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,10 +41,18 @@ class ApprovalGuardServiceTest {
   @Mock private ApprovalPolicyService policyService;
   @Mock private ApprovalRequestRepository requestRepo;
   @Mock private UserRepository userRepo;
+  @Mock private ApproverRecipientResolver approverRecipientResolver;
   @Mock private DomainEventPublisher eventPublisher;
   @Spy private Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
 
   @InjectMocks private ApprovalGuardService guardService;
+
+  @BeforeEach
+  void stubApproverRecipients() {
+    lenient()
+        .when(approverRecipientResolver.resolveUsersForApproverRole(any(), any()))
+        .thenReturn(List.of(UUID.randomUUID()));
+  }
 
   private final UUID tenantId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();

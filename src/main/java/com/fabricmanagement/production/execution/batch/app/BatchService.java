@@ -90,7 +90,9 @@ public class BatchService {
                 request.getLocationId(),
                 qualityStandardId,
                 request.getRemarks(),
-                attributes));
+                attributes,
+                request.getSourceType(),
+                request.getSourceId()));
 
     batch = batchRepository.save(batch);
 

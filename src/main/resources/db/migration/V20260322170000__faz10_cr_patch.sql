@@ -28,37 +28,37 @@ ALTER TABLE iwm.stock_count_assignee ADD COLUMN IF NOT EXISTS version BIGINT NOT
 -- Not: Bu constraint'ler production ve iwm şemaları arası bağımlılık yaratır.
 -- Mikroservis ayrımı yapılacaksa bu satırlar kaldırılabilir.
 ALTER TABLE iwm.stock_reservation
-  ADD CONSTRAINT IF NOT EXISTS fk_stock_res_location
+  ADD CONSTRAINT fk_stock_res_location
   FOREIGN KEY (location_id) REFERENCES iwm.warehouse_location(id);
 
 ALTER TABLE iwm.stock_count
-  ADD CONSTRAINT IF NOT EXISTS fk_stock_count_location
+  ADD CONSTRAINT fk_stock_count_location
   FOREIGN KEY (location_id) REFERENCES iwm.warehouse_location(id);
 
 ALTER TABLE iwm.stock_transfer
-  ADD CONSTRAINT IF NOT EXISTS fk_stock_transfer_from_loc
+  ADD CONSTRAINT fk_stock_transfer_from_loc
   FOREIGN KEY (from_location_id) REFERENCES iwm.warehouse_location(id);
 
 ALTER TABLE iwm.stock_transfer
-  ADD CONSTRAINT IF NOT EXISTS fk_stock_transfer_to_loc
+  ADD CONSTRAINT fk_stock_transfer_to_loc
   FOREIGN KEY (to_location_id) REFERENCES iwm.warehouse_location(id);
 
 ALTER TABLE iwm.rma_line
-  ADD CONSTRAINT IF NOT EXISTS fk_rma_line_rma
+  ADD CONSTRAINT fk_rma_line_rma
   FOREIGN KEY (rma_id) REFERENCES iwm.rma(id);
 
 ALTER TABLE iwm.stock_count_line
-  ADD CONSTRAINT IF NOT EXISTS fk_count_line_count
+  ADD CONSTRAINT fk_count_line_count
   FOREIGN KEY (stock_count_id) REFERENCES iwm.stock_count(id);
 
 ALTER TABLE iwm.stock_count_assignee
-  ADD CONSTRAINT IF NOT EXISTS fk_count_assignee_count
+  ADD CONSTRAINT fk_count_assignee_count
   FOREIGN KEY (stock_count_id) REFERENCES iwm.stock_count(id);
 
 ALTER TABLE iwm.min_stock_rule
-  ADD CONSTRAINT IF NOT EXISTS fk_min_stock_location
+  ADD CONSTRAINT fk_min_stock_location
   FOREIGN KEY (location_id) REFERENCES iwm.warehouse_location(id);
 
 ALTER TABLE iwm.stock_adjustment_request
-  ADD CONSTRAINT IF NOT EXISTS fk_adj_req_location
+  ADD CONSTRAINT fk_adj_req_location
   FOREIGN KEY (location_id) REFERENCES iwm.warehouse_location(id);

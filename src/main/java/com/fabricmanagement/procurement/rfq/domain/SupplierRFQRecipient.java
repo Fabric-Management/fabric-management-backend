@@ -19,7 +19,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class SupplierRFQRecipient extends BaseEntity {
 
-  @Column(name = "rfq_id", nullable = false)
+  @Column(name = "rfq_id", nullable = false, insertable = false, updatable = false)
   private UUID rfqId;
 
   @Column(name = "trading_partner_id", nullable = false)

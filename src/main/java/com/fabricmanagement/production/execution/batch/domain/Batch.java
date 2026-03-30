@@ -5,7 +5,12 @@ import com.fabricmanagement.production.common.exception.InsufficientStockExcepti
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -63,13 +68,16 @@ public class Batch extends BaseEntity {
   private BigDecimal quantity;
 
   @Column(name = "reserved_quantity", nullable = false, precision = 15, scale = 3)
-  private BigDecimal reservedQuantity;
+  @Builder.Default
+  private BigDecimal reservedQuantity = BigDecimal.ZERO;
 
   @Column(name = "consumed_quantity", nullable = false, precision = 15, scale = 3)
-  private BigDecimal consumedQuantity;
+  @Builder.Default
+  private BigDecimal consumedQuantity = BigDecimal.ZERO;
 
   @Column(name = "waste_quantity", nullable = false, precision = 15, scale = 3)
-  private BigDecimal wasteQuantity;
+  @Builder.Default
+  private BigDecimal wasteQuantity = BigDecimal.ZERO;
 
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
@@ -106,6 +114,19 @@ public class Batch extends BaseEntity {
   @Column(name = "remarks", columnDefinition = "TEXT")
   private String remarks;
 
+  @PrePersist
+  private void defaultQuantityColumnsIfNull() {
+    if (reservedQuantity == null) {
+      reservedQuantity = BigDecimal.ZERO;
+    }
+    if (consumedQuantity == null) {
+      consumedQuantity = BigDecimal.ZERO;
+    }
+    if (wasteQuantity == null) {
+      wasteQuantity = BigDecimal.ZERO;
+    }
+  }
+
   /**
    * Create a new batch from a {@link CreateBatchCommand}.
    *
@@ -130,6 +151,8 @@ public class Batch extends BaseEntity {
     batch.setLocationId(cmd.locationId());
     batch.setQualityStandardId(cmd.qualityStandardId());
     batch.setRemarks(cmd.remarks());
+    batch.setSourceType(cmd.sourceType());
+    batch.setSourceId(cmd.sourceId());
     batch.setAttributes(
         cmd.attributes() != null
             ? new java.util.HashMap<>(cmd.attributes())
@@ -171,7 +194,9 @@ public class Batch extends BaseEntity {
             locationId,
             qualityStandardId,
             remarks,
-            attributes));
+            attributes,
+            null,
+            null));
   }
 
   /**
