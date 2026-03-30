@@ -2,10 +2,10 @@ package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserDeactivatedEvent;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.CreateAdminUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
@@ -40,7 +40,7 @@ public class UserService implements UserFacade {
   private final UserOnboardingService userOnboardingService;
   private final UserProfileService userProfileService;
   private final UserRepository userRepository;
-  private final EmployeeService employeeService;
+  private final EmployeeProjectionPort employeeProjectionPort;
   private final DomainEventPublisher eventPublisher;
 
   @Transactional
@@ -120,7 +120,7 @@ public class UserService implements UserFacade {
     User saved = userRepository.save(user);
 
     log.info("User updated: id={}, displayName={}", saved.getId(), saved.getDisplayName());
-    return UserDto.from(saved, employeeService.getEmployeeByUserId(userId).orElse(null));
+    return UserDto.from(saved, employeeProjectionPort.findByUserId(userId).orElse(null));
   }
 
   @Transactional

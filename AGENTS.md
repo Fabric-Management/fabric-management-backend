@@ -386,6 +386,68 @@ Yukarıdaki kuralların büyük kısmı **ArchUnit testleriyle** otomatik olarak
 
 ---
 
+## 17. Platform ↔ Human Tenant Decoupling (Employee Projection Port)
+
+`platform/user` modülünün `human/core/employee` modülüne doğrudan binary bağımlılığını (service/entity seviyesinde) engellemek için **Port/Adapter Pattern** ve **Shared Kernel** kullanılır. 
+
+### 17.1 Shared Kernel (`common/infrastructure/identity/`) ✅
+Modüller arası veri değişiminde kullanılan ortak tipler burada tanımlanır:
+- `Gender`, `Title` (Enum)
+- `EmergencyContactData` (Record — immutable)
+
+### 17.2 Port Pattern (Platform Domain) ✅
+Platform modülü, HR verisine ihtiyaç duyduğunda `human` modülüne sormaz; kendi domain'inde bir interface (Port) ve veri modeli (Snapshot) tanımlar.
+- `EmployeeProjectionPort`: Veri okuma (findByUserId, findByUserIds)
+- `EmployeeCreationPort`: Veri oluşturma / lifecycle
+- `EmployeeSnapshot`: Platform modülüne özel read-only veri modeli (Record)
+
+### 17.3 Adapter Implementation (Human App) ✅
+Human modülü, platform'un tanımladığı portları kendi `app/adapter/` klasörü altında implemente eder.
+- `EmployeeProjectionAdapter`: Entity → Snapshot dönüşümünü yapar.
+- `EmployeeCreationAdapter`: `EmployeeService` domain orchestration'ı ile platform taleplerini bağlar.
+
+### 17.4 N+1 Önleme Kuralı ✅
+Kullanıcı listeleri (admin, user search vb.) dönerken employee verisi eklemek için **mutlaka batch-load** (`findByUserIds`) kullanılmalıdır. Stream içinde tek tek `findByUserId` çağrılması **KESİNLİKLE YASAKTIR.**
+
+## 18. Platform/AI ↔ Production Decoupling (AI Tool Registry Pattern)
+
+`platform/ai` modülünün production altyapısına (repository, entity) doğrudan bağımlılığını 
+engellemek için **AI Tool Registry Pattern** kullanılır.
+
+### 18.1 Shared Infrastructure (`common/infrastructure/ai/`) ✅
+- `AIToolProvider` — domain provider'ların implement ettiği interface (`getSupportedTools()`, `execute()`)
+- `AIQueryNormalizer` — Türkçe→İngilizce fiber terminoloji çevirisi (pamuk→cotton, vb.)
+
+### 18.2 Registry (`platform/ai/app/`) ✅
+- `AIToolRegistry` — Tüm `AIToolProvider` bean'lerini Spring injection ile toplar.
+  Sonuç cachelemesi (60 sn TTL) burada yönetilir. `create_*` araçları cache'lenmez.
+- `AIFunctionCaller` — Saf entry point; yalnızca `TenantContext`'ten tenantId okur ve 
+  `toolRegistry.execute()` 'e delege eder.
+
+### 18.3 Domain Providers (Adapter) ✅
+Her domain kendi AI araçlarını kendi `app/adapter/` altında implement eder:
+- `FiberAIToolProvider` → `search_fibers`, `get_fiber_info`, `list_fiber_categories`, `create_fiber`
+- `MaterialAIToolProvider` → `check_material_stock`, `create_material`, `search_materials`, `get_production_status`
+- `SmartSearchAIToolProvider` (`platform/ai/app/adapter/`) → `smart_search` (cross-domain orkestrasyon)
+
+### 18.4 Circular Dependency Çözümü ✅
+`SmartSearchAIToolProvider` `AIToolRegistry`'ye bağımlıdır — ancak `AIToolRegistry` 
+tüm provider'ları (SmartSearch dahil) toplar. Circular dependency `ObjectProvider<AIToolRegistry>` 
+ile çözülür: Spring lazy proxy ile initialization sırasında circular dep oluşmaz.
+
+### 18.5 ArchUnit Rule 11.4 ✅
+`platform/ai` modülü production altyapısına (`..production..infra..`) doğrudan erişemez.
+Facade (`api/facade/`) ve DTO kullanımı serbesttir.
+
+### 18.6 Kural: Yeni AI Aracı Eklemek
+1. İlgili domain modülünde `app/adapter/XxxAIToolProvider.java` oluştur (`AIToolProvider` implement et)
+2. `getSupportedTools()` içinde araç adını kaydet
+3. `execute()` içinde işlemi kendi facade'ı üzerinden gerçekleştir
+4. Unit test yaz (`XxxAIToolProviderTest`)
+5. `AIFunctionCaller`'a **kesinlikle dokunma** — araç otomatik olarak kayıt olur
+
+---
+
 ## Commits
 
 Format: `type(scope): description`

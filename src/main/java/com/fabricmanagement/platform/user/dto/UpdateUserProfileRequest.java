@@ -1,7 +1,7 @@
 package com.fabricmanagement.platform.user.dto;
 
-import com.fabricmanagement.human.core.employee.domain.Gender;
-import com.fabricmanagement.human.core.employee.domain.Title;
+import com.fabricmanagement.common.infrastructure.identity.Gender;
+import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.platform.user.domain.value.ProfileCategory;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;

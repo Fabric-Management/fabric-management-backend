@@ -1,5 +1,7 @@
 package com.fabricmanagement.human.core.employee.domain;
 
+import com.fabricmanagement.common.infrastructure.identity.Gender;
+import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;

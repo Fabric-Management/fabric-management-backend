@@ -2,8 +2,6 @@ package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
-import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.platform.communication.app.AddressService;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.AddressType;
@@ -15,6 +13,7 @@ import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserOnboardingCompletedEvent;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.OnboardingStatusResponse;
 import com.fabricmanagement.platform.user.dto.UserDto;
@@ -45,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserOnboardingService {
 
   private final UserRepository userRepository;
-  private final EmployeeService employeeService;
+  private final EmployeeProjectionPort employeeProjectionPort;
   private final DomainEventPublisher eventPublisher;
   private final OrganizationService organizationService;
   private final AddressService addressService;
@@ -94,8 +93,7 @@ public class UserOnboardingService {
       if (request != null) {
         applyEnrichment(tenantId, request);
       }
-      Employee employee = employeeService.getEmployeeByUserId(userId).orElse(null);
-      return UserDto.from(user, employee);
+      return UserDto.from(user, employeeProjectionPort.findByUserId(userId).orElse(null));
     }
 
     if (request != null) {
@@ -109,8 +107,7 @@ public class UserOnboardingService {
 
     log.info("Onboarding completed: userId={}, uid={}", saved.getId(), saved.getUid());
 
-    Employee employee = employeeService.getEmployeeByUserId(saved.getId()).orElse(null);
-    return UserDto.from(saved, employee);
+    return UserDto.from(saved, employeeProjectionPort.findByUserId(saved.getId()).orElse(null));
   }
 
   @Transactional(readOnly = true)

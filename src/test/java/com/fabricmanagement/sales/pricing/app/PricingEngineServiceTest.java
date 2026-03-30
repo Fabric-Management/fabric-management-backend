@@ -1,8 +1,7 @@
-package com.fabricmanagement.sales.app;
+package com.fabricmanagement.sales.pricing.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fabricmanagement.sales.pricing.app.PricingEngineService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
 import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;

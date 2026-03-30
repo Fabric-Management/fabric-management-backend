@@ -429,6 +429,47 @@ public class FiberService implements FiberFacade {
         .toList();
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public List<FiberDto> findByNameContaining(String query) {
+    return searchByName(query);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<FiberCategoryDto> listActiveCategories() {
+    return fiberCategoryRepository.findByIsActiveTrue().stream()
+        .map(FiberCategoryDto::from)
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<FiberDto> findByMaterialIds(java.util.Collection<java.util.UUID> materialIds) {
+    if (materialIds == null || materialIds.isEmpty()) {
+      return java.util.List.of();
+    }
+
+    // Step 1: Fetch tenant fibers (batch SQL query)
+    List<Fiber> tenantFibers =
+        fiberRepository.findByMaterialIdIn(new java.util.ArrayList<>(materialIds));
+
+    // Step 2: Fetch system/global fibers (available to all tenants)
+    java.util.UUID systemTenantId =
+        com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID;
+    List<Fiber> systemFibers =
+        fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId).stream()
+            .filter(f -> f.getMaterial() != null && materialIds.contains(f.getMaterial().getId()))
+            .toList();
+
+    // Step 3: Combine and map to DTO
+    java.util.List<FiberDto> result = new java.util.ArrayList<>();
+    tenantFibers.stream().map(FiberDto::from).forEach(result::add);
+    systemFibers.stream().map(FiberDto::from).forEach(result::add);
+
+    return result;
+  }
+
   @Transactional
   public FiberDto updateFiber(UUID id, UpdateFiberRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();

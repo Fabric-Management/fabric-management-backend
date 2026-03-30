@@ -1,8 +1,8 @@
 package com.fabricmanagement.platform.user.app;
 
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
-import com.fabricmanagement.human.core.employee.domain.Employee;
+import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.Collection;
@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserQueryService {
 
   private final UserRepository userRepository;
-  private final EmployeeService employeeService;
+  private final EmployeeProjectionPort employeeProjectionPort;
   private final UserWorkLocationService userWorkLocationService;
 
   @Transactional(readOnly = true)
@@ -43,7 +43,7 @@ public class UserQueryService {
         .map(
             user -> {
               UserDto dto =
-                  UserDto.from(user, employeeService.getEmployeeByUserId(userId).orElse(null));
+                  UserDto.from(user, employeeProjectionPort.findByUserId(userId).orElse(null));
               Map<UUID, String> labelMap =
                   userWorkLocationService.getPrimaryLocationLabels(tenantId, List.of(userId));
               dto.setWorkLocationLabel(labelMap.get(userId));
@@ -58,7 +58,7 @@ public class UserQueryService {
         .findByContactValue(contactValue)
         .map(
             user ->
-                UserDto.from(user, employeeService.getEmployeeByUserId(user.getId()).orElse(null)));
+                UserDto.from(user, employeeProjectionPort.findByUserId(user.getId()).orElse(null)));
   }
 
   @Transactional(readOnly = true)
@@ -141,7 +141,8 @@ public class UserQueryService {
       return List.of();
     }
     List<UUID> userIds = users.stream().map(User::getId).toList();
-    Map<UUID, Employee> employeeMap = employeeService.getEmployeesByUserIds(tenantId, userIds);
+    Map<UUID, EmployeeSnapshot> employeeMap =
+        employeeProjectionPort.findByUserIds(tenantId, userIds);
     Map<UUID, String> labelMap =
         userWorkLocationService.getPrimaryLocationLabels(tenantId, userIds);
 

@@ -438,13 +438,12 @@ class ConstitutionArchTest {
     @Test
     @DisplayName("Rule 11.2: Domain modules can depend on platform, not vice versa")
     void platformShouldNotDependOnDomainModules() {
-      // Existing violations (numerous, grouped into 6 main class clusters):
-      //   - platform/user -> human/core/employee
-      //   - platform/admin -> human/core/employee
+      // Existing violations (reduced 2026-03-30: platform user/admin/auth use employee ports):
+      //   - platform/user -> human (only Employee*Event listeners + UserCacheInvalidationService;
+      //     see Rule 11.3)
       //   - platform/ai -> production/masterdata/fiber + material
       //   - platform/tradingpartner -> production/masterdata/fiber
       //   - platform/organization -> production/masterdata/fiber
-      //   - platform/auth -> human/core/employee (PasswordSetupService)
 
       ArchRule rule =
           noClasses()
@@ -480,6 +479,44 @@ class ConstitutionArchTest {
                   "Rule 11.2: Platform modules must not depend on domain modules"
                       + " (one-way dependency only)."
                       + " (6 platform sub-modules frozen)");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("Rule 11.3: platform/user must not depend on human except event listeners")
+    void platformUserShouldNotImportHumanDirectly() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.platform.user..")
+              .and()
+              .haveSimpleNameNotEndingWith("EventListener")
+              .and()
+              .doNotHaveSimpleName("UserCacheInvalidationService")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.human..")
+              .as(
+                  "Rule 11.3: platform/user uses ports/adapters for employee data;"
+                      + " human imports are limited to Employee*Event listeners and cache invalidation");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("Rule 11.4: platform/ai must not access production infrastructure directly")
+    void aiModuleShouldNotAccessProductionInfrastructure() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.platform.ai..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.production..infra..")
+              .as(
+                  "Rule 11.4: platform/ai must not access production infrastructure directly (repositories, entities);"
+                      + " it must use facades or AIToolRegistry.");
 
       rule.check(allClasses);
     }
