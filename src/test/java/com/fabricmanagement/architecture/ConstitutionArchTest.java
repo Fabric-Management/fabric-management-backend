@@ -548,6 +548,109 @@ class ConstitutionArchTest {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  // Article 13: Cross-Module Infrastructure Isolation
+  // ═══════════════════════════════════════════════════════════════════
+
+  @Nested
+  @DisplayName("Article 13 — Cross-Module Infrastructure Isolation")
+  class CrossModuleInfrastructureIsolationTests {
+
+    @Test
+    @DisplayName("Rule 13.1: No outside module may access platform's infra layer")
+    void noModuleShouldAccessPlatformInfra() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideOutsideOfPackage("com.fabricmanagement.platform..")
+              .and()
+              .resideOutsideOfPackage("com.fabricmanagement.common..")
+              .and()
+              .doNotHaveSimpleName("InventoryNotificationListener")
+              .and()
+              .doNotHaveSimpleName("ProcurementNotificationListener")
+              .and()
+              .doNotHaveSimpleName("ProductionNotificationListener")
+              .and()
+              .doNotHaveSimpleName("BatchCertificationExpiryCheckJob")
+              .and()
+              .doNotHaveSimpleName("BatchCertificationService")
+              .and()
+              .doNotHaveSimpleName("FiberRequestService")
+              .and()
+              .doNotHaveSimpleName("InvoiceOverdueJob")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.platform..infra..")
+              .as(
+                  "Rule 13.1: No outside module may access platform's infra layer. "
+                      + "(7 frozen class names)");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("Rule 13.2: No outside module may access production's infra layer")
+    void noModuleShouldAccessProductionInfra() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideOutsideOfPackage("com.fabricmanagement.production..")
+              .and()
+              .doNotHaveSimpleName("OrganizationCertificationService")
+              .and()
+              .doNotHaveSimpleName("TradingPartnerCertificationService")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.production..infra..")
+              .as(
+                  "Rule 13.2: No outside module may access production's infra layer. "
+                      + "(2 frozen violations)");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("Rule 13.3: No outside module may access notification's infra layer")
+    void noModuleShouldAccessNotificationInfra() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideOutsideOfPackage("com.fabricmanagement.notification..")
+              .and()
+              .doNotHaveSimpleName("UserLocaleService")
+              .and()
+              .doNotHaveSimpleName("LocalizationService")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.notification..infra..")
+              .as(
+                  "Rule 13.3: No outside module may access notification's infra layer. "
+                      + "(2 frozen violations)");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("Rule 13.4: No outside module may access procurement's infra layer")
+    void noModuleShouldAccessProcurementInfra() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideOutsideOfPackage("com.fabricmanagement.procurement..")
+              .and()
+              .doNotHaveSimpleName("ProcurementNotificationListener")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.procurement..infra..")
+              .as(
+                  "Rule 13.4: No outside module may access procurement's infra layer. "
+                      + "(1 frozen violation)");
+
+      rule.check(allClasses);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // Article 12: WorkOrder Bounded Context Isolation
   // ═══════════════════════════════════════════════════════════════════
 

@@ -544,6 +544,18 @@ Rule 12.3 uygulanırken 3 gizli coupling daha yakalandı:
 
 ---
 
+## 20. Mimari Sağlık Raporu ve Konsolidasyon (Article 13)
+
+Cross-Module alanında en toksik bağımlılık türü "Infrastructure Bypass" durumudur. Bir modülün, başka bir modülün `infra` katmanına (Repository, Entity vb.) doğrudan erişmesi; o modülün business kurallarını (validasyonlar, event publishing) ve app katmanındaki interceptor'ları (tenant isolation, RLS) tamamen devre dışı bırakır.
+
+### Kural 13.1 - 13.4 (Cross-Module Infra Isolation)
+- **HİÇBİR MODÜL** kendi dışındaki bir modülün `.infra..` paketine erişemez. (common/infrastructure istisnadır)
+- İhtiyaç durumunda **Port/Adapter pattern** veya hedef modülün **QueryService/Facade** katmanları kullanılmalıdır.
+- Mevcut 13 ihlal `ConstitutionArchTest.java` içerisinde ilgili sınıflar `.and().doNotHaveSimpleName(...)` ile filtrelenerek dondurulmuştur (frozen state). ArchUnit testleri bu 13 ihlal dışında hiçbir yeni infrastructure-bypass ihlaline izin vermez.
+- İlerleyen dönemlerde bu bypass'lar, sağlayıcı modüllere Adapter yazılarak ve consumer modüllerden Port ile erişilerek sıfırlanacaktır.
+
+---
+
 ## Commits
 
 Format: `type(scope): description`
