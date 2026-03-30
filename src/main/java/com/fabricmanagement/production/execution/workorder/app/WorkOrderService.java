@@ -1,7 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
-import com.fabricmanagement.approval.app.ApprovalGuardService;
-import com.fabricmanagement.approval.domain.ApprovalEntityType;
+import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
@@ -38,7 +37,7 @@ public class WorkOrderService {
   private final BatchFacade batchFacade;
   private final TradingPartnerCertificationService certificationService;
   private final DomainEventPublisher domainEventPublisher;
-  private final ApprovalGuardService approvalGuardService;
+  private final ApprovalPort approvalPort;
 
   /** Retrieves a work order by its UUID. */
   public WorkOrderResponse getWorkOrder(UUID id) {
@@ -121,9 +120,7 @@ public class WorkOrderService {
   public void createFromSalesOrderLine(
       UUID tenantId,
       UUID salesOrderId,
-      com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent
-              .SalesOrderLineSnapshot
-          line) {
+      com.fabricmanagement.production.execution.workorder.dto.IncomingSalesOrderLine line) {
 
     List<WorkOrder> existingForLine =
         workOrderRepository.findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
@@ -165,12 +162,12 @@ public class WorkOrderService {
       workOrder = workOrderRepository.save(workOrder);
     }
 
-    // Business Logic: Use ApprovalGuardService for approval enforcement
+    // Business Logic: Use ApprovalPort for approval enforcement
     boolean needsApproval =
-        approvalGuardService.checkAndEnforceApproval(
+        approvalPort.requiresApproval(
             tenantId,
             com.fabricmanagement.platform.user.domain.SystemUser.ID,
-            ApprovalEntityType.WORK_ORDER,
+            "WORK_ORDER",
             workOrder.getId(),
             48); // 48 hours to expire
 

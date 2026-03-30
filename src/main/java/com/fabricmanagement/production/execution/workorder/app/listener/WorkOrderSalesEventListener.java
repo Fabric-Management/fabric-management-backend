@@ -28,8 +28,17 @@ public class WorkOrderSalesEventListener {
     event
         .getLines()
         .forEach(
-            line ->
-                workOrderService.createFromSalesOrderLine(
-                    event.getTenantId(), event.getSalesOrderId(), line));
+            line -> {
+              var incomingLine =
+                  new com.fabricmanagement.production.execution.workorder.dto
+                      .IncomingSalesOrderLine(
+                      line.lineId(),
+                      line.productCode(),
+                      line.quantity(),
+                      line.unit(),
+                      line.requestedDeliveryDate());
+              workOrderService.createFromSalesOrderLine(
+                  event.getTenantId(), event.getSalesOrderId(), incomingLine);
+            });
   }
 }

@@ -11,11 +11,10 @@ import com.fabricmanagement.approval.domain.PromotionRequestStatus;
 import com.fabricmanagement.approval.domain.PromotionTriggerType;
 import com.fabricmanagement.approval.domain.UserPromotionRequest;
 import com.fabricmanagement.approval.domain.UserTrustLevel;
+import com.fabricmanagement.approval.domain.port.UserTrustMutationPort;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.approval.infra.repository.UserPromotionRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.platform.user.app.UserService;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -32,8 +31,7 @@ class UserPromotionServiceTest {
 
   @Mock private UserPromotionRequestRepository promotionRepo;
   @Mock private ApprovalRequestRepository requestRepo;
-  @Mock private UserRepository userRepo;
-  @Mock private UserService userService;
+  @Mock private UserTrustMutationPort userTrustMutationPort;
   @Mock private DomainEventPublisher eventPublisher;
 
   @InjectMocks private UserPromotionService promotionService;
@@ -91,7 +89,7 @@ class UserPromotionServiceTest {
     assertThat(req.getStatus()).isEqualTo(PromotionRequestStatus.REJECTED);
     assertThat(req.getAdminNote()).isEqualTo("Hala kurallara uymuyor.");
 
-    // Eskalasyon kuralı gereği servis hesabın dondurulması için UserService'i çağırmalı
-    verify(userService).deactivateUser(eq(tenantId), eq(userId), anyString());
+    // Eskalasyon kuralı gereği servis hesabın dondurulması için Port'u çağırmalı
+    verify(userTrustMutationPort).deactivateUser(eq(tenantId), eq(userId), anyString());
   }
 }

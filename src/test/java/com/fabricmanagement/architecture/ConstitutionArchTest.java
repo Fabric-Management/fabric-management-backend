@@ -546,4 +546,65 @@ class ConstitutionArchTest {
       rule.check(allClasses);
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Article 12: WorkOrder Bounded Context Isolation
+  // ═══════════════════════════════════════════════════════════════════
+
+  @Nested
+  @DisplayName("Article 12 — WorkOrder Bounded Context Isolation")
+  class WorkOrderBoundedContextTests {
+
+    @Test
+    @DisplayName("Rule 12.1: sales must not depend on production app or infra layers")
+    void salesShouldNotDependOnProductionImplementation() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.sales..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAnyPackage(
+                  "com.fabricmanagement.production..app..",
+                  "com.fabricmanagement.production..infra..")
+              .as(
+                  "Rule 12.1: sales must use ProductionOrderPort — direct WorkOrderService/repository import forbidden");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("Rule 12.2: production must not depend on approval app layer directly")
+    void productionShouldNotDependOnApprovalAppLayer() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.production..")
+              .and()
+              .haveSimpleNameNotEndingWith("EventListener")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.approval.app..")
+              .as(
+                  "Rule 12.2: production must use ApprovalPort from common — direct ApprovalGuardService import forbidden (event listeners exempt)");
+
+      rule.check(allClasses);
+    }
+
+    @Test
+    @DisplayName("Rule 12.3: approval must not access platform.user infrastructure directly")
+    void approvalShouldNotAccessPlatformUserInfrastructure() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.approval..")
+              .should()
+              .dependOnClassesThat()
+              .resideInAPackage("com.fabricmanagement.platform.user.infra..")
+              .as(
+                  "Rule 12.3: approval must use UserTrustLevelPort — direct UserRepository import forbidden");
+
+      rule.check(allClasses);
+    }
+  }
 }

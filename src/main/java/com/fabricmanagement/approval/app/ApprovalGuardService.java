@@ -9,8 +9,6 @@ import com.fabricmanagement.approval.domain.UserTrustLevel;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.platform.approval.domain.event.ApprovalPendingEvent;
-import com.fabricmanagement.platform.user.domain.User;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -30,7 +28,7 @@ public class ApprovalGuardService {
 
   private final ApprovalPolicyService policyService;
   private final ApprovalRequestRepository requestRepo;
-  private final UserRepository userRepo;
+  private final com.fabricmanagement.approval.domain.port.UserTrustLevelPort userTrustLevelPort;
   private final ApproverRecipientResolver approverRecipientResolver;
   private final DomainEventPublisher eventPublisher;
   private final Clock clock;
@@ -58,19 +56,8 @@ public class ApprovalGuardService {
       return false;
     }
 
-    // 2. Kullanıcının trust_level'i bu kuralın radarına giriyor mu? (SystemUser bypass or default)
-    UserTrustLevel trustLevel;
-    if (com.fabricmanagement.platform.user.domain.SystemUser.ID.equals(userId)) {
-      // Sistem tarafından oluşturulan işlemler otomatik olarak en düşük güven seviyesi (PROBATION)
-      // veya ALL politikalarına takılsın diye PROBATION kabul edilebilir.
-      trustLevel = UserTrustLevel.PROBATION;
-    } else {
-      User user =
-          userRepo
-              .findByTenantIdAndId(tenantId, userId)
-              .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
-      trustLevel = user.getTrustLevel();
-    }
+    // 2. Kullanıcının trust_level'i bu kuralın radarına giriyor mu?
+    UserTrustLevel trustLevel = userTrustLevelPort.resolveTrustLevel(tenantId, userId);
 
     if (!isUserMatchingPolicyLevel(trustLevel, policy.getRequiredForLevel())) {
       log.debug("User {} ({}) bypasses policy {}", userId, trustLevel, policy.getId());

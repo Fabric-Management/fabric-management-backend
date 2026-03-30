@@ -448,6 +448,102 @@ Facade (`api/facade/`) ve DTO kullanımı serbesttir.
 
 ---
 
+## 19. WorkOrder Cross-Module Decoupling (Port/Adapter + ACL Pattern)
+
+`production/execution/workorder` eksenindeki çapraz modül bağımlılıklarını izole etmek için
+**Port/Adapter + Anti-Corruption Layer** uygulandı. 3 fazda tamamlandı.
+
+### 19.1 Tespit Edilen Coupling Noktaları
+
+| ID | Kaynak | Hedef | Tür |
+|----|--------|-------|-----|
+| C1 | `sales/SalesOrderRuleEngine` | `production/WorkOrderService` | Doğrudan servis çağrısı |
+| C2 | `production/WorkOrderService` | `sales/SalesOrderConfirmedEvent.SalesOrderLineSnapshot` | Event tipi sızıntısı |
+| C3 | `production/WorkOrderService` | `approval/ApprovalGuardService` | Doğrudan servis çağrısı |
+| C4 | `approval/ApprovalGuardService` | `platform.user.infra/UserRepository` | Altyapı bypass |
+| C5 | `production/WorkOrderService` | `platform/TradingPartnerCertificationService` | Kasıtlı — **dokunulmadı** |
+
+C5 bilinçli olarak izole edilmedi: platform→domain yönü Rule 11.2 kapsamında kabul edilebilir.
+
+### 19.2 Phase 1 — Event İzolasyonu & Altyapı Bypass Düzeltmesi ✅
+
+**C2:** `production/execution/workorder/dto/IncomingSalesOrderLine` record tanımlandı.
+`WorkOrderSalesEventListener` çeviri sınırıdır: event alır, map'ler, servise local DTO iletir.
+`WorkOrderService` sıfır `sales.*` import'u ile çalışır.
+
+**C4:** `approval/domain/port/UserTrustLevelPort` arayüzü + `platform/user/app/adapter/UserTrustLevelAdapter`.
+`SystemUser.ID` kontrolü adapter içinde — `ApprovalGuardService` platform bilmez.
+
+**Phase X (ertelendi):** `User.java`, `approval.domain.UserTrustLevel` enum'unu import ediyor.
+Bu `platform/user → approval` pre-existing coupling ayrı bir refactoring konusudur.
+
+### 19.3 Phase 2 — Cross-BC Port/Adapter (Hibrit Karar) ✅
+
+**C1 — Bounded Port (1:1):**
+- `sales/salesorder/domain/port/ProductionOrderPort` — Sales kendi dilinde konuşur ("production order", "work order" değil)
+- `sales/salesorder/domain/port/DraftProductionOrderCommand` — Sales çıktı kontratı (record)
+- `production/execution/workorder/app/adapter/WorkOrderCreationAdapter` — portu implement eder, command→request map'leme burada
+
+**C3 — Universal Port (cross-cutting):**
+- `common/infrastructure/approval/ApprovalPort` — approval cross-cutting olduğu için `common`'da; `String entityType` kullanır
+- `approval/app/adapter/ApprovalGuardAdapter` — `String` → `ApprovalEntityType.valueOf()` dönüşümü burada
+- `WorkOrderService` sıfır `approval.*` import'u; `"WORK_ORDER"` String sabitini kullanır
+
+**Bağımlılık yönü kararı (DIP):**
+- 1:1 bağımlılık → port consumer modülünde (`ProductionOrderPort` → `sales`)
+- Cross-cutting → `common/infrastructure/` (`ApprovalPort` → `common`)
+
+### 19.4 Phase 3 — ArchUnit Guardrail'ları ✅
+
+`ConstitutionArchTest.java` — **Article 12 — WorkOrder Bounded Context Isolation:**
+
+- **Rule 12.1:** `sales..` → `production..app..` / `production..infra..` yasak
+- **Rule 12.2:** `production..` (EventListener hariç) → `approval.app..` yasak
+- **Rule 12.3:** `approval..` → `platform.user.infra..` yasak
+
+Rule 12.3 uygulanırken 3 gizli coupling daha yakalandı:
+
+| Sınıf | Sorun | Port |
+|-------|-------|------|
+| `UserPromotionService` | `UserRepository.save()` + `UserService` doğrudan | `approval/domain/port/UserTrustMutationPort` |
+| `ApproverRecipientResolver` | `UserRepository.findByTenantIdAndRole_RoleCodeIn()` | `approval/domain/port/ApproverRecipientPort` |
+
+### 19.5 Tüm Port/Adapter Envanteri
+
+**`approval/domain/port/`:**
+- `UserTrustLevelPort` — trust level okuma (ApprovalGuardService)
+- `UserTrustMutationPort` — trust level yazma + kullanıcı deaktivasyon (UserPromotionService)
+- `ApproverRecipientPort` — role kodu → kullanıcı ID listesi (ApproverRecipientResolver)
+
+**`platform/user/app/adapter/`:**
+- `UserTrustLevelAdapter` — SystemUser.ID bypass burada
+- `UserTrustMutationAdapter`
+- `ApproverRecipientAdapter`
+
+**`sales/salesorder/domain/port/`:**
+- `ProductionOrderPort` + `DraftProductionOrderCommand`
+
+**`production/execution/workorder/app/adapter/`:**
+- `WorkOrderCreationAdapter`
+
+**`common/infrastructure/approval/`:**
+- `ApprovalPort` — cross-cutting; String entityType (enum coupling yok)
+
+**`approval/app/adapter/`:**
+- `ApprovalGuardAdapter`
+
+### 19.6 Kurallar: Yeni Cross-BC Bağımlılık Eklendiğinde
+
+1. Doğrudan servis/repository import'u **YASAK** — port tanımla
+2. Port, ihtiyaç duyan modülde yaşar (consumer owns the contract — DIP)
+3. 1:1 bağımlılık → port consumer modülünde; cross-cutting → `common/infrastructure/`
+4. Adapter, sağlayıcı modülün `app/adapter/` içinde; infra'ya sadece adapter erişir
+5. ACL: Port consumer'ın kendi dilini kullanır ("production order", "work order" değil)
+6. Port/Adapter tamamlandıktan sonra `ConstitutionArchTest`'e ihlali engelleyen ArchUnit kuralı eklenir
+7. `SystemUser.ID`, `ApproverRole` gibi platform sabitleri adapter'a taşınır; servis katmanı platform bilmez
+
+---
+
 ## Commits
 
 Format: `type(scope): description`

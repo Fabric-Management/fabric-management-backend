@@ -1,10 +1,10 @@
 package com.fabricmanagement.sales.salesorder.app.ruleengine;
 
-import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
-import com.fabricmanagement.production.execution.workorder.dto.CreateWorkOrderRequest;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
+import com.fabricmanagement.sales.salesorder.domain.port.DraftProductionOrderCommand;
+import com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SalesOrderRuleEngine {
 
   private final SalesOrderLineRepository lineRepository;
-  private final WorkOrderService workOrderService;
+  private final ProductionOrderPort productionOrderPort;
   private final WorkOrderRecipeHistoryQuery historyQuery;
 
   /**
@@ -121,18 +121,17 @@ public class SalesOrderRuleEngine {
 
   /** Creates a DRAFT WorkOrder linked to the SalesOrderLine. */
   private void createDraftWorkOrder(SalesOrder order, SalesOrderLine line, UUID recipeId) {
-    CreateWorkOrderRequest woReq =
-        CreateWorkOrderRequest.builder()
-            .recipeId(recipeId)
-            .tradingPartnerId(order.getTradingPartnerId())
-            .salesOrderLineId(line.getId())
-            .plannedQty(line.getRequestedQty())
-            .unit(line.getUnit())
-            .currency(line.getCurrency())
-            .deadline(order.getDeadline())
-            .build();
+    DraftProductionOrderCommand cmd =
+        new DraftProductionOrderCommand(
+            recipeId,
+            order.getTradingPartnerId(),
+            line.getId(),
+            line.getRequestedQty(),
+            line.getUnit(),
+            line.getCurrency(),
+            order.getDeadline());
 
-    workOrderService.createWorkOrder(woReq);
+    productionOrderPort.requestDraftProductionOrder(cmd);
     log.info(
         "RuleEngine: WorkOrder (DRAFT) created for SalesOrderLine {} (recipe={})",
         line.getId(),
