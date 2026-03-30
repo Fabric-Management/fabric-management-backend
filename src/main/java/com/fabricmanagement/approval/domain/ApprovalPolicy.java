@@ -27,7 +27,7 @@ public class ApprovalPolicy extends BaseEntity {
 
   // ALL, PROBATION, STANDARD
   @Enumerated(EnumType.STRING)
-  @Column(name = "required_for_level", nullable = false, length = 50)
+  @Column(name = "required_for_level", nullable = false, length = 32)
   private PolicyTargetLevel requiredForLevel;
 
   @Enumerated(EnumType.STRING)

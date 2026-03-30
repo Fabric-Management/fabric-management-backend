@@ -5,13 +5,12 @@ import com.fabricmanagement.approval.domain.PromotionRequestStatus;
 import com.fabricmanagement.approval.domain.PromotionTriggerType;
 import com.fabricmanagement.approval.domain.UserPromotionRequest;
 import com.fabricmanagement.approval.domain.UserTrustLevel;
+import com.fabricmanagement.approval.domain.port.UserTrustMutationPort;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.approval.infra.repository.UserPromotionRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.platform.approval.domain.event.PromotionEscalationEvent;
-import com.fabricmanagement.platform.user.app.UserService;
-import com.fabricmanagement.platform.user.domain.User;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,8 +30,7 @@ public class UserPromotionService {
 
   private final UserPromotionRequestRepository promotionRepo;
   private final ApprovalRequestRepository requestRepo;
-  private final UserRepository userRepo;
-  private final UserService userService;
+  private final UserTrustMutationPort userTrustMutationPort;
   private final DomainEventPublisher eventPublisher;
 
   /**
@@ -41,13 +39,26 @@ public class UserPromotionService {
    */
   @Transactional
   public void checkAndTriggerPromotion(UUID tenantId, UUID userId, int threshold) {
-    User user =
-        userRepo
-            .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    if (userId == null || SystemUser.ID.equals(userId)) {
+      log.debug(
+          "Promotion check skipped: no real requester user (tenant={}, userId={})",
+          tenantId,
+          userId);
+      return;
+    }
+
+    UserTrustLevel currentTrustLevel =
+        userTrustMutationPort.findTrustLevel(tenantId, userId).orElse(null);
+    if (currentTrustLevel == null) {
+      log.debug(
+          "Promotion check skipped: user not found in tenant (tenant={}, userId={})",
+          tenantId,
+          userId);
+      return;
+    }
 
     // TRUSTED olanların daha yükseleceği yer yok
-    if (user.getTrustLevel() == UserTrustLevel.TRUSTED) return;
+    if (currentTrustLevel == UserTrustLevel.TRUSTED) return;
 
     int approvedCount =
         requestRepo.countApprovedRequestsForUser(tenantId, userId, ApprovalRequestStatus.APPROVED);
@@ -56,7 +67,7 @@ public class UserPromotionService {
       log.info(
           "User {} (Level: {}) reached promotion threshold ({}). Creating UP request...",
           userId,
-          user.getTrustLevel(),
+          currentTrustLevel,
           threshold);
 
       UserPromotionRequest existing =
@@ -69,7 +80,7 @@ public class UserPromotionService {
       if (existing == null) {
         // Hedef Level
         UserTrustLevel target =
-            user.getTrustLevel() == UserTrustLevel.PROBATION
+            currentTrustLevel == UserTrustLevel.PROBATION
                 ? UserTrustLevel.STANDARD
                 : UserTrustLevel.TRUSTED;
 
@@ -82,7 +93,7 @@ public class UserPromotionService {
             new UserPromotionRequest(
                 tenantId,
                 userId,
-                user.getTrustLevel(),
+                currentTrustLevel,
                 target,
                 PromotionTriggerType.SYSTEM,
                 currentRejection,
@@ -112,12 +123,7 @@ public class UserPromotionService {
     promotionRepo.save(req);
 
     // Asıl user'ın trust level'ı güncelleme
-    User user =
-        userRepo
-            .findByTenantIdAndId(tenantId, req.getUserId())
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    user.setTrustLevel(req.getToLevel());
-    userRepo.save(user);
+    userTrustMutationPort.upgradeTrustLevel(tenantId, req.getUserId(), req.getToLevel());
 
     log.info("User {} promoted to {} by Admin {}", req.getUserId(), req.getToLevel(), adminUserId);
   }
@@ -151,7 +157,7 @@ public class UserPromotionService {
     // Kural: 3. Redde hesap askıya alınacak ve HR bildirimi tetiklenecek
     if (attemptNumber >= 3) {
       log.error("ESCALATION: User {} rejected 3 times! Suspending account...", req.getUserId());
-      userService.deactivateUser(
+      userTrustMutationPort.deactivateUser(
           tenantId, req.getUserId(), "System: 3 times promotion rejection escalation");
 
       eventPublisher.publish(

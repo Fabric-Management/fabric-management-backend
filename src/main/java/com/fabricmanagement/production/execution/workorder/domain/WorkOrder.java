@@ -33,8 +33,14 @@ public class WorkOrder extends BaseEntity {
   @Column(name = "trading_partner_id")
   private UUID tradingPartnerId;
 
+  @Column(name = "sales_order_id")
+  private UUID salesOrderId;
+
   @Column(name = "sales_order_line_id")
   private UUID salesOrderLineId;
+
+  @Column(name = "product_code", length = 100)
+  private String productCode;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "fulfillment_type", nullable = false, length = 20)
@@ -42,6 +48,36 @@ public class WorkOrder extends BaseEntity {
 
   @Column(name = "fulfillment_id")
   private UUID fulfillmentId;
+
+  public static WorkOrder createFromSalesOrderLine(
+      UUID tenantId,
+      UUID salesOrderId,
+      UUID salesOrderLineId,
+      String productCode,
+      BigDecimal quantity,
+      String unit,
+      LocalDate requestedDeliveryDate,
+      String workOrderNumber) {
+
+    WorkOrder w =
+        WorkOrder.builder()
+            .salesOrderId(salesOrderId)
+            .salesOrderLineId(salesOrderLineId)
+            .productCode(productCode)
+            .plannedQty(quantity)
+            .unit(unit)
+            .deadline(
+                requestedDeliveryDate != null
+                    ? requestedDeliveryDate.atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
+                    : null)
+            .status(WorkOrderStatus.DRAFT)
+            .workOrderNumber(workOrderNumber)
+            .fulfillmentType(FulfillmentType.INTERNAL)
+            .build();
+
+    w.setTenantId(tenantId);
+    return w;
+  }
 
   @Column(name = "planned_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal plannedQty;

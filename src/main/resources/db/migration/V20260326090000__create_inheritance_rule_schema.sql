@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS production.inheritance_rule_schema (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_by      UUID,
-    updated_by      UUID
+    updated_by      UUID,
+    deleted_at      TIMESTAMPTZ
 );
 
 -- Unique constraint: one active rule per tenant + source + target combination

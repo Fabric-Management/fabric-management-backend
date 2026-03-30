@@ -1,6 +1,6 @@
 package com.fabricmanagement.platform.user.dto;
 
-import com.fabricmanagement.human.core.employee.domain.Employee;
+import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserDepartment;
 import java.time.Instant;
@@ -70,7 +70,7 @@ public class UserDto {
     return from(user, null);
   }
 
-  public static UserDto from(User user, Employee employee) {
+  public static UserDto from(User user, EmployeeSnapshot employee) {
     UserDtoBuilder builder =
         UserDto.builder()
             .id(user.getId())
@@ -129,22 +129,22 @@ public class UserDto {
             .preferredLocale(user.getPreferredLocale())
             .preferredTimezone(user.getPreferredTimezone());
 
-    if (employee != null) {
+    if (employee != null && employee.isPresent()) {
       builder
           .isEmployee(true)
-          .title(employee.getTitle() != null ? employee.getTitle().name() : null)
-          .gender(employee.getGender() != null ? employee.getGender().name() : null)
-          .birthDate(employee.getBirthDate())
-          .nationality(employee.getNationality())
-          .employeeNumber(employee.getEmployeeNumber())
-          .hireDate(employee.getHireDate());
+          .title(employee.title() != null ? employee.title().name() : null)
+          .gender(employee.gender() != null ? employee.gender().name() : null)
+          .birthDate(employee.birthDate())
+          .nationality(employee.nationality())
+          .employeeNumber(employee.employeeNumber())
+          .hireDate(employee.hireDate());
 
-      if (employee.getEmergencyContact() != null && !employee.getEmergencyContact().isEmpty()) {
+      if (employee.emergencyContact() != null && !employee.emergencyContact().isEmpty()) {
         builder.emergencyContact(
             EmergencyContactDto.builder()
-                .name(employee.getEmergencyContact().getName())
-                .phone(employee.getEmergencyContact().getPhone())
-                .relationship(employee.getEmergencyContact().getRelationship())
+                .name(employee.emergencyContact().name())
+                .phone(employee.emergencyContact().phone())
+                .relationship(employee.emergencyContact().relationship())
                 .build());
       }
     } else {

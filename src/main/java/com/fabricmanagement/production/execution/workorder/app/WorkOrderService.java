@@ -1,9 +1,11 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
+import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
-import com.fabricmanagement.production.execution.batch.app.BatchOperationsService;
+import com.fabricmanagement.platform.user.domain.SystemUser;
+import com.fabricmanagement.production.execution.batch.api.facade.BatchFacade;
 import com.fabricmanagement.production.execution.batch.dto.BlendParentRequest;
 import com.fabricmanagement.production.execution.batch.dto.CreateBlendedBatchRequest;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
@@ -18,6 +20,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,9 +34,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkOrderService {
 
   private final WorkOrderRepository workOrderRepository;
-  private final BatchOperationsService batchOperationsService;
+  private final BatchFacade batchFacade;
   private final TradingPartnerCertificationService certificationService;
   private final DomainEventPublisher domainEventPublisher;
+  private final ApprovalPort approvalPort;
 
   /** Retrieves a work order by its UUID. */
   public WorkOrderResponse getWorkOrder(UUID id) {
@@ -109,6 +113,82 @@ public class WorkOrderService {
 
     WorkOrder saved = workOrderRepository.save(workOrder);
     return mapToResponse(saved);
+  }
+
+  /** Creates a WorkOrder from a SalesOrderLine snapshot published in an event. */
+  @Transactional
+  public void createFromSalesOrderLine(
+      UUID tenantId,
+      UUID salesOrderId,
+      com.fabricmanagement.production.execution.workorder.dto.IncomingSalesOrderLine line) {
+
+    List<WorkOrder> existingForLine =
+        workOrderRepository.findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
+            tenantId, line.lineId());
+
+    Optional<WorkOrder> draftForLine =
+        existingForLine.stream().filter(wo -> wo.getStatus() == WorkOrderStatus.DRAFT).findFirst();
+
+    if (!existingForLine.isEmpty() && draftForLine.isEmpty()) {
+      log.debug(
+          "Work order(s) already exist for sales order line {} (no DRAFT) — skipping duplicate"
+              + " createFromSalesOrderLine",
+          line.lineId());
+      return;
+    }
+
+    WorkOrder workOrder;
+    if (draftForLine.isPresent()) {
+      // SalesOrderRuleEngine already created a DRAFT WO in the confirm transaction; promote it
+      // instead of inserting a second row for the same line.
+      workOrder = draftForLine.get();
+      if (workOrder.getSalesOrderId() == null) {
+        workOrder.setSalesOrderId(salesOrderId);
+      }
+      if (workOrder.getProductCode() == null && line.productCode() != null) {
+        workOrder.setProductCode(line.productCode());
+      }
+    } else {
+      workOrder =
+          WorkOrder.createFromSalesOrderLine(
+              tenantId,
+              salesOrderId,
+              line.lineId(),
+              line.productCode(),
+              line.quantity(),
+              line.unit(),
+              line.requestedDeliveryDate(),
+              generateWorkOrderNumber());
+      workOrder = workOrderRepository.save(workOrder);
+    }
+
+    // Business Logic: Use ApprovalPort for approval enforcement
+    boolean needsApproval =
+        approvalPort.requiresApproval(
+            tenantId,
+            com.fabricmanagement.platform.user.domain.SystemUser.ID,
+            "WORK_ORDER",
+            workOrder.getId(),
+            48); // 48 hours to expire
+
+    workOrder.setStatus(
+        needsApproval ? WorkOrderStatus.PENDING_APPROVAL : WorkOrderStatus.APPROVED);
+
+    workOrder = workOrderRepository.save(workOrder);
+    log.info(
+        "WorkOrder {} for SalesOrder {} line {} is now {}",
+        workOrder.getWorkOrderNumber(),
+        salesOrderId,
+        line.lineId(),
+        workOrder.getStatus());
+
+    if (workOrder.getStatus() == WorkOrderStatus.APPROVED) {
+      domainEventPublisher.publish(
+          new WorkOrderApprovedEvent(
+              tenantId, workOrder.getId(), workOrder.getWorkOrderNumber(), SystemUser.ID));
+    }
+    // Note: If needsApproval is true, ApprovalGuardService already published ApprovalPendingEvent.
+    // We remove the redundant WorkOrderPendingApprovalEvent.
   }
 
   /**
@@ -193,9 +273,13 @@ public class WorkOrderService {
             .locationId(request.getOutputLocationId())
             .remarks(request.getRemarks())
             .parents(parentBatches)
+            .sourceType(
+                com.fabricmanagement.production.execution.batch.domain.BatchSourceType
+                    .INTERNAL_PRODUCTION)
+            .sourceId(workOrder.getId())
             .build();
 
-    batchOperationsService.createBlendedBatch(blendReq);
+    batchFacade.createBlendedBatch(blendReq);
 
     return mapToResponse(workOrder);
   }

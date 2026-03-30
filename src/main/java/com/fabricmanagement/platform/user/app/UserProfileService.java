@@ -1,19 +1,21 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.identity.EmergencyContactData;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
-import com.fabricmanagement.human.core.employee.domain.EmergencyContact;
-import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.platform.communication.app.AddressService;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
+import com.fabricmanagement.platform.user.domain.EmployeeFieldUpdates;
+import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserProfileUpdatedEvent;
+import com.fabricmanagement.platform.user.domain.port.EmployeeMutationPort;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.domain.value.ProfileCategory;
 import com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
@@ -46,7 +48,8 @@ public class UserProfileService {
   private final UserAddressAssignmentService userAddressAssignmentService;
   private final UserDepartmentService userDepartmentService;
   private final RoleRepository roleRepository;
-  private final EmployeeService employeeService;
+  private final EmployeeProjectionPort employeeProjectionPort;
+  private final EmployeeMutationPort employeeMutationPort;
   private final DomainEventPublisher eventPublisher;
 
   @Transactional
@@ -117,14 +120,14 @@ public class UserProfileService {
       updatePersonalContact(userId, request.getPersonalPhone(), ContactType.MOBILE);
     }
 
-    Employee employee = updateEmployeePersonalFields(userId, request);
+    EmployeeSnapshot employeeSnapshot = updateEmployeePersonalFields(userId, request);
 
     User saved = userRepository.save(user);
     eventPublisher.publish(
         new UserProfileUpdatedEvent(saved.getTenantId(), saved.getId(), requesterId, categories));
 
     log.info("Profile updated: userId={}, updatedBy={}", saved.getId(), requesterId);
-    return UserDto.from(saved, employee);
+    return UserDto.from(saved, employeeSnapshot);
   }
 
   /**
@@ -132,57 +135,37 @@ public class UserProfileService {
    * these fields are silently skipped (user is external or Employee wasn't created during
    * onboarding).
    */
-  private Employee updateEmployeePersonalFields(UUID userId, UpdateUserProfileRequest request) {
-    boolean hasEmployeeUpdates =
-        request.getBirthDate() != null
-            || request.getEmergencyContact() != null
-            || request.getTitle() != null
-            || request.getGender() != null
-            || request.getNationality() != null
-            || request.getEmployeeNumber() != null
-            || request.getHireDate() != null;
-
-    if (!hasEmployeeUpdates) {
-      return employeeService.getEmployeeByUserId(userId).orElse(null);
+  private EmployeeSnapshot updateEmployeePersonalFields(
+      UUID userId, UpdateUserProfileRequest request) {
+    EmployeeFieldUpdates updates = buildEmployeeFieldUpdates(request);
+    if (!updates.hasAny()) {
+      return employeeProjectionPort.findByUserId(userId).orElse(null);
     }
-
-    return employeeService
-        .getEmployeeByUserId(userId)
-        .map(
-            employee -> {
-              if (request.getTitle() != null) {
-                employee.setTitle(request.getTitle());
-              }
-              if (request.getGender() != null) {
-                employee.setGender(request.getGender());
-              }
-              if (request.getBirthDate() != null) {
-                employee.setBirthDate(request.getBirthDate());
-              }
-              if (request.getNationality() != null) {
-                employee.setNationality(request.getNationality());
-              }
-              if (request.getEmployeeNumber() != null) {
-                employee.setEmployeeNumber(request.getEmployeeNumber());
-              }
-              if (request.getHireDate() != null) {
-                employee.setHireDate(request.getHireDate());
-              }
-              if (request.getEmergencyContact() != null) {
-                employee.setEmergencyContact(
-                    EmergencyContact.builder()
-                        .name(request.getEmergencyContact().getName())
-                        .phone(request.getEmergencyContact().getPhone())
-                        .relationship(request.getEmergencyContact().getRelationship())
-                        .build());
-              }
-              return employeeService.saveEmployee(employee);
-            })
+    return employeeMutationPort
+        .applyFieldUpdates(userId, updates)
         .orElseGet(
             () -> {
               log.debug("No Employee record for userId={}; skipping personal field update", userId);
               return null;
             });
+  }
+
+  private static EmployeeFieldUpdates buildEmployeeFieldUpdates(UpdateUserProfileRequest request) {
+    EmergencyContactData emergency =
+        request.getEmergencyContact() != null
+            ? new EmergencyContactData(
+                request.getEmergencyContact().getName(),
+                request.getEmergencyContact().getPhone(),
+                request.getEmergencyContact().getRelationship())
+            : null;
+    return new EmployeeFieldUpdates(
+        request.getTitle(),
+        request.getGender(),
+        request.getBirthDate(),
+        request.getNationality(),
+        request.getEmployeeNumber(),
+        request.getHireDate(),
+        emergency);
   }
 
   private void updateWorkContact(UUID userId, String contactValue, ContactType contactType) {

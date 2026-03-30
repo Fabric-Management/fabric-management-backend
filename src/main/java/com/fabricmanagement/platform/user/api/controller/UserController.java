@@ -5,7 +5,6 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactSuggestionService;
 import com.fabricmanagement.platform.communication.dto.ContactSuggestionsDto;
@@ -13,6 +12,7 @@ import com.fabricmanagement.platform.subscription.app.UserCreationOptionsService
 import com.fabricmanagement.platform.user.app.TeamAccessService;
 import com.fabricmanagement.platform.user.app.UserLocaleService;
 import com.fabricmanagement.platform.user.app.UserService;
+import com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
@@ -37,7 +37,7 @@ public class UserController {
 
   private final UserService userService;
   private final ContactSuggestionService contactSuggestionService;
-  private final EmployeeService employeeService;
+  private final EmployeeCreationPort employeeCreationPort;
   private final UserCreationOptionsService userCreationOptionsService;
   private final TeamAccessService teamAccessService;
   private final UserLocaleService userLocaleService;
@@ -352,7 +352,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<String>> generateEmployeeNumber() {
     log.debug("Generating employee number");
 
-    String employeeNumber = employeeService.generateEmployeeNumber();
+    String employeeNumber = employeeCreationPort.generateEmployeeNumber();
 
     return ResponseEntity.ok(ApiResponse.success(employeeNumber));
   }

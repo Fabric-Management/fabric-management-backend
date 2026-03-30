@@ -40,7 +40,8 @@ class StockControlEngineTest {
             "Customer",
             BigDecimal.valueOf(100),
             "KG",
-            LocalDate.now().plusDays(14));
+            LocalDate.now().plusDays(14),
+            java.util.Collections.emptyList());
 
     // Mock port
     // TenantContext is statically resolved, which might be null. For simplicity, we mock any().
@@ -65,7 +66,8 @@ class StockControlEngineTest {
             "Customer",
             BigDecimal.ZERO,
             "KG",
-            LocalDate.now().plusDays(7));
+            LocalDate.now().plusDays(7),
+            java.util.Collections.emptyList());
 
     when(stockPort.getAvailableStockForOrder(any(), any())).thenReturn(BigDecimal.ZERO);
     List<StockControlEngine.StockDecision> decisions = engine.analyze(event);

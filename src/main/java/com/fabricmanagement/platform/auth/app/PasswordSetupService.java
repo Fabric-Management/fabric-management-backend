@@ -3,7 +3,6 @@ package com.fabricmanagement.platform.auth.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.platform.auth.domain.RegistrationToken;
@@ -25,6 +24,7 @@ import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.app.UserContactAssignmentService;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -75,7 +75,7 @@ public class PasswordSetupService {
   private final OrganizationRepository organizationRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
   private final TenantRepository tenantRepository;
-  private final EmployeeService employeeService;
+  private final EmployeeProjectionPort employeeProjectionPort;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
@@ -212,8 +212,8 @@ public class PasswordSetupService {
     UserDto freshUser =
         UserDto.from(
             freshUserEntity,
-            employeeService
-                .getEmployeeByUserId(freshUserEntity.getTenantId(), freshUserEntity.getId())
+            employeeProjectionPort
+                .findByUserId(freshUserEntity.getTenantId(), freshUserEntity.getId())
                 .orElse(null));
 
     boolean needsOnboarding = !Boolean.TRUE.equals(user.getHasCompletedOnboarding());

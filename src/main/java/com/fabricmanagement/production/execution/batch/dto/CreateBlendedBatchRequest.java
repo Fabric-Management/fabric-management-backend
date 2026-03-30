@@ -46,4 +46,8 @@ public class CreateBlendedBatchRequest {
   @Size(min = 2, message = "At least 2 parent batches are required for blending")
   @Valid
   private List<BlendParentRequest> parents;
+
+  // ── Source Tracking ──
+  private com.fabricmanagement.production.execution.batch.domain.BatchSourceType sourceType;
+  private UUID sourceId;
 }

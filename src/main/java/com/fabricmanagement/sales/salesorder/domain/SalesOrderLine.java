@@ -28,12 +28,12 @@ import org.hibernate.annotations.Type;
  *   <li>Update {@code lineStatus} to RECIPE_ASSIGNED or leave PENDING with FlowBoard task.
  * </ol>
  *
- * <p>Table: {@code order.sales_order_line}
+ * <p>Table: {@code sales_ord.sales_order_line}
  */
 @Entity
 @Table(
     name = "sales_order_line",
-    schema = "order",
+    schema = "sales_ord",
     indexes = {
       @Index(name = "idx_sol_sales_order_id", columnList = "sales_order_id"),
       @Index(name = "idx_sol_material_id", columnList = "material_id"),
@@ -72,6 +72,10 @@ public class SalesOrderLine extends BaseEntity {
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
 
+  @Column(name = "shipped_qty", nullable = false, precision = 15, scale = 3)
+  @Builder.Default
+  private BigDecimal shippedQty = BigDecimal.ZERO;
+
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
@@ -80,6 +84,15 @@ public class SalesOrderLine extends BaseEntity {
 
   @Column(name = "currency", length = 3)
   private String currency;
+
+  @ElementCollection
+  @CollectionTable(
+      name = "sales_order_line_processed_shipments",
+      schema = "sales_ord",
+      joinColumns = @JoinColumn(name = "sales_order_line_id"))
+  @Column(name = "shipment_line_id", nullable = false)
+  @Builder.Default
+  private java.util.Set<UUID> processedShipmentLineIds = new java.util.HashSet<>();
 
   // ── Module-specific specs ─────────────────────────────────────────────────
 
@@ -135,5 +148,21 @@ public class SalesOrderLine extends BaseEntity {
   /** Validates that at least one of materialId / productDesc is present. */
   public boolean isValid() {
     return materialId != null || (productDesc != null && !productDesc.isBlank());
+  }
+
+  /**
+   * Adds confirmed shipped quantity. Uses shipmentLineId as an idempotency key to prevent
+   * double-counting if the event is processed twice.
+   */
+  public void addShippedQuantity(UUID shipmentLineId, BigDecimal quantity) {
+    if (this.processedShipmentLineIds.contains(shipmentLineId)) {
+      return; // Idempotent return
+    }
+
+    if (this.shippedQty == null) {
+      this.shippedQty = BigDecimal.ZERO;
+    }
+    this.shippedQty = this.shippedQty.add(quantity);
+    this.processedShipmentLineIds.add(shipmentLineId);
   }
 }

@@ -5,6 +5,7 @@ import com.fabricmanagement.notification.hub.infra.email.EmailNotificationSender
 import com.fabricmanagement.notification.hub.infra.repository.*;
 import com.fabricmanagement.notification.hub.infra.websocket.InAppNotificationSender;
 import com.fabricmanagement.notification.i18n.app.TranslationService;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -40,13 +41,40 @@ public class NotificationItemProcessor {
   private final NotificationUserQueryService userQueryService;
 
   /**
+   * PROCESSING'de takılı kalan kaydı kurtarır (satır kilidi ile — eşzamanlı güncellemede optimistic
+   * lock çakışması olmaz).
+   */
+  @Transactional
+  public void recoverStuckProcessingItem(UUID queueId, Instant stuckBefore) {
+    NotificationQueue item = queueRepo.findByIdWithWriteLock(queueId).orElse(null);
+    if (item == null || item.getStatus() != NotificationQueueStatus.PROCESSING) {
+      return;
+    }
+    if (item.getUpdatedAt() == null || !item.getUpdatedAt().isBefore(stuckBefore)) {
+      return;
+    }
+    item.markFailed("Stuck in PROCESSING — recovered by scheduler");
+    queueRepo.save(item);
+  }
+
+  /**
    * Tek bir kuyruktaki bildirimi işler.
    *
    * <p>Akış: PENDING → PROCESSING → translate → send → log → SENT. Hata olursa: retryCount++ → 3'te
    * FAILED.
+   *
+   * <p>{@code queueId} üzerinden satır kilidi ile yeniden yüklenir; scheduler veya çoklu instance
+   * ortamında aynı kayıt için optimistic locking hatası riski azalır.
    */
   @Transactional
-  public void processItem(NotificationQueue item) {
+  public void processItem(UUID queueId) {
+    NotificationQueue item = queueRepo.findByIdWithWriteLock(queueId).orElse(null);
+    if (item == null
+        || item.getStatus() != NotificationQueueStatus.PENDING
+        || item.getRetryCount() >= 3) {
+      return;
+    }
+
     item.markProcessing();
     queueRepo.save(item);
 

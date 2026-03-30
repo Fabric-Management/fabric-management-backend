@@ -130,6 +130,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/auth/**")
                     .permitAll()
+                    .requestMatchers("/api/common/company-types/**")
+                    .permitAll()
                     .requestMatchers("/api/webhooks/**")
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/admin/**")

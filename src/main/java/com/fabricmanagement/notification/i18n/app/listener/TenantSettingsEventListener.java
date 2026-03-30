@@ -25,7 +25,7 @@ public class TenantSettingsEventListener {
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
-  @Transactional
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
   public void onTenantSettingsUpdated(TenantSettingsUpdatedEvent event) {
     log.info("Syncing TenantLocaleConfig for tenantId={}", event.getTenantId());
 

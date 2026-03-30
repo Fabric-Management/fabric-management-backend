@@ -7,6 +7,7 @@ import com.fabricmanagement.notification.hub.domain.NotificationEventType;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.user.app.UserQueryService;
+import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
@@ -147,10 +148,32 @@ public class ProductionNotificationListener {
                   "referenceId", event.getWorkOrderId().toString(),
                   "referenceType", "WORK_ORDER");
 
+          UUID approvedBy = event.getApprovedByUserId();
+          if (approvedBy == null || SystemUser.ID.equals(approvedBy)) {
+            var fallback =
+                userQueryService.findActiveUserIdsByRoleCodes(
+                    event.getTenantId(), List.of("ADMIN", "MANAGER"));
+            if (fallback.isEmpty()) {
+              log.warn(
+                  "WorkOrderApproved: no recipients for wo={} (system approval, no ADMIN/MANAGER"
+                      + " users)",
+                  event.getWorkOrderNumber());
+              return;
+            }
+            notificationHubService.notifyAll(
+                fallback,
+                event.getTenantId(),
+                NotificationEventType.WORK_ORDER_APPROVED,
+                payload,
+                event.getWorkOrderId(),
+                "WORK_ORDER");
+            return;
+          }
+
           notificationHubService.notify(
               NotificationContext.of(
                   event.getTenantId(),
-                  event.getApprovedByUserId(),
+                  approvedBy,
                   NotificationEventType.WORK_ORDER_APPROVED,
                   payload,
                   event.getWorkOrderId(),

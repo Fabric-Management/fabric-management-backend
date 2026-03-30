@@ -64,18 +64,16 @@ public class PricingEngineService {
     // 3. Sequential Rule Evaluation (order matters — most restrictive first)
     QuotePriceZone zone;
 
-    // RULE 1 — Red Line / BLOCKED: profit is below minimum acceptable
     if (profitMargin.compareTo(policy.getMinProfitMargin()) <= 0) {
+      // RULE 1 — Red Line / BLOCKED: profit is below minimum acceptable
       zone = QuotePriceZone.BLOCKED;
-    }
-    // RULE 2 — MANAGER_APPROVAL: discount exceeds the manager approval threshold
-    //   Uses requireManagerAbove, which is the explicit manager-approval trigger
-    //   (distinct from the hard red-line minProfitMargin).
-    else if (discountRate.compareTo(policy.getRequireManagerAbove()) > 0) {
+    } else if (discountRate.compareTo(policy.getRequireManagerAbove()) > 0) {
+      // RULE 2 — MANAGER_APPROVAL: discount exceeds the manager approval threshold
+      //   Uses requireManagerAbove, which is the explicit manager-approval trigger
+      //   (distinct from the hard red-line minProfitMargin).
       zone = QuotePriceZone.MANAGER_APPROVAL;
-    }
-    // RULE 3 — FREE zone: within all limits, no approval needed
-    else {
+    } else {
+      // RULE 3 — FREE zone: within all limits, no approval needed
       zone = QuotePriceZone.FREE;
     }
 

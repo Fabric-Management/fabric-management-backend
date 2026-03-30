@@ -45,6 +45,7 @@ public class InventoryBalanceUpdater {
       case SPLIT_IN:
       case TRANSFER_IN:
       case RETURN:
+      case SHIPMENT_RETURN:
         balance.setQuantity(balance.getQuantity().add(event.getQuantity()));
         break;
 
@@ -61,6 +62,7 @@ public class InventoryBalanceUpdater {
       case SPLIT_OUT:
       case TRANSFER_OUT:
       case SAMPLE:
+      case SHIPMENT_DISPATCH:
         balance.setQuantity(balance.getQuantity().subtract(event.getQuantity()));
         break;
 

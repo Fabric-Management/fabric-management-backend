@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS flowboard.task_checklist
     completed_by_user_id UUID,
     display_order       INTEGER      NOT NULL    DEFAULT 1,
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS flowboard.task_comment
     content             TEXT         NOT NULL,
     mentioned_user_ids  TEXT,                   -- JSONB
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
@@ -69,6 +71,7 @@ CREATE TABLE IF NOT EXISTS flowboard.task_activity_log
     new_value           VARCHAR(255),
     metadata            TEXT,                   -- JSONB
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
@@ -81,15 +84,22 @@ CREATE INDEX idx_task_activity_log_action ON flowboard.task_activity_log (action
 -- =============================================================================
 -- 4. TASK DEPENDENCY
 -- =============================================================================
--- Dikkat: BaseEntity extend etmeyen junction table
-
+-- Tablo artık BaseEntity extend ediyor
 CREATE TABLE IF NOT EXISTS flowboard.task_dependency
 (
     id                  UUID PRIMARY KEY         DEFAULT gen_random_uuid(),
+    tenant_id           UUID         NOT NULL,
+    uid                 VARCHAR(100) UNIQUE,
     task_id             UUID         NOT NULL REFERENCES flowboard.task (id),
     depends_on_task_id  UUID         NOT NULL REFERENCES flowboard.task (id),
     dependency_type     VARCHAR(20)  NOT NULL,  -- FINISH_TO_START, START_TO_START, PARALLEL
-    created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW()
+    deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
+    created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
+    created_by          UUID,
+    updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
+    updated_by          UUID,
+    version             BIGINT       NOT NULL    DEFAULT 0
 );
 CREATE UNIQUE INDEX uk_task_dependency ON flowboard.task_dependency (task_id, depends_on_task_id);
 CREATE INDEX idx_task_dependency_depends_on ON flowboard.task_dependency (depends_on_task_id);
@@ -111,6 +121,7 @@ CREATE TABLE IF NOT EXISTS flowboard.task_time_entry
     entry_type          VARCHAR(20)  NOT NULL,  -- TIMER, MANUAL
     note                VARCHAR(500),
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
@@ -142,6 +153,7 @@ CREATE TABLE IF NOT EXISTS flowboard.task_attachment
     attachment_type     VARCHAR(20)  NOT NULL,  -- DOCUMENT, IMAGE, REPORT, OTHER
     description         VARCHAR(255),
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
@@ -169,6 +181,7 @@ CREATE TABLE IF NOT EXISTS flowboard.task_reminder
     sent_at             TIMESTAMPTZ,
     channel             VARCHAR(20)  NOT NULL,  -- IN_APP, EMAIL, BOTH
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
@@ -193,6 +206,7 @@ CREATE TABLE IF NOT EXISTS flowboard.task_relation
     created_by_user_id  UUID         NOT NULL,
     note                VARCHAR(255),
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
@@ -219,6 +233,7 @@ CREATE TABLE IF NOT EXISTS flowboard.escalation_log
     resolved_by_user_id UUID,
     resolution_note     VARCHAR(500),
     deleted_at          TIMESTAMPTZ,
+    is_active           BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by          UUID,
     updated_at          TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),

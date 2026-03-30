@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.identity.EmergencyContactData;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
@@ -16,6 +17,9 @@ import com.fabricmanagement.platform.organization.infra.repository.DepartmentRep
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserCreatedEvent;
+import com.fabricmanagement.platform.user.domain.port.EmployeeCompliancePort;
+import com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.AddressData;
 import com.fabricmanagement.platform.user.dto.ContactData;
 import com.fabricmanagement.platform.user.dto.CreateAdminUserRequest;
@@ -63,7 +67,9 @@ public class UserCreationService {
   private final UserDepartmentService userDepartmentService;
   private final DepartmentRepository departmentRepository;
   private final UserWorkLocationService userWorkLocationService;
-  private final com.fabricmanagement.human.core.employee.app.EmployeeService employeeService;
+  private final EmployeeCreationPort employeeCreationPort;
+  private final EmployeeProjectionPort employeeProjectionPort;
+  private final EmployeeCompliancePort employeeCompliancePort;
 
   @Transactional
   public UserDto createInternalUser(CreateInternalUserRequest request) {
@@ -125,15 +131,12 @@ public class UserCreationService {
 
     checkAndTrackHrCompliance(saved.getId(), request.getDepartment());
 
-    com.fabricmanagement.human.core.employee.domain.Employee employee =
-        employeeService.getEmployeeByUserId(saved.getId()).orElse(null);
-
     log.info(
         "Internal user created: id={}, uid={}, displayName={}",
         saved.getId(),
         saved.getUid(),
         saved.getDisplayName());
-    return UserDto.from(saved, employee);
+    return UserDto.from(saved, employeeProjectionPort.findByUserId(saved.getId()).orElse(null));
   }
 
   @Transactional
@@ -240,8 +243,8 @@ public class UserCreationService {
           assignAdminDefaultDepartment(saved, request);
 
           try {
-            String employeeNumber = employeeService.generateEmployeeNumber();
-            employeeService.createOrUpdateEmployee(
+            String employeeNumber = employeeCreationPort.generateEmployeeNumber();
+            employeeCreationPort.createOrUpdate(
                 saved.getId(),
                 null,
                 null,
@@ -439,20 +442,19 @@ public class UserCreationService {
 
     String employeeNumber = request.getEmployeeNumber();
     if (employeeNumber == null || employeeNumber.isBlank()) {
-      employeeNumber = employeeService.generateEmployeeNumber();
+      employeeNumber = employeeCreationPort.generateEmployeeNumber();
     }
 
-    com.fabricmanagement.human.core.employee.domain.EmergencyContact emergencyContact = null;
+    EmergencyContactData emergencyContact = null;
     if (request.getEmergencyContact() != null) {
       emergencyContact =
-          com.fabricmanagement.human.core.employee.domain.EmergencyContact.builder()
-              .name(request.getEmergencyContact().getName())
-              .phone(request.getEmergencyContact().getPhone())
-              .relationship(request.getEmergencyContact().getRelationship())
-              .build();
+          new EmergencyContactData(
+              request.getEmergencyContact().getName(),
+              request.getEmergencyContact().getPhone(),
+              request.getEmergencyContact().getRelationship());
     }
 
-    employeeService.createOrUpdateEmployee(
+    employeeCreationPort.createOrUpdate(
         userId,
         request.getTitle(),
         request.getGender(),
@@ -564,19 +566,15 @@ public class UserCreationService {
    */
   private void checkAndTrackHrCompliance(UUID userId, String department) {
     try {
-      Optional<com.fabricmanagement.human.core.employee.domain.Employee> employeeOpt =
-          employeeService.getEmployeeByUserId(userId);
-      if (employeeOpt.isPresent()) {
-        var employee = employeeOpt.get();
-        List<String> missingFields = employeeService.checkAndUpdateCompliance(employee, department);
-        if (!missingFields.isEmpty()) {
-          log.warn(
-              "HR Compliance incomplete: userId={}, department={}, missingFields={}. "
-                  + "User created but compliance must be resolved via HR module.",
-              userId,
-              department,
-              missingFields);
-        }
+      List<String> missingFields =
+          employeeCompliancePort.runComplianceEvaluation(userId, department);
+      if (!missingFields.isEmpty()) {
+        log.warn(
+            "HR Compliance incomplete: userId={}, department={}, missingFields={}. "
+                + "User created but compliance must be resolved via HR module.",
+            userId,
+            department,
+            missingFields);
       }
     } catch (Exception e) {
       log.error(

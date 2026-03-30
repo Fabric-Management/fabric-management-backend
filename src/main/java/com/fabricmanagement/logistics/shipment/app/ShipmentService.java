@@ -1,15 +1,23 @@
 package com.fabricmanagement.logistics.shipment.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.logistics.common.exception.LogisticsDomainException;
 import com.fabricmanagement.logistics.shipment.domain.Shipment;
+import com.fabricmanagement.logistics.shipment.domain.ShipmentLine;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentStatus;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentType;
+import com.fabricmanagement.logistics.shipment.domain.event.ShipmentPickedUpEvent;
+import com.fabricmanagement.logistics.shipment.dto.AddBatchToLineRequest;
+import com.fabricmanagement.logistics.shipment.dto.AddShipmentLineRequest;
 import com.fabricmanagement.logistics.shipment.dto.CreateShipmentRequest;
 import com.fabricmanagement.logistics.shipment.dto.ShipmentDto;
 import com.fabricmanagement.logistics.shipment.infra.repository.ShipmentRepository;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.production.execution.batch.api.facade.BatchFacade;
+import com.fabricmanagement.production.execution.batch.dto.BatchDto;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -36,6 +44,8 @@ public class ShipmentService {
   private final ShipmentRepository shipmentRepository;
   private final TradingPartnerResolver partnerResolver;
   private final TradingPartnerService partnerService;
+  private final DomainEventPublisher eventPublisher;
+  private final BatchFacade batchFacade;
 
   private static final DateTimeFormatter SHIPMENT_NUMBER_DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -335,6 +345,26 @@ public class ShipmentService {
     Shipment saved = shipmentRepository.save(shipment);
 
     log.info("Shipment picked up: uid={}, tracking={}", saved.getUid(), trackingNumber);
+
+    // Publish picking event for inventory transfer/deduction
+    eventPublisher.publish(new ShipmentPickedUpEvent(tenantId, shipmentId));
+
+    // Publish confirmed events for sales order update
+    if (saved.getLines() != null) {
+      saved.getLines().stream()
+          .filter(line -> line.getSalesOrderLineId() != null)
+          .filter(line -> line.totalLoadedQuantity().compareTo(java.math.BigDecimal.ZERO) > 0)
+          .forEach(
+              line ->
+                  eventPublisher.publish(
+                      new com.fabricmanagement.logistics.shipment.domain.event
+                          .ShipmentLineConfirmedEvent(
+                          tenantId,
+                          line.getId(),
+                          line.getSalesOrderLineId(),
+                          line.totalLoadedQuantity())));
+    }
+
     return ShipmentDto.from(saved);
   }
 
@@ -470,6 +500,89 @@ public class ShipmentService {
   // ═══════════════════════════════════════════════════════════════════════════
   // HELPERS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  @Transactional
+  public ShipmentDto addShipmentLine(UUID shipmentId, AddShipmentLineRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    log.debug("Adding line to shipment {}: {}", shipmentId, request);
+
+    Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
+
+    // Prevent modification if shipment is beyond READY
+    if (shipment.getStatus() != ShipmentStatus.PENDING
+        && shipment.getStatus() != ShipmentStatus.PREPARING
+        && shipment.getStatus() != ShipmentStatus.READY) {
+      throw new LogisticsDomainException(
+          "Cannot add lines to shipment in status " + shipment.getStatus());
+    }
+
+    ShipmentLine line =
+        ShipmentLine.builder()
+            .shipmentId(shipmentId)
+            .lineNumber(request.getLineNumber())
+            .salesOrderLineId(request.getSalesOrderLineId())
+            .quantity(request.getQuantity())
+            .unit(request.getUnit())
+            .build();
+
+    shipment.addLine(line);
+    Shipment saved = shipmentRepository.save(shipment);
+
+    return ShipmentDto.from(saved);
+  }
+
+  @Transactional
+  public ShipmentDto addBatchToLine(
+      UUID shipmentId, UUID shipmentLineId, AddBatchToLineRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
+
+    ShipmentLine line =
+        shipment.getLines().stream()
+            .filter(l -> l.getId().equals(shipmentLineId))
+            .findFirst()
+            .orElseThrow(
+                () -> new LogisticsDomainException("Shipment line not found: " + shipmentLineId));
+
+    // Idempotency check
+    boolean alreadyAdded =
+        line.getBatches().stream().anyMatch(b -> b.getBatchId().equals(request.getBatchId()));
+    if (alreadyAdded) {
+      log.info("Batch {} already added to line {}", request.getBatchId(), shipmentLineId);
+      return ShipmentDto.from(shipment);
+    }
+
+    // Cross-module QC Check
+    BatchDto batch =
+        batchFacade
+            .getById(request.getBatchId())
+            .orElseThrow(
+                () ->
+                    new LogisticsDomainException(
+                        "Batch not found in production module: " + request.getBatchId()));
+
+    // Check if QC Approved (AVAILABLE corresponds to QC approved in batch module)
+    if (batch.getStatus()
+        != com.fabricmanagement.production.execution.batch.domain.BatchStatus.AVAILABLE) {
+      throw new LogisticsDomainException(
+          "Cannot add batch to shipment: QC status is not APPROVED (AVAILABLE). Current status: "
+              + batch.getStatus());
+    }
+
+    // Extract Grade if any
+    String grade = null;
+    if (batch.getAttributes() != null && batch.getAttributes().containsKey("fiber_grade")) {
+      grade = String.valueOf(batch.getAttributes().get("fiber_grade"));
+    }
+
+    line.addBatch(request.getBatchId(), request.getQuantity(), grade);
+
+    Shipment saved = shipmentRepository.save(shipment);
+
+    log.info("Batch {} added to ShipmentLine {}", request.getBatchId(), shipmentLineId);
+    return ShipmentDto.from(saved);
+  }
 
   private Shipment getShipmentOrThrow(UUID tenantId, UUID shipmentId) {
     return shipmentRepository

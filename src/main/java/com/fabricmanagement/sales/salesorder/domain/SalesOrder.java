@@ -30,7 +30,7 @@ import org.hibernate.annotations.Type;
 @Entity
 @Table(
     name = "sales_order",
-    schema = "order",
+    schema = "sales_ord",
     indexes = {
       @Index(name = "idx_so_tenant", columnList = "tenant_id"),
       @Index(name = "idx_so_trading_partner", columnList = "trading_partner_id"),

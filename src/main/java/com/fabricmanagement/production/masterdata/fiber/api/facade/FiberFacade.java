@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.masterdata.fiber.api.facade;
 
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import java.util.List;
 import java.util.Optional;
@@ -53,4 +54,29 @@ public interface FiberFacade {
    * @return Created fiber DTO
    */
   FiberDto createFiber(CreateFiberRequest request);
+
+  /**
+   * Search fibers by name across tenant and system fibers. Includes both tenant-specific and global
+   * system fibers.
+   *
+   * @param query Case-insensitive name fragment to search for
+   * @return Matching active fibers ordered by name
+   */
+  List<FiberDto> findByNameContaining(String query);
+
+  /**
+   * List all active fiber categories. Used for AI-assisted fiber creation and classification.
+   *
+   * @return Active categories ordered by display order
+   */
+  List<FiberCategoryDto> listActiveCategories();
+
+  /**
+   * Find fibers by multiple material IDs (batch lookup). Includes both tenant-specific and global
+   * system fibers. Primarily used for cross-reference searches in the material module.
+   *
+   * @param materialIds Collection of material IDs to search
+   * @return Matching fibers as DTOs
+   */
+  List<FiberDto> findByMaterialIds(java.util.Collection<java.util.UUID> materialIds);
 }

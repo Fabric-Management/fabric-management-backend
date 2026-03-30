@@ -386,6 +386,164 @@ Yukarıdaki kuralların büyük kısmı **ArchUnit testleriyle** otomatik olarak
 
 ---
 
+## 17. Platform ↔ Human Tenant Decoupling (Employee Projection Port)
+
+`platform/user` modülünün `human/core/employee` modülüne doğrudan binary bağımlılığını (service/entity seviyesinde) engellemek için **Port/Adapter Pattern** ve **Shared Kernel** kullanılır. 
+
+### 17.1 Shared Kernel (`common/infrastructure/identity/`) ✅
+Modüller arası veri değişiminde kullanılan ortak tipler burada tanımlanır:
+- `Gender`, `Title` (Enum)
+- `EmergencyContactData` (Record — immutable)
+
+### 17.2 Port Pattern (Platform Domain) ✅
+Platform modülü, HR verisine ihtiyaç duyduğunda `human` modülüne sormaz; kendi domain'inde bir interface (Port) ve veri modeli (Snapshot) tanımlar.
+- `EmployeeProjectionPort`: Veri okuma (findByUserId, findByUserIds)
+- `EmployeeCreationPort`: Veri oluşturma / lifecycle
+- `EmployeeSnapshot`: Platform modülüne özel read-only veri modeli (Record)
+
+### 17.3 Adapter Implementation (Human App) ✅
+Human modülü, platform'un tanımladığı portları kendi `app/adapter/` klasörü altında implemente eder.
+- `EmployeeProjectionAdapter`: Entity → Snapshot dönüşümünü yapar.
+- `EmployeeCreationAdapter`: `EmployeeService` domain orchestration'ı ile platform taleplerini bağlar.
+
+### 17.4 N+1 Önleme Kuralı ✅
+Kullanıcı listeleri (admin, user search vb.) dönerken employee verisi eklemek için **mutlaka batch-load** (`findByUserIds`) kullanılmalıdır. Stream içinde tek tek `findByUserId` çağrılması **KESİNLİKLE YASAKTIR.**
+
+## 18. Platform/AI ↔ Production Decoupling (AI Tool Registry Pattern)
+
+`platform/ai` modülünün production altyapısına (repository, entity) doğrudan bağımlılığını 
+engellemek için **AI Tool Registry Pattern** kullanılır.
+
+### 18.1 Shared Infrastructure (`common/infrastructure/ai/`) ✅
+- `AIToolProvider` — domain provider'ların implement ettiği interface (`getSupportedTools()`, `execute()`)
+- `AIQueryNormalizer` — Türkçe→İngilizce fiber terminoloji çevirisi (pamuk→cotton, vb.)
+
+### 18.2 Registry (`platform/ai/app/`) ✅
+- `AIToolRegistry` — Tüm `AIToolProvider` bean'lerini Spring injection ile toplar.
+  Sonuç cachelemesi (60 sn TTL) burada yönetilir. `create_*` araçları cache'lenmez.
+- `AIFunctionCaller` — Saf entry point; yalnızca `TenantContext`'ten tenantId okur ve 
+  `toolRegistry.execute()` 'e delege eder.
+
+### 18.3 Domain Providers (Adapter) ✅
+Her domain kendi AI araçlarını kendi `app/adapter/` altında implement eder:
+- `FiberAIToolProvider` → `search_fibers`, `get_fiber_info`, `list_fiber_categories`, `create_fiber`
+- `MaterialAIToolProvider` → `check_material_stock`, `create_material`, `search_materials`, `get_production_status`
+- `SmartSearchAIToolProvider` (`platform/ai/app/adapter/`) → `smart_search` (cross-domain orkestrasyon)
+
+### 18.4 Circular Dependency Çözümü ✅
+`SmartSearchAIToolProvider` `AIToolRegistry`'ye bağımlıdır — ancak `AIToolRegistry` 
+tüm provider'ları (SmartSearch dahil) toplar. Circular dependency `ObjectProvider<AIToolRegistry>` 
+ile çözülür: Spring lazy proxy ile initialization sırasında circular dep oluşmaz.
+
+### 18.5 ArchUnit Rule 11.4 ✅
+`platform/ai` modülü production altyapısına (`..production..infra..`) doğrudan erişemez.
+Facade (`api/facade/`) ve DTO kullanımı serbesttir.
+
+### 18.6 Kural: Yeni AI Aracı Eklemek
+1. İlgili domain modülünde `app/adapter/XxxAIToolProvider.java` oluştur (`AIToolProvider` implement et)
+2. `getSupportedTools()` içinde araç adını kaydet
+3. `execute()` içinde işlemi kendi facade'ı üzerinden gerçekleştir
+4. Unit test yaz (`XxxAIToolProviderTest`)
+5. `AIFunctionCaller`'a **kesinlikle dokunma** — araç otomatik olarak kayıt olur
+
+---
+
+## 19. WorkOrder Cross-Module Decoupling (Port/Adapter + ACL Pattern)
+
+`production/execution/workorder` eksenindeki çapraz modül bağımlılıklarını izole etmek için
+**Port/Adapter + Anti-Corruption Layer** uygulandı. 3 fazda tamamlandı.
+
+### 19.1 Tespit Edilen Coupling Noktaları
+
+| ID | Kaynak | Hedef | Tür |
+|----|--------|-------|-----|
+| C1 | `sales/SalesOrderRuleEngine` | `production/WorkOrderService` | Doğrudan servis çağrısı |
+| C2 | `production/WorkOrderService` | `sales/SalesOrderConfirmedEvent.SalesOrderLineSnapshot` | Event tipi sızıntısı |
+| C3 | `production/WorkOrderService` | `approval/ApprovalGuardService` | Doğrudan servis çağrısı |
+| C4 | `approval/ApprovalGuardService` | `platform.user.infra/UserRepository` | Altyapı bypass |
+| C5 | `production/WorkOrderService` | `platform/TradingPartnerCertificationService` | Kasıtlı — **dokunulmadı** |
+
+C5 bilinçli olarak izole edilmedi: platform→domain yönü Rule 11.2 kapsamında kabul edilebilir.
+
+### 19.2 Phase 1 — Event İzolasyonu & Altyapı Bypass Düzeltmesi ✅
+
+**C2:** `production/execution/workorder/dto/IncomingSalesOrderLine` record tanımlandı.
+`WorkOrderSalesEventListener` çeviri sınırıdır: event alır, map'ler, servise local DTO iletir.
+`WorkOrderService` sıfır `sales.*` import'u ile çalışır.
+
+**C4:** `approval/domain/port/UserTrustLevelPort` arayüzü + `platform/user/app/adapter/UserTrustLevelAdapter`.
+`SystemUser.ID` kontrolü adapter içinde — `ApprovalGuardService` platform bilmez.
+
+**Phase X (ertelendi):** `User.java`, `approval.domain.UserTrustLevel` enum'unu import ediyor.
+Bu `platform/user → approval` pre-existing coupling ayrı bir refactoring konusudur.
+
+### 19.3 Phase 2 — Cross-BC Port/Adapter (Hibrit Karar) ✅
+
+**C1 — Bounded Port (1:1):**
+- `sales/salesorder/domain/port/ProductionOrderPort` — Sales kendi dilinde konuşur ("production order", "work order" değil)
+- `sales/salesorder/domain/port/DraftProductionOrderCommand` — Sales çıktı kontratı (record)
+- `production/execution/workorder/app/adapter/WorkOrderCreationAdapter` — portu implement eder, command→request map'leme burada
+
+**C3 — Universal Port (cross-cutting):**
+- `common/infrastructure/approval/ApprovalPort` — approval cross-cutting olduğu için `common`'da; `String entityType` kullanır
+- `approval/app/adapter/ApprovalGuardAdapter` — `String` → `ApprovalEntityType.valueOf()` dönüşümü burada
+- `WorkOrderService` sıfır `approval.*` import'u; `"WORK_ORDER"` String sabitini kullanır
+
+**Bağımlılık yönü kararı (DIP):**
+- 1:1 bağımlılık → port consumer modülünde (`ProductionOrderPort` → `sales`)
+- Cross-cutting → `common/infrastructure/` (`ApprovalPort` → `common`)
+
+### 19.4 Phase 3 — ArchUnit Guardrail'ları ✅
+
+`ConstitutionArchTest.java` — **Article 12 — WorkOrder Bounded Context Isolation:**
+
+- **Rule 12.1:** `sales..` → `production..app..` / `production..infra..` yasak
+- **Rule 12.2:** `production..` (EventListener hariç) → `approval.app..` yasak
+- **Rule 12.3:** `approval..` → `platform.user.infra..` yasak
+
+Rule 12.3 uygulanırken 3 gizli coupling daha yakalandı:
+
+| Sınıf | Sorun | Port |
+|-------|-------|------|
+| `UserPromotionService` | `UserRepository.save()` + `UserService` doğrudan | `approval/domain/port/UserTrustMutationPort` |
+| `ApproverRecipientResolver` | `UserRepository.findByTenantIdAndRole_RoleCodeIn()` | `approval/domain/port/ApproverRecipientPort` |
+
+### 19.5 Tüm Port/Adapter Envanteri
+
+**`approval/domain/port/`:**
+- `UserTrustLevelPort` — trust level okuma (ApprovalGuardService)
+- `UserTrustMutationPort` — trust level yazma + kullanıcı deaktivasyon (UserPromotionService)
+- `ApproverRecipientPort` — role kodu → kullanıcı ID listesi (ApproverRecipientResolver)
+
+**`platform/user/app/adapter/`:**
+- `UserTrustLevelAdapter` — SystemUser.ID bypass burada
+- `UserTrustMutationAdapter`
+- `ApproverRecipientAdapter`
+
+**`sales/salesorder/domain/port/`:**
+- `ProductionOrderPort` + `DraftProductionOrderCommand`
+
+**`production/execution/workorder/app/adapter/`:**
+- `WorkOrderCreationAdapter`
+
+**`common/infrastructure/approval/`:**
+- `ApprovalPort` — cross-cutting; String entityType (enum coupling yok)
+
+**`approval/app/adapter/`:**
+- `ApprovalGuardAdapter`
+
+### 19.6 Kurallar: Yeni Cross-BC Bağımlılık Eklendiğinde
+
+1. Doğrudan servis/repository import'u **YASAK** — port tanımla
+2. Port, ihtiyaç duyan modülde yaşar (consumer owns the contract — DIP)
+3. 1:1 bağımlılık → port consumer modülünde; cross-cutting → `common/infrastructure/`
+4. Adapter, sağlayıcı modülün `app/adapter/` içinde; infra'ya sadece adapter erişir
+5. ACL: Port consumer'ın kendi dilini kullanır ("production order", "work order" değil)
+6. Port/Adapter tamamlandıktan sonra `ConstitutionArchTest`'e ihlali engelleyen ArchUnit kuralı eklenir
+7. `SystemUser.ID`, `ApproverRole` gibi platform sabitleri adapter'a taşınır; servis katmanı platform bilmez
+
+---
+
 ## Commits
 
 Format: `type(scope): description`

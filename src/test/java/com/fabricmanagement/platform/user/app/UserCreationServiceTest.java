@@ -56,7 +56,16 @@ class UserCreationServiceTest {
   private com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository
       departmentRepository;
 
-  @Mock private com.fabricmanagement.human.core.employee.app.EmployeeService employeeService;
+  @Mock
+  private com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort employeeCreationPort;
+
+  @Mock
+  private com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort
+      employeeProjectionPort;
+
+  @Mock
+  private com.fabricmanagement.platform.user.domain.port.EmployeeCompliancePort
+      employeeCompliancePort;
 
   @InjectMocks private UserCreationService service;
 

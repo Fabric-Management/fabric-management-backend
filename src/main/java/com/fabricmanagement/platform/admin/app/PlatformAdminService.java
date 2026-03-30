@@ -1,7 +1,6 @@
 package com.fabricmanagement.platform.admin.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.platform.admin.dto.TenantStatistics;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
@@ -10,11 +9,14 @@ import com.fabricmanagement.platform.subscription.infra.repository.SubscriptionR
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
+import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +55,7 @@ public class PlatformAdminService {
   private final OrganizationRepository organizationRepository;
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
-  private final EmployeeService employeeService;
+  private final EmployeeProjectionPort employeeProjectionPort;
 
   /**
    * Get all tenants in the system (unpaginated).
@@ -129,10 +131,19 @@ public class PlatformAdminService {
         tenantId,
         () -> {
           List<User> users = userRepository.findByTenantIdAndIsActiveTrue(tenantId);
+          if (users.isEmpty()) {
+            return List.of();
+          }
 
           log.debug("Found {} users in tenant {}", users.size(), tenantId);
 
-          return users.stream().map(UserDto::from).collect(Collectors.toList());
+          List<UUID> userIds = users.stream().map(User::getId).toList();
+          Map<UUID, EmployeeSnapshot> employeeMap =
+              employeeProjectionPort.findByUserIds(tenantId, userIds);
+
+          return users.stream()
+              .map(user -> UserDto.from(user, employeeMap.get(user.getId())))
+              .collect(Collectors.toList());
         });
   }
 
@@ -180,7 +191,7 @@ public class PlatformAdminService {
                               String.format("User %s not found in tenant %s", userId, tenantId)));
 
           return UserDto.from(
-              user, employeeService.getEmployeeByUserId(tenantId, userId).orElse(null));
+              user, employeeProjectionPort.findByUserId(tenantId, userId).orElse(null));
         });
   }
 

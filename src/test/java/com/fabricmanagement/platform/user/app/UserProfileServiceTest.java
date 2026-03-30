@@ -11,6 +11,8 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserProfileUpdatedEvent;
+import com.fabricmanagement.platform.user.domain.port.EmployeeMutationPort;
+import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
 import com.fabricmanagement.platform.user.domain.value.ProfileCategory;
 import com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
@@ -51,7 +53,8 @@ class UserProfileServiceTest {
   @Mock private DomainEventPublisher eventPublisher;
   @Mock private UserQueryService userQueryService;
 
-  @Mock private com.fabricmanagement.human.core.employee.app.EmployeeService employeeService;
+  @Mock private EmployeeProjectionPort employeeProjectionPort;
+  @Mock private EmployeeMutationPort employeeMutationPort;
 
   @InjectMocks private UserProfileService service;
 
@@ -127,7 +130,7 @@ class UserProfileServiceTest {
       when(permissionService.canUpdateWorkProfile(REQUESTER_ID, USER_ID)).thenReturn(true);
       when(userRepository.findByTenantIdAndId(TENANT_ID, USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-      when(employeeService.getEmployeeByUserId(USER_ID)).thenReturn(Optional.empty());
+      when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
 
       UserDto result = service.updateProfile(USER_ID, request, REQUESTER_ID);
 
@@ -184,7 +187,7 @@ class UserProfileServiceTest {
           .thenReturn(contact);
       when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
           .thenReturn(false);
-      when(employeeService.getEmployeeByUserId(USER_ID)).thenReturn(Optional.empty());
+      when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
 
       UserDto result = service.updateProfile(USER_ID, request, REQUESTER_ID);
 

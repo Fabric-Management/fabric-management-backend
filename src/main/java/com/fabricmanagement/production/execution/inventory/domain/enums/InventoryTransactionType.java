@@ -14,5 +14,7 @@ public enum InventoryTransactionType {
   SPLIT_IN,
   TRANSFER_OUT,
   TRANSFER_IN,
-  QUALITY_TEST
+  QUALITY_TEST,
+  SHIPMENT_DISPATCH,
+  SHIPMENT_RETURN
 }

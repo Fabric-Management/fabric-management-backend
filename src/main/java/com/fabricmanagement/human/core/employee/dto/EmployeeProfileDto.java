@@ -1,8 +1,8 @@
 package com.fabricmanagement.human.core.employee.dto;
 
-import com.fabricmanagement.human.core.employee.domain.Gender;
+import com.fabricmanagement.common.infrastructure.identity.Gender;
+import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.human.core.employee.domain.HrComplianceStatus;
-import com.fabricmanagement.human.core.employee.domain.Title;
 import java.time.LocalDate;
 import java.util.UUID;
 import lombok.Builder;

@@ -56,7 +56,7 @@ public class NotificationQueueProcessor {
 
     for (NotificationQueue item : pending) {
       try {
-        itemProcessor.processItem(item);
+        itemProcessor.processItem(item.getId());
       } catch (Exception ex) {
         // itemProcessor kendi içinde hataları yönetiyor,
         // ama beklenmedik bir hata olursa (ör: DB bağlantısı) diğer kayıtları engellemesin
@@ -85,13 +85,16 @@ public class NotificationQueueProcessor {
           stuckThresholdMinutes);
 
       for (NotificationQueue item : stuck) {
-        item.markFailed("Stuck in PROCESSING — recovered by scheduler");
-        queueRepo.save(item);
-        log.warn(
-            "Recovered stuck notification: queueId={} event={} retryCount={}",
-            item.getId(),
-            item.getEventType(),
-            item.getRetryCount());
+        try {
+          itemProcessor.recoverStuckProcessingItem(item.getId(), threshold);
+          log.warn(
+              "Recovered stuck notification: queueId={} event={}",
+              item.getId(),
+              item.getEventType());
+        } catch (Exception ex) {
+          log.error(
+              "Failed to recover stuck notification queueId={}: {}", item.getId(), ex.getMessage());
+        }
       }
     }
   }

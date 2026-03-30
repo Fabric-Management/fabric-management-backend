@@ -2,6 +2,7 @@ package com.fabricmanagement.approval.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -12,15 +13,16 @@ import com.fabricmanagement.approval.domain.ApprovalRequest;
 import com.fabricmanagement.approval.domain.ApproverRole;
 import com.fabricmanagement.approval.domain.PolicyTargetLevel;
 import com.fabricmanagement.approval.domain.UserTrustLevel;
+import com.fabricmanagement.approval.domain.port.UserTrustLevelPort;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.platform.user.domain.User;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +31,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ApprovalGuardService Test")
@@ -37,11 +38,19 @@ class ApprovalGuardServiceTest {
 
   @Mock private ApprovalPolicyService policyService;
   @Mock private ApprovalRequestRepository requestRepo;
-  @Mock private UserRepository userRepo;
+  @Mock private UserTrustLevelPort userTrustLevelPort;
+  @Mock private ApproverRecipientResolver approverRecipientResolver;
   @Mock private DomainEventPublisher eventPublisher;
   @Spy private Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
 
   @InjectMocks private ApprovalGuardService guardService;
+
+  @BeforeEach
+  void stubApproverRecipients() {
+    lenient()
+        .when(approverRecipientResolver.resolveUsersForApproverRole(any(), any()))
+        .thenReturn(List.of(UUID.randomUUID()));
+  }
 
   private final UUID tenantId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
@@ -74,11 +83,8 @@ class ApprovalGuardServiceTest {
     when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER))
         .thenReturn(Optional.of(policy));
 
-    User user = User.builder().build();
-    ReflectionTestUtils.setField(user, "tenantId", tenantId);
-    ReflectionTestUtils.setField(user, "id", userId);
-    user.setTrustLevel(UserTrustLevel.PROBATION);
-    when(userRepo.findByTenantIdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+    when(userTrustLevelPort.resolveTrustLevel(tenantId, userId))
+        .thenReturn(UserTrustLevel.PROBATION);
 
     boolean requiresApproval =
         guardService.checkAndEnforceApproval(
@@ -106,11 +112,8 @@ class ApprovalGuardServiceTest {
     when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER))
         .thenReturn(Optional.of(policy));
 
-    User user = User.builder().build();
-    ReflectionTestUtils.setField(user, "tenantId", tenantId);
-    ReflectionTestUtils.setField(user, "id", userId);
-    user.setTrustLevel(UserTrustLevel.STANDARD);
-    when(userRepo.findByTenantIdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+    when(userTrustLevelPort.resolveTrustLevel(tenantId, userId))
+        .thenReturn(UserTrustLevel.STANDARD);
 
     boolean requiresApproval =
         guardService.checkAndEnforceApproval(
@@ -133,11 +136,8 @@ class ApprovalGuardServiceTest {
     when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.CRITICAL_ACTION))
         .thenReturn(Optional.of(policy));
 
-    User user = User.builder().build();
-    ReflectionTestUtils.setField(user, "tenantId", tenantId);
-    ReflectionTestUtils.setField(user, "id", userId);
-    user.setTrustLevel(UserTrustLevel.TRUSTED); // Trusted olsalar da politika herkese hitap ediyor
-    when(userRepo.findByTenantIdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+    when(userTrustLevelPort.resolveTrustLevel(tenantId, userId))
+        .thenReturn(UserTrustLevel.TRUSTED); // Trusted olsalar da politika herkese hitap ediyor
 
     boolean requiresApproval =
         guardService.checkAndEnforceApproval(

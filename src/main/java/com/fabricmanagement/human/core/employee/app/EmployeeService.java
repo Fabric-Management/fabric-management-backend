@@ -1,6 +1,8 @@
 package com.fabricmanagement.human.core.employee.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.identity.Gender;
+import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.human.compliance.app.EmployeeComplianceContext;
 import com.fabricmanagement.human.compliance.app.EmployeeCompliancePolicyRegistry;
@@ -8,8 +10,6 @@ import com.fabricmanagement.human.compliance.domain.EmployeeCompliancePolicy;
 import com.fabricmanagement.human.core.employee.domain.EmergencyContact;
 import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.human.core.employee.domain.EmployeeNumberSequence;
-import com.fabricmanagement.human.core.employee.domain.Gender;
-import com.fabricmanagement.human.core.employee.domain.Title;
 import com.fabricmanagement.human.core.employee.domain.event.EmployeeUpdatedEvent;
 import com.fabricmanagement.human.core.employee.infra.repository.EmployeeNumberSequenceRepository;
 import com.fabricmanagement.human.core.employee.infra.repository.EmployeeRepository;

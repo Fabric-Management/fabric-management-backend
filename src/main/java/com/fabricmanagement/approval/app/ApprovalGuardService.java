@@ -9,8 +9,6 @@ import com.fabricmanagement.approval.domain.UserTrustLevel;
 import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.platform.approval.domain.event.ApprovalPendingEvent;
-import com.fabricmanagement.platform.user.domain.User;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -30,7 +28,8 @@ public class ApprovalGuardService {
 
   private final ApprovalPolicyService policyService;
   private final ApprovalRequestRepository requestRepo;
-  private final UserRepository userRepo;
+  private final com.fabricmanagement.approval.domain.port.UserTrustLevelPort userTrustLevelPort;
+  private final ApproverRecipientResolver approverRecipientResolver;
   private final DomainEventPublisher eventPublisher;
   private final Clock clock;
 
@@ -58,12 +57,10 @@ public class ApprovalGuardService {
     }
 
     // 2. Kullanıcının trust_level'i bu kuralın radarına giriyor mu?
-    User user =
-        userRepo
-            .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    if (!isUserMatchingPolicyLevel(user.getTrustLevel(), policy.getRequiredForLevel())) {
-      log.debug("User {} ({}) bypasses policy {}", userId, user.getTrustLevel(), policy.getId());
+    UserTrustLevel trustLevel = userTrustLevelPort.resolveTrustLevel(tenantId, userId);
+
+    if (!isUserMatchingPolicyLevel(trustLevel, policy.getRequiredForLevel())) {
+      log.debug("User {} ({}) bypasses policy {}", userId, trustLevel, policy.getId());
       return false;
     }
 
@@ -82,7 +79,7 @@ public class ApprovalGuardService {
     log.info(
         "User {} ({}) requires approval for {} - {}. Policy: {}",
         userId,
-        user.getTrustLevel(),
+        trustLevel,
         entityType,
         entityId,
         policy.getId());
@@ -94,6 +91,17 @@ public class ApprovalGuardService {
 
     requestRepo.save(request);
 
+    var notifyRecipients =
+        approverRecipientResolver.resolveUsersForApproverRole(tenantId, policy.getApproverRole());
+    if (notifyRecipients.isEmpty()) {
+      log.warn(
+          "Approval pending for {} {} but no notify recipients resolved for approverRole={} —"
+              + " notification skipped.",
+          entityType,
+          entityId,
+          policy.getApproverRole());
+    }
+
     eventPublisher.publish(
         new ApprovalPendingEvent(
             tenantId,
@@ -101,7 +109,8 @@ public class ApprovalGuardService {
             entityType.name(),
             entityId,
             request.getUid(),
-            null)); // approverId henüz belli değil
+            null,
+            notifyRecipients));
 
     return true; // "Evet, onay gerektiriyor" olarak anla ve entity'ni (Örn WO) PENDING yap.
   }
