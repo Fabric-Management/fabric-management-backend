@@ -106,6 +106,37 @@ public class StockUnitService {
     UUID tenantId = TenantContext.requireTenantId();
     validateBatchExists(batchId, tenantId);
 
+    return internalCreate(
+        tenantId,
+        batchId,
+        materialType,
+        barcode,
+        serialNumber,
+        packageType,
+        initialWeight,
+        grossWeight,
+        unit,
+        locationId,
+        sourceType,
+        sourceId,
+        actorId);
+  }
+
+  private StockUnit internalCreate(
+      UUID tenantId,
+      UUID batchId,
+      MaterialType materialType,
+      String barcode,
+      String serialNumber,
+      PackageType packageType,
+      BigDecimal initialWeight,
+      BigDecimal grossWeight,
+      String unit,
+      UUID locationId,
+      StockUnitSourceType sourceType,
+      UUID sourceId,
+      UUID actorId) {
+
     StockUnit stockUnit =
         StockUnit.create(
             tenantId,
@@ -670,7 +701,8 @@ public class StockUnitService {
     return requests.stream()
         .map(
             r ->
-                create(
+                internalCreate(
+                    tenantId,
                     batchId,
                     r.materialType(),
                     r.barcode(),
@@ -725,11 +757,7 @@ public class StockUnitService {
    * state. StockUnit statuses are NOT cascaded; the batch acts as a gate only.
    */
   private void assertBatchAllowsConsumption(Batch batch) {
-    if (batch.getStatus() == BatchStatus.ON_HOLD
-        || batch.getStatus() == BatchStatus.QUARANTINE
-        || batch.getStatus() == BatchStatus.QC_REJECTED
-        || batch.getStatus() == BatchStatus.RETURNED
-        || batch.getStatus() == BatchStatus.DESTROYED) {
+    if (BatchStatus.BLOCKED_FOR_PRODUCTION.contains(batch.getStatus())) {
       throw new StockUnitDomainException(
           String.format(
               "Batch %s is in status %s — consumption and transfer are blocked.",

@@ -129,6 +129,20 @@ public final class TenantContext {
   }
 
   /**
+   * Gets the current tenant ID for this thread. Throws IllegalStateException if not set.
+   *
+   * @return the current tenant ID
+   * @throws IllegalStateException if tenant context is missing
+   */
+  public static UUID requireTenantId() {
+    UUID tenantId = CURRENT_TENANT_ID.get();
+    if (tenantId == null) {
+      throw new IllegalStateException("TenantContext is not set. Cannot proceed without tenant.");
+    }
+    return tenantId;
+  }
+
+  /**
    * Gets the current tenant ID for this thread
    *
    * @return the current tenant ID, or SYSTEM_TENANT_ID if not set

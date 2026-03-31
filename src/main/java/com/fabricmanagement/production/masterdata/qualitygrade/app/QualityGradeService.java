@@ -62,8 +62,7 @@ public class QualityGradeService {
         .findByTenantIdAndMaterialTypeAndCodeAndIsActiveTrue(tenantId, materialType, code)
         .orElseThrow(
             () ->
-                new com.fabricmanagement.production.execution.stockunit.domain.exception
-                    .StockUnitDomainException(
+                new com.fabricmanagement.common.infrastructure.web.exception.NotFoundException(
                     String.format(
                         "QualityGrade not found: materialType=%s, code=%s", materialType, code)));
   }
@@ -82,8 +81,8 @@ public class QualityGradeService {
         .filter(g -> g.getTenantId().equals(tenantId))
         .orElseThrow(
             () ->
-                new com.fabricmanagement.production.execution.stockunit.domain.exception
-                    .StockUnitDomainException("QualityGrade not found: " + gradeId));
+                new com.fabricmanagement.common.infrastructure.web.exception.NotFoundException(
+                    "QualityGrade not found: " + gradeId));
   }
 
   // ── Commands ──────────────────────────────────────────────────────────────
@@ -147,7 +146,7 @@ public class QualityGradeService {
   @Transactional
   public void deactivate(UUID gradeId) {
     QualityGrade grade = findById(gradeId);
-    grade.softDelete();
+    grade.delete();
     qualityGradeRepository.save(grade);
     log.info("QualityGrade deactivated: id={}, code={}", gradeId, grade.getCode());
   }
