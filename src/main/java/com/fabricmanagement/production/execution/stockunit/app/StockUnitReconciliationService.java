@@ -16,9 +16,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * Passive mode reconciliation cron job. Runs periodically to compare the sum of current StockUnit
- * weights against the denormalized getAvailableQuantity() on the parent Batch. Logs discrepancies
- * for operational tracking.
+ * Passive mode reconciliation cron job.
+ *
+ * <p>Runs nightly to detect discrepancies between the Batch lot-level summary and the physical
+ * StockUnit weights. The comparison is:
+ *
+ * <pre>
+ *   batch.quantity - batch.consumedQuantity  ==  SUM(stockUnit.currentWeight WHERE status NOT DISPOSED)
+ * </pre>
+ *
+ * Both sides represent "total weight that has entered the system and has not yet been written off"
+ * — reserved weight is still physically present and must be counted on both sides.
  */
 @Slf4j
 @Service
@@ -72,16 +80,21 @@ public class StockUnitReconciliationService {
         physicalSum = BigDecimal.ZERO;
       }
 
-      BigDecimal nominalAvailable = batch.getAvailableQuantity();
+      // C3: Correct comparison:
+      //   Batch side:        quantity - consumedQuantity  (physical stock not yet written off)
+      //   StockUnit side:    SUM(currentWeight) excluding DISPOSED  (same concept)
+      // Note: getAvailableQuantity() also subtracts reservedQuantity, which would create a
+      // systematic false-positive for every batch with active reservations.
+      BigDecimal nominalRemaining = batch.getQuantity().subtract(batch.getConsumedQuantity());
 
       // If the difference is non-zero, log it. In a real scenario we might have an acceptable
       // tolerance.
-      if (physicalSum.compareTo(nominalAvailable) != 0) {
+      if (physicalSum.compareTo(nominalRemaining) != 0) {
         log.warn(
-            "Reconciliation discrepancy found! Tenant: {}, Batch: {}, NominalAvailable: {}, PhysicalSum: {}",
+            "Reconciliation discrepancy found! Tenant: {}, Batch: {}, NominalRemaining: {}, PhysicalSum: {}",
             tenantId,
             batch.getBatchCode(),
-            nominalAvailable,
+            nominalRemaining,
             physicalSum);
         discrepancyCount++;
       }

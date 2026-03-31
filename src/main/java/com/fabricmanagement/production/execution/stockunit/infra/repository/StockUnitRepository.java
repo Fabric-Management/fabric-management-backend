@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.stockunit.infra.repository;
 
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
+import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,6 +19,14 @@ import org.springframework.stereotype.Repository;
 public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
 
   Optional<StockUnit> findByTenantIdAndBarcode(UUID tenantId, String barcode);
+
+  /**
+   * Idempotency guard for event listeners. Returns true if at least one StockUnit already exists
+   * for the given source record (e.g. GoodsReceiptItem). Used by {@code
+   * GoodsReceiptConfirmedEventListener} to skip duplicate event processing.
+   */
+  boolean existsByTenantIdAndSourceTypeAndSourceId(
+      UUID tenantId, StockUnitSourceType sourceType, UUID sourceId);
 
   List<StockUnit> findByTenantIdAndBatchIdAndStatusIn(
       UUID tenantId, UUID batchId, List<StockUnitStatus> statuses);
