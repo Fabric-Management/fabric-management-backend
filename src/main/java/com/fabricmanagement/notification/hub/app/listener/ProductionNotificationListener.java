@@ -182,34 +182,34 @@ public class ProductionNotificationListener {
   public void onGoodsReceiptConfirmed(GoodsReceiptConfirmedEvent event) {
     log.info(
         "NotificationHub ← GoodsReceiptConfirmed: receipt={} items={}",
-        event.receiptNumber(),
-        event.items().size());
+        event.getReceiptNumber(),
+        event.getItems().size());
 
     TenantContext.executeInTenantContext(
-        event.tenantId(),
+        event.getTenantId(),
         () -> {
           List<UUID> managerIds =
               departmentRecipientPort.findManagersByDepartmentKeyword(
-                  event.tenantId(), "WAREHOUSE", "Warehouse");
+                  event.getTenantId(), "WAREHOUSE", "Warehouse");
 
           if (!managerIds.isEmpty()) {
             var payload =
                 Map.of(
                     "receiptNumber",
-                    event.receiptNumber() != null ? event.receiptNumber() : "",
+                    event.getReceiptNumber() != null ? event.getReceiptNumber() : "",
                     "itemCount",
-                    String.valueOf(event.items().size()));
+                    String.valueOf(event.getItems().size()));
             notificationHubService.notifyAll(
                 managerIds,
-                event.tenantId(),
+                event.getTenantId(),
                 NotificationEventType.GOODS_RECEIPT_CONFIRMED,
                 payload,
-                event.receiptId(),
+                event.getReceiptId(),
                 "GOODS_RECEIPT");
           } else {
             log.warn(
                 "No recipients found for GoodsReceiptConfirmed (receipt={})",
-                event.receiptNumber());
+                event.getReceiptNumber());
           }
         });
   }
