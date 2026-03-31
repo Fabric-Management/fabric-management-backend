@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.organization.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.dto.CertificationSummary;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationCertification;
@@ -10,9 +11,11 @@ import com.fabricmanagement.platform.organization.dto.UpdateOrganizationCertific
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationCertificationRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberCertificationQueryService;
-import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,8 +44,32 @@ public class OrganizationCertificationService {
                         404,
                         new Object[] {organizationId}));
 
-    return certificationRepository.findByOrganizationIdAndIsActiveTrue(org.getId()).stream()
-        .map(OrganizationCertificationDto::from)
+    List<OrganizationCertification> certs =
+        certificationRepository.findByOrganizationIdAndIsActiveTrue(org.getId());
+
+    Set<UUID> certIds =
+        certs.stream()
+            .map(OrganizationCertification::getCertificationId)
+            .collect(Collectors.toSet());
+
+    var certMap =
+        fiberCertificationQueryService.findAllActiveByIds(certIds).stream()
+            .collect(Collectors.toMap(c -> c.getId(), Function.identity()));
+
+    return certs.stream()
+        .map(
+            entity -> {
+              var certDto = certMap.get(entity.getCertificationId());
+              CertificationSummary summary =
+                  certDto != null
+                      ? new CertificationSummary(
+                          certDto.getId(),
+                          certDto.getCertificationCode(),
+                          certDto.getCertificationName(),
+                          certDto.getCertifyingBody())
+                      : null;
+              return OrganizationCertificationDto.from(entity, summary);
+            })
         .toList();
   }
 
@@ -65,7 +92,18 @@ public class OrganizationCertificationService {
         .filter(c -> c.getOrganization().getId().equals(org.getId()))
         .filter(c -> tenantId.equals(c.getTenantId()))
         .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
-        .map(OrganizationCertificationDto::from)
+        .map(
+            entity -> {
+              var cert =
+                  fiberCertificationQueryService.findActiveByIdOrThrow(entity.getCertificationId());
+              CertificationSummary summary =
+                  new CertificationSummary(
+                      cert.getId(),
+                      cert.getCertificationCode(),
+                      cert.getCertificationName(),
+                      cert.getCertifyingBody());
+              return OrganizationCertificationDto.from(entity, summary);
+            })
         .orElseThrow(
             () ->
                 new PlatformDomainException(
@@ -91,13 +129,12 @@ public class OrganizationCertificationService {
                         404,
                         new Object[] {organizationId}));
 
-    FiberCertification certification =
-        fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
+    fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
 
     OrganizationCertification entity =
         OrganizationCertification.builder()
             .organization(org)
-            .certification(certification)
+            .certificationId(request.getCertificationId())
             .licenseNo(request.getLicenseNo())
             .issuedAt(request.getIssuedAt())
             .validUntil(request.getValidUntil())
@@ -106,12 +143,20 @@ public class OrganizationCertificationService {
 
     OrganizationCertification saved = certificationRepository.save(entity);
     log.info(
-        "Added certification {} to organization {}: {}",
-        certification.getCertificationCode(),
+        "Added certification ID {} to organization {}: {}",
+        request.getCertificationId(),
         org.getUid(),
         saved.getId());
 
-    return OrganizationCertificationDto.from(saved);
+    var cert = fiberCertificationQueryService.findActiveByIdOrThrow(saved.getCertificationId());
+    CertificationSummary summary =
+        new CertificationSummary(
+            cert.getId(),
+            cert.getCertificationCode(),
+            cert.getCertificationName(),
+            cert.getCertifyingBody());
+
+    return OrganizationCertificationDto.from(saved, summary);
   }
 
   @Transactional
@@ -151,9 +196,8 @@ public class OrganizationCertificationService {
     }
 
     if (request.getCertificationId() != null) {
-      FiberCertification certification =
-          fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
-      entity.setCertification(certification);
+      fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
+      entity.setCertificationId(request.getCertificationId());
     }
     if (request.getLicenseNo() != null) entity.setLicenseNo(request.getLicenseNo());
     if (request.getIssuedAt() != null) entity.setIssuedAt(request.getIssuedAt());
@@ -163,7 +207,15 @@ public class OrganizationCertificationService {
     OrganizationCertification saved = certificationRepository.save(entity);
     log.info("Updated organization certification: org={}, cert={}", org.getUid(), certificationId);
 
-    return OrganizationCertificationDto.from(saved);
+    var cert = fiberCertificationQueryService.findActiveByIdOrThrow(saved.getCertificationId());
+    CertificationSummary summary =
+        new CertificationSummary(
+            cert.getId(),
+            cert.getCertificationCode(),
+            cert.getCertificationName(),
+            cert.getCertifyingBody());
+
+    return OrganizationCertificationDto.from(saved, summary);
   }
 
   @Transactional

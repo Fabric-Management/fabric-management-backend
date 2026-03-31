@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tradingpartner.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.common.dto.CertificationSummary;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerCertification;
 import com.fabricmanagement.platform.tradingpartner.dto.AddTradingPartnerCertificationRequest;
@@ -9,9 +10,11 @@ import com.fabricmanagement.platform.tradingpartner.dto.UpdateTradingPartnerCert
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberCertificationQueryService;
-import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,8 +38,32 @@ public class TradingPartnerCertificationService {
             .orElseThrow(
                 () -> new IllegalArgumentException("Trading partner not found: " + partnerId));
 
-    return certificationRepository.findByTradingPartnerIdAndIsActiveTrue(partner.getId()).stream()
-        .map(TradingPartnerCertificationDto::from)
+    List<TradingPartnerCertification> certs =
+        certificationRepository.findByTradingPartnerIdAndIsActiveTrue(partner.getId());
+
+    Set<UUID> certIds =
+        certs.stream()
+            .map(TradingPartnerCertification::getCertificationId)
+            .collect(Collectors.toSet());
+
+    var certMap =
+        fiberCertificationQueryService.findAllActiveByIds(certIds).stream()
+            .collect(Collectors.toMap(c -> c.getId(), Function.identity()));
+
+    return certs.stream()
+        .map(
+            entity -> {
+              var certDto = certMap.get(entity.getCertificationId());
+              CertificationSummary summary =
+                  certDto != null
+                      ? new CertificationSummary(
+                          certDto.getId(),
+                          certDto.getCertificationCode(),
+                          certDto.getCertificationName(),
+                          certDto.getCertifyingBody())
+                      : null;
+              return TradingPartnerCertificationDto.from(entity, summary);
+            })
         .toList();
   }
 
@@ -54,7 +81,18 @@ public class TradingPartnerCertificationService {
         .filter(c -> c.getTradingPartner().getId().equals(partner.getId()))
         .filter(c -> tenantId.equals(c.getTenantId()))
         .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
-        .map(TradingPartnerCertificationDto::from)
+        .map(
+            entity -> {
+              var cert =
+                  fiberCertificationQueryService.findActiveByIdOrThrow(entity.getCertificationId());
+              CertificationSummary summary =
+                  new CertificationSummary(
+                      cert.getId(),
+                      cert.getCertificationCode(),
+                      cert.getCertificationName(),
+                      cert.getCertifyingBody());
+              return TradingPartnerCertificationDto.from(entity, summary);
+            })
         .orElseThrow(
             () ->
                 new IllegalArgumentException(
@@ -72,13 +110,12 @@ public class TradingPartnerCertificationService {
             .orElseThrow(
                 () -> new IllegalArgumentException("Trading partner not found: " + partnerId));
 
-    FiberCertification certification =
-        fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
+    fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
 
     TradingPartnerCertification entity =
         TradingPartnerCertification.builder()
             .tradingPartner(partner)
-            .certification(certification)
+            .certificationId(request.getCertificationId())
             .licenseNo(request.getLicenseNo())
             .issuedAt(request.getIssuedAt())
             .validUntil(request.getValidUntil())
@@ -87,12 +124,20 @@ public class TradingPartnerCertificationService {
 
     TradingPartnerCertification saved = certificationRepository.save(entity);
     log.info(
-        "Added certification {} to partner {}: {}",
-        certification.getCertificationCode(),
+        "Added certification ID {} to partner {}: {}",
+        request.getCertificationId(),
         partner.getUid(),
         saved.getId());
 
-    return TradingPartnerCertificationDto.from(saved);
+    var cert = fiberCertificationQueryService.findActiveByIdOrThrow(saved.getCertificationId());
+    CertificationSummary summary =
+        new CertificationSummary(
+            cert.getId(),
+            cert.getCertificationCode(),
+            cert.getCertificationName(),
+            cert.getCertifyingBody());
+
+    return TradingPartnerCertificationDto.from(saved, summary);
   }
 
   @Transactional
@@ -124,9 +169,8 @@ public class TradingPartnerCertificationService {
     }
 
     if (request.getCertificationId() != null) {
-      FiberCertification certification =
-          fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
-      entity.setCertification(certification);
+      fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
+      entity.setCertificationId(request.getCertificationId());
     }
     if (request.getLicenseNo() != null) entity.setLicenseNo(request.getLicenseNo());
     if (request.getIssuedAt() != null) entity.setIssuedAt(request.getIssuedAt());
@@ -137,7 +181,15 @@ public class TradingPartnerCertificationService {
     log.info(
         "Updated partner certification: partner={}, cert={}", partner.getUid(), certificationId);
 
-    return TradingPartnerCertificationDto.from(saved);
+    var cert = fiberCertificationQueryService.findActiveByIdOrThrow(saved.getCertificationId());
+    CertificationSummary summary =
+        new CertificationSummary(
+            cert.getId(),
+            cert.getCertificationCode(),
+            cert.getCertificationName(),
+            cert.getCertifyingBody());
+
+    return TradingPartnerCertificationDto.from(saved, summary);
   }
 
   @Transactional

@@ -1,7 +1,7 @@
 package com.fabricmanagement.platform.tradingpartner.dto;
 
+import com.fabricmanagement.platform.common.dto.CertificationSummary;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerCertification;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -21,7 +21,7 @@ public class TradingPartnerCertificationDto {
   private String uid;
   private UUID tradingPartnerId;
   private UUID certificationId;
-  private FiberCertificationDto certification;
+  private CertificationSummary certification;
   private String licenseNo;
   private LocalDate issuedAt;
   private LocalDate validUntil;
@@ -31,19 +31,16 @@ public class TradingPartnerCertificationDto {
   private Instant createdAt;
   private Instant updatedAt;
 
-  public static TradingPartnerCertificationDto from(TradingPartnerCertification entity) {
+  public static TradingPartnerCertificationDto from(
+      TradingPartnerCertification entity, CertificationSummary certificationSummary) {
     return TradingPartnerCertificationDto.builder()
         .id(entity.getId())
         .tenantId(entity.getTenantId())
         .uid(entity.getUid())
         .tradingPartnerId(
             entity.getTradingPartner() != null ? entity.getTradingPartner().getId() : null)
-        .certificationId(
-            entity.getCertification() != null ? entity.getCertification().getId() : null)
-        .certification(
-            entity.getCertification() != null
-                ? FiberCertificationDto.from(entity.getCertification())
-                : null)
+        .certificationId(entity.getCertificationId())
+        .certification(certificationSummary)
         .licenseNo(entity.getLicenseNo())
         .issuedAt(entity.getIssuedAt())
         .validUntil(entity.getValidUntil())

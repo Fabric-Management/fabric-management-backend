@@ -1,7 +1,7 @@
 package com.fabricmanagement.platform.organization.dto;
 
+import com.fabricmanagement.platform.common.dto.CertificationSummary;
 import com.fabricmanagement.platform.organization.domain.OrganizationCertification;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -21,7 +21,7 @@ public class OrganizationCertificationDto {
   private String uid;
   private UUID organizationId;
   private UUID certificationId;
-  private FiberCertificationDto certification;
+  private CertificationSummary certification;
   private String licenseNo;
   private LocalDate issuedAt;
   private LocalDate validUntil;
@@ -31,18 +31,15 @@ public class OrganizationCertificationDto {
   private Instant createdAt;
   private Instant updatedAt;
 
-  public static OrganizationCertificationDto from(OrganizationCertification entity) {
+  public static OrganizationCertificationDto from(
+      OrganizationCertification entity, CertificationSummary certificationSummary) {
     return OrganizationCertificationDto.builder()
         .id(entity.getId())
         .tenantId(entity.getTenantId())
         .uid(entity.getUid())
         .organizationId(entity.getOrganization() != null ? entity.getOrganization().getId() : null)
-        .certificationId(
-            entity.getCertification() != null ? entity.getCertification().getId() : null)
-        .certification(
-            entity.getCertification() != null
-                ? FiberCertificationDto.from(entity.getCertification())
-                : null)
+        .certificationId(entity.getCertificationId())
+        .certification(certificationSummary)
         .licenseNo(entity.getLicenseNo())
         .issuedAt(entity.getIssuedAt())
         .validUntil(entity.getValidUntil())

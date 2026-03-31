@@ -305,7 +305,7 @@ public class WorkOrderService {
         if (certs != null && !certs.isEmpty()) {
           var cert = certs.get(0);
           if (cert.getCertification() != null) {
-            workOrder.setSupplierCertificationCode(cert.getCertification().getCertificationCode());
+            workOrder.setSupplierCertificationCode(cert.getCertification().certificationCode());
           }
           workOrder.setSupplierLicenseNo(cert.getLicenseNo());
           workOrder.setSupplierLicenseValidUntil(cert.getValidUntil());
