@@ -3,9 +3,7 @@ package com.fabricmanagement.production.execution.stockunit.app.listener;
 import com.fabricmanagement.production.execution.inventory.api.facade.InventoryFacade;
 import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionReasonCode;
 import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionType;
-import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.event.StockUnitTransferredEvent;
-import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +18,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class StockUnitInventoryBridgeListener {
 
   private final InventoryFacade inventoryFacade;
-  private final StockUnitRepository stockUnitRepository;
 
   /**
    * StockUnit location transfer → InventoryTransaction TRANSFER_OUT + TRANSFER_IN
@@ -30,19 +27,13 @@ public class StockUnitInventoryBridgeListener {
    */
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onStockUnitTransferred(StockUnitTransferredEvent event) {
-    StockUnit unit = stockUnitRepository.findById(event.getStockUnitId()).orElse(null);
-    if (unit == null) {
-      log.warn("StockUnit {} not found for transfer event", event.getStockUnitId());
-      return;
-    }
-
     UUID batchId = event.getBatchId();
     BigDecimal weight = event.getWeight();
     String unitStr = event.getUnit();
 
     log.debug(
         "Bridging StockUnitTransferredEvent to InventoryTransaction for StockUnit {}",
-        unit.getBarcode());
+        event.getBarcode());
 
     inventoryFacade.logTransaction(
         event.getTenantId(),

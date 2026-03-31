@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.exception.NotFoundExceptio
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.WasteCategory;
+import com.fabricmanagement.production.execution.batch.domain.event.BatchAdjustedEvent;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchConsumedEvent;
 import com.fabricmanagement.production.execution.batch.domain.event.BatchWasteRecordedEvent;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
@@ -61,8 +62,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>If a StockUnit is RESERVED, it must be consumed via {@link #consumeReserved(UUID, BigDecimal,
  * UUID)} which releases the reservation and immediately consumes in one atomic operation. This
- * avoids the 2-call dance of {@code releaseReservation()} → {@code consume()} and prevents the
- * window where the unit is briefly AVAILABLE and could be grabbed by another operation.
+ * avoids the 2-call dance of {@code releaseReservation()} → {@code consume()} and
+ *
+ * <p>TODO (Sprint 3): Implement data migration to reconcile Batch counters for physical StockUnit
+ * consumptions made prior to Sprint 2 (proactive sync).
  */
 @Slf4j
 @Service
@@ -356,11 +359,27 @@ public class StockUnitService {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
+    Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 
     BigDecimal prevWeight = unit.getCurrentWeight();
 
     unit.reverseConsumption(amount, reason);
     unit = stockUnitRepository.save(unit);
+
+    // Sync: Reduce consumed quantity at Batch level
+    batch.reverseConsumption(amount);
+    batchRepository.save(batch);
+
+    // Publish BatchAdjustedEvent to bridge this correction to inventory
+    eventPublisher.publishEvent(
+        new BatchAdjustedEvent(
+            tenantId,
+            batch.getId(),
+            amount,
+            batch.getUnit(),
+            batch.getLocationId(),
+            reason,
+            "StockUnit consumption reversal: " + unit.getBarcode()));
 
     writeAuditLog(
         tenantId,
