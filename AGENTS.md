@@ -669,6 +669,142 @@ Port yeri: 1:1 → consumer modülünde; cross-cutting (2+ consumer) → `common
 
 ---
 
+## 23. Domain Event Standardizasyonu (Rule 8.1)
+
+**Article 8 — Rule 8.1**: `domain/event/` paketindeki tüm `*Event` sınıfları `DomainEvent` base class'ını extend etmek zorundadır.
+
+### 23.1 Kural Amacı
+
+`DomainEvent` base class'ı (`common.infrastructure.events.DomainEvent`) 4 standart field sağlar:
+- `eventId` (UUID) — her event için benzersiz ID, otomatik üretilir
+- `tenantId` (UUID) — hangi tenant'ın eventi
+- `eventType` (String) — "BATCH_LINEAGE_DELETED" gibi sabit string
+- `occurredAt` (Instant) — event yayın zamanı, otomatik set edilir
+
+### 23.2 Çözülen İhlaller (7 frozen → 0) ✅
+
+| Event | Modül | Eski Yapı | Dönüşüm |
+|-------|-------|-----------|---------|
+| BatchLineageDeletedEvent | production/lineage | `@Value class` | `@Getter extends DomainEvent` |
+| BatchLineageCreatedEvent | production/lineage | `@Value class` | `@Getter extends DomainEvent`, `consumedAt` korundu |
+| CostVarianceDetectedEvent | costing | `@Builder record` | `@Getter class extends DomainEvent`, `detectedAt` → `occurredAt` |
+| InventoryTransactionCreatedEvent | production/inventory | `@Getter @Builder class` | `extends DomainEvent`, `tenantId` field kaldırıldı |
+| GoodsReceiptConfirmedEvent | production/goodsreceipt | `@Builder record` | `@Getter class extends DomainEvent` |
+| MinStockAlertEvent | iwm | `@Data @Builder class` | `@Getter extends DomainEvent` (production versiyonu zaten uyumluydu) |
+| ReturnRateExceededEvent | iwm | `@Data @Builder class` | `@Getter extends DomainEvent` (production versiyonu zaten uyumluydu) |
+
+### 23.3 Migration Pattern (Record / @Value → DomainEvent subclass)
+
+Java `record` ve `@Value` class'ları abstract class extend edemez. Dönüşüm adımları:
+
+```java
+// ESKİ: @Builder record veya @Value class
+@Builder
+public record XxxEvent(UUID tenantId, UUID entityId, String data) {}
+
+// YENİ: @Getter class + @Builder constructor üzerinde
+@Getter
+public class XxxEvent extends DomainEvent {
+
+    private final UUID entityId;
+    private final String data;
+    // tenantId kaldırıldı — DomainEvent'ten miras
+
+    @Builder  // ← constructor üzerinde; producer builder chain'i DEĞİŞMEZ
+    public XxxEvent(UUID tenantId, UUID entityId, String data) {
+        super(tenantId, "XXX_HAPPENED");
+        this.entityId = entityId;
+        this.data = data;
+    }
+}
+```
+
+**Neden `@Builder` constructor üzerinde?** — Producer kodlarındaki `.tenantId(x).entityId(y).build()` zinciri kırılmadan çalışmaya devam eder.
+
+**İş semantiği olan timestamp'ler korunur** — `consumedAt` (tüketim tarihi) veya `transactionDate` (işlem tarihi) `occurredAt` (event yayın anı) ile aynı kavram değildir; bu field'lar entity'de kalır.
+
+### 23.4 Consumer Uyum Notu
+
+`record` → `class` dönüşümünde record accessor'ları (`.fieldName()`) Java Bean getter'larına (`.getFieldName()`) dönüşür. Consumer sınıflarda bu değişiklik yapılmalıdır. Bu refactoring'de güncellenenler:
+- `ProductionNotificationListener` — 5 call site
+- `GoodsReceiptEventAdapter` — 3 call site
+
+---
+
+## 24. Entity Standardizasyonu (Rule 4.3)
+
+**Article 4 — Rule 4.3**: `@Entity` sınıfları `BaseEntity` veya `BaseJunctionEntity`'den türemek zorundadır.
+
+### 24.1 Kural Amacı
+
+`BaseEntity` (`common.infrastructure.persistence.BaseEntity`) şu sözleşmeyi zorunlu kılar:
+- `id` (UUID, @Id) — primary key, otomatik üretilir
+- `tenantId` (UUID) — multi-tenant izolasyon
+- `uid` (String) — insan okunabilir benzersiz ID
+- `createdAt/By`, `updatedAt/By` — Spring Data Auditing
+- `isActive`, `deletedAt` — soft-delete
+- `version` (Long) — optimistic locking
+- Abstract `getModuleCode()` — UID üretimi için modül kodu
+
+### 24.2 Sonuç: 7 → 6 (1 false positive kaldırıldı)
+
+| Entity | Sonuç | Gerekçe |
+|--------|-------|---------|
+| **TaskDependency** | ✅ frozen'dan çıkarıldı | Zaten BaseEntity'yi extend ediyordu — false positive |
+| **Tenant** | 🔒 Kalıcı exception | Root entity; kendi tenantId'si olamaz |
+| **TradingPartnerRegistry** | 🔒 Kalıcı exception | Platform-wide singleton; tenant scope yok |
+| **EmployeeNumberSequence** | 🔒 Kalıcı exception | `tenantId` IS `@Id`; UUID @Id ile uyumsuz |
+| **BatchOverrideLog** | 🔒 Kalıcı exception | Append-only audit log; soft-delete/version anlamsız |
+| **UserDepartment** | 🔒 Kalıcı exception | Composite `@IdClass` key; BaseEntity @Id ile uyumsuz |
+| **TaskLabelAssignment** | 🔒 Kalıcı exception | NOTE [X1] — bilinçli karar; junction table, audit trail gereksiz |
+
+### 24.3 Karar Prensibi: Zorunlu Uyum vs. Tasarım İstisnası
+
+Rule 8.1 (domain event'ler) → saf Java davranışı, hiçbir entity bu kuraldan muaf olamaz.
+Rule 4.3 (entity'ler) → şema sözleşmesi; `tenantId`, UUID @Id, soft-delete **anlamsız** olduğunda enforce etmek mimariyi kirletir.
+
+Altı entity için CalıcıException kararını `ConstitutionArchTest`'teki inline comment'ler belgeler. Gelecekte yeni `@Entity` yazan herhangi biri ArchUnit'ten anında feedback alır.
+
+---
+
+## 25. Katmanlı Mimari Temizliği (Rule 2.2 & Rule 6.2)
+
+**Rule 2.2** — Application layer sınıfları infra katmanına ait olmamalıdır.
+**Rule 6.2** — Application layer sınıfları `Service`, `Component`, `Facade`, vb. son eki taşımalıdır.
+
+### 25.1 Rule 2.2 — Çözülen İhlaller
+
+| Sınıf | Eski Konum | Yeni Konum | Gerekçe |
+|-------|-----------|-----------|---------|
+| `EmployeeComplianceContext` | `human/compliance/app/` | `human/compliance/domain/` | Domain verisi tutan `record`; app katmanında olmamalıydı |
+| `EmailNotificationSender` | `notification/hub/infra/email/` | `notification/hub/app/adapter/email/` | Email gönderimi bir adapter; infra değil app/adapter'a aittir |
+
+**Kalıcı exception:**
+- `WebSocketAuthInterceptor` → `notification/hub/infra/websocket/` — Spring `ChannelInterceptor`; `JwtService` gerektiren gerçek güvenlik altyapısı; app katmanına taşınamaz.
+
+ArchUnit muafiyet kapsamı `notification.hub.infra..` → `notification.hub.infra.websocket..` olarak daraltıldı.
+
+### 25.2 Rule 6.2 — Naming Convention Ek İstisna
+
+`EmailNotificationSender`, `app/adapter/` altına taşındıktan sonra isimlendirme kuralını tetikledi.
+`Sender` son eki, `Evaluator` ve `Dispatcher` gibi önceki istisnalar listesine eklendi.
+Gerekçe: Gönderici adaptörler iş odaklı isimler taşır; `Service` son eki semantik olarak yanlış olur.
+
+### 25.3 Rule 11.2 — Platform→Domain Exception Dokümantasyonu
+
+6 platform sub-modülü için bilinçli exception'lar `ConstitutionArchTest` inline comment'lerinde belgelendi:
+
+| Kod | Modül | Gerekçe |
+|-----|-------|---------|
+| [E1] | `platform.user` | Approval port adaptörleri + Human event listener'lar (cache invalidation) + Notification query impl |
+| [E2] | `platform.admin` | Platformu taraflı admin operasyonları; gelecekteki domain erişimi için korunan guard |
+| [E3] | `platform.ai` | AIToolRegistry tüm domain modüllerinden AIToolProvider toplar; cross-domain tool discovery çekirdeği |
+| [E4] | `platform.tradingpartner` | TradingPartner entity OfflineMetadata embed eder; certification servisleri FiberCertification referans eder |
+| [E5] | `platform.organization` | OrganizationCertification, fiber standart doğrulaması için production.masterdata.fiber'a bağlıdır |
+| [E6] | `platform.auth` | Tenant-scoped izin çözümlemesi için domain erişimi gerekebilir; ileriye dönük guard |
+
+---
+
 ## Commits
 
 Format: `type(scope): description`
