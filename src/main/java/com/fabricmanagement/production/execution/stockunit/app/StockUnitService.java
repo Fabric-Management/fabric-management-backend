@@ -4,6 +4,9 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.domain.WasteCategory;
+import com.fabricmanagement.production.execution.batch.domain.event.BatchConsumedEvent;
+import com.fabricmanagement.production.execution.batch.domain.event.BatchWasteRecordedEvent;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
@@ -197,7 +200,7 @@ public class StockUnitService {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
-    Batch batch = loadBatch(unit.getBatchId(), tenantId);
+    Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 
     assertBatchAllowsConsumption(batch);
 
@@ -206,6 +209,9 @@ public class StockUnitService {
 
     unit.consume(amount);
     unit = stockUnitRepository.save(unit);
+
+    batch.consumeFromAvailable(amount);
+    batchRepository.save(batch);
 
     writeAuditLog(
         tenantId,
@@ -227,6 +233,16 @@ public class StockUnitService {
             amount,
             unit.getCurrentWeight(),
             unit.getUnit()));
+
+    eventPublisher.publishEvent(
+        new BatchConsumedEvent(
+            tenantId,
+            batch.getId(),
+            amount,
+            batch.getUnit(),
+            batch.getLocationId(),
+            unit.getId(),
+            "STOCK_UNIT"));
 
     if (unit.getStatus() == StockUnitStatus.DEPLETED && prevStatus != StockUnitStatus.DEPLETED) {
       eventPublisher.publishEvent(
@@ -261,7 +277,7 @@ public class StockUnitService {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
-    Batch batch = loadBatch(unit.getBatchId(), tenantId);
+    Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 
     assertBatchAllowsConsumption(batch);
 
@@ -278,6 +294,9 @@ public class StockUnitService {
     unit.releaseReservation();
     unit.consume(amount);
     unit = stockUnitRepository.save(unit);
+
+    batch.consumeFromReservation(amount);
+    batchRepository.save(batch);
 
     writeAuditLog(
         tenantId,
@@ -299,6 +318,16 @@ public class StockUnitService {
             amount,
             unit.getCurrentWeight(),
             unit.getUnit()));
+
+    eventPublisher.publishEvent(
+        new BatchConsumedEvent(
+            tenantId,
+            batch.getId(),
+            amount,
+            batch.getUnit(),
+            batch.getLocationId(),
+            unit.getId(),
+            "STOCK_UNIT"));
 
     if (unit.getStatus() == StockUnitStatus.DEPLETED) {
       eventPublisher.publishEvent(
@@ -409,7 +438,14 @@ public class StockUnitService {
 
     eventPublisher.publishEvent(
         new StockUnitTransferredEvent(
-            tenantId, unit.getId(), unit.getBarcode(), fromLocation, finalLocationId));
+            tenantId,
+            unit.getId(),
+            unit.getBarcode(),
+            unit.getBatchId(),
+            unit.getCurrentWeight(),
+            unit.getUnit(),
+            fromLocation,
+            finalLocationId));
 
     log.info("Transfer completed: StockUnit={}, arrivedAt={}", unit.getBarcode(), finalLocationId);
     return unit;
@@ -581,6 +617,7 @@ public class StockUnitService {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
+    Batch batch = loadBatchForUpdate(unit.getBatchId(), tenantId);
 
     if (reason == null || reason.isBlank()) {
       throw new StockUnitDomainException("Disposal reason must not be blank");
@@ -589,6 +626,12 @@ public class StockUnitService {
     BigDecimal disposedWeight = unit.getCurrentWeight();
     unit.dispose();
     unit = stockUnitRepository.save(unit);
+
+    if (disposedWeight.compareTo(BigDecimal.ZERO) > 0) {
+      batch.consumeFromAvailable(disposedWeight);
+      batch.recordWaste(disposedWeight);
+      batchRepository.save(batch);
+    }
 
     writeAuditLog(
         tenantId,
@@ -611,6 +654,18 @@ public class StockUnitService {
             disposedWeight,
             unit.getUnit(),
             reason));
+
+    if (disposedWeight.compareTo(BigDecimal.ZERO) > 0) {
+      eventPublisher.publishEvent(
+          new BatchWasteRecordedEvent(
+              tenantId,
+              batch.getId(),
+              disposedWeight,
+              batch.getUnit(),
+              batch.getLocationId(),
+              WasteCategory.OTHER,
+              reason));
+    }
 
     log.warn(
         "StockUnit disposed: id={}, barcode={}, reason={}",
@@ -726,9 +781,9 @@ public class StockUnitService {
         .orElseThrow(() -> new NotFoundException("StockUnit not found: " + stockUnitId));
   }
 
-  private Batch loadBatch(UUID batchId, UUID tenantId) {
+  private Batch loadBatchForUpdate(UUID batchId, UUID tenantId) {
     return batchRepository
-        .findByIdAndTenantId(batchId, tenantId)
+        .findByIdAndTenantIdForUpdate(batchId, tenantId)
         .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
   }
 
