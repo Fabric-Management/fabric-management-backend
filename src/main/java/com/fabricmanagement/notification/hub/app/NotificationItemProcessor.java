@@ -1,7 +1,7 @@
 package com.fabricmanagement.notification.hub.app;
 
+import com.fabricmanagement.notification.hub.app.adapter.email.EmailNotificationSender;
 import com.fabricmanagement.notification.hub.domain.*;
-import com.fabricmanagement.notification.hub.infra.email.EmailNotificationSender;
 import com.fabricmanagement.notification.hub.infra.repository.*;
 import com.fabricmanagement.notification.hub.infra.websocket.InAppNotificationSender;
 import com.fabricmanagement.notification.i18n.app.TranslationService;
