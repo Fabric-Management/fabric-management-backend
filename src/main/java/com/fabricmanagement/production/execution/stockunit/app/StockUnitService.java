@@ -673,7 +673,9 @@ public class StockUnitService {
    *
    * @param batchId parent batch
    * @param requests list of unit creation parameters
-   * @param actorId the user/system triggering the operation
+   * @param actorId explicit actor ID — use TenantContext.SYSTEM_ACTOR_ID for system-triggered
+   *     operations (e.g. GR listener). Unlike other methods, this does NOT call getCurrentUserId()
+   *     because the listener runs outside an authenticated request context.
    * @return list of saved StockUnits in the same order as {@code requests}
    */
   @Transactional

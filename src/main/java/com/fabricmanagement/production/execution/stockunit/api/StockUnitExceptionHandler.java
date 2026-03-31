@@ -6,19 +6,13 @@ import com.fabricmanagement.production.execution.stockunit.domain.exception.Inva
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.WeightReconciliationException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Module-scoped exception handler for StockUnit domain exceptions.
- *
- * <p>Runs before the global handler due to {@code @Order(1)}.
- */
+/** Module-scoped exception handler for StockUnit domain exceptions. */
 @Slf4j
-@Order(1)
 @RestControllerAdvice(assignableTypes = StockUnitController.class)
 public class StockUnitExceptionHandler {
 

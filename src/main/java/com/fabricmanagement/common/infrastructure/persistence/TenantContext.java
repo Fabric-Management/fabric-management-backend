@@ -57,6 +57,9 @@ public final class TenantContext {
   public static final UUID SYSTEM_TENANT_ID =
       UUID.fromString("00000000-0000-0000-0000-000000000000");
 
+  public static final UUID SYSTEM_ACTOR_ID =
+      UUID.fromString("00000000-0000-0000-0000-000000000001");
+
   /** ThreadLocal storage for current tenant ID */
   private static final ThreadLocal<UUID> CURRENT_TENANT_ID = new ThreadLocal<>();
 

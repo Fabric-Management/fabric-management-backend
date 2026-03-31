@@ -111,7 +111,7 @@ public class GoodsReceiptConfirmedEventListener {
                                 item.itemId()))
                     .toList();
 
-            stockUnitService.createBulk(batchId, requests, TenantContext.SYSTEM_TENANT_ID);
+            stockUnitService.createBulk(batchId, requests, TenantContext.SYSTEM_ACTOR_ID);
 
             log.info(
                 "Auto-created {} StockUnits for GoodsReceipt {}",
