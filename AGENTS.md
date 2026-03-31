@@ -544,6 +544,131 @@ Rule 12.3 uygulanırken 3 gizli coupling daha yakalandı:
 
 ---
 
+## 20. Mimari Sağlık Raporu ve Konsolidasyon (Article 13)
+
+Cross-Module alanında en toksik bağımlılık türü "Infrastructure Bypass" durumudur. Bir modülün, başka bir modülün `infra` katmanına (Repository, Entity vb.) doğrudan erişmesi; o modülün business kurallarını (validasyonlar, event publishing) ve app katmanındaki interceptor'ları (tenant isolation, RLS) tamamen devre dışı bırakır.
+
+### Kural 13.1 - 13.4 (Cross-Module Infra Isolation)
+- **HİÇBİR MODÜL** kendi dışındaki bir modülün `.infra..` paketine erişemez. (common/infrastructure istisnadır)
+- İhtiyaç durumunda **Port/Adapter pattern** veya hedef modülün **QueryService/Facade** katmanları kullanılmalıdır.
+- **Article 13 TAMAMEN TEMİZ — 13 frozen → 0 ✅** (Tüm 4 rule: 0 frozen violation)
+- Frozen sınıflar `.and().doNotHaveSimpleName(...)` ile filtrelenir. ArchUnit testleri herhangi bir yeni infrastructure-bypass ihlaline izin vermez.
+- Çözüm geçmişi ve kullanılan pattern'ler Section 22'de belgelenmiştir.
+
+---
+
+## 21. Notification Hub Cross-Module Decoupling (Port/Adapter + Event Enrichment)
+
+Notification Hub'daki 3 listener (InventoryNotificationListener, ProcurementNotificationListener, ProductionNotificationListener) doğrudan `platform.organization.infra.repository.DepartmentRepository` kullanıyordu. Ek olarak ProcurementNotificationListener, SupplierRFQRepository üzerinden callback yaparak `rfqCreatedByUserId` çekiyordu.
+
+### 21.1 Çözüm A — DepartmentRecipientPort (ACL Pattern)
+
+Port, **notification modülünde** yaşar (platform'da değil) — bağımlılık grafiği tek yönlü kalır.
+
+**Port:**
+- `notification/hub/domain/port/DepartmentRecipientPort` — department bazlı kullanıcı/yönetici çözümleme
+  - `findUsersByDepartmentKeyword(UUID tenantId, String... keywords)`
+  - `findManagersByDepartmentKeyword(UUID tenantId, String... keywords)`
+
+**Adapter:**
+- `notification/hub/app/adapter/PlatformDepartmentAdapter` — ACL; DepartmentService + UserQueryService çağırır
+  - Tüm `getDepartmentUsers()` / `getDepartmentManagers()` / `matchesAny()` helper logic'i burada konsolide
+
+### 21.2 Çözüm B — Event Enrichment (SupplierQuoteReceivedEvent)
+
+`ProcurementNotificationListener`, SupplierRFQRepository'den `rfqCreatedByUserId` çekiyordu (DB callback = N+1 risk). Çözüm: Event'e `rfqCreatedByUserId` alanı eklendi.
+
+- `procurement/quote/domain/event/SupplierQuoteReceivedEvent` → yeni alan: `UUID rfqCreatedByUserId`
+- Listener artık sıfır DB sorgusu yapar; tüm veri event'ten gelir
+
+### 21.3 Refactored Listeners
+
+3 listener'da yapılan değişiklikler:
+- `DepartmentRepository` import'u kaldırıldı → `DepartmentRecipientPort` inject edildi
+- `getDepartmentUsers()` / `getDepartmentManagers()` / `matchesAny()` helper method'ları silindi
+- `ProcurementNotificationListener`: SupplierRFQRepository import'u kaldırıldı → event field'dan okuma
+
+### 21.4 ArchUnit Etkisi
+
+- **Rule 13.4** artık tamamen temiz (0 frozen violation)
+- **Rule 13.1** frozen count: 7 → 4 (3 notification listener çözüldü)
+- Toplam frozen violation: 12 → 8
+
+### 21.5 Mimari Kararlar
+
+| Karar | Gerekçe |
+|-------|---------|
+| Port notification'da, platform'da değil | Unidirectional dependency graph; consumer owns the contract (DIP) |
+| Event Enrichment > Port/Adapter (RFQ case) | Hem coupling'i hem DB query'yi ortadan kaldırır; zero latency |
+| Tek port, iki method | `findUsers` + `findManagers` — aynı bounded context, aynı aggregate (Department→User) |
+
+---
+
+## 22. Frozen Violation Envanteri ve Çözüm Geçmişi
+
+### 22.1 Çözülen Gruplar
+
+**Grup A — TenantRepository bypass ✅ (3 frozen → 0, Toplam: 8→5)**
+
+Port/Adapter pattern — domain model sınırı geçilmediğinden uygulandı.
+- Port: `common/infrastructure/tenant/TenantQueryPort` — `findAllActiveTenants()`, `findAllByIds()`, `findById()`
+- Adapter: `platform/tenant/app/adapter/TenantQueryAdapter`
+- DTO: `common/infrastructure/tenant/TenantReference` (id, uid, name)
+- Çözülen: BatchCertificationExpiryCheckJob, FiberRequestService, InvoiceOverdueJob
+
+**Grup B — Certification çapraz referans ✅ (3 frozen → 0, Toplam: 5→2)**
+
+QueryService pattern — JPA @ManyToOne ilişkiler domain sınırını zaten geçtiğinden Port/Adapter yerine app-layer delegation uygulandı.
+- `production/masterdata/fiber/app/FiberCertificationQueryService` — platform modüllerinin production infra bypass'ını önler
+- `platform/tradingpartner/app/TradingPartnerCertificationQueryService` — production modülünün platform infra bypass'ını önler
+- `platform/organization/app/OrganizationCertificationQueryService` — production modülünün platform infra bypass'ını önler
+- Çözülen: OrganizationCertificationService, TradingPartnerCertificationService, BatchCertificationService
+
+**Pattern Seçim Rehberi:**
+- Domain entity sınırı geçilmiyorsa → **Port/Adapter** (minimal DTO, ACL)
+- JPA @ManyToOne ilişki zaten sınır geçiyorsa → **QueryService** (app delegation, infra bypass'ı kapatır)
+
+### 22.2 Article 13 — TAMAMEN TEMİZ ✅
+
+**Grup C — Locale/i18n bypass ✅ (2 frozen → 0, Toplam: 2→0)**
+
+Port/Adapter pattern — JPA @ManyToOne yoktur (sadece primitive UUID); Grup A pattern'i geçerli.
+- `common/infrastructure/locale/LocaleResolutionPort` — 4 method: `findUserLocale()`, `findUserTimezone()`, `findTenantDefaultLocale()`, `findTenantTimezone()`
+- `notification/i18n/app/adapter/LocaleResolutionAdapter` — port'u implement eder
+- `platform/user/domain/port/UserLocaleConfigPort` — `findByUserId()`, `saveOrUpdate()`, `deleteByUserId()`
+- `platform/user/domain/port/UserLocalePreferences` — record DTO (userId, locale, timezone)
+- `notification/i18n/app/adapter/UserLocaleConfigAdapter` — entity create/update signature karmaşıklığını saklar; dateFormat korunur
+- Normalization (`extractLanguageCode`, "tr-TR" → "TR") UserLocaleService'de kalır — porta normalize data gider
+- Çözülen: LocalizationService, UserLocaleService
+
+**Tüm Frozen Violations: 13 → 0** — Rule 13.1, 13.2, 13.3, 13.4 hepsi temiz.
+
+### 22.3 Yeni Cross-Module Bağımlılık Oluştuğunda
+
+Aşağıdaki karar ağacını kullan:
+
+```
+Yeni cross-module bağımlılık gerekiyor
+         |
+         ▼
+Domain entity @ManyToOne var mı?
+    |               |
+   EVET            HAYIR
+    |               |
+    ▼               ▼
+QueryService    UUID/primitive yeterli mi?
+(app delegation)    |               |
+                   EVET            HAYIR (zengin veri)
+                    |               |
+                    ▼               ▼
+               Port/Adapter    Port/Adapter
+               (minimal DTO)  (zengin DTO)
+```
+
+Port yeri: 1:1 → consumer modülünde; cross-cutting (2+ consumer) → `common/infrastructure/`
+
+---
+
 ## Commits
 
 Format: `type(scope): description`

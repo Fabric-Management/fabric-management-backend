@@ -1,9 +1,9 @@
 package com.fabricmanagement.finance.invoice.app.scheduler;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.finance.invoice.app.InvoiceService;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,28 +16,28 @@ import org.springframework.stereotype.Component;
 public class InvoiceOverdueJob {
 
   private final InvoiceService invoiceService;
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
 
   @Scheduled(cron = "0 0 2 * * *")
   public void markOverdueInvoicesForAllTenants() {
     log.info("Starting overdue invoice scan for all tenants");
 
-    List<Tenant> activeTenants = tenantRepository.findAllActive();
+    List<TenantReference> activeTenants = tenantQueryPort.findAllActiveTenants();
     int totalMarked = 0;
 
-    for (Tenant tenant : activeTenants) {
+    for (TenantReference tenant : activeTenants) {
       try {
         int marked =
             TenantContext.executeInTenantContext(
-                tenant.getId(),
+                tenant.id(),
                 () -> {
-                  TenantContext.setCurrentTenantUid(tenant.getUid());
-                  return invoiceService.markOverdueInvoices(tenant.getId());
+                  TenantContext.setCurrentTenantUid(tenant.uid());
+                  return invoiceService.markOverdueInvoices(tenant.id());
                 });
         totalMarked += marked;
       } catch (Exception e) {
         log.error(
-            "Failed to mark overdue invoices for tenant {}: {}", tenant.getUid(), e.getMessage());
+            "Failed to mark overdue invoices for tenant {}: {}", tenant.uid(), e.getMessage());
       }
     }
 

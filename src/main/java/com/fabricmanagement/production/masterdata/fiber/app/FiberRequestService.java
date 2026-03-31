@@ -1,11 +1,12 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.platform.communication.app.InAppNotificationService;
 import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
 import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.platform.communication.dto.NotificationRequest;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequestStatus;
@@ -59,7 +60,7 @@ public class FiberRequestService {
   private final MaterialRepository materialRepository;
   private final FiberRepository fiberRepository;
   private final InAppNotificationService notificationService;
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
 
   /**
    * Submit a fiber request (tenant → platform).
@@ -237,11 +238,8 @@ public class FiberRequestService {
     Set<UUID> tenantIds =
         page.getContent().stream().map(FiberRequest::getTenantId).collect(Collectors.toSet());
     Map<UUID, String> tenantNames =
-        tenantRepository.findAllById(tenantIds).stream()
-            .collect(
-                Collectors.toMap(
-                    com.fabricmanagement.platform.tenant.domain.Tenant::getId,
-                    com.fabricmanagement.platform.tenant.domain.Tenant::getName));
+        tenantQueryPort.findAllByIds(tenantIds).stream()
+            .collect(Collectors.toMap(TenantReference::id, TenantReference::name));
 
     return page.map(
         e ->
@@ -263,9 +261,9 @@ public class FiberRequestService {
         .map(
             e -> {
               String tenantName =
-                  tenantRepository
+                  tenantQueryPort
                       .findById(e.getTenantId())
-                      .map(com.fabricmanagement.platform.tenant.domain.Tenant::getName)
+                      .map(TenantReference::name)
                       .orElse(e.getTenantId().toString());
               return FiberRequestDto.from(e, tenantName);
             });
@@ -320,7 +318,7 @@ public class FiberRequestService {
   private void sendOnSubmitNotification(
       UUID fiberRequestId, UUID tenantId, String isoCode, String fiberName) {
     String tenantName =
-        tenantRepository.findById(tenantId).map(t -> t.getName()).orElse(tenantId.toString());
+        tenantQueryPort.findById(tenantId).map(TenantReference::name).orElse(tenantId.toString());
     String message = isoCode + " — " + fiberName + " requested by " + tenantName;
 
     notificationService.send(

@@ -12,13 +12,20 @@ public class SupplierQuoteReceivedEvent extends DomainEvent {
   private final UUID rfqId;
   private final UUID supplierId;
   private final String supplierName;
+  private final UUID rfqCreatedByUserId;
 
   public SupplierQuoteReceivedEvent(
-      UUID tenantId, UUID quoteId, UUID rfqId, UUID supplierId, String supplierName) {
+      UUID tenantId,
+      UUID quoteId,
+      UUID rfqId,
+      UUID supplierId,
+      String supplierName,
+      UUID rfqCreatedByUserId) {
     super(tenantId, "SUPPLIER_QUOTE_RECEIVED");
     this.quoteId = quoteId;
     this.rfqId = rfqId;
     this.supplierId = supplierId;
     this.supplierName = supplierName;
+    this.rfqCreatedByUserId = rfqCreatedByUserId;
   }
 }

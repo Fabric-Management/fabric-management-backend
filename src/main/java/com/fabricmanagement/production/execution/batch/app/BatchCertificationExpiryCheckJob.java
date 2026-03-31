@@ -1,12 +1,12 @@
 package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.common.infrastructure.web.LocalizationService;
 import com.fabricmanagement.platform.communication.app.InAppNotificationService;
 import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
 import com.fabricmanagement.platform.communication.domain.NotificationType;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchCertificationRepository;
 import java.time.LocalDate;
@@ -36,7 +36,7 @@ public class BatchCertificationExpiryCheckJob {
   @Value("${application.batch-certification.expiry-warning-days:30}")
   private int expiryWarningDays;
 
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
   private final BatchCertificationRepository batchCertificationRepository;
   private final InAppNotificationService inAppNotificationService;
   private final LocalizationService localizationService;
@@ -49,10 +49,10 @@ public class BatchCertificationExpiryCheckJob {
   @Transactional(readOnly = true)
   public void checkExpiringCertifications() {
     LocalDate threshold = LocalDate.now().plusDays(expiryWarningDays);
-    List<Tenant> tenants = tenantRepository.findAllActive();
+    List<TenantReference> tenants = tenantQueryPort.findAllActiveTenants();
 
-    for (Tenant tenant : tenants) {
-      UUID tenantId = tenant.getId();
+    for (TenantReference tenant : tenants) {
+      UUID tenantId = tenant.id();
       try {
         TenantContext.executeInTenantContext(
             tenantId,

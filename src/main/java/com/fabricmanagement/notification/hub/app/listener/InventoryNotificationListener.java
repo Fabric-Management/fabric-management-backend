@@ -3,16 +3,11 @@ package com.fabricmanagement.notification.hub.app.listener;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.notification.hub.app.NotificationHubService;
 import com.fabricmanagement.notification.hub.domain.NotificationEventType;
-import com.fabricmanagement.platform.organization.domain.Department;
-import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
-import com.fabricmanagement.platform.user.app.UserQueryService;
-import com.fabricmanagement.platform.user.dto.UserDto;
+import com.fabricmanagement.notification.hub.domain.port.DepartmentRecipientPort;
 import com.fabricmanagement.production.execution.inventory.domain.event.MinStockAlertEvent;
 import com.fabricmanagement.production.execution.inventory.domain.event.ReturnRateExceededEvent;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,8 +23,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class InventoryNotificationListener {
 
   private final NotificationHubService notificationHubService;
-  private final DepartmentRepository departmentRepository;
-  private final UserQueryService userQueryService;
+  private final DepartmentRecipientPort departmentRecipientPort;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
@@ -43,25 +37,9 @@ public class InventoryNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          List<Department> procurementDepts =
-              departmentRepository.findByTenantIdAndIsActiveTrue(event.getTenantId()).stream()
-                  .filter(
-                      d ->
-                          d.getDepartmentName().contains("Procurement")
-                              || d.getDepartmentCode().contains("PROCUREMENTSUPPLY")
-                              || d.getDepartmentCode().contains("PROCUREMENT"))
-                  .toList();
-
           List<UUID> recipientIds =
-              procurementDepts.stream()
-                  .flatMap(
-                      d ->
-                          userQueryService
-                              .findByDepartments(event.getTenantId(), Set.of(d.getId()))
-                              .stream())
-                  .map(UserDto::getId)
-                  .distinct()
-                  .toList();
+              departmentRecipientPort.findUsersByDepartmentKeyword(
+                  event.getTenantId(), "PROCUREMENT", "PROCUREMENTSUPPLY", "Procurement");
 
           if (!recipientIds.isEmpty()) {
             Map<String, String> payload =
@@ -97,33 +75,9 @@ public class InventoryNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          List<Department> targetDepts =
-              departmentRepository.findByTenantIdAndIsActiveTrue(event.getTenantId()).stream()
-                  .filter(
-                      d ->
-                          d.getDepartmentCode().contains("QUALITY")
-                              || d.getDepartmentCode().contains("PROCUREMENT"))
-                  .toList();
-
           List<UUID> managerIds =
-              targetDepts.stream()
-                  .map(Department::getManagerId)
-                  .filter(Objects::nonNull)
-                  .distinct()
-                  .toList();
-
-          if (managerIds.isEmpty()) {
-            managerIds =
-                targetDepts.stream()
-                    .flatMap(
-                        d ->
-                            userQueryService
-                                .findByDepartments(event.getTenantId(), Set.of(d.getId()))
-                                .stream())
-                    .map(UserDto::getId)
-                    .distinct()
-                    .toList();
-          }
+              departmentRecipientPort.findManagersByDepartmentKeyword(
+                  event.getTenantId(), "QUALITY", "PROCUREMENT");
 
           if (!managerIds.isEmpty()) {
             Map<String, String> payload =

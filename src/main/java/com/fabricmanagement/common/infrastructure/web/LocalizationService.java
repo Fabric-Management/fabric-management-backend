@@ -1,7 +1,6 @@
 package com.fabricmanagement.common.infrastructure.web;
 
-import com.fabricmanagement.notification.i18n.infra.repository.TenantLocaleConfigRepository;
-import com.fabricmanagement.notification.i18n.infra.repository.UserLocaleConfigRepository;
+import com.fabricmanagement.common.infrastructure.locale.LocaleResolutionPort;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.UUID;
@@ -47,8 +46,7 @@ public class LocalizationService {
   private static final ZoneId FALLBACK_TIMEZONE = ZoneId.of("UTC");
 
   private final MessageSource messageSource;
-  private final UserLocaleConfigRepository userLocaleConfigRepository;
-  private final TenantLocaleConfigRepository tenantLocaleConfigRepository;
+  private final LocaleResolutionPort localeResolutionPort;
 
   // ============================================================
   // MESSAGE RESOLUTION (properties-based)
@@ -105,15 +103,15 @@ public class LocalizationService {
   @Transactional(readOnly = true)
   public Locale resolveLocaleForUser(UUID tenantId, UUID userId) {
     // 1. User preference
-    var userConfig = userLocaleConfigRepository.findByUserId(userId);
-    if (userConfig.isPresent() && userConfig.get().getLocale() != null) {
-      return parseLocale(userConfig.get().getLocale());
+    var userLocale = localeResolutionPort.findUserLocale(userId);
+    if (userLocale.isPresent() && userLocale.get() != null) {
+      return parseLocale(userLocale.get());
     }
 
     // 2. Tenant default
-    var tenantConfig = tenantLocaleConfigRepository.findByTenantId(tenantId);
-    if (tenantConfig.isPresent() && tenantConfig.get().getDefaultLocale() != null) {
-      return parseLocale(tenantConfig.get().getDefaultLocale());
+    var tenantLocale = localeResolutionPort.findTenantDefaultLocale(tenantId);
+    if (tenantLocale.isPresent() && tenantLocale.get() != null) {
+      return parseLocale(tenantLocale.get());
     }
 
     // 3. System fallback
@@ -134,9 +132,9 @@ public class LocalizationService {
    */
   @Transactional(readOnly = true)
   public Locale resolveLocaleForTenant(UUID tenantId) {
-    var tenantConfig = tenantLocaleConfigRepository.findByTenantId(tenantId);
-    if (tenantConfig.isPresent() && tenantConfig.get().getDefaultLocale() != null) {
-      return parseLocale(tenantConfig.get().getDefaultLocale());
+    var tenantLocale = localeResolutionPort.findTenantDefaultLocale(tenantId);
+    if (tenantLocale.isPresent() && tenantLocale.get() != null) {
+      return parseLocale(tenantLocale.get());
     }
     log.debug("resolveLocaleForTenant: no config for tenantId={} — using EN fallback", tenantId);
     return FALLBACK_LOCALE;
@@ -158,15 +156,15 @@ public class LocalizationService {
   @Transactional(readOnly = true)
   public ZoneId resolveTimezoneForUser(UUID tenantId, UUID userId) {
     // 1. User preference
-    var userConfig = userLocaleConfigRepository.findByUserId(userId);
-    if (userConfig.isPresent() && userConfig.get().getTimezone() != null) {
-      return parseZoneId(userConfig.get().getTimezone());
+    var userTimezone = localeResolutionPort.findUserTimezone(userId);
+    if (userTimezone.isPresent() && userTimezone.get() != null) {
+      return parseZoneId(userTimezone.get());
     }
 
     // 2. Tenant default
-    var tenantConfig = tenantLocaleConfigRepository.findByTenantId(tenantId);
-    if (tenantConfig.isPresent() && tenantConfig.get().getTimezone() != null) {
-      return parseZoneId(tenantConfig.get().getTimezone());
+    var tenantTimezone = localeResolutionPort.findTenantTimezone(tenantId);
+    if (tenantTimezone.isPresent() && tenantTimezone.get() != null) {
+      return parseZoneId(tenantTimezone.get());
     }
 
     // 3. System fallback

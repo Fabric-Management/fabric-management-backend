@@ -2,10 +2,10 @@ package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.platform.organization.app.OrganizationCertificationQueryService;
 import com.fabricmanagement.platform.organization.domain.OrganizationCertification;
-import com.fabricmanagement.platform.organization.infra.repository.OrganizationCertificationRepository;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationQueryService;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerCertification;
-import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
 import com.fabricmanagement.production.common.exception.BatchCertificationOverlapException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchCertification;
@@ -38,8 +38,8 @@ public class BatchCertificationService {
   private final BatchCertificationRepository certificationRepository;
   private final BatchRepository batchRepository;
   private final FiberCertificationRepository fiberCertificationRepository;
-  private final TradingPartnerCertificationRepository partnerCertificationRepository;
-  private final OrganizationCertificationRepository orgCertificationRepository;
+  private final TradingPartnerCertificationQueryService partnerCertificationQueryService;
+  private final OrganizationCertificationQueryService orgCertificationQueryService;
 
   @Transactional(readOnly = true)
   public List<BatchCertificationDto> findByBatchId(UUID batchId) {
@@ -76,7 +76,7 @@ public class BatchCertificationService {
     TradingPartnerCertification partnerCert = null;
     if (request.getPartnerCertificationId() != null) {
       partnerCert =
-          partnerCertificationRepository
+          partnerCertificationQueryService
               .findById(request.getPartnerCertificationId())
               .filter(pc -> Boolean.TRUE.equals(pc.getIsActive()))
               .orElseThrow(
@@ -89,7 +89,7 @@ public class BatchCertificationService {
     OrganizationCertification orgCert = null;
     if (request.getOrgCertificationId() != null) {
       orgCert =
-          orgCertificationRepository
+          orgCertificationQueryService
               .findById(request.getOrgCertificationId())
               .filter(oc -> Boolean.TRUE.equals(oc.getIsActive()))
               .orElseThrow(
@@ -251,7 +251,7 @@ public class BatchCertificationService {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     if (scope == BatchCertificationScope.SUPPLIER && partnerCertificationId != null) {
-      return partnerCertificationRepository
+      return partnerCertificationQueryService
           .findById(partnerCertificationId)
           .filter(partnerCert -> isPartnerCertEligibleForAutofill(partnerCert, tenantId))
           .map(this::buildAutoFillFromPartnerCert)
@@ -259,7 +259,7 @@ public class BatchCertificationService {
     }
 
     if (scope == BatchCertificationScope.FACILITY && orgCertificationId != null) {
-      return orgCertificationRepository
+      return orgCertificationQueryService
           .findById(orgCertificationId)
           .filter(orgCert -> isOrgCertEligibleForAutofill(orgCert, tenantId))
           .map(this::buildAutoFillFromOrgCert)
