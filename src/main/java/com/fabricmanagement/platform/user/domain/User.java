@@ -76,8 +76,8 @@ public class User extends BaseEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "trust_level", nullable = false, length = 32)
   @Builder.Default
-  private com.fabricmanagement.approval.domain.UserTrustLevel trustLevel =
-      com.fabricmanagement.approval.domain.UserTrustLevel.PROBATION;
+  private com.fabricmanagement.common.infrastructure.user.UserTrustLevel trustLevel =
+      com.fabricmanagement.common.infrastructure.user.UserTrustLevel.PROBATION;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "role_id")

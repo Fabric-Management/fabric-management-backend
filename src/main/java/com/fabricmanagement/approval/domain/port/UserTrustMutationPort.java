@@ -1,6 +1,6 @@
 package com.fabricmanagement.approval.domain.port;
 
-import com.fabricmanagement.approval.domain.UserTrustLevel;
+import com.fabricmanagement.common.infrastructure.user.UserTrustLevel;
 import java.util.Optional;
 import java.util.UUID;
 

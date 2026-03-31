@@ -436,6 +436,8 @@ class ConstitutionArchTest {
       //      domain events (EmployeeTerminatedEvent, EmployeeUpdatedEvent) for cache
       //      invalidation. Also implements NotificationUserQueryService. All cross-domain
       //      access is done via ports/adapters or event listeners — not direct service calls.
+      //      NOTE: UserTrustLevel enum moved to common.infrastructure.user — User entity
+      //      no longer imports approval.domain directly; coupling is purely adapter-level.
       //
       // [E2] platform.admin — Platform-wide administrative operations require cross-domain
       //      visibility for tenant module management and health checks. Exception preserved
