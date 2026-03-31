@@ -4,11 +4,9 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.notification.hub.app.NotificationContext;
 import com.fabricmanagement.notification.hub.app.NotificationHubService;
 import com.fabricmanagement.notification.hub.domain.NotificationEventType;
-import com.fabricmanagement.platform.organization.domain.Department;
-import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
+import com.fabricmanagement.notification.hub.domain.port.DepartmentRecipientPort;
 import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.domain.SystemUser;
-import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderPendingApprovalEvent;
@@ -16,8 +14,6 @@ import com.fabricmanagement.production.quality.result.domain.event.BatchQcFailed
 import com.fabricmanagement.production.quality.result.domain.event.BatchQcPendingEvent;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +41,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class ProductionNotificationListener {
 
   private final NotificationHubService notificationHubService;
-  private final DepartmentRepository departmentRepository;
+  private final DepartmentRecipientPort departmentRecipientPort;
   private final UserQueryService userQueryService;
 
   // ---- CRITICAL ----
@@ -192,36 +188,9 @@ public class ProductionNotificationListener {
     TenantContext.executeInTenantContext(
         event.tenantId(),
         () -> {
-          List<Department> warehouseDepts =
-              departmentRepository.findByTenantIdAndIsActiveTrue(event.tenantId()).stream()
-                  .filter(
-                      d -> {
-                        String code = d.getDepartmentCode();
-                        String name = d.getDepartmentName();
-                        return (code != null && code.contains("WAREHOUSE"))
-                            || (name != null && name.contains("Warehouse"));
-                      })
-                  .toList();
-
           List<UUID> managerIds =
-              warehouseDepts.stream()
-                  .map(Department::getManagerId)
-                  .filter(Objects::nonNull)
-                  .distinct()
-                  .toList();
-
-          if (managerIds.isEmpty()) {
-            managerIds =
-                warehouseDepts.stream()
-                    .flatMap(
-                        d ->
-                            userQueryService
-                                .findByDepartments(event.tenantId(), Set.of(d.getId()))
-                                .stream())
-                    .map(UserDto::getId)
-                    .distinct()
-                    .toList();
-          }
+              departmentRecipientPort.findManagersByDepartmentKeyword(
+                  event.tenantId(), "WAREHOUSE", "Warehouse");
 
           if (!managerIds.isEmpty()) {
             var payload =

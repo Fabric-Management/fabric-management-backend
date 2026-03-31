@@ -3,10 +3,7 @@ package com.fabricmanagement.notification.hub.app.listener;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.notification.hub.app.NotificationHubService;
 import com.fabricmanagement.notification.hub.domain.NotificationEventType;
-import com.fabricmanagement.platform.organization.domain.Department;
-import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
-import com.fabricmanagement.platform.user.app.UserQueryService;
-import com.fabricmanagement.platform.user.dto.UserDto;
+import com.fabricmanagement.notification.hub.domain.port.DepartmentRecipientPort;
 import com.fabricmanagement.procurement.purchaseorder.domain.event.PoConfirmedEvent;
 import com.fabricmanagement.procurement.purchaseorder.domain.event.PoDeliveryLateEvent;
 import com.fabricmanagement.procurement.purchaseorder.domain.event.PoPartiallyReceivedEvent;
@@ -14,11 +11,8 @@ import com.fabricmanagement.procurement.quote.domain.event.SupplierQuoteReceived
 import com.fabricmanagement.procurement.rfq.domain.event.RfqDeadlineApproachingEvent;
 import com.fabricmanagement.procurement.rfq.domain.event.RfqNoResponseEvent;
 import com.fabricmanagement.procurement.rfq.domain.event.RfqSentEvent;
-import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,9 +28,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class ProcurementNotificationListener {
 
   private final NotificationHubService notificationHubService;
-  private final DepartmentRepository departmentRepository;
-  private final UserQueryService userQueryService;
-  private final SupplierRFQRepository rfqRepository;
+  private final DepartmentRecipientPort departmentRecipientPort;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
@@ -49,7 +41,9 @@ public class ProcurementNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          List<UUID> recipientIds = getDepartmentUsers(event.getTenantId(), "PROCUREMENT");
+          List<UUID> recipientIds =
+              departmentRecipientPort.findUsersByDepartmentKeyword(
+                  event.getTenantId(), "PROCUREMENT");
           if (!recipientIds.isEmpty()) {
             notificationHubService.notifyAll(
                 recipientIds,
@@ -76,25 +70,18 @@ public class ProcurementNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          rfqRepository
-              .findByTenantIdAndIdAndIsActiveTrue(event.getTenantId(), event.getRfqId())
-              .ifPresentOrElse(
-                  rfq -> {
-                    if (rfq.getCreatedBy() != null) {
-                      notificationHubService.notifyAll(
-                          List.of(rfq.getCreatedBy()),
-                          event.getTenantId(),
-                          NotificationEventType.SUPPLIER_QUOTE_RECEIVED,
-                          Map.of(
-                              "supplierName",
-                              event.getSupplierName() != null ? event.getSupplierName() : ""),
-                          event.getQuoteId(),
-                          "QUOTE");
-                    }
-                  },
-                  () ->
-                      log.warn(
-                          "RFQ not found for SupplierQuoteReceived (rfqId={})", event.getRfqId()));
+          if (event.getRfqCreatedByUserId() != null) {
+            notificationHubService.notifyAll(
+                List.of(event.getRfqCreatedByUserId()),
+                event.getTenantId(),
+                NotificationEventType.SUPPLIER_QUOTE_RECEIVED,
+                Map.of(
+                    "supplierName", event.getSupplierName() != null ? event.getSupplierName() : ""),
+                event.getQuoteId(),
+                "QUOTE");
+          } else {
+            log.warn("No createdBy user for SupplierQuoteReceived (rfqId={})", event.getRfqId());
+          }
         });
   }
 
@@ -109,7 +96,9 @@ public class ProcurementNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          List<UUID> recipientIds = getDepartmentManagers(event.getTenantId(), "PROCUREMENT");
+          List<UUID> recipientIds =
+              departmentRecipientPort.findManagersByDepartmentKeyword(
+                  event.getTenantId(), "PROCUREMENT");
           if (!recipientIds.isEmpty()) {
             notificationHubService.notifyAll(
                 recipientIds,
@@ -140,7 +129,9 @@ public class ProcurementNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          List<UUID> recipientIds = getDepartmentManagers(event.getTenantId(), "PROCUREMENT");
+          List<UUID> recipientIds =
+              departmentRecipientPort.findManagersByDepartmentKeyword(
+                  event.getTenantId(), "PROCUREMENT");
           if (!recipientIds.isEmpty()) {
             notificationHubService.notifyAll(
                 recipientIds,
@@ -166,7 +157,8 @@ public class ProcurementNotificationListener {
         event.getTenantId(),
         () -> {
           List<UUID> recipientIds =
-              getDepartmentUsers(event.getTenantId(), "PROCUREMENT", "FINANCE");
+              departmentRecipientPort.findUsersByDepartmentKeyword(
+                  event.getTenantId(), "PROCUREMENT", "FINANCE");
           if (!recipientIds.isEmpty()) {
             notificationHubService.notifyAll(
                 recipientIds,
@@ -193,7 +185,9 @@ public class ProcurementNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          List<UUID> recipientIds = getDepartmentManagers(event.getTenantId(), "WAREHOUSE");
+          List<UUID> recipientIds =
+              departmentRecipientPort.findManagersByDepartmentKeyword(
+                  event.getTenantId(), "WAREHOUSE");
           if (!recipientIds.isEmpty()) {
             notificationHubService.notifyAll(
                 recipientIds,
@@ -223,7 +217,9 @@ public class ProcurementNotificationListener {
     TenantContext.executeInTenantContext(
         event.getTenantId(),
         () -> {
-          List<UUID> managerIds = getDepartmentManagers(event.getTenantId(), "PROCUREMENT");
+          List<UUID> managerIds =
+              departmentRecipientPort.findManagersByDepartmentKeyword(
+                  event.getTenantId(), "PROCUREMENT");
           if (!managerIds.isEmpty()) {
             notificationHubService.notifyAll(
                 managerIds,
@@ -239,52 +235,5 @@ public class ProcurementNotificationListener {
             log.warn("No recipients found for PoDeliveryLate (po={})", event.getPoNumber());
           }
         });
-  }
-
-  private List<UUID> getDepartmentUsers(UUID tenantId, String... deptCodes) {
-    List<Department> deps =
-        departmentRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-            .filter(
-                d ->
-                    matchesAny(d.getDepartmentCode(), deptCodes)
-                        || matchesAny(d.getDepartmentName(), deptCodes))
-            .toList();
-
-    return deps.stream()
-        .flatMap(d -> userQueryService.findByDepartments(tenantId, Set.of(d.getId())).stream())
-        .map(UserDto::getId)
-        .distinct()
-        .toList();
-  }
-
-  private List<UUID> getDepartmentManagers(UUID tenantId, String... deptCodes) {
-    List<Department> deps =
-        departmentRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-            .filter(
-                d ->
-                    matchesAny(d.getDepartmentCode(), deptCodes)
-                        || matchesAny(d.getDepartmentName(), deptCodes))
-            .toList();
-
-    List<UUID> managers =
-        deps.stream().map(Department::getManagerId).filter(Objects::nonNull).distinct().toList();
-
-    if (managers.isEmpty()) {
-      return deps.stream()
-          .flatMap(d -> userQueryService.findByDepartments(tenantId, Set.of(d.getId())).stream())
-          .map(UserDto::getId)
-          .distinct()
-          .toList();
-    }
-    return managers;
-  }
-
-  private boolean matchesAny(String value, String[] targets) {
-    if (value == null) return false;
-    String upper = value.toUpperCase();
-    for (String target : targets) {
-      if (upper.contains(target.toUpperCase())) return true;
-    }
-    return false;
   }
 }

@@ -551,8 +551,81 @@ Cross-Module alanında en toksik bağımlılık türü "Infrastructure Bypass" d
 ### Kural 13.1 - 13.4 (Cross-Module Infra Isolation)
 - **HİÇBİR MODÜL** kendi dışındaki bir modülün `.infra..` paketine erişemez. (common/infrastructure istisnadır)
 - İhtiyaç durumunda **Port/Adapter pattern** veya hedef modülün **QueryService/Facade** katmanları kullanılmalıdır.
-- Mevcut 13 ihlal `ConstitutionArchTest.java` içerisinde ilgili sınıflar `.and().doNotHaveSimpleName(...)` ile filtrelenerek dondurulmuştur (frozen state). ArchUnit testleri bu 13 ihlal dışında hiçbir yeni infrastructure-bypass ihlaline izin vermez.
-- İlerleyen dönemlerde bu bypass'lar, sağlayıcı modüllere Adapter yazılarak ve consumer modüllerden Port ile erişilerek sıfırlanacaktır.
+- Başlangıçta 13 ihlal tespit edilmiş, Notification Hub decoupling sonrası **8 frozen violation** kalmıştır. Frozen sınıflar `.and().doNotHaveSimpleName(...)` ile filtrelenir. ArchUnit testleri frozen dışında hiçbir yeni infrastructure-bypass ihlaline izin vermez.
+- Kalan 8 frozen violation'ın detaylı envanteri ve çözüm grupları Section 22'de belgelenmiştir.
+
+---
+
+## 21. Notification Hub Cross-Module Decoupling (Port/Adapter + Event Enrichment)
+
+Notification Hub'daki 3 listener (InventoryNotificationListener, ProcurementNotificationListener, ProductionNotificationListener) doğrudan `platform.organization.infra.repository.DepartmentRepository` kullanıyordu. Ek olarak ProcurementNotificationListener, SupplierRFQRepository üzerinden callback yaparak `rfqCreatedByUserId` çekiyordu.
+
+### 21.1 Çözüm A — DepartmentRecipientPort (ACL Pattern)
+
+Port, **notification modülünde** yaşar (platform'da değil) — bağımlılık grafiği tek yönlü kalır.
+
+**Port:**
+- `notification/hub/domain/port/DepartmentRecipientPort` — department bazlı kullanıcı/yönetici çözümleme
+  - `findUsersByDepartmentKeyword(UUID tenantId, String... keywords)`
+  - `findManagersByDepartmentKeyword(UUID tenantId, String... keywords)`
+
+**Adapter:**
+- `notification/hub/app/adapter/PlatformDepartmentAdapter` — ACL; DepartmentService + UserQueryService çağırır
+  - Tüm `getDepartmentUsers()` / `getDepartmentManagers()` / `matchesAny()` helper logic'i burada konsolide
+
+### 21.2 Çözüm B — Event Enrichment (SupplierQuoteReceivedEvent)
+
+`ProcurementNotificationListener`, SupplierRFQRepository'den `rfqCreatedByUserId` çekiyordu (DB callback = N+1 risk). Çözüm: Event'e `rfqCreatedByUserId` alanı eklendi.
+
+- `procurement/quote/domain/event/SupplierQuoteReceivedEvent` → yeni alan: `UUID rfqCreatedByUserId`
+- Listener artık sıfır DB sorgusu yapar; tüm veri event'ten gelir
+
+### 21.3 Refactored Listeners
+
+3 listener'da yapılan değişiklikler:
+- `DepartmentRepository` import'u kaldırıldı → `DepartmentRecipientPort` inject edildi
+- `getDepartmentUsers()` / `getDepartmentManagers()` / `matchesAny()` helper method'ları silindi
+- `ProcurementNotificationListener`: SupplierRFQRepository import'u kaldırıldı → event field'dan okuma
+
+### 21.4 ArchUnit Etkisi
+
+- **Rule 13.4** artık tamamen temiz (0 frozen violation)
+- **Rule 13.1** frozen count: 7 → 4 (3 notification listener çözüldü)
+- Toplam frozen violation: 12 → 8
+
+### 21.5 Mimari Kararlar
+
+| Karar | Gerekçe |
+|-------|---------|
+| Port notification'da, platform'da değil | Unidirectional dependency graph; consumer owns the contract (DIP) |
+| Event Enrichment > Port/Adapter (RFQ case) | Hem coupling'i hem DB query'yi ortadan kaldırır; zero latency |
+| Tek port, iki method | `findUsers` + `findManagers` — aynı bounded context, aynı aggregate (Department→User) |
+
+---
+
+## 22. Kalan Frozen Violation Envanteri (8 adet)
+
+| # | Sınıf | Rule | Modül | İhlal (Cross-Module Infra) |
+|---|-------|------|-------|----------------------------|
+| 1 | BatchCertificationExpiryCheckJob | 13.1 | production | TenantRepository (platform.infra) |
+| 2 | BatchCertificationService | 13.1 | production | OrganizationCertificationRepository + TradingPartnerCertificationRepository (platform.infra) |
+| 3 | FiberRequestService | 13.1 | production | TenantRepository (platform.infra) |
+| 4 | InvoiceOverdueJob | 13.1 | finance | TenantRepository (platform.infra) |
+| 5 | OrganizationCertificationService | 13.2 | platform | FiberCertificationRepository (production.infra) |
+| 6 | TradingPartnerCertificationService | 13.2 | platform | FiberCertificationRepository (production.infra) |
+| 7 | UserLocaleService | 13.3 | platform | UserLocaleConfigRepository (notification.infra) |
+| 8 | LocalizationService | 13.3 | common | TenantLocaleConfigRepository + UserLocaleConfigRepository (notification.infra) |
+
+### Doğal Gruplamalar (Sonraki hedefler için):
+
+**Grup A — TenantRepository bypass (3 sınıf, 1 port):**
+Sınıflar 1, 3, 4. Ortak ihtiyaç: tenant listesi iterasyonu (scheduled job'lar). Tek bir `TenantQueryPort` ile 3 frozen violation birden çözülür.
+
+**Grup B — Certification çapraz referans (3 sınıf, bidirectional):**
+Sınıflar 2, 5, 6. production↔platform arasında sertifika verisi paylaşımı. Dikkatli port tasarımı gerektirir.
+
+**Grup C — Locale/i18n bypass (2 sınıf):**
+Sınıflar 7, 8. platform/common → notification.i18n.infra. `LocaleQueryPort` ile çözülebilir.
 
 ---
 
