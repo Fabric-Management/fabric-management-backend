@@ -9,8 +9,8 @@ import com.fabricmanagement.platform.organization.dto.OrganizationCertificationD
 import com.fabricmanagement.platform.organization.dto.UpdateOrganizationCertificationRequest;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationCertificationRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.production.masterdata.fiber.app.FiberCertificationQueryService;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ public class OrganizationCertificationService {
 
   private final OrganizationCertificationRepository certificationRepository;
   private final OrganizationRepository organizationRepository;
-  private final FiberCertificationRepository fiberCertificationRepository;
+  private final FiberCertificationQueryService fiberCertificationQueryService;
 
   @Transactional(readOnly = true)
   public List<OrganizationCertificationDto> findByOrganizationId(UUID organizationId) {
@@ -92,15 +92,7 @@ public class OrganizationCertificationService {
                         new Object[] {organizationId}));
 
     FiberCertification certification =
-        fiberCertificationRepository
-            .findById(request.getCertificationId())
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Certification not found",
-                        "ORG_CERTIFICATION_NOT_FOUND",
-                        404,
-                        new Object[] {request.getCertificationId()}));
+        fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
 
     OrganizationCertification entity =
         OrganizationCertification.builder()
@@ -160,15 +152,7 @@ public class OrganizationCertificationService {
 
     if (request.getCertificationId() != null) {
       FiberCertification certification =
-          fiberCertificationRepository
-              .findById(request.getCertificationId())
-              .orElseThrow(
-                  () ->
-                      new PlatformDomainException(
-                          "Certification not found",
-                          "ORG_CERTIFICATION_NOT_FOUND",
-                          404,
-                          new Object[] {request.getCertificationId()}));
+          fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
       entity.setCertification(certification);
     }
     if (request.getLicenseNo() != null) entity.setLicenseNo(request.getLicenseNo());

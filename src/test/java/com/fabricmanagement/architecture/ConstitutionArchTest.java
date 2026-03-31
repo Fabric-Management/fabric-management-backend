@@ -564,20 +564,12 @@ class ConstitutionArchTest {
               .resideOutsideOfPackage("com.fabricmanagement.platform..")
               .and()
               .resideOutsideOfPackage("com.fabricmanagement.common..")
-              .and()
-              .doNotHaveSimpleName("BatchCertificationExpiryCheckJob")
-              .and()
-              .doNotHaveSimpleName("BatchCertificationService")
-              .and()
-              .doNotHaveSimpleName("FiberRequestService")
-              .and()
-              .doNotHaveSimpleName("InvoiceOverdueJob")
               .should()
               .dependOnClassesThat()
               .resideInAPackage("com.fabricmanagement.platform..infra..")
               .as(
                   "Rule 13.1: No outside module may access platform's infra layer. "
-                      + "(7 frozen class names)");
+                      + "(0 frozen violations)");
 
       rule.check(allClasses);
     }
@@ -589,16 +581,12 @@ class ConstitutionArchTest {
           noClasses()
               .that()
               .resideOutsideOfPackage("com.fabricmanagement.production..")
-              .and()
-              .doNotHaveSimpleName("OrganizationCertificationService")
-              .and()
-              .doNotHaveSimpleName("TradingPartnerCertificationService")
               .should()
               .dependOnClassesThat()
               .resideInAPackage("com.fabricmanagement.production..infra..")
               .as(
                   "Rule 13.2: No outside module may access production's infra layer. "
-                      + "(2 frozen violations)");
+                      + "(0 frozen violations)");
 
       rule.check(allClasses);
     }
@@ -610,16 +598,12 @@ class ConstitutionArchTest {
           noClasses()
               .that()
               .resideOutsideOfPackage("com.fabricmanagement.notification..")
-              .and()
-              .doNotHaveSimpleName("UserLocaleService")
-              .and()
-              .doNotHaveSimpleName("LocalizationService")
               .should()
               .dependOnClassesThat()
               .resideInAPackage("com.fabricmanagement.notification..infra..")
               .as(
                   "Rule 13.3: No outside module may access notification's infra layer. "
-                      + "(2 frozen violations)");
+                      + "(0 frozen violations)");
 
       rule.check(allClasses);
     }

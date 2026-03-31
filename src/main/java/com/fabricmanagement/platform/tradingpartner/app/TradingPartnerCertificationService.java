@@ -8,8 +8,8 @@ import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerCertificat
 import com.fabricmanagement.platform.tradingpartner.dto.UpdateTradingPartnerCertificationRequest;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerCertificationRepository;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
+import com.fabricmanagement.production.masterdata.fiber.app.FiberCertificationQueryService;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ public class TradingPartnerCertificationService {
 
   private final TradingPartnerCertificationRepository certificationRepository;
   private final TradingPartnerRepository partnerRepository;
-  private final FiberCertificationRepository fiberCertificationRepository;
+  private final FiberCertificationQueryService fiberCertificationQueryService;
 
   @Transactional(readOnly = true)
   public List<TradingPartnerCertificationDto> findByPartnerId(UUID partnerId) {
@@ -73,12 +73,7 @@ public class TradingPartnerCertificationService {
                 () -> new IllegalArgumentException("Trading partner not found: " + partnerId));
 
     FiberCertification certification =
-        fiberCertificationRepository
-            .findById(request.getCertificationId())
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "Certification not found: " + request.getCertificationId()));
+        fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
 
     TradingPartnerCertification entity =
         TradingPartnerCertification.builder()
@@ -130,12 +125,7 @@ public class TradingPartnerCertificationService {
 
     if (request.getCertificationId() != null) {
       FiberCertification certification =
-          fiberCertificationRepository
-              .findById(request.getCertificationId())
-              .orElseThrow(
-                  () ->
-                      new IllegalArgumentException(
-                          "Certification not found: " + request.getCertificationId()));
+          fiberCertificationQueryService.findActiveByIdOrThrow(request.getCertificationId());
       entity.setCertification(certification);
     }
     if (request.getLicenseNo() != null) entity.setLicenseNo(request.getLicenseNo());

@@ -1,8 +1,7 @@
 package com.fabricmanagement.platform.user.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.notification.i18n.domain.UserLocaleConfig;
-import com.fabricmanagement.notification.i18n.infra.repository.UserLocaleConfigRepository;
+import com.fabricmanagement.platform.user.domain.port.UserLocaleConfigPort;
 import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
@@ -32,7 +31,7 @@ public class UserLocaleService {
 
   private final UserRepository userRepository;
   private final UserQueryService userQueryService;
-  private final UserLocaleConfigRepository userLocaleConfigRepository;
+  private final UserLocaleConfigPort userLocaleConfigPort;
 
   /**
    * Update the authenticated user's own locale and timezone preferences (self-service).
@@ -80,20 +79,14 @@ public class UserLocaleService {
 
     if (locale == null && timezone == null) {
       // Clear override: remove the config row so cascade reaches tenant settings
-      userLocaleConfigRepository.findByUserId(userId).ifPresent(userLocaleConfigRepository::delete);
+      userLocaleConfigPort.deleteByUserId(userId);
       return;
     }
 
-    var cfg =
-        userLocaleConfigRepository
-            .findByUserId(userId)
-            .orElseGet(
-                () -> UserLocaleConfig.create(tenantId, userId, locale != null ? locale : "EN"));
-
     // Normalize locale to uppercase 2-char code for i18n module (it uses e.g. "TR", "EN")
-    String normalizedLocale = locale != null ? extractLanguageCode(locale) : cfg.getLocale();
-    cfg.updateLocale(normalizedLocale, null, timezone);
-    userLocaleConfigRepository.save(cfg);
+    // If locale is null, passing null to port lets the adapter retain the old locale
+    String normalizedLocale = locale != null ? extractLanguageCode(locale) : null;
+    userLocaleConfigPort.saveOrUpdate(tenantId, userId, normalizedLocale, timezone);
   }
 
   /** Extracts the primary language subtag from a BCP 47 tag (e.g. "tr-TR" → "TR"). */

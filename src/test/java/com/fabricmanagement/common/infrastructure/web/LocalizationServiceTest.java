@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fabricmanagement.notification.i18n.domain.UserLocaleConfig;
-import com.fabricmanagement.notification.i18n.infra.repository.TenantLocaleConfigRepository;
-import com.fabricmanagement.notification.i18n.infra.repository.UserLocaleConfigRepository;
+import com.fabricmanagement.common.infrastructure.locale.LocaleResolutionPort;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Optional;
@@ -26,21 +24,12 @@ import org.springframework.context.NoSuchMessageException;
 class LocalizationServiceTest {
 
   @Mock private MessageSource messageSource;
-  @Mock private UserLocaleConfigRepository userLocaleConfigRepository;
-  @Mock private TenantLocaleConfigRepository tenantLocaleConfigRepository;
+  @Mock private LocaleResolutionPort localeResolutionPort;
 
   @InjectMocks private LocalizationService localizationService;
 
   private static final UUID TENANT_ID = UUID.randomUUID();
   private static final UUID USER_ID = UUID.randomUUID();
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  private UserLocaleConfig mockUserConfig(String locale, String timezone) {
-    var cfg = UserLocaleConfig.create(TENANT_ID, USER_ID, locale);
-    cfg.updateLocale(locale, null, timezone);
-    return cfg;
-  }
 
   // ── getMessage() ───────────────────────────────────────────────────────────
 
@@ -94,8 +83,7 @@ class LocalizationServiceTest {
     @Test
     @DisplayName("kullanıcı tercihi varsa onu döndürür")
     void should_return_user_locale_when_present() {
-      when(userLocaleConfigRepository.findByUserId(USER_ID))
-          .thenReturn(Optional.of(mockUserConfig("TR", null)));
+      when(localeResolutionPort.findUserLocale(USER_ID)).thenReturn(Optional.of("TR"));
 
       Locale result = localizationService.resolveLocaleForUser(TENANT_ID, USER_ID);
 
@@ -105,11 +93,8 @@ class LocalizationServiceTest {
     @Test
     @DisplayName("kullanıcı tercihi yoksa tenant default döner")
     void should_return_tenant_locale_when_user_has_no_config() {
-      when(userLocaleConfigRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
-      var tenantCfg = mock(com.fabricmanagement.notification.i18n.domain.TenantLocaleConfig.class);
-      when(tenantCfg.getDefaultLocale()).thenReturn("TR");
-      when(tenantLocaleConfigRepository.findByTenantId(TENANT_ID))
-          .thenReturn(Optional.of(tenantCfg));
+      when(localeResolutionPort.findUserLocale(USER_ID)).thenReturn(Optional.empty());
+      when(localeResolutionPort.findTenantDefaultLocale(TENANT_ID)).thenReturn(Optional.of("TR"));
 
       Locale result = localizationService.resolveLocaleForUser(TENANT_ID, USER_ID);
 
@@ -119,8 +104,8 @@ class LocalizationServiceTest {
     @Test
     @DisplayName("hiçbir config yoksa EN fallback döner")
     void should_return_english_fallback_when_no_config() {
-      when(userLocaleConfigRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
-      when(tenantLocaleConfigRepository.findByTenantId(TENANT_ID)).thenReturn(Optional.empty());
+      when(localeResolutionPort.findUserLocale(USER_ID)).thenReturn(Optional.empty());
+      when(localeResolutionPort.findTenantDefaultLocale(TENANT_ID)).thenReturn(Optional.empty());
 
       Locale result = localizationService.resolveLocaleForUser(TENANT_ID, USER_ID);
 
@@ -137,8 +122,8 @@ class LocalizationServiceTest {
     @Test
     @DisplayName("kullanıcı timezone'u varsa onu döndürür")
     void should_return_user_timezone_when_present() {
-      when(userLocaleConfigRepository.findByUserId(USER_ID))
-          .thenReturn(Optional.of(mockUserConfig("TR", "Europe/Istanbul")));
+      when(localeResolutionPort.findUserTimezone(USER_ID))
+          .thenReturn(Optional.of("Europe/Istanbul"));
 
       ZoneId result = localizationService.resolveTimezoneForUser(TENANT_ID, USER_ID);
 
@@ -148,7 +133,7 @@ class LocalizationServiceTest {
     @Test
     @DisplayName("timezone config yoksa UTC döner")
     void should_return_utc_fallback_when_no_config() {
-      when(userLocaleConfigRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+      when(localeResolutionPort.findUserTimezone(USER_ID)).thenReturn(Optional.empty());
 
       ZoneId result = localizationService.resolveTimezoneForUser(TENANT_ID, USER_ID);
 
@@ -158,8 +143,7 @@ class LocalizationServiceTest {
     @Test
     @DisplayName("geçersiz timezone varsa UTC fallback döner")
     void should_return_utc_fallback_for_invalid_timezone() {
-      when(userLocaleConfigRepository.findByUserId(USER_ID))
-          .thenReturn(Optional.of(mockUserConfig("TR", "INVALID/ZONE")));
+      when(localeResolutionPort.findUserTimezone(USER_ID)).thenReturn(Optional.of("INVALID/ZONE"));
 
       ZoneId result = localizationService.resolveTimezoneForUser(TENANT_ID, USER_ID);
 

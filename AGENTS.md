@@ -551,8 +551,9 @@ Cross-Module alanında en toksik bağımlılık türü "Infrastructure Bypass" d
 ### Kural 13.1 - 13.4 (Cross-Module Infra Isolation)
 - **HİÇBİR MODÜL** kendi dışındaki bir modülün `.infra..` paketine erişemez. (common/infrastructure istisnadır)
 - İhtiyaç durumunda **Port/Adapter pattern** veya hedef modülün **QueryService/Facade** katmanları kullanılmalıdır.
-- Başlangıçta 13 ihlal tespit edilmiş, Notification Hub decoupling sonrası **8 frozen violation** kalmıştır. Frozen sınıflar `.and().doNotHaveSimpleName(...)` ile filtrelenir. ArchUnit testleri frozen dışında hiçbir yeni infrastructure-bypass ihlaline izin vermez.
-- Kalan 8 frozen violation'ın detaylı envanteri ve çözüm grupları Section 22'de belgelenmiştir.
+- **Article 13 TAMAMEN TEMİZ — 13 frozen → 0 ✅** (Tüm 4 rule: 0 frozen violation)
+- Frozen sınıflar `.and().doNotHaveSimpleName(...)` ile filtrelenir. ArchUnit testleri herhangi bir yeni infrastructure-bypass ihlaline izin vermez.
+- Çözüm geçmişi ve kullanılan pattern'ler Section 22'de belgelenmiştir.
 
 ---
 
@@ -603,29 +604,68 @@ Port, **notification modülünde** yaşar (platform'da değil) — bağımlılı
 
 ---
 
-## 22. Kalan Frozen Violation Envanteri (8 adet)
+## 22. Frozen Violation Envanteri ve Çözüm Geçmişi
 
-| # | Sınıf | Rule | Modül | İhlal (Cross-Module Infra) |
-|---|-------|------|-------|----------------------------|
-| 1 | BatchCertificationExpiryCheckJob | 13.1 | production | TenantRepository (platform.infra) |
-| 2 | BatchCertificationService | 13.1 | production | OrganizationCertificationRepository + TradingPartnerCertificationRepository (platform.infra) |
-| 3 | FiberRequestService | 13.1 | production | TenantRepository (platform.infra) |
-| 4 | InvoiceOverdueJob | 13.1 | finance | TenantRepository (platform.infra) |
-| 5 | OrganizationCertificationService | 13.2 | platform | FiberCertificationRepository (production.infra) |
-| 6 | TradingPartnerCertificationService | 13.2 | platform | FiberCertificationRepository (production.infra) |
-| 7 | UserLocaleService | 13.3 | platform | UserLocaleConfigRepository (notification.infra) |
-| 8 | LocalizationService | 13.3 | common | TenantLocaleConfigRepository + UserLocaleConfigRepository (notification.infra) |
+### 22.1 Çözülen Gruplar
 
-### Doğal Gruplamalar (Sonraki hedefler için):
+**Grup A — TenantRepository bypass ✅ (3 frozen → 0, Toplam: 8→5)**
 
-**Grup A — TenantRepository bypass (3 sınıf, 1 port):**
-Sınıflar 1, 3, 4. Ortak ihtiyaç: tenant listesi iterasyonu (scheduled job'lar). Tek bir `TenantQueryPort` ile 3 frozen violation birden çözülür.
+Port/Adapter pattern — domain model sınırı geçilmediğinden uygulandı.
+- Port: `common/infrastructure/tenant/TenantQueryPort` — `findAllActiveTenants()`, `findAllByIds()`, `findById()`
+- Adapter: `platform/tenant/app/adapter/TenantQueryAdapter`
+- DTO: `common/infrastructure/tenant/TenantReference` (id, uid, name)
+- Çözülen: BatchCertificationExpiryCheckJob, FiberRequestService, InvoiceOverdueJob
 
-**Grup B — Certification çapraz referans (3 sınıf, bidirectional):**
-Sınıflar 2, 5, 6. production↔platform arasında sertifika verisi paylaşımı. Dikkatli port tasarımı gerektirir.
+**Grup B — Certification çapraz referans ✅ (3 frozen → 0, Toplam: 5→2)**
 
-**Grup C — Locale/i18n bypass (2 sınıf):**
-Sınıflar 7, 8. platform/common → notification.i18n.infra. `LocaleQueryPort` ile çözülebilir.
+QueryService pattern — JPA @ManyToOne ilişkiler domain sınırını zaten geçtiğinden Port/Adapter yerine app-layer delegation uygulandı.
+- `production/masterdata/fiber/app/FiberCertificationQueryService` — platform modüllerinin production infra bypass'ını önler
+- `platform/tradingpartner/app/TradingPartnerCertificationQueryService` — production modülünün platform infra bypass'ını önler
+- `platform/organization/app/OrganizationCertificationQueryService` — production modülünün platform infra bypass'ını önler
+- Çözülen: OrganizationCertificationService, TradingPartnerCertificationService, BatchCertificationService
+
+**Pattern Seçim Rehberi:**
+- Domain entity sınırı geçilmiyorsa → **Port/Adapter** (minimal DTO, ACL)
+- JPA @ManyToOne ilişki zaten sınır geçiyorsa → **QueryService** (app delegation, infra bypass'ı kapatır)
+
+### 22.2 Article 13 — TAMAMEN TEMİZ ✅
+
+**Grup C — Locale/i18n bypass ✅ (2 frozen → 0, Toplam: 2→0)**
+
+Port/Adapter pattern — JPA @ManyToOne yoktur (sadece primitive UUID); Grup A pattern'i geçerli.
+- `common/infrastructure/locale/LocaleResolutionPort` — 4 method: `findUserLocale()`, `findUserTimezone()`, `findTenantDefaultLocale()`, `findTenantTimezone()`
+- `notification/i18n/app/adapter/LocaleResolutionAdapter` — port'u implement eder
+- `platform/user/domain/port/UserLocaleConfigPort` — `findByUserId()`, `saveOrUpdate()`, `deleteByUserId()`
+- `platform/user/domain/port/UserLocalePreferences` — record DTO (userId, locale, timezone)
+- `notification/i18n/app/adapter/UserLocaleConfigAdapter` — entity create/update signature karmaşıklığını saklar; dateFormat korunur
+- Normalization (`extractLanguageCode`, "tr-TR" → "TR") UserLocaleService'de kalır — porta normalize data gider
+- Çözülen: LocalizationService, UserLocaleService
+
+**Tüm Frozen Violations: 13 → 0** — Rule 13.1, 13.2, 13.3, 13.4 hepsi temiz.
+
+### 22.3 Yeni Cross-Module Bağımlılık Oluştuğunda
+
+Aşağıdaki karar ağacını kullan:
+
+```
+Yeni cross-module bağımlılık gerekiyor
+         |
+         ▼
+Domain entity @ManyToOne var mı?
+    |               |
+   EVET            HAYIR
+    |               |
+    ▼               ▼
+QueryService    UUID/primitive yeterli mi?
+(app delegation)    |               |
+                   EVET            HAYIR (zengin veri)
+                    |               |
+                    ▼               ▼
+               Port/Adapter    Port/Adapter
+               (minimal DTO)  (zengin DTO)
+```
+
+Port yeri: 1:1 → consumer modülünde; cross-cutting (2+ consumer) → `common/infrastructure/`
 
 ---
 
