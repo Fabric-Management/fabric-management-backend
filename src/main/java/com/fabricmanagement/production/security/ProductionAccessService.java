@@ -49,6 +49,8 @@ public class ProductionAccessService extends BaseAccessService {
   public static final String MODULE_QUALITY_TEST = "QUALITY_TEST";
   public static final String MODULE_WAREHOUSE_LOCATION = "WAREHOUSE_LOCATION";
   public static final String MODULE_GOODS_RECEIPT = "GOODS_RECEIPT";
+  public static final String MODULE_STOCK_UNIT = "STOCK_UNIT";
+  public static final String MODULE_QUALITY_GRADE = "QUALITY_GRADE";
 
   private static final Set<String> FIBER_MASTERDATA_WRITE_DEPARTMENTS =
       Set.of(
@@ -73,6 +75,12 @@ public class ProductionAccessService extends BaseAccessService {
 
   private static final Set<String> GOODS_RECEIPT_WRITE_DEPARTMENTS = Set.of("WAREHOUSE");
 
+  private static final Set<String> STOCK_UNIT_WRITE_DEPARTMENTS =
+      Set.of("WAREHOUSE", "PRODUCTIONPLANNING");
+
+  private static final Set<String> QUALITY_GRADE_WRITE_DEPARTMENTS =
+      Set.of("QUALITYCONTROL", "RDPRODUCTDEVELOPMENT");
+
   private static final Set<String> ALL_PRODUCTION_READ_DEPARTMENTS =
       Set.of(
           "RDPRODUCTDEVELOPMENT",
@@ -92,16 +100,20 @@ public class ProductionAccessService extends BaseAccessService {
           MODULE_BATCH,
           MODULE_QUALITY_TEST,
           MODULE_WAREHOUSE_LOCATION,
-          MODULE_GOODS_RECEIPT);
+          MODULE_GOODS_RECEIPT,
+          MODULE_STOCK_UNIT,
+          MODULE_QUALITY_GRADE);
 
   private static final Map<String, Set<String>> WRITE_DEPTS =
-      Map.of(
-          MODULE_FIBER, FIBER_MASTERDATA_WRITE_DEPARTMENTS,
-          MODULE_MATERIAL, FIBER_MASTERDATA_WRITE_DEPARTMENTS,
-          MODULE_BATCH, BATCH_WRITE_DEPARTMENTS,
-          MODULE_QUALITY_TEST, QUALITY_TEST_WRITE_DEPARTMENTS,
-          MODULE_WAREHOUSE_LOCATION, WAREHOUSE_LOCATION_WRITE_DEPARTMENTS,
-          MODULE_GOODS_RECEIPT, GOODS_RECEIPT_WRITE_DEPARTMENTS);
+      Map.ofEntries(
+          Map.entry(MODULE_FIBER, FIBER_MASTERDATA_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_MATERIAL, FIBER_MASTERDATA_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_BATCH, BATCH_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_QUALITY_TEST, QUALITY_TEST_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_WAREHOUSE_LOCATION, WAREHOUSE_LOCATION_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_GOODS_RECEIPT, GOODS_RECEIPT_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_STOCK_UNIT, STOCK_UNIT_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_QUALITY_GRADE, QUALITY_GRADE_WRITE_DEPARTMENTS));
 
   @Override
   protected Set<String> knownModules() {
@@ -141,7 +153,8 @@ public class ProductionAccessService extends BaseAccessService {
         && (MODULE_BATCH.equals(module)
             || MODULE_QUALITY_TEST.equals(module)
             || MODULE_WAREHOUSE_LOCATION.equals(module)
-            || MODULE_GOODS_RECEIPT.equals(module))) {
+            || MODULE_GOODS_RECEIPT.equals(module)
+            || MODULE_STOCK_UNIT.equals(module))) {
       return ctx.isInAnyDepartment(authorizedDepts);
     }
 

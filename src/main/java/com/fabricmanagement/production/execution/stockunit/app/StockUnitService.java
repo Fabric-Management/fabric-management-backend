@@ -34,6 +34,12 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Application service for all {@link StockUnit} lifecycle operations.
  *
+ * <h2>Actor Resolution</h2>
+ *
+ * <p>All operations resolve the acting user via {@code TenantContext.getCurrentUserId()}
+ * internally. The controller layer does NOT pass actorId — consistent with {@code
+ * BatchOperationsService} pattern.
+ *
  * <h2>Invariant Enforcement</h2>
  *
  * <p>All weight invariants and state transitions are enforced by the {@link StockUnit} entity
@@ -51,8 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <h2>F5: RESERVED → Consume Flow</h2>
  *
  * <p>If a StockUnit is RESERVED, it must be consumed via {@link #consumeReserved(UUID, BigDecimal,
- * UUID, UUID)} which releases the reservation and immediately consumes in one atomic operation.
- * This avoids the 2-call dance of {@code releaseReservation()} → {@code consume()} and prevents the
+ * UUID)} which releases the reservation and immediately consumes in one atomic operation. This
+ * avoids the 2-call dance of {@code releaseReservation()} → {@code consume()} and prevents the
  * window where the unit is briefly AVAILABLE and could be grabbed by another operation.
  */
 @Slf4j
@@ -73,20 +79,6 @@ public class StockUnitService {
    *
    * <p>Validates that the parent Batch exists and belongs to the current tenant. Package type
    * compatibility is validated inside {@link StockUnit#create}.
-   *
-   * @param batchId parent batch
-   * @param materialType denormalized from the batch (caller must pass the batch's materialType)
-   * @param barcode pre-generated scannable barcode (copied from GoodsReceiptItem)
-   * @param serialNumber optional supplier serial number
-   * @param packageType physical packaging type
-   * @param initialWeight weight at first weigh-in (immutable)
-   * @param grossWeight optional gross weight
-   * @param unit weight unit
-   * @param locationId initial warehouse location
-   * @param sourceType origin type
-   * @param sourceId origin record ID
-   * @param actorId the user performing the operation
-   * @return saved StockUnit
    */
   @Transactional
   public StockUnit create(
@@ -100,10 +92,10 @@ public class StockUnitService {
       String unit,
       UUID locationId,
       StockUnitSourceType sourceType,
-      UUID sourceId,
-      UUID actorId) {
+      UUID sourceId) {
 
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     validateBatchExists(batchId, tenantId);
 
     return internalCreate(
@@ -199,11 +191,11 @@ public class StockUnitService {
    *
    * @param stockUnitId the unit to consume from
    * @param amount weight to consume (must be positive and ≤ currentWeight)
-   * @param actorId the user performing the operation
    */
   @Transactional
-  public StockUnit consume(UUID stockUnitId, BigDecimal amount, UUID actorId) {
+  public StockUnit consume(UUID stockUnitId, BigDecimal amount) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     Batch batch = loadBatch(unit.getBatchId(), tenantId);
 
@@ -263,12 +255,11 @@ public class StockUnitService {
    * @param stockUnitId the reserved unit
    * @param amount weight to consume
    * @param workOrderId the consuming work order (for audit trail)
-   * @param actorId the user performing the operation
    */
   @Transactional
-  public StockUnit consumeReserved(
-      UUID stockUnitId, BigDecimal amount, UUID workOrderId, UUID actorId) {
+  public StockUnit consumeReserved(UUID stockUnitId, BigDecimal amount, UUID workOrderId) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     Batch batch = loadBatch(unit.getBatchId(), tenantId);
 
@@ -330,12 +321,11 @@ public class StockUnitService {
    * @param stockUnitId the unit to reverse consumption on
    * @param amount the weight to add back (must not exceed consumed amount)
    * @param reason mandatory justification for the reversal
-   * @param actorId the user authorizing the reversal (requires Trust Level ≥ 2)
    */
   @Transactional
-  public StockUnit reverseConsumption(
-      UUID stockUnitId, BigDecimal amount, String reason, UUID actorId) {
+  public StockUnit reverseConsumption(UUID stockUnitId, BigDecimal amount, String reason) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
 
     BigDecimal prevWeight = unit.getCurrentWeight();
@@ -365,16 +355,11 @@ public class StockUnitService {
 
   // ── Transfer ──────────────────────────────────────────────────────────────
 
-  /**
-   * Initiates a transfer — transitions StockUnit to IN_TRANSIT.
-   *
-   * @param stockUnitId the unit to transfer
-   * @param targetLocationId destination warehouse location
-   * @param actorId the user performing the transfer
-   */
+  /** Initiates a transfer — transitions StockUnit to IN_TRANSIT. */
   @Transactional
-  public StockUnit startTransfer(UUID stockUnitId, UUID targetLocationId, UUID actorId) {
+  public StockUnit startTransfer(UUID stockUnitId, UUID targetLocationId) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
 
     UUID fromLocation = unit.getLocationId();
@@ -400,16 +385,11 @@ public class StockUnitService {
     return unit;
   }
 
-  /**
-   * Completes a transfer — StockUnit arrives at its destination.
-   *
-   * @param stockUnitId the unit arriving
-   * @param finalLocationId the actual destination (may differ from startTransfer target)
-   * @param actorId the receiving warehouse operator
-   */
+  /** Completes a transfer — StockUnit arrives at its destination. */
   @Transactional
-  public StockUnit completeTransfer(UUID stockUnitId, UUID finalLocationId, UUID actorId) {
+  public StockUnit completeTransfer(UUID stockUnitId, UUID finalLocationId) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
 
     UUID fromLocation = unit.getPreviousLocationId();
@@ -448,12 +428,11 @@ public class StockUnitService {
    * @param newGradeId the target quality grade
    * @param reason mandatory justification for both upgrades and downgrades
    * @param approvalId required if the transition is a promotion; null allowed for demotions
-   * @param actorId the QC officer (Trust Level ≥ 2 for demotions, ≥ 3 for promotions)
    */
   @Transactional
-  public StockUnit changeGrade(
-      UUID stockUnitId, UUID newGradeId, String reason, UUID approvalId, UUID actorId) {
+  public StockUnit changeGrade(UUID stockUnitId, UUID newGradeId, String reason, UUID approvalId) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     QualityGrade newGrade = qualityGradeService.findById(newGradeId);
 
@@ -508,8 +487,9 @@ public class StockUnitService {
   // ── Hold / Quarantine ─────────────────────────────────────────────────────
 
   @Transactional
-  public StockUnit hold(UUID stockUnitId, String reason, UUID actorId) {
+  public StockUnit hold(UUID stockUnitId, String reason) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     StockUnitStatus prev = unit.getStatus();
     unit.hold();
@@ -528,8 +508,9 @@ public class StockUnitService {
   }
 
   @Transactional
-  public StockUnit releaseHold(UUID stockUnitId, String reason, UUID actorId) {
+  public StockUnit releaseHold(UUID stockUnitId, String reason) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     unit.releaseHold();
     unit = stockUnitRepository.save(unit);
@@ -547,8 +528,9 @@ public class StockUnitService {
   }
 
   @Transactional
-  public StockUnit quarantine(UUID stockUnitId, String reason, UUID actorId) {
+  public StockUnit quarantine(UUID stockUnitId, String reason) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     StockUnitStatus prev = unit.getStatus();
     unit.quarantine();
@@ -567,8 +549,9 @@ public class StockUnitService {
   }
 
   @Transactional
-  public StockUnit releaseQuarantine(UUID stockUnitId, String reason, UUID actorId) {
+  public StockUnit releaseQuarantine(UUID stockUnitId, String reason) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     unit.releaseQuarantine();
     unit = stockUnitRepository.save(unit);
@@ -590,15 +573,13 @@ public class StockUnitService {
   /**
    * Disposes a StockUnit — terminal operation.
    *
-   * <p>Requires Admin trust level (4). Caller is responsible for verifying this before invocation.
-   *
    * @param stockUnitId the unit to dispose
    * @param reason mandatory reason for disposal
-   * @param actorId the admin authorizing the disposal
    */
   @Transactional
-  public StockUnit dispose(UUID stockUnitId, String reason, UUID actorId) {
+  public StockUnit dispose(UUID stockUnitId, String reason) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
 
     if (reason == null || reason.isBlank()) {
@@ -642,8 +623,9 @@ public class StockUnitService {
   // ── Reservation ───────────────────────────────────────────────────────────
 
   @Transactional
-  public StockUnit reserve(UUID stockUnitId, UUID actorId) {
+  public StockUnit reserve(UUID stockUnitId) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     unit.reserve();
     unit = stockUnitRepository.save(unit);
@@ -661,8 +643,9 @@ public class StockUnitService {
   }
 
   @Transactional
-  public StockUnit releaseReservation(UUID stockUnitId, UUID actorId) {
+  public StockUnit releaseReservation(UUID stockUnitId) {
     UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
     StockUnit unit = loadUnit(stockUnitId, tenantId);
     unit.releaseReservation();
     unit = stockUnitRepository.save(unit);
@@ -685,11 +668,12 @@ public class StockUnitService {
    * Creates multiple StockUnits for the same Batch in a single transaction.
    *
    * <p>Used by the {@code GoodsReceiptConfirmedEventListener} to bulk-create units from all items
-   * in a confirmed goods receipt.
+   * in a confirmed goods receipt. The {@code actorId} is still passed explicitly here because the
+   * listener runs in a system context without an authenticated user.
    *
    * @param batchId parent batch
    * @param requests list of unit creation parameters
-   * @param actorId the user triggering the operation
+   * @param actorId the user/system triggering the operation
    * @return list of saved StockUnits in the same order as {@code requests}
    */
   @Transactional
