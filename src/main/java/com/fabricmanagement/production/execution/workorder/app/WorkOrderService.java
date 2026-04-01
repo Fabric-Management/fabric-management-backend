@@ -15,11 +15,13 @@ import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrde
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
+import com.fabricmanagement.production.execution.workorder.dto.WorkOrderFilterRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderOutputRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
+import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderSpecification;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -32,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,21 +53,18 @@ public class WorkOrderService {
   private final ApprovalPort approvalPort;
 
   /**
-   * Paginated listing of WorkOrders, optionally filtered by status.
+   * Paginated, filterable listing of WorkOrders for the current tenant.
    *
-   * @param status null → all statuses; non-null → filter by that status
-   * @param pageable Spring Data pagination (page, size, sort)
+   * @param filter optional filter criteria (all fields nullable)
+   * @param pageable page, size, sort
    */
   public PagedResponse<WorkOrderResponse> listWorkOrders(
-      WorkOrderStatus status, Pageable pageable) {
+      WorkOrderFilterRequest filter, Pageable pageable) {
+
     UUID tenantId = TenantContext.requireTenantId();
-
-    Page<WorkOrder> page =
-        (status != null)
-            ? workOrderRepository.findByTenantIdAndStatusAndIsActiveTrue(tenantId, status, pageable)
-            : workOrderRepository.findByTenantIdAndIsActiveTrue(tenantId, pageable);
-
-    return PagedResponse.from(page, this::mapToResponse);
+    Specification<WorkOrder> spec = WorkOrderSpecification.build(tenantId, filter);
+    Page<WorkOrder> page = workOrderRepository.findAll(spec, pageable);
+    return PagedResponse.from(page, WorkOrderResponse::from);
   }
 
   /** Retrieves a work order by its UUID. */

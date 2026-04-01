@@ -8,17 +8,25 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID> {
+public interface WorkOrderRepository
+    extends JpaRepository<WorkOrder, UUID>, JpaSpecificationExecutor<WorkOrder> {
   Optional<WorkOrder> findByWorkOrderNumberAndIsActiveTrue(String workOrderNumber);
 
   List<WorkOrder> findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
       UUID tenantId, UUID salesOrderLineId);
 
-  /** Paginated listing — all active WorkOrders for tenant. */
+  /**
+   * @deprecated Sprint 9: Replaced by JpaSpecificationExecutor with WorkOrderSpecification
+   */
+  @Deprecated(since = "Sprint 9", forRemoval = true)
   Page<WorkOrder> findByTenantIdAndIsActiveTrue(UUID tenantId, Pageable pageable);
 
-  /** Paginated listing — filtered by status. */
+  /**
+   * @deprecated Sprint 9: Replaced by JpaSpecificationExecutor with WorkOrderSpecification
+   */
+  @Deprecated(since = "Sprint 9", forRemoval = true)
   Page<WorkOrder> findByTenantIdAndStatusAndIsActiveTrue(
       UUID tenantId, WorkOrderStatus status, Pageable pageable);
 }

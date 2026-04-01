@@ -12,14 +12,19 @@ import com.fabricmanagement.production.execution.workorder.dto.RecordOutputReque
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderConsumptionResponse;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderConsumptionSummaryResponse;
+import com.fabricmanagement.production.execution.workorder.dto.WorkOrderFilterRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderOutputResponse;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderOutputSummaryResponse;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,11 +48,55 @@ public class WorkOrderController {
   private final WorkOrderOutputService workOrderOutputService;
   private final WorkOrderCostRecalculationService workOrderCostRecalculationService;
 
+  @Operation(
+      summary = "List WorkOrders with optional filtering",
+      description =
+          "Returns a paginated list of WorkOrders for the current tenant. "
+              + "All filter parameters are optional. Combine with Pageable for sorting.")
   @GetMapping
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'READ')")
   public PagedResponse<WorkOrderResponse> listWorkOrders(
-      @RequestParam(required = false) WorkOrderStatus status, Pageable pageable) {
-    return workOrderService.listWorkOrders(status, pageable);
+      @Parameter(description = "Filter by status") @RequestParam(required = false)
+          WorkOrderStatus status,
+      @Parameter(description = "Filter by customer/supplier") @RequestParam(required = false)
+          UUID tradingPartnerId,
+      @Parameter(description = "Filter by sales order") @RequestParam(required = false)
+          UUID salesOrderId,
+      @Parameter(description = "Filter by recipe") @RequestParam(required = false) UUID recipeId,
+      @Parameter(description = "Partial match on WO number or product code")
+          @RequestParam(required = false)
+          String searchText,
+      @Parameter(description = "Deadline range start (ISO 8601)")
+          @RequestParam(required = false)
+          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant deadlineFrom,
+      @Parameter(description = "Deadline range end (ISO 8601)")
+          @RequestParam(required = false)
+          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant deadlineTo,
+      @Parameter(description = "Created date range start (ISO 8601)")
+          @RequestParam(required = false)
+          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant createdFrom,
+      @Parameter(description = "Created date range end (ISO 8601)")
+          @RequestParam(required = false)
+          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant createdTo,
+      Pageable pageable) {
+
+    WorkOrderFilterRequest filter =
+        new WorkOrderFilterRequest(
+            status,
+            tradingPartnerId,
+            salesOrderId,
+            recipeId,
+            searchText,
+            deadlineFrom,
+            deadlineTo,
+            createdFrom,
+            createdTo);
+
+    return workOrderService.listWorkOrders(filter, pageable);
   }
 
   @GetMapping("/{id}")
