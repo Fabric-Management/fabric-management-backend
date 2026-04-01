@@ -8,6 +8,7 @@ import com.fabricmanagement.production.execution.workorder.app.WorkOrderOutputSe
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.dto.ConsumeFromStockUnitRequest;
+import com.fabricmanagement.production.execution.workorder.dto.ProductionDashboardResponse;
 import com.fabricmanagement.production.execution.workorder.dto.RecordOutputRequest;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderConsumptionResponse;
@@ -47,6 +48,17 @@ public class WorkOrderController {
   private final WorkOrderConsumptionService workOrderConsumptionService;
   private final WorkOrderOutputService workOrderOutputService;
   private final WorkOrderCostRecalculationService workOrderCostRecalculationService;
+
+  @Operation(
+      summary = "Production dashboard summary",
+      description =
+          "Aggregate overview: status breakdown, overdue alerts, "
+              + "cost variance (PLANNED vs ACTUAL), and yield performance.")
+  @GetMapping("/dashboard")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'READ')")
+  public ProductionDashboardResponse getProductionDashboard() {
+    return workOrderService.getProductionDashboard();
+  }
 
   @Operation(
       summary = "List WorkOrders with optional filtering",
