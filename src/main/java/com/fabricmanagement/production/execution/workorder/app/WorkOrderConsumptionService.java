@@ -68,7 +68,7 @@ public class WorkOrderConsumptionService {
     Batch batch = loadBatch(stockUnit.getBatchId(), tenantId);
 
     // 3. Perform consumption via StockUnitService
-    // Handles validation, status transitons, event publishing, and Batch sync reliably
+    // Handles validation, status transitions, event publishing, and Batch sync reliably
     if (stockUnit.getStatus() == StockUnitStatus.RESERVED) {
       stockUnitService.consumeReserved(stockUnitId, amount, workOrderId);
     } else {
@@ -170,15 +170,11 @@ public class WorkOrderConsumptionService {
   // --- Helpers --- //
 
   private WorkOrder loadWorkOrder(UUID id, UUID tenantId) {
-    WorkOrder workOrder =
-        workOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("WorkOrder not found: " + id));
-
-    if (!workOrder.getTenantId().equals(tenantId)) {
-      throw new NotFoundException("WorkOrder not found: " + id);
-    }
-    return workOrder;
+    return workOrderRepository
+        .findById(id)
+        .filter(wo -> wo.getTenantId().equals(tenantId))
+        .filter(com.fabricmanagement.common.infrastructure.persistence.BaseEntity::getIsActive)
+        .orElseThrow(() -> new NotFoundException("WorkOrder not found: " + id));
   }
 
   private StockUnit loadStockUnit(UUID id, UUID tenantId) {

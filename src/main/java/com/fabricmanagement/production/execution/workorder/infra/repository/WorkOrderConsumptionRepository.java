@@ -3,7 +3,6 @@ package com.fabricmanagement.production.execution.workorder.infra.repository;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderConsumption;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -27,6 +26,6 @@ public interface WorkOrderConsumptionRepository extends JpaRepository<WorkOrderC
         AND c.workOrderId = :workOrderId
         AND c.isActive = true
       """)
-  Optional<BigDecimal> sumConsumedWeightByWorkOrderId(
+  BigDecimal sumConsumedWeightByWorkOrderId(
       @Param("tenantId") UUID tenantId, @Param("workOrderId") UUID workOrderId);
 }
