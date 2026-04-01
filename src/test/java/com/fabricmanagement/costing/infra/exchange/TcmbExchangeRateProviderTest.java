@@ -154,4 +154,41 @@ class TcmbExchangeRateProviderTest {
     // Update goes through — dead code guard was removed
     verify(cacheRepo).save(any());
   }
+
+  // ─── parseXml() ───────────────────────────────────────────
+
+  @Test
+  void parseXml_ValidXml_ShouldParseRatesAndSkipXDR() throws Exception {
+    String xml =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<Tarih_Date Tarih=\"01.04.2026\" Date=\"04/01/2026\"  Bulten_No=\"2026/63\">\n"
+            + "    <Currency CrossOrder=\"0\" Kod=\"USD\" CurrencyCode=\"USD\">\n"
+            + "        <Unit>1</Unit>\n"
+            + "        <ForexBuying>32.1234</ForexBuying>\n"
+            + "    </Currency>\n"
+            + "    <Currency CrossOrder=\"1\" Kod=\"EUR\" CurrencyCode=\"EUR\">\n"
+            + "        <Unit>1</Unit>\n"
+            + "        <ForexBuying>35.5678</ForexBuying>\n"
+            + "    </Currency>\n"
+            + "    <Currency CrossOrder=\"2\" Kod=\"XDR\" CurrencyCode=\"XDR\">\n"
+            + "        <Unit>1</Unit>\n"
+            + "        <ForexBuying>41.0000</ForexBuying>\n"
+            + "    </Currency>\n"
+            + "    <Currency CrossOrder=\"3\" Kod=\"GBP\" CurrencyCode=\"GBP\">\n"
+            + "        <Unit>1</Unit>\n"
+            + "        <ForexBuying>  </ForexBuying>\n"
+            + "    </Currency>\n"
+            + "</Tarih_Date>";
+
+    java.io.InputStream is =
+        new java.io.ByteArrayInputStream(xml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+    Map<String, BigDecimal> parsed = provider.parseXml(is);
+
+    assertThat(parsed).containsEntry("TRY", BigDecimal.ONE);
+    assertThat(parsed).containsEntry("USD", new BigDecimal("32.1234"));
+    assertThat(parsed).containsEntry("EUR", new BigDecimal("35.5678"));
+    assertThat(parsed).doesNotContainKey("XDR"); // Specially skipped
+    assertThat(parsed).doesNotContainKey("GBP"); // Empty text skipped
+  }
 }

@@ -121,7 +121,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
     return String.format("https://www.tcmb.gov.tr/kurlar/%s/%s.xml", yearMonth, dayMonthYear);
   }
 
-  private Map<String, BigDecimal> parseXml(InputStream is) throws Exception {
+  Map<String, BigDecimal> parseXml(InputStream is) throws Exception {
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
     // XXE protection — defense-in-depth
