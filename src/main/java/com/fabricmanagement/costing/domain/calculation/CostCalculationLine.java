@@ -46,7 +46,12 @@ public class CostCalculationLine extends BaseEntity {
   @Builder.Default
   private BigDecimal totalInBaseCurrency = BigDecimal.ZERO;
 
-  /** Rate used to convert from line currency to base currency; null when currencies match. */
+  /**
+   * @deprecated Since Sprint 7b — exchange rate is now stored in the embedded {@code
+   *     convertedTotal.exchangeRate} field. Retained for backward compatibility with pre-Sprint 7b
+   *     data. Will be removed in a future migration.
+   */
+  @Deprecated(since = "Sprint 7b", forRemoval = true)
   @Column(name = "exchange_rate", precision = 20, scale = 8)
   private BigDecimal exchangeRate;
 
@@ -61,6 +66,18 @@ public class CostCalculationLine extends BaseEntity {
    */
   @Column(name = "material_id")
   private UUID materialId;
+
+  // Sprint 7b — Multi-Currency: conversion audit trail
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(name = "originalAmount", column = @Column(name = "original_line_total")),
+    @AttributeOverride(name = "originalCurrency", column = @Column(name = "original_currency")),
+    @AttributeOverride(name = "convertedAmount", column = @Column(name = "converted_line_total")),
+    @AttributeOverride(name = "convertedCurrency", column = @Column(name = "reporting_currency")),
+    @AttributeOverride(name = "exchangeRate", column = @Column(name = "exchange_rate_used")),
+    @AttributeOverride(name = "rateDate", column = @Column(name = "exchange_rate_date"))
+  })
+  private com.fabricmanagement.common.domain.vo.ConvertedMoney convertedTotal;
 
   @Column(name = "notes", columnDefinition = "TEXT")
   private String notes;

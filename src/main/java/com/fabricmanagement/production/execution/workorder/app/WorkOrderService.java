@@ -261,7 +261,14 @@ public class WorkOrderService {
     if (workOrder.getStatus() == WorkOrderStatus.APPROVED) {
       domainEventPublisher.publish(
           new WorkOrderApprovedEvent(
-              tenantId, workOrder.getId(), workOrder.getWorkOrderNumber(), SystemUser.ID));
+              tenantId,
+              workOrder.getId(),
+              workOrder.getWorkOrderNumber(),
+              workOrder.getModuleType(),
+              workOrder.getOutputMaterialId(),
+              workOrder.getPlannedQty(),
+              workOrder.getTradingPartnerId(),
+              SystemUser.ID));
     }
     // Note: If needsApproval is true, ApprovalGuardService already published ApprovalPendingEvent.
     // We remove the redundant WorkOrderPendingApprovalEvent.
@@ -290,6 +297,10 @@ public class WorkOrderService {
               saved.getTenantId(),
               saved.getId(),
               saved.getWorkOrderNumber(),
+              saved.getModuleType(),
+              saved.getOutputMaterialId(),
+              saved.getPlannedQty(),
+              saved.getTradingPartnerId(),
               TenantContext.getCurrentUserId()));
     }
     return mapToResponse(saved);

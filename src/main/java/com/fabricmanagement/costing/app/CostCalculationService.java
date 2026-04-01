@@ -1,10 +1,14 @@
 package com.fabricmanagement.costing.app;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
+import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
+import com.fabricmanagement.costing.app.port.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.app.port.WorkOrderPlanningUpdatePort;
 import com.fabricmanagement.costing.domain.calculation.*;
 import com.fabricmanagement.costing.domain.event.CostVarianceDetectedEvent;
 import com.fabricmanagement.costing.domain.exception.CostingDomainException;
 import com.fabricmanagement.costing.domain.exception.PriceListNotFoundException;
+import com.fabricmanagement.costing.domain.item.CalculationBase;
 import com.fabricmanagement.costing.domain.item.CostItem;
 import com.fabricmanagement.costing.domain.price.PriceList;
 import com.fabricmanagement.costing.domain.price.PriceListItem;
@@ -44,6 +48,10 @@ public class CostCalculationService {
   /** Variance threshold — 10 % deviation triggers the CostVarianceDetectedEvent. */
   private static final BigDecimal VARIANCE_THRESHOLD = new BigDecimal("0.10");
 
+  // TODO(Sprint 8+): All exchange rate conversions currently use LocalDate.now().
+  //  For audit/reconciliation, consider adding an optional rateDate parameter to compute()
+  //  so recalculations can use the original calculation date's exchange rate instead of today's.
+
   private final CostItemRepository costItemRepo;
   private final CostTemplateRepository costTemplateRepo;
   private final PriceListRepository priceListRepo;
@@ -51,6 +59,12 @@ public class CostCalculationService {
   private final CostCalculationRepository costCalcRepo;
   private final ApplicationEventPublisher eventPublisher;
   private final Optional<WorkOrderPlanningUpdatePort> workOrderPlanningUpdatePort;
+  private final ExchangeRateService exchangeRateService;
+  private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
+
+  private String getTargetCurrency(UUID tenantId) {
+    return tenantReportingCurrencyPort.getReportingCurrency(tenantId);
+  }
 
   // ============================================================
   // PUBLIC API
@@ -201,8 +215,9 @@ public class CostCalculationService {
    * <p>For all other template items (LABOR, MACHINE, OVERHEAD, etc.): standard computation against
    * outputMaterialId + actualOutputQty, unchanged from Sprint 5.
    *
-   * <p>Known limitation: assumes all price lists share the same base currency (TRY). Multi-currency
-   * conversion is deferred to Sprint 7.
+   * <p>Sprint 7b: Each line's cost is automatically converted from the price list currency to the
+   * tenant's reporting currency via {@link ExchangeRateService}. PERCENTAGE and FIXED items are
+   * exempt from conversion (their totals are already in the reporting currency).
    */
   @Transactional
   public CostCalculation computeActualForWorkOrderWithConsumptions(
@@ -224,7 +239,7 @@ public class CostCalculationService {
               costCalcRepo.save(existing);
             });
 
-    // PriceList per moduleType — her unique moduleType için tek DB sorgusu (Cache)
+    // PriceList per moduleType — single DB query per unique moduleType (Cache)
     Map<String, Optional<PriceList>> priceListCache =
         consumptions.stream()
             .map(ConsumptionCostInput::moduleType)
@@ -248,6 +263,8 @@ public class CostCalculationService {
                     new CostingDomainException(
                         "No default cost template for module: " + outputModuleType));
 
+    String targetCurrency = getTargetCurrency(tenantId);
+
     // 3. Create calculation shell
     CostCalculation calc =
         CostCalculation.create(
@@ -256,7 +273,7 @@ public class CostCalculationService {
             workOrderId,
             outputModuleType,
             CostStage.ACTUAL,
-            outputPriceList.getCurrency());
+            targetCurrency);
     calc.setCostTemplateId(template.getId());
 
     List<CostItem> relevantItems = costItemRepo.findActiveForModule(outputModuleType);
@@ -317,9 +334,14 @@ public class CostCalculationService {
           line.setUnit(consumption.unit());
           line.setUnitPrice(unitPrice);
           line.setCurrency(priceItem.getCurrency());
-          line.setTotalInBaseCurrency(lineTotal);
           line.setVolumeDiscountApplied(!unitPrice.equals(priceItem.getUnitPrice()));
           line.setMaterialId(consumption.materialId());
+
+          ConvertedMoney convertedTotal =
+              exchangeRateService.convert(
+                  lineTotal, priceItem.getCurrency(), targetCurrency, LocalDate.now());
+          line.setConvertedTotal(convertedTotal);
+          line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
 
           calc.addLine(line);
         }
@@ -360,8 +382,20 @@ public class CostCalculationService {
         line.setUnit(unit);
         line.setUnitPrice(effectiveUnitPrice);
         line.setCurrency(priceItem.getCurrency());
-        line.setTotalInBaseCurrency(lineTotal);
         line.setVolumeDiscountApplied(volumeDiscountApplied);
+
+        // PERCENTAGE/FIXED: lineTotal derived from running total (already targetCurrency)
+        ConvertedMoney convertedTotal;
+        if (costItem.getCalculationBase() == CalculationBase.PERCENTAGE
+            || costItem.getCalculationBase() == CalculationBase.FIXED) {
+          convertedTotal = ConvertedMoney.sameUnit(lineTotal, targetCurrency);
+        } else {
+          convertedTotal =
+              exchangeRateService.convert(
+                  lineTotal, priceItem.getCurrency(), targetCurrency, LocalDate.now());
+        }
+        line.setConvertedTotal(convertedTotal);
+        line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
 
         calc.addLine(line);
       }
@@ -449,10 +483,11 @@ public class CostCalculationService {
                             + tenantId
                             + ")"));
 
+    String targetCurrency = getTargetCurrency(tenantId);
+
     // 4. Build calculation
     var calc =
-        CostCalculation.create(
-            tenantId, entityType, entityId, moduleType, stage, priceList.getCurrency());
+        CostCalculation.create(tenantId, entityType, entityId, moduleType, stage, targetCurrency);
     calc.setCostTemplateId(template.getId());
 
     List<CostItem> relevantItems = costItemRepo.findActiveForModule(moduleType);
@@ -514,8 +549,22 @@ public class CostCalculationService {
       line.setUnit(unit);
       line.setUnitPrice(effectiveUnitPrice);
       line.setCurrency(priceItem.getCurrency());
-      line.setTotalInBaseCurrency(lineTotal);
       line.setVolumeDiscountApplied(volumeDiscountApplied);
+
+      // PERCENTAGE/FIXED: lineTotal is derived from running totalCost (already in targetCurrency)
+      // → no currency conversion needed. PER_KG/PER_HOUR/PER_UNIT: lineTotal is in priceItem
+      // currency → needs conversion.
+      ConvertedMoney convertedTotal;
+      if (costItem.getCalculationBase() == CalculationBase.PERCENTAGE
+          || costItem.getCalculationBase() == CalculationBase.FIXED) {
+        convertedTotal = ConvertedMoney.sameUnit(lineTotal, targetCurrency);
+      } else {
+        convertedTotal =
+            exchangeRateService.convert(
+                lineTotal, priceItem.getCurrency(), targetCurrency, LocalDate.now());
+      }
+      line.setConvertedTotal(convertedTotal);
+      line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
 
       calc.addLine(line);
     }
@@ -566,7 +615,16 @@ public class CostCalculationService {
         .findByEntityTypeAndEntityIdAndStage(entityType, entityId, previousStage)
         .ifPresent(
             previous -> {
-              // Fix #3: compute once, reuse for threshold check and event payload
+              // Guard: comparing costs in different currencies is meaningless
+              if (!current.getCurrency().equals(previous.getCurrency())) {
+                log.warn(
+                    "Variance skip: currency mismatch {} vs {} for entityId={}",
+                    current.getCurrency(),
+                    previous.getCurrency(),
+                    entityId);
+                return;
+              }
+
               BigDecimal ratioSigned = current.varianceRatioVs(previous.getTotalCost());
               BigDecimal ratioAbs = ratioSigned.abs();
               if (ratioAbs.compareTo(VARIANCE_THRESHOLD) > 0) {

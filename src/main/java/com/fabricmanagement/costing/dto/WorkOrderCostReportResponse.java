@@ -57,20 +57,45 @@ public record WorkOrderCostReportResponse(
       BigDecimal qty,
       String unit,
       BigDecimal unitPrice,
-      String currency,
-      BigDecimal totalInBaseCurrency,
-      boolean volumeDiscountApplied) {
+      String priceCurrency,
+      BigDecimal totalInReportingCurrency,
+      String reportingCurrency,
+      boolean volumeDiscountApplied,
+      BigDecimal originalLineTotal,
+      BigDecimal exchangeRateUsed,
+      String exchangeRateDate) {
 
     public static CostLineDetail from(CostCalculationLine line) {
+      String priceCur = line.getCurrency();
+      String reportCur = line.getCurrency();
+      BigDecimal origTotal = line.getTotalInBaseCurrency();
+      BigDecimal exchRate = null;
+      String exchDate = null;
+
+      if (line.getConvertedTotal() != null) {
+        priceCur = line.getConvertedTotal().getOriginalCurrency();
+        reportCur = line.getConvertedTotal().getConvertedCurrency();
+        origTotal = line.getConvertedTotal().getOriginalAmount();
+        exchRate = line.getConvertedTotal().getExchangeRate();
+        exchDate =
+            line.getConvertedTotal().getRateDate() != null
+                ? line.getConvertedTotal().getRateDate().toString()
+                : null;
+      }
+
       return new CostLineDetail(
           line.getCostItemCode(),
           line.getMaterialId(),
           line.getQty(),
           line.getUnit(),
           line.getUnitPrice(),
-          line.getCurrency(),
+          priceCur,
           line.getTotalInBaseCurrency(),
-          line.isVolumeDiscountApplied());
+          reportCur,
+          line.isVolumeDiscountApplied(),
+          origTotal,
+          exchRate,
+          exchDate);
     }
   }
 
@@ -83,6 +108,8 @@ public record WorkOrderCostReportResponse(
     public static VarianceSummary between(CostCalculation planned, CostCalculation actual) {
       if (planned == null || actual == null) return null;
       if (planned.getTotalCost().compareTo(BigDecimal.ZERO) == 0) return null;
+      // Guard: comparing costs in different currencies is meaningless
+      if (!planned.getCurrency().equals(actual.getCurrency())) return null;
 
       BigDecimal amount = actual.getTotalCost().subtract(planned.getTotalCost());
       BigDecimal ratio = amount.divide(planned.getTotalCost(), 4, RoundingMode.HALF_UP);
@@ -156,7 +183,11 @@ public record WorkOrderCostReportResponse(
                       .map(l -> l.getQty() != null ? l.getQty() : BigDecimal.ZERO)
                       .reduce(BigDecimal.ZERO, BigDecimal::add);
               String unit = lines.get(0).getUnit();
-              String currency = lines.get(0).getCurrency();
+              // Use reporting currency (matches totalInBaseCurrency which is in reporting currency)
+              String currency =
+                  lines.get(0).getConvertedTotal() != null
+                      ? lines.get(0).getConvertedTotal().getConvertedCurrency()
+                      : lines.get(0).getCurrency();
               return new MaterialCostBreakdown(
                   entry.getKey(), totalCost, totalWeight, unit, currency);
             })

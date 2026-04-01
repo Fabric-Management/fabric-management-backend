@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderConsumptionService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostRecalculationService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderOutputService;
+import com.fabricmanagement.production.execution.workorder.app.WorkOrderPlannedCostTriggerService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.dto.ConsumeFromStockUnitRequest;
@@ -48,6 +49,7 @@ public class WorkOrderController {
   private final WorkOrderConsumptionService workOrderConsumptionService;
   private final WorkOrderOutputService workOrderOutputService;
   private final WorkOrderCostRecalculationService workOrderCostRecalculationService;
+  private final WorkOrderPlannedCostTriggerService workOrderPlannedCostTriggerService;
 
   @Operation(
       summary = "Production dashboard summary",
@@ -202,6 +204,30 @@ public class WorkOrderController {
   public ResponseEntity<ApiResponse<WorkOrderResponse>> completeWorkOrder(@PathVariable UUID id) {
     var response = workOrderService.completeWorkOrder(id);
     return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
+  /**
+   * Manually triggers planned cost calculation for an APPROVED (or later) WorkOrder.
+   *
+   * <p>Use this when automatic planned cost calculation failed at approval time (e.g. missing cost
+   * template or price list). Also useful for recalculating after price list updates. Idempotent —
+   * safe to call multiple times.
+   *
+   * @param id the WorkOrder UUID
+   * @return updated WorkOrderResponse with recalculated plannedCost
+   */
+  @Operation(
+      summary = "Manually trigger planned cost calculation",
+      description =
+          "Recalculates planned cost for an APPROVED or later WorkOrder. "
+              + "Requires outputMaterialId and moduleType to be set (Sprint 12+ WorkOrders).")
+  @PostMapping("/{id}/recalculate-planned")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'WRITE')")
+  public ResponseEntity<ApiResponse<WorkOrderResponse>> recalculatePlannedCost(
+      @PathVariable UUID id) {
+    var response = workOrderPlannedCostTriggerService.triggerPlannedCost(id);
+    return ResponseEntity.ok(
+        ApiResponse.success(response, "Planned cost recalculated successfully"));
   }
 
   /**

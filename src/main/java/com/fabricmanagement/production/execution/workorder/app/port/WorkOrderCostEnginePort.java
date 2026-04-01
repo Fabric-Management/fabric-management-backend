@@ -40,4 +40,26 @@ public interface WorkOrderCostEnginePort {
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
       List<ConsumptionCostInput> consumptions);
+
+  /**
+   * Sprint 12: Planned cost computation triggered on WorkOrder approval.
+   *
+   * <p>Delegates to {@code CostCalculationService.computePlanned()} which also writes the result
+   * back to the WorkOrder entity via {@code WorkOrderPlanningUpdatePort} (Sprint 11).
+   *
+   * @param tenantId owning tenant
+   * @param workOrderId the WorkOrder entity ID
+   * @param moduleType production module (e.g. "YARN", "WEAVING")
+   * @param outputMaterialId the planned output material
+   * @param plannedQuantity the work order planned quantity in kg
+   * @param tradingPartnerId the selected supplier (for contracted prices)
+   * @return snapshot with totalPlannedCost and currency
+   */
+  ComputedCostSnapshot computePlannedCost(
+      UUID tenantId,
+      UUID workOrderId,
+      String moduleType,
+      UUID outputMaterialId,
+      BigDecimal plannedQuantity,
+      UUID tradingPartnerId);
 }
