@@ -62,6 +62,12 @@ public class CostCalculation extends BaseEntity {
   @Builder.Default
   private Instant calculatedAt = Instant.now();
 
+  /**
+   * @deprecated Since Sprint 7b — exchange rate info is now embedded per-line in
+   *     CostCalculationLine.convertedTotal. Retained for backward compatibility with existing data.
+   *     Will be removed in a future migration.
+   */
+  @Deprecated(since = "Sprint 7b", forRemoval = true)
   @Column(name = "exchange_rate_snapshot_id")
   private UUID exchangeRateSnapshotId;
 

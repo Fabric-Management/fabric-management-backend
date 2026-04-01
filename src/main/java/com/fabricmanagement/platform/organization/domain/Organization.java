@@ -99,6 +99,10 @@ public class Organization extends BaseEntity {
   @Column(name = "parent_organization_id")
   private UUID parentOrganizationId;
 
+  /** Tenant ana raporlama para birimi (TRY, USD, EUR, vs) */
+  @Column(name = "reporting_currency", length = 3)
+  private String reportingCurrency;
+
   /** Associated contacts (junction table) */
   @OneToMany(mappedBy = "organization", fetch = FetchType.LAZY)
   @Builder.Default

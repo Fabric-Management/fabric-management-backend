@@ -4,7 +4,6 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.costing.app.CostCalculationService;
 import com.fabricmanagement.costing.app.PriceListService;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
-import com.fabricmanagement.costing.domain.currency.ExchangeRateSnapshot;
 import com.fabricmanagement.costing.domain.price.PriceList;
 import com.fabricmanagement.costing.dto.*;
 import jakarta.validation.Valid;
@@ -143,21 +142,5 @@ public class CostingController {
   public ResponseEntity<Void> deactivatePriceList(@PathVariable UUID priceListId) {
     priceListService.deactivatePriceList(priceListId);
     return ResponseEntity.noContent().build();
-  }
-
-  // ============================================================
-  // EXCHANGE RATES
-  // ============================================================
-
-  @PreAuthorize("hasRole('FINANCE_MANAGER')")
-  @PostMapping("/exchange-rates")
-  @ResponseStatus(HttpStatus.CREATED)
-  public ExchangeRateResponse captureExchangeRate(
-      @Valid @RequestBody CaptureExchangeRateRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    ExchangeRateSnapshot snap =
-        priceListService.captureExchangeRate(
-            tenantId, req.baseCurrency(), req.targetCurrency(), req.rate(), req.source());
-    return ExchangeRateResponse.from(snap);
   }
 }
