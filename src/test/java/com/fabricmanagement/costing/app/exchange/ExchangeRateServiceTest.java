@@ -14,9 +14,11 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.costing.domain.exchange.ExchangeRateCache;
 import com.fabricmanagement.costing.domain.exchange.ExchangeRateProvider;
+import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import com.fabricmanagement.costing.infra.repository.ExchangeRateCacheRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -25,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,7 +37,7 @@ class ExchangeRateServiceTest {
   @Mock private ExchangeRateProvider rateProvider;
   @Mock private ExchangeRateCacheRepository cacheRepo;
 
-  @InjectMocks private ExchangeRateService service;
+  private ExchangeRateService service;
 
   @Captor private ArgumentCaptor<ExchangeRateCache> cacheCaptor;
 
@@ -46,6 +47,8 @@ class ExchangeRateServiceTest {
   @BeforeEach
   void setUp() {
     tenantContextMock = mockStatic(TenantContext.class);
+    tenantContextMock.when(TenantContext::requireTenantId).thenReturn(tenantId);
+    service = new ExchangeRateService(List.of(rateProvider), cacheRepo);
   }
 
   @AfterEach
@@ -66,7 +69,7 @@ class ExchangeRateServiceTest {
     assertThat(result.getConvertedCurrency()).isEqualTo("USD");
     assertThat(result.getExchangeRate()).isEqualTo(BigDecimal.ONE);
     // Provider should not be called
-    verify(rateProvider, never()).getRate(any(), any(), any());
+    verify(rateProvider, never()).getRate(any(), any(), any(), any());
   }
 
   @Test
@@ -75,7 +78,7 @@ class ExchangeRateServiceTest {
     LocalDate date = LocalDate.now();
     BigDecimal rate = new BigDecimal("38.50");
 
-    when(rateProvider.getRate("USD", "TRY", date)).thenReturn(Optional.of(rate));
+    when(rateProvider.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
 
     ConvertedMoney result = service.convert(amount, "USD", "TRY", date);
 
@@ -93,7 +96,7 @@ class ExchangeRateServiceTest {
     BigDecimal amount = new BigDecimal("100");
     LocalDate date = LocalDate.now();
 
-    when(rateProvider.getRate("USD", "TRY", date)).thenReturn(Optional.empty());
+    when(rateProvider.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.convert(amount, "USD", "TRY", date))
         .isInstanceOf(ExchangeRateRequiredException.class)
@@ -105,7 +108,7 @@ class ExchangeRateServiceTest {
   void getRequiredRate_RateFound_ShouldReturnRate() {
     LocalDate date = LocalDate.now();
     BigDecimal rate = new BigDecimal("38.50");
-    when(rateProvider.getRate("USD", "TRY", date)).thenReturn(Optional.of(rate));
+    when(rateProvider.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
 
     BigDecimal result = service.getRequiredRate("USD", "TRY", date);
 
@@ -114,7 +117,6 @@ class ExchangeRateServiceTest {
 
   @Test
   void saveRate_ShouldSaveForwardAndReverseRates() {
-    tenantContextMock.when(TenantContext::requireTenantId).thenReturn(tenantId);
     LocalDate date = LocalDate.now();
     BigDecimal forwardRate = new BigDecimal("38.50");
 
@@ -126,7 +128,7 @@ class ExchangeRateServiceTest {
             tenantId, "TRY", "USD", date))
         .thenReturn(Optional.empty());
 
-    service.saveRate("USD", "TRY", forwardRate, date, "MANUAL");
+    service.saveRate("USD", "TRY", forwardRate, date, ExchangeRateSource.MANUAL);
 
     verify(cacheRepo, times(2)).save(cacheCaptor.capture());
 
@@ -137,30 +139,29 @@ class ExchangeRateServiceTest {
     assertThat(forwardCache.getBaseCurrency()).isEqualTo("USD");
     assertThat(forwardCache.getTargetCurrency()).isEqualTo("TRY");
     assertThat(forwardCache.getRate()).isEqualTo(forwardRate);
-    assertThat(forwardCache.getSource()).isEqualTo("MANUAL");
+    assertThat(forwardCache.getSource()).isEqualTo(ExchangeRateSource.MANUAL);
 
     ExchangeRateCache reverseCache = savedCaches.get(1);
     assertThat(reverseCache.getBaseCurrency()).isEqualTo("TRY");
     assertThat(reverseCache.getTargetCurrency()).isEqualTo("USD");
     // 1 / 38.50 = 0.025974 (scale 6 with HALF_UP)
     assertThat(reverseCache.getRate()).isEqualByComparingTo("0.025974");
-    assertThat(reverseCache.getSource()).isEqualTo("MANUAL");
+    assertThat(reverseCache.getSource()).isEqualTo(ExchangeRateSource.MANUAL);
   }
 
   @Test
   void saveRate_ExistingRate_ShouldUpdate() {
-    tenantContextMock.when(TenantContext::requireTenantId).thenReturn(tenantId);
     LocalDate date = LocalDate.now();
     BigDecimal newForwardRate = new BigDecimal("38.50");
 
     ExchangeRateCache existingForward = ExchangeRateCache.builder().build();
     existingForward.setRate(new BigDecimal("38.00"));
-    existingForward.setSource("OLD_MANUAL");
+    existingForward.setSource(ExchangeRateSource.MANUAL);
 
     ExchangeRateCache existingReverse = ExchangeRateCache.builder().build();
     // 1 / 38.00
     existingReverse.setRate(new BigDecimal("0.026315"));
-    existingReverse.setSource("OLD_MANUAL");
+    existingReverse.setSource(ExchangeRateSource.MANUAL);
 
     when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
             tenantId, "USD", "TRY", date))
@@ -169,7 +170,7 @@ class ExchangeRateServiceTest {
             tenantId, "TRY", "USD", date))
         .thenReturn(Optional.of(existingReverse));
 
-    service.saveRate("USD", "TRY", newForwardRate, date, "NEW_MANUAL");
+    service.saveRate("USD", "TRY", newForwardRate, date, ExchangeRateSource.ECB);
 
     verify(cacheRepo, times(2)).save(cacheCaptor.capture());
 
@@ -177,9 +178,9 @@ class ExchangeRateServiceTest {
     assertThat(savedCaches).hasSize(2);
 
     assertThat(savedCaches.get(0).getRate()).isEqualTo(newForwardRate);
-    assertThat(savedCaches.get(0).getSource()).isEqualTo("NEW_MANUAL");
+    assertThat(savedCaches.get(0).getSource()).isEqualTo(ExchangeRateSource.ECB);
 
     assertThat(savedCaches.get(1).getRate()).isEqualByComparingTo("0.025974");
-    assertThat(savedCaches.get(1).getSource()).isEqualTo("NEW_MANUAL");
+    assertThat(savedCaches.get(1).getSource()).isEqualTo(ExchangeRateSource.ECB);
   }
 }

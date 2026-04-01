@@ -2,6 +2,7 @@ package com.fabricmanagement.costing.api;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
+import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import com.fabricmanagement.costing.dto.ExchangeRateResponse;
 import com.fabricmanagement.costing.dto.ExchangeRateSubmitRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,7 +39,7 @@ public class ExchangeRateController {
         request.targetCurrency(),
         request.rate(),
         request.rateDate() != null ? request.rateDate() : LocalDate.now(),
-        "MANUAL");
+        ExchangeRateSource.MANUAL);
     return ApiResponse.success(null, "Exchange rate saved");
   }
 

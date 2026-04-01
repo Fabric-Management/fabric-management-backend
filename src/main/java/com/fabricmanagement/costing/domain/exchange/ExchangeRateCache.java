@@ -3,6 +3,8 @@ package com.fabricmanagement.costing.domain.exchange;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
@@ -41,8 +43,9 @@ public class ExchangeRateCache extends BaseEntity {
   @Column(name = "rate_date", nullable = false)
   private LocalDate rateDate;
 
+  @Enumerated(EnumType.STRING)
   @Column(name = "source", nullable = false, length = 20)
-  private String source; // MANUAL, TCMB, ECB, OVERRIDE
+  private ExchangeRateSource source; // MANUAL, TCMB, ECB
 
   @Override
   protected String getModuleCode() {

@@ -5,10 +5,12 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.costing.domain.exchange.ExchangeRateCache;
 import com.fabricmanagement.costing.domain.exchange.ExchangeRateProvider;
+import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import com.fabricmanagement.costing.infra.repository.ExchangeRateCacheRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeRateService {
 
-  private final ExchangeRateProvider rateProvider;
+  private final List<ExchangeRateProvider> rateProviders;
   private final ExchangeRateCacheRepository cacheRepo;
 
   /**
@@ -27,14 +29,20 @@ public class ExchangeRateService {
    * atlar ve direkt cache'e yazar.
    */
   public BigDecimal getRequiredRate(String from, String to, LocalDate date) {
-    return rateProvider
-        .getRate(from, to, date)
+    return getRate(from, to, date)
         .orElseThrow(() -> new ExchangeRateRequiredException(from, to, date));
   }
 
-  /** Delegate to provider — returns empty if no rate found. */
+  /** Iterates through the ordered list of providers — returns first rate found. */
   public Optional<BigDecimal> getRate(String from, String to, LocalDate date) {
-    return rateProvider.getRate(from, to, date);
+    UUID tenantId = TenantContext.requireTenantId();
+    for (ExchangeRateProvider provider : rateProviders) {
+      Optional<BigDecimal> rate = provider.getRate(tenantId, from, to, date);
+      if (rate.isPresent()) {
+        return rate;
+      }
+    }
+    return Optional.empty();
   }
 
   /** ConvertedMoney oluşturur — CostCalculationService'in kullanacağı ana metod. */
@@ -57,7 +65,11 @@ public class ExchangeRateService {
   /** Kuru cache'e yazar + reverse rate'i de otomatik oluşturur. */
   @Transactional
   public void saveRate(
-      String baseCurrency, String targetCurrency, BigDecimal rate, LocalDate date, String source) {
+      String baseCurrency,
+      String targetCurrency,
+      BigDecimal rate,
+      LocalDate date,
+      ExchangeRateSource source) {
     UUID tenantId = TenantContext.requireTenantId();
 
     // Forward rate: USD → TRY = 38.50
@@ -69,7 +81,12 @@ public class ExchangeRateService {
   }
 
   private void saveOrUpdate(
-      UUID tenantId, String base, String target, BigDecimal rate, LocalDate date, String source) {
+      UUID tenantId,
+      String base,
+      String target,
+      BigDecimal rate,
+      LocalDate date,
+      ExchangeRateSource source) {
     ExchangeRateCache existing =
         cacheRepo
             .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(

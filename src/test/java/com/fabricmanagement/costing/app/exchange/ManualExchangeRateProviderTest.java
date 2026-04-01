@@ -45,14 +45,13 @@ class ManualExchangeRateProviderTest {
   void getRate_SameCurrency_ShouldReturnOne() {
     LocalDate date = LocalDate.now();
 
-    Optional<BigDecimal> result = provider.getRate("USD", "usd", date);
+    Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "usd", date);
 
     assertThat(result).isPresent().contains(BigDecimal.ONE);
   }
 
   @Test
   void getRate_ExactDateMatch_ShouldReturnRate() {
-    tenantContextMock.when(TenantContext::requireTenantId).thenReturn(tenantId);
     LocalDate date = LocalDate.now();
     BigDecimal rate = new BigDecimal("38.50");
     ExchangeRateCache cache = ExchangeRateCache.builder().build();
@@ -62,14 +61,13 @@ class ManualExchangeRateProviderTest {
             tenantId, "USD", "TRY", date))
         .thenReturn(Optional.of(cache));
 
-    Optional<BigDecimal> result = provider.getRate("USD", "TRY", date);
+    Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "TRY", date);
 
     assertThat(result).isPresent().contains(rate);
   }
 
   @Test
   void getRate_FallbackWithinCutoff_ShouldReturnRate() {
-    tenantContextMock.when(TenantContext::requireTenantId).thenReturn(tenantId);
     LocalDate date = LocalDate.now();
     LocalDate cutoffDate = date.minusDays(7);
     BigDecimal rate = new BigDecimal("38.00");
@@ -86,7 +84,7 @@ class ManualExchangeRateProviderTest {
                 tenantId, "USD", "TRY", cutoffDate, date))
         .thenReturn(Optional.of(cache));
 
-    Optional<BigDecimal> result = provider.getRate("USD", "TRY", date);
+    Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "TRY", date);
 
     assertThat(result).isPresent().contains(rate);
     verify(cacheRepo)
@@ -96,7 +94,6 @@ class ManualExchangeRateProviderTest {
 
   @Test
   void getRate_FallbackOutsideCutoff_ShouldReturnEmpty() {
-    tenantContextMock.when(TenantContext::requireTenantId).thenReturn(tenantId);
     LocalDate date = LocalDate.now();
     LocalDate cutoffDate = date.minusDays(7);
 
@@ -110,14 +107,13 @@ class ManualExchangeRateProviderTest {
                 tenantId, "USD", "TRY", cutoffDate, date))
         .thenReturn(Optional.empty());
 
-    Optional<BigDecimal> result = provider.getRate("USD", "TRY", date);
+    Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "TRY", date);
 
     assertThat(result).isEmpty();
   }
 
   @Test
   void getRate_NoRecordFound_ShouldReturnEmpty() {
-    tenantContextMock.when(TenantContext::requireTenantId).thenReturn(tenantId);
     LocalDate date = LocalDate.now();
     LocalDate cutoffDate = date.minusDays(7);
 
@@ -130,7 +126,7 @@ class ManualExchangeRateProviderTest {
                 tenantId, "USD", "TRY", cutoffDate, date))
         .thenReturn(Optional.empty());
 
-    Optional<BigDecimal> result = provider.getRate("USD", "TRY", date);
+    Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "TRY", date);
 
     assertThat(result).isEmpty();
   }
