@@ -140,6 +140,43 @@ public class CostCalculationService {
         supplierId);
   }
 
+  /**
+   * Compute or re-compute the ACTUAL cost for a completed WorkOrder.
+   *
+   * <p>Uses CostEntityType.WORK_ORDER with CostStage.ACTUAL — distinct from the PLANNED stage
+   * calculation. Variance detection runs automatically against the existing (WORK_ORDER,
+   * workOrderId, PLANNED) record if one exists.
+   *
+   * <p>NOTE: materialId and quantityKg are derived from the primary output batch. Multi-material
+   * input cost breakdown is deferred to a future sprint.
+   *
+   * @param tenantId owning tenant
+   * @param workOrderId the completed WorkOrder entity ID
+   * @param moduleType production module (e.g. "YARN", derived from output batch materialType)
+   * @param materialId primary output material ID (from output batch)
+   * @param actualQuantityKg actual quantity produced (net output, from WorkOrderCompletedEvent)
+   * @param supplierId supplier for price resolution (may be null — falls back to general price)
+   * @return the saved CostCalculation
+   */
+  @Transactional
+  public CostCalculation computeActualForWorkOrder(
+      UUID tenantId,
+      UUID workOrderId,
+      String moduleType,
+      UUID materialId,
+      BigDecimal actualQuantityKg,
+      UUID supplierId) {
+    return compute(
+        tenantId,
+        CostEntityType.WORK_ORDER,
+        workOrderId,
+        moduleType,
+        CostStage.ACTUAL,
+        materialId,
+        actualQuantityKg,
+        supplierId);
+  }
+
   // ============================================================
   // INTERNAL ENGINE
   // ============================================================

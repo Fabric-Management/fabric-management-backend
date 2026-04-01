@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.batch.infra.repository;
 
 import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import jakarta.persistence.LockModeType;
@@ -42,6 +43,13 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
   Optional<Batch> findByTenantIdAndBatchCode(UUID tenantId, String batchCode);
 
   boolean existsByTenantIdAndBatchCode(UUID tenantId, String batchCode);
+
+  /**
+   * Find the first output batch produced by a specific source (e.g., WorkOrder). Used for cost
+   * calculation to determine output material and module type.
+   */
+  Optional<Batch> findFirstByTenantIdAndSourceIdAndSourceType(
+      UUID tenantId, UUID sourceId, BatchSourceType sourceType);
 
   /** Count batches that are direct children of the given parent (for split code generation). */
   long countByTenantIdAndParentBatchId(UUID tenantId, UUID parentBatchId);

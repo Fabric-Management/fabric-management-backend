@@ -43,6 +43,9 @@ public class WorkOrderResponse {
   private Instant completedAt;
   private UUID completedBy;
 
+  private BigDecimal actualCost;
+  private String actualCostCurrency;
+
   // Supplier Snapshot Fields
   private String supplierCertificationCode;
   private String supplierLicenseNo;
