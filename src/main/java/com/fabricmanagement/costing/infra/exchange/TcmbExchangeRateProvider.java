@@ -180,11 +180,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
     }
   }
 
-  /**
-   * Tenant bazlı audit trail kaydeder. Bu provider'a sadece ManualExchangeRateProvider cache'te
-   * hiçbir kayıt bulamadığında sıra gelir. Bu yüzden burada TCMB kaydı varsa günceller, yoksa yeni
-   * kaydeder.
-   */
+  /** Mevcut kayıt varsa günceller, yoksa yeni kaydeder — tenant bazlı audit trail. */
   void saveToAuditCache(
       UUID tenantId, String base, String target, BigDecimal rate, LocalDate date) {
     ExchangeRateCache existing =
@@ -194,7 +190,6 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
             .orElse(null);
 
     if (existing != null) {
-      // Mevcut kayıt TCMB ise güncelleriz, değilse dokunmayız
       existing.setRate(rate);
       cacheRepo.save(existing);
     } else {
