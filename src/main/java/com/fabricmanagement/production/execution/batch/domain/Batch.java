@@ -410,6 +410,37 @@ public class Batch extends BaseEntity {
     onUpdate();
   }
 
+  /**
+   * Reverses a previously recorded consumption — decreases {@code consumedQuantity}.
+   *
+   * @param qty amount to reverse (must be positive and ≤ consumedQuantity)
+   */
+  public void reverseConsumption(BigDecimal qty) {
+    if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new BatchDomainException("Reversal amount must be positive for batch " + batchCode);
+    }
+    if (this.consumedQuantity.compareTo(qty) < 0) {
+      throw new BatchDomainException(
+          String.format(
+              "Cannot reverse %.3f %s: only %.3f %s was consumed in batch %s",
+              qty, unit, consumedQuantity, unit, batchCode));
+    }
+
+    this.consumedQuantity = this.consumedQuantity.subtract(qty);
+
+    if (this.status == BatchStatus.DEPLETED) {
+      // If was DEPLETED, it must move back to IN_PROGRESS or AVAILABLE/RESERVED
+      this.status =
+          this.consumedQuantity.compareTo(BigDecimal.ZERO) > 0
+              ? BatchStatus.IN_PROGRESS
+              : (this.reservedQuantity.compareTo(BigDecimal.ZERO) > 0
+                  ? BatchStatus.RESERVED
+                  : BatchStatus.AVAILABLE);
+    }
+
+    onUpdate();
+  }
+
   /** Net useful output = consumed - waste. */
   public BigDecimal getNetOutputQuantity() {
     return consumedQuantity.subtract(wasteQuantity);

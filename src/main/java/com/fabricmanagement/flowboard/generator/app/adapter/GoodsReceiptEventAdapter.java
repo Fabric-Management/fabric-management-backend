@@ -20,10 +20,10 @@ public class GoodsReceiptEventAdapter implements DomainEventAdapter<GoodsReceipt
   @Override
   public TaskTemplateContext buildContext(GoodsReceiptConfirmedEvent event) {
     return new TaskTemplateContext(
-        event.tenantId(),
-        event.receiptId(),
+        event.getTenantId(),
+        event.getReceiptId(),
         "GOODS_RECEIPT",
-        event.receiptNumber(),
+        event.getReceiptNumber(),
         null, // Deadline GoodsReceiptConfirmedEvent içerisinde yok
         Map.of()); // Interpolation değişkenleri şimdilik boş
   }

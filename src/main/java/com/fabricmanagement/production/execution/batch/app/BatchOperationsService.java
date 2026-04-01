@@ -2,9 +2,6 @@ package com.fabricmanagement.production.execution.batch.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
-import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
-import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
-import com.fabricmanagement.iwm.location.dto.WarehouseLocationDto;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchOverrideLog;
@@ -12,6 +9,8 @@ import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.CreateBatchCommand;
 import com.fabricmanagement.production.execution.batch.domain.event.*;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
+import com.fabricmanagement.production.execution.batch.domain.port.LocationValidationResult;
+import com.fabricmanagement.production.execution.batch.domain.port.WarehouseLocationPort;
 import com.fabricmanagement.production.execution.batch.dto.*;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchOverrideLogRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
@@ -58,7 +57,7 @@ public class BatchOperationsService {
   private final BatchOverrideLogRepository overrideLogRepository;
   private final BatchCodeGenerator batchCodeGenerator;
   private final BatchLineageService batchLineageService;
-  private final WarehouseLocationService warehouseLocationService;
+  private final WarehouseLocationPort warehouseLocationPort;
   private final ApplicationEventPublisher applicationEventPublisher;
 
   // ── Blend ─────────────────────────────────────────────────────────────────
@@ -537,13 +536,13 @@ public class BatchOperationsService {
       throw new BatchDomainException("Batch is already in production: " + batch.getBatchCode());
     }
 
-    WarehouseLocationDto machineLocation =
-        warehouseLocationService.getById(request.getMachineLocationId());
-    if (machineLocation.getType() != WarehouseLocationType.MACHINE
-        && machineLocation.getType() != WarehouseLocationType.PRODUCTION_LINE) {
+    LocationValidationResult locationResult =
+        warehouseLocationPort.validateProductionLocation(request.getMachineLocationId());
+    if (!locationResult.validProductionLocation()) {
       throw new BatchDomainException(
-          "Target location must be a MACHINE or PRODUCTION_LINE, got: "
-              + machineLocation.getType());
+          "Target location must be a MACHINE or PRODUCTION_LINE. Location '"
+              + locationResult.locationCode()
+              + "' is not a valid production location.");
     }
 
     UUID previousLocationId = batch.getLocationId();
@@ -560,13 +559,13 @@ public class BatchOperationsService {
             batch.getUnit(),
             previousLocationId,
             request.getMachineLocationId(),
-            machineLocation.getCode()));
+            locationResult.locationCode()));
 
     log.info(
         "Production started: batchId={}, batchCode={}, machine={}, status={}",
         saved.getId(),
         saved.getBatchCode(),
-        machineLocation.getCode(),
+        locationResult.locationCode(),
         saved.getStatus());
 
     return batchService.toBatchDto(saved);

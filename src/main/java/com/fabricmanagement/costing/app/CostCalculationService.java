@@ -12,7 +12,6 @@ import com.fabricmanagement.costing.domain.template.CostTemplateItem;
 import com.fabricmanagement.costing.infra.repository.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -318,7 +317,6 @@ public class CostCalculationService {
                         .currentTotal(current.getTotalCost())
                         .varianceRatio(ratioSigned) // signed: + overrun, - saving
                         .currency(current.getCurrency())
-                        .detectedAt(Instant.now())
                         .build();
                 eventPublisher.publishEvent(event);
                 log.warn(

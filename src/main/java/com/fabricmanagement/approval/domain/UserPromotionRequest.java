@@ -1,6 +1,7 @@
 package com.fabricmanagement.approval.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.common.infrastructure.user.UserTrustLevel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

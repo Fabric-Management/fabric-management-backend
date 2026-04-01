@@ -2,6 +2,8 @@ package com.fabricmanagement.iwm.location.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.common.infrastructure.web.exception.OptimisticLockConflictException;
+import com.fabricmanagement.iwm.common.exception.IwmDomainException;
 import com.fabricmanagement.iwm.location.domain.LocationStatus;
 import com.fabricmanagement.iwm.location.domain.StorageCondition;
 import com.fabricmanagement.iwm.location.domain.WarehouseLocation;
@@ -12,8 +14,6 @@ import com.fabricmanagement.iwm.location.dto.UpdateWarehouseLocationRequest;
 import com.fabricmanagement.iwm.location.dto.WarehouseLocationDto;
 import com.fabricmanagement.iwm.location.dto.WarehouseLocationTreeDto;
 import com.fabricmanagement.iwm.location.infra.repository.WarehouseLocationRepository;
-import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
-import com.fabricmanagement.production.common.exception.ProductionDomainException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -166,7 +166,7 @@ public class WarehouseLocationService {
 
     long childCount = repository.countActiveChildren(id);
     if (childCount > 0) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           String.format(
               "Cannot deactivate location '%s' — it has %d active child location(s). Deactivate or move them first.",
               location.getCode(), childCount));
@@ -177,7 +177,7 @@ public class WarehouseLocationService {
     BigDecimal cv =
         location.getCurrentVolumeM3() != null ? location.getCurrentVolumeM3() : BigDecimal.ZERO;
     if (cw.compareTo(BigDecimal.ZERO) > 0 || cv.compareTo(BigDecimal.ZERO) > 0) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           String.format(
               "Cannot deactivate location '%s' — it still holds inventory (weight=%.3f kg, volume=%.3f m³). Transfer inventory first.",
               location.getCode(), cw, cv));
@@ -313,7 +313,7 @@ public class WarehouseLocationService {
     BigDecimal cw =
         location.getCurrentWeightKg() != null ? location.getCurrentWeightKg() : BigDecimal.ZERO;
     if (newMaxWeight != null && cw.compareTo(newMaxWeight) > 0) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           String.format(
               "Cannot set max weight to %.3f kg — current load is %.3f kg. Remove inventory first.",
               newMaxWeight, cw));
@@ -321,7 +321,7 @@ public class WarehouseLocationService {
     BigDecimal cv =
         location.getCurrentVolumeM3() != null ? location.getCurrentVolumeM3() : BigDecimal.ZERO;
     if (newMaxVolume != null && cv.compareTo(newMaxVolume) > 0) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           String.format(
               "Cannot set max volume to %.3f m³ — current volume is %.3f m³. Remove inventory first.",
               newMaxVolume, cv));
@@ -330,14 +330,13 @@ public class WarehouseLocationService {
 
   private void validateCodeUnique(UUID tenantId, String code) {
     if (repository.existsByTenantIdAndCode(tenantId, code)) {
-      throw new ProductionDomainException(
-          "A warehouse location with code '" + code + "' already exists.");
+      throw new IwmDomainException("A warehouse location with code '" + code + "' already exists.");
     }
   }
 
   private void validateBarcodeUnique(UUID tenantId, String barcode) {
     if (repository.existsByTenantIdAndBarcode(tenantId, barcode)) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           "A warehouse location with barcode '" + barcode + "' already exists.");
     }
   }
@@ -345,12 +344,12 @@ public class WarehouseLocationService {
   private void validateHierarchy(WarehouseLocationType childType, WarehouseLocation parent) {
     Set<WarehouseLocationType> allowed = ALLOWED_PARENTS.get(childType);
     if (allowed == null) {
-      throw new ProductionDomainException("Unknown location type: " + childType);
+      throw new IwmDomainException("Unknown location type: " + childType);
     }
 
     if (allowed.isEmpty()) {
       if (parent != null) {
-        throw new ProductionDomainException(
+        throw new IwmDomainException(
             childType
                 + " must be a root location (no parent). Cannot be placed under "
                 + parent.getType()
@@ -360,12 +359,11 @@ public class WarehouseLocationService {
     }
 
     if (parent == null) {
-      throw new ProductionDomainException(
-          childType + " requires a parent location of type: " + allowed);
+      throw new IwmDomainException(childType + " requires a parent location of type: " + allowed);
     }
 
     if (!allowed.contains(parent.getType())) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           String.format(
               "%s cannot be placed under %s. Allowed parent types: %s",
               childType, parent.getType(), allowed));

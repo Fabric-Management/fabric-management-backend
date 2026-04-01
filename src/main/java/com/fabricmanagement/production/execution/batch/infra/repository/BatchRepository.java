@@ -48,6 +48,8 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
   List<Batch> findByTenantIdAndStatus(UUID tenantId, BatchStatus status);
 
+  List<Batch> findByTenantIdAndStatusIn(UUID tenantId, Collection<BatchStatus> statuses);
+
   List<Batch> findByTenantIdAndMaterialIdAndStatusIn(
       UUID tenantId, UUID materialId, Collection<BatchStatus> statuses);
 

@@ -3,7 +3,7 @@ package com.fabricmanagement.approval.dto;
 import com.fabricmanagement.approval.domain.PromotionRequestStatus;
 import com.fabricmanagement.approval.domain.PromotionTriggerType;
 import com.fabricmanagement.approval.domain.UserPromotionRequest;
-import com.fabricmanagement.approval.domain.UserTrustLevel;
+import com.fabricmanagement.common.infrastructure.user.UserTrustLevel;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;

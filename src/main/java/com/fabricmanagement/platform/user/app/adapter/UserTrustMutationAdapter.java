@@ -1,7 +1,7 @@
 package com.fabricmanagement.platform.user.app.adapter;
 
-import com.fabricmanagement.approval.domain.UserTrustLevel;
 import com.fabricmanagement.approval.domain.port.UserTrustMutationPort;
+import com.fabricmanagement.common.infrastructure.user.UserTrustLevel;
 import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;

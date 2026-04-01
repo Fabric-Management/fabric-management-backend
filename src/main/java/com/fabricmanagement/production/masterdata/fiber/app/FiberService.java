@@ -2,8 +2,8 @@ package com.fabricmanagement.production.masterdata.fiber.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.OptimisticLockConflictException;
 import com.fabricmanagement.production.common.exception.ForbiddenOperationException;
-import com.fabricmanagement.production.common.exception.OptimisticLockConflictException;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;

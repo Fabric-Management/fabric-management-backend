@@ -57,6 +57,9 @@ public final class TenantContext {
   public static final UUID SYSTEM_TENANT_ID =
       UUID.fromString("00000000-0000-0000-0000-000000000000");
 
+  public static final UUID SYSTEM_ACTOR_ID =
+      UUID.fromString("00000000-0000-0000-0000-000000000001");
+
   /** ThreadLocal storage for current tenant ID */
   private static final ThreadLocal<UUID> CURRENT_TENANT_ID = new ThreadLocal<>();
 
@@ -126,6 +129,20 @@ public final class TenantContext {
   public static void setCurrentUserId(UUID userId) {
     CURRENT_USER_ID.set(userId);
     log.trace("Set user ID: {} for thread: {}", userId, Thread.currentThread().getName());
+  }
+
+  /**
+   * Gets the current tenant ID for this thread. Throws IllegalStateException if not set.
+   *
+   * @return the current tenant ID
+   * @throws IllegalStateException if tenant context is missing
+   */
+  public static UUID requireTenantId() {
+    UUID tenantId = CURRENT_TENANT_ID.get();
+    if (tenantId == null) {
+      throw new IllegalStateException("TenantContext is not set. Cannot proceed without tenant.");
+    }
+    return tenantId;
   }
 
   /**

@@ -308,7 +308,10 @@ public class BatchCertificationService {
 
   private BatchCertificationAutoFillResponse buildAutoFillFromPartnerCert(
       TradingPartnerCertification partnerCert) {
-    var cert = partnerCert.getCertification();
+    var cert =
+        fiberCertificationRepository
+            .findByIdAndIsActiveTrue(partnerCert.getCertificationId())
+            .orElseThrow(() -> new NotFoundException("Certification not found"));
     return BatchCertificationAutoFillResponse.builder()
         .certificationId(cert.getId())
         .certificationCode(cert.getCertificationCode())
@@ -329,7 +332,10 @@ public class BatchCertificationService {
 
   private BatchCertificationAutoFillResponse buildAutoFillFromOrgCert(
       OrganizationCertification orgCert) {
-    var cert = orgCert.getCertification();
+    var cert =
+        fiberCertificationRepository
+            .findByIdAndIsActiveTrue(orgCert.getCertificationId())
+            .orElseThrow(() -> new NotFoundException("Certification not found"));
     return BatchCertificationAutoFillResponse.builder()
         .certificationId(cert.getId())
         .certificationCode(cert.getCertificationCode())

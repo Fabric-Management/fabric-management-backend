@@ -1,4 +1,4 @@
-package com.fabricmanagement.human.compliance.app;
+package com.fabricmanagement.human.compliance.domain;
 
 import java.util.Optional;
 

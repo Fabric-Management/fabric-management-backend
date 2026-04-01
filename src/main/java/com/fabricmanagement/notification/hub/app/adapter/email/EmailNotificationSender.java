@@ -1,4 +1,4 @@
-package com.fabricmanagement.notification.hub.infra.email;
+package com.fabricmanagement.notification.hub.app.adapter.email;
 
 import com.fabricmanagement.platform.communication.app.EmailOutboxService;
 import lombok.RequiredArgsConstructor;

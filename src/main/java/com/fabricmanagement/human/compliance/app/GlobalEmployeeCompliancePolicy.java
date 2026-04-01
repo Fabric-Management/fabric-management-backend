@@ -1,5 +1,6 @@
 package com.fabricmanagement.human.compliance.app;
 
+import com.fabricmanagement.human.compliance.domain.EmployeeComplianceContext;
 import com.fabricmanagement.human.compliance.domain.EmployeeCompliancePolicy;
 import com.fabricmanagement.human.compliance.localization.domain.HrLocalizationConstants;
 import com.fabricmanagement.human.core.employee.domain.EmergencyContact;

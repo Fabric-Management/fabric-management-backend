@@ -1,9 +1,9 @@
 package com.fabricmanagement.platform.organization.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCertification;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.util.UUID;
 import lombok.*;
 
 /**
@@ -12,7 +12,7 @@ import lombok.*;
  * <p>Stores organization-specific certification data: license number, issue/expiry dates, document
  * reference.
  *
- * <p>References {@link FiberCertification} for certification types (GOTS, OEKO-TEX, etc.).
+ * <p>References certification types (GOTS, OEKO-TEX, etc.) via UUID.
  */
 @Entity
 @Table(
@@ -34,9 +34,8 @@ public class OrganizationCertification extends BaseEntity {
   @JoinColumn(name = "organization_id", nullable = false)
   private Organization organization;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "certification_id", nullable = false)
-  private FiberCertification certification;
+  @Column(name = "certification_id", nullable = false)
+  private UUID certificationId;
 
   @Column(name = "license_no", length = 100)
   private String licenseNo;

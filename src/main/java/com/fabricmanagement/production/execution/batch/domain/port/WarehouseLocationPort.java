@@ -1,0 +1,26 @@
+package com.fabricmanagement.production.execution.batch.domain.port;
+
+import java.util.UUID;
+
+/**
+ * Port for validating warehouse locations from the IWM module.
+ *
+ * <p>Production never imports IWM services/entities directly. Instead, this port defines what
+ * production needs (location validation for production start), and IWM provides an adapter.
+ *
+ * <p>This follows the Port/Adapter pattern established in the codebase (see {@code
+ * ProductionOrderPort}, {@code UserTrustLevelPort}).
+ */
+public interface WarehouseLocationPort {
+
+  /**
+   * Validate that the given location exists and is suitable for production (MACHINE or
+   * PRODUCTION_LINE type).
+   *
+   * @param locationId the warehouse location ID
+   * @return validation result with location metadata
+   * @throws com.fabricmanagement.common.infrastructure.web.exception.NotFoundException if location
+   *     not found
+   */
+  LocationValidationResult validateProductionLocation(UUID locationId);
+}

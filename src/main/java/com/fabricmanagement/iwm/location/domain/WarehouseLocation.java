@@ -1,7 +1,7 @@
 package com.fabricmanagement.iwm.location.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.common.exception.ProductionDomainException;
+import com.fabricmanagement.iwm.common.exception.IwmDomainException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -145,7 +145,7 @@ public class WarehouseLocation extends BaseEntity {
     BigDecimal current = this.currentWeightKg != null ? this.currentWeightKg : BigDecimal.ZERO;
     BigDecimal newWeight = current.add(weight);
     if (this.maxWeightKg != null && newWeight.compareTo(this.maxWeightKg) > 0) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           String.format(
               "Weight %.3f kg would exceed max capacity %.3f kg for location '%s'",
               newWeight, this.maxWeightKg, this.code));
@@ -167,7 +167,7 @@ public class WarehouseLocation extends BaseEntity {
     BigDecimal current = this.currentVolumeM3 != null ? this.currentVolumeM3 : BigDecimal.ZERO;
     BigDecimal newVolume = current.add(volume);
     if (this.maxVolumeM3 != null && newVolume.compareTo(this.maxVolumeM3) > 0) {
-      throw new ProductionDomainException(
+      throw new IwmDomainException(
           String.format(
               "Volume %.3f m³ would exceed max capacity %.3f m³ for location '%s'",
               newVolume, this.maxVolumeM3, this.code));

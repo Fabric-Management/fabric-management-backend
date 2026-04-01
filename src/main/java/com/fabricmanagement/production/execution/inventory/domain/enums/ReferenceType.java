@@ -11,5 +11,6 @@ public enum ReferenceType {
   BATCH,
   WAREHOUSE_LOCATION,
   PRODUCTION,
-  SHIPMENT
+  SHIPMENT,
+  STOCK_UNIT
 }
