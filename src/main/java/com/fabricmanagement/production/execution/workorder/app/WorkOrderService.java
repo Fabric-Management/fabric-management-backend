@@ -3,6 +3,7 @@ package com.fabricmanagement.production.execution.workorder.app;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.production.execution.batch.api.facade.BatchFacade;
@@ -13,22 +14,30 @@ import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatu
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
+import com.fabricmanagement.production.execution.workorder.dto.ProductionDashboardResponse;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
+import com.fabricmanagement.production.execution.workorder.dto.WorkOrderFilterRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderOutputRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
+import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderSpecification;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +54,66 @@ public class WorkOrderService {
   private final TradingPartnerCertificationService certificationService;
   private final DomainEventPublisher domainEventPublisher;
   private final ApprovalPort approvalPort;
+
+  /**
+   * Paginated, filterable listing of WorkOrders for the current tenant.
+   *
+   * @param filter optional filter criteria (all fields nullable)
+   * @param pageable page, size, sort
+   */
+  public PagedResponse<WorkOrderResponse> listWorkOrders(
+      WorkOrderFilterRequest filter, Pageable pageable) {
+
+    UUID tenantId = TenantContext.requireTenantId();
+    Specification<WorkOrder> spec = WorkOrderSpecification.build(tenantId, filter);
+    Page<WorkOrder> page = workOrderRepository.findAll(spec, pageable);
+    return PagedResponse.from(page, WorkOrderResponse::from);
+  }
+
+  /**
+   * Returns aggregate production dashboard for the current tenant.
+   *
+   * <p>Two DB queries:
+   *
+   * <ol>
+   *   <li>Status breakdown (JPQL GROUP BY)
+   *   <li>Aggregate stats: overdue, yield, cost (native SQL, single row)
+   * </ol>
+   */
+  public ProductionDashboardResponse getProductionDashboard() {
+    UUID tenantId = TenantContext.requireTenantId();
+    Instant now = Instant.now();
+
+    // TODO Sprint 7b: resolve tenant default currency from config
+    // For now, use TRY as default — multi-currency dashboard requires
+    // ExchangeRateSnapshot conversion which is not yet implemented.
+    String dashboardCurrency = "TRY";
+
+    // Query 1: Status counts
+    List<WorkOrderRepository.StatusCountProjection> statusCounts =
+        workOrderRepository.countByStatus(tenantId);
+
+    Map<String, Long> statusBreakdown = new java.util.LinkedHashMap<>();
+    for (WorkOrderStatus status : WorkOrderStatus.values()) {
+      statusBreakdown.put(status.name(), 0L);
+    }
+    for (var sc : statusCounts) {
+      statusBreakdown.put(sc.getStatus().name(), sc.getCount());
+    }
+
+    // Query 2: Aggregate stats (currency-filtered)
+    WorkOrderRepository.DashboardStatsProjection stats =
+        workOrderRepository.getDashboardStats(tenantId, now, dashboardCurrency);
+
+    return ProductionDashboardResponse.of(
+        statusBreakdown,
+        stats.getOverdueCount() != null ? stats.getOverdueCount() : 0L,
+        stats.getTotalPlannedCost(),
+        stats.getTotalActualCost(),
+        stats.getAvgYield(),
+        stats.getCompletedCount() != null ? stats.getCompletedCount() : 0L,
+        dashboardCurrency);
+  }
 
   /** Retrieves a work order by its UUID. */
   public WorkOrderResponse getWorkOrder(UUID id) {
@@ -379,32 +448,6 @@ public class WorkOrderService {
   }
 
   private WorkOrderResponse mapToResponse(WorkOrder workOrder) {
-    return WorkOrderResponse.builder()
-        .id(workOrder.getId())
-        .uid(workOrder.getUid())
-        .workOrderNumber(workOrder.getWorkOrderNumber())
-        .recipeId(workOrder.getRecipeId())
-        .tradingPartnerId(workOrder.getTradingPartnerId())
-        .salesOrderLineId(workOrder.getSalesOrderLineId())
-        .fulfillmentType(workOrder.getFulfillmentType())
-        .fulfillmentId(workOrder.getFulfillmentId())
-        .plannedQty(workOrder.getPlannedQty())
-        .unit(workOrder.getUnit())
-        .unitCost(workOrder.getUnitCost())
-        .currency(workOrder.getCurrency())
-        .plannedCost(workOrder.getPlannedCost())
-        .plannedCostCurrency(workOrder.getPlannedCostCurrency())
-        .status(workOrder.getStatus())
-        .deadline(workOrder.getDeadline())
-        .notes(workOrder.getNotes())
-        .attachments(workOrder.getAttachments())
-        .actualQty(workOrder.getActualQty())
-        .yieldPercentage(workOrder.getYieldPercentage())
-        .completedAt(workOrder.getCompletedAt())
-        .completedBy(workOrder.getCompletedBy())
-        .supplierCertificationCode(workOrder.getSupplierCertificationCode())
-        .supplierLicenseNo(workOrder.getSupplierLicenseNo())
-        .supplierLicenseValidUntil(workOrder.getSupplierLicenseValidUntil())
-        .build();
+    return WorkOrderResponse.from(workOrder);
   }
 }

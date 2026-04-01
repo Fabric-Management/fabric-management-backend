@@ -93,6 +93,21 @@ public class CostingController {
     return CostCalculationResponse.from(calc);
   }
 
+  /**
+   * Full cost report for a WorkOrder: PLANNED vs ACTUAL with per-material breakdown.
+   *
+   * <p>Either stage may be absent if not yet calculated. Frontend should handle null sections.
+   *
+   * @param workOrderId the WorkOrder UUID
+   * @return WorkOrderCostReportResponse with variance analysis and raw material breakdown
+   */
+  @PreAuthorize("hasRole('COSTING_READ') or hasRole('PRODUCTION_MANAGER')")
+  @GetMapping("/calculations/work-orders/{workOrderId}")
+  public WorkOrderCostReportResponse getWorkOrderCostReport(@PathVariable UUID workOrderId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return costCalculationService.getWorkOrderCostReport(tenantId, workOrderId);
+  }
+
   // ============================================================
   // PRICE LISTS
   // ============================================================

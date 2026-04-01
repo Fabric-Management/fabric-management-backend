@@ -3,6 +3,7 @@ package com.fabricmanagement.production.execution.workorder.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
@@ -21,11 +22,11 @@ import com.fabricmanagement.production.execution.workorder.infra.repository.Work
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -132,34 +133,20 @@ public class WorkOrderConsumptionService {
     UUID tenantId = TenantContext.requireTenantId();
     WorkOrder workOrder = loadWorkOrder(workOrderId, tenantId);
 
-    List<WorkOrderConsumption> consumptions =
-        workOrderConsumptionRepository
-            .findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(tenantId, workOrderId);
-
-    BigDecimal totalConsumed =
-        consumptions.stream()
-            .map(WorkOrderConsumption::getConsumedWeight)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-    Map<
-            com.fabricmanagement.production.masterdata.material.domain.MaterialType,
-            List<WorkOrderConsumption>>
-        grouped =
-            consumptions.stream()
-                .collect(Collectors.groupingBy(WorkOrderConsumption::getMaterialType));
-
+    // DB-level aggregation — no in-memory groupBy
     List<WorkOrderConsumptionSummaryResponse.MaterialBreakdown> breakdowns =
-        grouped.entrySet().stream()
+        workOrderConsumptionRepository.aggregateByMaterialType(tenantId, workOrderId).stream()
             .map(
-                entry -> {
-                  BigDecimal typeSum =
-                      entry.getValue().stream()
-                          .map(WorkOrderConsumption::getConsumedWeight)
-                          .reduce(BigDecimal.ZERO, BigDecimal::add);
-                  return new WorkOrderConsumptionSummaryResponse.MaterialBreakdown(
-                      entry.getKey(), typeSum, entry.getValue().size());
-                })
+                agg ->
+                    new WorkOrderConsumptionSummaryResponse.MaterialBreakdown(
+                        agg.getMaterialType(), agg.getTotalWeight(), agg.getRecordCount()))
             .toList();
+
+    // Derive total from aggregation — single query, no extra DB round-trip
+    BigDecimal totalConsumed =
+        breakdowns.stream()
+            .map(WorkOrderConsumptionSummaryResponse.MaterialBreakdown::consumedWeight)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
 
     return new WorkOrderConsumptionSummaryResponse(
         workOrder.getId(),
@@ -167,6 +154,19 @@ public class WorkOrderConsumptionService {
         totalConsumed,
         workOrder.getUnit(),
         breakdowns);
+  }
+
+  @Transactional(readOnly = true)
+  public PagedResponse<WorkOrderConsumptionResponse> getConsumptionsPaged(
+      UUID workOrderId, Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+    loadWorkOrder(workOrderId, tenantId);
+
+    Page<WorkOrderConsumption> page =
+        workOrderConsumptionRepository.findByTenantIdAndWorkOrderIdAndIsActiveTrue(
+            tenantId, workOrderId, pageable);
+
+    return PagedResponse.from(page, WorkOrderConsumptionResponse::from);
   }
 
   // --- Helpers --- //

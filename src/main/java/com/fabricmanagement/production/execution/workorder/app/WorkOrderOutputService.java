@@ -3,6 +3,7 @@ package com.fabricmanagement.production.execution.workorder.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
@@ -22,11 +23,11 @@ import com.fabricmanagement.production.execution.workorder.infra.repository.Work
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -128,51 +129,59 @@ public class WorkOrderOutputService {
     UUID tenantId = TenantContext.requireTenantId();
     WorkOrder workOrder = loadWorkOrder(workOrderId, tenantId);
 
-    List<WorkOrderOutput> outputs =
-        workOrderOutputRepository.findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
-            tenantId, workOrderId);
-
-    BigDecimal totalOutput =
-        workOrderOutputRepository.sumOutputWeightByWorkOrderId(tenantId, workOrderId);
-
     BigDecimal totalConsumed =
         workOrderConsumptionRepository.sumConsumedWeightByWorkOrderId(tenantId, workOrderId);
 
-    // Protect against zero division
+    // DB-level aggregation — no in-memory groupBy
+    List<WorkOrderOutputSummaryResponse.MaterialBreakdown> breakdowns =
+        workOrderOutputRepository.aggregateByMaterialType(tenantId, workOrderId).stream()
+            .map(
+                agg ->
+                    new WorkOrderOutputSummaryResponse.MaterialBreakdown(
+                        agg.getMaterialType(), agg.getTotalWeight(), agg.getRecordCount()))
+            .toList();
+
+    // Derive totals from aggregation — no extra DB round-trip
+    BigDecimal totalOutputWeight =
+        breakdowns.stream()
+            .map(WorkOrderOutputSummaryResponse.MaterialBreakdown::outputWeight)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    long outputCount =
+        breakdowns.stream()
+            .mapToLong(WorkOrderOutputSummaryResponse.MaterialBreakdown::outputCount)
+            .sum();
+
+    // Zero division protection
     BigDecimal yieldPercentage =
         totalConsumed.compareTo(BigDecimal.ZERO) == 0
             ? BigDecimal.ZERO
-            : totalOutput
+            : totalOutputWeight
                 .multiply(new BigDecimal("100"))
                 .divide(totalConsumed, 2, RoundingMode.HALF_UP);
-
-    Map<
-            com.fabricmanagement.production.masterdata.material.domain.MaterialType,
-            List<WorkOrderOutput>>
-        grouped = outputs.stream().collect(Collectors.groupingBy(WorkOrderOutput::getMaterialType));
-
-    List<WorkOrderOutputSummaryResponse.MaterialBreakdown> breakdowns =
-        grouped.entrySet().stream()
-            .map(
-                entry -> {
-                  BigDecimal typeSum =
-                      entry.getValue().stream()
-                          .map(WorkOrderOutput::getOutputWeight)
-                          .reduce(BigDecimal.ZERO, BigDecimal::add);
-                  return new WorkOrderOutputSummaryResponse.MaterialBreakdown(
-                      entry.getKey(), typeSum, entry.getValue().size());
-                })
-            .toList();
 
     return new WorkOrderOutputSummaryResponse(
         workOrder.getId(),
         workOrder.getPlannedQty(),
-        totalOutput,
+        totalOutputWeight,
         totalConsumed,
         yieldPercentage,
         workOrder.getUnit(),
         breakdowns,
-        outputs.size());
+        outputCount);
+  }
+
+  @Transactional(readOnly = true)
+  public PagedResponse<WorkOrderOutputResponse> getOutputsPaged(
+      UUID workOrderId, Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+    loadWorkOrder(workOrderId, tenantId);
+
+    Page<WorkOrderOutput> page =
+        workOrderOutputRepository.findByTenantIdAndWorkOrderIdAndIsActiveTrue(
+            tenantId, workOrderId, pageable);
+
+    return PagedResponse.from(page, WorkOrderOutputResponse::from);
   }
 
   // --- Helpers --- //
