@@ -6,6 +6,7 @@ import com.fabricmanagement.production.execution.workorder.app.port.ComputedCost
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +46,7 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
       UUID outputMaterialId,
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
-      java.util.List<ConsumptionCostInput> consumptions) {
+      List<ConsumptionCostInput> consumptions) {
 
     log.info(
         "Computing multi-material actual cost for WorkOrder: {} ({} consumption records)",
