@@ -138,8 +138,8 @@ class TcmbExchangeRateProviderTest {
 
   @Test
   void saveToAuditCache_ExistingAnySourceRate_ShouldStillUpdate() {
-    // Bu provider'a sıra geldiğinde, Manual provider cache'te kayıt bulamamıştır.
-    // Dolayısıyla existing kayıt varsa bile, TCMB güncelleme yapabilir.
+    // When this provider is reached, it means the Manual provider did not find a cache entry.
+    // Therefore, even if an existing record exists, TCMB can update it.
     LocalDate date = LocalDate.now();
     ExchangeRateCache existing = ExchangeRateCache.builder().build();
     existing.setSource(ExchangeRateSource.MANUAL);
@@ -151,7 +151,7 @@ class TcmbExchangeRateProviderTest {
 
     provider.saveToAuditCache(tenantId, "USD", "TRY", new BigDecimal("38.50"), date);
 
-    // Artık güncelleme yapılır — dead code guard kaldırıldı
+    // Update goes through — dead code guard was removed
     verify(cacheRepo).save(any());
   }
 }

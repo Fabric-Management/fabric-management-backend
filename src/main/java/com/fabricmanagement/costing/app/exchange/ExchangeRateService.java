@@ -25,30 +25,32 @@ public class ExchangeRateService {
   private final ExchangeRateCacheRepository cacheRepo;
 
   /**
-   * Kuru çeker. Bulamazsa ExchangeRateRequiredException fırlatır. TenantContext'ten tenantId
-   * çözümler — controller/facade katmanından çağrılacak convenience metod.
+   * Fetches the rate. Throws ExchangeRateRequiredException if not found. Resolves tenantId from
+   * TenantContext — convenience method for controller/facade layer.
    */
   public BigDecimal getRequiredRate(String from, String to, LocalDate date) {
     UUID tenantId = TenantContext.requireTenantId();
     return getRequiredRate(tenantId, from, to, date);
   }
 
-  /** Explicit tenantId ile kur çeker. Bulamazsa ExchangeRateRequiredException fırlatır. */
+  /** Fetches the rate with explicit tenantId. Throws ExchangeRateRequiredException if not found. */
   public BigDecimal getRequiredRate(UUID tenantId, String from, String to, LocalDate date) {
     return getRate(tenantId, from, to, date)
         .orElseThrow(() -> new ExchangeRateRequiredException(from, to, date));
   }
 
   /**
-   * Iterates through the ordered list of providers — returns first rate found. TenantContext'ten
-   * tenantId çözümler.
+   * Iterates through the ordered list of providers — returns first rate found. Resolves tenantId
+   * from TenantContext.
    */
   public Optional<BigDecimal> getRate(String from, String to, LocalDate date) {
     UUID tenantId = TenantContext.requireTenantId();
     return getRate(tenantId, from, to, date);
   }
 
-  /** Explicit tenantId ile ordered provider chain'i tarar — ilk bulunan rate döner. */
+  /**
+   * Iterates through the ordered provider chain with explicit tenantId — returns first rate found.
+   */
   public Optional<BigDecimal> getRate(UUID tenantId, String from, String to, LocalDate date) {
     for (ExchangeRateProvider provider : rateProviders) {
       Optional<BigDecimal> rate = provider.getRate(tenantId, from, to, date);
@@ -60,8 +62,8 @@ public class ExchangeRateService {
   }
 
   /**
-   * ConvertedMoney oluşturur — CostCalculationService'in kullanacağı ana metod. TenantContext'ten
-   * tenantId çözümler.
+   * Creates a ConvertedMoney — main method used by CostCalculationService. Resolves tenantId from
+   * TenantContext.
    */
   public ConvertedMoney convert(
       BigDecimal originalAmount, String originalCurrency, String targetCurrency, LocalDate date) {
@@ -69,7 +71,7 @@ public class ExchangeRateService {
     return convert(tenantId, originalAmount, originalCurrency, targetCurrency, date);
   }
 
-  /** Explicit tenantId ile ConvertedMoney oluşturur. */
+  /** Creates a ConvertedMoney with explicit tenantId. */
   public ConvertedMoney convert(
       UUID tenantId,
       BigDecimal originalAmount,
@@ -88,7 +90,7 @@ public class ExchangeRateService {
         originalAmount, originalCurrency, convertedAmount, targetCurrency, rate, date);
   }
 
-  /** Kuru cache'e yazar + reverse rate'i de otomatik oluşturur. */
+  /** Saves the rate to cache and automatically creates the reverse rate. */
   @Transactional
   public void saveRate(
       String baseCurrency,

@@ -239,7 +239,7 @@ public class CostCalculationService {
               costCalcRepo.save(existing);
             });
 
-    // PriceList per moduleType — her unique moduleType için tek DB sorgusu (Cache)
+    // PriceList per moduleType — single DB query per unique moduleType (Cache)
     Map<String, Optional<PriceList>> priceListCache =
         consumptions.stream()
             .map(ConsumptionCostInput::moduleType)

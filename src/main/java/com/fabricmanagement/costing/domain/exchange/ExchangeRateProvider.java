@@ -7,8 +7,8 @@ import java.util.UUID;
 
 public interface ExchangeRateProvider {
   /**
-   * Verilen tarih için kuru döner. Empty = kur bulunamadı → caller karar verir (kullanıcıya sor
-   * veya hata fırlat).
+   * Returns the rate for the given currency pair and date. Empty = rate not found — caller decides
+   * (prompt user or throw exception).
    */
   Optional<BigDecimal> getRate(
       UUID tenantId, String fromCurrency, String toCurrency, LocalDate date);

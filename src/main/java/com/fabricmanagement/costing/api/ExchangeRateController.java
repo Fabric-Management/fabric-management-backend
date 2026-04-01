@@ -29,7 +29,7 @@ public class ExchangeRateController {
 
   private final ExchangeRateService exchangeRateService;
 
-  /** Kur girişi — "ihtiyaç anında sor" akışında frontend buraya POST atar */
+  /** Submit a rate — in the “ask when missing” flow, the frontend POSTs here. */
   @PostMapping
   @Operation(summary = "Submit exchange rate (manual entry or override)")
   @PreAuthorize("hasRole('COSTING_ADMIN')")
@@ -44,7 +44,7 @@ public class ExchangeRateController {
   }
 
   /**
-   * Mevcut kuru sorgula — frontend "bu kur doğru mu?" göstermek için.
+   * Query the current rate — for frontend to display “is this rate correct?”.
    *
    * <p>Returns the rate if found, or a NOT_FOUND response with the queried pair so the frontend can
    * prompt the user to enter a manual rate.

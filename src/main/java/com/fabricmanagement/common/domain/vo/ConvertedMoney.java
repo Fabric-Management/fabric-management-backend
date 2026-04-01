@@ -22,7 +22,7 @@ public class ConvertedMoney {
   private BigDecimal exchangeRate; // 38.50
   private LocalDate rateDate; // 2026-04-01
 
-  /** Farklı para birimleri arası dönüşüm */
+  /** Creates a converted money between different currencies. */
   public static ConvertedMoney of(
       BigDecimal originalAmount,
       String originalCurrency,
@@ -36,7 +36,7 @@ public class ConvertedMoney {
         exchangeRate, rateDate);
   }
 
-  /** Aynı para birimi — dönüşüm gereksiz, rate=1 */
+  /** Same currency — no conversion needed, rate=1. */
   public static ConvertedMoney sameUnit(BigDecimal amount, String currency) {
     return new ConvertedMoney(amount, currency, amount, currency, BigDecimal.ONE, LocalDate.now());
   }

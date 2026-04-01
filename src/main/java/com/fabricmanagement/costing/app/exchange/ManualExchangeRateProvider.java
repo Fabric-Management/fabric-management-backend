@@ -20,7 +20,7 @@ public class ManualExchangeRateProvider implements ExchangeRateProvider {
 
   @Override
   public Optional<BigDecimal> getRate(UUID tenantId, String from, String to, LocalDate date) {
-    // Aynı birim → 1.0
+    // Same currency → 1.0
     if (from.equalsIgnoreCase(to)) {
       return Optional.of(BigDecimal.ONE);
     }
@@ -33,7 +33,7 @@ public class ManualExchangeRateProvider implements ExchangeRateProvider {
       return Optional.of(exact.get().getRate());
     }
 
-    // 2. En yakın önceki tarih (max 7 gün geriye — bounded at DB level)
+    // 2. Nearest previous date (max 7 days back — bounded at DB level)
     LocalDate cutoff = date.minusDays(7);
     return cacheRepo
         .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(

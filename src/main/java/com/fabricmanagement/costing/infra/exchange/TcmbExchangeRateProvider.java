@@ -29,14 +29,14 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 /**
- * TCMB (Türkiye Cumhuriyet Merkez Bankası) döviz kuru sağlayıcı.
+ * TCMB (Central Bank of the Republic of Turkey) exchange rate provider.
  *
- * <p>Lazy cache pattern ile çalışır: İlk getRate() çağrısında TCMB XML feed'inden günlük kurları
- * çeker ve JVM-level in-memory cache'te saklar. Sonraki çağrılar cache'ten döner. Her tenant için
- * DB'ye audit trail kaydeder.
+ * <p>Uses a lazy cache pattern: On the first getRate() call, fetches daily rates from the TCMB XML
+ * feed and stores them in a JVM-level in-memory cache. Subsequent calls return from cache. Writes
+ * an audit trail to the DB for each tenant.
  *
- * <p>ManualExchangeRateProvider'dan sonra çalışır (@Order(2)). Manuel girilen kurlar her zaman
- * TCMB'yi override eder çünkü chain'de önce çözümlenir ve bu provider'a sıra gelmez.
+ * <p>Runs after ManualExchangeRateProvider (@Order(2)). Manually entered rates always override TCMB
+ * because they are resolved first in the chain, so this provider is never reached.
  */
 @Slf4j
 @Component
@@ -113,8 +113,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
   }
 
   /**
-   * Her zaman tarih bazlı URL kullanır. today.xml tutarsız format ve güncelleme zamanlaması
-   * nedeniyle kullanılmaz.
+   * Always uses date-based URL. today.xml is not used due to inconsistent format and update timing.
    */
   String buildTcmbUrl(LocalDate date) {
     String yearMonth = date.format(DateTimeFormatter.ofPattern("yyyyMM"));
@@ -125,7 +124,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
   private Map<String, BigDecimal> parseXml(InputStream is) throws Exception {
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
-    // XXE koruması — defense-in-depth
+    // XXE protection — defense-in-depth
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
     factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
     factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
@@ -180,7 +179,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
     }
   }
 
-  /** Mevcut kayıt varsa günceller, yoksa yeni kaydeder — tenant bazlı audit trail. */
+  /** Updates existing record or inserts a new one — per-tenant audit trail. */
   void saveToAuditCache(
       UUID tenantId, String base, String target, BigDecimal rate, LocalDate date) {
     ExchangeRateCache existing =
@@ -206,7 +205,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
     }
   }
 
-  /** 30 günden eski cache entry'lerini temizler — bellek hijyeni. */
+  /** Evicts cache entries older than 30 days — memory hygiene. */
   private void evictStaleCacheEntries() {
     LocalDate cutoff = LocalDate.now().minusDays(MAX_CACHE_DAYS);
     tcmbDailyRates.keySet().removeIf(date -> date.isBefore(cutoff));
