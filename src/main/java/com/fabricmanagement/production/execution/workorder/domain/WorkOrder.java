@@ -31,6 +31,12 @@ public class WorkOrder extends BaseEntity {
   @Column(name = "recipe_id")
   private UUID recipeId;
 
+  @Column(name = "output_material_id")
+  private UUID outputMaterialId;
+
+  @Column(name = "module_type", length = 50)
+  private String moduleType;
+
   @Column(name = "trading_partner_id")
   private UUID tradingPartnerId;
 

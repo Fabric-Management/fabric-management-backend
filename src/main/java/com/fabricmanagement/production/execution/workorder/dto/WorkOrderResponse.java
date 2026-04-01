@@ -24,6 +24,8 @@ public class WorkOrderResponse {
   private String uid;
   private String workOrderNumber;
   private UUID recipeId;
+  private UUID outputMaterialId;
+  private String moduleType;
   private UUID tradingPartnerId;
   private UUID salesOrderId;
   private UUID salesOrderLineId;
@@ -63,6 +65,8 @@ public class WorkOrderResponse {
         .uid(workOrder.getUid())
         .workOrderNumber(workOrder.getWorkOrderNumber())
         .recipeId(workOrder.getRecipeId())
+        .outputMaterialId(workOrder.getOutputMaterialId())
+        .moduleType(workOrder.getModuleType())
         .tradingPartnerId(workOrder.getTradingPartnerId())
         .salesOrderId(workOrder.getSalesOrderId())
         .salesOrderLineId(workOrder.getSalesOrderLineId())

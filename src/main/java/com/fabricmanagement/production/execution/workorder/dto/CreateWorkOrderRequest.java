@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
 import com.fabricmanagement.production.execution.workorder.domain.FulfillmentType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -27,6 +28,14 @@ import lombok.NoArgsConstructor;
 public class CreateWorkOrderRequest {
 
   private UUID recipeId;
+
+  @NotNull
+  @Schema(description = "Output material UUID")
+  private UUID outputMaterialId;
+
+  @NotBlank
+  @Schema(description = "Production module type (e.g. WEAVING, DYEING)")
+  private String moduleType;
 
   private UUID tradingPartnerId;
 
