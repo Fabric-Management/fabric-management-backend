@@ -35,47 +35,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
 @RecordApplicationEvents
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
 @DisplayName("Cost Calculation Pipeline Integration Test")
-class CostCalculationIntegrationTest {
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
-          .withDatabaseName("fabric_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
+class CostCalculationIntegrationTest
+    extends com.fabricmanagement.costing.integration.AbstractCostingIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;
@@ -171,7 +139,6 @@ class CostCalculationIntegrationTest {
   @DisplayName("CostVarianceDetectedEvent emitted when ACTUAL deviates from PLANNED by threshold")
   void varianceDetection_emitsEventIfExceedsThreshold() {
     UUID tenantId = UUID.randomUUID();
-    UUID batchId = UUID.randomUUID();
     UUID workOrderId = UUID.randomUUID(); // Represents the entity ID in PLANNED
 
     // 1. Items & Template
@@ -188,25 +155,25 @@ class CostCalculationIntegrationTest {
         TestCostDataFactory.createPriceListItem(
             pl.getId(), "ENERGY", null, new BigDecimal("20.0"), "TRY"));
 
-    // Action: Planned (100 KG -> 2000 TRY)
-    CostCalculation planned =
-        costService.computePlanned(
-            tenantId, workOrderId, "DYEING", null, new BigDecimal("100.0"), null);
-
     // In CostCalculationService, ACTUAL for WorkOrder searches for the PLANNED record associated
     // with that the same WorkOrder.
     // Action: Actual (120 KG -> 2400 TRY). Variance = (2400-2000)/2000 = 0.20 (20%) -> Should
     // trigger event!
-    CostCalculation actual =
-        costService.computeActualForWorkOrder(
-            tenantId, workOrderId, "DYEING", null, new BigDecimal("120.0"), null);
+    costService.computeActualForWorkOrder(
+        tenantId, workOrderId, "DYEING", null, new BigDecimal("120.0"), null);
 
-    // Assert Domain Event
-    long varianceEvents = events.stream(CostVarianceDetectedEvent.class).count();
+    // Assert Domain Event filtered by entityId to avoid cross-test pollution
+    long varianceEvents =
+        events.stream(CostVarianceDetectedEvent.class)
+            .filter(e -> e.getEntityId().equals(workOrderId))
+            .count();
     assertThat(varianceEvents).isEqualTo(1);
 
     CostVarianceDetectedEvent event =
-        events.stream(CostVarianceDetectedEvent.class).findFirst().orElseThrow();
+        events.stream(CostVarianceDetectedEvent.class)
+            .filter(e -> e.getEntityId().equals(workOrderId))
+            .findFirst()
+            .orElseThrow();
     assertThat(event.getTenantId()).isEqualTo(tenantId);
     assertThat(event.getEntityId()).isEqualTo(workOrderId);
     assertThat(event.getPreviousTotal()).isEqualByComparingTo("2000.0000");
