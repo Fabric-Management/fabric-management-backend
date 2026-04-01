@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -126,8 +127,7 @@ public class WorkOrder extends BaseEntity {
 
   public void complete(BigDecimal actualQty, BigDecimal yieldPercentage, UUID completedBy) {
     if (!this.status.canTransitionTo(WorkOrderStatus.COMPLETED)) {
-      throw new com.fabricmanagement.production.execution.workorder.domain.exception
-          .WorkOrderDomainException("Cannot complete WO in status: " + this.status);
+      throw new WorkOrderDomainException("Cannot complete WO in status: " + this.status);
     }
     this.actualQty = actualQty;
     this.yieldPercentage = yieldPercentage;
