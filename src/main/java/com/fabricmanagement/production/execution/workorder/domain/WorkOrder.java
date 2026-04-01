@@ -98,10 +98,10 @@ public class WorkOrder extends BaseEntity {
   @Column(name = "planned_cost_currency", length = 3)
   private String plannedCostCurrency;
 
-  @Column(name = "actual_cost", precision = 15, scale = 3)
+  @Column(name = "actual_cost", precision = 18, scale = 4)
   private BigDecimal actualCost;
 
-  @Column(name = "actual_cost_currency", length = 3)
+  @Column(name = "actual_cost_currency", length = 10)
   private String actualCostCurrency;
 
   @Enumerated(EnumType.STRING)

@@ -86,6 +86,7 @@ public class WorkOrderConsumptionService {
             stockUnit.getBarcode(),
             batch.getBatchCode(),
             stockUnit.getMaterialType(),
+            batch.getMaterialId(),
             amount,
             stockUnit.getUnit(), // Usually matches workOrder unit, but SU owns physical unit
             stockUnit.getQualityGradeId(),

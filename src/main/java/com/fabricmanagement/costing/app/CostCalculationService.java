@@ -10,12 +10,15 @@ import com.fabricmanagement.costing.domain.price.PriceListItem;
 import com.fabricmanagement.costing.domain.template.CostTemplate;
 import com.fabricmanagement.costing.domain.template.CostTemplateItem;
 import com.fabricmanagement.costing.infra.repository.*;
+import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -175,6 +178,192 @@ public class CostCalculationService {
         materialId,
         actualQuantityKg,
         supplierId);
+  }
+
+  /**
+   * Sprint 6: Compute ACTUAL cost for a WorkOrder using per-consumption material prices.
+   *
+   * <p>For RAW_MATERIAL template items: iterates over each ConsumptionCostInput and resolves the
+   * per-material unit price independently. This gives accurate blending cost — e.g. 60% FIBER_A at
+   * 45 TRY/kg + 40% FIBER_B at 52 TRY/kg instead of pricing by the output yarn.
+   *
+   * <p>For all other template items (LABOR, MACHINE, OVERHEAD, etc.): standard computation against
+   * outputMaterialId + actualOutputQty, unchanged from Sprint 5.
+   *
+   * <p>Known limitation: assumes all price lists share the same base currency (TRY). Multi-currency
+   * conversion is deferred to Sprint 7.
+   */
+  @Transactional
+  public CostCalculation computeActualForWorkOrderWithConsumptions(
+      UUID tenantId,
+      UUID workOrderId,
+      String outputModuleType,
+      UUID outputMaterialId,
+      BigDecimal actualOutputQty,
+      UUID tradingPartnerId,
+      List<ConsumptionCostInput> consumptions) {
+
+    // 1. Idempotent recalculation — soft-delete any existing WORK_ORDER/ACTUAL record
+    costCalcRepo
+        .findActiveByEntityTypeAndEntityIdAndStage(
+            CostEntityType.WORK_ORDER, workOrderId, CostStage.ACTUAL)
+        .ifPresent(
+            existing -> {
+              existing.delete();
+              costCalcRepo.save(existing);
+            });
+
+    // PriceList per moduleType — her unique moduleType için tek DB sorgusu (Cache)
+    Map<String, Optional<PriceList>> priceListCache =
+        consumptions.stream()
+            .map(ConsumptionCostInput::moduleType)
+            .distinct()
+            .collect(
+                Collectors.toMap(
+                    mt -> mt,
+                    mt -> priceListRepo.findActiveForModule(tenantId, mt, LocalDate.now())));
+
+    // 2. Resolve PriceList and Template for the output module (used for LABOR, OVERHEAD, etc.)
+    PriceList outputPriceList =
+        priceListRepo
+            .findActiveForModule(tenantId, outputModuleType, LocalDate.now())
+            .orElseThrow(() -> new PriceListNotFoundException(outputModuleType));
+
+    CostTemplate template =
+        costTemplateRepo
+            .findDefault(tenantId, outputModuleType)
+            .orElseThrow(
+                () ->
+                    new CostingDomainException(
+                        "No default cost template for module: " + outputModuleType));
+
+    // 3. Create calculation shell
+    CostCalculation calc =
+        CostCalculation.create(
+            tenantId,
+            CostEntityType.WORK_ORDER,
+            workOrderId,
+            outputModuleType,
+            CostStage.ACTUAL,
+            outputPriceList.getCurrency());
+    calc.setCostTemplateId(template.getId());
+
+    List<CostItem> relevantItems = costItemRepo.findActiveForModule(outputModuleType);
+
+    // 4. Process template items
+    for (CostTemplateItem templateItem : template.getItems()) {
+      if (!templateItem.isIncluded()) continue;
+
+      Optional<CostItem> costItemOpt =
+          relevantItems.stream()
+              .filter(ci -> ci.getCode().equals(templateItem.costItemCode()))
+              .findFirst();
+      if (costItemOpt.isEmpty()) {
+        log.warn("CostItem '{}' in template not found — skipping", templateItem.costItemCode());
+        continue;
+      }
+      CostItem costItem = costItemOpt.get();
+
+      if ("RAW_MATERIAL".equals(costItem.getCode())) {
+        // ── Multi-material path: one line per consumption record ──
+        for (ConsumptionCostInput consumption : consumptions) {
+
+          PriceList consumptionPriceList =
+              priceListCache.getOrDefault(consumption.moduleType(), Optional.empty()).orElse(null);
+
+          if (consumptionPriceList == null) {
+            log.warn(
+                "No active price list for module '{}' — raw material cost skipped for materialId {}",
+                consumption.moduleType(),
+                consumption.materialId());
+            continue;
+          }
+
+          Optional<PriceListItem> priceItemOpt =
+              priceListItemRepo.findBest(
+                  consumptionPriceList.getId(),
+                  "RAW_MATERIAL",
+                  consumption.materialId(),
+                  tradingPartnerId);
+          if (priceItemOpt.isEmpty()) {
+            log.debug(
+                "No RAW_MATERIAL price for materialId {} — skipping line",
+                consumption.materialId());
+            continue;
+          }
+
+          PriceListItem priceItem = priceItemOpt.get();
+          BigDecimal unitPrice = priceItem.resolveUnitPrice(consumption.consumedWeight());
+          BigDecimal lineTotal =
+              unitPrice
+                  .multiply(consumption.consumedWeight())
+                  .setScale(4, java.math.RoundingMode.HALF_UP);
+
+          CostCalculationLine line = new CostCalculationLine();
+          line.setTenantId(tenantId);
+          line.setCostItemCode("RAW_MATERIAL");
+          line.setQty(consumption.consumedWeight());
+          line.setUnit(consumption.unit());
+          line.setUnitPrice(unitPrice);
+          line.setCurrency(priceItem.getCurrency());
+          line.setTotalInBaseCurrency(lineTotal);
+          line.setVolumeDiscountApplied(!unitPrice.equals(priceItem.getUnitPrice()));
+          line.setNotes("materialId=" + consumption.materialId()); // breakdown için
+
+          calc.addLine(line);
+        }
+      } else {
+        // ── Standard path: output material + output qty (LABOR, MACHINE, OVERHEAD vb.) ──
+        Optional<PriceListItem> priceItemOpt =
+            priceListItemRepo.findBest(
+                outputPriceList.getId(), costItem.getCode(), outputMaterialId, tradingPartnerId);
+        if (priceItemOpt.isEmpty()) {
+          log.debug("No price for '{}' in output price list — skipping", costItem.getCode());
+          continue;
+        }
+
+        PriceListItem priceItem = priceItemOpt.get();
+        BigDecimal effectiveUnitPrice = priceItem.resolveUnitPrice(actualOutputQty);
+        boolean volumeDiscountApplied = !effectiveUnitPrice.equals(priceItem.getUnitPrice());
+
+        BigDecimal lineTotal =
+            computeLineTotal(
+                costItem,
+                effectiveUnitPrice,
+                actualOutputQty,
+                templateItem.weight(),
+                calc.getTotalCost());
+
+        String unit =
+            switch (costItem.getCalculationBase()) {
+              case PER_KG -> "KG";
+              case PER_HOUR -> "HOUR";
+              case PER_UNIT -> "UNIT";
+              case PERCENTAGE, FIXED -> null;
+            };
+
+        CostCalculationLine line = new CostCalculationLine();
+        line.setTenantId(tenantId);
+        line.setCostItemCode(costItem.getCode());
+        line.setQty(actualOutputQty);
+        line.setUnit(unit);
+        line.setUnitPrice(effectiveUnitPrice);
+        line.setCurrency(priceItem.getCurrency());
+        line.setTotalInBaseCurrency(lineTotal);
+        line.setVolumeDiscountApplied(volumeDiscountApplied);
+
+        calc.addLine(line);
+      }
+    }
+
+    var saved = costCalcRepo.save(calc);
+    log.info(
+        "Multi-material CostCalculation saved: workOrderId={} stage=ACTUAL totalCost={}",
+        workOrderId,
+        saved.getTotalCost());
+
+    detectAndPublishVariance(tenantId, saved, CostEntityType.WORK_ORDER, workOrderId);
+    return saved;
   }
 
   // ============================================================
