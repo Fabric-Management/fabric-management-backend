@@ -9,6 +9,7 @@ import com.fabricmanagement.costing.domain.price.PriceList;
 import com.fabricmanagement.costing.domain.price.PriceListItem;
 import com.fabricmanagement.costing.domain.template.CostTemplate;
 import com.fabricmanagement.costing.domain.template.CostTemplateItem;
+import com.fabricmanagement.costing.dto.WorkOrderCostReportResponse;
 import com.fabricmanagement.costing.infra.repository.*;
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import java.math.BigDecimal;
@@ -308,7 +309,7 @@ public class CostCalculationService {
           line.setCurrency(priceItem.getCurrency());
           line.setTotalInBaseCurrency(lineTotal);
           line.setVolumeDiscountApplied(!unitPrice.equals(priceItem.getUnitPrice()));
-          line.setNotes("materialId=" + consumption.materialId()); // breakdown için
+          line.setMaterialId(consumption.materialId());
 
           calc.addLine(line);
         }
@@ -364,6 +365,34 @@ public class CostCalculationService {
 
     detectAndPublishVariance(tenantId, saved, CostEntityType.WORK_ORDER, workOrderId);
     return saved;
+  }
+
+  /**
+   * Retrieves the PLANNED and ACTUAL cost calculations for a WorkOrder and builds a structured
+   * report with per-material breakdown and variance summary.
+   *
+   * <p>Either stage may be absent (not yet calculated or calculation failed) — the response handles
+   * partial data gracefully.
+   *
+   * @param tenantId the current tenant
+   * @param workOrderId the WorkOrder to report on
+   * @return WorkOrderCostReportResponse (never null, but may have null sections)
+   */
+  @Transactional(readOnly = true)
+  public WorkOrderCostReportResponse getWorkOrderCostReport(UUID tenantId, UUID workOrderId) {
+    Optional<CostCalculation> planned =
+        costCalcRepo.findActiveByEntityTypeAndEntityIdAndStage(
+            CostEntityType.WORK_ORDER, workOrderId, CostStage.PLANNED);
+
+    Optional<CostCalculation> actual =
+        costCalcRepo.findActiveByEntityTypeAndEntityIdAndStage(
+            CostEntityType.WORK_ORDER, workOrderId, CostStage.ACTUAL);
+
+    // Force-load lazy lines within this transaction
+    planned.ifPresent(c -> c.getLines().size());
+    actual.ifPresent(c -> c.getLines().size());
+
+    return WorkOrderCostReportResponse.of(workOrderId, planned, actual);
   }
 
   // ============================================================

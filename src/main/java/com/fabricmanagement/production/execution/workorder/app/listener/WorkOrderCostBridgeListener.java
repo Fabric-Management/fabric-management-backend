@@ -1,18 +1,8 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.execution.workorder.app.port.ComputedCostSnapshot;
-import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
-import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
-import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
-import com.fabricmanagement.production.execution.workorder.domain.WorkOrderConsumption;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostRecalculationService;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
-import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
-import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
-import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,104 +11,40 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+/**
+ * Triggers automatic cost calculation when a WorkOrder is completed.
+ *
+ * <p>Delegates all orchestration to {@link WorkOrderCostRecalculationService}. On failure, logs the
+ * error but does NOT roll back the COMPLETED status — cost can be recalculated manually via the
+ * {@code POST /api/production/work-orders/{id}/recalculate-cost} endpoint.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class WorkOrderCostBridgeListener {
 
-  private final WorkOrderCostEnginePort costEnginePort;
-  private final BatchRepository batchRepository;
-  private final WorkOrderRepository workOrderRepository;
-  private final WorkOrderConsumptionRepository workOrderConsumptionRepository;
+  private final WorkOrderCostRecalculationService costRecalculationService;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void handleWorkOrderCompletedEvent(WorkOrderCompletedEvent event) {
     log.info(
-        "WorkOrderCompletedEvent received for WorkOrder: {}. Initiating multi-material cost calc.",
+        "WorkOrderCompletedEvent: initiating cost calculation for WorkOrder {}",
         event.getWorkOrderId());
 
     try {
-      // 1. Load WorkOrder — tenant guard
-      Optional<WorkOrder> workOrderOpt = workOrderRepository.findById(event.getWorkOrderId());
-      if (workOrderOpt.isEmpty() || !workOrderOpt.get().getTenantId().equals(event.getTenantId())) {
-        log.warn(
-            "WorkOrder {} not found or tenant mismatch. Cost skipped.", event.getWorkOrderId());
-        return;
-      }
-      WorkOrder workOrder = workOrderOpt.get();
-
-      // 2. Find the output batch (provides outputModuleType and outputMaterialId)
-      Optional<Batch> batchOpt =
-          batchRepository.findFirstByTenantIdAndSourceIdAndSourceType(
-              event.getTenantId(), event.getWorkOrderId(), BatchSourceType.INTERNAL_PRODUCTION);
-      if (batchOpt.isEmpty()) {
-        log.warn("No output batch for WorkOrder: {}. Cost skipped.", event.getWorkOrderId());
-        return;
-      }
-      Batch outputBatch = batchOpt.get();
-
-      // 3. Load all active consumption records
-      List<WorkOrderConsumption> consumptions =
-          workOrderConsumptionRepository
-              .findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
-                  event.getTenantId(), event.getWorkOrderId());
-
-      if (consumptions.isEmpty()) {
-        log.warn("No consumption records for WorkOrder {}. Cost skipped.", event.getWorkOrderId());
-        return;
-      }
-
-      // 4. Map to port DTOs — filter nulls (legacy records pre-Sprint 6 may lack materialId)
-      List<ConsumptionCostInput> costInputs =
-          consumptions.stream()
-              .filter(c -> c.getMaterialId() != null)
-              .map(
-                  c ->
-                      new ConsumptionCostInput(
-                          c.getMaterialId(),
-                          c.getMaterialType().name(), // e.g. "FIBER", "YARN"
-                          c.getConsumedWeight(),
-                          c.getUnit()))
-              .toList();
-
-      if (costInputs.isEmpty()) {
-        log.warn(
-            "All {} consumption records for WorkOrder {} lack materialId (pre-Sprint 6 data). "
-                + "Cost skipped.",
-            consumptions.size(),
-            event.getWorkOrderId());
-        return;
-      }
-
-      // 5. Compute cost via Port (cross-module boundary)
-      ComputedCostSnapshot snapshot =
-          costEnginePort.computeActualCostFromConsumptions(
-              event.getTenantId(),
-              event.getWorkOrderId(),
-              outputBatch.getMaterialType().name(),
-              outputBatch.getMaterialId(),
-              event.getActualQty(),
-              workOrder.getTradingPartnerId(),
-              costInputs);
-
-      // 6. Write back to WorkOrder
-      workOrder.updateActualCost(snapshot.totalActualCost(), snapshot.currency());
-      workOrderRepository.save(workOrder);
-
-      log.info(
-          "Multi-material cost computed for WorkOrder {}. Total: {} {} ({} input lines)",
-          event.getWorkOrderId(),
-          snapshot.totalActualCost(),
-          snapshot.currency(),
-          costInputs.size());
-
+      // Belt-and-suspenders: REQUIRES_NEW opens a new transaction; TenantContext
+      // is thread-local and normally preserved, but set it explicitly to be safe.
+      TenantContext.setCurrentTenantId(event.getTenantId());
+      costRecalculationService.recalculateActualCost(event.getWorkOrderId());
     } catch (Exception e) {
       log.error(
-          "Failed to compute actual cost for WorkOrder: {}. WorkOrder status is COMPLETED — "
-              + "cost can be recalculated manually.",
+          "Automatic cost calculation failed for WorkOrder {}. "
+              + "Use POST /api/production/work-orders/{}/recalculate-cost after fixing configuration.",
+          event.getWorkOrderId(),
           event.getWorkOrderId(),
           e);
+      // Intentional: cost failure must not roll back the COMPLETED status.
     }
   }
 }

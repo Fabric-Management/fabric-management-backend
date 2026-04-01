@@ -1,7 +1,9 @@
 package com.fabricmanagement.production.execution.workorder.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderConsumptionService;
+import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostRecalculationService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderOutputService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
@@ -15,9 +17,9 @@ import com.fabricmanagement.production.execution.workorder.dto.WorkOrderOutputSu
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,6 +41,14 @@ public class WorkOrderController {
   private final WorkOrderService workOrderService;
   private final WorkOrderConsumptionService workOrderConsumptionService;
   private final WorkOrderOutputService workOrderOutputService;
+  private final WorkOrderCostRecalculationService workOrderCostRecalculationService;
+
+  @GetMapping
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'READ')")
+  public PagedResponse<WorkOrderResponse> listWorkOrders(
+      @RequestParam(required = false) WorkOrderStatus status, Pageable pageable) {
+    return workOrderService.listWorkOrders(status, pageable);
+  }
 
   @GetMapping("/{id}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'READ')")
@@ -90,10 +100,9 @@ public class WorkOrderController {
 
   @GetMapping("/{id}/consumptions")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'READ')")
-  public ResponseEntity<ApiResponse<List<WorkOrderConsumptionResponse>>> getConsumptions(
-      @PathVariable UUID id) {
-    var response = workOrderConsumptionService.getConsumptions(id);
-    return ResponseEntity.ok(ApiResponse.success(response));
+  public PagedResponse<WorkOrderConsumptionResponse> getConsumptions(
+      @PathVariable UUID id, Pageable pageable) {
+    return workOrderConsumptionService.getConsumptionsPaged(id, pageable);
   }
 
   @GetMapping("/{id}/consumption-summary")
@@ -114,10 +123,9 @@ public class WorkOrderController {
 
   @GetMapping("/{id}/outputs")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'READ')")
-  public ResponseEntity<ApiResponse<List<WorkOrderOutputResponse>>> getOutputs(
-      @PathVariable UUID id) {
-    var response = workOrderOutputService.getOutputs(id);
-    return ResponseEntity.ok(ApiResponse.success(response));
+  public PagedResponse<WorkOrderOutputResponse> getOutputs(
+      @PathVariable UUID id, Pageable pageable) {
+    return workOrderOutputService.getOutputsPaged(id, pageable);
   }
 
   @GetMapping("/{id}/output-summary")
@@ -133,5 +141,22 @@ public class WorkOrderController {
   public ResponseEntity<ApiResponse<WorkOrderResponse>> completeWorkOrder(@PathVariable UUID id) {
     var response = workOrderService.completeWorkOrder(id);
     return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
+  /**
+   * Manually triggers cost recalculation for a COMPLETED WorkOrder.
+   *
+   * <p>Use this when automatic cost calculation failed at completion time (e.g. price list was not
+   * configured). Idempotent — safe to call multiple times.
+   *
+   * @param id the WorkOrder UUID
+   * @return updated WorkOrderResponse with recalculated actualCost
+   */
+  @PostMapping("/{id}/recalculate-cost")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'WORK_ORDER', 'WRITE')")
+  public ResponseEntity<ApiResponse<WorkOrderResponse>> recalculateCost(@PathVariable UUID id) {
+    var response = workOrderCostRecalculationService.recalculateActualCost(id);
+    return ResponseEntity.ok(
+        ApiResponse.success(response, "Actual cost recalculated successfully"));
   }
 }

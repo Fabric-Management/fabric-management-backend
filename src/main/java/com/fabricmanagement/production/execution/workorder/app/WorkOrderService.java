@@ -3,6 +3,7 @@ package com.fabricmanagement.production.execution.workorder.app;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.production.execution.batch.api.facade.BatchFacade;
@@ -29,6 +30,8 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +48,24 @@ public class WorkOrderService {
   private final TradingPartnerCertificationService certificationService;
   private final DomainEventPublisher domainEventPublisher;
   private final ApprovalPort approvalPort;
+
+  /**
+   * Paginated listing of WorkOrders, optionally filtered by status.
+   *
+   * @param status null → all statuses; non-null → filter by that status
+   * @param pageable Spring Data pagination (page, size, sort)
+   */
+  public PagedResponse<WorkOrderResponse> listWorkOrders(
+      WorkOrderStatus status, Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+
+    Page<WorkOrder> page =
+        (status != null)
+            ? workOrderRepository.findByTenantIdAndStatusAndIsActiveTrue(tenantId, status, pageable)
+            : workOrderRepository.findByTenantIdAndIsActiveTrue(tenantId, pageable);
+
+    return PagedResponse.from(page, this::mapToResponse);
+  }
 
   /** Retrieves a work order by its UUID. */
   public WorkOrderResponse getWorkOrder(UUID id) {
@@ -379,32 +400,6 @@ public class WorkOrderService {
   }
 
   private WorkOrderResponse mapToResponse(WorkOrder workOrder) {
-    return WorkOrderResponse.builder()
-        .id(workOrder.getId())
-        .uid(workOrder.getUid())
-        .workOrderNumber(workOrder.getWorkOrderNumber())
-        .recipeId(workOrder.getRecipeId())
-        .tradingPartnerId(workOrder.getTradingPartnerId())
-        .salesOrderLineId(workOrder.getSalesOrderLineId())
-        .fulfillmentType(workOrder.getFulfillmentType())
-        .fulfillmentId(workOrder.getFulfillmentId())
-        .plannedQty(workOrder.getPlannedQty())
-        .unit(workOrder.getUnit())
-        .unitCost(workOrder.getUnitCost())
-        .currency(workOrder.getCurrency())
-        .plannedCost(workOrder.getPlannedCost())
-        .plannedCostCurrency(workOrder.getPlannedCostCurrency())
-        .status(workOrder.getStatus())
-        .deadline(workOrder.getDeadline())
-        .notes(workOrder.getNotes())
-        .attachments(workOrder.getAttachments())
-        .actualQty(workOrder.getActualQty())
-        .yieldPercentage(workOrder.getYieldPercentage())
-        .completedAt(workOrder.getCompletedAt())
-        .completedBy(workOrder.getCompletedBy())
-        .supplierCertificationCode(workOrder.getSupplierCertificationCode())
-        .supplierLicenseNo(workOrder.getSupplierLicenseNo())
-        .supplierLicenseValidUntil(workOrder.getSupplierLicenseValidUntil())
-        .build();
+    return WorkOrderResponse.from(workOrder);
   }
 }

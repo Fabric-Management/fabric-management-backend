@@ -54,6 +54,14 @@ public class CostCalculationLine extends BaseEntity {
   @Builder.Default
   private boolean volumeDiscountApplied = false;
 
+  /**
+   * The specific material this cost line applies to. Populated for RAW_MATERIAL lines in
+   * multi-material WorkOrder cost calculations (Sprint 6+). Null for non-material cost items
+   * (LABOR, OVERHEAD, etc.) and legacy single-material calculations.
+   */
+  @Column(name = "material_id")
+  private UUID materialId;
+
   @Column(name = "notes", columnDefinition = "TEXT")
   private String notes;
 
