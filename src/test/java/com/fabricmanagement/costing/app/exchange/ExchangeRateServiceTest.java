@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -55,6 +56,8 @@ class ExchangeRateServiceTest {
   void tearDown() {
     tenantContextMock.close();
   }
+
+  // ─── convert() ────────────────────────────────────────
 
   @Test
   void convert_SameCurrency_ShouldReturnSameUnit() {
@@ -105,6 +108,23 @@ class ExchangeRateServiceTest {
   }
 
   @Test
+  void convertWithExplicitTenantId_ShouldPassTenantIdToProvider() {
+    BigDecimal amount = new BigDecimal("100");
+    LocalDate date = LocalDate.now();
+    UUID explicitTenantId = UUID.randomUUID();
+    BigDecimal rate = new BigDecimal("38.50");
+
+    when(rateProvider.getRate(explicitTenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+
+    ConvertedMoney result = service.convert(explicitTenantId, amount, "USD", "TRY", date);
+
+    assertThat(result.getConvertedAmount()).isEqualByComparingTo("3850.0000");
+    verify(rateProvider).getRate(explicitTenantId, "USD", "TRY", date);
+  }
+
+  // ─── getRequiredRate() ────────────────────────────────
+
+  @Test
   void getRequiredRate_RateFound_ShouldReturnRate() {
     LocalDate date = LocalDate.now();
     BigDecimal rate = new BigDecimal("38.50");
@@ -115,12 +135,13 @@ class ExchangeRateServiceTest {
     assertThat(result).isEqualTo(rate);
   }
 
+  // ─── saveRate() ───────────────────────────────────────
+
   @Test
   void saveRate_ShouldSaveForwardAndReverseRates() {
     LocalDate date = LocalDate.now();
     BigDecimal forwardRate = new BigDecimal("38.50");
 
-    // Mock existing checks
     when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
             tenantId, "USD", "TRY", date))
         .thenReturn(Optional.empty());
@@ -159,7 +180,6 @@ class ExchangeRateServiceTest {
     existingForward.setSource(ExchangeRateSource.MANUAL);
 
     ExchangeRateCache existingReverse = ExchangeRateCache.builder().build();
-    // 1 / 38.00
     existingReverse.setRate(new BigDecimal("0.026315"));
     existingReverse.setSource(ExchangeRateSource.MANUAL);
 
@@ -182,5 +202,61 @@ class ExchangeRateServiceTest {
 
     assertThat(savedCaches.get(1).getRate()).isEqualByComparingTo("0.025974");
     assertThat(savedCaches.get(1).getSource()).isEqualTo(ExchangeRateSource.ECB);
+  }
+
+  // ─── Chain of Responsibility behavior ─────────────────
+
+  @Nested
+  class ChainBehaviorTests {
+
+    @Mock private ExchangeRateProvider provider1;
+    @Mock private ExchangeRateProvider provider2;
+
+    @Test
+    void getRate_FirstProviderReturnsRate_ShouldNotCallSecond() {
+      ExchangeRateService chainService =
+          new ExchangeRateService(List.of(provider1, provider2), cacheRepo);
+      LocalDate date = LocalDate.now();
+      BigDecimal rate = new BigDecimal("38.50");
+
+      when(provider1.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+
+      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "TRY", date);
+
+      assertThat(result).isPresent().contains(rate);
+      verify(provider1).getRate(tenantId, "USD", "TRY", date);
+      verify(provider2, never()).getRate(any(), any(), any(), any());
+    }
+
+    @Test
+    void getRate_FirstProviderEmpty_ShouldFallToSecond() {
+      ExchangeRateService chainService =
+          new ExchangeRateService(List.of(provider1, provider2), cacheRepo);
+      LocalDate date = LocalDate.now();
+      BigDecimal rate = new BigDecimal("38.50");
+
+      when(provider1.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
+      when(provider2.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+
+      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "TRY", date);
+
+      assertThat(result).isPresent().contains(rate);
+      verify(provider1).getRate(tenantId, "USD", "TRY", date);
+      verify(provider2).getRate(tenantId, "USD", "TRY", date);
+    }
+
+    @Test
+    void getRate_AllProvidersEmpty_ShouldReturnEmpty() {
+      ExchangeRateService chainService =
+          new ExchangeRateService(List.of(provider1, provider2), cacheRepo);
+      LocalDate date = LocalDate.now();
+
+      when(provider1.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
+      when(provider2.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
+
+      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "TRY", date);
+
+      assertThat(result).isEmpty();
+    }
   }
 }

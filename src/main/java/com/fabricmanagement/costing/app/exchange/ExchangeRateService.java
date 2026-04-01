@@ -25,17 +25,31 @@ public class ExchangeRateService {
   private final ExchangeRateCacheRepository cacheRepo;
 
   /**
-   * Kuru çeker. Bulamazsa ExchangeRateRequiredException fırlatır. Override verilmişse provider'ı
-   * atlar ve direkt cache'e yazar.
+   * Kuru çeker. Bulamazsa ExchangeRateRequiredException fırlatır. TenantContext'ten tenantId
+   * çözümler — controller/facade katmanından çağrılacak convenience metod.
    */
   public BigDecimal getRequiredRate(String from, String to, LocalDate date) {
-    return getRate(from, to, date)
+    UUID tenantId = TenantContext.requireTenantId();
+    return getRequiredRate(tenantId, from, to, date);
+  }
+
+  /** Explicit tenantId ile kur çeker. Bulamazsa ExchangeRateRequiredException fırlatır. */
+  public BigDecimal getRequiredRate(UUID tenantId, String from, String to, LocalDate date) {
+    return getRate(tenantId, from, to, date)
         .orElseThrow(() -> new ExchangeRateRequiredException(from, to, date));
   }
 
-  /** Iterates through the ordered list of providers — returns first rate found. */
+  /**
+   * Iterates through the ordered list of providers — returns first rate found. TenantContext'ten
+   * tenantId çözümler.
+   */
   public Optional<BigDecimal> getRate(String from, String to, LocalDate date) {
     UUID tenantId = TenantContext.requireTenantId();
+    return getRate(tenantId, from, to, date);
+  }
+
+  /** Explicit tenantId ile ordered provider chain'i tarar — ilk bulunan rate döner. */
+  public Optional<BigDecimal> getRate(UUID tenantId, String from, String to, LocalDate date) {
     for (ExchangeRateProvider provider : rateProviders) {
       Optional<BigDecimal> rate = provider.getRate(tenantId, from, to, date);
       if (rate.isPresent()) {
@@ -45,21 +59,33 @@ public class ExchangeRateService {
     return Optional.empty();
   }
 
-  /** ConvertedMoney oluşturur — CostCalculationService'in kullanacağı ana metod. */
+  /**
+   * ConvertedMoney oluşturur — CostCalculationService'in kullanacağı ana metod. TenantContext'ten
+   * tenantId çözümler.
+   */
   public ConvertedMoney convert(
       BigDecimal originalAmount, String originalCurrency, String targetCurrency, LocalDate date) {
+    UUID tenantId = TenantContext.requireTenantId();
+    return convert(tenantId, originalAmount, originalCurrency, targetCurrency, date);
+  }
+
+  /** Explicit tenantId ile ConvertedMoney oluşturur. */
+  public ConvertedMoney convert(
+      UUID tenantId,
+      BigDecimal originalAmount,
+      String originalCurrency,
+      String targetCurrency,
+      LocalDate date) {
 
     if (originalCurrency.equalsIgnoreCase(targetCurrency)) {
       return ConvertedMoney.sameUnit(originalAmount, originalCurrency);
     }
 
-    BigDecimal rate = getRequiredRate(originalCurrency, targetCurrency, date);
+    BigDecimal rate = getRequiredRate(tenantId, originalCurrency, targetCurrency, date);
     BigDecimal convertedAmount = originalAmount.multiply(rate).setScale(4, RoundingMode.HALF_UP);
 
     return ConvertedMoney.of(
-        originalAmount, originalCurrency,
-        convertedAmount, targetCurrency,
-        rate, date);
+        originalAmount, originalCurrency, convertedAmount, targetCurrency, rate, date);
   }
 
   /** Kuru cache'e yazar + reverse rate'i de otomatik oluşturur. */
