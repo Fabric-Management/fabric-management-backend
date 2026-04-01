@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
@@ -173,7 +174,7 @@ public class WorkOrderConsumptionService {
     return workOrderRepository
         .findById(id)
         .filter(wo -> wo.getTenantId().equals(tenantId))
-        .filter(com.fabricmanagement.common.infrastructure.persistence.BaseEntity::getIsActive)
+        .filter(BaseEntity::getIsActive)
         .orElseThrow(() -> new NotFoundException("WorkOrder not found: " + id));
   }
 

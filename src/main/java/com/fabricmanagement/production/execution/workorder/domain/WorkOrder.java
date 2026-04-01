@@ -112,6 +112,31 @@ public class WorkOrder extends BaseEntity {
   @Builder.Default
   private List<Map<String, Object>> attachments = List.of();
 
+  @Column(name = "actual_qty", precision = 15, scale = 3)
+  private BigDecimal actualQty;
+
+  @Column(name = "yield_percentage", precision = 5, scale = 2)
+  private BigDecimal yieldPercentage;
+
+  @Column(name = "completed_at")
+  private Instant completedAt;
+
+  @Column(name = "completed_by")
+  private UUID completedBy;
+
+  public void complete(BigDecimal actualQty, BigDecimal yieldPercentage, UUID completedBy) {
+    if (!this.status.canTransitionTo(WorkOrderStatus.COMPLETED)) {
+      throw new com.fabricmanagement.production.execution.workorder.domain.exception
+          .WorkOrderDomainException("Cannot complete WO in status: " + this.status);
+    }
+    this.actualQty = actualQty;
+    this.yieldPercentage = yieldPercentage;
+    this.completedAt = Instant.now();
+    this.completedBy = completedBy;
+    this.status = WorkOrderStatus.COMPLETED;
+    onUpdate();
+  }
+
   // --- Supplier Snapshot Fields --- //
 
   @Column(name = "supplier_certification_code", length = 100)
