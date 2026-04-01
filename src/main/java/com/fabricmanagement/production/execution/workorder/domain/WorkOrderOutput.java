@@ -84,7 +84,7 @@ public class WorkOrderOutput extends BaseEntity {
   @Column(name = "produced_by", nullable = false)
   private UUID producedBy;
 
-  @Column(name = "notes", length = 1000)
+  @Column(name = "notes")
   private String notes;
 
   /** Factory method to record a new WorkOrder output. */
