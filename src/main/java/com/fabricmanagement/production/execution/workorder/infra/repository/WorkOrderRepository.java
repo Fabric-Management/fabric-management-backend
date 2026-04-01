@@ -83,11 +83,9 @@ public interface WorkOrderRepository
                   WHERE status = 'COMPLETED'
               ) AS completed_count,
 
-              COALESCE(SUM(unit_cost * planned_qty) FILTER (
+              COALESCE(SUM(COALESCE(planned_cost, unit_cost * planned_qty)) FILTER (
                   WHERE status <> 'CANCELLED'
-                    AND unit_cost IS NOT NULL
-                    AND planned_qty IS NOT NULL
-                    AND currency = :currency
+                    AND COALESCE(planned_cost_currency, currency) = :currency
               ), 0) AS total_planned_cost,
 
               COALESCE(SUM(actual_cost) FILTER (

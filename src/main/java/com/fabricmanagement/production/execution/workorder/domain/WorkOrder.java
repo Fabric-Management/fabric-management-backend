@@ -149,6 +149,19 @@ public class WorkOrder extends BaseEntity {
     onUpdate();
   }
 
+  /**
+   * Writes back the planned cost after CostCalculationService.computePlanned() completes. Called
+   * synchronously within the same transaction as the cost calculation.
+   */
+  public void updatePlannedCost(BigDecimal plannedCost, String currency) {
+    if (plannedCost == null || plannedCost.compareTo(BigDecimal.ZERO) < 0) {
+      throw new IllegalArgumentException("Planned cost must be non-negative");
+    }
+    this.plannedCost = plannedCost;
+    this.plannedCostCurrency = currency;
+    onUpdate();
+  }
+
   // --- Supplier Snapshot Fields --- //
 
   @Column(name = "supplier_certification_code", length = 100)

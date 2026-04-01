@@ -1,5 +1,6 @@
 package com.fabricmanagement.costing.app;
 
+import com.fabricmanagement.costing.app.port.WorkOrderPlanningUpdatePort;
 import com.fabricmanagement.costing.domain.calculation.*;
 import com.fabricmanagement.costing.domain.event.CostVarianceDetectedEvent;
 import com.fabricmanagement.costing.domain.exception.CostingDomainException;
@@ -49,6 +50,7 @@ public class CostCalculationService {
   private final PriceListItemRepository priceListItemRepo;
   private final CostCalculationRepository costCalcRepo;
   private final ApplicationEventPublisher eventPublisher;
+  private final Optional<WorkOrderPlanningUpdatePort> workOrderPlanningUpdatePort;
 
   // ============================================================
   // PUBLIC API
@@ -103,15 +105,23 @@ public class CostCalculationService {
       UUID materialId,
       BigDecimal plannedQuantityKg,
       UUID supplierId) {
-    return compute(
-        tenantId,
-        CostEntityType.WORK_ORDER,
-        workOrderId,
-        moduleType,
-        CostStage.PLANNED,
-        materialId,
-        plannedQuantityKg,
-        supplierId);
+    CostCalculation calculation =
+        compute(
+            tenantId,
+            CostEntityType.WORK_ORDER,
+            workOrderId,
+            moduleType,
+            CostStage.PLANNED,
+            materialId,
+            plannedQuantityKg,
+            supplierId);
+
+    workOrderPlanningUpdatePort.ifPresent(
+        port ->
+            port.updatePlannedCost(
+                tenantId, workOrderId, calculation.getTotalCost(), calculation.getCurrency()));
+
+    return calculation;
   }
 
   /**
