@@ -10,10 +10,8 @@ import com.fabricmanagement.costing.app.port.WorkOrderPlanningUpdatePort;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
 import com.fabricmanagement.costing.domain.calculation.CostCalculationLine;
 import com.fabricmanagement.costing.domain.item.CalculationBase;
-import com.fabricmanagement.costing.domain.item.CostItem;
 import com.fabricmanagement.costing.domain.item.CostItemScope;
 import com.fabricmanagement.costing.domain.price.PriceList;
-import com.fabricmanagement.costing.domain.template.CostTemplate;
 import com.fabricmanagement.costing.domain.template.CostTemplateItem;
 import com.fabricmanagement.costing.infra.exchange.TcmbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.repository.CostCalculationRepository;
@@ -37,8 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
 @DisplayName("Multi-Material Cost Integration Test")
-class MultiMaterialCostIntegrationTest
-    extends com.fabricmanagement.costing.integration.AbstractCostingIntegrationTest {
+class MultiMaterialCostIntegrationTest extends AbstractCostingIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;
@@ -78,24 +75,21 @@ class MultiMaterialCostIntegrationTest
     UUID fiberBId = UUID.randomUUID();
 
     // 1. Create items
-    CostItem rawMaterial =
-        costItemRepo.save(
-            TestCostDataFactory.createCostItem(
-                "RAW_MATERIAL", "Raw Material", CostItemScope.GLOBAL, CalculationBase.PER_KG));
-    CostItem labor =
-        costItemRepo.save(
-            TestCostDataFactory.createCostItem(
-                "LABOR", "Labor", CostItemScope.GLOBAL, CalculationBase.PER_KG));
+    costItemRepo.save(
+        TestCostDataFactory.createCostItem(
+            "RAW_MATERIAL", "Raw Material", CostItemScope.GLOBAL, CalculationBase.PER_KG));
+    costItemRepo.save(
+        TestCostDataFactory.createCostItem(
+            "LABOR", "Labor", CostItemScope.GLOBAL, CalculationBase.PER_KG));
 
     // 2. Create CostTemplate for YARN
-    CostTemplate template =
-        templateRepo.save(
-            TestCostDataFactory.createDefaultTemplate(
-                tenantId,
-                "YARN",
-                List.of(
-                    new CostTemplateItem("RAW_MATERIAL", BigDecimal.ONE, true),
-                    new CostTemplateItem("LABOR", BigDecimal.ONE, true))));
+    templateRepo.save(
+        TestCostDataFactory.createDefaultTemplate(
+            tenantId,
+            "YARN",
+            List.of(
+                new CostTemplateItem("RAW_MATERIAL", BigDecimal.ONE, true),
+                new CostTemplateItem("LABOR", BigDecimal.ONE, true))));
 
     // 3. Create Price Lists
     PriceList plYarn =

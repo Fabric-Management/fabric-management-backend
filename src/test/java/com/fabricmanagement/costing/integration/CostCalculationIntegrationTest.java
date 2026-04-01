@@ -42,8 +42,7 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 
 @RecordApplicationEvents
 @DisplayName("Cost Calculation Pipeline Integration Test")
-class CostCalculationIntegrationTest
-    extends com.fabricmanagement.costing.integration.AbstractCostingIntegrationTest {
+class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;
