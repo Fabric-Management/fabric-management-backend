@@ -51,6 +51,7 @@ public class ProductionAccessService extends BaseAccessService {
   public static final String MODULE_GOODS_RECEIPT = "GOODS_RECEIPT";
   public static final String MODULE_STOCK_UNIT = "STOCK_UNIT";
   public static final String MODULE_QUALITY_GRADE = "QUALITY_GRADE";
+  public static final String MODULE_WORK_ORDER = "WORK_ORDER";
 
   private static final Set<String> FIBER_MASTERDATA_WRITE_DEPARTMENTS =
       Set.of(
@@ -81,6 +82,9 @@ public class ProductionAccessService extends BaseAccessService {
   private static final Set<String> QUALITY_GRADE_WRITE_DEPARTMENTS =
       Set.of("QUALITYCONTROL", "RDPRODUCTDEVELOPMENT");
 
+  private static final Set<String> WORK_ORDER_WRITE_DEPARTMENTS =
+      Set.of("PRODUCTIONPLANNING", "YARNPRODUCTION", "WEAVINGKNITTING", "DYEINGFINISHING");
+
   private static final Set<String> ALL_PRODUCTION_READ_DEPARTMENTS =
       Set.of(
           "RDPRODUCTDEVELOPMENT",
@@ -102,7 +106,8 @@ public class ProductionAccessService extends BaseAccessService {
           MODULE_WAREHOUSE_LOCATION,
           MODULE_GOODS_RECEIPT,
           MODULE_STOCK_UNIT,
-          MODULE_QUALITY_GRADE);
+          MODULE_QUALITY_GRADE,
+          MODULE_WORK_ORDER);
 
   private static final Map<String, Set<String>> WRITE_DEPTS =
       Map.ofEntries(
@@ -113,7 +118,8 @@ public class ProductionAccessService extends BaseAccessService {
           Map.entry(MODULE_WAREHOUSE_LOCATION, WAREHOUSE_LOCATION_WRITE_DEPARTMENTS),
           Map.entry(MODULE_GOODS_RECEIPT, GOODS_RECEIPT_WRITE_DEPARTMENTS),
           Map.entry(MODULE_STOCK_UNIT, STOCK_UNIT_WRITE_DEPARTMENTS),
-          Map.entry(MODULE_QUALITY_GRADE, QUALITY_GRADE_WRITE_DEPARTMENTS));
+          Map.entry(MODULE_QUALITY_GRADE, QUALITY_GRADE_WRITE_DEPARTMENTS),
+          Map.entry(MODULE_WORK_ORDER, WORK_ORDER_WRITE_DEPARTMENTS));
 
   @Override
   protected Set<String> knownModules() {
@@ -154,7 +160,8 @@ public class ProductionAccessService extends BaseAccessService {
             || MODULE_QUALITY_TEST.equals(module)
             || MODULE_WAREHOUSE_LOCATION.equals(module)
             || MODULE_GOODS_RECEIPT.equals(module)
-            || MODULE_STOCK_UNIT.equals(module))) {
+            || MODULE_STOCK_UNIT.equals(module)
+            || MODULE_WORK_ORDER.equals(module))) {
       return ctx.isInAnyDepartment(authorizedDepts);
     }
 
