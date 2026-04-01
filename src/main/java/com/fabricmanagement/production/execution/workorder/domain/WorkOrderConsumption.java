@@ -69,6 +69,10 @@ public class WorkOrderConsumption extends BaseEntity {
   @Column(name = "material_type", nullable = false, length = 30)
   private MaterialType materialType;
 
+  /** Denormalized from Batch.materialId — used by the cost engine for per-material price lookup. */
+  @Column(name = "material_id")
+  private UUID materialId;
+
   @Column(name = "consumed_weight", nullable = false, precision = 15, scale = 3)
   private BigDecimal consumedWeight;
 
@@ -109,6 +113,7 @@ public class WorkOrderConsumption extends BaseEntity {
       String barcode,
       String batchCode,
       MaterialType materialType,
+      UUID materialId,
       BigDecimal consumedWeight,
       String unit,
       UUID qualityGradeId,
@@ -135,6 +140,7 @@ public class WorkOrderConsumption extends BaseEntity {
             .barcode(barcode)
             .batchCode(batchCode)
             .materialType(materialType)
+            .materialId(materialId)
             .consumedWeight(consumedWeight)
             .unit(unit)
             .qualityGradeId(qualityGradeId)

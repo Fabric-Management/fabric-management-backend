@@ -38,6 +38,14 @@ public class WorkOrderResponse {
   private String notes;
   private List<Map<String, Object>> attachments;
 
+  private BigDecimal actualQty;
+  private BigDecimal yieldPercentage;
+  private Instant completedAt;
+  private UUID completedBy;
+
+  private BigDecimal actualCost;
+  private String actualCostCurrency;
+
   // Supplier Snapshot Fields
   private String supplierCertificationCode;
   private String supplierLicenseNo;

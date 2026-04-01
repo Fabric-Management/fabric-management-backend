@@ -11,11 +11,16 @@ import com.fabricmanagement.production.execution.batch.dto.CreateBlendedBatchReq
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
+import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
+import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
+import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderOutputRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -34,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkOrderService {
 
   private final WorkOrderRepository workOrderRepository;
+  private final WorkOrderConsumptionRepository workOrderConsumptionRepository;
+  private final WorkOrderOutputRepository workOrderOutputRepository;
   private final BatchFacade batchFacade;
   private final TradingPartnerCertificationService certificationService;
   private final DomainEventPublisher domainEventPublisher;
@@ -284,6 +291,58 @@ public class WorkOrderService {
     return mapToResponse(workOrder);
   }
 
+  @Transactional
+  public WorkOrderResponse completeWorkOrder(UUID workOrderId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    UUID actorId = TenantContext.getCurrentUserId();
+
+    WorkOrder workOrder = findEntityById(workOrderId);
+
+    // Rule 1: Must be IN_PROGRESS
+    if (workOrder.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+      throw new WorkOrderDomainException(
+          "Cannot complete WorkOrder. Current status must be IN_PROGRESS, but is: "
+              + workOrder.getStatus());
+    }
+
+    // Rule 2: At least one consumption
+    BigDecimal totalConsumed =
+        workOrderConsumptionRepository.sumConsumedWeightByWorkOrderId(tenantId, workOrderId);
+    if (totalConsumed == null || totalConsumed.compareTo(BigDecimal.ZERO) == 0) {
+      throw new WorkOrderDomainException("Cannot complete: no consumption records found");
+    }
+
+    // Rule 3: At least one output
+    BigDecimal totalOutput =
+        workOrderOutputRepository.sumOutputWeightByWorkOrderId(tenantId, workOrderId);
+    if (totalOutput == null || totalOutput.compareTo(BigDecimal.ZERO) == 0) {
+      throw new WorkOrderDomainException("Cannot complete: no output records found");
+    }
+
+    // Calculate yield
+    BigDecimal yieldPct =
+        totalOutput.multiply(new BigDecimal("100")).divide(totalConsumed, 2, RoundingMode.HALF_UP);
+
+    // Domain method handles transition
+    workOrder.complete(totalOutput, yieldPct, actorId);
+    workOrderRepository.save(workOrder);
+
+    // Publish
+    domainEventPublisher.publish(
+        new WorkOrderCompletedEvent(
+            tenantId,
+            workOrderId,
+            workOrder.getWorkOrderNumber(),
+            workOrder.getPlannedQty(),
+            totalOutput,
+            totalConsumed,
+            yieldPct,
+            workOrder.getCompletedAt(),
+            actorId));
+
+    return mapToResponse(workOrder);
+  }
+
   private WorkOrder findEntityById(UUID id) {
     return workOrderRepository
         .findById(id)
@@ -339,6 +398,10 @@ public class WorkOrderService {
         .deadline(workOrder.getDeadline())
         .notes(workOrder.getNotes())
         .attachments(workOrder.getAttachments())
+        .actualQty(workOrder.getActualQty())
+        .yieldPercentage(workOrder.getYieldPercentage())
+        .completedAt(workOrder.getCompletedAt())
+        .completedBy(workOrder.getCompletedBy())
         .supplierCertificationCode(workOrder.getSupplierCertificationCode())
         .supplierLicenseNo(workOrder.getSupplierLicenseNo())
         .supplierLicenseValidUntil(workOrder.getSupplierLicenseValidUntil())

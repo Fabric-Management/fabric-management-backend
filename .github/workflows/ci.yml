@@ -44,8 +44,9 @@ jobs:
           mvn org.owasp:dependency-check-maven:check \
             -DfailBuildOnCVSS=7 \
             -DskipProvidedScope=true \
+            -DsuppressionFile=dependency-check-suppression.xml \
             -DnvdApiKey=$NVD_API_KEY
-        continue-on-error: true
+        continue-on-error: false
 
       - name: Upload Checkstyle results
         if: always()

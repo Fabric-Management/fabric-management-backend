@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -97,6 +98,12 @@ public class WorkOrder extends BaseEntity {
   @Column(name = "planned_cost_currency", length = 3)
   private String plannedCostCurrency;
 
+  @Column(name = "actual_cost", precision = 18, scale = 4)
+  private BigDecimal actualCost;
+
+  @Column(name = "actual_cost_currency", length = 10)
+  private String actualCostCurrency;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
   private WorkOrderStatus status;
@@ -111,6 +118,36 @@ public class WorkOrder extends BaseEntity {
   @Column(name = "attachments", columnDefinition = "jsonb")
   @Builder.Default
   private List<Map<String, Object>> attachments = List.of();
+
+  @Column(name = "actual_qty", precision = 15, scale = 3)
+  private BigDecimal actualQty;
+
+  @Column(name = "yield_percentage", precision = 5, scale = 2)
+  private BigDecimal yieldPercentage;
+
+  @Column(name = "completed_at")
+  private Instant completedAt;
+
+  @Column(name = "completed_by")
+  private UUID completedBy;
+
+  public void complete(BigDecimal actualQty, BigDecimal yieldPercentage, UUID completedBy) {
+    if (!this.status.canTransitionTo(WorkOrderStatus.COMPLETED)) {
+      throw new WorkOrderDomainException("Cannot complete WO in status: " + this.status);
+    }
+    this.actualQty = actualQty;
+    this.yieldPercentage = yieldPercentage;
+    this.completedAt = Instant.now();
+    this.completedBy = completedBy;
+    this.status = WorkOrderStatus.COMPLETED;
+    onUpdate();
+  }
+
+  public void updateActualCost(BigDecimal actualCost, String actualCostCurrency) {
+    this.actualCost = actualCost;
+    this.actualCostCurrency = actualCostCurrency;
+    onUpdate();
+  }
 
   // --- Supplier Snapshot Fields --- //
 
