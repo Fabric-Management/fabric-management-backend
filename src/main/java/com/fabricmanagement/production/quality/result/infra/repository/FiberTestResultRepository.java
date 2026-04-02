@@ -19,6 +19,9 @@ public interface FiberTestResultRepository extends JpaRepository<FiberTestResult
 
   List<FiberTestResult> findByTenantIdAndBatchIdAndIsActiveTrue(UUID tenantId, UUID batchId);
 
+  List<FiberTestResult> findByTenantIdAndStockUnitIdAndIsActiveTrue(
+      UUID tenantId, UUID stockUnitId);
+
   List<FiberTestResult> findByTenantIdAndApprovalStatus(
       UUID tenantId, TestApprovalStatus approvalStatus);
 

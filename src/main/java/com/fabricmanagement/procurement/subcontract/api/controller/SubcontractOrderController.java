@@ -4,6 +4,7 @@ import com.fabricmanagement.procurement.subcontract.app.SubcontractOrderService;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatus;
 import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.dto.SubcontractOrderResponse;
+import com.fabricmanagement.procurement.subcontract.dto.UpdateSubcontractOrderRequest;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -41,6 +42,14 @@ public class SubcontractOrderController {
   public SubcontractOrderResponse createSubcontractOrder(
       @RequestBody @Valid CreateSubcontractOrderRequest request) {
     return subcontractOrderService.createSubcontractOrder(request);
+  }
+
+  @PatchMapping("/{id}")
+  @PreAuthorize(
+      "@procurementAccessService.hasPermission(authentication, 'SUBCONTRACT_ORDER', 'WRITE')")
+  public SubcontractOrderResponse updateDraft(
+      @PathVariable UUID id, @RequestBody @Valid UpdateSubcontractOrderRequest request) {
+    return subcontractOrderService.updateDraft(id, request);
   }
 
   /**

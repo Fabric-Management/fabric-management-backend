@@ -1,11 +1,15 @@
 package com.fabricmanagement.procurement.subcontract.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrder;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatus;
 import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.dto.SubcontractOrderResponse;
+import com.fabricmanagement.procurement.subcontract.dto.UpdateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.infra.repository.SubcontractOrderRepository;
+import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
+import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -22,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubcontractOrderService {
 
   private final SubcontractOrderRepository scRepository;
+  private final MaterialFacade materialFacade;
 
   public SubcontractOrderResponse getSubcontractOrder(UUID id) {
     return mapToResponse(findEntityById(id));
@@ -29,20 +34,43 @@ public class SubcontractOrderService {
 
   @Transactional
   public SubcontractOrderResponse createSubcontractOrder(CreateSubcontractOrderRequest request) {
+    UUID tenantId = TenantContext.requireTenantId();
+
+    MaterialDto inputMaterial = null;
+    if (request.getInputMaterialId() != null) {
+      inputMaterial =
+          materialFacade
+              .findById(tenantId, request.getInputMaterialId())
+              .orElseThrow(() -> new ProcurementDomainException("Input material not found"));
+    }
+
+    MaterialDto outputMaterial = null;
+    if (request.getOutputMaterialId() != null) {
+      outputMaterial =
+          materialFacade
+              .findById(tenantId, request.getOutputMaterialId())
+              .orElseThrow(() -> new ProcurementDomainException("Output material not found"));
+    }
+
     SubcontractOrder sc =
-        SubcontractOrder.builder()
-            .scNumber(generateScNumber())
-            .workOrderId(request.getWorkOrderId())
-            .tradingPartnerId(request.getTradingPartnerId())
-            .status(SubcontractOrderStatus.DRAFT)
-            .materialId(request.getMaterialId())
-            .materialSentQty(request.getMaterialSentQty())
-            .unit(request.getUnit())
-            .agreedUnitPrice(request.getAgreedUnitPrice())
-            .currency(request.getCurrency())
-            .expectedReturnDate(request.getExpectedReturnDate())
-            .notes(request.getNotes())
-            .build();
+        SubcontractOrder.create(
+            tenantId,
+            generateScNumber(),
+            request.getWorkOrderId(),
+            null, // batchId currently nullable/null
+            request.getTradingPartnerId(),
+            request.getInputMaterialId(),
+            inputMaterial != null ? inputMaterial.getMaterialType() : null,
+            request.getOutputMaterialId(),
+            outputMaterial != null ? outputMaterial.getMaterialType() : null,
+            request.getExpectedOutputQty(),
+            outputMaterial != null ? outputMaterial.getUnit() : null,
+            request.getMaterialSentQty(),
+            inputMaterial != null ? inputMaterial.getUnit() : null,
+            request.getAgreedUnitPrice(),
+            request.getCurrency(),
+            request.getExpectedReturnDate(),
+            request.getNotes());
 
     SubcontractOrder saved = scRepository.save(sc);
     log.info(
@@ -95,10 +123,48 @@ public class SubcontractOrderService {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   private SubcontractOrder findEntityById(UUID id) {
+    UUID tenantId = TenantContext.requireTenantId();
     return scRepository
-        .findById(id)
+        .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
         .orElseThrow(
             () -> new ProcurementDomainException("SubcontractOrder not found with id: " + id));
+  }
+
+  @Transactional
+  public SubcontractOrderResponse updateDraft(UUID id, UpdateSubcontractOrderRequest request) {
+    SubcontractOrder sc = findEntityById(id);
+    if (sc.getStatus() != SubcontractOrderStatus.DRAFT) {
+      throw new ProcurementDomainException("Only DRAFT orders can be updated");
+    }
+
+    if (request.getOutputMaterialId() != null) {
+      MaterialDto outputMaterial =
+          materialFacade
+              .findById(sc.getTenantId(), request.getOutputMaterialId())
+              .orElseThrow(() -> new ProcurementDomainException("Output material not found"));
+      sc.setOutputMaterialId(outputMaterial.getId());
+      sc.setOutputMaterialType(outputMaterial.getMaterialType());
+      sc.setOutputUnit(outputMaterial.getUnit());
+    }
+
+    if (request.getExpectedOutputQty() != null) {
+      sc.setExpectedOutputQty(request.getExpectedOutputQty());
+    }
+    if (request.getAgreedUnitPrice() != null) {
+      sc.setAgreedUnitPrice(request.getAgreedUnitPrice());
+    }
+    if (request.getCurrency() != null) {
+      sc.setCurrency(request.getCurrency());
+    }
+    if (request.getExpectedReturnDate() != null) {
+      sc.setExpectedReturnDate(request.getExpectedReturnDate());
+    }
+    if (request.getNotes() != null) {
+      sc.setNotes(request.getNotes());
+    }
+
+    SubcontractOrder saved = scRepository.save(sc);
+    return mapToResponse(saved);
   }
 
   private String generateScNumber() {
@@ -115,9 +181,14 @@ public class SubcontractOrderService {
         .workOrderId(sc.getWorkOrderId())
         .tradingPartnerId(sc.getTradingPartnerId())
         .status(sc.getStatus())
-        .materialId(sc.getMaterialId())
+        .inputMaterialId(sc.getInputMaterialId())
+        .inputMaterialType(sc.getInputMaterialType())
+        .outputMaterialId(sc.getOutputMaterialId())
+        .outputMaterialType(sc.getOutputMaterialType())
         .materialSentQty(sc.getMaterialSentQty())
         .unit(sc.getUnit())
+        .expectedOutputQty(sc.getExpectedOutputQty())
+        .outputUnit(sc.getOutputUnit())
         .actualReturnedQty(sc.getActualReturnedQty())
         .wasteQty(sc.getWasteQty())
         .agreedUnitPrice(sc.getAgreedUnitPrice())

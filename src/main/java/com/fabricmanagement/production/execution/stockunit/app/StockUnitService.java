@@ -102,7 +102,9 @@ public class StockUnitService {
 
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
-    validateBatchExists(batchId, tenantId);
+    if (batchId != null) {
+      validateBatchExists(batchId, tenantId);
+    }
 
     return internalCreate(
         tenantId,
@@ -756,7 +758,9 @@ public class StockUnitService {
   public List<StockUnit> createBulk(
       UUID batchId, List<CreateStockUnitRequest> requests, UUID actorId) {
     UUID tenantId = TenantContext.requireTenantId();
-    validateBatchExists(batchId, tenantId);
+    if (batchId != null) {
+      validateBatchExists(batchId, tenantId);
+    }
 
     return requests.stream()
         .map(

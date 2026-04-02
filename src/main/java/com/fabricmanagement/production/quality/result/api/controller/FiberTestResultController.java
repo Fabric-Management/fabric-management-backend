@@ -62,6 +62,13 @@ public class FiberTestResultController {
     return ResponseEntity.ok(ApiResponse.success(testResultService.getByBatchId(batchId)));
   }
 
+  @GetMapping("/stock-unit/{stockUnitId}")
+  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
+  public ResponseEntity<ApiResponse<List<FiberTestResultDto>>> getTestResultsByStockUnit(
+      @PathVariable UUID stockUnitId) {
+    return ResponseEntity.ok(ApiResponse.success(testResultService.getByStockUnitId(stockUnitId)));
+  }
+
   @GetMapping("/status/{status}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
   public ResponseEntity<ApiResponse<List<FiberTestResultDto>>> getTestResultsByStatus(

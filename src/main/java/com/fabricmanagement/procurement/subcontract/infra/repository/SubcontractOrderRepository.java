@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SubcontractOrderRepository extends JpaRepository<SubcontractOrder, UUID> {
 
+  java.util.Optional<SubcontractOrder> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);
+
   List<SubcontractOrder> findByWorkOrderIdAndIsActiveTrue(UUID workOrderId);
 
   List<SubcontractOrder> findByTradingPartnerIdAndIsActiveTrue(UUID tradingPartnerId);

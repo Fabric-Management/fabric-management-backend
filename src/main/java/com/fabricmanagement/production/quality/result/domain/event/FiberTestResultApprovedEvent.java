@@ -16,13 +16,19 @@ import lombok.Getter;
 public class FiberTestResultApprovedEvent extends DomainEvent {
 
   private final UUID batchId;
+  private final UUID stockUnitId;
   private final TestApprovalStatus approvalStatus;
   private final UUID actorId;
 
   public FiberTestResultApprovedEvent(
-      UUID tenantId, UUID batchId, TestApprovalStatus approvalStatus, UUID actorId) {
+      UUID tenantId,
+      UUID batchId,
+      UUID stockUnitId,
+      TestApprovalStatus approvalStatus,
+      UUID actorId) {
     super(tenantId, "FIBER_TEST_RESULT_APPROVED");
     this.batchId = batchId;
+    this.stockUnitId = stockUnitId;
     this.approvalStatus = approvalStatus;
     this.actorId = actorId;
   }
