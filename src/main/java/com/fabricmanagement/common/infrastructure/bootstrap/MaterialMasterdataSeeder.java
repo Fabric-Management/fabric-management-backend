@@ -6,7 +6,6 @@ import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.production.masterdata.material.app.MaterialService;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
-import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,7 +21,6 @@ public class MaterialMasterdataSeeder implements DataSeeder {
 
   private final TenantService tenantService;
   private final MaterialService materialService;
-  private final MaterialRepository materialRepository;
   private final TransactionTemplate transactionTemplate;
 
   /**
@@ -35,8 +33,6 @@ public class MaterialMasterdataSeeder implements DataSeeder {
           MaterialType.YARN, 2L,
           MaterialType.FABRIC, 1L,
           MaterialType.CHEMICAL, 1L);
-
-  private static final long EXPECTED_TOTAL = 6L;
 
   @Override
   public boolean isSeeded() {
@@ -53,7 +49,7 @@ public class MaterialMasterdataSeeder implements DataSeeder {
           return EXPECTED_COUNTS.entrySet().stream()
               .allMatch(
                   entry ->
-                      materialRepository.countByTenantIdAndMaterialType(tenantId, entry.getKey())
+                      materialService.findByType(tenantId, entry.getKey()).size()
                           >= entry.getValue());
         });
   }
@@ -88,7 +84,7 @@ public class MaterialMasterdataSeeder implements DataSeeder {
    */
   private void seedMaterialIfNeeded(
       UUID tenantId, MaterialType type, String unit, int expectedCount) {
-    long currentCount = materialRepository.countByTenantIdAndMaterialType(tenantId, type);
+    long currentCount = materialService.findByType(tenantId, type).size();
     long toCreate = expectedCount - currentCount;
 
     if (toCreate <= 0) {

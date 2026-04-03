@@ -281,6 +281,7 @@ public class SalesOrderService {
                 line ->
                     new SalesOrderConfirmedEvent.SalesOrderLineSnapshot(
                         line.getId(),
+                        line.getMaterialId(),
                         line.getProductDesc() != null
                             ? line.getProductDesc()
                             : "MATERIAL_" + line.getMaterialId(), // Default product identifier

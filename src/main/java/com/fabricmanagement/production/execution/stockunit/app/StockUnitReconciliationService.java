@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,9 @@ public class StockUnitReconciliationService {
   private final TenantQueryPort tenantQueryPort;
   private final BatchRepository batchRepository;
   private final StockUnitRepository stockUnitRepository;
+
+  @Value("${application.stockunit.reconciliation-auto-fix:false}")
+  private boolean autoFix;
 
   /** Run every night at 3 AM. */
   @Scheduled(cron = "${application.stockunit.reconciliation-cron:0 0 3 * * ?}")
@@ -96,6 +100,26 @@ public class StockUnitReconciliationService {
             batch.getBatchCode(),
             nominalRemaining,
             physicalSum);
+
+        if (autoFix) {
+          BigDecimal correctedConsumed = batch.getQuantity().subtract(physicalSum);
+          if (correctedConsumed.compareTo(BigDecimal.ZERO) < 0) {
+            log.warn(
+                "Cannot auto-fix Batch {}: corrected consumed would be negative ({})",
+                batch.getBatchCode(),
+                correctedConsumed);
+          } else {
+            BigDecimal oldConsumed = batch.getConsumedQuantity();
+            batch.setConsumedQuantity(correctedConsumed);
+            batchRepository.save(batch);
+            log.info(
+                "Auto-fixed Batch {}: updated consumedQuantity from {} to {}",
+                batch.getBatchCode(),
+                oldConsumed,
+                correctedConsumed);
+          }
+        }
+
         discrepancyCount++;
       }
     }

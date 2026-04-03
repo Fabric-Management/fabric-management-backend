@@ -64,8 +64,9 @@ import org.springframework.transaction.annotation.Transactional;
  * UUID)} which releases the reservation and immediately consumes in one atomic operation. This
  * avoids the 2-call dance of {@code releaseReservation()} → {@code consume()} and
  *
- * <p>TODO (Sprint 3): Implement data migration to reconcile Batch counters for physical StockUnit
- * consumptions made prior to Sprint 2 (proactive sync).
+ * <p>Historical note: Pre-Sprint 2 Batch counter discrepancies (if any) are detected nightly by
+ * StockUnitReconciliationService. All new operations maintain atomic Batch ↔ StockUnit
+ * synchronization within the same transaction.
  */
 @Slf4j
 @Service

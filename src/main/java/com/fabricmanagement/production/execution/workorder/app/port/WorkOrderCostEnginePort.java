@@ -7,20 +7,6 @@ import java.util.UUID;
 public interface WorkOrderCostEnginePort {
 
   /**
-   * Sprint 5: Single-material actual cost — kept for potential future use.
-   *
-   * @deprecated Prefer {@link #computeActualCostFromConsumptions} for accurate blending cost.
-   */
-  @Deprecated(since = "Sprint 6")
-  ComputedCostSnapshot computeActualCost(
-      UUID tenantId,
-      UUID workOrderId,
-      String moduleType,
-      UUID materialId,
-      BigDecimal actualQuantityKg,
-      UUID tradingPartnerId);
-
-  /**
    * Sprint 6: Multi-material actual cost.
    *
    * <p>Raw-material lines are computed per consumption record ({@code consumedWeight ×

@@ -48,9 +48,8 @@ public class CostCalculationService {
   /** Variance threshold — 10 % deviation triggers the CostVarianceDetectedEvent. */
   private static final BigDecimal VARIANCE_THRESHOLD = new BigDecimal("0.10");
 
-  // TODO(Sprint 8+): All exchange rate conversions currently use LocalDate.now().
-  //  For audit/reconciliation, consider adding an optional rateDate parameter to compute()
-  //  so recalculations can use the original calculation date's exchange rate instead of today's.
+  // Since Sprint 8+: All public compute methods accept an optional rateDate parameter.
+  // Callers omitting rateDate default to LocalDate.now() (today's exchange rate).
 
   private final CostItemRepository costItemRepo;
   private final CostTemplateRepository costTemplateRepo;
@@ -89,6 +88,26 @@ public class CostCalculationService {
       UUID materialId,
       BigDecimal totalQuantityKg,
       UUID tradingPartnerId) {
+    return computeEstimated(
+        tenantId,
+        quoteId,
+        moduleType,
+        materialId,
+        totalQuantityKg,
+        tradingPartnerId,
+        LocalDate.now());
+  }
+
+  /** Compute or re-compute the ESTIMATED cost (Quote stage) with a specific rate date. */
+  @Transactional
+  public CostCalculation computeEstimated(
+      UUID tenantId,
+      UUID quoteId,
+      String moduleType,
+      UUID materialId,
+      BigDecimal totalQuantityKg,
+      UUID tradingPartnerId,
+      LocalDate rateDate) {
     return compute(
         tenantId,
         CostEntityType.QUOTE,
@@ -97,7 +116,8 @@ public class CostCalculationService {
         CostStage.ESTIMATED,
         materialId,
         totalQuantityKg,
-        tradingPartnerId);
+        tradingPartnerId,
+        rateDate);
   }
 
   /**
@@ -119,6 +139,28 @@ public class CostCalculationService {
       UUID materialId,
       BigDecimal plannedQuantityKg,
       UUID supplierId) {
+    return computePlanned(
+        tenantId,
+        workOrderId,
+        moduleType,
+        materialId,
+        plannedQuantityKg,
+        supplierId,
+        LocalDate.now());
+  }
+
+  /**
+   * Compute or re-compute the PLANNED cost (WorkOrder confirmed stage) with a specific rate date.
+   */
+  @Transactional
+  public CostCalculation computePlanned(
+      UUID tenantId,
+      UUID workOrderId,
+      String moduleType,
+      UUID materialId,
+      BigDecimal plannedQuantityKg,
+      UUID supplierId,
+      LocalDate rateDate) {
     CostCalculation calculation =
         compute(
             tenantId,
@@ -128,7 +170,8 @@ public class CostCalculationService {
             CostStage.PLANNED,
             materialId,
             plannedQuantityKg,
-            supplierId);
+            supplierId,
+            rateDate);
 
     workOrderPlanningUpdatePort.ifPresent(
         port ->
@@ -157,6 +200,20 @@ public class CostCalculationService {
       UUID materialId,
       BigDecimal actualQuantityKg,
       UUID supplierId) {
+    return computeActual(
+        tenantId, batchId, moduleType, materialId, actualQuantityKg, supplierId, LocalDate.now());
+  }
+
+  /** Compute or re-compute the ACTUAL cost (Batch completed stage) with a specific rate date. */
+  @Transactional
+  public CostCalculation computeActual(
+      UUID tenantId,
+      UUID batchId,
+      String moduleType,
+      UUID materialId,
+      BigDecimal actualQuantityKg,
+      UUID supplierId,
+      LocalDate rateDate) {
     return compute(
         tenantId,
         CostEntityType.BATCH,
@@ -165,44 +222,8 @@ public class CostCalculationService {
         CostStage.ACTUAL,
         materialId,
         actualQuantityKg,
-        supplierId);
-  }
-
-  /**
-   * Compute or re-compute the ACTUAL cost for a completed WorkOrder.
-   *
-   * <p>Uses CostEntityType.WORK_ORDER with CostStage.ACTUAL — distinct from the PLANNED stage
-   * calculation. Variance detection runs automatically against the existing (WORK_ORDER,
-   * workOrderId, PLANNED) record if one exists.
-   *
-   * <p>NOTE: materialId and quantityKg are derived from the primary output batch. Multi-material
-   * input cost breakdown is deferred to a future sprint.
-   *
-   * @param tenantId owning tenant
-   * @param workOrderId the completed WorkOrder entity ID
-   * @param moduleType production module (e.g. "YARN", derived from output batch materialType)
-   * @param materialId primary output material ID (from output batch)
-   * @param actualQuantityKg actual quantity produced (net output, from WorkOrderCompletedEvent)
-   * @param supplierId supplier for price resolution (may be null — falls back to general price)
-   * @return the saved CostCalculation
-   */
-  @Transactional
-  public CostCalculation computeActualForWorkOrder(
-      UUID tenantId,
-      UUID workOrderId,
-      String moduleType,
-      UUID materialId,
-      BigDecimal actualQuantityKg,
-      UUID supplierId) {
-    return compute(
-        tenantId,
-        CostEntityType.WORK_ORDER,
-        workOrderId,
-        moduleType,
-        CostStage.ACTUAL,
-        materialId,
-        actualQuantityKg,
-        supplierId);
+        supplierId,
+        rateDate);
   }
 
   /**
@@ -228,6 +249,31 @@ public class CostCalculationService {
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
       List<ConsumptionCostInput> consumptions) {
+    return computeActualForWorkOrderWithConsumptions(
+        tenantId,
+        workOrderId,
+        outputModuleType,
+        outputMaterialId,
+        actualOutputQty,
+        tradingPartnerId,
+        consumptions,
+        LocalDate.now());
+  }
+
+  /**
+   * Compute ACTUAL cost for a WorkOrder using per-consumption material prices, explicitly defining
+   * the rate calculation date.
+   */
+  @Transactional
+  public CostCalculation computeActualForWorkOrderWithConsumptions(
+      UUID tenantId,
+      UUID workOrderId,
+      String outputModuleType,
+      UUID outputMaterialId,
+      BigDecimal actualOutputQty,
+      UUID tradingPartnerId,
+      List<ConsumptionCostInput> consumptions,
+      LocalDate rateDate) {
 
     // 1. Idempotent recalculation — soft-delete any existing WORK_ORDER/ACTUAL record
     costCalcRepo
@@ -246,13 +292,12 @@ public class CostCalculationService {
             .distinct()
             .collect(
                 Collectors.toMap(
-                    mt -> mt,
-                    mt -> priceListRepo.findActiveForModule(tenantId, mt, LocalDate.now())));
+                    mt -> mt, mt -> priceListRepo.findActiveForModule(tenantId, mt, rateDate)));
 
     // 2. Resolve PriceList and Template for the output module (used for LABOR, OVERHEAD, etc.)
     PriceList outputPriceList =
         priceListRepo
-            .findActiveForModule(tenantId, outputModuleType, LocalDate.now())
+            .findActiveForModule(tenantId, outputModuleType, rateDate)
             .orElseThrow(() -> new PriceListNotFoundException(outputModuleType));
 
     CostTemplate template =
@@ -339,7 +384,7 @@ public class CostCalculationService {
 
           ConvertedMoney convertedTotal =
               exchangeRateService.convert(
-                  lineTotal, priceItem.getCurrency(), targetCurrency, LocalDate.now());
+                  lineTotal, priceItem.getCurrency(), targetCurrency, rateDate);
           line.setConvertedTotal(convertedTotal);
           line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
 
@@ -392,7 +437,7 @@ public class CostCalculationService {
         } else {
           convertedTotal =
               exchangeRateService.convert(
-                  lineTotal, priceItem.getCurrency(), targetCurrency, LocalDate.now());
+                  lineTotal, priceItem.getCurrency(), targetCurrency, rateDate);
         }
         line.setConvertedTotal(convertedTotal);
         line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
@@ -451,7 +496,8 @@ public class CostCalculationService {
       CostStage stage,
       UUID materialId,
       BigDecimal quantityKg,
-      UUID tradingPartnerId) {
+      UUID tradingPartnerId,
+      LocalDate rateDate) {
 
     // 1. Soft-delete existing calculation for this entity+stage (idempotent recalculation).
     //    Hard-delete is risky: if save() fails after deleteById(), the entity is lost with no
@@ -467,7 +513,7 @@ public class CostCalculationService {
     // 2. Resolve price list
     PriceList priceList =
         priceListRepo
-            .findActiveForModule(tenantId, moduleType, LocalDate.now())
+            .findActiveForModule(tenantId, moduleType, rateDate)
             .orElseThrow(() -> new PriceListNotFoundException(moduleType));
 
     // 3. Resolve cost template
@@ -561,7 +607,7 @@ public class CostCalculationService {
       } else {
         convertedTotal =
             exchangeRateService.convert(
-                lineTotal, priceItem.getCurrency(), targetCurrency, LocalDate.now());
+                lineTotal, priceItem.getCurrency(), targetCurrency, rateDate);
       }
       line.setConvertedTotal(convertedTotal);
       line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());

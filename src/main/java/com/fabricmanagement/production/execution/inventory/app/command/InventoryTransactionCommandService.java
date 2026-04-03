@@ -22,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryTransactionCommandService implements InventoryFacade {
 
   private final InventoryTransactionRepository inventoryTransactionRepository;
+  private final com.fabricmanagement.production.execution.inventory.infra.repository
+          .InventoryBalanceRepository
+      inventoryBalanceRepository;
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
@@ -123,5 +126,11 @@ public class InventoryTransactionCommandService implements InventoryFacade {
       log.warn("Unknown reference type '{}', defaulting to null", value);
       return null;
     }
+  }
+
+  @Override
+  public BigDecimal getAvailableQuantityByMaterial(UUID tenantId, UUID materialId) {
+    BigDecimal total = inventoryBalanceRepository.sumAvailableByMaterial(tenantId, materialId);
+    return total != null ? total : BigDecimal.ZERO;
   }
 }

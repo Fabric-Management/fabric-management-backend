@@ -6,6 +6,6 @@ import java.util.UUID;
 /** Independent access point to the IWM StockLedger for the StockControlEngine (STK1). */
 public interface StockQueryPort {
 
-  /** Returns the real-time stock quantity in the system (IWM) for the specified order. */
-  BigDecimal getAvailableStockForOrder(UUID tenantId, UUID salesOrderId);
+  /** Returns the real-time stock quantity in the system (IWM) for the specified material. */
+  BigDecimal getAvailableStockByMaterial(UUID tenantId, UUID materialId);
 }

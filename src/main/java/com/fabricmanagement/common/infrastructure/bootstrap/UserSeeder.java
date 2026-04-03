@@ -101,7 +101,7 @@ public class UserSeeder implements DataSeeder {
                     "Mehmet",
                     "Demir",
                     "production@akkaylar.com",
-                    "PRODUCTION_MANAGER",
+                    "MANAGER",
                     "Üretim",
                     tenant.getId(),
                     rootOrg.getId());
@@ -109,7 +109,7 @@ public class UserSeeder implements DataSeeder {
                     "Zeynep",
                     "Kaya",
                     "procurement@akkaylar.com",
-                    "PROCUREMENT_SPECIALIST",
+                    "WORKER",
                     "Finans ve Satınalma",
                     tenant.getId(),
                     rootOrg.getId());
@@ -117,7 +117,7 @@ public class UserSeeder implements DataSeeder {
                     "Ayşe",
                     "Yılmaz",
                     "sales@akkaylar.com",
-                    "SALES_REP",
+                    "WORKER",
                     "Satış",
                     tenant.getId(),
                     rootOrg.getId());
@@ -125,7 +125,7 @@ public class UserSeeder implements DataSeeder {
                     "Ali",
                     "Veli",
                     "warehouse@akkaylar.com",
-                    "INVENTORY_MANAGER",
+                    "MANAGER",
                     "Depo ve Lojistik",
                     tenant.getId(),
                     rootOrg.getId());
@@ -133,7 +133,7 @@ public class UserSeeder implements DataSeeder {
                     "Fatma",
                     "Şahin",
                     "quality@akkaylar.com",
-                    "QUALITY_INSPECTOR",
+                    "WORKER",
                     "Kalite",
                     tenant.getId(),
                     rootOrg.getId());
@@ -141,7 +141,7 @@ public class UserSeeder implements DataSeeder {
                     "Caner",
                     "Yıldız",
                     "hr@akkaylar.com",
-                    "HR_MANAGER",
+                    "MANAGER",
                     "Human Resources",
                     tenant.getId(),
                     rootOrg.getId());
@@ -149,7 +149,7 @@ public class UserSeeder implements DataSeeder {
                     "Veli",
                     "Can",
                     "finance@akkaylar.com",
-                    "FINANCE_CONTROLLER",
+                    "MANAGER",
                     "Finans ve Satınalma",
                     tenant.getId(),
                     rootOrg.getId());

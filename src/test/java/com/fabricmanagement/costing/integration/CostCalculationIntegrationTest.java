@@ -158,8 +158,14 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
     // with that the same WorkOrder.
     // Action: Actual (120 KG -> 2400 TRY). Variance = (2400-2000)/2000 = 0.20 (20%) -> Should
     // trigger event!
-    costService.computeActualForWorkOrder(
-        tenantId, workOrderId, "DYEING", null, new BigDecimal("120.0"), null);
+    costService.computeActualForWorkOrderWithConsumptions(
+        tenantId,
+        workOrderId,
+        "DYEING",
+        null,
+        new BigDecimal("120.0"),
+        null,
+        java.util.Collections.emptyList());
 
     // Assert Domain Event filtered by entityId to avoid cross-test pollution
     long varianceEvents =
