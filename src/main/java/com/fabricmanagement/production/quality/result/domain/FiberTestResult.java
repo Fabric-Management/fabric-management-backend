@@ -39,6 +39,9 @@ import lombok.*;
 @AllArgsConstructor
 public class FiberTestResult extends BaseEntity {
 
+  @Column(name = "stock_unit_id")
+  private UUID stockUnitId;
+
   @Column(name = "batch_id", nullable = false)
   private UUID batchId;
 

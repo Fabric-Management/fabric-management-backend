@@ -1,6 +1,7 @@
 package com.fabricmanagement.costing.integration.support;
 
 import com.fabricmanagement.costing.domain.exchange.ExchangeRateCache;
+import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import com.fabricmanagement.costing.domain.item.CalculationBase;
 import com.fabricmanagement.costing.domain.item.CostItem;
 import com.fabricmanagement.costing.domain.item.CostItemScope;
@@ -75,7 +76,7 @@ public class TestCostDataFactory {
       String to,
       BigDecimal rate,
       LocalDate date,
-      com.fabricmanagement.costing.domain.exchange.ExchangeRateSource source) {
+      ExchangeRateSource source) {
     ExchangeRateCache cache =
         ExchangeRateCache.builder()
             .baseCurrency(from)

@@ -213,10 +213,11 @@ public class GoodsReceiptService {
       com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType
           sourceType,
       UUID sourceId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
     return switch (sourceType) {
       case BATCH -> batchQueryService.getBatchCode(sourceId);
       case PURCHASE_ORDER -> poQueryService.getPurchaseOrderNumber(sourceId);
-      case SUBCONTRACT_ORDER -> scQueryService.getSubcontractOrderNumber(sourceId);
+      case SUBCONTRACT_ORDER -> scQueryService.getSubcontractOrderNumber(tenantId, sourceId);
     };
   }
 

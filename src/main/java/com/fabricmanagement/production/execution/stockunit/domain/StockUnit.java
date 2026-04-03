@@ -91,8 +91,10 @@ public class StockUnit extends BaseEntity {
   @Column(name = "serial_number", length = 100)
   private String serialNumber;
 
-  /** FK to the parent Batch (lot-level aggregate). */
-  @Column(name = "batch_id", nullable = false)
+  /**
+   * FK to the parent Batch (lot-level aggregate). Nullable for production outputs without batch.
+   */
+  @Column(name = "batch_id")
   private UUID batchId;
 
   // ── Physical Properties ───────────────────────────────────────────────────
@@ -246,9 +248,6 @@ public class StockUnit extends BaseEntity {
       StockUnitSourceType sourceType,
       UUID sourceId) {
 
-    if (batchId == null) {
-      throw new StockUnitDomainException("batchId must not be null");
-    }
     if (materialType == null) {
       throw new StockUnitDomainException("materialType must not be null");
     }

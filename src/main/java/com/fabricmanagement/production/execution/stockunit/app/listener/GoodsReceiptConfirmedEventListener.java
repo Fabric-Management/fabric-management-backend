@@ -1,6 +1,8 @@
 package com.fabricmanagement.production.execution.stockunit.app.listener;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQueryService;
+import com.fabricmanagement.procurement.subcontract.api.query.SubcontractOrderQueryService.SubcontractOutputInfo;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType;
@@ -14,8 +16,8 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -26,7 +28,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p><b>Idempotency:</b> Before creating any units, the listener checks whether StockUnits for the
  * first item of this receipt already exist. If they do, the event is a duplicate and is skipped.
  *
- * <p><b>Scope:</b> Currently only BATCH source type is handled. PO/SC requires a cross-module
+ * <p><b>Scope:</b> BATCH and SUBCONTRACT_ORDER source types are handled. PO requires a cross-module
  * Batch-creation step first (planned for Phase 4).
  */
 @Slf4j
@@ -37,21 +39,21 @@ public class GoodsReceiptConfirmedEventListener {
   private final StockUnitService stockUnitService;
   private final BatchRepository batchRepository;
   private final StockUnitRepository stockUnitRepository;
+  private final SubcontractOrderQueryService scQueryService;
 
   /**
-   * We run AFTER_COMMIT and Async so that GR confirmation is never blocked by StockUnit creation
-   * errors, and so each runs in its own independent transaction.
+   * We run AFTER_COMMIT with REQUIRES_NEW so that GR confirmation is never blocked by StockUnit
+   * creation errors, and so each runs in its own independent transaction.
    */
-  @Async
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onGoodsReceiptConfirmed(GoodsReceiptConfirmedEvent event) {
     // C2: PO/SC receipts require a prior Batch-creation step (Phase 4). Log at INFO, not WARN —
     // every PO delivery would generate a WARN otherwise, causing alert fatigue.
-    if (event.getSourceType() != GoodsReceiptSourceType.BATCH) {
+    if (event.getSourceType() == GoodsReceiptSourceType.PURCHASE_ORDER) {
       log.info(
           "StockUnit auto-creation skipped for {} source type (not yet implemented). Receipt: {}. "
-              + "TODO: Phase 4 — resolve Batch from PO/SC before creating StockUnits.",
+              + "TODO: Phase 4 — resolve Batch from PO before creating StockUnits.",
           event.getSourceType(),
           event.getReceiptNumber());
       return;
@@ -63,15 +65,11 @@ public class GoodsReceiptConfirmedEventListener {
     }
 
     UUID tenantId = event.getTenantId();
-    UUID batchId = event.getSourceId(); // For BATCH sourceType, sourceId is batchId
 
     try {
       TenantContext.executeInTenantContext(
           tenantId,
           () -> {
-            // C4: Idempotency guard — check if StockUnits for the first item already exist.
-            // Spring delivers AFTER_COMMIT events at-least-once; this prevents duplicate units
-            // if the same event is processed twice (e.g. node restart mid-processing).
             GoodsReceiptConfirmedEvent.ReceiptItemData firstItem = event.getItems().get(0);
             boolean alreadyProcessed =
                 stockUnitRepository.existsByTenantIdAndSourceTypeAndSourceId(
@@ -84,39 +82,11 @@ public class GoodsReceiptConfirmedEventListener {
               return null;
             }
 
-            Batch batch =
-                batchRepository
-                    .findByIdAndTenantId(batchId, tenantId)
-                    .orElseThrow(
-                        () ->
-                            new IllegalStateException(
-                                "Batch not found for GR confirm: " + batchId));
-
-            PackageType packageType = determineDefaultPackageType(batch.getMaterialType());
-
-            List<StockUnitService.CreateStockUnitRequest> requests =
-                event.getItems().stream()
-                    .map(
-                        item ->
-                            new StockUnitService.CreateStockUnitRequest(
-                                batch.getMaterialType(),
-                                item.barcode(),
-                                null, // serial number is not carried on the event payload
-                                packageType,
-                                item.netWeight(),
-                                item.grossWeight(),
-                                batch.getUnit(),
-                                batch.getLocationId(),
-                                StockUnitSourceType.GOODS_RECEIPT,
-                                item.itemId()))
-                    .toList();
-
-            stockUnitService.createBulk(batchId, requests, TenantContext.SYSTEM_ACTOR_ID);
-
-            log.info(
-                "Auto-created {} StockUnits for GoodsReceipt {}",
-                requests.size(),
-                event.getReceiptNumber());
+            if (event.getSourceType() == GoodsReceiptSourceType.BATCH) {
+              handleBatchReceipt(event, tenantId);
+            } else if (event.getSourceType() == GoodsReceiptSourceType.SUBCONTRACT_ORDER) {
+              handleSubcontractReceipt(event, tenantId);
+            }
             return null;
           });
     } catch (Exception e) {
@@ -126,6 +96,79 @@ public class GoodsReceiptConfirmedEventListener {
           e.getMessage(),
           e);
     }
+  }
+
+  private void handleBatchReceipt(GoodsReceiptConfirmedEvent event, UUID tenantId) {
+    UUID batchId = event.getSourceId();
+    Batch batch =
+        batchRepository
+            .findByIdAndTenantId(batchId, tenantId)
+            .orElseThrow(
+                () -> new IllegalStateException("Batch not found for GR confirm: " + batchId));
+
+    PackageType packageType = determineDefaultPackageType(batch.getMaterialType());
+
+    List<StockUnitService.CreateStockUnitRequest> requests =
+        event.getItems().stream()
+            .map(
+                item ->
+                    new StockUnitService.CreateStockUnitRequest(
+                        batch.getMaterialType(),
+                        item.barcode(),
+                        null,
+                        packageType,
+                        item.netWeight(),
+                        item.grossWeight(),
+                        batch.getUnit(),
+                        batch.getLocationId(),
+                        StockUnitSourceType.GOODS_RECEIPT,
+                        item.itemId()))
+            .toList();
+
+    stockUnitService.createBulk(batchId, requests, TenantContext.SYSTEM_ACTOR_ID);
+
+    log.info(
+        "Auto-created {} StockUnits for GoodsReceipt {}",
+        requests.size(),
+        event.getReceiptNumber());
+  }
+
+  private void handleSubcontractReceipt(GoodsReceiptConfirmedEvent event, UUID tenantId) {
+    SubcontractOutputInfo outputInfo =
+        scQueryService.getSubcontractOutputInfo(tenantId, event.getSourceId());
+
+    if (outputInfo.outputMaterialType() == null) {
+      log.warn(
+          "SubcontractOrder {} has no output material type, skipping StockUnit creation",
+          outputInfo.scNumber());
+      return;
+    }
+
+    PackageType packageType = determineDefaultPackageType(outputInfo.outputMaterialType());
+
+    List<StockUnitService.CreateStockUnitRequest> requests =
+        event.getItems().stream()
+            .map(
+                item ->
+                    new StockUnitService.CreateStockUnitRequest(
+                        outputInfo.outputMaterialType(),
+                        item.barcode(),
+                        null,
+                        packageType,
+                        item.netWeight(),
+                        item.grossWeight(),
+                        outputInfo.outputUnit(),
+                        null, // locationId not available in SC yet
+                        StockUnitSourceType.GOODS_RECEIPT,
+                        item.itemId()))
+            .toList();
+
+    stockUnitService.createBulk(outputInfo.batchId(), requests, TenantContext.SYSTEM_ACTOR_ID);
+
+    log.info(
+        "Auto-created {} StockUnits for SC GoodsReceipt {}",
+        requests.size(),
+        event.getReceiptNumber());
   }
 
   private PackageType determineDefaultPackageType(MaterialType materialType) {

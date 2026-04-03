@@ -6,8 +6,6 @@ import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrde
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -36,7 +34,6 @@ public class WorkOrderPlannedCostListener {
   private final WorkOrderPlannedCostTriggerService plannedCostTriggerService;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void handleWorkOrderApprovedEvent(WorkOrderApprovedEvent event) {
     log.info(
         "WorkOrderApprovedEvent: initiating planned cost calculation for WorkOrder {} ({})",

@@ -23,48 +23,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Validates the Exchange Rate chain logic and database operations. TCMB XML behavior is isolated
  * and mocked via @MockBean.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
 @DisplayName("Exchange Rate Provider Chain Integration")
-class ExchangeRateChainIntegrationTest {
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
-          .withDatabaseName("fabric_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
+class ExchangeRateChainIntegrationTest
+    extends com.fabricmanagement.costing.integration.AbstractCostingIntegrationTest {
 
   @Autowired private ExchangeRateService exchangeRateService;
   @Autowired private ExchangeRateCacheRepository cacheRepo;
@@ -157,9 +125,6 @@ class ExchangeRateChainIntegrationTest {
       UUID tenantId = UUID.randomUUID();
       TenantContext.setCurrentTenantId(tenantId);
       LocalDate date = LocalDate.now();
-
-      // Ensure clean slate
-      assertThat(cacheRepo.findAll()).isEmpty();
 
       // Action: save forward rate = 40.00
       exchangeRateService.saveRate(

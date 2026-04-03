@@ -10,10 +10,8 @@ import com.fabricmanagement.costing.app.port.WorkOrderPlanningUpdatePort;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
 import com.fabricmanagement.costing.domain.calculation.CostCalculationLine;
 import com.fabricmanagement.costing.domain.item.CalculationBase;
-import com.fabricmanagement.costing.domain.item.CostItem;
 import com.fabricmanagement.costing.domain.item.CostItemScope;
 import com.fabricmanagement.costing.domain.price.PriceList;
-import com.fabricmanagement.costing.domain.template.CostTemplate;
 import com.fabricmanagement.costing.domain.template.CostTemplateItem;
 import com.fabricmanagement.costing.infra.exchange.TcmbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.repository.CostCalculationRepository;
@@ -33,44 +31,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Testcontainers
-@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
 @DisplayName("Multi-Material Cost Integration Test")
-class MultiMaterialCostIntegrationTest {
-
-  static boolean dockerNotAvailable() {
-    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
-  }
-
-  @Container
-  @SuppressWarnings("resource")
-  static PostgreSQLContainer<?> postgres =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
-          .withDatabaseName("fabric_test")
-          .withUsername("test")
-          .withPassword("test");
-
-  @DynamicPropertySource
-  static void configureDatasource(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-  }
+class MultiMaterialCostIntegrationTest extends AbstractCostingIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;
@@ -110,41 +75,43 @@ class MultiMaterialCostIntegrationTest {
     UUID fiberBId = UUID.randomUUID();
 
     // 1. Create items
-    CostItem rawMaterial =
-        costItemRepo.save(
-            TestCostDataFactory.createCostItem(
-                "RAW_MATERIAL", "Raw Material", CostItemScope.GLOBAL, CalculationBase.PER_KG));
-    CostItem labor =
-        costItemRepo.save(
-            TestCostDataFactory.createCostItem(
-                "LABOR", "Labor", CostItemScope.GLOBAL, CalculationBase.PER_KG));
+    costItemRepo.save(
+        TestCostDataFactory.createCostItem(
+            "RAW_MATERIAL", "Raw Material", CostItemScope.GLOBAL, CalculationBase.PER_KG));
+    costItemRepo.save(
+        TestCostDataFactory.createCostItem(
+            "LABOR", "Labor", CostItemScope.GLOBAL, CalculationBase.PER_KG));
 
     // 2. Create CostTemplate for YARN
-    CostTemplate template =
-        templateRepo.save(
-            TestCostDataFactory.createDefaultTemplate(
-                tenantId,
-                "YARN",
-                List.of(
-                    new CostTemplateItem("RAW_MATERIAL", BigDecimal.ONE, true),
-                    new CostTemplateItem("LABOR", BigDecimal.ONE, true))));
+    templateRepo.save(
+        TestCostDataFactory.createDefaultTemplate(
+            tenantId,
+            "YARN",
+            List.of(
+                new CostTemplateItem("RAW_MATERIAL", BigDecimal.ONE, true),
+                new CostTemplateItem("LABOR", BigDecimal.ONE, true))));
 
-    // 3. Create PriceList
-    PriceList pl =
+    // 3. Create Price Lists
+    PriceList plYarn =
         priceListRepo.save(
             TestCostDataFactory.createPriceListWithItems(tenantId, "YARN", "TRY", Map.of()));
+    PriceList plFiber =
+        priceListRepo.save(
+            TestCostDataFactory.createPriceListWithItems(tenantId, "FIBER", "TRY", Map.of()));
 
-    // Fiber A costs 2.0 USD / KG (Needs conversion). Fiber B costs 55.0 TRY / KG. Labor costs 10.0
-    // TRY.
+    // Fiber A costs 2.0 USD / KG (Needs conversion). Fiber B costs 55.0 TRY / KG. (Attached to
+    // FIBER)
     priceListItemRepo.save(
         TestCostDataFactory.createPriceListItem(
-            pl.getId(), "RAW_MATERIAL", fiberAId, new BigDecimal("2.0"), "USD"));
+            plFiber.getId(), "RAW_MATERIAL", fiberAId, new BigDecimal("2.0"), "USD"));
     priceListItemRepo.save(
         TestCostDataFactory.createPriceListItem(
-            pl.getId(), "RAW_MATERIAL", fiberBId, new BigDecimal("55.0"), "TRY"));
+            plFiber.getId(), "RAW_MATERIAL", fiberBId, new BigDecimal("55.0"), "TRY"));
+
+    // Labor costs 10.0 TRY. (Attached to YARN)
     priceListItemRepo.save(
         TestCostDataFactory.createPriceListItem(
-            pl.getId(), "LABOR", null, new BigDecimal("10.0"), "TRY"));
+            plYarn.getId(), "LABOR", null, new BigDecimal("10.0"), "TRY"));
 
     // 4. Seed Exchange Rate: USD -> TRY = 38.50
     cacheRepo.save(

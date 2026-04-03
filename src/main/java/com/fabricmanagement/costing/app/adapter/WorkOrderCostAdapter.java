@@ -20,25 +20,6 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
   private final CostCalculationService costCalculationService;
 
   @Override
-  public ComputedCostSnapshot computeActualCost(
-      UUID tenantId,
-      UUID workOrderId,
-      String moduleType,
-      UUID materialId,
-      BigDecimal actualQuantityKg,
-      UUID tradingPartnerId) {
-
-    log.info("Computing actual cost for WorkOrder: {} in module: {}", workOrderId, moduleType);
-
-    CostCalculation calculation =
-        costCalculationService.computeActualForWorkOrder(
-            tenantId, workOrderId, moduleType, materialId, actualQuantityKg, tradingPartnerId);
-
-    return new ComputedCostSnapshot(
-        workOrderId, calculation.getTotalCost(), calculation.getCurrency());
-  }
-
-  @Override
   public ComputedCostSnapshot computeActualCostFromConsumptions(
       UUID tenantId,
       UUID workOrderId,

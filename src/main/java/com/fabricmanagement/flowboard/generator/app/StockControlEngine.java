@@ -32,41 +32,72 @@ public class StockControlEngine {
 
   private final StockQueryPort stockPort;
 
-  /** Stok analizi kararı — hangi task tipi, ne kadar miktar. */
-  public record StockDecision(TaskType taskType, BigDecimal quantity) {}
+  /** Stok analizi kararı — hangi task tipi, ne kadar miktar, hangi line. */
+  public record StockDecision(
+      TaskType taskType, BigDecimal quantity, java.util.UUID lineId, java.util.UUID materialId) {}
 
   /**
    * SalesOrderConfirmedEvent için stok analizi yapar.
    *
    * <p>[STK1 FIX] IWM StockLedger entegrasyonu tamamlandı. StockQueryPort üzerinden gerçek stok
-   * sorgusu yapılır.
+   * sorgusu yapılır. Line-bazlı (materialId) olarak çalışır.
    */
   public List<StockDecision> analyze(SalesOrderConfirmedEvent event) {
     log.info(
-        "StockControlEngine.analyze: orderId={} qty={}",
+        "StockControlEngine.analyze: orderId={} totalQty={}",
         event.getSalesOrderId(),
         event.getTotalQuantity());
 
-    // [STK1 FIX] Gerçek stok sorgulama IWM modülünden yapılıyor
-    BigDecimal available =
-        stockPort
-            .getAvailableStockForOrder(TenantContext.getCurrentTenantId(), event.getSalesOrderId())
-            .max(BigDecimal.ZERO); // [O3 FIX] Negatif stok koruması
-
     List<StockDecision> decisions = new ArrayList<>();
+    java.util.UUID tenantId = TenantContext.getCurrentTenantId();
 
-    if (available.compareTo(event.getTotalQuantity()) >= 0) {
-      // Tamamen stokta var
-      decisions.add(new StockDecision(TaskType.WAREHOUSE, event.getTotalQuantity()));
-    } else if (available.compareTo(BigDecimal.ZERO) == 0) {
-      // Hiç stok yok
-      decisions.add(new StockDecision(TaskType.PRODUCTION, event.getTotalQuantity()));
-    } else {
-      // Kısmi stok var
-      decisions.add(new StockDecision(TaskType.WAREHOUSE, available));
-      decisions.add(
-          new StockDecision(TaskType.PRODUCTION, event.getTotalQuantity().subtract(available)));
+    for (SalesOrderConfirmedEvent.SalesOrderLineSnapshot line : event.getLines()) {
+      if (line.materialId() == null) {
+        log.debug("Line {} has no materialId (free-text), deciding PRODUCTION", line.lineId());
+        decisions.add(new StockDecision(TaskType.PRODUCTION, line.quantity(), line.lineId(), null));
+        continue;
+      }
+
+      BigDecimal available =
+          stockPort
+              .getAvailableStockByMaterial(tenantId, line.materialId())
+              .max(BigDecimal.ZERO); // Negatif stok koruması
+
+      log.debug(
+          "Line {} (material={}) requested={}, available={}",
+          line.lineId(),
+          line.materialId(),
+          line.quantity(),
+          available);
+
+      if (available.compareTo(line.quantity()) >= 0) {
+        // Tamamen stokta var
+        decisions.add(
+            new StockDecision(
+                TaskType.WAREHOUSE, line.quantity(), line.lineId(), line.materialId()));
+      } else if (available.compareTo(BigDecimal.ZERO) == 0) {
+        // Hiç stok yok
+        decisions.add(
+            new StockDecision(
+                TaskType.PRODUCTION, line.quantity(), line.lineId(), line.materialId()));
+      } else {
+        // Kısmi stok var
+        decisions.add(
+            new StockDecision(TaskType.WAREHOUSE, available, line.lineId(), line.materialId()));
+        decisions.add(
+            new StockDecision(
+                TaskType.PRODUCTION,
+                line.quantity().subtract(available),
+                line.lineId(),
+                line.materialId()));
+      }
     }
+
+    log.info(
+        "Stock decisions for order {}: {} task(s) generated from {} lines",
+        event.getSalesOrderId(),
+        decisions.size(),
+        event.getLines().size());
 
     return decisions;
   }

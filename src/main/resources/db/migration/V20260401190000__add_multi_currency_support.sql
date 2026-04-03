@@ -1,6 +1,6 @@
 -- Sprint 7b: Multi-Currency Support
 -- 1. Organization: reporting_currency
-ALTER TABLE common_tenant.organization ADD COLUMN IF NOT EXISTS reporting_currency VARCHAR(3);
+ALTER TABLE common_company.common_organization ADD COLUMN IF NOT EXISTS reporting_currency VARCHAR(3);
 
 -- 2. ExchangeRateCache table (column names match ExchangeRateCache.java entity)
 CREATE TABLE IF NOT EXISTS costing.exchange_rate_cache (

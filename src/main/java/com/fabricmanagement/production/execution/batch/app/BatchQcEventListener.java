@@ -6,6 +6,9 @@ import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
+import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
+import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
 import java.util.Set;
@@ -38,6 +41,7 @@ public class BatchQcEventListener {
       Set.of(BatchStatus.PENDING_QC, BatchStatus.QUARANTINE);
 
   private final BatchRepository batchRepository;
+  private final StockUnitRepository stockUnitRepository;
   private final InAppNotificationService notificationService;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -47,6 +51,56 @@ public class BatchQcEventListener {
       return;
     }
 
+    if (event.getStockUnitId() != null) {
+      handleStockUnitQcResult(event);
+    } else {
+      handleBatchQcResult(event);
+    }
+  }
+
+  private void handleStockUnitQcResult(FiberTestResultApprovedEvent event) {
+    StockUnit su =
+        stockUnitRepository
+            .findByIdAndTenantIdAndIsActiveTrue(event.getStockUnitId(), event.getTenantId())
+            .orElse(null);
+
+    if (su == null) {
+      log.warn(
+          "StockUnit not found for QC event: stockUnitId={}, tenantId={}",
+          event.getStockUnitId(),
+          event.getTenantId());
+      return;
+    }
+
+    switch (event.getApprovalStatus()) {
+      case APPROVED -> {
+        if (su.getStatus() == StockUnitStatus.QUARANTINE) {
+          su.releaseQuarantine();
+        } else if (su.getStatus() == StockUnitStatus.ON_HOLD) {
+          su.releaseHold();
+        }
+      }
+      case REJECTED -> {
+        if (su.getStatus().canTransitionTo(StockUnitStatus.QUARANTINE)) {
+          su.quarantine();
+        }
+      }
+      case CONDITIONAL_ACCEPT -> {
+        if (su.getStatus().canTransitionTo(StockUnitStatus.ON_HOLD)) {
+          su.hold();
+        }
+      }
+      case PENDING -> {}
+    }
+
+    stockUnitRepository.save(su);
+    log.info(
+        "StockUnit status updated by QC: stockUnitId={}, approval={}",
+        event.getStockUnitId(),
+        event.getApprovalStatus());
+  }
+
+  private void handleBatchQcResult(FiberTestResultApprovedEvent event) {
     BatchStatus targetStatus = mapApprovalToBatchStatus(event.getApprovalStatus());
     if (targetStatus == null) {
       return;

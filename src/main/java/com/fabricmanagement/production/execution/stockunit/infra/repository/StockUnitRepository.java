@@ -20,6 +20,8 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
 
   Optional<StockUnit> findByTenantIdAndBarcode(UUID tenantId, String barcode);
 
+  Optional<StockUnit> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);
+
   /**
    * Idempotency guard for event listeners. Returns true if at least one StockUnit already exists
    * for the given source record (e.g. GoodsReceiptItem). Used by {@code

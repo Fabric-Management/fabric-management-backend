@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.platform.tenant.api.facade.TenantFacade;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.production.execution.batch.api.facade.BatchFacade;
@@ -54,6 +55,7 @@ public class WorkOrderService {
   private final TradingPartnerCertificationService certificationService;
   private final DomainEventPublisher domainEventPublisher;
   private final ApprovalPort approvalPort;
+  private final TenantFacade tenantFacade;
 
   /**
    * Paginated, filterable listing of WorkOrders for the current tenant.
@@ -84,10 +86,8 @@ public class WorkOrderService {
     UUID tenantId = TenantContext.requireTenantId();
     Instant now = Instant.now();
 
-    // TODO Sprint 7b: resolve tenant default currency from config
-    // For now, use TRY as default — multi-currency dashboard requires
-    // ExchangeRateSnapshot conversion which is not yet implemented.
-    String dashboardCurrency = "TRY";
+    String dashboardCurrency =
+        tenantFacade.findById(tenantId).map(t -> t.getSettings().getCurrency()).orElse("TRY");
 
     // Query 1: Status counts
     List<WorkOrderRepository.StatusCountProjection> statusCounts =

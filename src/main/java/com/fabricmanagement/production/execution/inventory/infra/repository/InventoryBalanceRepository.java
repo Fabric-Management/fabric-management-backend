@@ -17,4 +17,20 @@ public interface InventoryBalanceRepository extends JpaRepository<InventoryBalan
   Page<InventoryBalance> findByBatchId(UUID batchId, Pageable pageable);
 
   Page<InventoryBalance> findByLocationId(UUID locationId, Pageable pageable);
+
+  @org.springframework.data.jpa.repository.Query(
+      value =
+          """
+          SELECT COALESCE(SUM(ib.quantity - ib.reserved_quantity - ib.consumed_quantity), 0)
+          FROM production.production_execution_inventory_balance ib
+          JOIN production.production_execution_batch b ON b.id = ib.batch_id
+          WHERE b.tenant_id = :tenantId
+            AND b.material_id = :materialId
+            AND b.is_active = true
+            AND ib.is_active = true
+          """,
+      nativeQuery = true)
+  java.math.BigDecimal sumAvailableByMaterial(
+      @org.springframework.data.repository.query.Param("tenantId") UUID tenantId,
+      @org.springframework.data.repository.query.Param("materialId") UUID materialId);
 }

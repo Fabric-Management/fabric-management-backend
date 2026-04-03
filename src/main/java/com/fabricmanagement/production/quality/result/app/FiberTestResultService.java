@@ -6,6 +6,8 @@ import com.fabricmanagement.platform.communication.domain.NotificationDeliveryCh
 import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
+import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.domain.event.FiberTestResultApprovedEvent;
@@ -29,6 +31,7 @@ public class FiberTestResultService {
 
   private final FiberTestResultRepository testResultRepository;
   private final BatchRepository batchRepository;
+  private final StockUnitRepository stockUnitRepository;
   private final ApplicationEventPublisher applicationEventPublisher;
   private final FiberQcAutoEvaluator qcAutoEvaluator;
   private final InAppNotificationService notificationService;
@@ -37,16 +40,32 @@ public class FiberTestResultService {
   public FiberTestResultDto create(CreateFiberTestResultRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
+    UUID batchId;
+    if (request.getStockUnitId() != null) {
+      StockUnit su =
+          stockUnitRepository
+              .findByIdAndTenantIdAndIsActiveTrue(request.getStockUnitId(), tenantId)
+              .orElseThrow(() -> new IllegalArgumentException("StockUnit not found"));
+      batchId = su.getBatchId();
+      if (request.getBatchId() != null && !request.getBatchId().equals(batchId)) {
+        throw new IllegalArgumentException("Provided batchId does not match StockUnit's batch");
+      }
+    } else {
+      if (request.getBatchId() == null) {
+        throw new IllegalArgumentException("batchId is required for batch-level tests");
+      }
+      batchId = request.getBatchId();
+    }
+
     Batch batch =
         batchRepository
-            .findByIdAndTenantId(request.getBatchId(), tenantId)
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException("Fiber batch not found: " + request.getBatchId()));
+            .findByIdAndTenantId(batchId, tenantId)
+            .orElseThrow(() -> new IllegalArgumentException("Fiber batch not found: " + batchId));
 
     FiberTestResult result =
         FiberTestResult.builder()
-            .batchId(request.getBatchId())
+            .batchId(batchId)
+            .stockUnitId(request.getStockUnitId())
             .testDate(request.getTestDate())
             .testType(request.getTestType() != null ? request.getTestType() : "LABORATORY")
             .fineness(request.getFineness())
@@ -74,6 +93,7 @@ public class FiberTestResultService {
           new FiberTestResultApprovedEvent(
               tenantId,
               saved.getBatchId(),
+              saved.getStockUnitId(),
               saved.getApprovalStatus(),
               TenantContext.getCurrentUserId()));
     } else if (eval.isoCodeLabel() != null) {
@@ -119,6 +139,16 @@ public class FiberTestResultService {
   }
 
   @Transactional(readOnly = true)
+  public List<FiberTestResultDto> getByStockUnitId(UUID stockUnitId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return testResultRepository
+        .findByTenantIdAndStockUnitIdAndIsActiveTrue(tenantId, stockUnitId)
+        .stream()
+        .map(FiberTestResultDto::from)
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
   public List<FiberTestResultDto> getByApprovalStatus(TestApprovalStatus status) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     return testResultRepository.findByTenantIdAndApprovalStatus(tenantId, status).stream()
@@ -159,6 +189,7 @@ public class FiberTestResultService {
         new FiberTestResultApprovedEvent(
             tenantId,
             saved.getBatchId(),
+            saved.getStockUnitId(),
             saved.getApprovalStatus(),
             TenantContext.getCurrentUserId()));
 

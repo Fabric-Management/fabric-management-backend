@@ -19,6 +19,7 @@ public class FiberTestResultDto {
   private UUID tenantId;
   private String uid;
   private UUID batchId;
+  private UUID stockUnitId;
   private Instant testDate;
   private String testType;
 
@@ -50,6 +51,7 @@ public class FiberTestResultDto {
         .tenantId(entity.getTenantId())
         .uid(entity.getUid())
         .batchId(entity.getBatchId())
+        .stockUnitId(entity.getStockUnitId())
         .testDate(entity.getTestDate())
         .testType(entity.getTestType())
         .fineness(entity.getFineness())

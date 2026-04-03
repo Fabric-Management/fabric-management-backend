@@ -1,8 +1,10 @@
-package com.fabricmanagement.flowboard.generator.infra.adapter;
+package com.fabricmanagement.flowboard.generator.app.adapter;
 
 import com.fabricmanagement.flowboard.generator.domain.port.out.StockQueryPort;
+import com.fabricmanagement.production.execution.inventory.api.facade.InventoryFacade;
 import java.math.BigDecimal;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -12,12 +14,13 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class StockQueryAdapter implements StockQueryPort {
 
+  private final InventoryFacade inventoryFacade;
+
   @Override
-  public BigDecimal getAvailableStockForOrder(UUID tenantId, UUID salesOrderId) {
-    // TODO: Integrate with actual IwmStockFacade to retrieve real stock balance
-    log.debug("Stub: queried stock for sales order {} in tenant {}", salesOrderId, tenantId);
-    return BigDecimal.ZERO;
+  public BigDecimal getAvailableStockByMaterial(UUID tenantId, UUID materialId) {
+    return inventoryFacade.getAvailableQuantityByMaterial(tenantId, materialId);
   }
 }

@@ -22,13 +22,16 @@ public class CreateSubcontractOrderRequest {
   @NotNull(message = "Trading partner (subcontractor) ID is required")
   private UUID tradingPartnerId;
 
-  private UUID materialId;
+  @NotNull(message = "Input material is required for subcontract orders")
+  private UUID inputMaterialId;
+
+  private UUID outputMaterialId;
 
   @DecimalMin(value = "0.001", message = "Material sent quantity must be greater than zero")
   private BigDecimal materialSentQty;
 
-  @NotNull(message = "Unit is required")
-  private String unit;
+  @DecimalMin(value = "0.001", message = "Expected output quantity must be greater than zero")
+  private BigDecimal expectedOutputQty;
 
   private BigDecimal agreedUnitPrice;
   private String currency;

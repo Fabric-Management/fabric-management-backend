@@ -31,6 +31,8 @@ class StockControlEngineTest {
   @Test
   @DisplayName("Herhangi bir sipariş için PRODUCTION task kararı döner (stub)")
   void analyze_returnsProductionDecision() {
+    UUID lineId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
     SalesOrderConfirmedEvent event =
         new SalesOrderConfirmedEvent(
             TENANT_ID,
@@ -41,22 +43,32 @@ class StockControlEngineTest {
             BigDecimal.valueOf(100),
             "KG",
             LocalDate.now().plusDays(14),
-            java.util.Collections.emptyList());
+            java.util.List.of(
+                new SalesOrderConfirmedEvent.SalesOrderLineSnapshot(
+                    lineId,
+                    materialId,
+                    "PROD",
+                    BigDecimal.valueOf(100),
+                    "KG",
+                    LocalDate.now().plusDays(14))));
 
     // Mock port
     // TenantContext is statically resolved, which might be null. For simplicity, we mock any().
-    when(stockPort.getAvailableStockForOrder(any(), any())).thenReturn(BigDecimal.ZERO);
+    when(stockPort.getAvailableStockByMaterial(any(), any())).thenReturn(BigDecimal.ZERO);
 
     List<StockControlEngine.StockDecision> decisions = engine.analyze(event);
 
     assertThat(decisions).hasSize(1);
     assertThat(decisions.get(0).taskType()).isEqualTo(TaskType.PRODUCTION);
     assertThat(decisions.get(0).quantity()).isEqualByComparingTo(BigDecimal.valueOf(100));
+    assertThat(decisions.get(0).materialId()).isEqualTo(materialId);
   }
 
   @Test
   @DisplayName("Sıfır miktar için de karar döner")
   void analyze_zeroQuantity_stillReturnsDecision() {
+    UUID lineId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
     SalesOrderConfirmedEvent event =
         new SalesOrderConfirmedEvent(
             TENANT_ID,
@@ -67,9 +79,16 @@ class StockControlEngineTest {
             BigDecimal.ZERO,
             "KG",
             LocalDate.now().plusDays(7),
-            java.util.Collections.emptyList());
+            java.util.List.of(
+                new SalesOrderConfirmedEvent.SalesOrderLineSnapshot(
+                    lineId,
+                    materialId,
+                    "PROD",
+                    BigDecimal.ZERO,
+                    "KG",
+                    LocalDate.now().plusDays(7))));
 
-    when(stockPort.getAvailableStockForOrder(any(), any())).thenReturn(BigDecimal.ZERO);
+    when(stockPort.getAvailableStockByMaterial(any(), any())).thenReturn(BigDecimal.ZERO);
     List<StockControlEngine.StockDecision> decisions = engine.analyze(event);
 
     assertThat(decisions).isNotEmpty();

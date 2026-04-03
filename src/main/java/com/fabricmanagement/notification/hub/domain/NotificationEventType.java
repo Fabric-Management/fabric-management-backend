@@ -39,4 +39,5 @@ public final class NotificationEventType {
   public static final String RFQ_SENT = "RFQ_SENT";
   public static final String SUPPLIER_QUOTE_RECEIVED = "SUPPLIER_QUOTE_RECEIVED";
   public static final String TASK_BLOCKED = "TASK_BLOCKED";
+  public static final String AUTOMATION_ALERT = "AUTOMATION_ALERT";
 }
