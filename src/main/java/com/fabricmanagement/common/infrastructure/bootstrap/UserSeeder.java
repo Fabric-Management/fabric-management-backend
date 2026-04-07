@@ -3,7 +3,6 @@ package com.fabricmanagement.common.infrastructure.bootstrap;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
-import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.domain.Department;
@@ -42,7 +41,6 @@ public class UserSeeder implements DataSeeder {
   private final AuthUserRepository authUserRepository;
   private final PasswordEncoder passwordEncoder;
   private final TransactionTemplate transactionTemplate;
-  private final ContactService contactService;
   private final ContactRepository contactRepository;
 
   private static final String DEFAULT_PASSWORD = "password123";

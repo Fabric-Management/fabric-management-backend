@@ -1,5 +1,7 @@
 package com.fabricmanagement.sales.quote.api;
 
+import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.sales.quote.app.QuoteApprovalService;
 import com.fabricmanagement.sales.quote.app.QuoteService;
 import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
@@ -8,69 +10,133 @@ import com.fabricmanagement.sales.quote.dto.GenerateQuoteTokenRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteApprovalTokenDto;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.mapper.QuoteMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/sales/quotes")
 @RequiredArgsConstructor
+@Tag(name = "Quotes", description = "Quote management with pricing engine integration")
 public class QuoteController {
 
   private final QuoteService quoteService;
   private final QuoteApprovalService quoteApprovalService;
   private final QuoteMapper mapper;
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // READ
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @GetMapping
+  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'READ')")
+  @Operation(summary = "List all quotes (paginated)")
+  public ResponseEntity<ApiResponse<PagedResponse<QuoteResponse>>> listQuotes(
+      @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+    Page<QuoteResponse> page = quoteService.findAll(pageable).map(QuoteResponse::from);
+    return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(page)));
+  }
+
+  @GetMapping("/{quoteId}")
+  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'READ')")
+  @Operation(summary = "Get a quote by ID")
+  public ResponseEntity<ApiResponse<QuoteResponse>> getQuote(@PathVariable UUID quoteId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            QuoteResponse.from(
+                quoteService
+                    .findById(quoteId)
+                    .orElseThrow(
+                        () -> new EntityNotFoundException("Quote not found: " + quoteId)))));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WRITE
+  // ═══════════════════════════════════════════════════════════════════════════
+
   @PostMapping
-  @ResponseStatus(HttpStatus.CREATED)
-  public QuoteResponse createQuote(@Valid @RequestBody QuoteCreateRequest req) {
-    return QuoteResponse.from(quoteService.createQuote(req));
+  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @Operation(summary = "Create a new quote")
+  public ResponseEntity<ApiResponse<QuoteResponse>> createQuote(
+      @Valid @RequestBody QuoteCreateRequest req) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(QuoteResponse.from(quoteService.createQuote(req))));
   }
 
   @PostMapping("/{quoteId}/lines")
-  @ResponseStatus(HttpStatus.CREATED)
-  public QuoteResponse addLine(
+  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @Operation(summary = "Add a line item to a quote")
+  public ResponseEntity<ApiResponse<QuoteResponse>> addLine(
       @PathVariable UUID quoteId, @Valid @RequestBody AddQuoteLineRequest req) {
-    return QuoteResponse.from(
-        quoteService.addQuoteLine(
-            quoteId,
-            req.getMaterialId(),
-            req.getRequestedQty(),
-            req.getUnit(),
-            req.getOfferedPrice()));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            ApiResponse.success(
+                QuoteResponse.from(
+                    quoteService.addQuoteLine(
+                        quoteId,
+                        req.getMaterialId(),
+                        req.getRequestedQty(),
+                        req.getUnit(),
+                        req.getOfferedPrice()))));
   }
 
   @PostMapping("/{quoteId}/submit")
-  public QuoteResponse submitQuote(@PathVariable UUID quoteId) {
-    return QuoteResponse.from(quoteService.submitQuote(quoteId));
+  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @Operation(summary = "Submit a quote for approval")
+  public ResponseEntity<ApiResponse<QuoteResponse>> submitQuote(@PathVariable UUID quoteId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(QuoteResponse.from(quoteService.submitQuote(quoteId))));
   }
 
   @PostMapping("/{quoteId}/revise")
-  @ResponseStatus(HttpStatus.CREATED)
-  public QuoteResponse reviseQuote(@PathVariable UUID quoteId) {
-    return QuoteResponse.from(quoteService.reviseQuote(quoteId));
+  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @Operation(summary = "Create a new revision of a quote")
+  public ResponseEntity<ApiResponse<QuoteResponse>> reviseQuote(@PathVariable UUID quoteId) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(QuoteResponse.from(quoteService.reviseQuote(quoteId))));
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // APPROVAL TOKENS
+  // ═══════════════════════════════════════════════════════════════════════════
+
   @PostMapping("/{quoteId}/tokens")
-  @ResponseStatus(HttpStatus.CREATED)
-  public QuoteApprovalTokenDto generateToken(
+  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @Operation(summary = "Generate an approval token for a quote")
+  public ResponseEntity<ApiResponse<QuoteApprovalTokenDto>> generateToken(
       @PathVariable UUID quoteId, @Valid @RequestBody GenerateQuoteTokenRequest req) {
-    return mapper.toDto(
-        quoteApprovalService.generateTokenForQuote(quoteId, req.getChannel(), req.getSentTo()));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            ApiResponse.success(
+                mapper.toDto(
+                    quoteApprovalService.generateTokenForQuote(
+                        quoteId, req.getChannel(), req.getSentTo()))));
   }
 
   /** Public endpoint intended for the customer-facing frontend. */
   @PostMapping("/public/approve")
-  public QuoteResponse customerApprove(@Valid @RequestBody CustomerApprovalRequest req) {
-    return QuoteResponse.from(
-        quoteApprovalService.processCustomerApproval(
-            req.getToken(), req.getIpAddress(), req.getUserAgent()));
+  @Operation(summary = "Customer approves a quote via token (public endpoint)")
+  public ResponseEntity<ApiResponse<QuoteResponse>> customerApprove(
+      @Valid @RequestBody CustomerApprovalRequest req) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            QuoteResponse.from(
+                quoteApprovalService.processCustomerApproval(
+                    req.getToken(), req.getIpAddress(), req.getUserAgent()))));
   }
 }

@@ -10,8 +10,11 @@ import com.fabricmanagement.sales.sample.domain.SampleRequestStatus;
 import com.fabricmanagement.sales.sample.infra.repository.SampleDeliveryRepository;
 import com.fabricmanagement.sales.sample.infra.repository.SampleRequestRepository;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +25,18 @@ public class SampleManagementService {
 
   private final SampleRequestRepository requestRepository;
   private final SampleDeliveryRepository deliveryRepository;
+
+  @Transactional(readOnly = true)
+  public Page<SampleRequest> findAll(Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return requestRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<SampleRequest> findById(UUID requestId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return requestRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId);
+  }
 
   @Transactional
   public SampleRequest requestSample(SampleRequest request) {

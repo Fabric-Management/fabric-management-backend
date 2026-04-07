@@ -4,6 +4,8 @@ import com.fabricmanagement.sales.quote.domain.Quote;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +17,8 @@ public interface QuoteRepository extends JpaRepository<Quote, UUID> {
   Optional<Quote> findByTenantIdAndIdAndIsActiveTrue(UUID tenantId, UUID id);
 
   Optional<Quote> findByTenantIdAndQuoteNumberAndIsActiveTrue(UUID tenantId, String quoteNumber);
+
+  Page<Quote> findAllByTenantIdAndIsActiveTrue(UUID tenantId, Pageable pageable);
 
   List<Quote> findAllByTenantIdAndCustomerIdAndIsActiveTrue(UUID tenantId, UUID customerId);
 
