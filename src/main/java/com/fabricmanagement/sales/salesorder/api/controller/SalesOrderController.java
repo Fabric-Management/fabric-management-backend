@@ -1,23 +1,32 @@
 package com.fabricmanagement.sales.salesorder.api.controller;
 
+import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST API for Sales Orders.
@@ -25,7 +34,7 @@ import org.springframework.web.bind.annotation.*;
  * <p>Uses TradingPartner for customer/supplier references (Faz 1.5 pattern).
  */
 @RestController
-@RequestMapping("/api/v1/orders")
+@RequestMapping("/api/v1/sales/orders")
 @RequiredArgsConstructor
 @Tag(name = "Sales Orders", description = "Sales order management with TradingPartner integration")
 public class SalesOrderController {
@@ -39,46 +48,51 @@ public class SalesOrderController {
   @PostMapping
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
   @Operation(summary = "Create a new sales order")
-  public ResponseEntity<SalesOrderDto> createOrder(
+  public ResponseEntity<ApiResponse<SalesOrderDto>> createOrder(
       @Valid @RequestBody CreateSalesOrderRequest request) {
     SalesOrderDto order = orderService.createOrder(request);
-    return ResponseEntity.status(HttpStatus.CREATED).body(order);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(order));
   }
 
   @GetMapping("/{id}")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
   @Operation(summary = "Get order by ID")
-  public ResponseEntity<SalesOrderDto> getOrder(@PathVariable UUID id) {
-    return orderService
-        .findById(id)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+  public ResponseEntity<ApiResponse<SalesOrderDto>> getOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            orderService
+                .findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + id))));
   }
 
   @GetMapping("/number/{orderNumber}")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
   @Operation(summary = "Get order by order number")
-  public ResponseEntity<SalesOrderDto> getOrderByNumber(@PathVariable String orderNumber) {
-    return orderService
-        .findByOrderNumber(orderNumber)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+  public ResponseEntity<ApiResponse<SalesOrderDto>> getOrderByNumber(
+      @PathVariable String orderNumber) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            orderService
+                .findByOrderNumber(orderNumber)
+                .orElseThrow(
+                    () -> new EntityNotFoundException("Sales order not found: " + orderNumber))));
   }
 
   @GetMapping
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
   @Operation(summary = "Get all orders (paginated)")
-  public ResponseEntity<Page<SalesOrderDto>> getAllOrders(
+  public ResponseEntity<ApiResponse<PagedResponse<SalesOrderDto>>> getAllOrders(
       @PageableDefault(size = 20, sort = "orderDate") Pageable pageable) {
-    return ResponseEntity.ok(orderService.findAll(pageable));
+    return ResponseEntity.ok(
+        ApiResponse.success(PagedResponse.from(orderService.findAll(pageable))));
   }
 
   @DeleteMapping("/{id}")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
   @Operation(summary = "Delete order (soft delete)")
-  public ResponseEntity<Void> deleteOrder(@PathVariable UUID id) {
+  public ResponseEntity<ApiResponse<Void>> deleteOrder(@PathVariable UUID id) {
     orderService.deleteOrder(id);
-    return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -88,29 +102,31 @@ public class SalesOrderController {
   @GetMapping("/partner/{partnerId}")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
   @Operation(summary = "Get orders by partner ID")
-  public ResponseEntity<List<SalesOrderDto>> getOrdersByPartner(@PathVariable UUID partnerId) {
-    return ResponseEntity.ok(orderService.findByPartner(partnerId));
+  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOrdersByPartner(
+      @PathVariable UUID partnerId) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.findByPartner(partnerId)));
   }
 
   @GetMapping("/status/{status}")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
   @Operation(summary = "Get orders by status")
-  public ResponseEntity<List<SalesOrderDto>> getOrdersByStatus(@PathVariable OrderStatus status) {
-    return ResponseEntity.ok(orderService.findByStatus(status));
+  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOrdersByStatus(
+      @PathVariable OrderStatus status) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.findByStatus(status)));
   }
 
   @GetMapping("/open")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
   @Operation(summary = "Get open orders (not delivered or cancelled)")
-  public ResponseEntity<List<SalesOrderDto>> getOpenOrders() {
-    return ResponseEntity.ok(orderService.findOpenOrders());
+  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOpenOrders() {
+    return ResponseEntity.ok(ApiResponse.success(orderService.findOpenOrders()));
   }
 
   @GetMapping("/overdue")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
   @Operation(summary = "Get overdue orders")
-  public ResponseEntity<List<SalesOrderDto>> getOverdueOrders() {
-    return ResponseEntity.ok(orderService.findOverdueOrders());
+  public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOverdueOrders() {
+    return ResponseEntity.ok(ApiResponse.success(orderService.findOverdueOrders()));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -120,37 +136,37 @@ public class SalesOrderController {
   @PostMapping("/{id}/confirm")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
   @Operation(summary = "Confirm an order")
-  public ResponseEntity<SalesOrderDto> confirmOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(orderService.confirmOrder(id));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> confirmOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.confirmOrder(id)));
   }
 
   @PostMapping("/{id}/process")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
   @Operation(summary = "Start processing an order")
-  public ResponseEntity<SalesOrderDto> startProcessing(@PathVariable UUID id) {
-    return ResponseEntity.ok(orderService.startProcessing(id));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> startProcessing(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.startProcessing(id)));
   }
 
   @PostMapping("/{id}/ship")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
   @Operation(summary = "Ship an order")
-  public ResponseEntity<SalesOrderDto> shipOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(orderService.shipOrder(id));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> shipOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.shipOrder(id)));
   }
 
   @PostMapping("/{id}/deliver")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
   @Operation(summary = "Deliver an order")
-  public ResponseEntity<SalesOrderDto> deliverOrder(
-      @PathVariable UUID id,
-      @RequestParam(defaultValue = "#{T(java.time.LocalDate).now()}") LocalDate deliveryDate) {
-    return ResponseEntity.ok(orderService.deliverOrder(id, deliveryDate));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> deliverOrder(
+      @PathVariable UUID id, @RequestParam(required = false) LocalDate deliveryDate) {
+    LocalDate effectiveDate = deliveryDate != null ? deliveryDate : LocalDate.now();
+    return ResponseEntity.ok(ApiResponse.success(orderService.deliverOrder(id, effectiveDate)));
   }
 
   @PostMapping("/{id}/cancel")
   @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
   @Operation(summary = "Cancel an order")
-  public ResponseEntity<SalesOrderDto> cancelOrder(@PathVariable UUID id) {
-    return ResponseEntity.ok(orderService.cancelOrder(id));
+  public ResponseEntity<ApiResponse<SalesOrderDto>> cancelOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id)));
   }
 }

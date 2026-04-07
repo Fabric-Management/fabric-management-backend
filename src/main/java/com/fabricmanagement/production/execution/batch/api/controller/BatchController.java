@@ -9,6 +9,7 @@ import com.fabricmanagement.production.execution.batch.domain.BatchCertification
 import com.fabricmanagement.production.execution.batch.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -57,10 +58,11 @@ public class BatchController {
   @GetMapping("/{id}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
   public ResponseEntity<ApiResponse<BatchDto>> getBatch(@PathVariable UUID id) {
-    return batchService
-        .getById(id)
-        .map(batch -> ResponseEntity.ok(ApiResponse.success(batch)))
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            batchService
+                .getById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Batch not found: " + id))));
   }
 
   @GetMapping("/material/{materialId}")

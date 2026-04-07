@@ -15,8 +15,11 @@ import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +31,18 @@ public class QuoteService {
   private final PricingEngineService pricingEngineService;
   private final ProductCatalogService catalogService;
   private final DiscountPolicyService policyService;
+
+  @Transactional(readOnly = true)
+  public Page<Quote> findAll(Pageable pageable) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<Quote> findById(UUID quoteId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+  }
 
   @Transactional
   public Quote createQuote(QuoteCreateRequest req) {

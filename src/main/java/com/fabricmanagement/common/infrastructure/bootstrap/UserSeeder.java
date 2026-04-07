@@ -3,6 +3,7 @@ package com.fabricmanagement.common.infrastructure.bootstrap;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
+import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
@@ -40,6 +41,7 @@ public class UserSeeder implements DataSeeder {
   private final AuthUserRepository authUserRepository;
   private final PasswordEncoder passwordEncoder;
   private final TransactionTemplate transactionTemplate;
+  private final ContactRepository contactRepository;
 
   private static final String DEFAULT_PASSWORD = "password123";
 
@@ -153,6 +155,14 @@ public class UserSeeder implements DataSeeder {
                     "Finans ve Satınalma",
                     tenant.getId(),
                     rootOrg.getId());
+                seedUser(
+                    "Platform",
+                    "Admin",
+                    "platform@akkaylar.com",
+                    "PLATFORM_ADMIN",
+                    null, // Platform admins operate globally, mostly without a specific department
+                    tenant.getId(),
+                    rootOrg.getId());
               });
         });
   }
@@ -201,6 +211,17 @@ public class UserSeeder implements DataSeeder {
 
     // 3. Setup Password System ByPass
     setupAuthUser(user.getId(), tenantId);
+
+    // 4. Mark all auto-assigned contacts as verified to allow login
+    // Bypass L1 cache issues by directly checking the contact repository instead of
+    // user.getUserContacts()
+    contactRepository
+        .findByTenantIdAndContactValue(tenantId, email)
+        .ifPresent(
+            contact -> {
+              contact.verify();
+              contactRepository.save(contact);
+            });
 
     log.info("Created user: {} - {} - Role: {}", firstName, email, roleCode);
   }

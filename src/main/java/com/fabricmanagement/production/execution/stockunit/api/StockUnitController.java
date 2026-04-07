@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.stockunit.api;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitQueryService;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.dto.*;
@@ -80,10 +81,10 @@ public class StockUnitController {
   @GetMapping("/location/{locationId}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'STOCK_UNIT', 'READ')")
   @Operation(summary = "List StockUnits at a warehouse location (paginated)")
-  public ResponseEntity<ApiResponse<Page<StockUnitDto>>> findByLocation(
+  public ResponseEntity<ApiResponse<PagedResponse<StockUnitDto>>> findByLocation(
       @PathVariable UUID locationId, Pageable pageable) {
     Page<StockUnitDto> page = stockUnitQueryService.findByLocationId(locationId, pageable);
-    return ResponseEntity.ok(ApiResponse.success(page));
+    return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(page)));
   }
 
   // ── Consumption ───────────────────────────────────────────────────────────

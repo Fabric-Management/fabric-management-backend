@@ -1,6 +1,7 @@
 package com.fabricmanagement.flowboard.dashboard.api;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.flowboard.dashboard.api.mapper.DashboardMapper;
 import com.fabricmanagement.flowboard.dashboard.app.DashboardService;
 import com.fabricmanagement.flowboard.dashboard.domain.DashboardConfig;
@@ -10,6 +11,7 @@ import com.fabricmanagement.flowboard.dashboard.dto.DashboardConfigDto;
 import com.fabricmanagement.flowboard.dashboard.dto.DashboardWidgetDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -48,35 +50,40 @@ public class DashboardController {
 
   @GetMapping("/default")
   @Operation(summary = "Varsayilan dashboard'u getir")
-  public ResponseEntity<DashboardConfigDto> getDefaultDashboard(
+  public ResponseEntity<ApiResponse<DashboardConfigDto>> getDefaultDashboard(
       @RequestParam("userId") @NotNull UUID userId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return dashboardService
-        .getDefaultDashboard(tenantId, userId)
-        .map(DashboardMapper::toDto)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            DashboardMapper.toDto(
+                dashboardService
+                    .getDefaultDashboard(tenantId, userId)
+                    .orElseThrow(
+                        () ->
+                            new EntityNotFoundException(
+                                "Default dashboard not found for user: " + userId)))));
   }
 
   @GetMapping("/{dashboardId}/widgets")
-  public ResponseEntity<List<DashboardWidgetDto>> getWidgets(
+  public ResponseEntity<ApiResponse<List<DashboardWidgetDto>>> getWidgets(
       @PathVariable @NotNull UUID dashboardId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     List<DashboardWidget> widgets = dashboardService.getDashboardWidgets(tenantId, dashboardId);
-    return ResponseEntity.ok(widgets.stream().map(DashboardMapper::toDto).toList());
+    return ResponseEntity.ok(
+        ApiResponse.success(widgets.stream().map(DashboardMapper::toDto).toList()));
   }
 
   @PostMapping("/default/layout")
-  public ResponseEntity<DashboardConfigDto> updateDefaultLayout(
+  public ResponseEntity<ApiResponse<DashboardConfigDto>> updateDefaultLayout(
       @RequestParam("userId") @NotNull UUID userId, @RequestBody @NotBlank String layoutJsonb) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     DashboardConfig config =
         dashboardService.createOrUpdateDefaultDashboard(tenantId, userId, layoutJsonb);
-    return ResponseEntity.ok(DashboardMapper.toDto(config));
+    return ResponseEntity.ok(ApiResponse.success(DashboardMapper.toDto(config)));
   }
 
   @PostMapping("/{dashboardId}/widgets")
-  public ResponseEntity<DashboardWidgetDto> addWidget(
+  public ResponseEntity<ApiResponse<DashboardWidgetDto>> addWidget(
       @PathVariable @NotNull UUID dashboardId, @RequestBody @Valid AddWidgetRequest request) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     DashboardWidget widget =
@@ -87,6 +94,6 @@ public class DashboardController {
             request.title(),
             request.configJsonb(),
             request.displayOrder());
-    return ResponseEntity.ok(DashboardMapper.toDto(widget));
+    return ResponseEntity.ok(ApiResponse.success(DashboardMapper.toDto(widget)));
   }
 }

@@ -1,13 +1,13 @@
 package com.fabricmanagement.production.execution.inventory.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.execution.inventory.app.query.InventoryTransactionQueryService;
 import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionType;
 import com.fabricmanagement.production.execution.inventory.dto.InventoryTransactionDto;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -31,31 +31,35 @@ public class InventoryTransactionController {
 
   @GetMapping
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<Page<InventoryTransactionDto>>> getAll(
+  public ResponseEntity<ApiResponse<PagedResponse<InventoryTransactionDto>>> getAll(
       @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return ResponseEntity.ok(ApiResponse.success(transactionQueryService.getAll(pageable)));
+    return ResponseEntity.ok(
+        ApiResponse.success(PagedResponse.from(transactionQueryService.getAll(pageable))));
   }
 
   @GetMapping("/batch/{batchId}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<Page<InventoryTransactionDto>>> getByBatch(
+  public ResponseEntity<ApiResponse<PagedResponse<InventoryTransactionDto>>> getByBatch(
       @PathVariable UUID batchId,
       @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return ResponseEntity.ok(
-        ApiResponse.success(transactionQueryService.getByBatchId(batchId, pageable)));
+        ApiResponse.success(
+            PagedResponse.from(transactionQueryService.getByBatchId(batchId, pageable))));
   }
 
   @GetMapping("/batch/{batchId}/type/{type}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<Page<InventoryTransactionDto>>> getByBatchAndType(
+  public ResponseEntity<ApiResponse<PagedResponse<InventoryTransactionDto>>> getByBatchAndType(
       @PathVariable UUID batchId,
       @PathVariable InventoryTransactionType type,
       @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return ResponseEntity.ok(
-        ApiResponse.success(transactionQueryService.getByBatchIdAndType(batchId, type, pageable)));
+        ApiResponse.success(
+            PagedResponse.from(
+                transactionQueryService.getByBatchIdAndType(batchId, type, pageable))));
   }
 
   @GetMapping("/reference/{referenceType}/{referenceId}")

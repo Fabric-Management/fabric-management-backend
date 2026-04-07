@@ -14,6 +14,7 @@ import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -72,19 +73,24 @@ public class FiberController {
   @GetMapping("/{id}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<FiberDto>> getFiber(@PathVariable("id") UUID id) {
-    return fiberService
-        .getById(id)
-        .map(fiber -> ResponseEntity.ok(ApiResponse.success(fiber)))
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            fiberService
+                .getById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Fiber not found: " + id))));
   }
 
   @GetMapping("/material/{materialId}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
   public ResponseEntity<ApiResponse<FiberDto>> getFiberByMaterial(@PathVariable UUID materialId) {
-    return fiberService
-        .getByMaterialId(materialId)
-        .map(fiber -> ResponseEntity.ok(ApiResponse.success(fiber)))
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            fiberService
+                .getByMaterialId(materialId)
+                .orElseThrow(
+                    () ->
+                        new EntityNotFoundException(
+                            "Fiber not found for material: " + materialId))));
   }
 
   @GetMapping

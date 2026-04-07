@@ -31,11 +31,12 @@ import org.springframework.stereotype.Service;
 public class OrderAccessService extends BaseAccessService {
 
   public static final String MODULE_SALES_ORDER = "SALES_ORDER";
+  public static final String MODULE_QUOTE = "QUOTE";
 
-  private static final Set<String> SALES_ORDER_WRITE_DEPARTMENTS =
+  private static final Set<String> SALES_WRITE_DEPARTMENTS =
       Set.of("SALESMARKETING", "PRODUCTIONPLANNING", "ADMINISTRATIONOFFICE", "MANAGEMENTPLANNING");
 
-  private static final Set<String> ALL_ORDER_READ_DEPARTMENTS =
+  private static final Set<String> ALL_SALES_READ_DEPARTMENTS =
       Set.of(
           "SALESMARKETING",
           "PRODUCTIONPLANNING",
@@ -45,10 +46,12 @@ public class OrderAccessService extends BaseAccessService {
           "FIBERRAWMATERIAL",
           "WAREHOUSE");
 
-  private static final Set<String> KNOWN = Set.of(MODULE_SALES_ORDER);
+  private static final Set<String> KNOWN = Set.of(MODULE_SALES_ORDER, MODULE_QUOTE);
 
   private static final Map<String, Set<String>> WRITE_DEPTS =
-      Map.of(MODULE_SALES_ORDER, SALES_ORDER_WRITE_DEPARTMENTS);
+      Map.of(
+          MODULE_SALES_ORDER, SALES_WRITE_DEPARTMENTS,
+          MODULE_QUOTE, SALES_WRITE_DEPARTMENTS);
 
   @Override
   protected Set<String> knownModules() {
@@ -69,7 +72,7 @@ public class OrderAccessService extends BaseAccessService {
     String role = ctx.roleCode();
     if (role != null && OPERATIONAL_ROLES.contains(role)) return true;
     // WORKER/VIEWER reach here → check department membership
-    return ctx.isInAnyDepartment(ALL_ORDER_READ_DEPARTMENTS);
+    return ctx.isInAnyDepartment(ALL_SALES_READ_DEPARTMENTS);
   }
 
   @Override
