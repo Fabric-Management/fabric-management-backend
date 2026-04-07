@@ -100,4 +100,14 @@ public class BoardService {
     board.updateWipLimit(wipLimit);
     return boardRepo.save(board);
   }
+
+  /** Beklenen default board: GLOBAL eger o yoksa eldeki aktif boardlardan ilki. */
+  @Transactional(readOnly = true)
+  public Board getDefaultBoard() {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    return boardRepo
+        .findByTenantIdAndBoardType(tenantId, BoardType.GLOBAL)
+        .or(() -> boardRepo.findAllByTenantIdAndIsActiveTrue(tenantId).stream().findFirst())
+        .orElseThrow(() -> new EntityNotFoundException("No active boards found for tenant"));
+  }
 }

@@ -7,6 +7,8 @@ import com.fabricmanagement.approval.dto.ApprovalPolicyResponse;
 import com.fabricmanagement.approval.dto.CreatePolicyRequest;
 import com.fabricmanagement.approval.dto.UpdatePolicyRequest;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -27,28 +29,32 @@ public class ApprovalPolicyController {
 
   @GetMapping
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
-  public ResponseEntity<List<ApprovalPolicyResponse>> getAllPolicies() {
+  public ResponseEntity<ApiResponse<List<ApprovalPolicyResponse>>> getAllPolicies() {
     UUID tenantId = TenantContext.getCurrentTenantId();
     List<ApprovalPolicyResponse> response =
         policyService.getAllPolicies(tenantId).stream().map(ApprovalPolicyResponse::from).toList();
-    return ResponseEntity.ok(response);
+    return ResponseEntity.ok(ApiResponse.success(response));
   }
 
   @GetMapping("/{entityType}")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<ApprovalPolicyResponse> getActivePolicy(
+  public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> getActivePolicy(
       @PathVariable ApprovalEntityType entityType) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return policyService
-        .getActivePolicyFor(tenantId, entityType)
-        .map(ApprovalPolicyResponse::from)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            ApprovalPolicyResponse.from(
+                policyService
+                    .getActivePolicyFor(tenantId, entityType)
+                    .orElseThrow(
+                        () ->
+                            new EntityNotFoundException(
+                                "Active approval policy not found for: " + entityType)))));
   }
 
   @PostMapping
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
-  public ResponseEntity<ApprovalPolicyResponse> createPolicy(
+  public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> createPolicy(
       @RequestBody @Valid CreatePolicyRequest req) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     ApprovalPolicy policy =
@@ -59,12 +65,12 @@ public class ApprovalPolicyController {
             req.getApproverRole(),
             req.getPromotionThreshold());
 
-    return ResponseEntity.ok(ApprovalPolicyResponse.from(policy));
+    return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }
 
   @PutMapping("/{policyId}")
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
-  public ResponseEntity<ApprovalPolicyResponse> updatePolicy(
+  public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> updatePolicy(
       @PathVariable UUID policyId, @RequestBody @Valid UpdatePolicyRequest req) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     ApprovalPolicy policy =
@@ -75,15 +81,15 @@ public class ApprovalPolicyController {
             req.getApproverRole(),
             req.getPromotionThreshold());
 
-    return ResponseEntity.ok(ApprovalPolicyResponse.from(policy));
+    return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }
 
   @PatchMapping("/{policyId}/active")
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
-  public ResponseEntity<ApprovalPolicyResponse> togglePolicy(
+  public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> togglePolicy(
       @PathVariable UUID policyId, @RequestParam boolean active) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     ApprovalPolicy policy = policyService.togglePolicy(tenantId, policyId, active);
-    return ResponseEntity.ok(ApprovalPolicyResponse.from(policy));
+    return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }
 }

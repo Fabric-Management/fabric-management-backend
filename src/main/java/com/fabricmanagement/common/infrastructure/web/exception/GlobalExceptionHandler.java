@@ -18,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 @Slf4j
@@ -169,6 +170,26 @@ public class GlobalExceptionHandler {
     log.error("Data integrity violation: {}", ex.getMessage(), ex);
     String msg = "Data conflict (unique or FK constraint).";
     return ApiError.of(409, "Conflict", "DATA_INTEGRITY", msg, req.getRequestURI());
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiError handleTypeMismatch(
+      MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+    String paramName = ex.getName();
+    String requiredType =
+        ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+    String message = String.format("Parameter '%s' must be a valid %s", paramName, requiredType);
+
+    // Truncate value in logs to avoid leaking sensitive data
+    Object rawValue = ex.getValue();
+    String safeValue =
+        rawValue != null
+            ? rawValue.toString().substring(0, Math.min(rawValue.toString().length(), 36))
+            : "null";
+    log.info("Type mismatch: param={}, required={}, value={}", paramName, requiredType, safeValue);
+
+    return ApiError.of(400, "Bad Request", "TYPE_MISMATCH", message, req.getRequestURI());
   }
 
   @ExceptionHandler(Exception.class)

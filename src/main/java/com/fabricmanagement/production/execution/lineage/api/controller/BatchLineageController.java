@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.lineage.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.execution.lineage.app.BatchLineageService;
 import com.fabricmanagement.production.execution.lineage.dto.BatchLineageDetailDto;
 import com.fabricmanagement.production.execution.lineage.dto.BatchLineageDto;
@@ -42,9 +43,9 @@ public class BatchLineageController {
 
   @GetMapping
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
-  public ResponseEntity<ApiResponse<Page<BatchLineageDto>>> getAll(Pageable pageable) {
+  public ResponseEntity<ApiResponse<PagedResponse<BatchLineageDto>>> getAll(Pageable pageable) {
     Page<BatchLineageDto> lineages = batchLineageService.getAll(pageable);
-    return ResponseEntity.ok(ApiResponse.success(lineages));
+    return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(lineages)));
   }
 
   /** Forward trace: what input batches were consumed to produce this batch? */

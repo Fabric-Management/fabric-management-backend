@@ -7,6 +7,7 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberRequestService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequestRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberRequestDto;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -89,9 +90,10 @@ public class FiberRequestController {
   public ResponseEntity<ApiResponse<FiberRequestDto>> getById(@PathVariable("id") UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    return fiberRequestService
-        .getByIdForTenant(tenantId, id)
-        .map(dto -> ResponseEntity.ok(ApiResponse.success(dto)))
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            fiberRequestService
+                .getByIdForTenant(tenantId, id)
+                .orElseThrow(() -> new EntityNotFoundException("Fiber request not found: " + id))));
   }
 }

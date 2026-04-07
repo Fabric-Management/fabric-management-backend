@@ -6,6 +6,7 @@ import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
 import com.fabricmanagement.production.quality.result.dto.FiberTestResultDto;
 import com.fabricmanagement.production.quality.result.dto.UpdateApprovalRequest;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -43,10 +44,12 @@ public class FiberTestResultController {
   @GetMapping("/{id}")
   @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
   public ResponseEntity<ApiResponse<FiberTestResultDto>> getTestResult(@PathVariable UUID id) {
-    return testResultService
-        .getById(id)
-        .map(result -> ResponseEntity.ok(ApiResponse.success(result)))
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            testResultService
+                .getById(id)
+                .orElseThrow(
+                    () -> new EntityNotFoundException("Fiber test result not found: " + id))));
   }
 
   @GetMapping

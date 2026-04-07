@@ -143,4 +143,12 @@ public class BoardController {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success(BoardResponse.from(boardService.createBoard(req))));
   }
+
+  @GetMapping("/default")
+  @Operation(summary = "Tenant'ın varsayılan board'unu getir")
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ApiResponse<BoardResponse>> getDefaultBoard() {
+    return ResponseEntity.ok(
+        ApiResponse.success(BoardResponse.from(boardService.getDefaultBoard())));
+  }
 }

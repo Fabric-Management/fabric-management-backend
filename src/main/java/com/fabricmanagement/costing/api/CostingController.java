@@ -1,6 +1,7 @@
 package com.fabricmanagement.costing.api;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.costing.app.CostCalculationService;
 import com.fabricmanagement.costing.app.PriceListService;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
@@ -27,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
  *   <li>POST /api/costing/calculations/actual — Compute ACTUAL cost for a Batch
  *   <li>POST /api/costing/price-lists — Create price list
  *   <li>GET /api/costing/price-lists — List price lists for a module
- *   <li>POST /api/costing/exchange-rates — Capture exchange rate snapshot
+ *   <li>DELETE /api/costing/price-lists/{priceListId} — Deactivate price list
  * </ul>
  */
 @RestController
@@ -45,8 +46,7 @@ public class CostingController {
 
   @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('SALES_MANAGER')")
   @PostMapping("/calculations/estimated")
-  @ResponseStatus(HttpStatus.CREATED)
-  public CostCalculationResponse computeEstimated(
+  public ResponseEntity<ApiResponse<CostCalculationResponse>> computeEstimated(
       @Valid @RequestBody ComputeEstimatedCostRequest req) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     CostCalculation calc =
@@ -57,13 +57,14 @@ public class CostingController {
             req.materialId(),
             req.totalQuantityKg(),
             req.tradingPartnerId());
-    return CostCalculationResponse.from(calc);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(CostCalculationResponse.from(calc)));
   }
 
   @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
   @PostMapping("/calculations/planned")
-  @ResponseStatus(HttpStatus.CREATED)
-  public CostCalculationResponse computePlanned(@Valid @RequestBody ComputePlannedCostRequest req) {
+  public ResponseEntity<ApiResponse<CostCalculationResponse>> computePlanned(
+      @Valid @RequestBody ComputePlannedCostRequest req) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     CostCalculation calc =
         costCalculationService.computePlanned(
@@ -73,13 +74,14 @@ public class CostingController {
             req.materialId(),
             req.plannedQuantityKg(),
             req.supplierId());
-    return CostCalculationResponse.from(calc);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(CostCalculationResponse.from(calc)));
   }
 
   @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
   @PostMapping("/calculations/actual")
-  @ResponseStatus(HttpStatus.CREATED)
-  public CostCalculationResponse computeActual(@Valid @RequestBody ComputeActualCostRequest req) {
+  public ResponseEntity<ApiResponse<CostCalculationResponse>> computeActual(
+      @Valid @RequestBody ComputeActualCostRequest req) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     CostCalculation calc =
         costCalculationService.computeActual(
@@ -89,7 +91,8 @@ public class CostingController {
             req.materialId(),
             req.actualQuantityKg(),
             req.supplierId());
-    return CostCalculationResponse.from(calc);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(CostCalculationResponse.from(calc)));
   }
 
   /**
@@ -102,9 +105,11 @@ public class CostingController {
    */
   @PreAuthorize("hasRole('COSTING_READ') or hasRole('PRODUCTION_MANAGER')")
   @GetMapping("/calculations/work-orders/{workOrderId}")
-  public WorkOrderCostReportResponse getWorkOrderCostReport(@PathVariable UUID workOrderId) {
+  public ResponseEntity<ApiResponse<WorkOrderCostReportResponse>> getWorkOrderCostReport(
+      @PathVariable UUID workOrderId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return costCalculationService.getWorkOrderCostReport(tenantId, workOrderId);
+    return ResponseEntity.ok(
+        ApiResponse.success(costCalculationService.getWorkOrderCostReport(tenantId, workOrderId)));
   }
 
   // ============================================================
@@ -113,8 +118,8 @@ public class CostingController {
 
   @PreAuthorize("hasRole('COSTING_ADMIN')")
   @PostMapping("/price-lists")
-  @ResponseStatus(HttpStatus.CREATED)
-  public PriceListResponse createPriceList(@Valid @RequestBody CreatePriceListRequest req) {
+  public ResponseEntity<ApiResponse<PriceListResponse>> createPriceList(
+      @Valid @RequestBody CreatePriceListRequest req) {
     UUID tenantId = TenantContext.getCurrentTenantId();
     PriceList pl =
         priceListService.createPriceList(
@@ -125,22 +130,26 @@ public class CostingController {
             req.validFrom(),
             req.validUntil(),
             req.seasonTag());
-    return PriceListResponse.from(pl);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(PriceListResponse.from(pl)));
   }
 
   @PreAuthorize("hasRole('COSTING_READ')")
   @GetMapping("/price-lists")
-  public List<PriceListResponse> listPriceLists(@RequestParam String moduleType) {
+  public ResponseEntity<ApiResponse<List<PriceListResponse>>> listPriceLists(
+      @RequestParam String moduleType) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return priceListService.listPriceLists(tenantId, moduleType).stream()
-        .map(PriceListResponse::from)
-        .toList();
+    List<PriceListResponse> list =
+        priceListService.listPriceLists(tenantId, moduleType).stream()
+            .map(PriceListResponse::from)
+            .toList();
+    return ResponseEntity.ok(ApiResponse.success(list));
   }
 
   @PreAuthorize("hasRole('COSTING_ADMIN')")
   @DeleteMapping("/price-lists/{priceListId}")
-  public ResponseEntity<Void> deactivatePriceList(@PathVariable UUID priceListId) {
+  public ResponseEntity<ApiResponse<Void>> deactivatePriceList(@PathVariable UUID priceListId) {
     priceListService.deactivatePriceList(priceListId);
-    return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 }

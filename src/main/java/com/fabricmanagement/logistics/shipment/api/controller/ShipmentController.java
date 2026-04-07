@@ -1,16 +1,18 @@
 package com.fabricmanagement.logistics.shipment.api.controller;
 
+import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.logistics.shipment.app.ShipmentService;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentStatus;
 import com.fabricmanagement.logistics.shipment.dto.CreateShipmentRequest;
 import com.fabricmanagement.logistics.shipment.dto.ShipmentDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -39,46 +41,51 @@ public class ShipmentController {
   @PostMapping
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Create a new shipment")
-  public ResponseEntity<ShipmentDto> createShipment(
+  public ResponseEntity<ApiResponse<ShipmentDto>> createShipment(
       @Valid @RequestBody CreateShipmentRequest request) {
     ShipmentDto shipment = shipmentService.createShipment(request);
-    return ResponseEntity.status(HttpStatus.CREATED).body(shipment);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(shipment));
   }
 
   @GetMapping("/{id}")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipment by ID")
-  public ResponseEntity<ShipmentDto> getShipment(@PathVariable UUID id) {
-    return shipmentService
-        .findById(id)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+  public ResponseEntity<ApiResponse<ShipmentDto>> getShipment(@PathVariable UUID id) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            shipmentService
+                .findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Shipment not found: " + id))));
   }
 
   @GetMapping("/tracking/{trackingNumber}")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipment by tracking number")
-  public ResponseEntity<ShipmentDto> getShipmentByTracking(@PathVariable String trackingNumber) {
-    return shipmentService
-        .findByTrackingNumber(trackingNumber)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+  public ResponseEntity<ApiResponse<ShipmentDto>> getShipmentByTracking(
+      @PathVariable String trackingNumber) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            shipmentService
+                .findByTrackingNumber(trackingNumber)
+                .orElseThrow(
+                    () -> new EntityNotFoundException("Shipment not found: " + trackingNumber))));
   }
 
   @GetMapping
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get all shipments (paginated)")
-  public ResponseEntity<Page<ShipmentDto>> getAllShipments(
+  public ResponseEntity<ApiResponse<PagedResponse<ShipmentDto>>> getAllShipments(
       @PageableDefault(size = 20, sort = "shipDate") Pageable pageable) {
-    return ResponseEntity.ok(shipmentService.findAll(pageable));
+    return ResponseEntity.ok(
+        ApiResponse.success(PagedResponse.from(shipmentService.findAll(pageable))));
   }
 
   @DeleteMapping("/{id}")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Delete shipment (soft delete)")
-  public ResponseEntity<Void> deleteShipment(@PathVariable UUID id) {
+  public ResponseEntity<ApiResponse<Void>> deleteShipment(@PathVariable UUID id) {
     shipmentService.deleteShipment(id);
-    return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -88,66 +95,70 @@ public class ShipmentController {
   @GetMapping("/partner/{partnerId}")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipments by partner ID")
-  public ResponseEntity<List<ShipmentDto>> getShipmentsByPartner(@PathVariable UUID partnerId) {
-    return ResponseEntity.ok(shipmentService.findByPartner(partnerId));
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getShipmentsByPartner(
+      @PathVariable UUID partnerId) {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.findByPartner(partnerId)));
   }
 
   @GetMapping("/partner/{partnerId}/in-transit")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get in-transit shipments by partner")
-  public ResponseEntity<List<ShipmentDto>> getInTransitByPartner(@PathVariable UUID partnerId) {
-    return ResponseEntity.ok(shipmentService.findInTransitByPartner(partnerId));
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getInTransitByPartner(
+      @PathVariable UUID partnerId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(shipmentService.findInTransitByPartner(partnerId)));
   }
 
   @GetMapping("/status/{status}")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipments by status")
-  public ResponseEntity<List<ShipmentDto>> getShipmentsByStatus(
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getShipmentsByStatus(
       @PathVariable ShipmentStatus status) {
-    return ResponseEntity.ok(shipmentService.findByStatus(status));
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.findByStatus(status)));
   }
 
   @GetMapping("/in-transit")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get all in-transit shipments")
-  public ResponseEntity<List<ShipmentDto>> getInTransit() {
-    return ResponseEntity.ok(shipmentService.findInTransit());
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getInTransit() {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.findInTransit()));
   }
 
   @GetMapping("/pending")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get pending shipments (not yet dispatched)")
-  public ResponseEntity<List<ShipmentDto>> getPendingShipments() {
-    return ResponseEntity.ok(shipmentService.findPendingShipments());
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getPendingShipments() {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.findPendingShipments()));
   }
 
   @GetMapping("/late")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get late shipments")
-  public ResponseEntity<List<ShipmentDto>> getLateShipments() {
-    return ResponseEntity.ok(shipmentService.findLateShipments());
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getLateShipments() {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.findLateShipments()));
   }
 
   @GetMapping("/outbound")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get outbound shipments")
-  public ResponseEntity<List<ShipmentDto>> getOutboundShipments() {
-    return ResponseEntity.ok(shipmentService.findOutboundShipments());
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getOutboundShipments() {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.findOutboundShipments()));
   }
 
   @GetMapping("/inbound")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get inbound shipments")
-  public ResponseEntity<List<ShipmentDto>> getInboundShipments() {
-    return ResponseEntity.ok(shipmentService.findInboundShipments());
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getInboundShipments() {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.findInboundShipments()));
   }
 
   @GetMapping("/order/{orderReference}")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'READ')")
   @Operation(summary = "Get shipments by order reference")
-  public ResponseEntity<List<ShipmentDto>> getShipmentsByOrder(
+  public ResponseEntity<ApiResponse<List<ShipmentDto>>> getShipmentsByOrder(
       @PathVariable String orderReference) {
-    return ResponseEntity.ok(shipmentService.findByOrderReference(orderReference));
+    return ResponseEntity.ok(
+        ApiResponse.success(shipmentService.findByOrderReference(orderReference)));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -157,73 +168,77 @@ public class ShipmentController {
   @PostMapping("/{id}/prepare")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Start preparing a shipment")
-  public ResponseEntity<ShipmentDto> startPreparing(@PathVariable UUID id) {
-    return ResponseEntity.ok(shipmentService.startPreparing(id));
+  public ResponseEntity<ApiResponse<ShipmentDto>> startPreparing(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.startPreparing(id)));
   }
 
   @PostMapping("/{id}/ready")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Mark shipment as ready for pickup")
-  public ResponseEntity<ShipmentDto> markReady(@PathVariable UUID id) {
-    return ResponseEntity.ok(shipmentService.markReady(id));
+  public ResponseEntity<ApiResponse<ShipmentDto>> markReady(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.markReady(id)));
   }
 
   @PostMapping("/{id}/pickup")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Record pickup by carrier")
-  public ResponseEntity<ShipmentDto> recordPickup(
+  public ResponseEntity<ApiResponse<ShipmentDto>> recordPickup(
       @PathVariable UUID id,
       @RequestParam String carrierName,
       @RequestParam String trackingNumber) {
-    return ResponseEntity.ok(shipmentService.recordPickup(id, carrierName, trackingNumber));
+    return ResponseEntity.ok(
+        ApiResponse.success(shipmentService.recordPickup(id, carrierName, trackingNumber)));
   }
 
   @PostMapping("/{id}/in-transit")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Mark shipment as in transit")
-  public ResponseEntity<ShipmentDto> markInTransit(@PathVariable UUID id) {
-    return ResponseEntity.ok(shipmentService.markInTransit(id));
+  public ResponseEntity<ApiResponse<ShipmentDto>> markInTransit(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.markInTransit(id)));
   }
 
   @PostMapping("/{id}/out-for-delivery")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Mark shipment as out for delivery")
-  public ResponseEntity<ShipmentDto> markOutForDelivery(@PathVariable UUID id) {
-    return ResponseEntity.ok(shipmentService.markOutForDelivery(id));
+  public ResponseEntity<ApiResponse<ShipmentDto>> markOutForDelivery(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.markOutForDelivery(id)));
   }
 
   @PostMapping("/{id}/deliver")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Record delivery")
-  public ResponseEntity<ShipmentDto> recordDelivery(
+  public ResponseEntity<ApiResponse<ShipmentDto>> recordDelivery(
       @PathVariable UUID id,
       @RequestParam String recipientName,
       @RequestParam(required = false) String deliveryProof) {
-    return ResponseEntity.ok(shipmentService.recordDelivery(id, recipientName, deliveryProof));
+    return ResponseEntity.ok(
+        ApiResponse.success(shipmentService.recordDelivery(id, recipientName, deliveryProof)));
   }
 
   @PostMapping("/{id}/delivery-failed")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Record delivery failure")
-  public ResponseEntity<ShipmentDto> recordDeliveryFailure(
+  public ResponseEntity<ApiResponse<ShipmentDto>> recordDeliveryFailure(
       @PathVariable UUID id, @RequestParam String reason) {
-    return ResponseEntity.ok(shipmentService.recordDeliveryFailure(id, reason));
+    return ResponseEntity.ok(
+        ApiResponse.success(shipmentService.recordDeliveryFailure(id, reason)));
   }
 
   @PostMapping("/{id}/cancel")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Cancel a shipment")
-  public ResponseEntity<ShipmentDto> cancelShipment(@PathVariable UUID id) {
-    return ResponseEntity.ok(shipmentService.cancelShipment(id));
+  public ResponseEntity<ApiResponse<ShipmentDto>> cancelShipment(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(shipmentService.cancelShipment(id)));
   }
 
   @PutMapping("/{id}/tracking")
   @PreAuthorize("@logisticsAccessService.hasPermission(authentication, 'SHIPMENT', 'WRITE')")
   @Operation(summary = "Update tracking info")
-  public ResponseEntity<ShipmentDto> updateTracking(
+  public ResponseEntity<ApiResponse<ShipmentDto>> updateTracking(
       @PathVariable UUID id,
       @RequestParam String trackingNumber,
       @RequestParam(required = false) String trackingUrl) {
-    return ResponseEntity.ok(shipmentService.updateTracking(id, trackingNumber, trackingUrl));
+    return ResponseEntity.ok(
+        ApiResponse.success(shipmentService.updateTracking(id, trackingNumber, trackingUrl)));
   }
 }

@@ -8,6 +8,7 @@ import com.fabricmanagement.production.masterdata.fiber.app.FiberRequestService;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequestStatus;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberRequestDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.RejectFiberRequestRequest;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.Optional;
 import java.util.UUID;
@@ -80,10 +81,11 @@ public class FiberRequestPlatformController {
   @GetMapping("/{id}")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
   public ResponseEntity<ApiResponse<FiberRequestDto>> getById(@PathVariable("id") UUID id) {
-    return fiberRequestService
-        .getById(id)
-        .map(dto -> ResponseEntity.ok(ApiResponse.success(dto)))
-        .orElse(ResponseEntity.notFound().build());
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            fiberRequestService
+                .getById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Fiber request not found: " + id))));
   }
 
   /**
