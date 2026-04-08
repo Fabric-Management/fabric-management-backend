@@ -30,16 +30,16 @@ public class ProcurementAccessService extends BaseAccessService {
   public static final String MODULE_SUPPLIER_QUOTE = "SUPPLIER_QUOTE";
 
   private static final Set<String> PROCUREMENT_WRITE_DEPARTMENTS =
-      Set.of("PROCUREMENTSUPPLY", "ADMINISTRATIONOFFICE");
+      Set.of("PROCUREMENT", "MANAGEMENT");
 
   private static final Set<String> ALL_PROCUREMENT_READ_DEPARTMENTS =
       Set.of(
-          "PROCUREMENTSUPPLY",
-          "ADMINISTRATIONOFFICE",
-          "WAREHOUSE",
-          "PRODUCTIONPLANNING",
-          "RDPRODUCTDEVELOPMENT",
-          "SALESCOMMERCIAL");
+          "PROCUREMENT",
+          "MANAGEMENT",
+          "WAREHOUSE_LOGISTICS",
+          "PRODUCTION",
+          "PRODUCTION",
+          "SALES_MARKETING");
 
   private static final Set<String> KNOWN =
       Set.of(

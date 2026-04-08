@@ -141,8 +141,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/webhooks/**")
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
-                    .requestMatchers("/ws/**")
-                    .permitAll() // SockJS handshake — real auth at STOMP CONNECT level
+                    .requestMatchers("/api/ws/**")
+                    .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
                     .requestMatchers("/api/admin/**")
                     .permitAll()
                     .anyRequest()
@@ -181,8 +181,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/webhooks/**")
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
-                    .requestMatchers("/ws/**")
-                    .permitAll() // SockJS handshake — real auth at STOMP CONNECT level
+                    .requestMatchers("/api/ws/**")
+                    .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
@@ -231,7 +231,7 @@ public class SecurityConfig {
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", configuration);
-    source.registerCorsConfiguration("/ws/**", configuration);
+    source.registerCorsConfiguration("/api/ws/**", configuration);
 
     log.info("✅ CORS configured: Development origins allowed (localhost, 127.0.0.1, etc.)");
 
@@ -273,7 +273,7 @@ public class SecurityConfig {
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", configuration);
-    source.registerCorsConfiguration("/ws/**", configuration);
+    source.registerCorsConfiguration("/api/ws/**", configuration);
 
     log.info("✅ CORS configured for production");
 

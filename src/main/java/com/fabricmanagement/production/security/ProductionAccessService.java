@@ -30,13 +30,13 @@ import org.springframework.stereotype.Service;
  * <h2>Department Codes</h2>
  *
  * <ul>
- *   <li>{@code RDPRODUCTDEVELOPMENT} — R&amp;D / Product Development
- *   <li>{@code PRODUCTIONPLANNING} — Production Planning
- *   <li>{@code FIBERRAWMATERIAL} — Fiber &amp; Raw Material
- *   <li>{@code YARNPRODUCTION} — Yarn Production
- *   <li>{@code WEAVINGKNITTING} — Weaving &amp; Knitting
- *   <li>{@code DYEINGFINISHING} — Dyeing &amp; Finishing
- *   <li>{@code QUALITYCONTROL} — Quality Control
+ *   <li>{@code PRODUCTION} — R&amp;D / Product Development
+ *   <li>{@code PRODUCTION} — Production Planning
+ *   <li>{@code PROCUREMENT} — Fiber &amp; Raw Material
+ *   <li>{@code PRODUCTION} — Yarn Production
+ *   <li>{@code PRODUCTION} — Weaving &amp; Knitting
+ *   <li>{@code PRODUCTION} — Dyeing &amp; Finishing
+ *   <li>{@code QUALITY_CONTROL} — Quality Control
  *   <li>{@code WAREHOUSE} — Warehouse
  * </ul>
  */
@@ -54,48 +54,47 @@ public class ProductionAccessService extends BaseAccessService {
   public static final String MODULE_WORK_ORDER = "WORK_ORDER";
 
   private static final Set<String> FIBER_MASTERDATA_WRITE_DEPARTMENTS =
-      Set.of(
-          "RDPRODUCTDEVELOPMENT", "PRODUCTIONPLANNING", "FIBERRAWMATERIAL", "ADMINISTRATIONOFFICE");
+      Set.of("PRODUCTION", "PRODUCTION", "PROCUREMENT", "MANAGEMENT");
 
   private static final Set<String> BATCH_WRITE_DEPARTMENTS =
       Set.of(
-          "RDPRODUCTDEVELOPMENT",
-          "PRODUCTIONPLANNING",
-          "FIBERRAWMATERIAL",
-          "YARNPRODUCTION",
-          "WEAVINGKNITTING",
-          "DYEINGFINISHING",
-          "QUALITYCONTROL",
-          "WAREHOUSE");
+          "PRODUCTION",
+          "PRODUCTION",
+          "PROCUREMENT",
+          "PRODUCTION",
+          "PRODUCTION",
+          "PRODUCTION",
+          "QUALITY_CONTROL",
+          "WAREHOUSE_LOGISTICS");
 
   private static final Set<String> QUALITY_TEST_WRITE_DEPARTMENTS =
-      Set.of("QUALITYCONTROL", "RDPRODUCTDEVELOPMENT", "FIBERRAWMATERIAL");
+      Set.of("QUALITY_CONTROL", "PRODUCTION", "PROCUREMENT");
 
   private static final Set<String> WAREHOUSE_LOCATION_WRITE_DEPARTMENTS =
-      Set.of("WAREHOUSE", "PRODUCTIONPLANNING");
+      Set.of("WAREHOUSE_LOGISTICS", "PRODUCTION");
 
-  private static final Set<String> GOODS_RECEIPT_WRITE_DEPARTMENTS = Set.of("WAREHOUSE");
+  private static final Set<String> GOODS_RECEIPT_WRITE_DEPARTMENTS = Set.of("WAREHOUSE_LOGISTICS");
 
   private static final Set<String> STOCK_UNIT_WRITE_DEPARTMENTS =
-      Set.of("WAREHOUSE", "PRODUCTIONPLANNING");
+      Set.of("WAREHOUSE_LOGISTICS", "PRODUCTION");
 
   private static final Set<String> QUALITY_GRADE_WRITE_DEPARTMENTS =
-      Set.of("QUALITYCONTROL", "RDPRODUCTDEVELOPMENT");
+      Set.of("QUALITY_CONTROL", "PRODUCTION");
 
   private static final Set<String> WORK_ORDER_WRITE_DEPARTMENTS =
-      Set.of("PRODUCTIONPLANNING", "YARNPRODUCTION", "WEAVINGKNITTING", "DYEINGFINISHING");
+      Set.of("PRODUCTION", "PRODUCTION", "PRODUCTION", "PRODUCTION");
 
   private static final Set<String> ALL_PRODUCTION_READ_DEPARTMENTS =
       Set.of(
-          "RDPRODUCTDEVELOPMENT",
-          "PRODUCTIONPLANNING",
-          "FIBERRAWMATERIAL",
-          "YARNPRODUCTION",
-          "WEAVINGKNITTING",
-          "DYEINGFINISHING",
-          "QUALITYCONTROL",
-          "WAREHOUSE",
-          "PROCUREMENTSUPPLY");
+          "PRODUCTION",
+          "PRODUCTION",
+          "PROCUREMENT",
+          "PRODUCTION",
+          "PRODUCTION",
+          "PRODUCTION",
+          "QUALITY_CONTROL",
+          "WAREHOUSE_LOGISTICS",
+          "PROCUREMENT");
 
   private static final Set<String> KNOWN =
       Set.of(

@@ -35,9 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class TeamAccessService {
 
   private static final Set<String> FULL_ACCESS_DEPARTMENTS =
-      Set.of("ADMINISTRATIONOFFICE", "HUMANRESOURCES");
+      Set.of("MANAGEMENT", "HUMAN_RESOURCES");
 
-  private static final Set<String> READ_ALL_DEPARTMENTS = Set.of("FINANCEACCOUNTING");
+  private static final Set<String> READ_ALL_DEPARTMENTS = Set.of("FINANCE_ACCOUNTING");
 
   private static final Set<String> ADMIN_ROLES = Set.of("ADMIN", "PLATFORM_ADMIN");
 

@@ -42,6 +42,11 @@ public class UserDto {
   private Instant createdAt;
   private Instant updatedAt;
 
+  private java.util.Map<
+          String, java.util.Map<String, com.fabricmanagement.platform.user.domain.DataScope>>
+      permissions;
+  private boolean superAdmin;
+
   /** User-level locale preference (e.g. "tr-TR"). Null = inherits from tenant settings. */
   private String preferredLocale;
 

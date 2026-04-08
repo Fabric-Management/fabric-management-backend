@@ -21,11 +21,17 @@ public class FlowBoardAccessService extends BaseAccessService {
 
   private static final Map<String, Set<String>> WRITE_DEPARTMENTS =
       Map.of(
-          "BOARD", Set.of("MANAGEMENT", "PLANNING"),
-          "TASK", Set.of("MANAGEMENT", "PLANNING", "PRODUCTION", "WAREHOUSE", "QUALITY"),
+          "BOARD", Set.of("MANAGEMENT", "PRODUCTION"),
+          "TASK",
+              Set.of(
+                  "MANAGEMENT",
+                  "PRODUCTION",
+                  "PRODUCTION",
+                  "WAREHOUSE_LOGISTICS",
+                  "QUALITY_CONTROL"),
           "DASHBOARD", Set.of("MANAGEMENT"),
           "PERFORMANCE", Set.of("MANAGEMENT"),
-          "RECURRING_TEMPLATE", Set.of("MANAGEMENT", "PLANNING"));
+          "RECURRING_TEMPLATE", Set.of("MANAGEMENT", "PRODUCTION"));
 
   @Override
   protected Set<String> knownModules() {

@@ -49,13 +49,23 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
       return message;
     }
 
+    String token = null;
     String authHeader = accessor.getFirstNativeHeader("Authorization");
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      log.warn("WebSocket CONNECT rejected — missing Authorization header");
-      throw new SecurityException("Missing or invalid Authorization header");
+
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    } else {
+      java.util.Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+      if (sessionAttributes != null && sessionAttributes.containsKey("auth_token")) {
+        token = (String) sessionAttributes.get("auth_token");
+      }
     }
 
-    String token = authHeader.substring(7);
+    if (token == null) {
+      log.warn(
+          "WebSocket CONNECT rejected — missing Authorization header and auth_token attribute");
+      throw new SecurityException("Missing or invalid Authorization token");
+    }
 
     if (!jwtService.validateToken(token) || jwtService.isPreAuthToken(token)) {
       log.warn("WebSocket CONNECT rejected — invalid or pre-auth JWT token");

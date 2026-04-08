@@ -30,8 +30,7 @@ public class HumanAccessService extends BaseAccessService {
   public static final String MODULE_PAYROLL = "PAYROLL";
   public static final String MODULE_LEAVE = "LEAVE";
 
-  private static final Set<String> HR_WRITE_DEPARTMENTS =
-      Set.of("HUMANRESOURCES", "ADMINISTRATIONOFFICE");
+  private static final Set<String> HR_WRITE_DEPARTMENTS = Set.of("HUMAN_RESOURCES", "MANAGEMENT");
 
   private static final Set<String> KNOWN = Set.of(MODULE_EMPLOYEE, MODULE_PAYROLL, MODULE_LEAVE);
 

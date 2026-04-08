@@ -29,16 +29,16 @@ public class LogisticsAccessService extends BaseAccessService {
   public static final String MODULE_SHIPMENT = "SHIPMENT";
 
   private static final Set<String> SHIPMENT_WRITE_DEPARTMENTS =
-      Set.of("SHIPPINGTRANSPORT", "WAREHOUSE");
+      Set.of("WAREHOUSE_LOGISTICS", "WAREHOUSE_LOGISTICS");
 
   private static final Set<String> SHIPMENT_READ_DEPARTMENTS =
       Set.of(
-          "SHIPPINGTRANSPORT",
-          "WAREHOUSE",
-          "SALESMARKETING",
-          "PROCUREMENTSUPPLY",
-          "MANAGEMENTPLANNING",
-          "PRODUCTIONPLANNING");
+          "WAREHOUSE_LOGISTICS",
+          "WAREHOUSE_LOGISTICS",
+          "SALES_MARKETING",
+          "PROCUREMENT",
+          "MANAGEMENT",
+          "PRODUCTION");
 
   private static final Set<String> KNOWN = Set.of(MODULE_SHIPMENT);
 

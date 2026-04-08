@@ -187,7 +187,7 @@ public class ProcurementNotificationListener {
         () -> {
           List<UUID> recipientIds =
               departmentRecipientPort.findManagersByDepartmentKeyword(
-                  event.getTenantId(), "WAREHOUSE");
+                  event.getTenantId(), "WAREHOUSE_LOGISTICS");
           if (!recipientIds.isEmpty()) {
             notificationHubService.notifyAll(
                 recipientIds,

@@ -8,7 +8,7 @@ import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.tenant.app.TenantService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,15 +30,16 @@ public class OrganizationSeeder implements DataSeeder {
 
   private static final String TAX_ID = "AKK-1234567890";
 
-  private static final List<String> EXPECTED_DEPARTMENTS =
-      List.of(
-          "Management",
-          "Human Resources",
-          "Finans ve Satınalma",
-          "Üretim",
-          "Kalite",
-          "Depo ve Lojistik",
-          "Satış");
+  private static final Map<String, String> EXPECTED_DEPARTMENTS =
+      Map.of(
+          "Management", "MANAGEMENT",
+          "Human Resources", "HUMAN_RESOURCES",
+          "Finance", "FINANCE_ACCOUNTING",
+          "Procurement", "PROCUREMENT",
+          "Production", "PRODUCTION",
+          "Quality", "QUALITY_CONTROL",
+          "Warehouse", "WAREHOUSE_LOGISTICS",
+          "Sales", "SALES_MARKETING");
 
   @Override
   public boolean isSeeded() {
@@ -61,7 +62,7 @@ public class OrganizationSeeder implements DataSeeder {
                   .map(Department::getDepartmentName)
                   .collect(Collectors.toSet());
 
-          return EXPECTED_DEPARTMENTS.stream().allMatch(existingNames::contains);
+          return EXPECTED_DEPARTMENTS.keySet().stream().allMatch(existingNames::contains);
         });
   }
 
@@ -94,7 +95,9 @@ public class OrganizationSeeder implements DataSeeder {
 
                 // 2. Create Departments - granular per-record idempotency
                 log.info("Creating Departments for org: {}", rootOrg.getId());
-                for (String dpName : EXPECTED_DEPARTMENTS) {
+                for (Map.Entry<String, String> entry : EXPECTED_DEPARTMENTS.entrySet()) {
+                  String dpName = entry.getKey();
+                  String dpCode = entry.getValue();
                   if (departmentRepository
                       .findByTenantIdAndOrganizationIdAndDepartmentName(
                           tenant.getId(), rootOrg.getId(), dpName)
@@ -103,8 +106,7 @@ public class OrganizationSeeder implements DataSeeder {
                     dp.setTenantId(tenant.getId());
                     dp.setOrganizationId(rootOrg.getId());
                     dp.setDepartmentName(dpName);
-                    dp.setDepartmentCode(
-                        dpName.substring(0, Math.min(3, dpName.length())).toUpperCase());
+                    dp.setDepartmentCode(dpCode);
                     dp.setIsActive(true);
                     departmentRepository.save(dp);
                     log.info("Created department: {}", dpName);

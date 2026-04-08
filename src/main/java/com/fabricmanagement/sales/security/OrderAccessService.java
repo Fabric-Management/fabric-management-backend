@@ -24,8 +24,8 @@ import org.springframework.stereotype.Service;
  *
  * <p><b>CR-12-03:</b> WORKER/VIEWER role: OPERATIONAL_ROLES check covers ADMIN/MANAGER/SUPERVISOR.
  * Workers reach the department fallback and get READ only if they belong to {@code
- * ALL_ORDER_READ_DEPARTMENTS} (e.g., WAREHOUSE, FIBERRAWMATERIAL). Workers not in those departments
- * are denied.
+ * ALL_ORDER_READ_DEPARTMENTS} (e.g., WAREHOUSE, PROCUREMENT). Workers not in those departments are
+ * denied.
  */
 @Service("orderAccessService")
 public class OrderAccessService extends BaseAccessService {
@@ -34,17 +34,17 @@ public class OrderAccessService extends BaseAccessService {
   public static final String MODULE_QUOTE = "QUOTE";
 
   private static final Set<String> SALES_WRITE_DEPARTMENTS =
-      Set.of("SALESMARKETING", "PRODUCTIONPLANNING", "ADMINISTRATIONOFFICE", "MANAGEMENTPLANNING");
+      Set.of("SALES_MARKETING", "PRODUCTION", "MANAGEMENT", "MANAGEMENT");
 
   private static final Set<String> ALL_SALES_READ_DEPARTMENTS =
       Set.of(
-          "SALESMARKETING",
-          "PRODUCTIONPLANNING",
-          "ADMINISTRATIONOFFICE",
-          "MANAGEMENTPLANNING",
-          "PROCUREMENTSUPPLY",
-          "FIBERRAWMATERIAL",
-          "WAREHOUSE");
+          "SALES_MARKETING",
+          "PRODUCTION",
+          "MANAGEMENT",
+          "MANAGEMENT",
+          "PROCUREMENT",
+          "PROCUREMENT",
+          "WAREHOUSE_LOGISTICS");
 
   private static final Set<String> KNOWN = Set.of(MODULE_SALES_ORDER, MODULE_QUOTE);
 

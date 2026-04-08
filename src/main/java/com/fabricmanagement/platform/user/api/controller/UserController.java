@@ -1,6 +1,8 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
+import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
@@ -41,6 +43,7 @@ public class UserController {
   private final UserCreationOptionsService userCreationOptionsService;
   private final TeamAccessService teamAccessService;
   private final UserLocaleService userLocaleService;
+  private final PermissionEvaluator permissionEvaluator;
 
   /**
    * Create internal employee (own staff with HR data).
@@ -229,6 +232,7 @@ public class UserController {
   @GetMapping("/me")
   public ResponseEntity<ApiResponse<UserDto>> getCurrentUser() {
     UUID userId = TenantContext.getCurrentUserId();
+    UUID tenantId = TenantContext.getCurrentTenantId();
 
     if (userId == null) {
       throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
@@ -238,8 +242,15 @@ public class UserController {
 
     UserDto user =
         userService
-            .findById(TenantContext.getCurrentTenantId(), userId)
+            .findById(tenantId, userId)
             .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+
+    PermissionResult permResult =
+        permissionEvaluator.evaluate(
+            tenantId, user.getRoleCode(), user.getDepartmentCodes(), user.getId());
+
+    user.setPermissions(permResult.permissions());
+    user.setSuperAdmin(permResult.isSuperAdmin());
 
     return ResponseEntity.ok(ApiResponse.success(user));
   }

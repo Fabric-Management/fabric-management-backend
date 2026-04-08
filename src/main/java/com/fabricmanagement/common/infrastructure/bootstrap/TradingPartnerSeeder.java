@@ -69,34 +69,34 @@ public class TradingPartnerSeeder implements DataSeeder {
                         .collect(Collectors.toSet());
 
                 seedPartner(
-                    "Öz Pamuk İplik San. Tic. A.Ş.",
+                    "Oz Cotton Yarns Inc.",
                     "1111111111",
                     PartnerType.SUPPLIER,
-                    "Öz Pamuk",
+                    "Oz Yarns",
                     existingTaxIds);
                 seedPartner(
-                    "Global Moda Giyim A.Ş.",
+                    "Global Fashion Wear Corp.",
                     "2222222222",
                     PartnerType.CUSTOMER,
-                    "Global Moda",
+                    "Global Fashion",
                     existingTaxIds);
                 seedPartner(
-                    "Güney Boya ve Apre Tesisi",
+                    "South Dyeing Facilities",
                     "3333333333",
                     PartnerType.FASON,
-                    "Güney Boya",
+                    "South Dyeing",
                     existingTaxIds);
                 seedPartner(
-                    "Hızlı Lojistik Taşıma A.Ş.",
+                    "Fast Logistics Shipping LLC",
                     "4444444444",
                     PartnerType.SERVICE_PROVIDER,
-                    "Hızlı Lojistik",
+                    "Fast Logistics",
                     existingTaxIds);
                 seedPartner(
-                    "Merkez Tekstil Sanayi Ltd. Şti.",
+                    "Central Textile Mills Ltd.",
                     "5555555555",
                     PartnerType.BOTH,
-                    "Merkez Tekstil",
+                    "Central Textile",
                     existingTaxIds);
               });
         });

@@ -35,19 +35,19 @@ public class IwmAccessService extends BaseAccessService {
   public static final String MODULE_STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT";
 
   private static final Set<String> WAREHOUSE_WRITE_DEPARTMENTS =
-      Set.of("WAREHOUSE", "PRODUCTIONPLANNING");
+      Set.of("WAREHOUSE_LOGISTICS", "PRODUCTION");
 
   private static final Set<String> STOCK_COUNT_WRITE_DEPARTMENTS =
-      Set.of("WAREHOUSE", "QUALITYCONTROL");
+      Set.of("WAREHOUSE_LOGISTICS", "QUALITY_CONTROL");
 
   private static final Set<String> IWM_READ_DEPARTMENTS =
       Set.of(
-          "WAREHOUSE",
-          "PRODUCTIONPLANNING",
-          "QUALITYCONTROL",
-          "PROCUREMENTSUPPLY",
-          "FIBERRAWMATERIAL",
-          "SALESMARKETING");
+          "WAREHOUSE_LOGISTICS",
+          "PRODUCTION",
+          "QUALITY_CONTROL",
+          "PROCUREMENT",
+          "PROCUREMENT",
+          "SALES_MARKETING");
 
   private static final Set<String> KNOWN =
       Set.of(

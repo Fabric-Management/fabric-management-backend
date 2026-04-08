@@ -30,15 +30,10 @@ public class FinanceAccessService extends BaseAccessService {
   public static final String MODULE_INVOICE = "INVOICE";
 
   private static final Set<String> INVOICE_WRITE_DEPARTMENTS =
-      Set.of("FINANCEACCOUNTING", "ADMINISTRATIONOFFICE");
+      Set.of("FINANCE_ACCOUNTING", "MANAGEMENT");
 
   private static final Set<String> INVOICE_READ_DEPARTMENTS =
-      Set.of(
-          "FINANCEACCOUNTING",
-          "ADMINISTRATIONOFFICE",
-          "SALESMARKETING",
-          "PROCUREMENTSUPPLY",
-          "MANAGEMENTPLANNING");
+      Set.of("FINANCE_ACCOUNTING", "MANAGEMENT", "SALES_MARKETING", "PROCUREMENT", "MANAGEMENT");
 
   private static final Set<String> KNOWN = Set.of(MODULE_INVOICE);
 
