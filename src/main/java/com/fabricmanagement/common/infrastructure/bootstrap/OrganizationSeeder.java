@@ -30,16 +30,27 @@ public class OrganizationSeeder implements DataSeeder {
 
   private static final String TAX_ID = "AKK-1234567890";
 
-  private static final Map<String, String> EXPECTED_DEPARTMENTS =
+  private static final Map<String, String> EXPECTED_DEPARTMENTS = new java.util.LinkedHashMap<>();
+
+  static {
+    EXPECTED_DEPARTMENTS.put("Management", "MANAGEMENT");
+    EXPECTED_DEPARTMENTS.put("Human Resources", "HUMAN_RESOURCES");
+    EXPECTED_DEPARTMENTS.put("Finance", "FINANCE_ACCOUNTING");
+    EXPECTED_DEPARTMENTS.put("Procurement", "PROCUREMENT");
+    EXPECTED_DEPARTMENTS.put("Production", "PRODUCTION");
+    EXPECTED_DEPARTMENTS.put("Yarn Production", "YARN_PRODUCTION");
+    EXPECTED_DEPARTMENTS.put("Weaving", "WEAVING");
+    EXPECTED_DEPARTMENTS.put("Dyeing & Finishing", "DYEING_FINISHING");
+    EXPECTED_DEPARTMENTS.put("Quality", "QUALITY_CONTROL");
+    EXPECTED_DEPARTMENTS.put("Warehouse", "WAREHOUSE_LOGISTICS");
+    EXPECTED_DEPARTMENTS.put("Sales", "SALES_MARKETING");
+  }
+
+  private static final Map<String, String> PARENT_MAPPING =
       Map.of(
-          "Management", "MANAGEMENT",
-          "Human Resources", "HUMAN_RESOURCES",
-          "Finance", "FINANCE_ACCOUNTING",
-          "Procurement", "PROCUREMENT",
-          "Production", "PRODUCTION",
-          "Quality", "QUALITY_CONTROL",
-          "Warehouse", "WAREHOUSE_LOGISTICS",
-          "Sales", "SALES_MARKETING");
+          "Yarn Production", "PRODUCTION",
+          "Weaving", "PRODUCTION",
+          "Dyeing & Finishing", "PRODUCTION");
 
   @Override
   public boolean isSeeded() {
@@ -95,23 +106,47 @@ public class OrganizationSeeder implements DataSeeder {
 
                 // 2. Create Departments - granular per-record idempotency
                 log.info("Creating Departments for org: {}", rootOrg.getId());
+                Map<String, Department> createdDepartments = new java.util.HashMap<>();
+
+                // Fetch all existing so we don't duplicate logic
+                departmentRepository
+                    .findByTenantIdAndIsActiveTrue(tenant.getId())
+                    .forEach(d -> createdDepartments.put(d.getDepartmentCode(), d));
+
                 for (Map.Entry<String, String> entry : EXPECTED_DEPARTMENTS.entrySet()) {
                   String dpName = entry.getKey();
                   String dpCode = entry.getValue();
-                  if (departmentRepository
-                      .findByTenantIdAndOrganizationIdAndDepartmentName(
-                          tenant.getId(), rootOrg.getId(), dpName)
-                      .isEmpty()) {
-                    Department dp = new Department();
+
+                  Department dp = createdDepartments.get(dpCode);
+                  if (dp == null) {
+                    dp = new Department();
                     dp.setTenantId(tenant.getId());
                     dp.setOrganizationId(rootOrg.getId());
                     dp.setDepartmentName(dpName);
                     dp.setDepartmentCode(dpCode);
                     dp.setIsActive(true);
+
+                    // Assign parent if mapped and parent exists
+                    String parentCode = PARENT_MAPPING.get(dpName);
+                    if (parentCode != null && createdDepartments.containsKey(parentCode)) {
+                      dp.setParentDepartment(createdDepartments.get(parentCode));
+                    }
+
                     departmentRepository.save(dp);
-                    log.info("Created department: {}", dpName);
+                    createdDepartments.put(dpCode, dp);
+                    log.info("Created department: {} (Parent: {})", dpName, parentCode);
                   } else {
                     log.debug("Department already exists, skipping: {}", dpName);
+
+                    // Retroactively map parent if missing (for dev-tools idempotency)
+                    String parentCode = PARENT_MAPPING.get(dpName);
+                    if (parentCode != null
+                        && dp.getParentDepartment() == null
+                        && createdDepartments.containsKey(parentCode)) {
+                      dp.setParentDepartment(createdDepartments.get(parentCode));
+                      departmentRepository.save(dp);
+                      log.info("Updated department {} with parent {}", dpName, parentCode);
+                    }
                   }
                 }
               });

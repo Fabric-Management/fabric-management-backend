@@ -242,7 +242,7 @@ public class UserController {
 
     UserDto user =
         userService
-            .findById(tenantId, userId)
+            .findByIdWithPermissionData(tenantId, userId)
             .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
     PermissionResult permResult =

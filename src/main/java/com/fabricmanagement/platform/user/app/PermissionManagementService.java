@@ -59,6 +59,7 @@ public class PermissionManagementService {
   }
 
   @Transactional
+  @org.springframework.cache.annotation.CacheEvict(value = "permissions", allEntries = true)
   public PermissionTemplateDto createTemplate(
       UUID tenantId, CreatePermissionTemplateRequest request) {
     validateResourceAction(request.getResource(), request.getAction());
@@ -79,6 +80,7 @@ public class PermissionManagementService {
   }
 
   @Transactional
+  @org.springframework.cache.annotation.CacheEvict(value = "permissions", allEntries = true)
   public PermissionTemplateDto updateTemplate(
       UUID tenantId, UUID id, UpdatePermissionTemplateRequest request) {
     PermissionTemplate template =
@@ -115,6 +117,7 @@ public class PermissionManagementService {
   }
 
   @Transactional
+  @org.springframework.cache.annotation.CacheEvict(value = "permissions", allEntries = true)
   public void deleteTemplate(UUID tenantId, UUID id) {
     PermissionTemplate template =
         templateRepository
@@ -142,6 +145,9 @@ public class PermissionManagementService {
   }
 
   @Transactional
+  @org.springframework.cache.annotation.CacheEvict(
+      value = "permissions",
+      key = "#tenantId + '_' + #request.userId")
   public PermissionOverrideDto createOverride(
       UUID tenantId, UUID grantedBy, CreatePermissionOverrideRequest request) {
     validateResourceAction(request.getResource(), request.getAction());
@@ -164,6 +170,7 @@ public class PermissionManagementService {
   }
 
   @Transactional
+  @org.springframework.cache.annotation.CacheEvict(value = "permissions", allEntries = true)
   public void deleteOverride(UUID tenantId, UUID id) {
     PermissionOverride override =
         overrideRepository

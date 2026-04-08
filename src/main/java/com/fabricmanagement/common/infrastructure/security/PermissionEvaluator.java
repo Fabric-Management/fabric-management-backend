@@ -21,12 +21,17 @@ public class PermissionEvaluator {
 
   private final PermissionTemplateRepository templateRepo;
   private final PermissionOverrideRepository overrideRepo;
+  private final com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository
+      departmentRepository;
 
   /**
    * Calculates the effective permissions for a user via logic precedence. 1. ADMIN/PLATFORM_ADMIN
-   * bypass 2. Per-Dept retrieval with tenant overriding system default 3. Cross-Dept merging
-   * (escalating scope) 4. User-Specific overrides applied last
+   * bypass 2. Per-Dept hierarchical retrieval with tenant overriding system default 3. Cross-Dept
+   * merging (escalating scope) 4. User-Specific overrides applied last
    */
+  @org.springframework.cache.annotation.Cacheable(
+      value = "permissions",
+      key = "#tenantId + '_' + #userId")
   public PermissionResult evaluate(
       UUID tenantId, String roleCode, List<String> departmentCodes, UUID userId) {
     log.debug(
@@ -45,30 +50,95 @@ public class PermissionEvaluator {
 
     Map<String, Map<String, DataScope>> evaluatedPermissions = new HashMap<>();
 
-    List<String> evalDepts =
+    List<String> userDepts =
         (departmentCodes == null || departmentCodes.isEmpty())
             ? List.of((String) null)
             : departmentCodes;
 
-    // TODO: Optimize to single query when department count > 1.
-    // Process Templates
-    for (String deptCode : evalDepts) {
-      List<PermissionTemplate> templates =
-          templateRepo.findEffectiveTemplates(tenantId, roleCode, deptCode);
-      log.debug("Found {} templates for role={}, dept={}", templates.size(), roleCode, deptCode);
+    // Expand search width by gathering all ancestors for each assigned department
+    // Depth limited to 5 implicitly in practice, but usually tree isn't too deep
+    java.util.Set<String> allAncestorCodes = new java.util.HashSet<>();
+    Map<String, List<String>> deptLineages = new HashMap<>();
 
-      // Dept-Level cache to enforce Rule 2: Tenant wins over system default (due to NULLS LAST
-      // ORDER)
-      Map<String, Map<String, DataScope>> deptLocalMap = new HashMap<>();
+    for (String deptCode : userDepts) {
+      if (deptCode == null) continue;
+      List<String> ancestors = departmentRepository.findAncestorCodes(tenantId, deptCode);
+      if (ancestors.size() > 5) {
+        ancestors = ancestors.subList(0, 5); // 5 levels depth limit
+      }
+      allAncestorCodes.addAll(ancestors);
+      deptLineages.put(deptCode, ancestors); // Child -> Parent order
+    }
 
-      for (PermissionTemplate tpl : templates) {
-        deptLocalMap.putIfAbsent(tpl.getResource(), new HashMap<>());
-        // putIfAbsent prevents system default overriding previously stored tenant-specific
-        deptLocalMap.get(tpl.getResource()).putIfAbsent(tpl.getAction(), tpl.getDataScope());
+    List<String> evalDeptsBatch = new java.util.ArrayList<>(allAncestorCodes);
+    if (evalDeptsBatch.isEmpty()) {
+      evalDeptsBatch.add(null);
+    }
+
+    // Single query to fetch all templates for user's extended dependencies
+    List<PermissionTemplate> templates =
+        templateRepo.findEffectiveTemplatesForDepartments(tenantId, roleCode, evalDeptsBatch);
+    log.debug(
+        "Found {} templates for role={}, depts={}", templates.size(), roleCode, evalDeptsBatch);
+
+    // Group global templates (System fallback ones without explicit department)
+    List<PermissionTemplate> globalTemplates = new java.util.ArrayList<>();
+    Map<String, List<PermissionTemplate>> deptTemplatesMap = new HashMap<>();
+
+    for (PermissionTemplate tpl : templates) {
+      if (tpl.getDepartmentCode() == null) {
+        globalTemplates.add(tpl);
+      } else {
+        deptTemplatesMap
+            .computeIfAbsent(tpl.getDepartmentCode(), k -> new java.util.ArrayList<>())
+            .add(tpl);
+      }
+    }
+
+    // Process global templates map once to avoid re-evaluating tenant priorities
+    Map<String, Map<String, DataScope>> globalLocalMap = new HashMap<>();
+    for (PermissionTemplate tpl : globalTemplates) {
+      globalLocalMap.putIfAbsent(tpl.getResource(), new HashMap<>());
+      globalLocalMap.get(tpl.getResource()).putIfAbsent(tpl.getAction(), tpl.getDataScope());
+    }
+
+    // Process Templates dynamically per mapped department to maintain escalation precedence
+    for (String userDeptCode : userDepts) {
+      List<String> lineage =
+          userDeptCode == null
+              ? List.of()
+              : deptLineages.getOrDefault(userDeptCode, List.of(userDeptCode));
+      List<String> reversedLineage = new java.util.ArrayList<>(lineage);
+      java.util.Collections.reverse(reversedLineage); // Process ROOT to LEAF
+
+      Map<String, Map<String, DataScope>> lineageMap = new HashMap<>();
+
+      // 1. Apply Globals
+      for (Map.Entry<String, Map<String, DataScope>> resEntry : globalLocalMap.entrySet()) {
+        lineageMap.putIfAbsent(resEntry.getKey(), new HashMap<>());
+        lineageMap.get(resEntry.getKey()).putAll(resEntry.getValue());
       }
 
-      // Cross-Department Escalation
-      for (Map.Entry<String, Map<String, DataScope>> resEntry : deptLocalMap.entrySet()) {
+      // 2. Apply Hierarchical Levels (Parent then Child)
+      for (String currentDept : reversedLineage) {
+        List<PermissionTemplate> deptTpls = deptTemplatesMap.getOrDefault(currentDept, List.of());
+        Map<String, Map<String, DataScope>> currentMap = new HashMap<>();
+        for (PermissionTemplate tpl : deptTpls) {
+          currentMap.putIfAbsent(tpl.getResource(), new HashMap<>());
+          currentMap
+              .get(tpl.getResource())
+              .putIfAbsent(tpl.getAction(), tpl.getDataScope()); // Tenant wins over system
+        }
+
+        // Overwrite lineage (Child wins)
+        for (Map.Entry<String, Map<String, DataScope>> resEntry : currentMap.entrySet()) {
+          lineageMap.putIfAbsent(resEntry.getKey(), new HashMap<>());
+          lineageMap.get(resEntry.getKey()).putAll(resEntry.getValue());
+        }
+      }
+
+      // 3. Cross-Department Sibling Escalation (Merge to evaluatedPermissions)
+      for (Map.Entry<String, Map<String, DataScope>> resEntry : lineageMap.entrySet()) {
         for (Map.Entry<String, DataScope> actionEntry : resEntry.getValue().entrySet()) {
           mergeHigherScope(
               evaluatedPermissions,

@@ -44,7 +44,7 @@ public class SampleManagementController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @GetMapping
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "List all sample requests (paginated)")
   public ResponseEntity<ApiResponse<PagedResponse<SampleRequestDto>>> listSampleRequests(
       @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
@@ -53,7 +53,7 @@ public class SampleManagementController {
   }
 
   @GetMapping("/requests/{requestId}")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get a sample request by ID")
   public ResponseEntity<ApiResponse<SampleRequestDto>> getSampleRequest(
       @PathVariable UUID requestId) {
@@ -73,7 +73,7 @@ public class SampleManagementController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/requests")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Create a new sample request")
   public ResponseEntity<ApiResponse<SampleRequestDto>> requestSample(
       @Valid @RequestBody CreateSampleRequestDto request) {
@@ -83,7 +83,7 @@ public class SampleManagementController {
   }
 
   @PostMapping("/requests/{requestId}/dispatch")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Dispatch a sample for delivery")
   public ResponseEntity<ApiResponse<SampleDeliveryDto>> dispatchSample(
       @PathVariable UUID requestId, @Valid @RequestBody DispatchSampleRequest req) {
@@ -99,7 +99,7 @@ public class SampleManagementController {
   }
 
   @PostMapping("/deliveries/{deliveryId}/mark-delivered")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Mark a sample delivery as delivered")
   public ResponseEntity<ApiResponse<SampleDeliveryDto>> markDelivered(
       @PathVariable UUID deliveryId, @Valid @RequestBody MarkDeliveredRequest req) {

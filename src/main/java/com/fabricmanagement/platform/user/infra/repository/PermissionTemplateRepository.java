@@ -25,6 +25,17 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
       @Param("deptCode") String departmentCode);
 
   @Query(
+      "SELECT pt FROM PermissionTemplate pt WHERE pt.roleCode = :roleCode "
+          + "AND (pt.departmentCode IN :deptCodes OR pt.departmentCode IS NULL) "
+          + "AND (pt.tenantId = :tenantId OR pt.tenantId IS NULL) "
+          + "AND pt.isActive = true "
+          + "ORDER BY pt.departmentCode NULLS LAST, pt.tenantId NULLS LAST")
+  List<PermissionTemplate> findEffectiveTemplatesForDepartments(
+      @Param("tenantId") UUID tenantId,
+      @Param("roleCode") String roleCode,
+      @Param("deptCodes") List<String> deptCodes);
+
+  @Query(
       "SELECT pt FROM PermissionTemplate pt WHERE "
           + "(pt.tenantId = :tenantId OR pt.tenantId IS NULL) "
           + "AND (:roleCode IS NULL OR pt.roleCode = :roleCode) "

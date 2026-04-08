@@ -54,6 +54,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   Optional<User> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
   /**
+   * Find user by tenant and ID ensuring roles and departments are eagerly loaded. Path for critical
+   * access control checks (like /me).
+   */
+  @org.springframework.data.jpa.repository.EntityGraph(
+      attributePaths = {"role", "userDepartments", "userDepartments.department"})
+  @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.id = :id")
+  Optional<User> findByIdWithPermissionData(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
+
+  /**
    * Find user by tenant and contact value via Contact entity (new system).
    *
    * <p>Uses UserContact junction table and Contact entity.
