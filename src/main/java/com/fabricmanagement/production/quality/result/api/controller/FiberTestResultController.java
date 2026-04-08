@@ -20,9 +20,9 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST API for fiber laboratory test results and quality gate decisions.
  *
- * <p>Security uses department-aware checks via {@code ProductionAccessService}. WRITE = record
- * tests / approve-reject (ADMIN, or MANAGER/SUPERVISOR in QC / R&D / Fiber dept). READ = any
- * authenticated user in a production-related department.
+ * <p>Security uses department-aware checks via {@code PermissionEvaluator}. WRITE = record tests /
+ * approve-reject (ADMIN, or MANAGER/SUPERVISOR in QC / R&D / Fiber dept). READ = any authenticated
+ * user in a production-related department.
  */
 @RestController
 @RequestMapping("/api/production/quality/fiber-tests")
@@ -33,7 +33,7 @@ public class FiberTestResultController {
   private final FiberTestResultService testResultService;
 
   @PostMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
   public ResponseEntity<ApiResponse<FiberTestResultDto>> createTestResult(
       @Valid @RequestBody CreateFiberTestResultRequest request) {
     log.info("Recording fiber test result: batchId={}", request.getBatchId());
@@ -42,7 +42,7 @@ public class FiberTestResultController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
   public ResponseEntity<ApiResponse<FiberTestResultDto>> getTestResult(@PathVariable UUID id) {
     return ResponseEntity.ok(
         ApiResponse.success(
@@ -53,34 +53,34 @@ public class FiberTestResultController {
   }
 
   @GetMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
   public ResponseEntity<ApiResponse<List<FiberTestResultDto>>> getAllTestResults() {
     return ResponseEntity.ok(ApiResponse.success(testResultService.getAll()));
   }
 
   @GetMapping("/batch/{batchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
   public ResponseEntity<ApiResponse<List<FiberTestResultDto>>> getTestResultsByBatch(
       @PathVariable UUID batchId) {
     return ResponseEntity.ok(ApiResponse.success(testResultService.getByBatchId(batchId)));
   }
 
   @GetMapping("/stock-unit/{stockUnitId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
   public ResponseEntity<ApiResponse<List<FiberTestResultDto>>> getTestResultsByStockUnit(
       @PathVariable UUID stockUnitId) {
     return ResponseEntity.ok(ApiResponse.success(testResultService.getByStockUnitId(stockUnitId)));
   }
 
   @GetMapping("/status/{status}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
   public ResponseEntity<ApiResponse<List<FiberTestResultDto>>> getTestResultsByStatus(
       @PathVariable TestApprovalStatus status) {
     return ResponseEntity.ok(ApiResponse.success(testResultService.getByApprovalStatus(status)));
   }
 
   @PatchMapping("/{id}/approval")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'QUALITY_TEST', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
   public ResponseEntity<ApiResponse<FiberTestResultDto>> updateApproval(
       @PathVariable UUID id, @Valid @RequestBody UpdateApprovalRequest request) {
     log.info("Updating test approval: id={}, status={}", id, request.getApprovalStatus());

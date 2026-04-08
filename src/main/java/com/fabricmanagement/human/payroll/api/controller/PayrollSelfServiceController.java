@@ -27,7 +27,7 @@ public class PayrollSelfServiceController {
    *
    * <p>Used for the Self-Service portal (My Salary tab).
    */
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'settings', 'read')")
   @GetMapping("/salary-slips")
   public ResponseEntity<ApiResponse<List<SalarySlipDto>>> getMySalarySlips() {
     UUID userId = TenantContext.getCurrentUserId();

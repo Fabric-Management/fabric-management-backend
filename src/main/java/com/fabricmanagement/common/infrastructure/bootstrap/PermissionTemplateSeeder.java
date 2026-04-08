@@ -49,7 +49,22 @@ public class PermissionTemplateSeeder implements DataSeeder {
                   new String[] {"MANAGER", "notifications", "view", "ORGANIZATION"},
                   new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
                   new String[] {"VIEWER", "dashboard", "view", "ORGANIZATION"},
-                  new String[] {"VIEWER", "notifications", "view", "ORGANIZATION"}));
+                  new String[] {"VIEWER", "notifications", "view", "ORGANIZATION"},
+                  new String[] {"WORKER", "members", "read", "OWN"},
+                  new String[] {"WORKER", "settings", "read", "OWN"},
+                  new String[] {"WORKER", "settings", "write", "OWN"},
+                  new String[] {"WORKER", "flowboard", "read", "OWN"},
+                  new String[] {"WORKER", "flowboard", "write", "OWN"},
+                  new String[] {"SUPERVISOR", "members", "read", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "settings", "read", "OWN"},
+                  new String[] {"SUPERVISOR", "settings", "write", "OWN"},
+                  new String[] {"SUPERVISOR", "flowboard", "read", "OWN"},
+                  new String[] {"SUPERVISOR", "flowboard", "write", "OWN"},
+                  new String[] {"MANAGER", "members", "read", "DEPARTMENT"},
+                  new String[] {"MANAGER", "settings", "read", "OWN"},
+                  new String[] {"MANAGER", "settings", "write", "OWN"},
+                  new String[] {"MANAGER", "flowboard", "read", "OWN"},
+                  new String[] {"MANAGER", "flowboard", "write", "OWN"}));
 
           // 2. SALES_MARKETING
           seedDepartment(
@@ -140,7 +155,10 @@ public class PermissionTemplateSeeder implements DataSeeder {
                   new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
                   new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "reports", "export", "ORGANIZATION"}));
+                  new String[] {"MANAGER", "reports", "export", "ORGANIZATION"},
+                  new String[] {"WORKER", "members", "read", "ORGANIZATION"},
+                  new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
+                  new String[] {"MANAGER", "members", "read", "ORGANIZATION"}));
 
           // 7. HUMAN_RESOURCES
           seedDepartment(
@@ -150,7 +168,13 @@ public class PermissionTemplateSeeder implements DataSeeder {
                   new String[] {"WORKER", "settings", "view", "OWN"},
                   new String[] {"SUPERVISOR", "settings", "view", "DEPARTMENT"},
                   new String[] {"MANAGER", "settings", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "settings", "manage", "DEPARTMENT"}));
+                  new String[] {"MANAGER", "settings", "manage", "DEPARTMENT"},
+                  new String[] {"WORKER", "members", "read", "ORGANIZATION"},
+                  new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
+                  new String[] {"SUPERVISOR", "members", "write", "ORGANIZATION"},
+                  new String[] {"MANAGER", "members", "read", "ORGANIZATION"},
+                  new String[] {"MANAGER", "members", "write", "ORGANIZATION"},
+                  new String[] {"MANAGER", "members", "manage", "ORGANIZATION"}));
 
           // 8. PROCUREMENT
           seedDepartment(
@@ -187,7 +211,13 @@ public class PermissionTemplateSeeder implements DataSeeder {
                   new String[] {"MANAGER", "sales", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "projects", "read", "ORGANIZATION"},
                   new String[] {"MANAGER", "projects", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "settings", "view", "ORGANIZATION"}));
+                  new String[] {"MANAGER", "settings", "view", "ORGANIZATION"},
+                  new String[] {"WORKER", "members", "read", "ORGANIZATION"},
+                  new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
+                  new String[] {"SUPERVISOR", "members", "write", "ORGANIZATION"},
+                  new String[] {"MANAGER", "members", "read", "ORGANIZATION"},
+                  new String[] {"MANAGER", "members", "write", "ORGANIZATION"},
+                  new String[] {"MANAGER", "members", "manage", "ORGANIZATION"}));
 
           permissionTemplateRepository.saveAll(templatesToSave);
           log.info("Successfully seeded {} Permission Templates", templatesToSave.size());

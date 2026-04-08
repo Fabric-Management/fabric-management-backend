@@ -24,7 +24,9 @@ public final class PermissionRegistry {
           "settings",
           "admin",
           "reports",
-          "notifications");
+          "notifications",
+          "quality",
+          "members");
 
   public static final Set<String> VALID_ACTIONS =
       Set.of("view", "read", "write", "manage", "access", "delete", "approve", "export");

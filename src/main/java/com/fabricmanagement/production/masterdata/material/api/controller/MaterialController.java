@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Material Controller - REST endpoints for material management.
  *
- * <p>Security uses department-aware checks via {@code ProductionAccessService}. WRITE = create /
+ * <p>Security uses department-aware checks via {@code PermissionEvaluator}. WRITE = create /
  * deactivate (ADMIN, or MANAGER in R&D / Prod. Planning / Fiber dept). READ = any authenticated
  * user in a production-related department.
  */
@@ -32,7 +32,7 @@ public class MaterialController {
   private final MaterialService materialService;
 
   @PostMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'MATERIAL', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<MaterialDto>> createMaterial(
       @Valid @RequestBody CreateMaterialRequest request) {
 
@@ -45,7 +45,7 @@ public class MaterialController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'MATERIAL', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<MaterialDto>> getMaterial(@PathVariable UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
@@ -58,7 +58,7 @@ public class MaterialController {
   }
 
   @GetMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'MATERIAL', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<MaterialDto>>> getAllMaterials() {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
@@ -68,7 +68,7 @@ public class MaterialController {
   }
 
   @GetMapping("/type/{type}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'MATERIAL', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<MaterialDto>>> getMaterialsByType(
       @PathVariable MaterialType type) {
     UUID tenantId = TenantContext.getCurrentTenantId();
@@ -79,7 +79,7 @@ public class MaterialController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'MATERIAL', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<Void>> deactivateMaterial(@PathVariable UUID id) {
     log.info("Deactivating material: id={}", id);
 

@@ -34,7 +34,7 @@ public class BatchLineageController {
   private final BatchLineageService batchLineageService;
 
   @PostMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchLineageDto>> createLineage(
       @Valid @RequestBody CreateBatchLineageRequest request) {
     BatchLineageDto lineage = batchLineageService.create(request);
@@ -42,7 +42,7 @@ public class BatchLineageController {
   }
 
   @GetMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<BatchLineageDto>>> getAll(Pageable pageable) {
     Page<BatchLineageDto> lineages = batchLineageService.getAll(pageable);
     return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(lineages)));
@@ -50,7 +50,7 @@ public class BatchLineageController {
 
   /** Forward trace: what input batches were consumed to produce this batch? */
   @GetMapping("/parents/{childBatchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<BatchLineageDto>>> getParents(
       @PathVariable UUID childBatchId) {
     List<BatchLineageDto> parents = batchLineageService.getParents(childBatchId);
@@ -59,7 +59,7 @@ public class BatchLineageController {
 
   /** Aggregated lineage detail: focal batch + enriched parents & children in one call. */
   @GetMapping("/batch/{batchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<BatchLineageDetailDto>> getLineageDetail(
       @PathVariable UUID batchId) {
     BatchLineageDetailDto detail = batchLineageService.getLineageDetail(batchId);
@@ -68,7 +68,7 @@ public class BatchLineageController {
 
   /** Backward trace: where was this parent batch used as input? */
   @GetMapping("/children/{parentBatchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<BatchLineageDto>>> getChildren(
       @PathVariable UUID parentBatchId) {
     List<BatchLineageDto> children = batchLineageService.getChildren(parentBatchId);
@@ -77,7 +77,7 @@ public class BatchLineageController {
 
   /** Recursive backward trace: full ancestry tree (cotton → yarn → fabric). */
   @GetMapping("/trace-backward/{batchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<TraceNodeDto>> traceBackward(@PathVariable UUID batchId) {
     TraceNodeDto tree = batchLineageService.traceBackward(batchId);
     return ResponseEntity.ok(ApiResponse.success(tree));
@@ -85,14 +85,14 @@ public class BatchLineageController {
 
   /** Recursive forward trace: full descendant tree (cotton → yarn → fabric). */
   @GetMapping("/trace-forward/{batchId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<TraceNodeDto>> traceForward(@PathVariable UUID batchId) {
     TraceNodeDto tree = batchLineageService.traceForward(batchId);
     return ResponseEntity.ok(ApiResponse.success(tree));
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'BATCH', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<Void>> deleteLineage(@PathVariable UUID id) {
     batchLineageService.delete(id);
     return ResponseEntity.ok(ApiResponse.success(null, "Batch lineage deleted"));

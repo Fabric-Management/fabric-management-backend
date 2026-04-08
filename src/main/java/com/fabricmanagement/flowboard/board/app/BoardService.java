@@ -35,10 +35,10 @@ public class BoardService {
       throw new EntityNotFoundException("Board not found: " + boardId);
     }
 
-    // Auth context (FlowBoardAccessService tests logic against SecurityContext usually, but we need
+    // Auth context (PermissionEvaluator tests logic against SecurityContext usually, but we need
     // to check if individual users can write? No, the requirement usually means "Check if CURRENT
-    // USER can write/read this using FlowBoardAccessService". )
-    // Wait, the user said: "Sadece aynı tenant, aktif kullanıcılar. FlowBoardAccessService
+    // USER can write/read this using PermissionEvaluator". )
+    // Wait, the user said: "Sadece aynı tenant, aktif kullanıcılar. PermissionEvaluator
     // üzerinden kontrol yap."
     // This could just mean: "ensure this method checks if the current user has access to FlowBoard
     // before exposing the list."

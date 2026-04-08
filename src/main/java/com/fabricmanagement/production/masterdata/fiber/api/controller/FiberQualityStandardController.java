@@ -31,20 +31,20 @@ public class FiberQualityStandardController {
   private final FiberQualityStandardService standardService;
 
   @GetMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
   public ResponseEntity<ApiResponse<List<FiberQualityStandardGroupDto>>> getAll() {
     return ResponseEntity.ok(ApiResponse.success(standardService.getAllGroupedByIsoCode()));
   }
 
   @GetMapping("/iso-code/{isoCodeId}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
   public ResponseEntity<ApiResponse<List<FiberQualityStandardDto>>> getByIsoCodeId(
       @PathVariable UUID isoCodeId) {
     return ResponseEntity.ok(ApiResponse.success(standardService.getByIsoCodeId(isoCodeId)));
   }
 
   @PostMapping
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'fiber', 'write')")
   public ResponseEntity<ApiResponse<FiberQualityStandardDto>> create(
       @Valid @RequestBody CreateFiberQualityStandardRequest request) {
     FiberQualityStandardDto standard = standardService.create(request);
@@ -52,7 +52,7 @@ public class FiberQualityStandardController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'fiber', 'write')")
   public ResponseEntity<ApiResponse<FiberQualityStandardDto>> update(
       @PathVariable UUID id, @Valid @RequestBody UpdateFiberQualityStandardRequest request) {
     FiberQualityStandardDto standard = standardService.update(id, request);
@@ -60,7 +60,7 @@ public class FiberQualityStandardController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'FIBER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'fiber', 'write')")
   public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
     String warning = standardService.delete(id);
     return ResponseEntity.ok(

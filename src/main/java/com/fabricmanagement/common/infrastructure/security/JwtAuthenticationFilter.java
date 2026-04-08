@@ -90,7 +90,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       List<SimpleGrantedAuthority> authorities = buildAuthorities(roleCode, userType);
 
-      // Build the user context so downstream security beans (e.g. ProductionAccessService)
+      // Build the user context so downstream security checks (e.g. PermissionEvaluator)
       // can evaluate role + department without additional DB calls.
       List<String> departmentCodes = jwtService.getDepartmentCodesFromToken(token);
       String primaryDepartment = jwtService.getPrimaryDepartmentFromToken(token);
