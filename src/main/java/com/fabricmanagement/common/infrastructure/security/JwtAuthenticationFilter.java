@@ -105,7 +105,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
               userId, roleCode, departmentCodes, primaryDepartment, tenantId);
 
       UsernamePasswordAuthenticationToken authentication =
-          new UsernamePasswordAuthenticationToken(userId.toString(), null, authorities);
+          new UsernamePasswordAuthenticationToken(userContext, null, authorities);
       authentication.setDetails(userContext);
 
       // Expose partner_id on the request so service/AOP layers can enforce isolation

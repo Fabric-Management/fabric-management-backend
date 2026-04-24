@@ -16,7 +16,7 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
           + "AND ((:deptCode IS NULL AND pt.departmentCode IS NULL) "
           + "     OR pt.departmentCode = :deptCode "
           + "     OR pt.departmentCode IS NULL) "
-          + "AND (pt.tenantId = :tenantId OR pt.tenantId IS NULL) "
+          + "AND (pt.tenantId = :tenantId OR pt.tenantId = :#{T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).SYSTEM_TENANT_ID}) "
           + "AND pt.isActive = true "
           + "ORDER BY pt.tenantId NULLS LAST")
   List<PermissionTemplate> findEffectiveTemplates(
@@ -27,7 +27,7 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
   @Query(
       "SELECT pt FROM PermissionTemplate pt WHERE pt.roleCode = :roleCode "
           + "AND (pt.departmentCode IN :deptCodes OR pt.departmentCode IS NULL) "
-          + "AND (pt.tenantId = :tenantId OR pt.tenantId IS NULL) "
+          + "AND (pt.tenantId = :tenantId OR pt.tenantId = :#{T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).SYSTEM_TENANT_ID}) "
           + "AND pt.isActive = true "
           + "ORDER BY pt.departmentCode NULLS LAST, pt.tenantId NULLS LAST")
   List<PermissionTemplate> findEffectiveTemplatesForDepartments(
@@ -37,7 +37,7 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
 
   @Query(
       "SELECT pt FROM PermissionTemplate pt WHERE "
-          + "(pt.tenantId = :tenantId OR pt.tenantId IS NULL) "
+          + "(pt.tenantId = :tenantId OR pt.tenantId = :#{T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).SYSTEM_TENANT_ID}) "
           + "AND (:roleCode IS NULL OR pt.roleCode = :roleCode) "
           + "AND (:deptCode IS NULL OR pt.departmentCode = :deptCode) "
           + "AND pt.isActive = true "
@@ -47,5 +47,5 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
       @Param("roleCode") String roleCode,
       @Param("deptCode") String departmentCode);
 
-  boolean existsByTenantIdIsNull();
+  boolean existsByTenantId(UUID tenantId);
 }
