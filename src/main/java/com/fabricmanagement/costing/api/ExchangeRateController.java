@@ -32,7 +32,7 @@ public class ExchangeRateController {
   /** Submit a rate — in the “ask when missing” flow, the frontend POSTs here. */
   @PostMapping
   @Operation(summary = "Submit exchange rate (manual entry or override)")
-  @PreAuthorize("hasRole('COSTING_ADMIN')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'manage')")
   public ApiResponse<Void> submitRate(@RequestBody @Valid ExchangeRateSubmitRequest request) {
     exchangeRateService.saveRate(
         request.baseCurrency(),
@@ -51,7 +51,7 @@ public class ExchangeRateController {
    */
   @GetMapping
   @Operation(summary = "Get current exchange rate between two currencies")
-  @PreAuthorize("hasRole('COSTING_READ')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'read')")
   public ResponseEntity<ApiResponse<ExchangeRateResponse>> getRate(
       @RequestParam String from,
       @RequestParam String to,
