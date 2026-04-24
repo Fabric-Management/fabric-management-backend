@@ -33,24 +33,36 @@ public class OrganizationSeeder implements DataSeeder {
   private static final Map<String, String> EXPECTED_DEPARTMENTS = new java.util.LinkedHashMap<>();
 
   static {
-    EXPECTED_DEPARTMENTS.put("Management", "MANAGEMENT");
-    EXPECTED_DEPARTMENTS.put("Human Resources", "HUMAN_RESOURCES");
-    EXPECTED_DEPARTMENTS.put("Finance", "FINANCE_ACCOUNTING");
+    // Support group
+    EXPECTED_DEPARTMENTS.put("Human Resources", "HR");
+    EXPECTED_DEPARTMENTS.put("Finance & Accounting", "FINANCE");
+    EXPECTED_DEPARTMENTS.put("Sales & Marketing", "SALES");
     EXPECTED_DEPARTMENTS.put("Procurement", "PROCUREMENT");
-    EXPECTED_DEPARTMENTS.put("Production", "PRODUCTION");
-    EXPECTED_DEPARTMENTS.put("Yarn Production", "YARN_PRODUCTION");
+    EXPECTED_DEPARTMENTS.put("Quality Control", "QUALITY");
+    EXPECTED_DEPARTMENTS.put("Warehouse & Logistics", "WAREHOUSE");
+    // Production group
+    EXPECTED_DEPARTMENTS.put("Fiber Processing", "FIBER");
+    EXPECTED_DEPARTMENTS.put("Yarn Production", "YARN");
     EXPECTED_DEPARTMENTS.put("Weaving", "WEAVING");
-    EXPECTED_DEPARTMENTS.put("Dyeing & Finishing", "DYEING_FINISHING");
-    EXPECTED_DEPARTMENTS.put("Quality", "QUALITY_CONTROL");
-    EXPECTED_DEPARTMENTS.put("Warehouse", "WAREHOUSE_LOGISTICS");
-    EXPECTED_DEPARTMENTS.put("Sales", "SALES_MARKETING");
+    EXPECTED_DEPARTMENTS.put("Knitting", "KNITTING");
+    EXPECTED_DEPARTMENTS.put("Dyeing & Finishing", "DYEING");
+    EXPECTED_DEPARTMENTS.put("Garment Production", "GARMENT");
   }
 
-  private static final Map<String, String> PARENT_MAPPING =
+  private static final Map<String, String> GROUP_MAPPING =
       Map.of(
-          "Yarn Production", "PRODUCTION",
-          "Weaving", "PRODUCTION",
-          "Dyeing & Finishing", "PRODUCTION");
+          "HR", "SUPPORT",
+          "FINANCE", "SUPPORT",
+          "SALES", "SUPPORT",
+          "PROCUREMENT", "SUPPORT",
+          "QUALITY", "SUPPORT",
+          "WAREHOUSE", "SUPPORT",
+          "FIBER", "PRODUCTION",
+          "YARN", "PRODUCTION",
+          "WEAVING", "PRODUCTION",
+          "KNITTING", "PRODUCTION",
+          "DYEING", "PRODUCTION",
+          "GARMENT", "PRODUCTION");
 
   @Override
   public boolean isSeeded() {
@@ -124,28 +136,22 @@ public class OrganizationSeeder implements DataSeeder {
                     dp.setOrganizationId(rootOrg.getId());
                     dp.setDepartmentName(dpName);
                     dp.setDepartmentCode(dpCode);
+                    dp.setDepartmentGroup(GROUP_MAPPING.get(dpCode));
                     dp.setIsActive(true);
 
-                    // Assign parent if mapped and parent exists
-                    String parentCode = PARENT_MAPPING.get(dpName);
-                    if (parentCode != null && createdDepartments.containsKey(parentCode)) {
-                      dp.setParentDepartment(createdDepartments.get(parentCode));
-                    }
-
-                    departmentRepository.save(dp);
+                    dp = departmentRepository.save(dp);
                     createdDepartments.put(dpCode, dp);
-                    log.info("Created department: {} (Parent: {})", dpName, parentCode);
+                    log.info(
+                        "Created department: {} (group: {})", dpName, GROUP_MAPPING.get(dpCode));
                   } else {
                     log.debug("Department already exists, skipping: {}", dpName);
 
-                    // Retroactively map parent if missing (for dev-tools idempotency)
-                    String parentCode = PARENT_MAPPING.get(dpName);
-                    if (parentCode != null
-                        && dp.getParentDepartment() == null
-                        && createdDepartments.containsKey(parentCode)) {
-                      dp.setParentDepartment(createdDepartments.get(parentCode));
+                    // Retroactively assign group if missing (idempotency for existing data)
+                    if (dp.getDepartmentGroup() == null && GROUP_MAPPING.containsKey(dpCode)) {
+                      dp.setDepartmentGroup(GROUP_MAPPING.get(dpCode));
                       departmentRepository.save(dp);
-                      log.info("Updated department {} with parent {}", dpName, parentCode);
+                      log.info(
+                          "Updated department {} with group {}", dpName, GROUP_MAPPING.get(dpCode));
                     }
                   }
                 }

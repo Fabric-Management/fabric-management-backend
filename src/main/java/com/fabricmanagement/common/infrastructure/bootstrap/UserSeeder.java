@@ -56,6 +56,7 @@ public class UserSeeder implements DataSeeder {
           "quality@akkayalar.com",
           "hr@akkayalar.com",
           "finance@akkayalar.com",
+          "marketing@akkayalar.com",
           "admin@fabricos.io");
 
   @Override
@@ -97,7 +98,7 @@ public class UserSeeder implements DataSeeder {
                     "Akkayalar",
                     "admin@akkayalar.com",
                     "ADMIN",
-                    "Management",
+                    null, // ADMIN role has cross-org access; no single dept needed
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
@@ -105,7 +106,7 @@ public class UserSeeder implements DataSeeder {
                     "Manager",
                     "production@akkayalar.com",
                     "MANAGER",
-                    "Production",
+                    "Yarn Production",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
@@ -121,7 +122,7 @@ public class UserSeeder implements DataSeeder {
                     "Executive",
                     "sales@akkayalar.com",
                     "WORKER",
-                    "Sales",
+                    "Sales & Marketing",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
@@ -129,7 +130,7 @@ public class UserSeeder implements DataSeeder {
                     "Manager",
                     "warehouse@akkayalar.com",
                     "MANAGER",
-                    "Warehouse",
+                    "Warehouse & Logistics",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
@@ -137,7 +138,7 @@ public class UserSeeder implements DataSeeder {
                     "Controller",
                     "quality@akkayalar.com",
                     "WORKER",
-                    "Quality",
+                    "Quality Control",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
@@ -153,7 +154,7 @@ public class UserSeeder implements DataSeeder {
                     "Director",
                     "finance@akkayalar.com",
                     "MANAGER",
-                    "Finance",
+                    "Finance & Accounting",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
@@ -161,7 +162,15 @@ public class UserSeeder implements DataSeeder {
                     "Admin",
                     "admin@fabricos.io",
                     "PLATFORM_ADMIN",
-                    null, // Platform admins operate globally, mostly without a specific department
+                    null, // Platform admins operate globally, no specific department
+                    tenant.getId(),
+                    rootOrg.getId());
+                seedUser(
+                    "Marketing",
+                    "Test",
+                    "marketing@akkayalar.com",
+                    "WORKER",
+                    "Sales & Marketing",
                     tenant.getId(),
                     rootOrg.getId());
               });
