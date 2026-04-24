@@ -35,6 +35,13 @@ public interface UserDepartmentRepository extends JpaRepository<UserDepartment, 
       @Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
 
   @Query(
+      "SELECT ud.departmentId FROM UserDepartment ud "
+          + "JOIN ud.user u "
+          + "WHERE u.tenantId = :tenantId AND ud.userId = :userId")
+  List<UUID> findDepartmentIdsByTenantIdAndUserId(
+      @Param("tenantId") UUID tenantId, @Param("userId") UUID userId);
+
+  @Query(
       "SELECT ud FROM UserDepartment ud "
           + "JOIN ud.user u "
           + "WHERE u.tenantId = :tenantId AND ud.departmentId = :departmentId")

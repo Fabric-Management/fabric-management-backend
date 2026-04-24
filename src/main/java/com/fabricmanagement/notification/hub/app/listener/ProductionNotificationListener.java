@@ -190,7 +190,7 @@ public class ProductionNotificationListener {
         () -> {
           List<UUID> managerIds =
               departmentRecipientPort.findManagersByDepartmentKeyword(
-                  event.getTenantId(), "WAREHOUSE_LOGISTICS", "Warehouse");
+                  event.getTenantId(), "WAREHOUSE", "Warehouse");
 
           if (!managerIds.isEmpty()) {
             var payload =

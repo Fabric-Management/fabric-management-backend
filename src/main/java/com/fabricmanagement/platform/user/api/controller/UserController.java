@@ -14,7 +14,6 @@ import com.fabricmanagement.platform.subscription.app.UserCreationOptionsService
 import com.fabricmanagement.platform.user.app.UserLocaleService;
 import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.platform.user.domain.DataScope;
-import com.fabricmanagement.platform.user.domain.UserDepartment;
 import com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
@@ -26,7 +25,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -166,9 +164,8 @@ public class UserController {
     } else if (scope == DataScope.DEPARTMENT) {
       log.debug("Getting department-scoped users: requesterId={}", requesterId);
       Set<UUID> deptIds =
-          userDepartmentRepository.findByTenantIdAndUserId(tenantId, requesterId).stream()
-              .map(UserDepartment::getDepartmentId)
-              .collect(Collectors.toSet());
+          new java.util.HashSet<>(
+              userDepartmentRepository.findDepartmentIdsByTenantIdAndUserId(tenantId, requesterId));
 
       if (deptIds.isEmpty()) {
         return ResponseEntity.ok(ApiResponse.success(List.of()));

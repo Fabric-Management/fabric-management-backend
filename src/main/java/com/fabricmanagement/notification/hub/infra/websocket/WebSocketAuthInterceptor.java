@@ -90,8 +90,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
               userId, roleCode, departmentCodes, primaryDepartment, tenantId);
 
       var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + roleCode));
-      var authentication =
-          new UsernamePasswordAuthenticationToken(userId.toString(), null, authorities);
+      var authentication = new UsernamePasswordAuthenticationToken(userContext, null, authorities);
       authentication.setDetails(userContext);
 
       accessor.setUser(authentication);
