@@ -50,19 +50,19 @@ public class OrganizationSeeder implements DataSeeder {
   }
 
   private static final Map<String, String> GROUP_MAPPING =
-      Map.of(
-          "HR", "SUPPORT",
-          "FINANCE", "SUPPORT",
-          "SALES", "SUPPORT",
-          "PROCUREMENT", "SUPPORT",
-          "QUALITY", "SUPPORT",
-          "WAREHOUSE", "SUPPORT",
-          "FIBER", "PRODUCTION",
-          "YARN", "PRODUCTION",
-          "WEAVING", "PRODUCTION",
-          "KNITTING", "PRODUCTION",
-          "DYEING", "PRODUCTION",
-          "GARMENT", "PRODUCTION");
+      Map.ofEntries(
+          Map.entry("HR", "SUPPORT"),
+          Map.entry("FINANCE", "SUPPORT"),
+          Map.entry("SALES", "SUPPORT"),
+          Map.entry("PROCUREMENT", "SUPPORT"),
+          Map.entry("QUALITY", "SUPPORT"),
+          Map.entry("WAREHOUSE", "SUPPORT"),
+          Map.entry("FIBER", "PRODUCTION"),
+          Map.entry("YARN", "PRODUCTION"),
+          Map.entry("WEAVING", "PRODUCTION"),
+          Map.entry("KNITTING", "PRODUCTION"),
+          Map.entry("DYEING", "PRODUCTION"),
+          Map.entry("GARMENT", "PRODUCTION"));
 
   @Override
   public boolean isSeeded() {
