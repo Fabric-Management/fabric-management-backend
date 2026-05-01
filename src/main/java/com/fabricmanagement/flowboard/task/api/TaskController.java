@@ -41,7 +41,7 @@ public class TaskController {
 
   @GetMapping("/{id}/comments")
   @Operation(summary = "Task yorumlarını listele")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<List<TaskCommentResponse>>> getTaskComments(
       @PathVariable UUID id) {
     return ResponseEntity.ok(
@@ -50,7 +50,7 @@ public class TaskController {
 
   @PostMapping("/{id}/comments")
   @Operation(summary = "Task'a yorum ekle")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<TaskCommentResponse>> addTaskComment(
       @PathVariable UUID id, @Valid @RequestBody AddTaskCommentRequest req) {
     var userCtx = currentUser();
@@ -62,7 +62,7 @@ public class TaskController {
 
   @GetMapping("/{id}")
   @Operation(summary = "Task detayı")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<TaskResponse>> getTask(@PathVariable UUID id) {
     var task = taskService.getTask(id);
     return ResponseEntity.ok(
@@ -74,7 +74,7 @@ public class TaskController {
 
   @PostMapping
   @Operation(summary = "Manuel task oluştur")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<TaskResponse>> createTask(
       @Valid @RequestBody CreateTaskRequest req) {
     var task = taskService.createTask(req);
@@ -88,7 +88,7 @@ public class TaskController {
 
   @PutMapping("/{id}/status")
   @Operation(summary = "Task status güncelle — WIP kontrolü ile")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<TaskResponse>> updateStatus(
       @PathVariable UUID id, @Valid @RequestBody UpdateTaskStatusRequest req) {
     var userCtx = currentUser();
@@ -103,7 +103,7 @@ public class TaskController {
 
   @PutMapping("/{id}/assign")
   @Operation(summary = "Task'ı kullanıcıya ata")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<Void>> assignTask(
       @PathVariable UUID id,
       @RequestParam UUID userId,
@@ -121,7 +121,7 @@ public class TaskController {
 
   @GetMapping("/{id}/assignees")
   @Operation(summary = "Task'a atanmış kişileri getir")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<
           ApiResponse<java.util.List<com.fabricmanagement.flowboard.task.dto.TaskAssigneeResponse>>>
       getAssignees(@PathVariable UUID id) {
@@ -130,7 +130,7 @@ public class TaskController {
 
   @DeleteMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Task'tan atamayı kaldır")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<Void>> unassignUser(
       @PathVariable UUID id, @PathVariable UUID userId) {
     var userCtx = currentUser();
@@ -140,7 +140,7 @@ public class TaskController {
 
   @DeleteMapping("/{id}")
   @Operation(summary = "Task'ı iptal et (soft cancel)")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<Void> cancelTask(@PathVariable UUID id) {
     taskService.cancelTask(id);
     return ResponseEntity.noContent().build();

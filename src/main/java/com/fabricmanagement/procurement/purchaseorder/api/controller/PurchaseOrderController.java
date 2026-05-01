@@ -27,15 +27,14 @@ public class PurchaseOrderController {
   private final PurchaseOrderService purchaseOrderService;
 
   @GetMapping("/{id}")
-  @PreAuthorize("@procurementAccessService.hasPermission(authentication, 'PURCHASE_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public PurchaseOrderResponse getPurchaseOrder(@PathVariable UUID id) {
     return purchaseOrderService.getPurchaseOrder(id);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize(
-      "@procurementAccessService.hasPermission(authentication, 'PURCHASE_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public PurchaseOrderResponse createPurchaseOrder(
       @RequestBody @Valid CreatePurchaseOrderRequest request) {
     return purchaseOrderService.createPurchaseOrder(request);
@@ -46,8 +45,7 @@ public class PurchaseOrderController {
    * ...→CANCELLED
    */
   @PatchMapping("/{id}/status")
-  @PreAuthorize(
-      "@procurementAccessService.hasPermission(authentication, 'PURCHASE_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public PurchaseOrderResponse changeStatus(
       @PathVariable UUID id, @RequestParam PurchaseOrderStatus status) {
     return purchaseOrderService.changeStatus(id, status);

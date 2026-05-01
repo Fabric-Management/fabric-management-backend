@@ -65,6 +65,11 @@ public class UserService implements UserFacade {
     return userQueryService.findById(tenantId, userId);
   }
 
+  @Transactional(readOnly = true)
+  public Optional<UserDto> findByIdWithPermissionData(UUID tenantId, UUID userId) {
+    return userQueryService.findByIdWithPermissionData(tenantId, userId);
+  }
+
   @Override
   @Transactional(readOnly = true)
   public Optional<UserDto> findByContactValue(String contactValue) {

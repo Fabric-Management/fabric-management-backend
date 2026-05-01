@@ -254,10 +254,17 @@ public class AuthController {
    */
   private UUID getCurrentUserId() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof String)) {
+    if (auth == null || !auth.isAuthenticated()) {
       throw new PlatformDomainException("Not authenticated", "AUTH_NOT_AUTHENTICATED", 401);
     }
-    return UUID.fromString((String) auth.getPrincipal());
+    Object principal = auth.getPrincipal();
+    if (principal instanceof AuthenticatedUserContext ctx) {
+      return ctx.userId();
+    }
+    if (principal instanceof String str) {
+      return UUID.fromString(str);
+    }
+    throw new PlatformDomainException("Not authenticated", "AUTH_NOT_AUTHENTICATED", 401);
   }
 
   /**

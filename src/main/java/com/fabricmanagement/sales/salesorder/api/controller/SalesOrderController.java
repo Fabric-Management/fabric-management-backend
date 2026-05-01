@@ -46,7 +46,7 @@ public class SalesOrderController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Create a new sales order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> createOrder(
       @Valid @RequestBody CreateSalesOrderRequest request) {
@@ -55,7 +55,7 @@ public class SalesOrderController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get order by ID")
   public ResponseEntity<ApiResponse<SalesOrderDto>> getOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(
@@ -66,7 +66,7 @@ public class SalesOrderController {
   }
 
   @GetMapping("/number/{orderNumber}")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get order by order number")
   public ResponseEntity<ApiResponse<SalesOrderDto>> getOrderByNumber(
       @PathVariable String orderNumber) {
@@ -79,7 +79,7 @@ public class SalesOrderController {
   }
 
   @GetMapping
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get all orders (paginated)")
   public ResponseEntity<ApiResponse<PagedResponse<SalesOrderDto>>> getAllOrders(
       @PageableDefault(size = 20, sort = "orderDate") Pageable pageable) {
@@ -88,7 +88,7 @@ public class SalesOrderController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Delete order (soft delete)")
   public ResponseEntity<ApiResponse<Void>> deleteOrder(@PathVariable UUID id) {
     orderService.deleteOrder(id);
@@ -100,7 +100,7 @@ public class SalesOrderController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @GetMapping("/partner/{partnerId}")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get orders by partner ID")
   public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOrdersByPartner(
       @PathVariable UUID partnerId) {
@@ -108,7 +108,7 @@ public class SalesOrderController {
   }
 
   @GetMapping("/status/{status}")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get orders by status")
   public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOrdersByStatus(
       @PathVariable OrderStatus status) {
@@ -116,14 +116,14 @@ public class SalesOrderController {
   }
 
   @GetMapping("/open")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get open orders (not delivered or cancelled)")
   public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOpenOrders() {
     return ResponseEntity.ok(ApiResponse.success(orderService.findOpenOrders()));
   }
 
   @GetMapping("/overdue")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get overdue orders")
   public ResponseEntity<ApiResponse<List<SalesOrderDto>>> getOverdueOrders() {
     return ResponseEntity.ok(ApiResponse.success(orderService.findOverdueOrders()));
@@ -134,28 +134,28 @@ public class SalesOrderController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{id}/confirm")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Confirm an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> confirmOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.confirmOrder(id)));
   }
 
   @PostMapping("/{id}/process")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Start processing an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> startProcessing(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.startProcessing(id)));
   }
 
   @PostMapping("/{id}/ship")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Ship an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> shipOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.shipOrder(id)));
   }
 
   @PostMapping("/{id}/deliver")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Deliver an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> deliverOrder(
       @PathVariable UUID id, @RequestParam(required = false) LocalDate deliveryDate) {
@@ -164,7 +164,7 @@ public class SalesOrderController {
   }
 
   @PostMapping("/{id}/cancel")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'SALES_ORDER', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Cancel an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> cancelOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id)));

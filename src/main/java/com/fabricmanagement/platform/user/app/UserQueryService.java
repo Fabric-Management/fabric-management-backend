@@ -52,6 +52,22 @@ public class UserQueryService {
   }
 
   @Transactional(readOnly = true)
+  public Optional<UserDto> findByIdWithPermissionData(UUID tenantId, UUID userId) {
+    log.debug("Finding user (with permissions): tenantId={}, userId={}", tenantId, userId);
+    return userRepository
+        .findByIdWithPermissionData(tenantId, userId)
+        .map(
+            user -> {
+              UserDto dto =
+                  UserDto.from(user, employeeProjectionPort.findByUserId(userId).orElse(null));
+              Map<UUID, String> labelMap =
+                  userWorkLocationService.getPrimaryLocationLabels(tenantId, List.of(userId));
+              dto.setWorkLocationLabel(labelMap.get(userId));
+              return dto;
+            });
+  }
+
+  @Transactional(readOnly = true)
   public Optional<UserDto> findByContactValue(String contactValue) {
     log.debug("Finding user by contact: contactValue=(masked)");
     return userRepository

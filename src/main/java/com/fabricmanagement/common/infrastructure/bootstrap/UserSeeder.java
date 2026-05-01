@@ -48,14 +48,16 @@ public class UserSeeder implements DataSeeder {
   /** All expected user emails — used for both seeding and granular isSeeded() verification. */
   private static final List<String> EXPECTED_EMAILS =
       List.of(
-          "admin@akkaylar.com",
-          "production@akkaylar.com",
-          "procurement@akkaylar.com",
-          "sales@akkaylar.com",
-          "warehouse@akkaylar.com",
-          "quality@akkaylar.com",
-          "hr@akkaylar.com",
-          "finance@akkaylar.com");
+          "admin@akkayalar.com",
+          "production@akkayalar.com",
+          "procurement@akkayalar.com",
+          "sales@akkayalar.com",
+          "warehouse@akkayalar.com",
+          "quality@akkayalar.com",
+          "hr@akkayalar.com",
+          "finance@akkayalar.com",
+          "marketing@akkayalar.com",
+          "admin@fabricos.io");
 
   @Override
   public boolean isSeeded() {
@@ -92,75 +94,83 @@ public class UserSeeder implements DataSeeder {
                         .orElseThrow(() -> new IllegalStateException("Root organization missing"));
 
                 seedUser(
-                    "Ahmet",
-                    "Akkay",
-                    "admin@akkaylar.com",
+                    "Admin",
+                    "Akkayalar",
+                    "admin@akkayalar.com",
                     "ADMIN",
-                    "Management",
+                    null, // ADMIN role has cross-org access; no single dept needed
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Mehmet",
-                    "Demir",
-                    "production@akkaylar.com",
+                    "Production",
+                    "Manager",
+                    "production@akkayalar.com",
                     "MANAGER",
-                    "Üretim",
+                    "Yarn Production",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Zeynep",
-                    "Kaya",
-                    "procurement@akkaylar.com",
+                    "Procurement",
+                    "Specialist",
+                    "procurement@akkayalar.com",
                     "WORKER",
-                    "Finans ve Satınalma",
+                    "Procurement",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Ayşe",
-                    "Yılmaz",
-                    "sales@akkaylar.com",
+                    "Sales",
+                    "Executive",
+                    "sales@akkayalar.com",
                     "WORKER",
-                    "Satış",
+                    "Sales & Marketing",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Ali",
-                    "Veli",
-                    "warehouse@akkaylar.com",
+                    "Logistics",
+                    "Manager",
+                    "warehouse@akkayalar.com",
                     "MANAGER",
-                    "Depo ve Lojistik",
+                    "Warehouse & Logistics",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Fatma",
-                    "Şahin",
-                    "quality@akkaylar.com",
+                    "Quality",
+                    "Controller",
+                    "quality@akkayalar.com",
                     "WORKER",
-                    "Kalite",
+                    "Quality Control",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Caner",
-                    "Yıldız",
-                    "hr@akkaylar.com",
+                    "HR",
+                    "Manager",
+                    "hr@akkayalar.com",
                     "MANAGER",
                     "Human Resources",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Veli",
-                    "Can",
-                    "finance@akkaylar.com",
+                    "Finance",
+                    "Director",
+                    "finance@akkayalar.com",
                     "MANAGER",
-                    "Finans ve Satınalma",
+                    "Finance & Accounting",
                     tenant.getId(),
                     rootOrg.getId());
                 seedUser(
-                    "Platform",
+                    "FabricOS",
                     "Admin",
-                    "platform@akkaylar.com",
+                    "admin@fabricos.io",
                     "PLATFORM_ADMIN",
-                    null, // Platform admins operate globally, mostly without a specific department
+                    null, // Platform admins operate globally, no specific department
+                    tenant.getId(),
+                    rootOrg.getId());
+                seedUser(
+                    "Marketing",
+                    "Test",
+                    "marketing@akkayalar.com",
+                    "WORKER",
+                    "Sales & Marketing",
                     tenant.getId(),
                     rootOrg.getId());
               });

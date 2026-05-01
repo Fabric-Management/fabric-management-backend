@@ -161,3 +161,6 @@ MANIFEST.MF
 !pom.xml
 !docker-compose.yml
 !docker-compose.monitoring.yml
+# Temporary dev/debug files
+hash.java
+test-sessions.sh

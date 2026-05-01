@@ -1,10 +1,12 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
+import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.user.app.ProfileUpdateRequestService;
-import com.fabricmanagement.platform.user.app.TeamAccessService;
 import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.platform.user.dto.CreateProfileUpdateRequestDto;
 import com.fabricmanagement.platform.user.dto.ProfileUpdateRequestDto;
@@ -33,7 +35,17 @@ public class UserProfileController {
 
   private final UserService userService;
   private final ProfileUpdateRequestService profileUpdateRequestService;
-  private final TeamAccessService teamAccessService;
+  private final PermissionEvaluator permissionEvaluator;
+
+  private PermissionResult getPermissions(UUID requesterId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    UserDto requester =
+        userService
+            .findByIdWithPermissionData(tenantId, requesterId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
+    return permissionEvaluator.evaluate(
+        tenantId, requester.getRoleCode(), requester.getDepartmentCodes(), requesterId);
+  }
 
   /**
    * Update user profile (Admin/HR/Dept Manager only).
@@ -57,7 +69,7 @@ public class UserProfileController {
       throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
-    if (!teamAccessService.canManageMembers(requesterId)) {
+    if (!getPermissions(requesterId).can("members", "write")) {
       throw new AccessDeniedException(
           "Only Administration Office and Human Resources can update member profiles.");
     }

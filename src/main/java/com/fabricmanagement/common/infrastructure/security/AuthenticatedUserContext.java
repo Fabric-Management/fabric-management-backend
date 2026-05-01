@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
  * Immutable snapshot of the authenticated user's identity, role and department memberships.
  *
  * <p>Populated by {@link JwtAuthenticationFilter} from JWT claims and stored as {@code
- * Authentication.details}. Consumed by security services (e.g. {@code ProductionAccessService}) via
+ * Authentication.details}. Consumed by security services (e.g. {@code PermissionEvaluator}) via
  * SpEL {@code @PreAuthorize} expressions without any additional DB round-trips.
  *
  * <p><b>JWT claim sources:</b>

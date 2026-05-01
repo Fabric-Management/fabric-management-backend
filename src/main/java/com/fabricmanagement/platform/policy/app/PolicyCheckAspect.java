@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.policy.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
 import com.fabricmanagement.platform.policy.domain.PolicyCheck;
 import com.fabricmanagement.platform.policy.domain.value.PolicyDecision;
 import com.fabricmanagement.platform.subscription.app.EnhancedSubscriptionService;
@@ -113,7 +114,9 @@ public class PolicyCheckAspect {
       context.put("roles", roles);
 
       // Extract department from authentication (set in JWT claims)
-      if (authentication.getPrincipal() instanceof String) {
+      if (authentication.getPrincipal() instanceof AuthenticatedUserContext ctx) {
+        context.put("department", ctx.primaryDepartmentCode());
+      } else {
         context.put("department", null);
       }
     }

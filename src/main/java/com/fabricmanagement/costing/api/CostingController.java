@@ -44,7 +44,7 @@ public class CostingController {
   // COST CALCULATIONS
   // ============================================================
 
-  @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('SALES_MANAGER')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'write')")
   @PostMapping("/calculations/estimated")
   public ResponseEntity<ApiResponse<CostCalculationResponse>> computeEstimated(
       @Valid @RequestBody ComputeEstimatedCostRequest req) {
@@ -61,7 +61,7 @@ public class CostingController {
         .body(ApiResponse.success(CostCalculationResponse.from(calc)));
   }
 
-  @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'write')")
   @PostMapping("/calculations/planned")
   public ResponseEntity<ApiResponse<CostCalculationResponse>> computePlanned(
       @Valid @RequestBody ComputePlannedCostRequest req) {
@@ -78,7 +78,7 @@ public class CostingController {
         .body(ApiResponse.success(CostCalculationResponse.from(calc)));
   }
 
-  @PreAuthorize("hasRole('COSTING_WRITE') or hasRole('PRODUCTION_MANAGER')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'write')")
   @PostMapping("/calculations/actual")
   public ResponseEntity<ApiResponse<CostCalculationResponse>> computeActual(
       @Valid @RequestBody ComputeActualCostRequest req) {
@@ -103,7 +103,7 @@ public class CostingController {
    * @param workOrderId the WorkOrder UUID
    * @return WorkOrderCostReportResponse with variance analysis and raw material breakdown
    */
-  @PreAuthorize("hasRole('COSTING_READ') or hasRole('PRODUCTION_MANAGER')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'read')")
   @GetMapping("/calculations/work-orders/{workOrderId}")
   public ResponseEntity<ApiResponse<WorkOrderCostReportResponse>> getWorkOrderCostReport(
       @PathVariable UUID workOrderId) {
@@ -116,7 +116,7 @@ public class CostingController {
   // PRICE LISTS
   // ============================================================
 
-  @PreAuthorize("hasRole('COSTING_ADMIN')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'manage')")
   @PostMapping("/price-lists")
   public ResponseEntity<ApiResponse<PriceListResponse>> createPriceList(
       @Valid @RequestBody CreatePriceListRequest req) {
@@ -134,7 +134,7 @@ public class CostingController {
         .body(ApiResponse.success(PriceListResponse.from(pl)));
   }
 
-  @PreAuthorize("hasRole('COSTING_READ')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'read')")
   @GetMapping("/price-lists")
   public ResponseEntity<ApiResponse<List<PriceListResponse>>> listPriceLists(
       @RequestParam String moduleType) {
@@ -146,7 +146,7 @@ public class CostingController {
     return ResponseEntity.ok(ApiResponse.success(list));
   }
 
-  @PreAuthorize("hasRole('COSTING_ADMIN')")
+  @PreAuthorize("@auth.can(authentication, 'costing', 'manage')")
   @DeleteMapping("/price-lists/{priceListId}")
   public ResponseEntity<ApiResponse<Void>> deactivatePriceList(@PathVariable UUID priceListId) {
     priceListService.deactivatePriceList(priceListId);

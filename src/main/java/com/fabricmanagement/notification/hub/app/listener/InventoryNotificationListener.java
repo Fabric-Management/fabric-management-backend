@@ -39,7 +39,7 @@ public class InventoryNotificationListener {
         () -> {
           List<UUID> recipientIds =
               departmentRecipientPort.findUsersByDepartmentKeyword(
-                  event.getTenantId(), "PROCUREMENT", "PROCUREMENTSUPPLY", "Procurement");
+                  event.getTenantId(), "PROCUREMENT", "Procurement");
 
           if (!recipientIds.isEmpty()) {
             Map<String, String> payload =

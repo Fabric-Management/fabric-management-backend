@@ -5,6 +5,8 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserDepartment;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,8 +28,11 @@ public class UserDto {
   private UUID organizationId;
   private UUID roleId;
   private String role; // Role name for display
+  private String roleCode;
   private UUID departmentId; // Primary department ID
   private String departmentName; // Primary department name for display
+  private List<String> departmentCodes;
+  private String primaryDepartmentCode;
   private String userType;
   private Boolean isActive;
   private Integer wipLimit;
@@ -36,6 +41,11 @@ public class UserDto {
   private Boolean hasCompletedOnboarding;
   private Instant createdAt;
   private Instant updatedAt;
+
+  private java.util.Map<
+          String, java.util.Map<String, com.fabricmanagement.platform.user.domain.DataScope>>
+      permissions;
+  private boolean superAdmin;
 
   /** User-level locale preference (e.g. "tr-TR"). Null = inherits from tenant settings. */
   private String preferredLocale;
@@ -82,6 +92,7 @@ public class UserDto {
             .organizationId(user.getOrganizationId())
             .roleId(user.getRole() != null ? user.getRole().getId() : null)
             .role(user.getRole() != null ? user.getRole().getRoleName() : null)
+            .roleCode(user.getRole() != null ? user.getRole().getRoleCode() : null)
             .userType(user.getUserType() != null ? user.getUserType().name() : null)
             .departmentId(
                 user.getUserDepartments().stream()
@@ -119,6 +130,29 @@ public class UserDto {
                                         ? ud.getDepartment().getDepartmentName()
                                         : null)
                             .orElse(null)))
+            .departmentCodes(
+                user.getUserDepartments().stream()
+                    .filter(ud -> Boolean.TRUE.equals(ud.getIsActive()))
+                    .map(
+                        ud ->
+                            ud.getDepartment() != null
+                                ? ud.getDepartment().getDepartmentCode()
+                                : null)
+                    .filter(Objects::nonNull)
+                    .toList())
+            .primaryDepartmentCode(
+                user.getUserDepartments().stream()
+                    .filter(
+                        ud ->
+                            Boolean.TRUE.equals(ud.getIsPrimary())
+                                && Boolean.TRUE.equals(ud.getIsActive()))
+                    .findFirst()
+                    .map(
+                        ud ->
+                            ud.getDepartment() != null
+                                ? ud.getDepartment().getDepartmentCode()
+                                : null)
+                    .orElse(null))
             .isActive(user.getIsActive())
             .wipLimit(user.getWipLimit())
             .lastActiveAt(user.getLastActiveAt())

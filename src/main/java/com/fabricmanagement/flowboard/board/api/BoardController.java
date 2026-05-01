@@ -37,7 +37,7 @@ public class BoardController {
 
   @GetMapping
   @Operation(summary = "Tüm aktif board'ları listele")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<List<BoardResponse>>> getAllBoards() {
     return ResponseEntity.ok(
         ApiResponse.success(
@@ -46,14 +46,14 @@ public class BoardController {
 
   @GetMapping("/{id}")
   @Operation(summary = "Board detayı")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<BoardResponse>> getBoard(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(BoardResponse.from(boardService.getBoard(id))));
   }
 
   @GetMapping("/{id}/tasks")
   @Operation(summary = "Board'daki task'ları sayfalı getir — priorityScore DESC sıralı")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<TaskResponse>>> getTasksByBoard(
       @PathVariable UUID id,
       @RequestParam(required = false) UUID assigneeId,
@@ -86,7 +86,7 @@ public class BoardController {
 
   @GetMapping("/{id}/kanban")
   @Operation(summary = "Kanban view — status bazlı task grupları")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<Map<String, List<TaskResponse>>>> getKanbanView(
       @PathVariable UUID id,
       @RequestParam(required = false) UUID assigneeId,
@@ -126,9 +126,7 @@ public class BoardController {
 
   @GetMapping("/{id}/eligible-assignees")
   @Operation(summary = "Pano için atanabilecek kullanıcıları getir")
-  @PreAuthorize(
-      "isAuthenticated()") // Or use @PreAuthorize("@flowBoardAccessService.canRead(authentication,
-  // 'BOARD')")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<
           ApiResponse<java.util.List<com.fabricmanagement.flowboard.common.dto.UserSummaryDto>>>
       getEligibleAssignees(@PathVariable UUID id) {
@@ -137,7 +135,7 @@ public class BoardController {
 
   @PostMapping
   @Operation(summary = "Yeni board oluştur")
-  @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<BoardResponse>> createBoard(
       @Valid @RequestBody CreateBoardRequest req) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -146,7 +144,7 @@ public class BoardController {
 
   @GetMapping("/default")
   @Operation(summary = "Tenant'ın varsayılan board'unu getir")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<BoardResponse>> getDefaultBoard() {
     return ResponseEntity.ok(
         ApiResponse.success(BoardResponse.from(boardService.getDefaultBoard())));

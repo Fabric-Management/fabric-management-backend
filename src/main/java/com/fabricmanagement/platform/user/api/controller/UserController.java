@@ -1,6 +1,8 @@
 package com.fabricmanagement.platform.user.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.PermissionEvaluator;
+import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.infrastructure.web.rate.RateLimited;
@@ -9,15 +11,16 @@ import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactSuggestionService;
 import com.fabricmanagement.platform.communication.dto.ContactSuggestionsDto;
 import com.fabricmanagement.platform.subscription.app.UserCreationOptionsService;
-import com.fabricmanagement.platform.user.app.TeamAccessService;
 import com.fabricmanagement.platform.user.app.UserLocaleService;
 import com.fabricmanagement.platform.user.app.UserService;
+import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
+import com.fabricmanagement.platform.user.infra.repository.UserDepartmentRepository;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
@@ -39,8 +42,19 @@ public class UserController {
   private final ContactSuggestionService contactSuggestionService;
   private final EmployeeCreationPort employeeCreationPort;
   private final UserCreationOptionsService userCreationOptionsService;
-  private final TeamAccessService teamAccessService;
+  private final UserDepartmentRepository userDepartmentRepository;
   private final UserLocaleService userLocaleService;
+  private final PermissionEvaluator permissionEvaluator;
+
+  private PermissionResult getPermissions(UUID requesterId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    UserDto requester =
+        userService
+            .findByIdWithPermissionData(tenantId, requesterId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
+    return permissionEvaluator.evaluate(
+        tenantId, requester.getRoleCode(), requester.getDepartmentCodes(), requesterId);
+  }
 
   /**
    * Create internal employee (own staff with HR data).
@@ -55,7 +69,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<UserDto>> createInternalUser(
       @Valid @RequestBody CreateInternalUserRequest request) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canManageMembers(requesterId)) {
+    if (!getPermissions(requesterId).can("members", "manage")) {
       throw new AccessDeniedException(
           "Only Administration Office and Human Resources can create members.");
     }
@@ -84,7 +98,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<UserDto>> createExternalUser(
       @Valid @RequestBody CreateExternalUserRequest request) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canManageMembers(requesterId)) {
+    if (!getPermissions(requesterId).can("members", "manage")) {
       throw new AccessDeniedException(
           "Only Administration Office and Human Resources can create members.");
     }
@@ -103,7 +117,7 @@ public class UserController {
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<UserDto>> getUser(@PathVariable UUID id) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canViewDepartmentMembers(requesterId)) {
+    if (!getPermissions(requesterId).can("members", "read")) {
       throw new AccessDeniedException("You don't have permission to view member details.");
     }
 
@@ -132,22 +146,35 @@ public class UserController {
     UUID requesterId = TenantContext.getCurrentUserId();
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    TeamAccessService.AccessLevel accessLevel = teamAccessService.resolveAccessLevel(requesterId);
+    PermissionResult perms = getPermissions(requesterId);
 
-    if (accessLevel == TeamAccessService.AccessLevel.NO_ACCESS) {
+    if (!perms.can("members", "read")) {
       throw new AccessDeniedException("You don't have permission to view team members.");
     }
 
-    if (accessLevel == TeamAccessService.AccessLevel.DEPARTMENT_ONLY) {
-      log.debug("Getting department-scoped users: requesterId={}", requesterId);
-      Set<UUID> deptIds = teamAccessService.getUserDepartmentIds(requesterId);
-      List<UserDto> users = userService.findByDepartments(tenantId, deptIds);
-      return ResponseEntity.ok(ApiResponse.success(users));
+    DataScope scope = perms.scopeOf("members", "read");
+    if (scope == null) {
+      throw new AccessDeniedException("Invalid data scope.");
     }
 
-    log.debug("Getting all users: requesterId={}, accessLevel={}", requesterId, accessLevel);
-    List<UserDto> users = userService.findByTenant(tenantId);
-    return ResponseEntity.ok(ApiResponse.success(users));
+    if (scope.ordinal() >= DataScope.ORGANIZATION.ordinal()) {
+      log.debug("Getting all users: requesterId={}, scope={}", requesterId, scope);
+      List<UserDto> users = userService.findByTenant(tenantId);
+      return ResponseEntity.ok(ApiResponse.success(users));
+    } else if (scope == DataScope.DEPARTMENT) {
+      log.debug("Getting department-scoped users: requesterId={}", requesterId);
+      Set<UUID> deptIds =
+          new java.util.HashSet<>(
+              userDepartmentRepository.findDepartmentIdsByTenantIdAndUserId(tenantId, requesterId));
+
+      if (deptIds.isEmpty()) {
+        return ResponseEntity.ok(ApiResponse.success(List.of()));
+      }
+      List<UserDto> users = userService.findByDepartments(tenantId, deptIds);
+      return ResponseEntity.ok(ApiResponse.success(users));
+    } else {
+      throw new AccessDeniedException("Insufficient data scope.");
+    }
   }
 
   @PreAuthorize("isAuthenticated()")
@@ -155,7 +182,11 @@ public class UserController {
   public ResponseEntity<ApiResponse<List<UserDto>>> getUsersByOrganization(
       @PathVariable UUID organizationId) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canViewAllMembers(requesterId)) {
+    PermissionResult perms = getPermissions(requesterId);
+    DataScope scope = perms.scopeOf("members", "read");
+    if (!perms.can("members", "read")
+        || scope == null
+        || scope.ordinal() < DataScope.ORGANIZATION.ordinal()) {
       throw new AccessDeniedException("You don't have permission to view organization members.");
     }
 
@@ -175,7 +206,7 @@ public class UserController {
   public ResponseEntity<ApiResponse<UserDto>> updateUser(
       @PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canManageMembers(requesterId)) {
+    if (!getPermissions(requesterId).can("members", "write")) {
       throw new AccessDeniedException(
           "Only Administration Office and Human Resources can edit members.");
     }
@@ -191,7 +222,7 @@ public class UserController {
   @DeleteMapping("/{id}")
   public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable UUID id) {
     UUID requesterId = TenantContext.getCurrentUserId();
-    if (!teamAccessService.canManageMembers(requesterId)) {
+    if (!getPermissions(requesterId).can("members", "manage")) {
       throw new AccessDeniedException(
           "Only Administration Office and Human Resources can deactivate members.");
     }
@@ -229,6 +260,7 @@ public class UserController {
   @GetMapping("/me")
   public ResponseEntity<ApiResponse<UserDto>> getCurrentUser() {
     UUID userId = TenantContext.getCurrentUserId();
+    UUID tenantId = TenantContext.getCurrentTenantId();
 
     if (userId == null) {
       throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
@@ -238,8 +270,15 @@ public class UserController {
 
     UserDto user =
         userService
-            .findById(TenantContext.getCurrentTenantId(), userId)
+            .findByIdWithPermissionData(tenantId, userId)
             .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+
+    PermissionResult permResult =
+        permissionEvaluator.evaluate(
+            tenantId, user.getRoleCode(), user.getDepartmentCodes(), user.getId());
+
+    user.setPermissions(permResult.permissions());
+    user.setSuperAdmin(permResult.isSuperAdmin());
 
     return ResponseEntity.ok(ApiResponse.success(user));
   }
@@ -281,9 +320,20 @@ public class UserController {
       throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);
     }
 
-    TeamAccessService.AccessLevel level = teamAccessService.resolveAccessLevel(requesterId);
+    PermissionResult perms = getPermissions(requesterId);
+    String accessLevel = "NO_ACCESS";
+    if (perms.can("members", "manage")) {
+      accessLevel = "FULL_ACCESS";
+    } else if (perms.can("members", "read")) {
+      DataScope scope = perms.scopeOf("members", "read");
+      if (scope != null && scope.ordinal() >= DataScope.ORGANIZATION.ordinal()) {
+        accessLevel = "READ_ALL";
+      } else if (scope == DataScope.DEPARTMENT) {
+        accessLevel = "DEPARTMENT_ONLY";
+      }
+    }
 
-    return ResponseEntity.ok(ApiResponse.success(level.name()));
+    return ResponseEntity.ok(ApiResponse.success(accessLevel));
   }
 
   /**

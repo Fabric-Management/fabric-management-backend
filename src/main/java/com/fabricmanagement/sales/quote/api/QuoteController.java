@@ -44,7 +44,7 @@ public class QuoteController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @GetMapping
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "List all quotes (paginated)")
   public ResponseEntity<ApiResponse<PagedResponse<QuoteResponse>>> listQuotes(
       @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
@@ -53,7 +53,7 @@ public class QuoteController {
   }
 
   @GetMapping("/{quoteId}")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "Get a quote by ID")
   public ResponseEntity<ApiResponse<QuoteResponse>> getQuote(@PathVariable UUID quoteId) {
     return ResponseEntity.ok(
@@ -70,7 +70,7 @@ public class QuoteController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Create a new quote")
   public ResponseEntity<ApiResponse<QuoteResponse>> createQuote(
       @Valid @RequestBody QuoteCreateRequest req) {
@@ -79,7 +79,7 @@ public class QuoteController {
   }
 
   @PostMapping("/{quoteId}/lines")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Add a line item to a quote")
   public ResponseEntity<ApiResponse<QuoteResponse>> addLine(
       @PathVariable UUID quoteId, @Valid @RequestBody AddQuoteLineRequest req) {
@@ -96,7 +96,7 @@ public class QuoteController {
   }
 
   @PostMapping("/{quoteId}/submit")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Submit a quote for approval")
   public ResponseEntity<ApiResponse<QuoteResponse>> submitQuote(@PathVariable UUID quoteId) {
     return ResponseEntity.ok(
@@ -104,7 +104,7 @@ public class QuoteController {
   }
 
   @PostMapping("/{quoteId}/revise")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Create a new revision of a quote")
   public ResponseEntity<ApiResponse<QuoteResponse>> reviseQuote(@PathVariable UUID quoteId) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -116,7 +116,7 @@ public class QuoteController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{quoteId}/tokens")
-  @PreAuthorize("@orderAccessService.hasPermission(authentication, 'QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Generate an approval token for a quote")
   public ResponseEntity<ApiResponse<QuoteApprovalTokenDto>> generateToken(
       @PathVariable UUID quoteId, @Valid @RequestBody GenerateQuoteTokenRequest req) {

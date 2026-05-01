@@ -15,9 +15,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class TenantSeeder implements DataSeeder {
 
-  public static final String TENANT_NAME = "Akkaylar Fabric";
+  public static final String TENANT_NAME = "Akkayalar Textile";
   public static final String TENANT_SLUG =
-      "akkaylar-fabric"; // Derived manually based on service logic
+      "akkayalar-textile"; // Derived manually based on service logic
 
   private final TenantService tenantService;
   private final TransactionTemplate transactionTemplate;
@@ -35,7 +35,7 @@ public class TenantSeeder implements DataSeeder {
           CreateTenantRequest request =
               CreateTenantRequest.builder()
                   .name(TENANT_NAME)
-                  .billingEmail("admin@akkaylar.com")
+                  .billingEmail("admin@akkayalar.com")
                   .country("TR")
                   .settings(settings)
                   .trialDays(365) // Dev env, don't expire soon

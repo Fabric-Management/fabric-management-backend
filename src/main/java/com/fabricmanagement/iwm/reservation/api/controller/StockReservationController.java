@@ -34,7 +34,7 @@ public class StockReservationController {
 
   @Operation(summary = "Get FIFO Lot Suggestions")
   @GetMapping("/suggestions/fifo")
-  @PreAuthorize("@iwmAccessService.hasPermission(authentication, 'STOCK_RESERVATION', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<List<LotSuggestion>> getFifoSuggestions(
       @RequestParam UUID materialId, @RequestParam BigDecimal requiredQty) {
     return ResponseEntity.ok(reservationService.getFifoSuggestions(materialId, requiredQty));
@@ -42,7 +42,7 @@ public class StockReservationController {
 
   @Operation(summary = "Create Reservation")
   @PostMapping
-  @PreAuthorize("@iwmAccessService.hasPermission(authentication, 'STOCK_RESERVATION', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<StockReservationResponse> createReservation(
       @RequestBody @Valid CreateReservationRequest request) {
     StockReservationResponse response =
@@ -58,7 +58,7 @@ public class StockReservationController {
 
   @Operation(summary = "Release Reservation")
   @PostMapping("/{id}/release")
-  @PreAuthorize("@iwmAccessService.hasPermission(authentication, 'STOCK_RESERVATION', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<Void> releaseReservation(@PathVariable UUID id) {
     reservationService.releaseReservation(id);
     return ResponseEntity.ok().build();
@@ -66,7 +66,7 @@ public class StockReservationController {
 
   @Operation(summary = "Convert Reservation to Real Move (Shipment)")
   @PostMapping("/{id}/convert")
-  @PreAuthorize("@iwmAccessService.hasPermission(authentication, 'STOCK_RESERVATION', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<Void> convertReservation(@PathVariable UUID id) {
     reservationService.convertReservation(id);
     return ResponseEntity.ok().build();

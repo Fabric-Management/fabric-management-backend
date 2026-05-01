@@ -71,6 +71,9 @@ public class Department extends BaseEntity {
   @Column(name = "display_order")
   private Integer displayOrder;
 
+  @Column(name = "department_group", length = 20)
+  private String departmentGroup;
+
   @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, orphanRemoval = false)
   @Builder.Default
   private List<UserDepartment> userDepartments = new ArrayList<>();

@@ -27,7 +27,7 @@ public class BoardDashboardController {
 
   @GetMapping("/metrics")
   @Operation(summary = "Pano için özet, trend ve iş yükü metriklerini getirir")
-  @PreAuthorize("isAuthenticated() and hasPermission(#boardId, 'Board', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<BoardMetricsResponse>> getBoardMetrics(
       @PathVariable UUID boardId) {
     UUID tenantId = TenantContext.getCurrentTenantId();

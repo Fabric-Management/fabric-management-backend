@@ -1,6 +1,8 @@
 # Fabric Management Backend — AI Coding Standards
 
-Bu dosya, projede kod yazan **tüm AI ajanlarının ve geliştiricilerin** uyması gereken tek kanonik kurallar bütünüdür.
+> **ÖNEMLİ:** Frontend iletişimi, sözleşme sınırları (OpenAPI) ve ortak domain dili gibi global kurallar için öncelikle kök dizindeki `fabric-management/AGENTS.md` dosyasına başvurun.
+
+Bu dosya, projede kod yazan **tüm AI ajanlarının ve geliştiricilerin** uyması gereken backend'e özel (Spring Boot) kanonik kurallar bütünüdür.
 
 ---
 
@@ -162,7 +164,7 @@ public record CreateBatchRequest(
 - **MapStruct** ile entity↔DTO mapping; shared config `unmappedTargetPolicy = ERROR`
 - **GlobalExceptionHandler** → Tüm exception'lar standart `ApiError` formatında
 - **@PreAuthorize** → Her endpoint'te rol kontrolü zorunlu
-- **OpenAPI** → `@Tag`, `@Operation`, `@ApiResponse` annotation'ları kullan
+- **OpenAPI (SÖZLEŞME)** → Frontend'in tüm tip güvenliği bu belgelendirmeye bağlıdır! `@Tag`, `@Operation`, `@ApiResponse`, `@Schema(required = true)` gibi annotation'lar asla eksik bırakılamaz. Backend'deki bir drift, frontend'i otomatik patlatır.
 - **API versioning** → `/api/v1/`
 
 ### 5.1 Exception Hiyerarşisi

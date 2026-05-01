@@ -8,7 +8,7 @@ import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.tenant.app.TenantService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,15 +30,39 @@ public class OrganizationSeeder implements DataSeeder {
 
   private static final String TAX_ID = "AKK-1234567890";
 
-  private static final List<String> EXPECTED_DEPARTMENTS =
-      List.of(
-          "Management",
-          "Human Resources",
-          "Finans ve Satınalma",
-          "Üretim",
-          "Kalite",
-          "Depo ve Lojistik",
-          "Satış");
+  private static final Map<String, String> EXPECTED_DEPARTMENTS = new java.util.LinkedHashMap<>();
+
+  static {
+    // Support group
+    EXPECTED_DEPARTMENTS.put("Human Resources", "HR");
+    EXPECTED_DEPARTMENTS.put("Finance & Accounting", "FINANCE");
+    EXPECTED_DEPARTMENTS.put("Sales & Marketing", "SALES");
+    EXPECTED_DEPARTMENTS.put("Procurement", "PROCUREMENT");
+    EXPECTED_DEPARTMENTS.put("Quality Control", "QUALITY");
+    EXPECTED_DEPARTMENTS.put("Warehouse & Logistics", "WAREHOUSE");
+    // Production group
+    EXPECTED_DEPARTMENTS.put("Fiber Processing", "FIBER");
+    EXPECTED_DEPARTMENTS.put("Yarn Production", "YARN");
+    EXPECTED_DEPARTMENTS.put("Weaving", "WEAVING");
+    EXPECTED_DEPARTMENTS.put("Knitting", "KNITTING");
+    EXPECTED_DEPARTMENTS.put("Dyeing & Finishing", "DYEING");
+    EXPECTED_DEPARTMENTS.put("Garment Production", "GARMENT");
+  }
+
+  private static final Map<String, String> GROUP_MAPPING =
+      Map.ofEntries(
+          Map.entry("HR", "SUPPORT"),
+          Map.entry("FINANCE", "SUPPORT"),
+          Map.entry("SALES", "SUPPORT"),
+          Map.entry("PROCUREMENT", "SUPPORT"),
+          Map.entry("QUALITY", "SUPPORT"),
+          Map.entry("WAREHOUSE", "SUPPORT"),
+          Map.entry("FIBER", "PRODUCTION"),
+          Map.entry("YARN", "PRODUCTION"),
+          Map.entry("WEAVING", "PRODUCTION"),
+          Map.entry("KNITTING", "PRODUCTION"),
+          Map.entry("DYEING", "PRODUCTION"),
+          Map.entry("GARMENT", "PRODUCTION"));
 
   @Override
   public boolean isSeeded() {
@@ -61,7 +85,7 @@ public class OrganizationSeeder implements DataSeeder {
                   .map(Department::getDepartmentName)
                   .collect(Collectors.toSet());
 
-          return EXPECTED_DEPARTMENTS.stream().allMatch(existingNames::contains);
+          return EXPECTED_DEPARTMENTS.keySet().stream().allMatch(existingNames::contains);
         });
   }
 
@@ -94,22 +118,41 @@ public class OrganizationSeeder implements DataSeeder {
 
                 // 2. Create Departments - granular per-record idempotency
                 log.info("Creating Departments for org: {}", rootOrg.getId());
-                for (String dpName : EXPECTED_DEPARTMENTS) {
-                  if (departmentRepository
-                      .findByTenantIdAndOrganizationIdAndDepartmentName(
-                          tenant.getId(), rootOrg.getId(), dpName)
-                      .isEmpty()) {
-                    Department dp = new Department();
+                Map<String, Department> createdDepartments = new java.util.HashMap<>();
+
+                // Fetch all existing so we don't duplicate logic
+                departmentRepository
+                    .findByTenantIdAndIsActiveTrue(tenant.getId())
+                    .forEach(d -> createdDepartments.put(d.getDepartmentCode(), d));
+
+                for (Map.Entry<String, String> entry : EXPECTED_DEPARTMENTS.entrySet()) {
+                  String dpName = entry.getKey();
+                  String dpCode = entry.getValue();
+
+                  Department dp = createdDepartments.get(dpCode);
+                  if (dp == null) {
+                    dp = new Department();
                     dp.setTenantId(tenant.getId());
                     dp.setOrganizationId(rootOrg.getId());
                     dp.setDepartmentName(dpName);
-                    dp.setDepartmentCode(
-                        dpName.substring(0, Math.min(3, dpName.length())).toUpperCase());
+                    dp.setDepartmentCode(dpCode);
+                    dp.setDepartmentGroup(GROUP_MAPPING.get(dpCode));
                     dp.setIsActive(true);
-                    departmentRepository.save(dp);
-                    log.info("Created department: {}", dpName);
+
+                    dp = departmentRepository.save(dp);
+                    createdDepartments.put(dpCode, dp);
+                    log.info(
+                        "Created department: {} (group: {})", dpName, GROUP_MAPPING.get(dpCode));
                   } else {
                     log.debug("Department already exists, skipping: {}", dpName);
+
+                    // Retroactively assign group if missing (idempotency for existing data)
+                    if (dp.getDepartmentGroup() == null && GROUP_MAPPING.containsKey(dpCode)) {
+                      dp.setDepartmentGroup(GROUP_MAPPING.get(dpCode));
+                      departmentRepository.save(dp);
+                      log.info(
+                          "Updated department {} with group {}", dpName, GROUP_MAPPING.get(dpCode));
+                    }
                   }
                 }
               });

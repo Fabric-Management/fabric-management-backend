@@ -26,7 +26,7 @@ public class EmployeeProfileController {
    *
    * <p>Used for the Self-Service portal (My HR Info tab).
    */
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@auth.can(authentication, 'settings', 'read')")
   @GetMapping("/me")
   public ResponseEntity<ApiResponse<EmployeeProfileDto>> getMyHrProfile() {
     UUID userId = TenantContext.getCurrentUserId();

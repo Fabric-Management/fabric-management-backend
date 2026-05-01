@@ -24,7 +24,7 @@ public class GoodsReceiptController {
   private final GoodsReceiptService goodsReceiptService;
 
   @GetMapping("/{id}")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'GOODS_RECEIPT', 'READ')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public GoodsReceiptResponse getGoodsReceipt(@PathVariable UUID id) {
     return goodsReceiptService.getGoodsReceipt(id);
   }
@@ -35,7 +35,7 @@ public class GoodsReceiptController {
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'GOODS_RECEIPT', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public GoodsReceiptResponse createGoodsReceipt(
       @RequestBody @Valid CreateGoodsReceiptRequest request) {
     return goodsReceiptService.createGoodsReceipt(request);
@@ -46,7 +46,7 @@ public class GoodsReceiptController {
    * update. Receipt must have at least one item.
    */
   @PostMapping("/{id}/confirm")
-  @PreAuthorize("@productionAccessService.hasPermission(authentication, 'GOODS_RECEIPT', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public GoodsReceiptResponse confirmGoodsReceipt(@PathVariable UUID id) {
     return goodsReceiptService.confirmGoodsReceipt(id);
   }

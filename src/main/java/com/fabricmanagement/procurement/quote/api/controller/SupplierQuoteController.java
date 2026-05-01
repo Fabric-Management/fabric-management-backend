@@ -29,31 +29,27 @@ public class SupplierQuoteController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize(
-      "@procurementAccessService.hasPermission(authentication, 'SUPPLIER_QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public SupplierQuoteResponse createQuote(@Valid @RequestBody CreateSupplierQuoteRequest req) {
     return SupplierQuoteResponse.from(quoteService.createQuote(req));
   }
 
   @PostMapping("/{quoteId}/lines")
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize(
-      "@procurementAccessService.hasPermission(authentication, 'SUPPLIER_QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public SupplierQuoteResponse addLine(
       @PathVariable UUID quoteId, @Valid @RequestBody AddQuoteLineRequest req) {
     return SupplierQuoteResponse.from(quoteService.addLine(quoteId, req));
   }
 
   @PostMapping("/{quoteId}/accept")
-  @PreAuthorize(
-      "@procurementAccessService.hasPermission(authentication, 'SUPPLIER_QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public SupplierQuoteResponse acceptQuote(@PathVariable UUID quoteId) {
     return SupplierQuoteResponse.from(quoteService.markAsAccepted(quoteId));
   }
 
   @PostMapping("/{quoteId}/reject")
-  @PreAuthorize(
-      "@procurementAccessService.hasPermission(authentication, 'SUPPLIER_QUOTE', 'WRITE')")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public SupplierQuoteResponse rejectQuote(@PathVariable UUID quoteId) {
     return SupplierQuoteResponse.from(quoteService.markAsRejected(quoteId));
   }
