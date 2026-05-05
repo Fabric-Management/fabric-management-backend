@@ -22,8 +22,9 @@ import org.springframework.stereotype.Component;
  * <p>Collects all {@link PurchaseOrderValidator} beans via Spring injection and dispatches
  * validation calls to the appropriate strategy based on {@link PurchaseOrderModuleType}.
  *
- * <p>If no validator is registered for a given type (e.g. GENERIC), validation passes silently
- * (Open-Closed Principle).
+ * <p>If no validator is registered for a given type (e.g., GENERIC), validation passes silently
+ * (Open-Closed Principle). GENERIC specs represent standard/miscellaneous items and intentionally
+ * have no strict technical boundaries.
  *
  * <p><b>Usage points in PurchaseOrderService:</b>
  *

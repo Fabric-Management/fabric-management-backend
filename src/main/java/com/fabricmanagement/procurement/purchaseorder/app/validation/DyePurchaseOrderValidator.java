@@ -1,5 +1,7 @@
 package com.fabricmanagement.procurement.purchaseorder.app.validation;
 
+import static com.fabricmanagement.procurement.purchaseorder.app.validation.TextileValidationConstants.*;
+
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.DyePurchaseSpecs;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
@@ -10,11 +12,10 @@ import org.springframework.stereotype.Component;
 /**
  * Validates {@link DyePurchaseSpecs} for dye/finishing purchase orders.
  *
- * <p>Create phase: no strict rules (draft can be saved with partial info while lab-dip is
- * in-progress).
+ * <p>Create phase: enforces lightness target length boundaries.
  *
- * <p>Confirm phase: colorCode and approvalDocumentId are mandatory. A dye PO cannot be sent to a
- * supplier without an approved lab-dip result.
+ * <p>Confirm phase: colorCode, approvalDocumentId, and applicationMethod are mandatory. A dye PO
+ * cannot be sent to a supplier without an approved lab-dip result.
  */
 @Component
 public class DyePurchaseOrderValidator implements PurchaseOrderValidator {
@@ -26,9 +27,13 @@ public class DyePurchaseOrderValidator implements PurchaseOrderValidator {
 
   @Override
   public List<String> validateOnCreate(PurchaseOrderSpecs specs) {
-    // No create-phase rules for dye — lab-dip process is iterative,
-    // drafts are saved with partial data intentionally
-    return List.of();
+    var violations = new ArrayList<String>();
+    if (specs instanceof DyePurchaseSpecs dye) {
+      if (dye.lightnessTarget() != null && dye.lightnessTarget().length() > LIGHTNESS_MAX_LENGTH) {
+        violations.add("Lightness target must not exceed " + LIGHTNESS_MAX_LENGTH + " characters");
+      }
+    }
+    return violations;
   }
 
   @Override
@@ -46,6 +51,9 @@ public class DyePurchaseOrderValidator implements PurchaseOrderValidator {
         violations.add(
             "Approval document is required before sending dye order to supplier"
                 + " (lab-dip must be approved first)");
+      }
+      if (dye.applicationMethod() == null || dye.applicationMethod().isBlank()) {
+        violations.add("Application method is required before sending dye order to supplier");
       }
     }
 
