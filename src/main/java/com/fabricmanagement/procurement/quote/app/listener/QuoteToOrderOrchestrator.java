@@ -2,6 +2,7 @@ package com.fabricmanagement.procurement.quote.app.listener;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
+import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
@@ -9,6 +10,7 @@ import com.fabricmanagement.procurement.quote.domain.SupplierQuoteLine;
 import com.fabricmanagement.procurement.quote.domain.event.SupplierQuoteAcceptedEvent;
 import com.fabricmanagement.procurement.quote.infra.repository.SupplierQuoteRepository;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQModuleType;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQType;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import com.fabricmanagement.procurement.subcontract.app.SubcontractOrderService;
@@ -104,6 +106,7 @@ public class QuoteToOrderOrchestrator {
                       .unit(line.getUnit())
                       .unitPrice(line.getUnitPrice())
                       .currency(line.getCurrency())
+                      .moduleSpecs(matchingRfqLine.map(rl -> rl.getModuleSpecs()).orElse("{}"))
                       .build();
                 })
             .toList();
@@ -113,6 +116,7 @@ public class QuoteToOrderOrchestrator {
             .workOrderId(rfq.getWorkOrderId())
             .tradingPartnerId(quote.getTradingPartnerId())
             .supplierQuoteId(quote.getId())
+            .moduleType(mapRfqModuleType(rfq.getModuleType()))
             .currency(quote.getCurrency())
             .paymentTerms(quote.getPaymentTerms())
             .notes("Auto-generated from Quote: " + quote.getQuoteNumber())
@@ -157,5 +161,15 @@ public class QuoteToOrderOrchestrator {
     } catch (Exception e) {
       log.error("Failed to create SubcontractOrder for quote {}", quote.getQuoteNumber(), e);
     }
+  }
+
+  private PurchaseOrderModuleType mapRfqModuleType(SupplierRFQModuleType rfqType) {
+    if (rfqType == null) return PurchaseOrderModuleType.GENERIC;
+    return switch (rfqType) {
+      case FIBER -> PurchaseOrderModuleType.FIBER;
+      case YARN -> PurchaseOrderModuleType.YARN;
+      case FABRIC -> PurchaseOrderModuleType.FABRIC;
+      case DYE_FINISHING -> PurchaseOrderModuleType.DYE_FINISHING;
+    };
   }
 }

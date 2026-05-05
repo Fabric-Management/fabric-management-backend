@@ -1,6 +1,8 @@
 package com.fabricmanagement.procurement.purchaseorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.procurement.purchaseorder.domain.specs.GenericPurchaseSpecs;
+import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -82,6 +84,17 @@ public class PurchaseOrder extends BaseEntity {
   @Column(name = "attachments", columnDefinition = "jsonb")
   @Builder.Default
   private List<Map<String, Object>> attachments = List.of();
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "module_type", nullable = false, length = 30)
+  @Builder.Default
+  private PurchaseOrderModuleType moduleType = PurchaseOrderModuleType.GENERIC;
+
+  /** Module-specific specs — Value Object, stored as JSONB. */
+  @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.json.JsonType.class)
+  @Column(name = "module_specs", columnDefinition = "jsonb")
+  @Builder.Default
+  private PurchaseOrderSpecs moduleSpecs = new GenericPurchaseSpecs(null);
 
   @Override
   protected String getModuleCode() {
