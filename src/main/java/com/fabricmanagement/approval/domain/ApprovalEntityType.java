@@ -7,5 +7,6 @@ package com.fabricmanagement.approval.domain;
 public enum ApprovalEntityType {
   WORK_ORDER,
   RECIPE_CREATE,
-  CRITICAL_ACTION
+  CRITICAL_ACTION,
+  PURCHASE_ORDER
 }
