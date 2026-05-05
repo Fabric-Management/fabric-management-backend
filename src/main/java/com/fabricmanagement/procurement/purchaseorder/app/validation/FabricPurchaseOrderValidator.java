@@ -1,5 +1,7 @@
 package com.fabricmanagement.procurement.purchaseorder.app.validation;
 
+import static com.fabricmanagement.procurement.purchaseorder.app.validation.TextileValidationConstants.*;
+
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.FabricPurchaseSpecs;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
@@ -10,9 +12,10 @@ import org.springframework.stereotype.Component;
 /**
  * Validates {@link FabricPurchaseSpecs} against textile domain rules.
  *
- * <p>Create phase: GSM 80-400, width 100-320 cm (AGENTS.md Textile Domain).
+ * <p>Create phase: GSM 80-400, width 100-320 cm (AGENTS.md Textile Domain). Shrinkage between -15%
+ * and +15%.
  *
- * <p>Confirm phase: construction must be specified.
+ * <p>Confirm phase: construction, composition, and fabricType must be specified.
  */
 @Component
 public class FabricPurchaseOrderValidator implements PurchaseOrderValidator {
@@ -27,11 +30,29 @@ public class FabricPurchaseOrderValidator implements PurchaseOrderValidator {
     var violations = new ArrayList<String>();
 
     if (specs instanceof FabricPurchaseSpecs fabric) {
-      if (fabric.gsm() != null && (fabric.gsm() < 80 || fabric.gsm() > 400)) {
-        violations.add("GSM must be between 80 and 400, got: " + fabric.gsm());
+      if (fabric.gsm() != null && (fabric.gsm() < GSM_MIN || fabric.gsm() > GSM_MAX)) {
+        violations.add(
+            "GSM must be between " + GSM_MIN + " and " + GSM_MAX + ", got: " + fabric.gsm());
       }
-      if (fabric.widthCm() != null && (fabric.widthCm() < 100 || fabric.widthCm() > 320)) {
-        violations.add("Width must be between 100 and 320 cm, got: " + fabric.widthCm());
+      if (fabric.widthCm() != null
+          && (fabric.widthCm() < WIDTH_CM_MIN || fabric.widthCm() > WIDTH_CM_MAX)) {
+        violations.add(
+            "Width must be between "
+                + WIDTH_CM_MIN
+                + " and "
+                + WIDTH_CM_MAX
+                + " cm, got: "
+                + fabric.widthCm());
+      }
+      if (fabric.shrinkage() != null
+          && (fabric.shrinkage() < SHRINKAGE_MIN || fabric.shrinkage() > SHRINKAGE_MAX)) {
+        violations.add(
+            "Shrinkage must be between "
+                + SHRINKAGE_MIN
+                + " and "
+                + SHRINKAGE_MAX
+                + "%, got: "
+                + fabric.shrinkage());
       }
     }
 
@@ -47,6 +68,12 @@ public class FabricPurchaseOrderValidator implements PurchaseOrderValidator {
     if (specs instanceof FabricPurchaseSpecs fabric) {
       if (fabric.construction() == null || fabric.construction().isBlank()) {
         violations.add("Fabric construction is required before sending to supplier");
+      }
+      if (fabric.composition() == null || fabric.composition().isBlank()) {
+        violations.add("Composition is required before sending to supplier");
+      }
+      if (fabric.fabricType() == null) {
+        violations.add("Fabric type is required before sending to supplier");
       }
     }
 
