@@ -10,10 +10,12 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -61,25 +63,55 @@ public class SupplierQuote extends BaseEntity {
 
   @Type(JsonType.class)
   @Column(name = "attachments", columnDefinition = "jsonb", nullable = false)
-  private String attachments = "[]";
+  private List<Map<String, Object>> attachments = new ArrayList<>();
 
   @Column(name = "submitted_at")
   private Instant submittedAt;
-
-  @Column(name = "is_active", nullable = false)
-  private boolean isActive = true;
 
   @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
   @JoinColumn(name = "supplier_quote_id", nullable = false, updatable = false)
   private List<SupplierQuoteLine> lines = new ArrayList<>();
 
+  /** Sadece RECEIVED durumundaki teklife satır eklenebilir. */
   public void addLine(SupplierQuoteLine line) {
+    if (this.status != SupplierQuoteStatus.RECEIVED) {
+      throw new IllegalStateException("Cannot add line to quote in status: " + this.status);
+    }
     this.lines.add(line);
   }
 
-  public void markAsDeleted() {
-    this.isActive = false;
-    super.delete();
+  public void transitionTo(SupplierQuoteStatus target) {
+    if (!this.status.canTransitionTo(target)) {
+      throw new IllegalStateException(
+          String.format("Cannot transition quote from %s to %s", this.status, target));
+    }
+    this.status = target;
+  }
+
+  public void accept() {
+    transitionTo(SupplierQuoteStatus.ACCEPTED);
+  }
+
+  public void reject() {
+    transitionTo(SupplierQuoteStatus.REJECTED);
+  }
+
+  public void startReview() {
+    transitionTo(SupplierQuoteStatus.UNDER_REVIEW);
+  }
+
+  public void expire() {
+    transitionTo(SupplierQuoteStatus.EXPIRED);
+  }
+
+  public boolean isExpired() {
+    return this.validUntil != null && this.validUntil.isBefore(LocalDate.now());
+  }
+
+  public BigDecimal computeTotalAmount() {
+    return this.lines.stream()
+        .map(SupplierQuoteLine::lineTotal)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   @Override

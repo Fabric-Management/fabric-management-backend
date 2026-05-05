@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderPlannedCostTriggerService;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -46,7 +47,7 @@ class WorkOrderPlannedCostListenerTest {
         TENANT_ID,
         WORK_ORDER_ID,
         "WO-TEST-001",
-        "YARN",
+        WorkOrderModuleType.SPINNING,
         UUID.randomUUID(),
         new BigDecimal("1000.000"),
         UUID.randomUUID(),

@@ -12,6 +12,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.workorder.app.port.ComputedCostSnapshot;
 import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
@@ -37,7 +38,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
   private static final UUID WORK_ORDER_ID = UUID.randomUUID();
   private static final UUID MATERIAL_ID = UUID.randomUUID();
   private static final UUID TRADING_PARTNER_ID = UUID.randomUUID();
-  private static final String MODULE_TYPE = "YARN";
+  private static final WorkOrderModuleType MODULE_TYPE = WorkOrderModuleType.SPINNING;
   private static final BigDecimal PLANNED_QTY = new BigDecimal("1000.000");
 
   @Mock private WorkOrderCostEnginePort costEnginePort;
@@ -56,7 +57,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
   }
 
   private WorkOrder buildWorkOrder(
-      WorkOrderStatus status, UUID outputMaterialId, String moduleType) {
+      WorkOrderStatus status, UUID outputMaterialId, WorkOrderModuleType moduleType) {
     WorkOrder wo =
         WorkOrder.builder()
             .workOrderNumber("WO-TEST-001")

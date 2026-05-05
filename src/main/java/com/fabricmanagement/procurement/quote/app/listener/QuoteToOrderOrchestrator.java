@@ -126,8 +126,12 @@ public class QuoteToOrderOrchestrator {
     try {
       purchaseOrderService.createPurchaseOrder(poRequest);
       log.info("Successfully created PurchaseOrder for quote {}", quote.getQuoteNumber());
-    } catch (Exception e) {
-      log.error("Failed to create PurchaseOrder for quote {}", quote.getQuoteNumber(), e);
+    } catch (RuntimeException e) {
+      log.error(
+          "Failed to create PurchaseOrder for quote {}: {}",
+          quote.getQuoteNumber(),
+          e.getMessage(),
+          e);
     }
   }
 
@@ -136,6 +140,13 @@ public class QuoteToOrderOrchestrator {
       log.warn(
           "Cannot create SubcontractOrder for quote {} — no lines found", quote.getQuoteNumber());
       return;
+    }
+
+    if (quote.getLines().size() > 1) {
+      log.warn(
+          "Quote {} has {} lines, but SubcontractOrder currently supports 1:1 creation. Processing only the first line.",
+          quote.getQuoteNumber(),
+          quote.getLines().size());
     }
 
     SupplierQuoteLine firstLine = quote.getLines().get(0);
@@ -158,8 +169,12 @@ public class QuoteToOrderOrchestrator {
     try {
       subcontractOrderService.createSubcontractOrder(soRequest);
       log.info("Successfully created SubcontractOrder for quote {}", quote.getQuoteNumber());
-    } catch (Exception e) {
-      log.error("Failed to create SubcontractOrder for quote {}", quote.getQuoteNumber(), e);
+    } catch (RuntimeException e) {
+      log.error(
+          "Failed to create SubcontractOrder for quote {}: {}",
+          quote.getQuoteNumber(),
+          e.getMessage(),
+          e);
     }
   }
 

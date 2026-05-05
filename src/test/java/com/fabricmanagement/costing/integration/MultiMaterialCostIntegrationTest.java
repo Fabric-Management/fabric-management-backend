@@ -22,6 +22,7 @@ import com.fabricmanagement.costing.infra.repository.PriceListItemRepository;
 import com.fabricmanagement.costing.infra.repository.PriceListRepository;
 import com.fabricmanagement.costing.integration.support.TestCostDataFactory;
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -97,10 +98,10 @@ class MultiMaterialCostIntegrationTest extends AbstractCostingIntegrationTest {
             TestCostDataFactory.createPriceListWithItems(tenantId, "YARN", "TRY", Map.of()));
     PriceList plFiber =
         priceListRepo.save(
-            TestCostDataFactory.createPriceListWithItems(tenantId, "FIBER", "TRY", Map.of()));
+            TestCostDataFactory.createPriceListWithItems(tenantId, "SPINNING", "TRY", Map.of()));
 
     // Fiber A costs 2.0 USD / KG (Needs conversion). Fiber B costs 55.0 TRY / KG. (Attached to
-    // FIBER)
+    // SPINNING)
     priceListItemRepo.save(
         TestCostDataFactory.createPriceListItem(
             plFiber.getId(), "RAW_MATERIAL", fiberAId, new BigDecimal("2.0"), "USD"));
@@ -126,8 +127,10 @@ class MultiMaterialCostIntegrationTest extends AbstractCostingIntegrationTest {
     // 5. Build Consumptions: 60kg FiberA, 40kg FiberB, Net Output = 95kg
     List<ConsumptionCostInput> consumptions =
         List.of(
-            new ConsumptionCostInput(fiberAId, "FIBER", new BigDecimal("60.0"), "KG"),
-            new ConsumptionCostInput(fiberBId, "FIBER", new BigDecimal("40.0"), "KG"));
+            new ConsumptionCostInput(
+                fiberAId, WorkOrderModuleType.SPINNING, new BigDecimal("60.0"), "KG"),
+            new ConsumptionCostInput(
+                fiberBId, WorkOrderModuleType.SPINNING, new BigDecimal("40.0"), "KG"));
 
     // ACTION
     CostCalculation result =

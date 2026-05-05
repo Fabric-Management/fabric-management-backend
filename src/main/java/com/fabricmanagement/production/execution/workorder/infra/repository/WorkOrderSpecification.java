@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.infra.repository;
 
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderFilterRequest;
 import java.time.Instant;
@@ -26,6 +27,10 @@ public final class WorkOrderSpecification {
 
   public static Specification<WorkOrder> hasStatus(WorkOrderStatus status) {
     return (root, query, cb) -> cb.equal(root.get("status"), status);
+  }
+
+  public static Specification<WorkOrder> hasModuleType(WorkOrderModuleType moduleType) {
+    return (root, query, cb) -> cb.equal(root.get("moduleType"), moduleType);
   }
 
   public static Specification<WorkOrder> hasTradingPartner(UUID tradingPartnerId) {
@@ -83,6 +88,7 @@ public final class WorkOrderSpecification {
     Specification<WorkOrder> spec = Specification.where(belongsToTenant(tenantId));
 
     if (filter.status() != null) spec = spec.and(hasStatus(filter.status()));
+    if (filter.moduleType() != null) spec = spec.and(hasModuleType(filter.moduleType()));
     if (filter.tradingPartnerId() != null)
       spec = spec.and(hasTradingPartner(filter.tradingPartnerId()));
     if (filter.salesOrderId() != null) spec = spec.and(hasSalesOrder(filter.salesOrderId()));

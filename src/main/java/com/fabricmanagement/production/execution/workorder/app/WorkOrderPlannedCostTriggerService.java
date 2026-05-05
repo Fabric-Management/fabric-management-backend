@@ -71,17 +71,17 @@ public class WorkOrderPlannedCostTriggerService {
           "Planned cost requires at least APPROVED status. Current: " + workOrder.getStatus());
     }
 
-    // 2. Guard: outputMaterialId + moduleType must be present (Sprint 12 enrichment)
+    if (workOrder.getModuleType() == null) {
+      throw new WorkOrderDomainException(
+          "WorkOrder " + workOrderId + " missing moduleType — cannot compute planned cost.");
+    }
+
     if (workOrder.getOutputMaterialId() == null) {
       throw new WorkOrderDomainException(
           "WorkOrder "
               + workOrderId
               + " missing outputMaterialId — cannot compute planned cost. "
               + "This may be a pre-Sprint 12 WorkOrder without enrichment data.");
-    }
-    if (workOrder.getModuleType() == null) {
-      throw new WorkOrderDomainException(
-          "WorkOrder " + workOrderId + " missing moduleType — cannot compute planned cost.");
     }
 
     // 3. Compute via Port → CostCalculationService.computePlanned() → write-back via

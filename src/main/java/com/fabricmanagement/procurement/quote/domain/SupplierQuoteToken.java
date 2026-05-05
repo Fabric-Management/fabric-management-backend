@@ -39,14 +39,6 @@ public class SupplierQuoteToken extends BaseEntity {
   @Column(name = "entry_method", length = 30)
   private QuoteEntryMethod entryMethod;
 
-  @Column(name = "is_active", nullable = false)
-  private boolean isActive = true;
-
-  public void markAsDeleted() {
-    this.isActive = false;
-    super.delete();
-  }
-
   @Override
   public String getModuleCode() {
     return "PROCUREMENT";

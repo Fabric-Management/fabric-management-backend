@@ -288,7 +288,7 @@ public class CostCalculationService {
     // PriceList per moduleType — single DB query per unique moduleType (Cache)
     Map<String, Optional<PriceList>> priceListCache =
         consumptions.stream()
-            .map(ConsumptionCostInput::moduleType)
+            .map(c -> c.moduleType().name())
             .distinct()
             .collect(
                 Collectors.toMap(
@@ -342,12 +342,14 @@ public class CostCalculationService {
         for (ConsumptionCostInput consumption : consumptions) {
 
           PriceList consumptionPriceList =
-              priceListCache.getOrDefault(consumption.moduleType(), Optional.empty()).orElse(null);
+              priceListCache
+                  .getOrDefault(consumption.moduleType().name(), Optional.empty())
+                  .orElse(null);
 
           if (consumptionPriceList == null) {
             log.warn(
                 "No active price list for module '{}' — raw material cost skipped for materialId {}",
-                consumption.moduleType(),
+                consumption.moduleType().name(),
                 consumption.materialId());
             continue;
           }

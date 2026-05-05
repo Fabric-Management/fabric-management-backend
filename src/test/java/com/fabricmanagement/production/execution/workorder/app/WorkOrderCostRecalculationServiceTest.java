@@ -17,6 +17,7 @@ import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionC
 import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderConsumption;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
@@ -70,7 +71,7 @@ class WorkOrderCostRecalculationServiceTest {
             .workOrderNumber("WO-TEST-001")
             .status(WorkOrderStatus.COMPLETED)
             .outputMaterialId(MATERIAL_ID)
-            .moduleType("YARN")
+            .moduleType(WorkOrderModuleType.SPINNING)
             .plannedQty(new BigDecimal("1000.000"))
             .actualQty(new BigDecimal("950.000"))
             .unit("KG")
@@ -238,7 +239,7 @@ class WorkOrderCostRecalculationServiceTest {
       when(costEnginePort.computeActualCostFromConsumptions(
               eq(TENANT_ID),
               eq(WORK_ORDER_ID),
-              eq("YARN"),
+              eq(WorkOrderModuleType.SPINNING),
               eq(MATERIAL_ID),
               eq(wo.getActualQty()),
               eq(TRADING_PARTNER_ID),

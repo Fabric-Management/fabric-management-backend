@@ -2,6 +2,8 @@ package com.fabricmanagement.production.execution.workorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
+import com.fabricmanagement.production.execution.workorder.domain.specs.GenericProductionSpecs;
+import com.fabricmanagement.production.execution.workorder.domain.specs.WorkOrderProductionSpecs;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,8 +36,14 @@ public class WorkOrder extends BaseEntity {
   @Column(name = "output_material_id")
   private UUID outputMaterialId;
 
-  @Column(name = "module_type", length = 50)
-  private String moduleType;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "module_type", nullable = false, length = 50)
+  private WorkOrderModuleType moduleType;
+
+  @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.json.JsonType.class)
+  @Column(name = "production_specs", columnDefinition = "jsonb", nullable = false)
+  @Builder.Default
+  private WorkOrderProductionSpecs productionSpecs = new GenericProductionSpecs(null);
 
   @Column(name = "trading_partner_id")
   private UUID tradingPartnerId;
@@ -80,6 +88,7 @@ public class WorkOrder extends BaseEntity {
             .status(WorkOrderStatus.DRAFT)
             .workOrderNumber(workOrderNumber)
             .fulfillmentType(FulfillmentType.INTERNAL)
+            .moduleType(WorkOrderModuleType.GENERIC)
             .build();
 
     w.setTenantId(tenantId);

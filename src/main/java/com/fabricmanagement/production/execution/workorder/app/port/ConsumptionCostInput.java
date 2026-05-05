@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app.port;
 
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -10,9 +11,9 @@ import java.util.UUID;
  * without leaking any production domain entities across module boundaries.
  *
  * @param materialId the specific material ID consumed (denormalized from Batch)
- * @param moduleType e.g. "FIBER", "YARN" — determines which PriceList to query
+ * @param moduleType e.g. SPINNING, WEAVING — determines which PriceList to query
  * @param consumedWeight the physical weight consumed (must be positive)
  * @param unit unit of measure (e.g. "KG")
  */
 public record ConsumptionCostInput(
-    UUID materialId, String moduleType, BigDecimal consumedWeight, String unit) {}
+    UUID materialId, WorkOrderModuleType moduleType, BigDecimal consumedWeight, String unit) {}

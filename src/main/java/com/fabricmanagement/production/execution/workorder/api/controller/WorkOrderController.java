@@ -7,6 +7,7 @@ import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostReca
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderOutputService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderPlannedCostTriggerService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.dto.ConsumeFromStockUnitRequest;
 import com.fabricmanagement.production.execution.workorder.dto.ProductionDashboardResponse;
@@ -72,6 +73,8 @@ public class WorkOrderController {
   public PagedResponse<WorkOrderResponse> listWorkOrders(
       @Parameter(description = "Filter by status") @RequestParam(required = false)
           WorkOrderStatus status,
+      @Parameter(description = "Filter by module type") @RequestParam(required = false)
+          WorkOrderModuleType moduleType,
       @Parameter(description = "Filter by customer/supplier") @RequestParam(required = false)
           UUID tradingPartnerId,
       @Parameter(description = "Filter by sales order") @RequestParam(required = false)
@@ -101,6 +104,7 @@ public class WorkOrderController {
     WorkOrderFilterRequest filter =
         new WorkOrderFilterRequest(
             status,
+            moduleType,
             tradingPartnerId,
             salesOrderId,
             recipeId,

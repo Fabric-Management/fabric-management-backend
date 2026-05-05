@@ -107,7 +107,8 @@ public class WorkOrderCostRecalculationService {
                 c ->
                     new ConsumptionCostInput(
                         c.getMaterialId(),
-                        c.getMaterialType().name(),
+                        workOrder
+                            .getModuleType(), // Production spec says parent consumes same as WO
                         c.getConsumedWeight(),
                         c.getUnit()))
             .toList();
@@ -124,7 +125,7 @@ public class WorkOrderCostRecalculationService {
         costEnginePort.computeActualCostFromConsumptions(
             tenantId,
             workOrderId,
-            outputBatch.getMaterialType().name(),
+            workOrder.getModuleType(),
             outputBatch.getMaterialId(),
             workOrder.getActualQty(),
             workOrder.getTradingPartnerId(),

@@ -12,6 +12,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupplierQuoteTokenService {
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-  private static final int TOKEN_VALIDITY_DAYS = 7;
+
+  @Value("${procurement.quote.token-validity-days:7}")
+  private int tokenValidityDays;
 
   private final SupplierQuoteTokenRepository tokenRepository;
 
@@ -60,7 +63,7 @@ public class SupplierQuoteTokenService {
     token.setRfqRecipientId(rfqRecipientId);
     token.setToken(secureToken);
     token.setEntryMethod(entryMethod);
-    token.setExpiresAt(Instant.now().plus(TOKEN_VALIDITY_DAYS, ChronoUnit.DAYS));
+    token.setExpiresAt(Instant.now().plus(tokenValidityDays, ChronoUnit.DAYS));
     token.setStatus(SupplierQuoteTokenStatus.PENDING);
 
     SupplierQuoteToken saved = tokenRepository.save(token);

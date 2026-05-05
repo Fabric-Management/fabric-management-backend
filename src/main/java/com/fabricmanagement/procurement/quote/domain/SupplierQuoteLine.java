@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -43,17 +45,14 @@ public class SupplierQuoteLine extends BaseEntity {
 
   @Type(JsonType.class)
   @Column(name = "volume_discounts", columnDefinition = "jsonb", nullable = false)
-  private String volumeDiscounts = "{}";
+  private Map<String, Object> volumeDiscounts = new HashMap<>();
 
   @Column(name = "notes", columnDefinition = "TEXT")
   private String notes;
 
-  @Column(name = "is_active", nullable = false)
-  private boolean isActive = true;
-
-  public void markAsDeleted() {
-    this.isActive = false;
-    super.delete();
+  public BigDecimal lineTotal() {
+    if (unitPrice == null || qty == null) return BigDecimal.ZERO;
+    return unitPrice.multiply(qty);
   }
 
   @Override
