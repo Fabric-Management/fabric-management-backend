@@ -1,6 +1,8 @@
 package com.fabricmanagement.procurement.purchaseorder.dto;
 
+import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
+import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -25,6 +27,8 @@ public class PurchaseOrderResponse {
   BigDecimal totalAmount;
   Integer revisionNumber;
   String notes;
+  PurchaseOrderModuleType moduleType;
+  PurchaseOrderSpecs moduleSpecs;
   List<PurchaseOrderLineResponse> lines;
 
   @Value
@@ -38,5 +42,6 @@ public class PurchaseOrderResponse {
     BigDecimal unitPrice;
     String currency;
     BigDecimal totalPrice;
+    String moduleSpecs;
   }
 }

@@ -1,5 +1,7 @@
 package com.fabricmanagement.procurement.purchaseorder.dto;
 
+import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
+import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
@@ -34,6 +36,12 @@ public class CreatePurchaseOrderRequest {
   private LocalDate expectedDelivery;
   private String notes;
 
+  /** Üretim modülü tipi. RFQ akışında otomatik set edilir, direkt PO'da frontend gönderir. */
+  private PurchaseOrderModuleType moduleType;
+
+  /** Modüle özgü spec'ler (JSONB olarak saklanacak). */
+  private PurchaseOrderSpecs moduleSpecs;
+
   @NotEmpty(message = "At least one order line is required")
   @Valid
   private List<PurchaseOrderLineRequest> lines;
@@ -61,5 +69,8 @@ public class CreatePurchaseOrderRequest {
 
     @NotNull(message = "Currency is required")
     private String currency;
+
+    /** Line-level module-specific data. */
+    private String moduleSpecs;
   }
 }
