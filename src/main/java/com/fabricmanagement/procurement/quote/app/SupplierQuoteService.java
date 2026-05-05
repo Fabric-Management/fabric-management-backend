@@ -90,6 +90,17 @@ public class SupplierQuoteService {
     String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     quote.setQuoteNumber(String.format("SQ-%s-%s", year, suffix));
 
+    SupplierRFQ parentRfq =
+        rfqRepository
+            .findByTenantIdAndIdAndIsActiveTrue(tenantId, req.rfqId())
+            .orElseThrow(() -> new ProcurementDomainException("RFQ not found"));
+
+    if (parentRfq.getModuleType() != null
+        && req.moduleType() != null
+        && !parentRfq.getModuleType().name().equals(req.moduleType().name())) {
+      throw new ProcurementDomainException("Quote moduleType must match parent RFQ moduleType");
+    }
+
     quote.setRfqId(req.rfqId());
     quote.setTradingPartnerId(req.tradingPartnerId());
     quote.setValidUntil(req.validUntil());
@@ -97,6 +108,7 @@ public class SupplierQuoteService {
     quote.setPaymentTerms(req.paymentTerms());
     quote.setLeadTimeDays(req.leadTimeDays());
     quote.setEntryMethod(req.entryMethod());
+    quote.setModuleType(req.moduleType());
     quote.setNotes(req.notes());
     quote.setStatus(SupplierQuoteStatus.RECEIVED);
 
@@ -125,6 +137,9 @@ public class SupplierQuoteService {
     line.setUnit(req.unit());
     if (req.volumeDiscounts() != null && !req.volumeDiscounts().isEmpty()) {
       line.setVolumeDiscounts(req.volumeDiscounts());
+    }
+    if (req.moduleSpecs() != null) {
+      line.setModuleSpecs(req.moduleSpecs());
     }
     line.setNotes(req.notes());
 

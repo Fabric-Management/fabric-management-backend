@@ -1,5 +1,6 @@
 package com.fabricmanagement.procurement.quote.dto;
 
+import com.fabricmanagement.procurement.quote.domain.specs.SupplierQuoteSpecs;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -31,4 +32,5 @@ public record AddQuoteLineRequest(
         @Schema(description = "Unit of measure", requiredMode = Schema.RequiredMode.REQUIRED)
         String unit,
     @Schema(description = "Volume discounts") Map<String, Object> volumeDiscounts,
+    @Schema(description = "Module-specific specifications") SupplierQuoteSpecs moduleSpecs,
     @Schema(description = "Line notes") String notes) {}

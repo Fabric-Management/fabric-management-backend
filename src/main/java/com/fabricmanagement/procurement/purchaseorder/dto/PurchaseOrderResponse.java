@@ -42,6 +42,6 @@ public class PurchaseOrderResponse {
     BigDecimal unitPrice;
     String currency;
     BigDecimal totalPrice;
-    String moduleSpecs;
+    PurchaseOrderSpecs moduleSpecs;
   }
 }

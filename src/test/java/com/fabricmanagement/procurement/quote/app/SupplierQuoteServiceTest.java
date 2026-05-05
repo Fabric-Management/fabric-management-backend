@@ -18,6 +18,7 @@ import com.fabricmanagement.procurement.quote.dto.CreateSupplierQuoteRequest;
 import com.fabricmanagement.procurement.quote.dto.SupplierQuoteResponse;
 import com.fabricmanagement.procurement.quote.infra.repository.SupplierQuoteRepository;
 import com.fabricmanagement.procurement.quote.mapper.SupplierQuoteMapper;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -85,13 +86,17 @@ class SupplierQuoteServiceTest {
             null,
             null,
             QuoteEntryMethod.MANUAL_ENTRY,
+            com.fabricmanagement.procurement.quote.domain.SupplierQuoteModuleType.GENERIC,
             null);
 
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
     when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
     when(partnerResolver.resolvePartner(tenantId, partnerId)).thenReturn(Optional.empty());
+    SupplierRFQ mockRfq = new SupplierRFQ();
+    mockRfq.setModuleType(
+        com.fabricmanagement.procurement.rfq.domain.SupplierRFQModuleType.GENERIC);
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
-        .thenReturn(Optional.empty());
+        .thenReturn(Optional.of(mockRfq));
 
     SupplierQuoteResponse created = quoteService.createQuote(req);
 
@@ -115,6 +120,7 @@ class SupplierQuoteServiceTest {
             "USD",
             new BigDecimal("500"),
             "KG",
+            null,
             null,
             null);
 
@@ -141,6 +147,7 @@ class SupplierQuoteServiceTest {
             "USD",
             new BigDecimal("100"),
             "KG",
+            null,
             null,
             null);
 

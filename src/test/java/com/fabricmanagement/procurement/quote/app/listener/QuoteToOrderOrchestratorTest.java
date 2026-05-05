@@ -16,6 +16,7 @@ import com.fabricmanagement.procurement.rfq.domain.SupplierRFQType;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import com.fabricmanagement.procurement.subcontract.app.SubcontractOrderService;
 import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +37,7 @@ class QuoteToOrderOrchestratorTest {
   @Mock private PurchaseOrderService purchaseOrderService;
   @Mock private PurchaseOrderRepository purchaseOrderRepository;
   @Mock private SubcontractOrderService subcontractOrderService;
+  @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
   @InjectMocks private QuoteToOrderOrchestrator orchestrator;
 

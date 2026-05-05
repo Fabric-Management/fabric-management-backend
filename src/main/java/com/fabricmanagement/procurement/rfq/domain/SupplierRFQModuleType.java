@@ -5,5 +5,8 @@ public enum SupplierRFQModuleType {
   FIBER,
   YARN,
   FABRIC,
-  DYE_FINISHING
+  DYE_FINISHING,
+
+  /** Tiplendirilmemiş RFQ'lar ve geriye dönük uyumluluk için varsayılan değer. */
+  GENERIC
 }

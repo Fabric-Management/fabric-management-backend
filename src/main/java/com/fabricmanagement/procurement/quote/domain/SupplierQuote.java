@@ -42,6 +42,10 @@ public class SupplierQuote extends BaseEntity {
   @Column(name = "status", nullable = false, length = 30)
   private SupplierQuoteStatus status = SupplierQuoteStatus.RECEIVED;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "module_type", nullable = false, length = 50)
+  private SupplierQuoteModuleType moduleType = SupplierQuoteModuleType.GENERIC;
+
   @Column(name = "valid_until", nullable = false)
   private LocalDate validUntil;
 

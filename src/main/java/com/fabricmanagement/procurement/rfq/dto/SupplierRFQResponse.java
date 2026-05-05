@@ -5,6 +5,8 @@ import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQModuleType;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQStatus;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQType;
+import com.fabricmanagement.procurement.rfq.domain.specs.SupplierRFQSpecs;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -34,13 +36,25 @@ public class SupplierRFQResponse {
 
   @Value
   @Builder
+  @Schema(description = "RFQ Line Response")
   public static class RfqLineResponse {
+    @Schema(description = "Line ID")
     UUID id;
+
+    @Schema(description = "Material ID")
     UUID materialId;
+
+    @Schema(description = "Product Description")
     String productDesc;
+
+    @Schema(description = "Requested Quantity")
     BigDecimal requestedQty;
+
+    @Schema(description = "Unit of Measure")
     String unit;
-    String moduleSpecs;
+
+    @Schema(description = "Module Specifications")
+    SupplierRFQSpecs moduleSpecs;
   }
 
   @Value

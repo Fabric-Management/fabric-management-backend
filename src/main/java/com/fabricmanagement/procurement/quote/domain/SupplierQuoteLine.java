@@ -1,6 +1,8 @@
 package com.fabricmanagement.procurement.quote.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.procurement.quote.domain.specs.GenericQuoteSpecs;
+import com.fabricmanagement.procurement.quote.domain.specs.SupplierQuoteSpecs;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,6 +48,10 @@ public class SupplierQuoteLine extends BaseEntity {
   @Type(JsonType.class)
   @Column(name = "volume_discounts", columnDefinition = "jsonb", nullable = false)
   private Map<String, Object> volumeDiscounts = new HashMap<>();
+
+  @Type(JsonType.class)
+  @Column(name = "module_specs", columnDefinition = "jsonb", nullable = false)
+  private SupplierQuoteSpecs moduleSpecs = new GenericQuoteSpecs(null);
 
   @Column(name = "notes", columnDefinition = "TEXT")
   private String notes;

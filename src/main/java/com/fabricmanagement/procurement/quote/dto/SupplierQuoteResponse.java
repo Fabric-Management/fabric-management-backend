@@ -1,7 +1,9 @@
 package com.fabricmanagement.procurement.quote.dto;
 
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
+import com.fabricmanagement.procurement.quote.domain.SupplierQuoteModuleType;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteStatus;
+import com.fabricmanagement.procurement.quote.domain.specs.SupplierQuoteSpecs;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -32,6 +34,9 @@ public class SupplierQuoteResponse {
 
   @Schema(description = "Trading Partner ID")
   UUID tradingPartnerId;
+
+  @Schema(description = "Module Type")
+  SupplierQuoteModuleType moduleType;
 
   @Schema(description = "Current Status")
   SupplierQuoteStatus status;
@@ -84,6 +89,9 @@ public class SupplierQuoteResponse {
 
     @Schema(description = "Unit of Measure")
     String unit;
+
+    @Schema(description = "Module Specs")
+    SupplierQuoteSpecs moduleSpecs;
 
     @Schema(description = "Total Line Amount")
     BigDecimal lineTotal;

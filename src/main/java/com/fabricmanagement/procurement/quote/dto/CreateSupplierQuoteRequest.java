@@ -1,6 +1,7 @@
 package com.fabricmanagement.procurement.quote.dto;
 
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
+import com.fabricmanagement.procurement.quote.domain.SupplierQuoteModuleType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
@@ -33,4 +34,9 @@ public record CreateSupplierQuoteRequest(
     @NotNull(message = "Entry method is required")
         @Schema(description = "Entry method", requiredMode = Schema.RequiredMode.REQUIRED)
         QuoteEntryMethod entryMethod,
+    @NotNull(message = "Module type is required")
+        @Schema(
+            description = "Module type of the quote",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        SupplierQuoteModuleType moduleType,
     @Schema(description = "Additional notes") String notes) {}
