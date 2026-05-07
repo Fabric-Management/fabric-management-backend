@@ -7,6 +7,8 @@ import com.fabricmanagement.platform.communication.domain.NotificationDeliveryCh
 import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.platform.communication.dto.NotificationRequest;
 import com.fabricmanagement.platform.communication.infra.repository.NotificationRepository;
+import com.fabricmanagement.platform.tenant.domain.TenantType;
+import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserContactRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
@@ -42,6 +44,7 @@ public class InAppNotificationService {
   private final UserRepository userRepository;
   private final UserContactRepository userContactRepository;
   private final NotificationService notificationService;
+  private final TenantRepository tenantRepository;
 
   /**
    * Send notification: save to DB and optionally send email if channel is EMAIL or BOTH.
@@ -51,6 +54,13 @@ public class InAppNotificationService {
    */
   @Transactional
   public Notification send(NotificationRequest request) {
+    if (isPlaygroundTenant(request.tenantId())) {
+      log.debug(
+          "🛡️ [PLAYGROUND] Skipping in-app notification for playground tenant: {}",
+          request.tenantId());
+      return null;
+    }
+
     Notification notification =
         TenantContext.executeInTenantContext(
             request.tenantId(),
@@ -205,5 +215,15 @@ public class InAppNotificationService {
               .channel(channel)
               .build());
     }
+  }
+
+  private boolean isPlaygroundTenant(UUID tenantId) {
+    if (tenantId == null) {
+      return false;
+    }
+    return tenantRepository
+        .findById(tenantId)
+        .map(tenant -> tenant.getType() == TenantType.PLAYGROUND)
+        .orElse(false);
   }
 }

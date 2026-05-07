@@ -38,7 +38,7 @@ class SupplierQuoteExpirationJobTest {
     List<SupplierQuote> staleQuotes = List.of(quote1, quote2);
 
     when(quoteRepository.findByValidUntilBeforeAndStatusInAndIsActiveTrue(
-            any(LocalDate.class), any(List.class)))
+            any(LocalDate.class), any()))
         .thenReturn(staleQuotes);
 
     expirationJob.expireStaleQuotes();
@@ -51,7 +51,7 @@ class SupplierQuoteExpirationJobTest {
   @Test
   void expireStaleQuotes_NoStaleQuotes_DoesNothing() {
     when(quoteRepository.findByValidUntilBeforeAndStatusInAndIsActiveTrue(
-            any(LocalDate.class), any(List.class)))
+            any(LocalDate.class), any()))
         .thenReturn(new ArrayList<>());
 
     expirationJob.expireStaleQuotes();
