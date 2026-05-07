@@ -143,6 +143,8 @@ public class SecurityConfig {
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/ws/**")
                     .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
+                    .requestMatchers("/api/v1/playground/init")
+                    .permitAll()
                     .requestMatchers("/api/admin/**")
                     .permitAll()
                     .anyRequest()
@@ -183,6 +185,8 @@ public class SecurityConfig {
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
                     .requestMatchers("/api/ws/**")
                     .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
+                    .requestMatchers("/api/v1/playground/init")
+                    .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
