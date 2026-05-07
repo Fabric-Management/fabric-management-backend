@@ -89,6 +89,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + "WHERE u.tenantId = :tenantId AND u.isActive = true")
   List<User> findByTenantIdAndIsActiveTrue(@Param("tenantId") UUID tenantId);
 
+  @Query(
+      """
+      SELECT DISTINCT u FROM User u
+      LEFT JOIN FETCH u.role
+      LEFT JOIN FETCH u.userDepartments ud
+      LEFT JOIN FETCH ud.department
+      LEFT JOIN FETCH u.userContacts uc
+      LEFT JOIN FETCH uc.contact
+      WHERE u.tenantId = :tenantId AND u.isActive = true
+      """)
+  List<User> findByTenantIdWithRelations(@Param("tenantId") UUID tenantId);
+
   /** Get all users for an organization with role and department eagerly loaded. */
   @Query(
       "SELECT DISTINCT u FROM User u "

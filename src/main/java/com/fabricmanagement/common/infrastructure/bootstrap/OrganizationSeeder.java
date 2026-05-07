@@ -28,7 +28,7 @@ public class OrganizationSeeder implements DataSeeder {
   private final DepartmentRepository departmentRepository;
   private final TransactionTemplate transactionTemplate;
 
-  private static final String TAX_ID = "AKK-1234567890";
+  private static final String TAX_ID = "NXF-1234567890";
 
   private static final Map<String, String> EXPECTED_DEPARTMENTS = new java.util.LinkedHashMap<>();
 
@@ -40,6 +40,7 @@ public class OrganizationSeeder implements DataSeeder {
     EXPECTED_DEPARTMENTS.put("Procurement", "PROCUREMENT");
     EXPECTED_DEPARTMENTS.put("Quality Control", "QUALITY");
     EXPECTED_DEPARTMENTS.put("Warehouse & Logistics", "WAREHOUSE");
+    EXPECTED_DEPARTMENTS.put("Shipping & Transport", "SHIPPING");
     // Production group
     EXPECTED_DEPARTMENTS.put("Fiber Processing", "FIBER");
     EXPECTED_DEPARTMENTS.put("Yarn Production", "YARN");
@@ -47,6 +48,8 @@ public class OrganizationSeeder implements DataSeeder {
     EXPECTED_DEPARTMENTS.put("Knitting", "KNITTING");
     EXPECTED_DEPARTMENTS.put("Dyeing & Finishing", "DYEING");
     EXPECTED_DEPARTMENTS.put("Garment Production", "GARMENT");
+    EXPECTED_DEPARTMENTS.put("Production Planning", "PLANNING");
+    EXPECTED_DEPARTMENTS.put("R&D & Product Development", "RD");
   }
 
   private static final Map<String, String> GROUP_MAPPING =
@@ -57,12 +60,15 @@ public class OrganizationSeeder implements DataSeeder {
           Map.entry("PROCUREMENT", "SUPPORT"),
           Map.entry("QUALITY", "SUPPORT"),
           Map.entry("WAREHOUSE", "SUPPORT"),
+          Map.entry("SHIPPING", "SUPPORT"),
           Map.entry("FIBER", "PRODUCTION"),
           Map.entry("YARN", "PRODUCTION"),
           Map.entry("WEAVING", "PRODUCTION"),
           Map.entry("KNITTING", "PRODUCTION"),
           Map.entry("DYEING", "PRODUCTION"),
-          Map.entry("GARMENT", "PRODUCTION"));
+          Map.entry("GARMENT", "PRODUCTION"),
+          Map.entry("PLANNING", "PRODUCTION"),
+          Map.entry("RD", "PRODUCTION"));
 
   @Override
   public boolean isSeeded() {

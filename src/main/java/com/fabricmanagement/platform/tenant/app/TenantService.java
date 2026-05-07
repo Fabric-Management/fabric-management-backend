@@ -70,7 +70,7 @@ public class TenantService {
     String slug = generateUniqueSlug(request.getName());
 
     // Create tenant
-    Tenant tenant = Tenant.create(request.getName(), uid, slug, settings);
+    Tenant tenant = Tenant.create(request.getName(), uid, slug, settings, request.getType());
     tenant.setBillingEmail(request.getBillingEmail());
 
     // Start trial if requested

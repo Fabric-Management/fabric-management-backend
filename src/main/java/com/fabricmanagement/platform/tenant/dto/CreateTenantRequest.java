@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tenant.dto;
 
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
+import com.fabricmanagement.platform.tenant.domain.TenantType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -37,4 +38,7 @@ public class CreateTenantRequest {
 
   /** Country code for locale defaults (ISO 3166-1 alpha-2) */
   private String country;
+
+  /** Tenant type classification (optional - uses REGULAR if not provided) */
+  private TenantType type;
 }

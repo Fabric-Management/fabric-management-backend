@@ -126,8 +126,14 @@ public class Tenant implements Serializable {
   private String billingEmail;
 
   // ========================================
-  // SUBSCRIPTION STATUS
+  // SUBSCRIPTION STATUS & TYPE
   // ========================================
+
+  /** Tenant type classification */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "type", nullable = false, length = 20)
+  @Builder.Default
+  private TenantType type = TenantType.REGULAR;
 
   /** Current lifecycle status */
   @Enumerated(EnumType.STRING)
@@ -229,10 +235,26 @@ public class Tenant implements Serializable {
    * @return new Tenant in TRIAL status
    */
   public static Tenant create(String name, String uid, String slug, TenantSettings settings) {
+    return create(name, uid, slug, settings, TenantType.REGULAR);
+  }
+
+  /**
+   * Create a new tenant with explicit slug and type.
+   *
+   * @param name Display name
+   * @param uid Human-readable UID
+   * @param slug URL-friendly slug
+   * @param settings Custom settings
+   * @param type Tenant type
+   * @return new Tenant in TRIAL status
+   */
+  public static Tenant create(
+      String name, String uid, String slug, TenantSettings settings, TenantType type) {
     return Tenant.builder()
         .name(name)
         .uid(uid)
         .slug(slug)
+        .type(type != null ? type : TenantType.REGULAR)
         .status(TenantStatus.TRIAL)
         .settings(settings != null ? settings : TenantSettings.defaults())
         .build();
@@ -337,6 +359,9 @@ public class Tenant implements Serializable {
     }
     if (this.settings == null) {
       this.settings = TenantSettings.defaults();
+    }
+    if (this.type == null) {
+      this.type = TenantType.REGULAR;
     }
   }
 

@@ -3,6 +3,8 @@ package com.fabricmanagement.platform.subscription.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
+import com.fabricmanagement.platform.user.domain.JobTitlePreset;
+import com.fabricmanagement.platform.user.domain.port.JobTitlePresetRepository;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TenantSeedService {
 
   private final DepartmentRepository departmentRepository;
+  private final JobTitlePresetRepository jobTitlePresetRepository;
 
   @Transactional
   public void seedDepartments(UUID tenantId, UUID organizationId) {
@@ -51,6 +54,8 @@ public class TenantSeedService {
       seedLogisticsDepartments(organizationId, logistics);
       seedUtilityDepartments(organizationId, utility);
       seedSupportDepartments(organizationId, support);
+
+      seedJobTitles(tenantId);
 
       log.info("Seeded departments for tenant: tenantId={}", tenantId);
     } finally {
@@ -177,5 +182,26 @@ public class TenantSeedService {
     createDepartment(organizationId, "Security", "Security and access control", parent);
     createDepartment(
         organizationId, "Cleaning Services", "Cleaning and janitorial services", parent);
+  }
+
+  private void seedJobTitles(UUID tenantId) {
+    int seededCount = 0;
+    for (var preset : JobTitleSeedData.ALL_PRESETS) {
+      if (!jobTitlePresetRepository.existsByTenantIdAndJobTitleCode(tenantId, preset.code())) {
+        jobTitlePresetRepository.save(
+            JobTitlePreset.createSystem(
+                preset.code(),
+                preset.name(),
+                preset.description(),
+                preset.roleCode(),
+                preset.departmentCode()));
+        seededCount++;
+      }
+    }
+    log.info(
+        "Seeded {}/{} job title presets for tenant: {}",
+        seededCount,
+        JobTitleSeedData.ALL_PRESETS.size(),
+        tenantId);
   }
 }
