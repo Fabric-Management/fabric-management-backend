@@ -18,8 +18,10 @@ import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.platform.user.domain.port.EmployeeCompliancePort;
+import com.fabricmanagement.platform.user.domain.port.EmployeeCreationCommand;
 import com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
+import com.fabricmanagement.platform.user.domain.port.JobTitlePresetRepository;
 import com.fabricmanagement.platform.user.dto.AddressData;
 import com.fabricmanagement.platform.user.dto.ContactData;
 import com.fabricmanagement.platform.user.dto.CreateAdminUserRequest;
@@ -70,6 +72,7 @@ public class UserCreationService {
   private final EmployeeCreationPort employeeCreationPort;
   private final EmployeeProjectionPort employeeProjectionPort;
   private final EmployeeCompliancePort employeeCompliancePort;
+  private final JobTitlePresetRepository jobTitlePresetRepository;
 
   @Transactional
   public UserDto createInternalUser(CreateInternalUserRequest request) {
@@ -245,14 +248,16 @@ public class UserCreationService {
           try {
             String employeeNumber = employeeCreationPort.generateEmployeeNumber();
             employeeCreationPort.createOrUpdate(
-                saved.getId(),
-                null,
-                null,
-                null,
-                null,
-                employeeNumber,
-                java.time.LocalDate.now(),
-                null);
+                new EmployeeCreationCommand(
+                    saved.getId(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    employeeNumber,
+                    java.time.LocalDate.now(),
+                    null,
+                    null));
             log.info(
                 "Initialized default Employee profile for admin: userId={}, empNo={}",
                 saved.getId(),
@@ -434,6 +439,7 @@ public class UserCreationService {
             || request.getNationality() != null
             || request.getHireDate() != null
             || request.getEmergencyContact() != null
+            || (request.getJobTitleCode() != null && !request.getJobTitleCode().isBlank())
             || (request.getEmployeeNumber() != null && !request.getEmployeeNumber().isBlank());
 
     if (!hasAnyHrData) {
@@ -454,15 +460,27 @@ public class UserCreationService {
               request.getEmergencyContact().getRelationship());
     }
 
+    UUID jobTitlePresetId = null;
+    if (request.getJobTitleCode() != null && !request.getJobTitleCode().isBlank()) {
+      jobTitlePresetId =
+          jobTitlePresetRepository
+              .findByTenantIdAndJobTitleCode(
+                  TenantContext.getCurrentTenantId(), request.getJobTitleCode())
+              .map(com.fabricmanagement.platform.user.domain.JobTitlePreset::getId)
+              .orElse(null);
+    }
+
     employeeCreationPort.createOrUpdate(
-        userId,
-        request.getTitle(),
-        request.getGender(),
-        request.getBirthDate(),
-        request.getNationality(),
-        employeeNumber,
-        request.getHireDate(),
-        emergencyContact);
+        new EmployeeCreationCommand(
+            userId,
+            request.getTitle(),
+            request.getGender(),
+            request.getBirthDate(),
+            request.getNationality(),
+            employeeNumber,
+            request.getHireDate(),
+            emergencyContact,
+            jobTitlePresetId));
   }
 
   private com.fabricmanagement.platform.communication.domain.AddressType parseAddressType(

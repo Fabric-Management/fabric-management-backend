@@ -1,17 +1,15 @@
 package com.fabricmanagement.human.core.employee.app.adapter;
 
 import com.fabricmanagement.common.infrastructure.identity.EmergencyContactData;
-import com.fabricmanagement.common.infrastructure.identity.Gender;
-import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.human.core.employee.domain.EmergencyContact;
 import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.platform.user.domain.EmployeeFieldUpdates;
 import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.port.EmployeeCompliancePort;
+import com.fabricmanagement.platform.user.domain.port.EmployeeCreationCommand;
 import com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort;
 import com.fabricmanagement.platform.user.domain.port.EmployeeMutationPort;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,20 +26,8 @@ public class EmployeeCreationAdapter
 
   @Override
   @Transactional
-  public EmployeeSnapshot createOrUpdate(
-      UUID userId,
-      Title title,
-      Gender gender,
-      LocalDate birthDate,
-      String nationality,
-      String employeeNumber,
-      LocalDate hireDate,
-      EmergencyContactData emergencyContact) {
-
-    EmergencyContact ec = toDomainEmergencyContact(emergencyContact);
-    Employee employee =
-        employeeService.createOrUpdateEmployee(
-            userId, title, gender, birthDate, nationality, employeeNumber, hireDate, ec);
+  public EmployeeSnapshot createOrUpdate(EmployeeCreationCommand command) {
+    Employee employee = employeeService.createOrUpdateEmployee(command);
     return EmployeeSnapshotFactory.fromEntity(employee);
   }
 

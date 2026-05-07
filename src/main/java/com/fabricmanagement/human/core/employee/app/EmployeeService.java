@@ -1,8 +1,7 @@
 package com.fabricmanagement.human.core.employee.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.common.infrastructure.identity.Gender;
-import com.fabricmanagement.common.infrastructure.identity.Title;
+import com.fabricmanagement.common.infrastructure.identity.EmergencyContactData;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.human.compliance.app.EmployeeCompliancePolicyRegistry;
 import com.fabricmanagement.human.compliance.domain.EmployeeComplianceContext;
@@ -13,6 +12,8 @@ import com.fabricmanagement.human.core.employee.domain.EmployeeNumberSequence;
 import com.fabricmanagement.human.core.employee.domain.event.EmployeeUpdatedEvent;
 import com.fabricmanagement.human.core.employee.infra.repository.EmployeeNumberSequenceRepository;
 import com.fabricmanagement.human.core.employee.infra.repository.EmployeeRepository;
+import com.fabricmanagement.platform.user.domain.port.EmployeeCreationCommand;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -31,42 +32,42 @@ public class EmployeeService {
   private final EmployeeNumberSequenceRepository sequenceRepository;
   private final EmployeeCompliancePolicyRegistry compliancePolicyRegistry;
   private final DomainEventPublisher eventPublisher;
+  private final EntityManager entityManager;
 
   @Transactional
-  public Employee createOrUpdateEmployee(
-      UUID userId,
-      Title title,
-      Gender gender,
-      LocalDate birthDate,
-      String nationality,
-      String employeeNumber,
-      LocalDate hireDate,
-      EmergencyContact emergencyContact) {
+  public Employee createOrUpdateEmployee(EmployeeCreationCommand command) {
 
     UUID tenantId = TenantContext.getCurrentTenantId();
 
-    log.debug("Creating/updating employee: userId={}, tenantId={}", userId, tenantId);
+    log.debug("Creating/updating employee: userId={}, tenantId={}", command.userId(), tenantId);
 
     Employee employee =
         employeeRepository
-            .findByUserId(userId)
+            .findByUserId(command.userId())
             .orElseGet(
                 () -> {
-                  Employee newEmployee = Employee.builder().userId(userId).build();
+                  Employee newEmployee = Employee.builder().userId(command.userId()).build();
                   newEmployee.setTenantId(tenantId);
                   return newEmployee;
                 });
 
-    employee.setTitle(title);
-    employee.setGender(gender);
-    employee.setBirthDate(birthDate);
-    employee.setNationality(nationality);
-    employee.setEmployeeNumber(employeeNumber);
-    employee.setHireDate(hireDate);
-    employee.setEmergencyContact(emergencyContact);
+    employee.setTitle(command.title());
+    employee.setGender(command.gender());
+    employee.setBirthDate(command.birthDate());
+    employee.setNationality(command.nationality());
+    employee.setEmployeeNumber(command.employeeNumber());
+    employee.setHireDate(command.hireDate());
+    employee.setEmergencyContact(toDomainEmergencyContact(command.emergencyContact()));
+
+    if (command.jobTitlePresetId() != null) {
+      employee.setJobTitlePreset(
+          entityManager.getReference(
+              com.fabricmanagement.platform.user.domain.JobTitlePreset.class,
+              command.jobTitlePresetId()));
+    }
 
     Employee saved = employeeRepository.save(employee);
-    eventPublisher.publish(new EmployeeUpdatedEvent(tenantId, userId));
+    eventPublisher.publish(new EmployeeUpdatedEvent(tenantId, command.userId()));
     return saved;
   }
 
@@ -189,5 +190,16 @@ public class EmployeeService {
         new com.fabricmanagement.human.core.employee.domain.event.EmployeeTerminatedEvent(
             tenantId, userId, terminationDate));
     return saved;
+  }
+
+  private static EmergencyContact toDomainEmergencyContact(EmergencyContactData data) {
+    if (data == null || data.isEmpty()) {
+      return null;
+    }
+    return EmergencyContact.builder()
+        .name(data.name())
+        .phone(data.phone())
+        .relationship(data.relationship())
+        .build();
   }
 }

@@ -72,6 +72,9 @@ public class CreateInternalUserRequest {
   /** Role ID for user assignment. */
   private UUID roleId;
 
+  /** Optional job title code to assign a JobTitlePreset. */
+  private String jobTitleCode;
+
   /** Additional contacts (emails, phones) beyond the primary contact. */
   @Builder.Default @Valid private List<ContactData> additionalContacts = new ArrayList<>();
 
