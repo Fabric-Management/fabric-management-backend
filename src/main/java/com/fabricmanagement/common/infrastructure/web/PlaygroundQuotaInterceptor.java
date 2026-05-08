@@ -26,7 +26,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Slf4j
 public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
 
-  private static final int MAX_MUTATIONS_PER_PLAYGROUND = 500;
+  private static final int MAX_MUTATIONS_PER_PLAYGROUND = 5_000;
 
   // In-memory counter for playground quotas.
   // In a multi-node environment with Redis, this should be replaced with a Redis counter.
@@ -68,7 +68,7 @@ public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
           response
               .getWriter()
               .write(
-                  "{\"error\": \"Playground quota exceeded. You have reached the 500 transaction limit for this session.\"}");
+                  "{\"error\": \"Playground quota exceeded. You have reached the 5,000 transaction limit for this session.\"}");
           return false;
         }
 

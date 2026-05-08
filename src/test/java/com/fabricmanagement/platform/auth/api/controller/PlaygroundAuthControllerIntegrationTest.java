@@ -39,6 +39,7 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractCostingIntegration
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.token").exists())
             .andExpect(jsonPath("$.tenantId").exists())
+            .andExpect(jsonPath("$.organizationType").exists())
             .andReturn();
 
     String responseStr = initResult.getResponse().getContentAsString();
@@ -50,6 +51,8 @@ class PlaygroundAuthControllerIntegrationTest extends AbstractCostingIntegration
             .perform(get("/api/v1/playground/personas").header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(2))))
+            .andExpect(jsonPath("$[0].userType").exists())
+            .andExpect(jsonPath("$[0].organizationName").exists())
             .andReturn();
 
     String personasStr = personasResult.getResponse().getContentAsString();

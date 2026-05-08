@@ -92,6 +92,15 @@ public class JwtService {
    */
   public String generatePlaygroundAccessToken(User user, String guestId) {
     String contactValue = getVerifiedContactOrThrow(user);
+    return generatePlaygroundAccessToken(user, guestId, contactValue);
+  }
+
+  /**
+   * Overload that accepts a pre-resolved contactValue. Use this when the caller has already fetched
+   * the contact (e.g. via a direct query) to avoid LazyInitializationException on
+   * User.userContacts.
+   */
+  public String generatePlaygroundAccessToken(User user, String guestId, String contactValue) {
     log.debug(
         "Generating playground access token for user: {}, guestId: {}", contactValue, guestId);
 
@@ -129,6 +138,9 @@ public class JwtService {
     String primaryDepartmentCode = null;
     String department = null;
     for (var ud : user.getUserDepartments()) {
+      if (ud.getDepartment() == null) {
+        continue;
+      }
       String code = ud.getDepartment().getDepartmentCode();
       if (code != null) {
         departmentCodes.add(code);

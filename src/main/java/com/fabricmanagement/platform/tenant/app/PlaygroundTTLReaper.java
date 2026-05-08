@@ -59,11 +59,23 @@ public class PlaygroundTTLReaper {
     log.info("Playground TTL Reaper job completed.");
   }
 
+  /**
+   * Hard-purge job: permanently deletes playground tenants that have been inactive for 30+ days.
+   * Runs daily at 4 AM, one hour after the soft-delete reaper.
+   *
+   * <p>Cascading delete order: UserContact → Contact → UserDepartment → User → Department →
+   * Organization → Tenant.
+   */
   @Scheduled(cron = "${playground.purge.cron:0 0 4 * * ?}")
   @Transactional
   public void purgeInactivePlaygrounds() {
-    Instant purgeThreshold = Instant.now().minus(30, ChronoUnit.DAYS);
-    log.info("Starting Playground Hard Purge job for tenants older than 30 days...");
-    // TODO: Implement cascading hard delete for playground tenant data (CR4-3)
+    log.info("Starting Playground Hard Purge job for tenants inactive for 30+ days...");
+    // TODO(CR4-3): Implement cascading hard delete for playground tenant data.
+    // Steps:
+    //   1. Find tenants WHERE type=PLAYGROUND AND isActive=false AND updatedAt < now()-30d
+    //   2. For each tenant, delete in order: notifications, user_contacts, contacts,
+    //      user_departments, users, departments, organizations, tenant
+    //   3. Log count of purged tenants
+    log.info("Hard purge not yet implemented — skipping.");
   }
 }

@@ -35,23 +35,23 @@ class PlaygroundQuotaInterceptorTest {
   class PreHandle {
 
     @Test
-    @DisplayName("Should block POST request after 500 mutations in playground session")
-    void shouldBlockAfter500Mutations() throws Exception {
+    @DisplayName("Should block POST request after 5000 mutations in playground session")
+    void shouldBlockAfter5000Mutations() throws Exception {
       UUID tenantId = UUID.randomUUID();
       setPlaygroundContext(tenantId, "guest-1");
 
       MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/orders");
 
-      // Perform 500 requests
-      for (int i = 0; i < 500; i++) {
+      // Perform 5000 requests
+      for (int i = 0; i < 5_000; i++) {
         MockHttpServletResponse res = new MockHttpServletResponse();
         boolean allowed = interceptor.preHandle(request, res, new Object());
         assertThat(allowed).isTrue();
         assertThat(res.getHeader("X-Playground-Quota-Remaining"))
-            .isEqualTo(String.valueOf(499 - i));
+            .isEqualTo(String.valueOf(4_999 - i));
       }
 
-      // The 501st request should be blocked
+      // The 5001st request should be blocked
       MockHttpServletResponse blockedResponse = new MockHttpServletResponse();
       boolean allowed = interceptor.preHandle(request, blockedResponse, new Object());
 

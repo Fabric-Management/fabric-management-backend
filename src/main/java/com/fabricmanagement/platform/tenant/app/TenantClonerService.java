@@ -112,6 +112,7 @@ public class TenantClonerService {
               .roleName(oldRole.getRoleName())
               .roleCode(oldRole.getRoleCode())
               .description(oldRole.getDescription())
+              .roleScope(oldRole.getRoleScope())
               .build();
       newRole.setTenantId(newTenantId);
       newRole = roleRepository.save(newRole);
@@ -119,7 +120,9 @@ public class TenantClonerService {
     }
 
     // 6. Clone Users, UserDepartments, and Contacts
+    // Two-pass fetch to avoid MultipleBagFetchException:
     List<User> users = userRepository.findByTenantIdWithRelations(templateTenantId);
+    userRepository.findByTenantIdWithContacts(templateTenantId); // L1 cache merge
     for (User oldUser : users) {
       User newUser =
           User.builder()
@@ -131,7 +134,8 @@ public class TenantClonerService {
               .build();
       newUser.setTenantId(newTenantId);
       if (oldUser.getRole() != null) {
-        newUser.setRole(roleMap.get(oldUser.getRole().getId()));
+        Role clonedRole = roleMap.get(oldUser.getRole().getId());
+        newUser.setRole(clonedRole != null ? clonedRole : oldUser.getRole());
       }
       newUser = userRepository.save(newUser);
 

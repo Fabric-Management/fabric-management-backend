@@ -29,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Seeder for initial employees and users.
  *
- * <p>Generates 62 playground users (2 admins + 60 job-title-specific personas) for the Nexus
+ * <p>Generates 68 playground users (2 admins + 66 job-title-specific personas) for the Nexus
  * Fabrics demo tenant. Each user has a thematic name that hints at their role for intuitive
  * simulation UX.
  */
@@ -251,13 +251,34 @@ public class UserSeeder implements DataSeeder {
           new SeedUserProfile(
               "Thomas", "Techwell", "technolog@nexusfabrics.com", "WORKER", "RD", "TECHNOLOG"),
           new SeedUserProfile(
-              "Selma", "Sample", "sample.mkr@nexusfabrics.com", "WORKER", "RD", "SAMPLE_MKR"));
+              "Selma", "Sample", "sample.mkr@nexusfabrics.com", "WORKER", "RD", "SAMPLE_MKR"),
+
+          // ── 10. HR ──
+          new SeedUserProfile(
+              "Helen", "Hart", "hr.mgr@nexusfabrics.com", "MANAGER", "HR", "HR_MGR"),
+          new SeedUserProfile(
+              "Nina", "Newland", "recruiter@nexusfabrics.com", "WORKER", "HR", "RECRUITER"),
+          new SeedUserProfile(
+              "Harry", "Handbook", "hr.spec@nexusfabrics.com", "SUPERVISOR", "HR", "HR_SPEC"),
+
+          // ── 11. Finance ──
+          new SeedUserProfile(
+              "Fred", "Fiscal", "cfo@nexusfabrics.com", "MANAGER", "FINANCE", "CFO"),
+          new SeedUserProfile(
+              "Anna", "Audit", "accountant@nexusfabrics.com", "WORKER", "FINANCE", "ACCOUNTANT"),
+          new SeedUserProfile(
+              "Betty",
+              "Budget",
+              "budget@nexusfabrics.com",
+              "SUPERVISOR",
+              "FINANCE",
+              "BUDGET_ANALYST"));
 
   /**
    * Sentinel email: the LAST profile in the list. If this user exists, we know the full seed
    * completed successfully. Per-user idempotency in seedUser() handles partial runs.
    */
-  private static final String LAST_SEEDED_EMAIL = "sample.mkr@nexusfabrics.com";
+  private static final String LAST_SEEDED_EMAIL = "budget@nexusfabrics.com";
 
   @Override
   public boolean isSeeded() {
