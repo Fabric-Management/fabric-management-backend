@@ -9,6 +9,7 @@ import com.fabricmanagement.production.execution.batch.domain.BatchCertification
 import com.fabricmanagement.production.execution.batch.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/production/batches")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Batch", description = "Material Batch Inventory & Lifecycle Management API")
 public class BatchController {
 
   private final BatchService batchService;
@@ -41,6 +43,10 @@ public class BatchController {
   // ── Batch CRUD ─────────────────────────────────────────────────────────────
 
   @PostMapping
+  @Operation(
+      summary = "Create Batch",
+      description =
+          "Creates a new material batch. Requires fiberSpecs if materialType is FIBER, and yarnSpecs if materialType is YARN.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> createBatch(
       @Valid @RequestBody CreateBatchRequest request) {
@@ -49,6 +55,7 @@ public class BatchController {
   }
 
   @GetMapping
+  @Operation(summary = "Get All Batches", description = "Retrieves a list of all active batches.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<BatchDto>>> getAllBatches() {
     List<BatchDto> batches = batchService.getAll();
@@ -56,6 +63,7 @@ public class BatchController {
   }
 
   @GetMapping("/{id}")
+  @Operation(summary = "Get Batch by ID", description = "Retrieves details of a specific batch.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<BatchDto>> getBatch(@PathVariable UUID id) {
     return ResponseEntity.ok(
@@ -66,6 +74,9 @@ public class BatchController {
   }
 
   @GetMapping("/material/{materialId}")
+  @Operation(
+      summary = "Get Batches by Material ID",
+      description = "Retrieves all batches belonging to a specific material.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<BatchDto>>> getBatchesByMaterialId(
       @PathVariable UUID materialId) {
@@ -74,6 +85,9 @@ public class BatchController {
   }
 
   @GetMapping("/certification-autofill")
+  @Operation(
+      summary = "Get Certification Auto-fill",
+      description = "Provides auto-fill data for batch certifications.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<BatchCertificationAutoFillResponse>> getCertificationAutoFill(
       @RequestParam BatchCertificationScope scope,
@@ -89,6 +103,9 @@ public class BatchController {
   // ── Named Reservation ──────────────────────────────────────────────────────
 
   @PostMapping("/{id}/reserve")
+  @Operation(
+      summary = "Reserve Batch Quantity",
+      description = "Reserves a specific quantity of a batch for a sales order or work order.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchReservationDto>> reserve(
       @PathVariable UUID id, @Valid @RequestBody ReserveRequest request) {
@@ -97,6 +114,9 @@ public class BatchController {
   }
 
   @DeleteMapping("/{id}/reservations/{reservationId}")
+  @Operation(
+      summary = "Release Batch Reservation",
+      description = "Releases a previously made reservation, returning the quantity to available.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> releaseReservation(
       @PathVariable UUID id, @PathVariable UUID reservationId) {
@@ -105,6 +125,9 @@ public class BatchController {
   }
 
   @PostMapping("/{id}/reservations/{reservationId}/complete")
+  @Operation(
+      summary = "Complete Batch Reservation",
+      description = "Marks a reservation as complete (consumed).")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> completeReservation(
       @PathVariable UUID id, @PathVariable UUID reservationId) {
@@ -113,6 +136,9 @@ public class BatchController {
   }
 
   @GetMapping("/{id}/reservations")
+  @Operation(
+      summary = "Get Batch Reservations",
+      description = "Retrieves all active reservations for a batch.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<BatchReservationDto>>> getReservations(
       @PathVariable UUID id) {
@@ -123,6 +149,9 @@ public class BatchController {
   // ── Consume ────────────────────────────────────────────────────────────────
 
   @PostMapping("/{id}/consume")
+  @Operation(
+      summary = "Consume Batch Quantity",
+      description = "Directly consumes a quantity from the batch (bypassing reservation).")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> consume(
       @PathVariable UUID id, @Valid @RequestBody ConsumeRequest request) {
@@ -133,6 +162,9 @@ public class BatchController {
   // ── Waste ──────────────────────────────────────────────────────────────────
 
   @PostMapping("/{id}/waste")
+  @Operation(
+      summary = "Record Batch Waste",
+      description = "Records a quantity of the batch as waste.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> recordWaste(
       @PathVariable UUID id, @Valid @RequestBody RecordWasteRequest request) {
@@ -143,6 +175,9 @@ public class BatchController {
   // ── Inventory Adjustment ───────────────────────────────────────────────────
 
   @PostMapping("/{id}/adjust")
+  @Operation(
+      summary = "Adjust Batch Inventory",
+      description = "Adjusts the available quantity of a batch (cycle counting, discrepancies).")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> adjust(
       @PathVariable UUID id, @Valid @RequestBody AdjustmentRequest request) {
@@ -153,6 +188,9 @@ public class BatchController {
   // ── Start Production (WIP) ─────────────────────────────────────────────────
 
   @PostMapping("/{id}/start-production")
+  @Operation(
+      summary = "Start Production on Batch",
+      description = "Transitions batch status to IN_PRODUCTION.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> startProduction(
       @PathVariable UUID id, @Valid @RequestBody StartProductionRequest request) {
@@ -180,6 +218,10 @@ public class BatchController {
    * RETURNED/DESTROYED. Returns both batches.
    */
   @PostMapping("/{id}/split")
+  @Operation(
+      summary = "Split Batch",
+      description =
+          "Splits the batch: acceptedQuantity becomes a new AVAILABLE batch, remainder stays in source.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<SplitBatchResponse>> splitBatch(
       @PathVariable UUID id, @Valid @RequestBody SplitBatchRequest request) {
@@ -192,6 +234,9 @@ public class BatchController {
    * batch with acceptedQuantity is AVAILABLE.
    */
   @PostMapping("/{id}/split-partial-acceptance")
+  @Operation(
+      summary = "Partial Acceptance Split",
+      description = "Splits batch for partial QC acceptance. Remainder gets rejectedStatus.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> splitPartialAcceptance(
       @PathVariable UUID id, @Valid @RequestBody PartialAcceptanceSplitRequest request) {
@@ -200,6 +245,9 @@ public class BatchController {
   }
 
   @PostMapping("/{id}/transfer")
+  @Operation(
+      summary = "Transfer Batch Location",
+      description = "Transfers the batch to a different location.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> transferBatch(
       @PathVariable UUID id, @Valid @RequestBody TransferBatchRequest request) {
@@ -212,6 +260,10 @@ public class BatchController {
    * Logged to override_log for audit. Manager-only: SUPERVISOR/WORKER/VIEWER → 403.
    */
   @PatchMapping("/{id}/override-status")
+  @Operation(
+      summary = "Override Batch Status",
+      description =
+          "Overrides batch status (e.g., QC_REJECTED to AVAILABLE). Requires reason. Admin/Manager only.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'manage')")
   public ResponseEntity<ApiResponse<BatchDto>> overrideStatus(
       @PathVariable UUID id, @Valid @RequestBody OverrideStatusRequest request) {
@@ -222,6 +274,9 @@ public class BatchController {
   // ── Certifications ────────────────────────────────────────────────────────
 
   @GetMapping("/{id}/certifications")
+  @Operation(
+      summary = "Get Batch Certifications",
+      description = "Retrieves all active certifications applied to the batch.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<BatchCertificationDto>>> getCertifications(
       @PathVariable UUID id) {
@@ -299,6 +354,9 @@ public class BatchController {
   // ── Attributes ─────────────────────────────────────────────────────────────
 
   @GetMapping("/{id}/attributes")
+  @Operation(
+      summary = "Get Batch Attributes",
+      description = "Retrieves dynamic attributes associated with the batch.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<BatchAttributeDto>>> getAttributes(@PathVariable UUID id) {
     List<BatchAttributeDto> list = batchAttributeService.findByBatchId(id);
@@ -306,6 +364,9 @@ public class BatchController {
   }
 
   @PostMapping("/{id}/attributes")
+  @Operation(
+      summary = "Add Batch Attribute",
+      description = "Adds a dynamic attribute to the batch.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<BatchAttributeDto>> addAttribute(
       @PathVariable UUID id, @Valid @RequestBody AddBatchAttributeRequest request) {
@@ -314,6 +375,9 @@ public class BatchController {
   }
 
   @DeleteMapping("/{id}/attributes/{attributeId}")
+  @Operation(
+      summary = "Delete Batch Attribute",
+      description = "Removes a dynamic attribute from the batch.")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<Void> deleteAttribute(
       @PathVariable UUID id, @PathVariable UUID attributeId) {
