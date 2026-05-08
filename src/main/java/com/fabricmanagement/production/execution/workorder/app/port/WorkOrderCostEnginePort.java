@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app.port;
 
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -21,7 +22,7 @@ public interface WorkOrderCostEnginePort {
   ComputedCostSnapshot computeActualCostFromConsumptions(
       UUID tenantId,
       UUID workOrderId,
-      String outputModuleType,
+      WorkOrderModuleType outputModuleType,
       UUID outputMaterialId,
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
@@ -44,7 +45,7 @@ public interface WorkOrderCostEnginePort {
   ComputedCostSnapshot computePlannedCost(
       UUID tenantId,
       UUID workOrderId,
-      String moduleType,
+      WorkOrderModuleType moduleType,
       UUID outputMaterialId,
       BigDecimal plannedQuantity,
       UUID tradingPartnerId);

@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -15,6 +16,8 @@ import java.util.UUID;
 public record WorkOrderFilterRequest(
     @Schema(description = "Filter by WorkOrder status", example = "IN_PROGRESS")
         WorkOrderStatus status,
+    @Schema(description = "Filter by WorkOrder module type", example = "WEAVING")
+        WorkOrderModuleType moduleType,
     @Schema(description = "Filter by customer/supplier trading partner") UUID tradingPartnerId,
     @Schema(description = "Filter by linked sales order") UUID salesOrderId,
     @Schema(description = "Filter by production recipe") UUID recipeId,

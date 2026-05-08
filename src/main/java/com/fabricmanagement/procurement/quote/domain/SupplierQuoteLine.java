@@ -1,11 +1,15 @@
 package com.fabricmanagement.procurement.quote.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.procurement.quote.domain.specs.GenericQuoteSpecs;
+import com.fabricmanagement.procurement.quote.domain.specs.SupplierQuoteSpecs;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -43,17 +47,18 @@ public class SupplierQuoteLine extends BaseEntity {
 
   @Type(JsonType.class)
   @Column(name = "volume_discounts", columnDefinition = "jsonb", nullable = false)
-  private String volumeDiscounts = "{}";
+  private Map<String, Object> volumeDiscounts = new HashMap<>();
+
+  @Type(JsonType.class)
+  @Column(name = "module_specs", columnDefinition = "jsonb", nullable = false)
+  private SupplierQuoteSpecs moduleSpecs = new GenericQuoteSpecs(null);
 
   @Column(name = "notes", columnDefinition = "TEXT")
   private String notes;
 
-  @Column(name = "is_active", nullable = false)
-  private boolean isActive = true;
-
-  public void markAsDeleted() {
-    this.isActive = false;
-    super.delete();
+  public BigDecimal lineTotal() {
+    if (unitPrice == null || qty == null) return BigDecimal.ZERO;
+    return unitPrice.multiply(qty);
   }
 
   @Override

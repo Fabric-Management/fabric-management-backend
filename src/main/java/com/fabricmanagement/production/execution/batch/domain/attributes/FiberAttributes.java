@@ -1,6 +1,10 @@
 package com.fabricmanagement.production.execution.batch.domain.attributes;
 
+import static com.fabricmanagement.production.execution.batch.domain.attributes.AttributeConversions.asString;
+import static com.fabricmanagement.production.execution.batch.domain.attributes.AttributeConversions.toDouble;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,13 +18,27 @@ import java.util.Map;
  * <p><b>BatchAttributeInheritanceEngine</b> and <b>fiber-to-yarn.json</b> are unchanged; they
  * continue to use raw string keys.
  */
+@Schema(description = "Detailed specifications for FIBER batches")
 public record FiberAttributes(
-    @JsonProperty("fiber_micronaire") Double micronaire,
-    @JsonProperty("fiber_staple_length") Double stapleLength,
-    @JsonProperty("fiber_grade") String grade,
-    @JsonProperty("fiber_shade") String shade,
-    @JsonProperty("fiber_organic_cert_no") Object organicCertNo,
-    @JsonProperty("bale_moisture") Double baleMoisture) {
+    @Schema(description = "Fiber micronaire (fineness/thickness)", example = "4.2")
+        @JsonProperty("fiber_micronaire")
+        Double micronaire,
+    @Schema(description = "Fiber staple length in millimeters", example = "28.5")
+        @JsonProperty("fiber_staple_length")
+        Double stapleLength,
+    @Schema(description = "Fiber quality grade", example = "A_GRADE") @JsonProperty("fiber_grade")
+        String grade,
+    @Schema(description = "Fiber shade/color", example = "OPTICAL_WHITE")
+        @JsonProperty("fiber_shade")
+        String shade,
+    @Schema(
+            description = "Organic certification number (e.g., GOTS TC number)",
+            example = "PRJ809982/1049294")
+        @JsonProperty("fiber_organic_cert_no")
+        String organicCertNo,
+    @Schema(description = "Bale moisture percentage", example = "7.5")
+        @JsonProperty("bale_moisture")
+        Double baleMoisture) {
 
   /**
    * Convert a raw attributes map to typed FiberAttributes.
@@ -38,9 +56,9 @@ public record FiberAttributes(
     return new FiberAttributes(
         toDouble(attrs.get("fiber_micronaire")),
         toDouble(attrs.get("fiber_staple_length")),
-        toString(attrs.get("fiber_grade")),
-        toString(attrs.get("fiber_shade")),
-        attrs.get("fiber_organic_cert_no"),
+        asString(attrs.get("fiber_grade")),
+        asString(attrs.get("fiber_shade")),
+        asString(attrs.get("fiber_organic_cert_no")),
         toDouble(attrs.get("bale_moisture")));
   }
 
@@ -73,26 +91,5 @@ public record FiberAttributes(
       m.put("bale_moisture", baleMoisture);
     }
     return m;
-  }
-
-  private static Double toDouble(Object o) {
-    if (o == null) {
-      return null;
-    }
-    if (o instanceof Number n) {
-      return n.doubleValue();
-    }
-    if (o instanceof String s) {
-      try {
-        return Double.parseDouble(s);
-      } catch (NumberFormatException e) {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  private static String toString(Object o) {
-    return o == null ? null : o.toString();
   }
 }

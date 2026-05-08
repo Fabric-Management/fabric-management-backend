@@ -19,6 +19,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
   private final JwtContextInterceptor jwtContextInterceptor;
+  private final PlaygroundQuotaInterceptor playgroundQuotaInterceptor;
 
   /**
    * Register global interceptors.
@@ -44,5 +45,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/actuator/**");
 
     log.info("✅ JwtContextInterceptor registered globally (with public endpoint exclusions)");
+
+    registry
+        .addInterceptor(playgroundQuotaInterceptor)
+        .addPathPatterns("/api/**")
+        .excludePathPatterns("/api/v1/playground/init");
+
+    log.info("✅ PlaygroundQuotaInterceptor registered globally");
   }
 }

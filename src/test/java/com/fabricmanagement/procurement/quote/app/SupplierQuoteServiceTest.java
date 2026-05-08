@@ -7,16 +7,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteStatus;
 import com.fabricmanagement.procurement.quote.dto.AddQuoteLineRequest;
 import com.fabricmanagement.procurement.quote.dto.CreateSupplierQuoteRequest;
+import com.fabricmanagement.procurement.quote.dto.SupplierQuoteResponse;
 import com.fabricmanagement.procurement.quote.infra.repository.SupplierQuoteRepository;
+import com.fabricmanagement.procurement.quote.mapper.SupplierQuoteMapper;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
+import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,16 +39,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SupplierQuoteServiceTest {
 
   @Mock private SupplierQuoteRepository quoteRepository;
-
-  @Mock
-  private com.fabricmanagement.common.infrastructure.events.DomainEventPublisher eventPublisher;
+  @Mock private SupplierRFQRepository rfqRepository;
+  @Mock private TradingPartnerResolver partnerResolver;
+  @Mock private SupplierQuoteMapper quoteMapper;
+  @Mock private DomainEventPublisher eventPublisher;
 
   @InjectMocks private SupplierQuoteService quoteService;
 
   private final UUID tenantId = UUID.randomUUID();
   private final UUID rfqId = UUID.randomUUID();
   private final UUID quoteId = UUID.randomUUID();
+  private final UUID partnerId = UUID.randomUUID();
   private SupplierQuote mockQuote;
+  private SupplierQuoteResponse mockResponse;
 
   @BeforeEach
   void setUp() {
@@ -52,8 +61,12 @@ class SupplierQuoteServiceTest {
     mockQuote.setId(quoteId);
     mockQuote.setTenantId(tenantId);
     mockQuote.setRfqId(rfqId);
+    mockQuote.setTradingPartnerId(partnerId);
     mockQuote.setQuoteNumber("SQ-2026-TEST");
     mockQuote.setStatus(SupplierQuoteStatus.RECEIVED);
+
+    mockResponse =
+        SupplierQuoteResponse.builder().id(quoteId).status(SupplierQuoteStatus.RECEIVED).build();
   }
 
   @AfterEach
@@ -64,23 +77,32 @@ class SupplierQuoteServiceTest {
   @Test
   @DisplayName("Should create Supplier Quote successfully")
   void shouldCreateQuote() {
-    CreateSupplierQuoteRequest req = new CreateSupplierQuoteRequest();
-    req.setRfqId(rfqId);
-    req.setTradingPartnerId(UUID.randomUUID());
-    req.setValidUntil(LocalDate.now().plusDays(10));
-    req.setCurrency("USD");
-    req.setEntryMethod(QuoteEntryMethod.MANUAL_ENTRY);
+    CreateSupplierQuoteRequest req =
+        new CreateSupplierQuoteRequest(
+            rfqId,
+            partnerId,
+            LocalDate.now().plusDays(10),
+            "USD",
+            null,
+            null,
+            QuoteEntryMethod.MANUAL_ENTRY,
+            com.fabricmanagement.procurement.quote.domain.SupplierQuoteModuleType.GENERIC,
+            null);
 
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(partnerResolver.resolvePartner(tenantId, partnerId)).thenReturn(Optional.empty());
+    SupplierRFQ mockRfq = new SupplierRFQ();
+    mockRfq.setModuleType(
+        com.fabricmanagement.procurement.rfq.domain.SupplierRFQModuleType.GENERIC);
+    when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
+        .thenReturn(Optional.of(mockRfq));
 
-    SupplierQuote created = quoteService.createQuote(req);
+    SupplierQuoteResponse created = quoteService.createQuote(req);
 
     assertNotNull(created);
-    assertEquals(tenantId, created.getTenantId());
-    assertNotNull(created.getQuoteNumber());
-    assertEquals("USD", created.getCurrency());
-    assertEquals(QuoteEntryMethod.MANUAL_ENTRY, created.getEntryMethod());
-    assertEquals(SupplierQuoteStatus.RECEIVED, created.getStatus());
+    verify(quoteRepository).save(any(SupplierQuote.class));
+    verify(eventPublisher).publish(any());
   }
 
   @Test
@@ -89,19 +111,24 @@ class SupplierQuoteServiceTest {
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
 
-    // Fix #2 — DTO kullanılıyor
-    AddQuoteLineRequest req = new AddQuoteLineRequest();
-    req.setRfqLineId(UUID.randomUUID());
-    req.setUnitPrice(new BigDecimal("12.50"));
-    req.setCurrency("USD");
-    req.setQty(new BigDecimal("500"));
-    req.setUnit("KG");
+    AddQuoteLineRequest req =
+        new AddQuoteLineRequest(
+            UUID.randomUUID(),
+            new BigDecimal("12.50"),
+            "USD",
+            new BigDecimal("500"),
+            "KG",
+            null,
+            null,
+            null);
 
-    SupplierQuote updated = quoteService.addLine(quoteId, req);
+    SupplierQuoteResponse updated = quoteService.addLine(quoteId, req);
 
-    assertEquals(1, updated.getLines().size());
-    assertEquals(new BigDecimal("12.50"), updated.getLines().get(0).getUnitPrice());
+    assertNotNull(updated);
+    assertEquals(1, mockQuote.getLines().size());
+    assertEquals(new BigDecimal("12.50"), mockQuote.getLines().get(0).getUnitPrice());
     verify(quoteRepository).save(mockQuote);
   }
 
@@ -113,21 +140,25 @@ class SupplierQuoteServiceTest {
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
 
-    AddQuoteLineRequest req = new AddQuoteLineRequest();
-    req.setRfqLineId(UUID.randomUUID());
-    req.setUnitPrice(new BigDecimal("5.00"));
-    req.setCurrency("USD");
-    req.setQty(new BigDecimal("100"));
-    req.setUnit("KG");
+    AddQuoteLineRequest req =
+        new AddQuoteLineRequest(
+            UUID.randomUUID(),
+            new BigDecimal("5.00"),
+            "USD",
+            new BigDecimal("100"),
+            "KG",
+            null,
+            null,
+            null);
 
-    ProcurementDomainException ex =
-        assertThrows(ProcurementDomainException.class, () -> quoteService.addLine(quoteId, req));
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> quoteService.addLine(quoteId, req));
 
     assertEquals("Cannot add line to quote in status: ACCEPTED", ex.getMessage());
   }
 
   @Test
-  @DisplayName("Should mark quote as ACCEPTED and auto-reject siblings (Fix #4,#5)")
+  @DisplayName("Should mark quote as ACCEPTED and auto-reject siblings")
   void shouldMarkQuoteAsAcceptedAndRejectSiblings() {
     UUID siblingId = UUID.randomUUID();
     SupplierQuote sibling = new SupplierQuote();
@@ -137,32 +168,44 @@ class SupplierQuoteServiceTest {
     sibling.setQuoteNumber("SQ-2026-SIBLING");
     sibling.setStatus(SupplierQuoteStatus.RECEIVED);
 
+    // Allow modification
+    List<SupplierQuote> receivedSiblings = new ArrayList<>();
+    receivedSiblings.add(mockQuote);
+    receivedSiblings.add(sibling);
+
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
-    // Fix #5 — sibling sorgusu
+
     when(quoteRepository.findByRfqIdAndTenantIdAndStatusAndIsActiveTrue(
             rfqId, tenantId, SupplierQuoteStatus.RECEIVED))
-        .thenReturn(List.of(mockQuote, sibling));
+        .thenReturn(receivedSiblings);
+
+    when(quoteRepository.findByRfqIdAndTenantIdAndStatusAndIsActiveTrue(
+            rfqId, tenantId, SupplierQuoteStatus.UNDER_REVIEW))
+        .thenReturn(new ArrayList<>());
+
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
 
-    SupplierQuote updated = quoteService.markAsAccepted(quoteId);
+    SupplierQuoteResponse updated = quoteService.markAsAccepted(quoteId);
 
-    assertEquals(SupplierQuoteStatus.ACCEPTED, updated.getStatus());
-    assertEquals(SupplierQuoteStatus.REJECTED, sibling.getStatus()); // Fix #5
+    assertNotNull(updated);
+    assertEquals(SupplierQuoteStatus.ACCEPTED, mockQuote.getStatus());
+    assertEquals(SupplierQuoteStatus.REJECTED, sibling.getStatus());
   }
 
   @Test
-  @DisplayName("Should throw when accepting already REJECTED quote (Fix #4)")
+  @DisplayName("Should throw when accepting already REJECTED quote")
   void shouldThrowWhenAcceptingRejectedQuote() {
     mockQuote.setStatus(SupplierQuoteStatus.REJECTED);
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
 
-    ProcurementDomainException ex =
-        assertThrows(ProcurementDomainException.class, () -> quoteService.markAsAccepted(quoteId));
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> quoteService.markAsAccepted(quoteId));
 
-    assertEquals("Cannot accept quote in status: REJECTED", ex.getMessage());
+    assertEquals("Cannot transition quote from REJECTED to ACCEPTED", ex.getMessage());
   }
 
   @Test
@@ -171,23 +214,25 @@ class SupplierQuoteServiceTest {
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
 
-    SupplierQuote updated = quoteService.markAsRejected(quoteId);
+    SupplierQuoteResponse updated = quoteService.markAsRejected(quoteId);
 
-    assertEquals(SupplierQuoteStatus.REJECTED, updated.getStatus());
+    assertNotNull(updated);
+    assertEquals(SupplierQuoteStatus.REJECTED, mockQuote.getStatus());
   }
 
   @Test
-  @DisplayName("Should throw when rejecting already ACCEPTED quote (Fix #4)")
+  @DisplayName("Should throw when rejecting already ACCEPTED quote")
   void shouldThrowWhenRejectingAcceptedQuote() {
     mockQuote.setStatus(SupplierQuoteStatus.ACCEPTED);
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
 
-    ProcurementDomainException ex =
-        assertThrows(ProcurementDomainException.class, () -> quoteService.markAsRejected(quoteId));
+    IllegalStateException ex =
+        assertThrows(IllegalStateException.class, () -> quoteService.markAsRejected(quoteId));
 
-    assertEquals("Cannot reject quote in status: ACCEPTED", ex.getMessage());
+    assertEquals("Cannot transition quote from ACCEPTED to REJECTED", ex.getMessage());
   }
 }

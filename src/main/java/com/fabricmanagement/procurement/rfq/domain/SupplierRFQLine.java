@@ -1,6 +1,8 @@
 package com.fabricmanagement.procurement.rfq.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.procurement.rfq.domain.specs.GenericRFQSpecs;
+import com.fabricmanagement.procurement.rfq.domain.specs.SupplierRFQSpecs;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -38,13 +40,10 @@ public class SupplierRFQLine extends BaseEntity {
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
-  /**
-   * Fix #14 — String JSONB alanı. Typed List<Map> opsiyonel iyileştirme için not bırakıldı; mevcut
-   * pattern tüm modüllerde ortak olduğu için şimdilik String kalıyor.
-   */
+  /** Module-specific RFQ line specifications, stored as JSONB. */
   @Type(JsonType.class)
   @Column(name = "module_specs", columnDefinition = "jsonb", nullable = false)
-  private String moduleSpecs = "{}";
+  private SupplierRFQSpecs moduleSpecs = new GenericRFQSpecs(null);
 
   @Column(name = "is_active", nullable = false)
   private boolean isActive = true;

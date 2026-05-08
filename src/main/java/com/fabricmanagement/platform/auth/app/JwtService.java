@@ -73,27 +73,57 @@ public class JwtService {
   }
 
   public String generateAccessToken(User user) {
-    // Get any verified contact for JWT subject (any verified contact =
-    // authentication contact)
-    String contactValue =
-        user.getAnyVerifiedContact()
-            .map(contact -> contact.getContactValue())
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "User has no verified contact", "AUTH_NO_VERIFIED_CONTACT", 400));
-
+    String contactValue = getVerifiedContactOrThrow(user);
     log.debug("Generating access token for user: {}", contactValue);
 
-    // Load tenant for tenant_uid
-    Optional<Tenant> tenantOpt = tenantRepository.findById(user.getTenantId());
-    String tenantUid =
-        tenantOpt.map(Tenant::getUid).orElseGet(() -> extractTenantUid(user.getUid()));
+    Map<String, Object> claims = buildCommonClaims(user);
 
     // Load organization for organization_type (category equivalent)
     Optional<Organization> orgOpt =
         organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
-    String organizationType = orgOpt.map(o -> o.getOrganizationType().name()).orElse(null);
+    orgOpt.ifPresent(o -> claims.put("organization_type", o.getOrganizationType().name()));
+
+    return buildToken(contactValue, claims, accessTokenExpiration);
+  }
+
+  /**
+   * Generates a JWT token for a playground guest session. Includes is_playground and guest_id
+   * claims.
+   */
+  public String generatePlaygroundAccessToken(User user, String guestId) {
+    String contactValue = getVerifiedContactOrThrow(user);
+    return generatePlaygroundAccessToken(user, guestId, contactValue);
+  }
+
+  /**
+   * Overload that accepts a pre-resolved contactValue. Use this when the caller has already fetched
+   * the contact (e.g. via a direct query) to avoid LazyInitializationException on
+   * User.userContacts.
+   */
+  public String generatePlaygroundAccessToken(User user, String guestId, String contactValue) {
+    log.debug(
+        "Generating playground access token for user: {}, guestId: {}", contactValue, guestId);
+
+    Map<String, Object> claims = buildCommonClaims(user);
+    claims.put("is_playground", true);
+    claims.put("guest_id", guestId);
+
+    return buildToken(contactValue, claims, accessTokenExpiration);
+  }
+
+  private String getVerifiedContactOrThrow(User user) {
+    return user.getAnyVerifiedContact()
+        .map(contact -> contact.getContactValue())
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "User has no verified contact", "AUTH_NO_VERIFIED_CONTACT", 400));
+  }
+
+  private Map<String, Object> buildCommonClaims(User user) {
+    Optional<Tenant> tenantOpt = tenantRepository.findById(user.getTenantId());
+    String tenantUid =
+        tenantOpt.map(Tenant::getUid).orElseGet(() -> extractTenantUid(user.getUid()));
 
     Map<String, Object> claims = new HashMap<>();
     claims.put("tenant_id", user.getTenantId().toString());
@@ -103,15 +133,14 @@ public class JwtService {
     claims.put("organization_id", user.getOrganizationId().toString());
     claims.put("firstName", user.getFirstName());
     claims.put("lastName", user.getLastName());
-    if (organizationType != null) {
-      claims.put("organization_type", organizationType);
-    }
-    // Department: primary name (backward compat) + department_codes list +
-    // primary_department code
+
     List<String> departmentCodes = new ArrayList<>();
     String primaryDepartmentCode = null;
     String department = null;
     for (var ud : user.getUserDepartments()) {
+      if (ud.getDepartment() == null) {
+        continue;
+      }
       String code = ud.getDepartment().getDepartmentCode();
       if (code != null) {
         departmentCodes.add(code);
@@ -133,12 +162,15 @@ public class JwtService {
       claims.put("role", user.getRole().getRoleName());
       claims.put("role_code", user.getRole().getRoleCode());
     }
+    return claims;
+  }
 
+  private String buildToken(String subject, Map<String, Object> claims, long expirationMillis) {
     return Jwts.builder()
-        .subject(contactValue)
+        .subject(subject)
         .claims(claims)
         .issuedAt(Date.from(Instant.now()))
-        .expiration(Date.from(Instant.now().plusMillis(accessTokenExpiration)))
+        .expiration(Date.from(Instant.now().plusMillis(expirationMillis)))
         .signWith(secretKey)
         .compact();
   }
@@ -407,6 +439,104 @@ public class JwtService {
     // Fallback: try role display name
     return claims.get("role", String.class);
   }
+
+  public boolean isPlaygroundToken(String token) {
+    Claims claims = extractClaims(token);
+    Boolean isPlayground = claims.get("is_playground", Boolean.class);
+    return Boolean.TRUE.equals(isPlayground);
+  }
+
+  public String getGuestIdFromToken(String token) {
+    Claims claims = extractClaims(token);
+    return claims.get("guest_id", String.class);
+  }
+
+  /**
+   * Extract all authentication-relevant claims from a JWT token in a single parse operation.
+   *
+   * <p>This avoids redundant {@link #extractClaims(String)} calls when the filter needs multiple
+   * claim values from the same token (CR2-5).
+   *
+   * @param token JWT access token
+   * @return record containing all claims needed by {@link
+   *     com.fabricmanagement.common.infrastructure.security.JwtAuthenticationFilter}
+   */
+  public AuthTokenClaims extractAuthContext(String token) {
+    Claims claims = extractClaims(token);
+
+    // user_id
+    String userIdStr = claims.get("user_id", String.class);
+    UUID userId = (userIdStr != null && !userIdStr.isBlank()) ? UUID.fromString(userIdStr) : null;
+
+    // role_code (with fallback)
+    String roleCode = claims.get("role_code", String.class);
+    if (roleCode == null) {
+      roleCode = claims.get("role", String.class);
+    }
+
+    // user_type
+    String userType = claims.get("user_type", String.class);
+
+    // department_codes
+    List<String> departmentCodes = List.of();
+    Object rawDeptCodes = claims.get("department_codes");
+    if (rawDeptCodes instanceof List<?> list) {
+      departmentCodes =
+          list.stream().filter(item -> item instanceof String).map(item -> (String) item).toList();
+    }
+
+    // primary_department
+    String primaryDepartment = claims.get("primary_department", String.class);
+
+    // tenant_id
+    UUID tenantId = null;
+    String tenantIdStr = claims.get("tenant_id", String.class);
+    if (tenantIdStr != null && !tenantIdStr.isBlank()) {
+      try {
+        tenantId = UUID.fromString(tenantIdStr);
+      } catch (IllegalArgumentException ignored) {
+        // malformed tenant_id
+      }
+    }
+
+    // playground claims
+    boolean isPlayground = Boolean.TRUE.equals(claims.get("is_playground", Boolean.class));
+    String guestId = claims.get("guest_id", String.class);
+
+    // partner_id
+    UUID partnerId = null;
+    String partnerIdStr = claims.get("partner_id", String.class);
+    if (partnerIdStr != null && !partnerIdStr.isBlank()) {
+      try {
+        partnerId = UUID.fromString(partnerIdStr);
+      } catch (IllegalArgumentException ignored) {
+        // malformed partner_id
+      }
+    }
+
+    return new AuthTokenClaims(
+        userId,
+        roleCode,
+        userType,
+        departmentCodes,
+        primaryDepartment,
+        tenantId,
+        isPlayground,
+        guestId,
+        partnerId);
+  }
+
+  /** Bundle of all authentication-relevant claims extracted from a JWT token in a single parse. */
+  public record AuthTokenClaims(
+      UUID userId,
+      String roleCode,
+      String userType,
+      List<String> departmentCodes,
+      String primaryDepartment,
+      UUID tenantId,
+      boolean isPlayground,
+      String guestId,
+      UUID partnerId) {}
 
   private Claims extractClaims(String token) {
     return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload();

@@ -140,6 +140,9 @@ public class WorkOrderService {
             .attachments(
                 request.getAttachments() == null ? java.util.List.of() : request.getAttachments())
             .status(WorkOrderStatus.DRAFT)
+            .moduleType(
+                com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
+                    .GENERIC)
             .build();
 
     applySupplierSnapshot(workOrder);
@@ -183,6 +186,9 @@ public class WorkOrderService {
             .attachments(
                 request.getAttachments() == null ? java.util.List.of() : request.getAttachments())
             .status(WorkOrderStatus.DRAFT)
+            .moduleType(
+                com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
+                    .GENERIC)
             .build();
 
     applySupplierSnapshot(workOrder);

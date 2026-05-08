@@ -1,16 +1,16 @@
 package com.fabricmanagement.production.execution.batch.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberAttribute;
+import com.fabricmanagement.production.masterdata.material.domain.reference.MaterialAttribute;
 import jakarta.persistence.*;
 import lombok.*;
 
 /**
- * Batch Attribute - Links a batch to a fiber attribute with a value.
+ * Batch Attribute - Links a batch to a material attribute with a value.
  *
  * <p>Stores batch-specific attribute values (e.g., ORGANIC=true, RECYCLED=percentage).
  *
- * <p>References {@link FiberAttribute} for attribute definitions.
+ * <p>References {@link MaterialAttribute} for attribute definitions.
  */
 @Entity
 @Table(
@@ -39,7 +39,7 @@ public class BatchAttribute extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "attribute_id", nullable = false)
-  private FiberAttribute attribute;
+  private MaterialAttribute attribute;
 
   @Column(name = "value", columnDefinition = "TEXT")
   private String value;

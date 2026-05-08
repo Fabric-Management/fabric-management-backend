@@ -3,12 +3,16 @@ package com.fabricmanagement.human.core.employee.domain;
 import com.fabricmanagement.common.infrastructure.identity.Gender;
 import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.platform.user.domain.JobTitlePreset;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -77,6 +81,10 @@ public class Employee extends BaseEntity {
 
   @Column(name = "last_compliance_check_at")
   private Instant lastComplianceCheckAt;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "job_title_preset_id")
+  private JobTitlePreset jobTitlePreset;
 
   public Integer calculateAge() {
     if (birthDate == null) {

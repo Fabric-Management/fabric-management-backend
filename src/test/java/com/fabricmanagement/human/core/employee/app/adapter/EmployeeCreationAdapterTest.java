@@ -2,7 +2,6 @@ package com.fabricmanagement.human.core.employee.app.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -10,10 +9,10 @@ import com.fabricmanagement.common.infrastructure.identity.EmergencyContactData;
 import com.fabricmanagement.common.infrastructure.identity.Gender;
 import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.human.core.employee.app.EmployeeService;
-import com.fabricmanagement.human.core.employee.domain.EmergencyContact;
 import com.fabricmanagement.human.core.employee.domain.Employee;
 import com.fabricmanagement.platform.user.domain.EmployeeFieldUpdates;
 import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
+import com.fabricmanagement.platform.user.domain.port.EmployeeCreationCommand;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,32 +37,18 @@ class EmployeeCreationAdapterTest {
     EmergencyContactData ecData = new EmergencyContactData("John", "123", "Brother");
     Employee employee = Employee.builder().userId(userId).employeeNumber("EMP-123").build();
 
-    when(employeeService.createOrUpdateEmployee(
-            eq(userId),
-            eq(Title.MR),
-            eq(Gender.MALE),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(EmergencyContact.class)))
+    EmployeeCreationCommand command =
+        new EmployeeCreationCommand(
+            userId, Title.MR, Gender.MALE, null, null, "EMP-123", null, ecData, null);
+
+    when(employeeService.createOrUpdateEmployee(any(EmployeeCreationCommand.class)))
         .thenReturn(employee);
 
-    EmployeeSnapshot result =
-        adapter.createOrUpdate(userId, Title.MR, Gender.MALE, null, null, "EMP-123", null, ecData);
+    EmployeeSnapshot result = adapter.createOrUpdate(command);
 
     assertThat(result.isPresent()).isTrue();
     assertThat(result.employeeNumber()).isEqualTo("EMP-123");
-    verify(employeeService)
-        .createOrUpdateEmployee(
-            eq(userId),
-            eq(Title.MR),
-            eq(Gender.MALE),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(EmergencyContact.class));
+    verify(employeeService).createOrUpdateEmployee(command);
   }
 
   @Test

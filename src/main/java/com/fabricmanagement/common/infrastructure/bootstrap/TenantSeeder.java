@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.platform.tenant.app.TenantService;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
+import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +16,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class TenantSeeder implements DataSeeder {
 
-  public static final String TENANT_NAME = "Akkayalar Textile";
+  public static final String TENANT_NAME = "Nexus Fabrics";
   public static final String TENANT_SLUG =
-      "akkayalar-textile"; // Derived manually based on service logic
+      "nexus-fabrics"; // Derived manually based on service logic
 
   private final TenantService tenantService;
   private final TransactionTemplate transactionTemplate;
@@ -35,9 +36,10 @@ public class TenantSeeder implements DataSeeder {
           CreateTenantRequest request =
               CreateTenantRequest.builder()
                   .name(TENANT_NAME)
-                  .billingEmail("admin@akkayalar.com")
+                  .billingEmail("admin@nexusfabrics.com")
                   .country("TR")
                   .settings(settings)
+                  .type(TenantType.TEMPLATE)
                   .trialDays(365) // Dev env, don't expire soon
                   .build();
 

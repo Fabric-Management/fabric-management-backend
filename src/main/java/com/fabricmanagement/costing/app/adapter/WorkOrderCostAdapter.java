@@ -5,6 +5,7 @@ import com.fabricmanagement.costing.domain.calculation.CostCalculation;
 import com.fabricmanagement.production.execution.workorder.app.port.ComputedCostSnapshot;
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -23,7 +24,7 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
   public ComputedCostSnapshot computeActualCostFromConsumptions(
       UUID tenantId,
       UUID workOrderId,
-      String outputModuleType,
+      WorkOrderModuleType outputModuleType,
       UUID outputMaterialId,
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
@@ -38,7 +39,7 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
         costCalculationService.computeActualForWorkOrderWithConsumptions(
             tenantId,
             workOrderId,
-            outputModuleType,
+            outputModuleType.name(),
             outputMaterialId,
             actualOutputQty,
             tradingPartnerId,
@@ -52,7 +53,7 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
   public ComputedCostSnapshot computePlannedCost(
       UUID tenantId,
       UUID workOrderId,
-      String moduleType,
+      WorkOrderModuleType moduleType,
       UUID outputMaterialId,
       BigDecimal plannedQuantity,
       UUID tradingPartnerId) {
@@ -65,7 +66,12 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
 
     CostCalculation calculation =
         costCalculationService.computePlanned(
-            tenantId, workOrderId, moduleType, outputMaterialId, plannedQuantity, tradingPartnerId);
+            tenantId,
+            workOrderId,
+            moduleType.name(),
+            outputMaterialId,
+            plannedQuantity,
+            tradingPartnerId);
 
     return new ComputedCostSnapshot(
         workOrderId, calculation.getTotalCost(), calculation.getCurrency());

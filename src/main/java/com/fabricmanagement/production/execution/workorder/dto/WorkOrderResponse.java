@@ -2,7 +2,9 @@ package com.fabricmanagement.production.execution.workorder.dto;
 
 import com.fabricmanagement.production.execution.workorder.domain.FulfillmentType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
+import com.fabricmanagement.production.execution.workorder.domain.specs.WorkOrderProductionSpecs;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,6 +20,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+// TODO(Technical Debt): Convert to record (AGENTS.md constraint) - pending large refactoring to
+// update all getter usages
 public class WorkOrderResponse {
 
   private UUID id;
@@ -25,7 +29,8 @@ public class WorkOrderResponse {
   private String workOrderNumber;
   private UUID recipeId;
   private UUID outputMaterialId;
-  private String moduleType;
+  private WorkOrderModuleType moduleType;
+  private WorkOrderProductionSpecs productionSpecs;
   private UUID tradingPartnerId;
   private UUID salesOrderId;
   private UUID salesOrderLineId;
@@ -67,6 +72,7 @@ public class WorkOrderResponse {
         .recipeId(workOrder.getRecipeId())
         .outputMaterialId(workOrder.getOutputMaterialId())
         .moduleType(workOrder.getModuleType())
+        .productionSpecs(workOrder.getProductionSpecs())
         .tradingPartnerId(workOrder.getTradingPartnerId())
         .salesOrderId(workOrder.getSalesOrderId())
         .salesOrderLineId(workOrder.getSalesOrderLineId())

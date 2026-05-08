@@ -71,6 +71,7 @@ public class CreatePurchaseOrderRequest {
     private String currency;
 
     /** Line-level module-specific data. */
-    private String moduleSpecs;
+    private com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs
+        moduleSpecs;
   }
 }

@@ -101,4 +101,8 @@ public class InvoiceLine extends BaseEntity {
   protected void onLineChange() {
     calculate();
   }
+
+  public BigDecimal getTaxRate() {
+    return this.taxRate;
+  }
 }

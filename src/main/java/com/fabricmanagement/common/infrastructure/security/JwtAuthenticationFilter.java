@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -84,46 +83,47 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     try {
-      UUID userId = jwtService.getUserIdFromToken(token);
-      String roleCode = jwtService.getRoleCodeFromToken(token);
-      String userType = jwtService.getUserTypeFromToken(token);
+      // Single JWT parse for all claims (CR2-5)
+      JwtService.AuthTokenClaims tokenClaims = jwtService.extractAuthContext(token);
 
-      List<SimpleGrantedAuthority> authorities = buildAuthorities(roleCode, userType);
+      if (tokenClaims.userId() == null) {
+        log.warn("JWT missing user_id claim for path: {}", request.getRequestURI());
+        filterChain.doFilter(request, response);
+        return;
+      }
+
+      List<SimpleGrantedAuthority> authorities =
+          buildAuthorities(tokenClaims.roleCode(), tokenClaims.userType());
 
       // Build the user context so downstream security checks (e.g. PermissionEvaluator)
       // can evaluate role + department without additional DB calls.
-      List<String> departmentCodes = jwtService.getDepartmentCodesFromToken(token);
-      String primaryDepartment = jwtService.getPrimaryDepartmentFromToken(token);
-      UUID tenantId = null;
-      try {
-        tenantId = jwtService.getTenantIdFromToken(token);
-      } catch (Exception e) {
-        log.debug("No tenant_id in token: {}", e.getMessage());
-      }
       AuthenticatedUserContext userContext =
           new AuthenticatedUserContext(
-              userId, roleCode, departmentCodes, primaryDepartment, tenantId);
+              tokenClaims.userId(),
+              tokenClaims.roleCode(),
+              tokenClaims.departmentCodes(),
+              tokenClaims.primaryDepartment(),
+              tokenClaims.tenantId(),
+              tokenClaims.isPlayground(),
+              tokenClaims.guestId());
 
       UsernamePasswordAuthenticationToken authentication =
           new UsernamePasswordAuthenticationToken(userContext, null, authorities);
       authentication.setDetails(userContext);
 
       // Expose partner_id on the request so service/AOP layers can enforce isolation
-      if ("PARTNER".equals(userType)) {
-        UUID partnerId = jwtService.getPartnerIdFromToken(token);
-        if (partnerId != null) {
-          request.setAttribute("partnerId", partnerId);
-        }
+      if ("PARTNER".equals(tokenClaims.userType()) && tokenClaims.partnerId() != null) {
+        request.setAttribute("partnerId", tokenClaims.partnerId());
       }
 
       SecurityContextHolder.getContext().setAuthentication(authentication);
 
       log.debug(
           "JWT authentication set: userId={}, userType={}, roles={}, departments={}, path={}",
-          userId,
-          userType,
+          tokenClaims.userId(),
+          tokenClaims.userType(),
           authorities,
-          departmentCodes,
+          tokenClaims.departmentCodes(),
           request.getRequestURI());
 
     } catch (Exception e) {

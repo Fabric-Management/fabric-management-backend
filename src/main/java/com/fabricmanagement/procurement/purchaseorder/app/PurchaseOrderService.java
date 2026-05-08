@@ -125,7 +125,10 @@ public class PurchaseOrderService {
               .unitPrice(lineReq.getUnitPrice())
               .currency(lineReq.getCurrency())
               .totalPrice(lineTotal)
-              .moduleSpecs(lineReq.getModuleSpecs() != null ? lineReq.getModuleSpecs() : "{}")
+              .moduleSpecs(
+                  lineReq.getModuleSpecs() != null
+                      ? lineReq.getModuleSpecs()
+                      : new GenericPurchaseSpecs(null))
               .build());
     }
     List<PurchaseOrderLine> savedLines = lineRepository.saveAll(lines);

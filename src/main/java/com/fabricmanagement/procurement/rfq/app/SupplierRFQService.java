@@ -65,12 +65,12 @@ public class SupplierRFQService {
     // Fix #2 — DTO'dan entity oluşturuyoruz (client entity göndermez)
     SupplierRFQLine line = new SupplierRFQLine();
     line.setTenantId(rfq.getTenantId());
-    line.setMaterialId(req.getMaterialId());
-    line.setProductDesc(req.getProductDesc());
-    line.setRequestedQty(req.getRequestedQty());
-    line.setUnit(req.getUnit());
-    if (req.getModuleSpecs() != null) {
-      line.setModuleSpecs(req.getModuleSpecs());
+    line.setMaterialId(req.materialId());
+    line.setProductDesc(req.productDesc());
+    line.setRequestedQty(req.requestedQty());
+    line.setUnit(req.unit());
+    if (req.moduleSpecs() != null) {
+      line.setModuleSpecs(req.moduleSpecs());
     }
 
     rfq.addLine(line);

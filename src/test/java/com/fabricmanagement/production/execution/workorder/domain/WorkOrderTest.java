@@ -22,7 +22,7 @@ class WorkOrderTest {
             .workOrderNumber("WO-TEST-001")
             .status(status)
             .outputMaterialId(UUID.randomUUID())
-            .moduleType("YARN")
+            .moduleType(WorkOrderModuleType.GENERIC)
             .plannedQty(new BigDecimal("1000.000"))
             .unit("KG")
             .tradingPartnerId(UUID.randomUUID())

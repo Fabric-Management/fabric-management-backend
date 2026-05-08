@@ -1,29 +1,22 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
 import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
+import com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
-@Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class BatchAttributeDto {
-
-  private UUID id;
-  private UUID batchId;
-  private UUID attributeId;
-  private FiberAttributeDto attribute;
-  private String value;
-  private Boolean isActive;
-  private Long version;
-  private Instant createdAt;
-  private Instant updatedAt;
+public record BatchAttributeDto(
+    UUID id,
+    UUID batchId,
+    UUID attributeId,
+    MaterialAttributeDto attribute,
+    String value,
+    Boolean isActive,
+    Long version,
+    Instant createdAt,
+    Instant updatedAt) {
 
   public static BatchAttributeDto from(BatchAttribute entity) {
     return BatchAttributeDto.builder()
@@ -31,7 +24,7 @@ public class BatchAttributeDto {
         .batchId(entity.getBatch() != null ? entity.getBatch().getId() : null)
         .attributeId(entity.getAttribute() != null ? entity.getAttribute().getId() : null)
         .attribute(
-            entity.getAttribute() != null ? FiberAttributeDto.from(entity.getAttribute()) : null)
+            entity.getAttribute() != null ? MaterialAttributeDto.from(entity.getAttribute()) : null)
         .value(entity.getValue())
         .isActive(entity.getIsActive())
         .version(entity.getVersion())

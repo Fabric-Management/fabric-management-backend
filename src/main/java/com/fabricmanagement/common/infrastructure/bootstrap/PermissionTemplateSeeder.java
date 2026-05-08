@@ -197,6 +197,22 @@ public class PermissionTemplateSeeder implements DataSeeder {
                   new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
                   new String[] {"MANAGER", "partners", "write", "DEPARTMENT"}));
 
+          // 9. PARTNER roles — visible only in partner invitation UIs
+          // Partners do not have departments, so wildcard (null) is used here.
+          // This is safe because these templates only match specific partner role codes.
+          seedDepartment(
+              templatesToSave,
+              null,
+              List.of(
+                  new String[] {"PARTNER_OWNER", "dashboard", "view", "ORGANIZATION"},
+                  new String[] {"PARTNER_OWNER", "sales", "read", "ORGANIZATION"},
+                  new String[] {"PARTNER_OWNER", "partners", "read", "OWN"},
+                  new String[] {"PARTNER_ACCOUNTANT", "dashboard", "view", "OWN"},
+                  new String[] {"PARTNER_ACCOUNTANT", "sales", "read", "ORGANIZATION"},
+                  new String[] {"PARTNER_BUYER", "sales", "read", "OWN"},
+                  new String[] {"PARTNER_BUYER", "sales", "write", "OWN"},
+                  new String[] {"PARTNER_VIEWER", "dashboard", "view", "OWN"}));
+
           // Note: MANAGEMENT department removed — ADMIN role provides cross-org access globally.
 
           permissionTemplateRepository.saveAll(templatesToSave);

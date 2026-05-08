@@ -1,6 +1,9 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
 import com.fabricmanagement.production.execution.workorder.domain.FulfillmentType;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.execution.workorder.domain.specs.GenericProductionSpecs;
+import com.fabricmanagement.production.execution.workorder.domain.specs.WorkOrderProductionSpecs;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -25,6 +28,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+// TODO(Technical Debt): Convert to record (AGENTS.md constraint) - pending large refactoring to
+// update all getter usages
 public class CreateWorkOrderRequest {
 
   private UUID recipeId;
@@ -33,9 +38,14 @@ public class CreateWorkOrderRequest {
   @Schema(description = "Output material UUID")
   private UUID outputMaterialId;
 
-  @NotBlank
+  @NotNull
   @Schema(description = "Production module type (e.g. WEAVING, DYEING)")
-  private String moduleType;
+  private WorkOrderModuleType moduleType;
+
+  @NotNull
+  @Schema(description = "Module-specific production specifications")
+  @Builder.Default
+  private WorkOrderProductionSpecs productionSpecs = new GenericProductionSpecs(null);
 
   private UUID tradingPartnerId;
 

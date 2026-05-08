@@ -1,35 +1,42 @@
 package com.fabricmanagement.procurement.quote.dto;
 
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
+import com.fabricmanagement.procurement.quote.domain.SupplierQuoteModuleType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.UUID;
-import lombok.Data;
 
-@Data
-public class CreateSupplierQuoteRequest {
-
-  @NotNull(message = "RFQ ID is required")
-  private UUID rfqId;
-
-  @NotNull(message = "Trading partner ID is required")
-  private UUID tradingPartnerId;
-
-  @NotNull(message = "Valid-until date is required")
-  @FutureOrPresent(message = "Valid-until date must be today or in the future")
-  private LocalDate validUntil;
-
-  @NotBlank(message = "Currency is required")
-  private String currency;
-
-  private String paymentTerms;
-
-  private Integer leadTimeDays;
-
-  @NotNull(message = "Entry method is required")
-  private QuoteEntryMethod entryMethod;
-
-  private String notes;
-}
+@Schema(description = "Request to create a new supplier quote")
+public record CreateSupplierQuoteRequest(
+    @NotNull(message = "RFQ ID is required")
+        @Schema(description = "RFQ ID", requiredMode = Schema.RequiredMode.REQUIRED)
+        UUID rfqId,
+    @NotNull(message = "Trading partner ID is required")
+        @Schema(
+            description = "Supplier trading partner ID",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        UUID tradingPartnerId,
+    @NotNull(message = "Valid-until date is required")
+        @FutureOrPresent(message = "Valid-until date must be today or in the future")
+        @Schema(description = "Quote validity date", requiredMode = Schema.RequiredMode.REQUIRED)
+        LocalDate validUntil,
+    @NotBlank(message = "Currency is required")
+        @Schema(
+            description = "Currency code",
+            example = "TRY",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String currency,
+    @Schema(description = "Payment terms") String paymentTerms,
+    @Schema(description = "Lead time in days") Integer leadTimeDays,
+    @NotNull(message = "Entry method is required")
+        @Schema(description = "Entry method", requiredMode = Schema.RequiredMode.REQUIRED)
+        QuoteEntryMethod entryMethod,
+    @NotNull(message = "Module type is required")
+        @Schema(
+            description = "Module type of the quote",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        SupplierQuoteModuleType moduleType,
+    @Schema(description = "Additional notes") String notes) {}

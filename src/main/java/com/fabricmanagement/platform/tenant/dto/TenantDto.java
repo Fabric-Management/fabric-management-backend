@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.tenant.dto;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
+import com.fabricmanagement.platform.tenant.domain.TenantType;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -26,6 +27,7 @@ public class TenantDto {
   private String slug;
   private String name;
   private String billingEmail;
+  private TenantType type;
   private TenantStatus status;
   private Instant trialEndsAt;
   private String subscriptionPlan;
@@ -49,6 +51,7 @@ public class TenantDto {
         .slug(tenant.getSlug())
         .name(tenant.getName())
         .billingEmail(tenant.getBillingEmail())
+        .type(tenant.getType())
         .status(tenant.getStatus())
         .trialEndsAt(tenant.getTrialEndsAt())
         .subscriptionPlan(tenant.getSubscriptionPlan())

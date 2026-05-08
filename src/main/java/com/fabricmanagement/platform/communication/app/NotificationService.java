@@ -1,7 +1,11 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.domain.strategy.EmailStrategy;
+import com.fabricmanagement.platform.tenant.domain.TenantType;
+import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +43,7 @@ public class NotificationService {
 
   private final EmailStrategy emailStrategy;
   private final EmailOutboxService emailOutboxService;
+  private final TenantRepository tenantRepository;
 
   @Value("${application.email.use-outbox:true}")
   private boolean useOutbox;
@@ -58,6 +63,14 @@ public class NotificationService {
    */
   @Async
   public void sendNotification(String recipient, String subject, String message) {
+    if (isPlaygroundTenant()) {
+      log.info(
+          "🛡️ [PLAYGROUND SAFEGUARD] Skipping async email notification to: {} (Subject: {})",
+          PiiMaskingUtil.maskEmail(recipient),
+          subject);
+      return;
+    }
+
     log.info("Sending notification (async) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
     try {
@@ -86,6 +99,14 @@ public class NotificationService {
    * @param message Email body
    */
   public void sendNotificationSync(String recipient, String subject, String message) {
+    if (isPlaygroundTenant()) {
+      log.info(
+          "🛡️ [PLAYGROUND SAFEGUARD] Skipping sync email notification to: {} (Subject: {})",
+          PiiMaskingUtil.maskEmail(recipient),
+          subject);
+      return;
+    }
+
     log.info("Sending notification (sync) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
     if (useOutbox) {
@@ -97,5 +118,16 @@ public class NotificationService {
       emailStrategy.sendEmail(recipient, subject, message);
       log.info("✅ Notification sent (sync) to: {}", PiiMaskingUtil.maskEmail(recipient));
     }
+  }
+
+  private boolean isPlaygroundTenant() {
+    UUID tenantId = TenantContext.getCurrentTenantIdOrNull();
+    if (tenantId == null) {
+      return false;
+    }
+    return tenantRepository
+        .findById(tenantId)
+        .map(tenant -> tenant.getType() == TenantType.PLAYGROUND)
+        .orElse(false);
   }
 }

@@ -92,9 +92,7 @@ class SupplierRFQServiceTest {
     when(rfqRepository.save(any(SupplierRFQ.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // Fix #2 — DTO ile gönderilir artık
-    AddRfqLineRequest req = new AddRfqLineRequest();
-    req.setRequestedQty(new BigDecimal("1000"));
-    req.setUnit("KG");
+    AddRfqLineRequest req = new AddRfqLineRequest(null, null, new BigDecimal("1000"), "KG", null);
 
     SupplierRFQ updated = rfqService.addLine(rfqId, req);
 
@@ -112,9 +110,7 @@ class SupplierRFQServiceTest {
         .thenReturn(Optional.of(mockRfq));
 
     // Fix #6 — DRAFT guard'ı "not found" benzeri bir mesaj döner değil, statü mesajı döner
-    AddRfqLineRequest req = new AddRfqLineRequest();
-    req.setRequestedQty(new BigDecimal("100"));
-    req.setUnit("KG");
+    AddRfqLineRequest req = new AddRfqLineRequest(null, null, new BigDecimal("100"), "KG", null);
 
     ProcurementDomainException ex =
         assertThrows(ProcurementDomainException.class, () -> rfqService.addLine(rfqId, req));

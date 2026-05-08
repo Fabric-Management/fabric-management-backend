@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.Getter;
@@ -11,7 +12,7 @@ public class WorkOrderApprovedEvent extends DomainEvent {
 
   private final UUID workOrderId;
   private final String workOrderNumber;
-  private final String moduleType;
+  private final WorkOrderModuleType moduleType;
   private final UUID outputMaterialId;
   private final BigDecimal plannedQuantity;
   private final UUID tradingPartnerId;
@@ -21,7 +22,7 @@ public class WorkOrderApprovedEvent extends DomainEvent {
       UUID tenantId,
       UUID workOrderId,
       String workOrderNumber,
-      String moduleType,
+      WorkOrderModuleType moduleType,
       UUID outputMaterialId,
       BigDecimal plannedQuantity,
       UUID tradingPartnerId,

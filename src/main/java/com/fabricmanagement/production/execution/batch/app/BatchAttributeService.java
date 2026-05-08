@@ -9,8 +9,8 @@ import com.fabricmanagement.production.execution.batch.dto.AddBatchAttributeRequ
 import com.fabricmanagement.production.execution.batch.dto.BatchAttributeDto;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchAttributeRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberAttribute;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
+import com.fabricmanagement.production.masterdata.material.domain.reference.MaterialAttribute;
+import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialAttributeRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ public class BatchAttributeService {
 
   private final BatchAttributeRepository attributeRepository;
   private final BatchRepository batchRepository;
-  private final FiberAttributeRepository fiberAttributeRepository;
+  private final MaterialAttributeRepository materialAttributeRepository;
 
   @Transactional(readOnly = true)
   public List<BatchAttributeDto> findByBatchId(UUID batchId) {
@@ -49,11 +49,15 @@ public class BatchAttributeService {
             .findByIdAndTenantId(batchId, tenantId)
             .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
 
-    FiberAttribute attribute =
-        fiberAttributeRepository
-            .findById(request.getAttributeId())
+    MaterialAttribute attribute =
+        materialAttributeRepository
+            .findById(request.attributeId())
+            .filter(
+                a ->
+                    TenantContext.SYSTEM_TENANT_ID.equals(a.getTenantId())
+                        || tenantId.equals(a.getTenantId()))
             .orElseThrow(
-                () -> new NotFoundException("Attribute not found: " + request.getAttributeId()));
+                () -> new NotFoundException("Attribute not found: " + request.attributeId()));
 
     if (attributeRepository
         .findByBatch_IdAndAttribute_Id(batch.getId(), attribute.getId())
@@ -66,11 +70,7 @@ public class BatchAttributeService {
     }
 
     BatchAttribute entity =
-        BatchAttribute.builder()
-            .batch(batch)
-            .attribute(attribute)
-            .value(request.getValue())
-            .build();
+        BatchAttribute.builder().batch(batch).attribute(attribute).value(request.value()).build();
 
     BatchAttribute saved = attributeRepository.save(entity);
     log.info(
@@ -93,9 +93,7 @@ public class BatchAttributeService {
 
     BatchAttribute entity =
         attributeRepository
-            .findById(attributeId)
-            .filter(a -> a.getBatch().getId().equals(batch.getId()))
-            .filter(a -> tenantId.equals(a.getTenantId()))
+            .findByIdAndBatch_IdAndTenantId(attributeId, batch.getId(), tenantId)
             .orElseThrow(
                 () ->
                     new NotFoundException(

@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.tenant.infra.repository;
 
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantStatus;
+import com.fabricmanagement.platform.tenant.domain.TenantType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -88,6 +89,15 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
    * @return list of tenants with given status
    */
   List<Tenant> findByStatus(TenantStatus status);
+
+  /** Find all tenants by type. */
+  List<Tenant> findByType(TenantType type);
+
+  /** Find active playgrounds older than a specific date for TTL reaping. */
+  @Query(
+      "SELECT t FROM Tenant t WHERE t.type = :type AND t.isActive = true AND t.createdAt < :threshold")
+  List<Tenant> findExpiredPlaygrounds(
+      @Param("type") TenantType type, @Param("threshold") Instant threshold);
 
   /**
    * Find all active tenants.

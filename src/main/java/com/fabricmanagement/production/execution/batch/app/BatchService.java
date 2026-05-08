@@ -141,34 +141,14 @@ public class BatchService {
         .orElse(null);
   }
 
-  /**
-   * Builds the attributes map for the batch. For FIBER material type, maps optional fiber-specific
-   * request fields into the "fiber_" prefix convention; only non-null values are included. Merges
-   * with any request.getAttributes() so client can override or add.
-   */
   private Map<String, Object> resolveAttributes(CreateBatchRequest request) {
-    Map<String, Object> attrs =
-        request.getAttributes() != null ? new HashMap<>(request.getAttributes()) : new HashMap<>();
-
-    if (request.getMaterialType() == MaterialType.FIBER) {
-      if (request.getMicronaire() != null) {
-        attrs.put("fiber_micronaire", request.getMicronaire());
-      }
-      if (request.getStapleLength() != null) {
-        attrs.put("fiber_staple_length", request.getStapleLength());
-      }
-      if (request.getFiberGrade() != null) {
-        attrs.put("fiber_grade", request.getFiberGrade());
-      }
-      if (request.getFiberShade() != null) {
-        attrs.put("fiber_shade", request.getFiberShade());
-      }
-      if (request.getOrganicCertNo() != null) {
-        attrs.put("fiber_organic_cert_no", request.getOrganicCertNo());
-      }
-    }
-
-    return attrs;
+    return switch (request.getMaterialType()) {
+      case FIBER ->
+          request.getFiberSpecs() != null ? request.getFiberSpecs().toMap() : new HashMap<>();
+      case YARN ->
+          request.getYarnSpecs() != null ? request.getYarnSpecs().toMap() : new HashMap<>();
+      default -> new HashMap<>();
+    };
   }
 
   /**
@@ -196,8 +176,13 @@ public class BatchService {
                     ? (BigDecimal) e.getValue()
                     : new BigDecimal(String.valueOf(e.getValue()));
             result.put(key, val);
-          } catch (Exception ignored) {
-            // skip invalid entries
+          } catch (Exception ex) {
+            log.warn(
+                "Invalid composition entry in batch {}: key={}, value={}. Error: {}",
+                batch.getId(),
+                e.getKey(),
+                e.getValue(),
+                ex.getMessage());
           }
         }
         return result;

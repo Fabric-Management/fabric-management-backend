@@ -27,6 +27,9 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
   Optional<Department> findByTenantIdAndOrganizationIdAndDepartmentName(
       UUID tenantId, UUID organizationId, String departmentName);
 
+  Optional<Department> findByTenantIdAndOrganizationIdAndDepartmentCode(
+      UUID tenantId, UUID organizationId, String departmentCode);
+
   boolean existsByTenantIdAndOrganizationIdAndDepartmentName(
       UUID tenantId, UUID organizationId, String departmentName);
 

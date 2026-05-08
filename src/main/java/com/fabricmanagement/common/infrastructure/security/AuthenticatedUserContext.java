@@ -28,10 +28,22 @@ public record AuthenticatedUserContext(
     String roleCode,
     List<String> departmentCodes,
     String primaryDepartmentCode,
-    UUID tenantId) {
+    UUID tenantId,
+    boolean isPlayground,
+    String guestId) {
 
   public AuthenticatedUserContext {
     departmentCodes = departmentCodes != null ? List.copyOf(departmentCodes) : List.of();
+  }
+
+  /** Constructor for backward compatibility */
+  public AuthenticatedUserContext(
+      UUID userId,
+      String roleCode,
+      List<String> departmentCodes,
+      String primaryDepartmentCode,
+      UUID tenantId) {
+    this(userId, roleCode, departmentCodes, primaryDepartmentCode, tenantId, false, null);
   }
 
   /** Returns true if the user's role matches the given code (case-insensitive). */

@@ -56,11 +56,14 @@ public class PurchaseOrderLine extends BaseEntity {
   @Column(name = "total_price", nullable = false, precision = 18, scale = 3)
   private BigDecimal totalPrice;
 
-  /** Line-level module-specific data (batch ref, test results). Raw JSONB for flexibility. */
+  /** Line-level module-specific data. Stored as JSONB. */
   @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.json.JsonType.class)
   @Column(name = "module_specs", columnDefinition = "jsonb")
   @Builder.Default
-  private String moduleSpecs = "{}";
+  private com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs
+      moduleSpecs =
+          new com.fabricmanagement.procurement.purchaseorder.domain.specs.GenericPurchaseSpecs(
+              null);
 
   @Override
   protected String getModuleCode() {

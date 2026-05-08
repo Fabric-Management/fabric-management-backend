@@ -15,6 +15,8 @@ import com.fabricmanagement.procurement.rfq.domain.SupplierRFQType;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import com.fabricmanagement.procurement.subcontract.app.SubcontractOrderService;
 import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +42,7 @@ public class QuoteToOrderOrchestrator {
   private final PurchaseOrderService purchaseOrderService;
   private final PurchaseOrderRepository purchaseOrderRepository;
   private final SubcontractOrderService subcontractOrderService;
+  private final ObjectMapper objectMapper;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Async
@@ -106,7 +109,30 @@ public class QuoteToOrderOrchestrator {
                       .unit(line.getUnit())
                       .unitPrice(line.getUnitPrice())
                       .currency(line.getCurrency())
-                      .moduleSpecs(matchingRfqLine.map(rl -> rl.getModuleSpecs()).orElse("{}"))
+                      .moduleSpecs(
+                          matchingRfqLine
+                              .map(
+                                  rl -> {
+                                    try {
+                                      String json =
+                                          objectMapper.writeValueAsString(rl.getModuleSpecs());
+                                      return objectMapper.readValue(
+                                          json,
+                                          com.fabricmanagement.procurement.purchaseorder.domain
+                                              .specs.PurchaseOrderSpecs.class);
+                                    } catch (JsonProcessingException e) {
+                                      log.warn(
+                                          "Failed to serialize RFQ line moduleSpecs, falling back to generic: {}",
+                                          e.getMessage());
+                                      return (com.fabricmanagement.procurement.purchaseorder.domain
+                                              .specs.PurchaseOrderSpecs)
+                                          new com.fabricmanagement.procurement.purchaseorder.domain
+                                              .specs.GenericPurchaseSpecs(null);
+                                    }
+                                  })
+                              .orElse(
+                                  new com.fabricmanagement.procurement.purchaseorder.domain.specs
+                                      .GenericPurchaseSpecs(null)))
                       .build();
                 })
             .toList();
@@ -126,8 +152,12 @@ public class QuoteToOrderOrchestrator {
     try {
       purchaseOrderService.createPurchaseOrder(poRequest);
       log.info("Successfully created PurchaseOrder for quote {}", quote.getQuoteNumber());
-    } catch (Exception e) {
-      log.error("Failed to create PurchaseOrder for quote {}", quote.getQuoteNumber(), e);
+    } catch (RuntimeException e) {
+      log.error(
+          "Failed to create PurchaseOrder for quote {}: {}",
+          quote.getQuoteNumber(),
+          e.getMessage(),
+          e);
     }
   }
 
@@ -136,6 +166,13 @@ public class QuoteToOrderOrchestrator {
       log.warn(
           "Cannot create SubcontractOrder for quote {} — no lines found", quote.getQuoteNumber());
       return;
+    }
+
+    if (quote.getLines().size() > 1) {
+      log.warn(
+          "Quote {} has {} lines, but SubcontractOrder currently supports 1:1 creation. Processing only the first line.",
+          quote.getQuoteNumber(),
+          quote.getLines().size());
     }
 
     SupplierQuoteLine firstLine = quote.getLines().get(0);
@@ -158,8 +195,12 @@ public class QuoteToOrderOrchestrator {
     try {
       subcontractOrderService.createSubcontractOrder(soRequest);
       log.info("Successfully created SubcontractOrder for quote {}", quote.getQuoteNumber());
-    } catch (Exception e) {
-      log.error("Failed to create SubcontractOrder for quote {}", quote.getQuoteNumber(), e);
+    } catch (RuntimeException e) {
+      log.error(
+          "Failed to create SubcontractOrder for quote {}: {}",
+          quote.getQuoteNumber(),
+          e.getMessage(),
+          e);
     }
   }
 
@@ -170,6 +211,7 @@ public class QuoteToOrderOrchestrator {
       case YARN -> PurchaseOrderModuleType.YARN;
       case FABRIC -> PurchaseOrderModuleType.FABRIC;
       case DYE_FINISHING -> PurchaseOrderModuleType.DYE_FINISHING;
+      case GENERIC -> PurchaseOrderModuleType.GENERIC;
     };
   }
 }
