@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.masterdata.fiber.dto;
 
+import com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +19,7 @@ public class FiberCatalogSummaryDto {
 
   private List<FiberCategoryDto> categories;
   private List<FiberIsoCodeDto> isoCodes;
-  private List<FiberAttributeDto> attributes;
+  private List<MaterialAttributeDto> attributes;
   private List<FiberCertificationDto> certifications;
   private List<FiberDto> fibers;
 }

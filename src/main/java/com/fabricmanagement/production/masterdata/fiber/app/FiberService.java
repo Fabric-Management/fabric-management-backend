@@ -15,19 +15,19 @@ import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeI
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCatalogSummaryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
+import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
 import com.fabricmanagement.production.masterdata.material.domain.Material;
+import com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto;
 import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -56,7 +56,7 @@ public class FiberService implements FiberFacade {
   private final MaterialRepository materialRepository;
   private final FiberCategoryRepository fiberCategoryRepository;
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
-  private final FiberAttributeRepository fiberAttributeRepository;
+  private final MaterialFacade materialFacade;
   private final FiberCertificationRepository fiberCertificationRepository;
   private final DomainEventPublisher eventPublisher;
   private final FiberValidationService validationService;
@@ -390,10 +390,7 @@ public class FiberService implements FiberFacade {
         fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
     List<FiberIsoCodeDto> isoCodes =
         fiberIsoCodeRepository.findByIsActiveTrue().stream().map(FiberIsoCodeDto::from).toList();
-    List<FiberAttributeDto> attributes =
-        fiberAttributeRepository.findByIsActiveTrue().stream()
-            .map(FiberAttributeDto::from)
-            .toList();
+    List<MaterialAttributeDto> attributes = materialFacade.getAttributes("FIBER");
     List<FiberCertificationDto> certifications =
         fiberCertificationRepository.findByIsActiveTrue().stream()
             .map(FiberCertificationDto::from)

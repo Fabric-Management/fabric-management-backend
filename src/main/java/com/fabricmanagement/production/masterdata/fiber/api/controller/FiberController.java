@@ -4,14 +4,12 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberIsoCodeService;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberAttributeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCatalogSummaryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberAttributeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -41,7 +39,6 @@ public class FiberController {
   private final FiberService fiberService;
   private final FiberIsoCodeService fiberIsoCodeService;
   private final FiberCategoryRepository fiberCategoryRepository;
-  private final FiberAttributeRepository fiberAttributeRepository;
   private final FiberCertificationRepository fiberCertificationRepository;
 
   @PostMapping
@@ -156,16 +153,6 @@ public class FiberController {
       @RequestParam(defaultValue = "false") boolean baseOnly) {
     List<FiberIsoCodeDto> isoCodes = fiberIsoCodeService.getIsoCodes(baseOnly);
     return ResponseEntity.ok(ApiResponse.success(isoCodes));
-  }
-
-  @GetMapping("/attributes")
-  @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
-  public ResponseEntity<ApiResponse<List<FiberAttributeDto>>> getAttributes() {
-    List<FiberAttributeDto> attributes =
-        fiberAttributeRepository.findByIsActiveTrue().stream()
-            .map(FiberAttributeDto::from)
-            .toList();
-    return ResponseEntity.ok(ApiResponse.success(attributes));
   }
 
   @GetMapping("/certifications")

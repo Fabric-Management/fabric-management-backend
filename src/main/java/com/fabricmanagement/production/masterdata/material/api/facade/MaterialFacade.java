@@ -58,4 +58,13 @@ public interface MaterialFacade {
    * @return Created material DTO
    */
   MaterialDto createMaterial(CreateMaterialRequest request);
+
+  /**
+   * Get material attributes by scope.
+   *
+   * @param scope Material scope (e.g., FIBER, YARN, FABRIC, ALL)
+   * @return List of material attributes
+   */
+  List<com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto> getAttributes(
+      String scope);
 }

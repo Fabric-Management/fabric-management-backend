@@ -15,4 +15,6 @@ public interface BatchAttributeRepository extends JpaRepository<BatchAttribute, 
   List<BatchAttribute> findByBatch_Id(UUID batchId);
 
   Optional<BatchAttribute> findByBatch_IdAndAttribute_Id(UUID batchId, UUID attributeId);
+
+  Optional<BatchAttribute> findByIdAndBatch_IdAndTenantId(UUID id, UUID batchId, UUID tenantId);
 }

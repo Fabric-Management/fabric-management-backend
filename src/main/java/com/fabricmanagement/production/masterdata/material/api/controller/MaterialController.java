@@ -2,10 +2,15 @@ package com.fabricmanagement.production.masterdata.material.api.controller;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.masterdata.material.app.MaterialService;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
+import com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto;
 import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -27,10 +32,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/production/materials")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Material", description = "Material Management API")
 public class MaterialController {
 
   private final MaterialService materialService;
 
+  @Operation(summary = "Create Material")
   @PostMapping
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
   public ResponseEntity<ApiResponse<MaterialDto>> createMaterial(
@@ -44,19 +51,22 @@ public class MaterialController {
         .body(ApiResponse.success(created, "Material created successfully"));
   }
 
+  @Operation(summary = "Get Material by ID")
   @GetMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
-  public ResponseEntity<ApiResponse<MaterialDto>> getMaterial(@PathVariable UUID id) {
+  public ResponseEntity<ApiResponse<MaterialDto>> getMaterial(
+      @Parameter(description = "Material ID") @PathVariable UUID id) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     MaterialDto material =
         materialService
             .findById(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Material not found"));
+            .orElseThrow(() -> new NotFoundException("Material not found: " + id));
 
     return ResponseEntity.ok(ApiResponse.success(material));
   }
 
+  @Operation(summary = "Get All Materials")
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<MaterialDto>>> getAllMaterials() {
@@ -67,10 +77,11 @@ public class MaterialController {
     return ResponseEntity.ok(ApiResponse.success(materials));
   }
 
+  @Operation(summary = "Get Materials by Type")
   @GetMapping("/type/{type}")
   @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
   public ResponseEntity<ApiResponse<List<MaterialDto>>> getMaterialsByType(
-      @PathVariable MaterialType type) {
+      @Parameter(description = "Material Type") @PathVariable MaterialType type) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     List<MaterialDto> materials = materialService.findByType(tenantId, type);
@@ -78,9 +89,22 @@ public class MaterialController {
     return ResponseEntity.ok(ApiResponse.success(materials));
   }
 
+  @Operation(summary = "Get Material Attributes")
+  @GetMapping("/attributes")
+  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  public ResponseEntity<ApiResponse<List<MaterialAttributeDto>>> getAttributes(
+      @Parameter(description = "Material Scope (e.g., FIBER, YARN, FABRIC)")
+          @RequestParam(required = false)
+          String scope) {
+    List<MaterialAttributeDto> attributes = materialService.getAttributes(scope);
+    return ResponseEntity.ok(ApiResponse.success(attributes));
+  }
+
+  @Operation(summary = "Deactivate Material")
   @DeleteMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
-  public ResponseEntity<ApiResponse<Void>> deactivateMaterial(@PathVariable UUID id) {
+  public ResponseEntity<ApiResponse<Void>> deactivateMaterial(
+      @Parameter(description = "Material ID") @PathVariable UUID id) {
     log.info("Deactivating material: id={}", id);
 
     materialService.deactivateMaterial(id);

@@ -2,12 +2,15 @@ package com.fabricmanagement.production.masterdata.material.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
 import com.fabricmanagement.production.masterdata.material.domain.Material;
 import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
 import com.fabricmanagement.production.masterdata.material.domain.event.MaterialCreatedEvent;
 import com.fabricmanagement.production.masterdata.material.dto.CreateMaterialRequest;
+import com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto;
 import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
+import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialAttributeRepository;
 import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MaterialService implements MaterialFacade {
 
   private final MaterialRepository materialRepository;
+  private final MaterialAttributeRepository materialAttributeRepository;
   private final DomainEventPublisher eventPublisher;
 
   /** Create material (internal method). */
@@ -88,7 +92,7 @@ public class MaterialService implements MaterialFacade {
     Material material =
         materialRepository
             .findByTenantIdAndId(tenantId, id)
-            .orElseThrow(() -> new IllegalArgumentException("Material not found"));
+            .orElseThrow(() -> new NotFoundException("Material not found: " + id));
 
     material.delete();
     materialRepository.save(material);
@@ -100,5 +104,19 @@ public class MaterialService implements MaterialFacade {
   @Transactional
   public MaterialDto createMaterial(CreateMaterialRequest request) {
     return createMaterialInternal(request);
+  }
+
+  @Transactional(readOnly = true)
+  public List<MaterialAttributeDto> getAttributes(String scope) {
+    if (scope != null) {
+      return materialAttributeRepository
+          .findByIsActiveTrueAndMaterialScopeIn(List.of("ALL", scope))
+          .stream()
+          .map(MaterialAttributeDto::from)
+          .toList();
+    }
+    return materialAttributeRepository.findByIsActiveTrue().stream()
+        .map(MaterialAttributeDto::from)
+        .toList();
   }
 }
