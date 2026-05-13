@@ -83,7 +83,7 @@ class QuoteToOrderOrchestratorTest {
 
     SupplierRFQLine rfqLine = new SupplierRFQLine();
     rfqLine.setId(quoteLine.getRfqLineId());
-    rfqLine.setMaterialId(UUID.randomUUID());
+    rfqLine.setProductId(UUID.randomUUID());
     rfq.setLines(List.of(rfqLine));
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
@@ -115,7 +115,7 @@ class QuoteToOrderOrchestratorTest {
 
     SupplierRFQLine rfqLine = new SupplierRFQLine();
     rfqLine.setId(quoteLine.getRfqLineId());
-    rfqLine.setMaterialId(UUID.randomUUID());
+    rfqLine.setProductId(UUID.randomUUID());
     rfq.setLines(List.of(rfqLine));
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))

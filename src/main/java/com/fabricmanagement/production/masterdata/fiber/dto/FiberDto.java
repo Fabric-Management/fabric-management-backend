@@ -21,7 +21,7 @@ public class FiberDto {
   private UUID id;
   private UUID tenantId;
   private String uid;
-  private UUID materialId;
+  private UUID productId;
   private UUID fiberCategoryId;
   private UUID fiberIsoCodeId;
   private FiberIsoCodeDto isoCode;
@@ -45,7 +45,7 @@ public class FiberDto {
         .id(entity.getId())
         .tenantId(entity.getTenantId())
         .uid(entity.getUid())
-        .materialId(entity.getMaterialId())
+        .productId(entity.getProductId())
         .fiberCategoryId(entity.getFiberCategoryId())
         .fiberIsoCodeId(entity.getFiberIsoCodeId())
         .isoCode(

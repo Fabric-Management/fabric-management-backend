@@ -7,7 +7,7 @@ import com.fabricmanagement.production.execution.lineage.domain.rule.BatchAttrib
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceAction;
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceRule;
 import com.fabricmanagement.production.execution.lineage.infra.configuration.AttributeInheritanceSchemaLoader;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -43,7 +43,7 @@ public class BatchAttributeInheritanceEngine implements BatchAttributeInheritanc
 
   @Override
   public Map<String, Object> resolveInheritedAttributes(
-      List<BatchAttributes> parentAttributes, MaterialType sourceType, MaterialType targetType) {
+      List<BatchAttributes> parentAttributes, ProductType sourceType, ProductType targetType) {
     if (parentAttributes == null) {
       throw new IllegalArgumentException("parentAttributes must not be null");
     }

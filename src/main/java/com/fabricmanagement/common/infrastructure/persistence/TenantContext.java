@@ -36,8 +36,8 @@ import lombok.extern.slf4j.Slf4j;
  *
  * try {
  *     // Process request - all entities will use this tenant
- *     Material material = materialService.create(request);
- *     // material.getTenantId() == tenantId (automatically set)
+ *     Product product = productService.create(request);
+ *     // product.getTenantId() == tenantId (automatically set)
  * } finally {
  *     TenantContext.clear();  // Always clear in finally block
  * }

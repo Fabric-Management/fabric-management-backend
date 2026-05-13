@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -24,11 +24,11 @@ public class CreateBlendedBatchRequest {
   @NotBlank(message = "Batch code is required")
   private String batchCode;
 
-  @NotNull(message = "Material ID is required")
-  private UUID materialId;
+  @NotNull(message = "Product ID is required")
+  private UUID productId;
 
-  @NotNull(message = "Material type is required")
-  private MaterialType materialType;
+  @NotNull(message = "Product type is required")
+  private ProductType productType;
 
   @NotNull(message = "Quantity is required")
   @DecimalMin(value = "0.001", message = "Quantity must be at least 0.001")

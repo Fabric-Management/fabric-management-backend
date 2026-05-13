@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.batch.domain;
 
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
@@ -17,8 +17,8 @@ import java.util.UUID;
  */
 public record CreateBatchCommand(
     UUID tenantId,
-    UUID materialId,
-    MaterialType materialType,
+    UUID productId,
+    ProductType productType,
     String batchCode,
     String supplierBatchCode,
     BigDecimal quantity,
@@ -35,8 +35,8 @@ public record CreateBatchCommand(
   /** Compact constructor — validates required fields eagerly. */
   public CreateBatchCommand {
     if (tenantId == null) throw new IllegalArgumentException("tenantId is required");
-    if (materialId == null) throw new IllegalArgumentException("materialId is required");
-    if (materialType == null) throw new IllegalArgumentException("materialType is required");
+    if (productId == null) throw new IllegalArgumentException("productId is required");
+    if (productType == null) throw new IllegalArgumentException("productType is required");
     if (batchCode == null || batchCode.isBlank())
       throw new IllegalArgumentException("batchCode is required");
     if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0)

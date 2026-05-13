@@ -21,7 +21,7 @@ class WorkOrderTest {
         WorkOrder.builder()
             .workOrderNumber("WO-TEST-001")
             .status(status)
-            .outputMaterialId(UUID.randomUUID())
+            .outputProductId(UUID.randomUUID())
             .moduleType(WorkOrderModuleType.GENERIC)
             .plannedQty(new BigDecimal("1000.000"))
             .unit("KG")

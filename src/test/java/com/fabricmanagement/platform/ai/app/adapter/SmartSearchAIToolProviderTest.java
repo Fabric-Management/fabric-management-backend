@@ -54,15 +54,15 @@ class SmartSearchAIToolProviderTest {
   }
 
   @Test
-  @DisplayName("Should delegate to search_materials with YARN type when YARN detected")
-  void shouldDelegateToMaterialWithYarnType() {
+  @DisplayName("Should delegate to search_products with YARN type when YARN detected")
+  void shouldDelegateToProductWithYarnType() {
     Map<String, Object> params = Map.of("query", "30/1 yarn");
-    when(mockRegistry.execute(eq(tenantId), eq("search_materials"), any())).thenReturn("Yarn info");
+    when(mockRegistry.execute(eq(tenantId), eq("search_products"), any())).thenReturn("Yarn info");
 
     String result = provider.execute(tenantId, "smart_search", params);
 
     assertTrue(result.contains("Yarn info"));
-    verify(mockRegistry).execute(eq(tenantId), eq("search_materials"), any());
+    verify(mockRegistry).execute(eq(tenantId), eq("search_products"), any());
   }
 
   @Test
@@ -70,15 +70,15 @@ class SmartSearchAIToolProviderTest {
   void shouldDelegateToBothIfUnknown() {
     Map<String, Object> params = Map.of("query", "something");
     when(mockRegistry.execute(eq(tenantId), eq("search_fibers"), any())).thenReturn("Fiber info");
-    when(mockRegistry.execute(eq(tenantId), eq("search_materials"), any()))
-        .thenReturn("Material info");
+    when(mockRegistry.execute(eq(tenantId), eq("search_products"), any()))
+        .thenReturn("Product info");
 
     String result = provider.execute(tenantId, "smart_search", params);
 
     assertTrue(result.contains("Fiber info"));
-    assertTrue(result.contains("Material info"));
+    assertTrue(result.contains("Product info"));
     verify(mockRegistry, times(1)).execute(eq(tenantId), eq("search_fibers"), any());
-    verify(mockRegistry, times(1)).execute(eq(tenantId), eq("search_materials"), any());
+    verify(mockRegistry, times(1)).execute(eq(tenantId), eq("search_products"), any());
   }
 
   @Test

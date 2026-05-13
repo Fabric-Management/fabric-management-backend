@@ -10,7 +10,7 @@ import lombok.Getter;
 public class QuoteLineResponse {
 
   private final UUID id;
-  private final UUID materialId;
+  private final UUID productId;
   private final String productDesc;
   private final BigDecimal requestedQty;
   private final String unit;
@@ -23,7 +23,7 @@ public class QuoteLineResponse {
 
   private QuoteLineResponse(QuoteLine line) {
     this.id = line.getId();
-    this.materialId = line.getMaterialId();
+    this.productId = line.getProductId();
     this.productDesc = line.getProductDesc();
     this.requestedQty = line.getRequestedQty();
     this.unit = line.getUnit();

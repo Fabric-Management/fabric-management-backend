@@ -4,7 +4,7 @@ import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -18,7 +18,7 @@ public record StockUnitDto(
     String serialNumber,
     UUID batchId,
     PackageType packageType,
-    MaterialType materialType,
+    ProductType productType,
     BigDecimal initialWeight,
     BigDecimal currentWeight,
     BigDecimal consumedWeight,
@@ -49,7 +49,7 @@ public record StockUnitDto(
         entity.getSerialNumber(),
         entity.getBatchId(),
         entity.getPackageType(),
-        entity.getMaterialType(),
+        entity.getProductType(),
         entity.getInitialWeight(),
         entity.getCurrentWeight(),
         entity.getConsumedWeight(),

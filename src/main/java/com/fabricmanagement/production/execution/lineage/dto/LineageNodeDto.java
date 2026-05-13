@@ -3,7 +3,7 @@ package com.fabricmanagement.production.execution.lineage.dto;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.lineage.domain.BatchLineage;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
@@ -38,7 +38,7 @@ public class LineageNodeDto {
   // ── Related batch summary ──
   private UUID batchId;
   private String batchCode;
-  private MaterialType materialType;
+  private ProductType productType;
   private BigDecimal batchQuantity;
   private BigDecimal availableQuantity;
   private String batchUnit;
@@ -62,7 +62,7 @@ public class LineageNodeDto {
         .remarks(lineage.getRemarks())
         .batchId(relatedBatch.getId())
         .batchCode(relatedBatch.getBatchCode())
-        .materialType(relatedBatch.getMaterialType())
+        .productType(relatedBatch.getProductType())
         .batchQuantity(relatedBatch.getQuantity())
         .availableQuantity(relatedBatch.getAvailableQuantity())
         .batchUnit(relatedBatch.getUnit())

@@ -20,11 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <h2>4-Step Recipe Matching Cascade</h2>
  *
  * <ol>
- *   <li><b>Step 1 — Material default recipe:</b> If line has a materialId and there is an active
- *       ACTIVE recipe associated to it (queried by materialId), use it.
+ *   <li><b>Step 1 — Product default recipe:</b> If line has a productId and there is an active
+ *       ACTIVE recipe associated to it (queried by productId), use it.
  *   <li><b>Step 2 — Customer history:</b> Query for the most recently used recipe for this
- *       (customer, material) combination from previous orders.
- *   <li><b>Step 3 — Constraint filter:</b> Find ACTIVE recipes for the material and pick the most
+ *       (customer, product) combination from previous orders.
+ *   <li><b>Step 3 — Constraint filter:</b> Find ACTIVE recipes for the product and pick the most
  *       frequently used (by WorkOrder count).
  *   <li><b>Step 4 — Fallback:</b> No match found — WorkOrder created with no recipe; FlowBoard task
  *       will be generated for manual recipe assignment.
@@ -74,10 +74,10 @@ public class SalesOrderRuleEngine {
           order.getOrderNumber());
     } else {
       log.warn(
-          "RuleEngine: no recipe found for SalesOrderLine {} (material={}). "
+          "RuleEngine: no recipe found for SalesOrderLine {} (product={}). "
               + "WorkOrder will be created without recipe — FlowBoard task pending.",
           line.getId(),
-          line.getMaterialId());
+          line.getProductId());
     }
 
     // Create WorkOrder (DRAFT) regardless of recipe availability
@@ -86,30 +86,29 @@ public class SalesOrderRuleEngine {
 
   /** 4-step cascade recipe matching. */
   private Optional<UUID> findRecipe(SalesOrder order, SalesOrderLine line) {
-    if (line.getMaterialId() == null) {
-      // No materialId — skip steps 1-3, go to fallback
+    if (line.getProductId() == null) {
+      // No productId — skip steps 1-3, go to fallback
       return Optional.empty();
     }
 
-    // Step 1 — material default recipe (most recent ACTIVE recipe for this material)
-    Optional<UUID> step1 = historyQuery.findDefaultRecipeForMaterial(line.getMaterialId());
+    // Step 1 — product default recipe (most recent ACTIVE recipe for this product)
+    Optional<UUID> step1 = historyQuery.findDefaultRecipeForProduct(line.getProductId());
     if (step1.isPresent()) {
-      log.debug(
-          "RuleEngine step1 match: material={} → recipe={}", line.getMaterialId(), step1.get());
+      log.debug("RuleEngine step1 match: product={} → recipe={}", line.getProductId(), step1.get());
       return step1;
     }
 
-    // Step 2 — customer history (same customer + material combination)
+    // Step 2 — customer history (same customer + product combination)
     Optional<UUID> step2 =
-        historyQuery.findMostRecentRecipeForCustomerAndMaterial(
-            order.getTradingPartnerId(), line.getMaterialId());
+        historyQuery.findMostRecentRecipeForCustomerAndProduct(
+            order.getTradingPartnerId(), line.getProductId());
     if (step2.isPresent()) {
       log.debug("RuleEngine step2 match (customer history): → recipe={}", step2.get());
       return step2;
     }
 
-    // Step 3 — most frequently used ACTIVE recipe for this material
-    Optional<UUID> step3 = historyQuery.findMostUsedRecipeForMaterial(line.getMaterialId());
+    // Step 3 — most frequently used ACTIVE recipe for this product
+    Optional<UUID> step3 = historyQuery.findMostUsedRecipeForProduct(line.getProductId());
     if (step3.isPresent()) {
       log.debug("RuleEngine step3 match (frequency): → recipe={}", step3.get());
       return step3;

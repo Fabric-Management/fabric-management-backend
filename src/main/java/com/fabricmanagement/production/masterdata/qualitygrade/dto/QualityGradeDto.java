@@ -1,13 +1,13 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.dto;
 
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import java.math.BigDecimal;
 import java.util.UUID;
 
 public record QualityGradeDto(
     UUID id,
-    MaterialType materialType,
+    ProductType productType,
     String code,
     String name,
     int rank,
@@ -24,7 +24,7 @@ public record QualityGradeDto(
     }
     return new QualityGradeDto(
         entity.getId(),
-        entity.getMaterialType(),
+        entity.getProductType(),
         entity.getCode(),
         entity.getName(),
         entity.getRank(),

@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/production/batches")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Batch", description = "Material Batch Inventory & Lifecycle Management API")
+@Tag(name = "Batch", description = "Product Batch Inventory & Lifecycle Management API")
 public class BatchController {
 
   private final BatchService batchService;
@@ -46,8 +46,8 @@ public class BatchController {
   @Operation(
       summary = "Create Batch",
       description =
-          "Creates a new material batch. Requires fiberSpecs if materialType is FIBER, and yarnSpecs if materialType is YARN.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+          "Creates a new product batch. Requires fiberSpecs if productType is FIBER, and yarnSpecs if productType is YARN.")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> createBatch(
       @Valid @RequestBody CreateBatchRequest request) {
     BatchDto batch = batchService.create(request);
@@ -56,7 +56,7 @@ public class BatchController {
 
   @GetMapping
   @Operation(summary = "Get All Batches", description = "Retrieves a list of all active batches.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<BatchDto>>> getAllBatches() {
     List<BatchDto> batches = batchService.getAll();
     return ResponseEntity.ok(ApiResponse.success(batches));
@@ -64,7 +64,7 @@ public class BatchController {
 
   @GetMapping("/{id}")
   @Operation(summary = "Get Batch by ID", description = "Retrieves details of a specific batch.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<BatchDto>> getBatch(@PathVariable UUID id) {
     return ResponseEntity.ok(
         ApiResponse.success(
@@ -73,14 +73,14 @@ public class BatchController {
                 .orElseThrow(() -> new EntityNotFoundException("Batch not found: " + id))));
   }
 
-  @GetMapping("/material/{materialId}")
+  @GetMapping("/product/{productId}")
   @Operation(
-      summary = "Get Batches by Material ID",
-      description = "Retrieves all batches belonging to a specific material.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
-  public ResponseEntity<ApiResponse<List<BatchDto>>> getBatchesByMaterialId(
-      @PathVariable UUID materialId) {
-    List<BatchDto> batches = batchService.getByMaterialId(materialId);
+      summary = "Get Batches by Product ID",
+      description = "Retrieves all batches belonging to a specific product.")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  public ResponseEntity<ApiResponse<List<BatchDto>>> getBatchesByProductId(
+      @PathVariable UUID productId) {
+    List<BatchDto> batches = batchService.getByProductId(productId);
     return ResponseEntity.ok(ApiResponse.success(batches));
   }
 
@@ -88,7 +88,7 @@ public class BatchController {
   @Operation(
       summary = "Get Certification Auto-fill",
       description = "Provides auto-fill data for batch certifications.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<BatchCertificationAutoFillResponse>> getCertificationAutoFill(
       @RequestParam BatchCertificationScope scope,
       @RequestParam(required = false) UUID partnerCertificationId,
@@ -106,7 +106,7 @@ public class BatchController {
   @Operation(
       summary = "Reserve Batch Quantity",
       description = "Reserves a specific quantity of a batch for a sales order or work order.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchReservationDto>> reserve(
       @PathVariable UUID id, @Valid @RequestBody ReserveRequest request) {
     BatchReservationDto reservation = batchService.reserve(id, request);
@@ -117,7 +117,7 @@ public class BatchController {
   @Operation(
       summary = "Release Batch Reservation",
       description = "Releases a previously made reservation, returning the quantity to available.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> releaseReservation(
       @PathVariable UUID id, @PathVariable UUID reservationId) {
     BatchDto batch = batchService.releaseReservation(id, reservationId);
@@ -128,7 +128,7 @@ public class BatchController {
   @Operation(
       summary = "Complete Batch Reservation",
       description = "Marks a reservation as complete (consumed).")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> completeReservation(
       @PathVariable UUID id, @PathVariable UUID reservationId) {
     BatchDto batch = batchService.completeReservation(id, reservationId);
@@ -139,7 +139,7 @@ public class BatchController {
   @Operation(
       summary = "Get Batch Reservations",
       description = "Retrieves all active reservations for a batch.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<BatchReservationDto>>> getReservations(
       @PathVariable UUID id) {
     List<BatchReservationDto> reservations = batchService.getReservations(id);
@@ -152,7 +152,7 @@ public class BatchController {
   @Operation(
       summary = "Consume Batch Quantity",
       description = "Directly consumes a quantity from the batch (bypassing reservation).")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> consume(
       @PathVariable UUID id, @Valid @RequestBody ConsumeRequest request) {
     BatchDto batch = batchService.consume(id, request);
@@ -165,7 +165,7 @@ public class BatchController {
   @Operation(
       summary = "Record Batch Waste",
       description = "Records a quantity of the batch as waste.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> recordWaste(
       @PathVariable UUID id, @Valid @RequestBody RecordWasteRequest request) {
     BatchDto batch = batchService.recordWaste(id, request);
@@ -178,7 +178,7 @@ public class BatchController {
   @Operation(
       summary = "Adjust Batch Inventory",
       description = "Adjusts the available quantity of a batch (cycle counting, discrepancies).")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> adjust(
       @PathVariable UUID id, @Valid @RequestBody AdjustmentRequest request) {
     BatchDto batch = batchOperationsService.adjust(id, request);
@@ -191,7 +191,7 @@ public class BatchController {
   @Operation(
       summary = "Start Production on Batch",
       description = "Transitions batch status to IN_PRODUCTION.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> startProduction(
       @PathVariable UUID id, @Valid @RequestBody StartProductionRequest request) {
     BatchDto batch = batchOperationsService.startProduction(id, request);
@@ -205,7 +205,7 @@ public class BatchController {
    * Returns the created child batch (201 Created).
    */
   @PostMapping("/blend")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Create a blended batch from multiple parent batches")
   public ResponseEntity<ApiResponse<BatchDto>> createBlendedBatch(
       @Valid @RequestBody CreateBlendedBatchRequest request) {
@@ -222,7 +222,7 @@ public class BatchController {
       summary = "Split Batch",
       description =
           "Splits the batch: acceptedQuantity becomes a new AVAILABLE batch, remainder stays in source.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<SplitBatchResponse>> splitBatch(
       @PathVariable UUID id, @Valid @RequestBody SplitBatchRequest request) {
     SplitBatchResponse response = batchOperationsService.splitBatch(id, request);
@@ -237,7 +237,7 @@ public class BatchController {
   @Operation(
       summary = "Partial Acceptance Split",
       description = "Splits batch for partial QC acceptance. Remainder gets rejectedStatus.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> splitPartialAcceptance(
       @PathVariable UUID id, @Valid @RequestBody PartialAcceptanceSplitRequest request) {
     BatchDto batch = batchOperationsService.splitPartialAcceptance(id, request);
@@ -248,7 +248,7 @@ public class BatchController {
   @Operation(
       summary = "Transfer Batch Location",
       description = "Transfers the batch to a different location.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchDto>> transferBatch(
       @PathVariable UUID id, @Valid @RequestBody TransferBatchRequest request) {
     BatchDto batch = batchOperationsService.transferBatch(id, request);
@@ -264,7 +264,7 @@ public class BatchController {
       summary = "Override Batch Status",
       description =
           "Overrides batch status (e.g., QC_REJECTED to AVAILABLE). Requires reason. Admin/Manager only.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'manage')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'manage')")
   public ResponseEntity<ApiResponse<BatchDto>> overrideStatus(
       @PathVariable UUID id, @Valid @RequestBody OverrideStatusRequest request) {
     BatchDto batch = batchOperationsService.overrideStatus(id, request);
@@ -277,7 +277,7 @@ public class BatchController {
   @Operation(
       summary = "Get Batch Certifications",
       description = "Retrieves all active certifications applied to the batch.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<BatchCertificationDto>>> getCertifications(
       @PathVariable UUID id) {
     List<BatchCertificationDto> list = batchCertificationService.findByBatchId(id);
@@ -285,7 +285,7 @@ public class BatchController {
   }
 
   @PostMapping("/{id}/certifications/copy-from/{sourceBatchId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(
       summary = "Copy certifications from another batch",
       description =
@@ -301,7 +301,7 @@ public class BatchController {
   }
 
   @PostMapping("/{id}/certifications")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(
       summary = "Add batch certification",
       description =
@@ -319,7 +319,7 @@ public class BatchController {
   }
 
   @PutMapping("/{id}/certifications/{certificationId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(
       summary = "Update batch certification",
       description =
@@ -339,7 +339,7 @@ public class BatchController {
   }
 
   @DeleteMapping("/{id}/certifications/{certificationId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(
       summary = "Delete batch certification",
       description = "Soft-deletes a batch certification. Already deleted records return 404.")
@@ -357,7 +357,7 @@ public class BatchController {
   @Operation(
       summary = "Get Batch Attributes",
       description = "Retrieves dynamic attributes associated with the batch.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<BatchAttributeDto>>> getAttributes(@PathVariable UUID id) {
     List<BatchAttributeDto> list = batchAttributeService.findByBatchId(id);
     return ResponseEntity.ok(ApiResponse.success(list));
@@ -367,7 +367,7 @@ public class BatchController {
   @Operation(
       summary = "Add Batch Attribute",
       description = "Adds a dynamic attribute to the batch.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<BatchAttributeDto>> addAttribute(
       @PathVariable UUID id, @Valid @RequestBody AddBatchAttributeRequest request) {
     BatchAttributeDto created = batchAttributeService.add(id, request);
@@ -378,7 +378,7 @@ public class BatchController {
   @Operation(
       summary = "Delete Batch Attribute",
       description = "Removes a dynamic attribute from the batch.")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<Void> deleteAttribute(
       @PathVariable UUID id, @PathVariable UUID attributeId) {
     batchAttributeService.delete(id, attributeId);
@@ -389,21 +389,21 @@ public class BatchController {
 
   /** Treatment catalog reference. Returns empty list until treatment master data exists. */
   @GetMapping("/treatments")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<?>>> getTreatmentCatalog() {
     return ResponseEntity.ok(ApiResponse.success(List.of()));
   }
 
   /** Batch treatments. Returns empty list until full implementation. */
   @GetMapping("/{id}/treatments")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<?>>> getBatchTreatments(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(List.of()));
   }
 
   /** Add treatment – 501 until full implementation. */
   @PostMapping("/{id}/treatments")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<Void>> addBatchTreatment(
       @PathVariable UUID id, @RequestBody(required = false) Object request) {
     return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
@@ -412,7 +412,7 @@ public class BatchController {
 
   /** Remove treatment – 501 until full implementation. */
   @DeleteMapping("/{id}/treatments/{treatmentId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<Void>> removeBatchTreatment(
       @PathVariable UUID id, @PathVariable UUID treatmentId) {
     return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)

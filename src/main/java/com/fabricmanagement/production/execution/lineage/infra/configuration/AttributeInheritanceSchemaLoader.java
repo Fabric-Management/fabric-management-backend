@@ -4,7 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.lineage.domain.rule.AttributeInheritanceSchema;
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceRule;
 import com.fabricmanagement.production.execution.lineage.infra.persistence.AttributeInheritanceSchemaRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Loads Attribute Inheritance Rule schemas from static JSON files on the classpath and exposes them
- * by source→target material type for the Metadata-Driven Attribute Inheritance Engine.
+ * by source→target product type for the Metadata-Driven Attribute Inheritance Engine.
  *
  * <p>At startup, scans {@code classpath:inheritance-rules/*.json}, deserializes each file into an
  * {@link AttributeInheritanceSchema}, and caches them in an immutable map keyed by {@code
@@ -125,15 +125,15 @@ public class AttributeInheritanceSchemaLoader {
   }
 
   /**
-   * Returns the schema for the given source→target material type pair. First checks the database
-   * for tenant-specific overrides (loaded via repository). If not found, falls back to the
+   * Returns the schema for the given source→target product type pair. First checks the database for
+   * tenant-specific overrides (loaded via repository). If not found, falls back to the
    * classpath-loaded generic schemas.
    *
-   * @param source material type of the consumed parent batch(es) (e.g. FIBER)
-   * @param target material type of the batch being produced (e.g. YARN)
+   * @param source product type of the consumed parent batch(es) (e.g. FIBER)
+   * @param target product type of the batch being produced (e.g. YARN)
    * @return the schema, or empty if no matching JSON file or DB record was found
    */
-  public Optional<AttributeInheritanceSchema> getSchema(MaterialType source, MaterialType target) {
+  public Optional<AttributeInheritanceSchema> getSchema(ProductType source, ProductType target) {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     if (tenantId != null) {
@@ -175,7 +175,7 @@ public class AttributeInheritanceSchemaLoader {
     return Optional.ofNullable(cache.get(key));
   }
 
-  private static String cacheKey(MaterialType source, MaterialType target) {
+  private static String cacheKey(ProductType source, ProductType target) {
     return source.name() + "_TO_" + target.name();
   }
 

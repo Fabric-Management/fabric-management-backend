@@ -281,10 +281,10 @@ public class SalesOrderService {
                 line ->
                     new SalesOrderConfirmedEvent.SalesOrderLineSnapshot(
                         line.getId(),
-                        line.getMaterialId(),
+                        line.getProductId(),
                         line.getProductDesc() != null
                             ? line.getProductDesc()
-                            : "MATERIAL_" + line.getMaterialId(), // Default product identifier
+                            : "PRODUCT_" + line.getProductId(), // Default product identifier
                         line.getRequestedQty(),
                         line.getUnit(),
                         saved.getRequestedDeliveryDate() // Parent order requested delivery date
@@ -427,7 +427,7 @@ public class SalesOrderService {
   private SalesOrderLine mapLineRequestToEntity(SalesOrderLineRequest req, UUID salesOrderId) {
     return SalesOrderLine.builder()
         .salesOrderId(salesOrderId)
-        .materialId(req.getMaterialId())
+        .productId(req.getProductId())
         .productDesc(req.getProductDesc())
         .requestedQty(req.getRequestedQty())
         .unit(req.getUnit())
@@ -444,7 +444,7 @@ public class SalesOrderService {
         .id(line.getId())
         .uid(line.getUid())
         .salesOrderId(line.getSalesOrderId())
-        .materialId(line.getMaterialId())
+        .productId(line.getProductId())
         .productDesc(line.getProductDesc())
         .requestedQty(line.getRequestedQty())
         .unit(line.getUnit())

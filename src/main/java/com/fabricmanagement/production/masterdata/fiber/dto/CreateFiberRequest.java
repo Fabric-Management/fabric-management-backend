@@ -19,11 +19,11 @@ import lombok.NoArgsConstructor;
  *   <li><b>Blended fiber:</b> composition contains base fiber IDs with percentages
  * </ul>
  *
- * <p><b>User-Friendly Design:</b> Material can be auto-created automatically.
+ * <p><b>User-Friendly Design:</b> Product can be auto-created automatically.
  *
- * <p>If materialId is provided, existing Material will be used.
+ * <p>If productId is provided, existing Product will be used.
  *
- * <p>If materialId is null, Material will be auto-created with type=FIBER and provided unit.
+ * <p>If productId is null, Product will be auto-created with type=FIBER and provided unit.
  */
 @Data
 @Builder
@@ -34,16 +34,16 @@ public class CreateFiberRequest {
   private Long version;
 
   /**
-   * Material ID (optional).
+   * Product ID (optional).
    *
-   * <p>If null, Material will be auto-created with type=FIBER and unit.
+   * <p>If null, Product will be auto-created with type=FIBER and unit.
    */
-  private UUID materialId;
+  private UUID productId;
 
   /**
-   * Unit for Material (required if materialId is null).
+   * Unit for Product (required if productId is null).
    *
-   * <p>Used when auto-creating Material. Examples: "kg", "ton", "m", etc.
+   * <p>Used when auto-creating Product. Examples: "kg", "ton", "m", etc.
    */
   private String unit;
 

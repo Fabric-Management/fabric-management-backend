@@ -21,8 +21,8 @@ import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.material.domain.Material;
-import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
+import com.fabricmanagement.production.masterdata.product.domain.Product;
+import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +46,7 @@ class FiberServiceTest {
   private static final String FIBER_NAME = "COT60_LIN40";
 
   @Mock private FiberRepository fiberRepository;
-  @Mock private MaterialRepository materialRepository;
+  @Mock private ProductRepository productRepository;
   @Mock private FiberCategoryRepository fiberCategoryRepository;
   @Mock private FiberIsoCodeRepository fiberIsoCodeRepository;
   @Mock private DomainEventPublisher eventPublisher;
@@ -79,11 +79,11 @@ class FiberServiceTest {
     @BeforeEach
     void setUp() {
       fiber = mock(Fiber.class);
-      Material material = mock(Material.class);
-      lenient().when(material.getId()).thenReturn(FIBER_ID);
+      Product product = mock(Product.class);
+      lenient().when(product.getId()).thenReturn(FIBER_ID);
       when(fiber.getFiberName()).thenReturn(FIBER_NAME);
       lenient().when(fiber.getVersion()).thenReturn(1L);
-      lenient().when(fiber.getMaterial()).thenReturn(material);
+      lenient().when(fiber.getProduct()).thenReturn(product);
       when(fiberRepository.findByTenantIdAndId(TENANT_ID, FIBER_ID)).thenReturn(Optional.of(fiber));
 
       Map<UUID, BigDecimal> newComposition = Map.of(UUID.randomUUID(), new BigDecimal("60.00"));
@@ -98,7 +98,7 @@ class FiberServiceTest {
     @Test
     @DisplayName("succeeds and persists new composition when no batches are in active production")
     void whenNoActiveBatches_compositionUpdatesSuccessfully() {
-      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+      when(batchRepository.existsByTenantIdAndProductIdAndStatusIn(
               TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(false);
       when(fiberRepository.save(fiber)).thenReturn(fiber);
@@ -113,7 +113,7 @@ class FiberServiceTest {
     @Test
     @DisplayName("throws RecipeInUseException when batches are RESERVED or IN_PROGRESS")
     void whenActiveBatchesExist_throwsRecipeInUseException() {
-      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+      when(batchRepository.existsByTenantIdAndProductIdAndStatusIn(
               TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(true);
 
@@ -130,7 +130,7 @@ class FiberServiceTest {
     @Test
     @DisplayName("thrown RecipeInUseException carries fiberId and fiberName for API details")
     void whenActiveBatchesExist_exceptionCarriesStructuredContext() {
-      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+      when(batchRepository.existsByTenantIdAndProductIdAndStatusIn(
               TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(true);
 
@@ -154,8 +154,7 @@ class FiberServiceTest {
       fiberService.updateFiber(FIBER_ID, requestWithoutComposition);
 
       // Guard query must not run — no composition means no recipe risk
-      verify(batchRepository, never())
-          .existsByTenantIdAndMaterialIdAndStatusIn(any(), any(), any());
+      verify(batchRepository, never()).existsByTenantIdAndProductIdAndStatusIn(any(), any(), any());
       verify(fiberRepository).save(fiber);
     }
   }
@@ -173,17 +172,17 @@ class FiberServiceTest {
     @BeforeEach
     void setUp() {
       fiber = mock(Fiber.class);
-      Material material = mock(Material.class);
-      when(material.getId()).thenReturn(FIBER_ID);
+      Product product = mock(Product.class);
+      when(product.getId()).thenReturn(FIBER_ID);
       lenient().when(fiber.getFiberName()).thenReturn(FIBER_NAME);
-      lenient().when(fiber.getMaterial()).thenReturn(material);
+      lenient().when(fiber.getProduct()).thenReturn(product);
       when(fiberRepository.findByTenantIdAndId(TENANT_ID, FIBER_ID)).thenReturn(Optional.of(fiber));
     }
 
     @Test
     @DisplayName("succeeds and marks fiber deleted when no batches are in active production")
     void whenNoActiveBatches_deactivationSucceeds() {
-      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+      when(batchRepository.existsByTenantIdAndProductIdAndStatusIn(
               TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(false);
       when(fiberRepository.save(fiber)).thenReturn(fiber);
@@ -197,7 +196,7 @@ class FiberServiceTest {
     @Test
     @DisplayName("throws FiberDomainException when batches are RESERVED or IN_PROGRESS")
     void whenActiveBatchesExist_throwsFiberDomainException() {
-      when(batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
+      when(batchRepository.existsByTenantIdAndProductIdAndStatusIn(
               TENANT_ID, FIBER_ID, BatchStatus.PRODUCTION_ACTIVE))
           .thenReturn(true);
 

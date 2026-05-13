@@ -101,7 +101,7 @@ class WorkOrderPlannedCostListenerTest {
     void swallowsDomainException() {
       doThrow(
               new com.fabricmanagement.production.execution.workorder.domain.exception
-                  .WorkOrderDomainException("missing outputMaterialId"))
+                  .WorkOrderDomainException("missing outputProductId"))
           .when(plannedCostTriggerService)
           .triggerPlannedCost(any());
 

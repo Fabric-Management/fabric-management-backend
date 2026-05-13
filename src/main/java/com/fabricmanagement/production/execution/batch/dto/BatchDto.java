@@ -4,7 +4,7 @@ import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.domain.attributes.FiberAttributes;
 import com.fabricmanagement.production.execution.batch.domain.attributes.YarnAttributes;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Response object representing a material batch in the system")
+@Schema(description = "Response object representing a product batch in the system")
 public class BatchDto {
 
   @Schema(description = "Unique batch ID")
@@ -32,11 +32,11 @@ public class BatchDto {
   @Schema(description = "Human-readable unique identifier", example = "BAT-2026-0001")
   private String uid;
 
-  @Schema(description = "ID of the parent material this batch belongs to")
-  private UUID materialId;
+  @Schema(description = "ID of the parent product this batch belongs to")
+  private UUID productId;
 
-  @Schema(description = "Type of the material (FIBER, YARN, FABRIC)")
-  private MaterialType materialType;
+  @Schema(description = "Type of the product (FIBER, YARN, FABRIC)")
+  private ProductType productType;
 
   @Schema(
       description = "Raw JSONB attributes map. Prefer using fiberSpecs/yarnSpecs when available.")
@@ -96,17 +96,17 @@ public class BatchDto {
 
   /**
    * Resolved composition: Batch.attributes.composition if present, else Fiber.composition. Map of
-   * baseFiberId → percentage. Empty for pure fibers. Only meaningful when materialType = FIBER.
+   * baseFiberId → percentage. Empty for pure fibers. Only meaningful when productType = FIBER.
    */
   @Schema(
       description =
           "Resolved composition. Map of Base Fiber ID to percentage. Empty for pure fibers.")
   private Map<UUID, BigDecimal> composition;
 
-  @Schema(description = "Detailed specifications for FIBER batches. Null for other material types.")
+  @Schema(description = "Detailed specifications for FIBER batches. Null for other product types.")
   private FiberAttributes fiberSpecs;
 
-  @Schema(description = "Detailed specifications for YARN batches. Null for other material types.")
+  @Schema(description = "Detailed specifications for YARN batches. Null for other product types.")
   private YarnAttributes yarnSpecs;
 
   @Schema(description = "Whether the batch is active (not soft-deleted)")
@@ -128,15 +128,15 @@ public class BatchDto {
             .id(entity.getId())
             .tenantId(entity.getTenantId())
             .uid(entity.getUid())
-            .materialId(entity.getMaterialId())
-            .materialType(entity.getMaterialType())
+            .productId(entity.getProductId())
+            .productType(entity.getProductType())
             .attributes(entity.getAttributes())
             .fiberSpecs(
-                entity.getMaterialType() == MaterialType.FIBER
+                entity.getProductType() == ProductType.FIBER
                     ? FiberAttributes.from(entity.getAttributes())
                     : null)
             .yarnSpecs(
-                entity.getMaterialType() == MaterialType.YARN
+                entity.getProductType() == ProductType.YARN
                     ? YarnAttributes.from(entity.getAttributes())
                     : null)
             .batchCode(entity.getBatchCode())

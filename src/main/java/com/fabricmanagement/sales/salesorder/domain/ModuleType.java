@@ -6,7 +6,7 @@ package com.fabricmanagement.sales.salesorder.domain;
  * <p>Determines which {@code moduleSpecs} JSONB schema applies and which recipe pool to search.
  *
  * <ul>
- *   <li>FIBER — raw fiber material
+ *   <li>FIBER — raw fiber product
  *   <li>YARN — spun yarn
  *   <li>FABRIC — woven or knitted fabric
  *   <li>DYE_FINISHING — dyeing & finishing services

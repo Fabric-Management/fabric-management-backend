@@ -25,10 +25,10 @@ import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCa
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
-import com.fabricmanagement.production.masterdata.material.domain.Material;
-import com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto;
-import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
+import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
+import com.fabricmanagement.production.masterdata.product.domain.Product;
+import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
+import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -53,10 +53,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class FiberService implements FiberFacade {
 
   private final FiberRepository fiberRepository;
-  private final MaterialRepository materialRepository;
+  private final ProductRepository productRepository;
   private final FiberCategoryRepository fiberCategoryRepository;
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
-  private final MaterialFacade materialFacade;
+  private final ProductFacade productFacade;
   private final FiberCertificationRepository fiberCertificationRepository;
   private final DomainEventPublisher eventPublisher;
   private final FiberValidationService validationService;
@@ -88,54 +88,54 @@ public class FiberService implements FiberFacade {
           "Pure fibers can only be created by the platform. Submit a fiber request instead.");
     }
 
-    // Auto-create Material if materialId is not provided (USER-FRIENDLY: Automation
+    // Auto-create Product if productId is not provided (USER-FRIENDLY: Automation
     // reduces user
     // errors)
-    Material material;
-    if (request.getMaterialId() != null) {
-      // Use existing Material
-      material =
-          materialRepository
-              .findByTenantIdAndId(tenantId, request.getMaterialId())
+    Product product;
+    if (request.getProductId() != null) {
+      // Use existing Product
+      product =
+          productRepository
+              .findByTenantIdAndId(tenantId, request.getProductId())
               .orElseThrow(
                   () ->
                       new FiberDomainException(
-                          "Material not found or not accessible",
-                          "FIBER_MATERIAL_NOT_FOUND",
+                          "Product not found or not accessible",
+                          "FIBER_PRODUCT_NOT_FOUND",
                           404,
-                          new Object[] {request.getMaterialId()}));
+                          new Object[] {request.getProductId()}));
     } else {
-      // Auto-create Material (USER-FRIENDLY: System handles Material creation
+      // Auto-create Product (USER-FRIENDLY: System handles Product creation
       // automatically)
       if (request.getUnit() == null || request.getUnit().isBlank()) {
         throw new FiberDomainException(
-            "Unit is required when materialId is not provided", "FIBER_UNIT_REQUIRED", 400);
+            "Unit is required when productId is not provided", "FIBER_UNIT_REQUIRED", 400);
       }
 
-      log.info("Auto-creating Material: type=FIBER, unit={}", request.getUnit());
-      material =
-          Material.create(
-              com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER,
+      log.info("Auto-creating Product: type=FIBER, unit={}", request.getUnit());
+      product =
+          Product.create(
+              com.fabricmanagement.production.masterdata.product.domain.ProductType.FIBER,
               request.getUnit());
-      material = materialRepository.save(material);
-      log.info("✅ Material auto-created: id={}, uid={}", material.getId(), material.getUid());
+      product = productRepository.save(product);
+      log.info("✅ Product auto-created: id={}, uid={}", product.getId(), product.getUid());
     }
 
-    // Validate material type is FIBER
-    if (material.getMaterialType()
-        != com.fabricmanagement.production.masterdata.material.domain.MaterialType.FIBER) {
+    // Validate product type is FIBER
+    if (product.getProductType()
+        != com.fabricmanagement.production.masterdata.product.domain.ProductType.FIBER) {
       throw new FiberDomainException(
-          "Material type must be FIBER",
-          "FIBER_MATERIAL_TYPE_INVALID",
+          "Product type must be FIBER",
+          "FIBER_PRODUCT_TYPE_INVALID",
           400,
-          new Object[] {material.getMaterialType()});
+          new Object[] {product.getProductType()});
     }
 
-    // Check if material already has a fiber detail
-    UUID materialIdToCheck = material.getId();
-    if (fiberRepository.findByMaterialId(materialIdToCheck).isPresent()) {
+    // Check if product already has a fiber detail
+    UUID productIdToCheck = product.getId();
+    if (fiberRepository.findByProductId(productIdToCheck).isPresent()) {
       throw new FiberDomainException(
-          "Material already has fiber details", "FIBER_MATERIAL_ALREADY_USED", 409);
+          "Product already has fiber details", "FIBER_PRODUCT_ALREADY_USED", 409);
     }
 
     // Validate composition if blended
@@ -172,10 +172,9 @@ public class FiberService implements FiberFacade {
     Fiber fiber;
     if (isBlended) {
       fiber =
-          Fiber.createBlendedFiber(
-              material, category, isoCode, fiberName, request.getComposition());
+          Fiber.createBlendedFiber(product, category, isoCode, fiberName, request.getComposition());
     } else {
-      fiber = Fiber.createPureFiber(material, category, isoCode, fiberName);
+      fiber = Fiber.createPureFiber(product, category, isoCode, fiberName);
     }
 
     fiber.setRemarks(request.getRemarks());
@@ -362,10 +361,10 @@ public class FiberService implements FiberFacade {
   }
 
   @Transactional(readOnly = true)
-  public Optional<FiberDto> getByMaterialId(UUID materialId) {
-    log.debug("Getting fiber by materialId: materialId={}", materialId);
+  public Optional<FiberDto> getByProductId(UUID productId) {
+    log.debug("Getting fiber by productId: productId={}", productId);
 
-    return fiberRepository.findByMaterialId(materialId).map(FiberDto::from);
+    return fiberRepository.findByProductId(productId).map(FiberDto::from);
   }
 
   @Transactional(readOnly = true)
@@ -390,7 +389,7 @@ public class FiberService implements FiberFacade {
         fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
     List<FiberIsoCodeDto> isoCodes =
         fiberIsoCodeRepository.findByIsActiveTrue().stream().map(FiberIsoCodeDto::from).toList();
-    List<MaterialAttributeDto> attributes = materialFacade.getAttributes("FIBER");
+    List<ProductAttributeDto> attributes = productFacade.getAttributes("FIBER");
     List<FiberCertificationDto> certifications =
         fiberCertificationRepository.findByIsActiveTrue().stream()
             .map(FiberCertificationDto::from)
@@ -442,21 +441,21 @@ public class FiberService implements FiberFacade {
 
   @Override
   @Transactional(readOnly = true)
-  public List<FiberDto> findByMaterialIds(java.util.Collection<java.util.UUID> materialIds) {
-    if (materialIds == null || materialIds.isEmpty()) {
+  public List<FiberDto> findByProductIds(java.util.Collection<java.util.UUID> productIds) {
+    if (productIds == null || productIds.isEmpty()) {
       return java.util.List.of();
     }
 
     // Step 1: Fetch tenant fibers (batch SQL query)
     List<Fiber> tenantFibers =
-        fiberRepository.findByMaterialIdIn(new java.util.ArrayList<>(materialIds));
+        fiberRepository.findByProductIdIn(new java.util.ArrayList<>(productIds));
 
     // Step 2: Fetch system/global fibers (available to all tenants)
     java.util.UUID systemTenantId =
         com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID;
     List<Fiber> systemFibers =
         fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId).stream()
-            .filter(f -> f.getMaterial() != null && materialIds.contains(f.getMaterial().getId()))
+            .filter(f -> f.getProduct() != null && productIds.contains(f.getProduct().getId()))
             .toList();
 
     // Step 3: Combine and map to DTO
@@ -497,8 +496,8 @@ public class FiberService implements FiberFacade {
     // 2) Validate the new composition (percentages, circular refs, active base
     // fibers, etc.)
     if (request.getComposition() != null && !request.getComposition().isEmpty()) {
-      if (batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
-          tenantId, fiber.getMaterial().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
+      if (batchRepository.existsByTenantIdAndProductIdAndStatusIn(
+          tenantId, fiber.getProduct().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
         throw new RecipeInUseException(id, fiber.getFiberName());
       }
       validateCompositionUpdate(request.getComposition());
@@ -536,8 +535,8 @@ public class FiberService implements FiberFacade {
             .findByTenantIdAndId(tenantId, id)
             .orElseThrow(() -> new FiberDomainException("Fiber not found", "FIBER_NOT_FOUND", 404));
 
-    if (batchRepository.existsByTenantIdAndMaterialIdAndStatusIn(
-        tenantId, fiber.getMaterial().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
+    if (batchRepository.existsByTenantIdAndProductIdAndStatusIn(
+        tenantId, fiber.getProduct().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
       throw new FiberDomainException(
           "Fiber '"
               + fiber.getFiberName()
@@ -563,9 +562,9 @@ public class FiberService implements FiberFacade {
 
   @Override
   @Transactional(readOnly = true)
-  public Optional<FiberDto> findByMaterialId(UUID materialId) {
-    log.debug("FiberFacade: Finding fiber by materialId: materialId={}", materialId);
-    return fiberRepository.findByMaterialId(materialId).map(FiberDto::from);
+  public Optional<FiberDto> findByProductId(UUID productId) {
+    log.debug("FiberFacade: Finding fiber by productId: productId={}", productId);
+    return fiberRepository.findByProductId(productId).map(FiberDto::from);
   }
 
   @Override

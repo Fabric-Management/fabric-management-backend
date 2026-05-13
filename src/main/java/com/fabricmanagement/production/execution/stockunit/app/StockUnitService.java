@@ -23,7 +23,7 @@ import com.fabricmanagement.production.execution.stockunit.domain.event.StockUni
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitAuditLogRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import java.math.BigDecimal;
@@ -90,7 +90,7 @@ public class StockUnitService {
   @Transactional
   public StockUnit create(
       UUID batchId,
-      MaterialType materialType,
+      ProductType productType,
       String barcode,
       String serialNumber,
       PackageType packageType,
@@ -110,7 +110,7 @@ public class StockUnitService {
     return internalCreate(
         tenantId,
         batchId,
-        materialType,
+        productType,
         barcode,
         serialNumber,
         packageType,
@@ -126,7 +126,7 @@ public class StockUnitService {
   private StockUnit internalCreate(
       UUID tenantId,
       UUID batchId,
-      MaterialType materialType,
+      ProductType productType,
       String barcode,
       String serialNumber,
       PackageType packageType,
@@ -142,7 +142,7 @@ public class StockUnitService {
         StockUnit.create(
             tenantId,
             batchId,
-            materialType,
+            productType,
             barcode,
             serialNumber,
             packageType,
@@ -173,7 +173,7 @@ public class StockUnitService {
             stockUnit.getId(),
             stockUnit.getBarcode(),
             batchId,
-            materialType,
+            productType,
             packageType,
             initialWeight,
             unit,
@@ -769,7 +769,7 @@ public class StockUnitService {
                 internalCreate(
                     tenantId,
                     batchId,
-                    r.materialType(),
+                    r.productType(),
                     r.barcode(),
                     r.serialNumber(),
                     r.packageType(),
@@ -785,7 +785,7 @@ public class StockUnitService {
 
   /** Immutable command record for bulk creation — avoids long parameter lists. */
   public record CreateStockUnitRequest(
-      MaterialType materialType,
+      ProductType productType,
       String barcode,
       String serialNumber,
       PackageType packageType,

@@ -33,9 +33,7 @@ public class StockRuleEvaluationService {
         OffsetDateTime nextAllowed = rule.getLastAlertAt().plusHours(rule.getAlertCooldownHours());
         if (OffsetDateTime.now().isBefore(nextAllowed)) {
           log.debug(
-              "MinStockRule for material {} on cooldown until {}",
-              rule.getMaterialId(),
-              nextAllowed);
+              "MinStockRule for product {} on cooldown until {}", rule.getProductId(), nextAllowed);
           return;
         }
       }
@@ -43,7 +41,7 @@ public class StockRuleEvaluationService {
       MinStockAlertEvent event =
           MinStockAlertEvent.builder()
               .tenantId(rule.getTenantId())
-              .materialId(rule.getMaterialId())
+              .productId(rule.getProductId())
               .locationId(rule.getLocationId())
               .currentQty(currentQty)
               .minQty(rule.getMinQty())
@@ -53,8 +51,8 @@ public class StockRuleEvaluationService {
       eventPublisher.publishEvent(event);
       rule.updateLastAlertAt(OffsetDateTime.now());
       log.info(
-          "MinStockAlert fired: material={}, location={}, current={}, min={}",
-          rule.getMaterialId(),
+          "MinStockAlert fired: product={}, location={}, current={}, min={}",
+          rule.getProductId(),
           rule.getLocationId(),
           currentQty,
           rule.getMinQty());

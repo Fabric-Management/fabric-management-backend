@@ -86,8 +86,8 @@ public class WorkOrderConsumptionService {
             stockUnit.getBatchId(),
             stockUnit.getBarcode(),
             batch.getBatchCode(),
-            stockUnit.getMaterialType(),
-            batch.getMaterialId(),
+            stockUnit.getProductType(),
+            batch.getProductId(),
             amount,
             stockUnit.getUnit(), // Usually matches workOrder unit, but SU owns physical unit
             stockUnit.getQualityGradeId(),
@@ -134,18 +134,18 @@ public class WorkOrderConsumptionService {
     WorkOrder workOrder = loadWorkOrder(workOrderId, tenantId);
 
     // DB-level aggregation — no in-memory groupBy
-    List<WorkOrderConsumptionSummaryResponse.MaterialBreakdown> breakdowns =
-        workOrderConsumptionRepository.aggregateByMaterialType(tenantId, workOrderId).stream()
+    List<WorkOrderConsumptionSummaryResponse.ProductBreakdown> breakdowns =
+        workOrderConsumptionRepository.aggregateByProductType(tenantId, workOrderId).stream()
             .map(
                 agg ->
-                    new WorkOrderConsumptionSummaryResponse.MaterialBreakdown(
-                        agg.getMaterialType(), agg.getTotalWeight(), agg.getRecordCount()))
+                    new WorkOrderConsumptionSummaryResponse.ProductBreakdown(
+                        agg.getProductType(), agg.getTotalWeight(), agg.getRecordCount()))
             .toList();
 
     // Derive total from aggregation — single query, no extra DB round-trip
     BigDecimal totalConsumed =
         breakdowns.stream()
-            .map(WorkOrderConsumptionSummaryResponse.MaterialBreakdown::consumedWeight)
+            .map(WorkOrderConsumptionSummaryResponse.ProductBreakdown::consumedWeight)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
     return new WorkOrderConsumptionSummaryResponse(

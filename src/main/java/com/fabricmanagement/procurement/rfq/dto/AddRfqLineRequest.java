@@ -11,7 +11,7 @@ import java.util.UUID;
 /** Fix #2 — İstemciden ham entity değil, bu DTO alınmalı. */
 @Schema(description = "Request to add a line to an RFQ")
 public record AddRfqLineRequest(
-    @Schema(description = "Material ID") UUID materialId,
+    @Schema(description = "Product ID") UUID productId,
     @Schema(description = "Product description") String productDesc,
     @NotNull(message = "Requested quantity is required")
         @DecimalMin(value = "0.001", message = "Quantity must be greater than zero")

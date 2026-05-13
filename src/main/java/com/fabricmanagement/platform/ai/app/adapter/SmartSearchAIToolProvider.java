@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * AI Tool Provider for Smart Search operations. This provider orchestrates searches across
- * different domain modules (Fiber, Material) by detecting the intended entity type from the query
+ * different domain modules (Fiber, Product) by detecting the intended entity type from the query
  * string.
  *
  * <p>Use {@link ObjectProvider} for {@link AIToolRegistry} to prevent circular dependencies.
@@ -67,29 +67,29 @@ public class SmartSearchAIToolProvider implements AIToolProvider {
       case YARN -> {
         Map<String, Object> yarnParams = new java.util.HashMap<>(parameters);
         yarnParams.put("type", "YARN");
-        String yarnResult = registry().execute(tenantId, "search_materials", yarnParams);
+        String yarnResult = registry().execute(tenantId, "search_products", yarnParams);
         result.append(yarnResult);
-        found = !yarnResult.contains("No materials found");
+        found = !yarnResult.contains("No products found");
       }
       case FABRIC -> {
         Map<String, Object> fabricParams = new java.util.HashMap<>(parameters);
         fabricParams.put("type", "FABRIC");
-        String fabricResult = registry().execute(tenantId, "search_materials", fabricParams);
+        String fabricResult = registry().execute(tenantId, "search_products", fabricParams);
         result.append(fabricResult);
-        found = !fabricResult.contains("No materials found");
+        found = !fabricResult.contains("No products found");
       }
       case UNKNOWN -> {
         // Search both domain modules mapping
         String fiberRes = registry().execute(tenantId, "search_fibers", parameters);
-        String materialRes = registry().execute(tenantId, "search_materials", parameters);
+        String productRes = registry().execute(tenantId, "search_products", parameters);
 
         if (!fiberRes.contains("No results found")) {
           found = true;
           result.append("✅ Fiber(s):\n").append(fiberRes).append("\n");
         }
-        if (!materialRes.contains("No materials found")) {
+        if (!productRes.contains("No products found")) {
           found = true;
-          result.append("\n✅ Material(s):\n").append(materialRes);
+          result.append("\n✅ Product(s):\n").append(productRes);
         }
       }
     }

@@ -8,8 +8,8 @@ import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRe
 import com.fabricmanagement.procurement.subcontract.dto.SubcontractOrderResponse;
 import com.fabricmanagement.procurement.subcontract.dto.UpdateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.infra.repository.SubcontractOrderRepository;
-import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
-import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
+import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
+import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubcontractOrderService {
 
   private final SubcontractOrderRepository scRepository;
-  private final MaterialFacade materialFacade;
+  private final ProductFacade productFacade;
 
   public SubcontractOrderResponse getSubcontractOrder(UUID id) {
     return mapToResponse(findEntityById(id));
@@ -36,20 +36,20 @@ public class SubcontractOrderService {
   public SubcontractOrderResponse createSubcontractOrder(CreateSubcontractOrderRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
 
-    MaterialDto inputMaterial = null;
-    if (request.getInputMaterialId() != null) {
-      inputMaterial =
-          materialFacade
-              .findById(tenantId, request.getInputMaterialId())
-              .orElseThrow(() -> new ProcurementDomainException("Input material not found"));
+    ProductDto inputProduct = null;
+    if (request.getInputProductId() != null) {
+      inputProduct =
+          productFacade
+              .findById(tenantId, request.getInputProductId())
+              .orElseThrow(() -> new ProcurementDomainException("Input product not found"));
     }
 
-    MaterialDto outputMaterial = null;
-    if (request.getOutputMaterialId() != null) {
-      outputMaterial =
-          materialFacade
-              .findById(tenantId, request.getOutputMaterialId())
-              .orElseThrow(() -> new ProcurementDomainException("Output material not found"));
+    ProductDto outputProduct = null;
+    if (request.getOutputProductId() != null) {
+      outputProduct =
+          productFacade
+              .findById(tenantId, request.getOutputProductId())
+              .orElseThrow(() -> new ProcurementDomainException("Output product not found"));
     }
 
     SubcontractOrder sc =
@@ -59,14 +59,14 @@ public class SubcontractOrderService {
             request.getWorkOrderId(),
             null, // batchId currently nullable/null
             request.getTradingPartnerId(),
-            request.getInputMaterialId(),
-            inputMaterial != null ? inputMaterial.getMaterialType() : null,
-            request.getOutputMaterialId(),
-            outputMaterial != null ? outputMaterial.getMaterialType() : null,
+            request.getInputProductId(),
+            inputProduct != null ? inputProduct.getProductType() : null,
+            request.getOutputProductId(),
+            outputProduct != null ? outputProduct.getProductType() : null,
             request.getExpectedOutputQty(),
-            outputMaterial != null ? outputMaterial.getUnit() : null,
-            request.getMaterialSentQty(),
-            inputMaterial != null ? inputMaterial.getUnit() : null,
+            outputProduct != null ? outputProduct.getUnit() : null,
+            request.getProductSentQty(),
+            inputProduct != null ? inputProduct.getUnit() : null,
             request.getAgreedUnitPrice(),
             request.getCurrency(),
             request.getExpectedReturnDate(),
@@ -82,7 +82,7 @@ public class SubcontractOrderService {
    * Transitions the SubcontractOrder status (state machine enforced).
    *
    * <p>Special: when newStatus=COMPLETED, actualReturnedQty must be provided. wasteQty is computed
-   * automatically: materialSentQty − actualReturnedQty.
+   * automatically: productSentQty − actualReturnedQty.
    */
   @Transactional
   public SubcontractOrderResponse changeStatus(
@@ -103,7 +103,7 @@ public class SubcontractOrderService {
                 + sc.getScNumber());
       }
       sc.setActualReturnedQty(actualReturnedQty);
-      BigDecimal sent = sc.getMaterialSentQty() != null ? sc.getMaterialSentQty() : BigDecimal.ZERO;
+      BigDecimal sent = sc.getProductSentQty() != null ? sc.getProductSentQty() : BigDecimal.ZERO;
       BigDecimal waste = sent.subtract(actualReturnedQty);
       sc.setWasteQty(waste.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : waste);
 
@@ -137,14 +137,14 @@ public class SubcontractOrderService {
       throw new ProcurementDomainException("Only DRAFT orders can be updated");
     }
 
-    if (request.getOutputMaterialId() != null) {
-      MaterialDto outputMaterial =
-          materialFacade
-              .findById(sc.getTenantId(), request.getOutputMaterialId())
-              .orElseThrow(() -> new ProcurementDomainException("Output material not found"));
-      sc.setOutputMaterialId(outputMaterial.getId());
-      sc.setOutputMaterialType(outputMaterial.getMaterialType());
-      sc.setOutputUnit(outputMaterial.getUnit());
+    if (request.getOutputProductId() != null) {
+      ProductDto outputProduct =
+          productFacade
+              .findById(sc.getTenantId(), request.getOutputProductId())
+              .orElseThrow(() -> new ProcurementDomainException("Output product not found"));
+      sc.setOutputProductId(outputProduct.getId());
+      sc.setOutputProductType(outputProduct.getProductType());
+      sc.setOutputUnit(outputProduct.getUnit());
     }
 
     if (request.getExpectedOutputQty() != null) {
@@ -181,11 +181,11 @@ public class SubcontractOrderService {
         .workOrderId(sc.getWorkOrderId())
         .tradingPartnerId(sc.getTradingPartnerId())
         .status(sc.getStatus())
-        .inputMaterialId(sc.getInputMaterialId())
-        .inputMaterialType(sc.getInputMaterialType())
-        .outputMaterialId(sc.getOutputMaterialId())
-        .outputMaterialType(sc.getOutputMaterialType())
-        .materialSentQty(sc.getMaterialSentQty())
+        .inputProductId(sc.getInputProductId())
+        .inputProductType(sc.getInputProductType())
+        .outputProductId(sc.getOutputProductId())
+        .outputProductType(sc.getOutputProductType())
+        .productSentQty(sc.getProductSentQty())
         .unit(sc.getUnit())
         .expectedOutputQty(sc.getExpectedOutputQty())
         .outputUnit(sc.getOutputUnit())

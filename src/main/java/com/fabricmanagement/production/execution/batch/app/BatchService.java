@@ -19,7 +19,7 @@ import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -79,8 +79,8 @@ public class BatchService {
         Batch.create(
             new CreateBatchCommand(
                 tenantId,
-                request.getMaterialId(),
-                request.getMaterialType(),
+                request.getProductId(),
+                request.getProductType(),
                 request.getBatchCode(),
                 request.getSupplierBatchCode(),
                 request.getQuantity(),
@@ -107,7 +107,7 @@ public class BatchService {
 
   /**
    * Resolves qualityStandardId for batch creation. If request has qualityStandardId, validate and
-   * use it. If null and FIBER: apply default profile for material's ISO code. If no default, skip.
+   * use it. If null and FIBER: apply default profile for product's ISO code. If no default, skip.
    */
   private UUID resolveQualityStandardId(CreateBatchRequest request) {
     if (request.getQualityStandardId() != null) {
@@ -120,13 +120,13 @@ public class BatchService {
       }
       return request.getQualityStandardId();
     }
-    if (request.getMaterialType() != MaterialType.FIBER) {
+    if (request.getProductType() != ProductType.FIBER) {
       return null;
     }
     UUID tenantId = TenantContext.getCurrentTenantId();
-    Optional<Fiber> fiberOpt = fiberRepository.findByMaterialId(request.getMaterialId());
+    Optional<Fiber> fiberOpt = fiberRepository.findByProductId(request.getProductId());
     if (fiberOpt.isEmpty()) {
-      fiberOpt = fiberRepository.findById(request.getMaterialId());
+      fiberOpt = fiberRepository.findById(request.getProductId());
     }
     if (fiberOpt.isEmpty()) {
       return null;
@@ -142,7 +142,7 @@ public class BatchService {
   }
 
   private Map<String, Object> resolveAttributes(CreateBatchRequest request) {
-    return switch (request.getMaterialType()) {
+    return switch (request.getProductType()) {
       case FIBER ->
           request.getFiberSpecs() != null ? request.getFiberSpecs().toMap() : new HashMap<>();
       case YARN ->
@@ -156,7 +156,7 @@ public class BatchService {
    * Returns empty map for non-FIBER or when neither has composition.
    */
   private Map<UUID, BigDecimal> resolveComposition(Batch batch) {
-    if (batch.getMaterialType() != MaterialType.FIBER) {
+    if (batch.getProductType() != ProductType.FIBER) {
       return Map.of();
     }
     Object compObj =
@@ -188,9 +188,9 @@ public class BatchService {
         return result;
       }
     }
-    // For FIBER, materialId references prod_fiber.id (see V061 migration)
+    // For FIBER, productId references prod_fiber.id (see V061 migration)
     return fiberRepository
-        .findById(batch.getMaterialId())
+        .findById(batch.getProductId())
         .map(Fiber::getComposition)
         .orElse(Map.of());
   }
@@ -224,11 +224,11 @@ public class BatchService {
   }
 
   @Transactional(readOnly = true)
-  public List<BatchDto> getByMaterialId(UUID materialId) {
+  public List<BatchDto> getByProductId(UUID productId) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Getting batches by materialId: tenantId={}, materialId={}", tenantId, materialId);
+    log.debug("Getting batches by productId: tenantId={}, productId={}", tenantId, productId);
 
-    return batchRepository.findByTenantIdAndMaterialIdAndIsActiveTrue(tenantId, materialId).stream()
+    return batchRepository.findByTenantIdAndProductIdAndIsActiveTrue(tenantId, productId).stream()
         .map(this::toBatchDto)
         .toList();
   }
@@ -515,7 +515,7 @@ public class BatchService {
    */
   void assertGotsCertificationValid(Batch batch) {
     if (!certEnforceOnReserve) return;
-    if (batch.getMaterialType() != MaterialType.FIBER) return;
+    if (batch.getProductType() != ProductType.FIBER) return;
     boolean isOrganic =
         batch.getAttributes() != null && batch.getAttributes().containsKey("fiber_organic_cert_no");
     if (!isOrganic) return;

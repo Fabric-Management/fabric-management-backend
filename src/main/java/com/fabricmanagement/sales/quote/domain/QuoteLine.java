@@ -23,8 +23,8 @@ public class QuoteLine extends BaseEntity {
 
   // No explicit quoteId field, mapped by @JoinColumn in Quote
 
-  @Column(name = "material_id")
-  private UUID materialId;
+  @Column(name = "product_id")
+  private UUID productId;
 
   @Column(name = "product_desc", columnDefinition = "TEXT")
   private String productDesc;

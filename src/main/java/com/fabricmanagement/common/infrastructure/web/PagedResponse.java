@@ -28,9 +28,9 @@ import org.springframework.data.domain.Page;
  *
  * <pre>{@code
  * @GetMapping
- * public ResponseEntity<PagedResponse<MaterialDto>> getAll(Pageable pageable) {
- *     Page<Material> page = materialRepository.findAll(pageable);
- *     return ResponseEntity.ok(PagedResponse.from(page, MaterialDto::from));
+ * public ResponseEntity<PagedResponse<ProductDto>> getAll(Pageable pageable) {
+ *     Page<Product> page = productRepository.findAll(pageable);
+ *     return ResponseEntity.ok(PagedResponse.from(page, ProductDto::from));
  * }
  * }</pre>
  */

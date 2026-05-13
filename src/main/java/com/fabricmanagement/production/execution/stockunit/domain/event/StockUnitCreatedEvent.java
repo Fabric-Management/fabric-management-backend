@@ -2,7 +2,7 @@ package com.fabricmanagement.production.execution.stockunit.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.Getter;
@@ -18,7 +18,7 @@ public class StockUnitCreatedEvent extends DomainEvent {
   private final UUID stockUnitId;
   private final String barcode;
   private final UUID batchId;
-  private final MaterialType materialType;
+  private final ProductType productType;
   private final PackageType packageType;
   private final BigDecimal initialWeight;
   private final String unit;
@@ -29,7 +29,7 @@ public class StockUnitCreatedEvent extends DomainEvent {
       UUID stockUnitId,
       String barcode,
       UUID batchId,
-      MaterialType materialType,
+      ProductType productType,
       PackageType packageType,
       BigDecimal initialWeight,
       String unit,
@@ -38,7 +38,7 @@ public class StockUnitCreatedEvent extends DomainEvent {
     this.stockUnitId = stockUnitId;
     this.barcode = barcode;
     this.batchId = batchId;
-    this.materialType = materialType;
+    this.productType = productType;
     this.packageType = packageType;
     this.initialWeight = initialWeight;
     this.unit = unit;

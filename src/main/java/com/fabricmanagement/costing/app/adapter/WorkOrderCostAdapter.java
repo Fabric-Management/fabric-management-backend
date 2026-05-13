@@ -25,13 +25,13 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
       UUID tenantId,
       UUID workOrderId,
       WorkOrderModuleType outputModuleType,
-      UUID outputMaterialId,
+      UUID outputProductId,
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
       List<ConsumptionCostInput> consumptions) {
 
     log.info(
-        "Computing multi-material actual cost for WorkOrder: {} ({} consumption records)",
+        "Computing multi-product actual cost for WorkOrder: {} ({} consumption records)",
         workOrderId,
         consumptions.size());
 
@@ -40,7 +40,7 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
             tenantId,
             workOrderId,
             outputModuleType.name(),
-            outputMaterialId,
+            outputProductId,
             actualOutputQty,
             tradingPartnerId,
             consumptions);
@@ -54,22 +54,22 @@ public class WorkOrderCostAdapter implements WorkOrderCostEnginePort {
       UUID tenantId,
       UUID workOrderId,
       WorkOrderModuleType moduleType,
-      UUID outputMaterialId,
+      UUID outputProductId,
       BigDecimal plannedQuantity,
       UUID tradingPartnerId) {
 
     log.info(
-        "Computing planned cost for WorkOrder: {} in module: {} (material: {})",
+        "Computing planned cost for WorkOrder: {} in module: {} (product: {})",
         workOrderId,
         moduleType,
-        outputMaterialId);
+        outputProductId);
 
     CostCalculation calculation =
         costCalculationService.computePlanned(
             tenantId,
             workOrderId,
             moduleType.name(),
-            outputMaterialId,
+            outputProductId,
             plannedQuantity,
             tradingPartnerId);
 

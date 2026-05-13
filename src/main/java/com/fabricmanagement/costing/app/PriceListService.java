@@ -99,7 +99,7 @@ public class PriceListService {
    * @param tenantId owning tenant
    * @param moduleType the module type
    * @param costItemCode the cost item being updated
-   * @param materialId the specific material
+   * @param productId the specific product
    * @param tradingPartnerId the supplier who delivered
    * @param actualUnitPrice the real purchase price per unit
    * @param currency currency of the price
@@ -109,7 +109,7 @@ public class PriceListService {
       UUID tenantId,
       String moduleType,
       String costItemCode,
-      UUID materialId,
+      UUID productId,
       UUID tradingPartnerId,
       BigDecimal actualUnitPrice,
       String currency) {
@@ -123,7 +123,7 @@ public class PriceListService {
 
     // Update or no-op the PriceListItem
     priceListItemRepo
-        .findBest(activeList.getId(), costItemCode, materialId, tradingPartnerId)
+        .findBest(activeList.getId(), costItemCode, productId, tradingPartnerId)
         .filter(
             item ->
                 item.getTradingPartnerId() != null
@@ -146,7 +146,7 @@ public class PriceListService {
     history.setTenantId(tenantId);
     history.setCostItemCode(costItemCode);
     history.setModuleType(moduleType);
-    history.setMaterialId(materialId);
+    history.setProductId(productId);
     history.setUnitPrice(actualUnitPrice);
     history.setCurrency(currency);
     history.setValidFrom(LocalDate.now());

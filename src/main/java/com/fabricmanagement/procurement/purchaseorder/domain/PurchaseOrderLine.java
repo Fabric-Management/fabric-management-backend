@@ -32,11 +32,11 @@ public class PurchaseOrderLine extends BaseEntity {
   @Column(name = "rfq_line_id")
   private UUID rfqLineId;
 
-  /** FK → Material — may be null if using free-text productDesc. */
-  @Column(name = "material_id")
-  private UUID materialId;
+  /** FK → Product — may be null if using free-text productDesc. */
+  @Column(name = "product_id")
+  private UUID productId;
 
-  /** Free-text product description (used when no Material entity exists yet). */
+  /** Free-text product description (used when no Product entity exists yet). */
   @Column(name = "product_desc", columnDefinition = "TEXT")
   private String productDesc;
 

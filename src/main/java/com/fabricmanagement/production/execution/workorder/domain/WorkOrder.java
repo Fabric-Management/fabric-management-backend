@@ -33,8 +33,8 @@ public class WorkOrder extends BaseEntity {
   @Column(name = "recipe_id")
   private UUID recipeId;
 
-  @Column(name = "output_material_id")
-  private UUID outputMaterialId;
+  @Column(name = "output_product_id")
+  private UUID outputProductId;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "module_type", nullable = false, length = 50)

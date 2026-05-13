@@ -10,6 +10,6 @@ import java.util.UUID;
 public record ComputeActualCostRequest(
     @NotNull UUID batchId,
     @NotBlank String moduleType,
-    @NotNull UUID materialId,
+    @NotNull UUID productId,
     @NotNull @Positive BigDecimal actualQuantityKg,
     UUID supplierId) {}

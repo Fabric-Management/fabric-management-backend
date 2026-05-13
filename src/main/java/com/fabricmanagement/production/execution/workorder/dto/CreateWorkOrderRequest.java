@@ -35,8 +35,8 @@ public class CreateWorkOrderRequest {
   private UUID recipeId;
 
   @NotNull
-  @Schema(description = "Output material UUID")
-  private UUID outputMaterialId;
+  @Schema(description = "Output product UUID")
+  private UUID outputProductId;
 
   @NotNull
   @Schema(description = "Production module type (e.g. WEAVING, DYEING)")

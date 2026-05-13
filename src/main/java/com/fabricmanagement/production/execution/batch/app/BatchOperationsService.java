@@ -118,8 +118,8 @@ public class BatchOperationsService {
         Batch.create(
             new CreateBatchCommand(
                 tenantId,
-                request.getMaterialId(),
-                request.getMaterialType(),
+                request.getProductId(),
+                request.getProductType(),
                 request.getBatchCode(),
                 null,
                 request.getQuantity(),
@@ -278,8 +278,8 @@ public class BatchOperationsService {
         Batch.create(
             new CreateBatchCommand(
                 tenantId,
-                sourceBatch.getMaterialId(),
-                sourceBatch.getMaterialType(),
+                sourceBatch.getProductId(),
+                sourceBatch.getProductType(),
                 newBatchCode,
                 sourceBatch.getSupplierBatchCode(),
                 acceptedQty,
@@ -394,8 +394,8 @@ public class BatchOperationsService {
         Batch.create(
             new CreateBatchCommand(
                 tenantId,
-                sourceBatch.getMaterialId(),
-                sourceBatch.getMaterialType(),
+                sourceBatch.getProductId(),
+                sourceBatch.getProductType(),
                 newBatchCode,
                 sourceBatch.getSupplierBatchCode(),
                 acceptedQty,
@@ -513,7 +513,7 @@ public class BatchOperationsService {
   /**
    * Start production: transfer batch to a machine location and mark IN_PROGRESS.
    *
-   * <p>Per the WIP Location Strategy, material is NOT consumed when entering production. It is
+   * <p>Per the WIP Location Strategy, product is NOT consumed when entering production. It is
    * transferred to the machine's warehouse location, keeping it visible in the system.
    */
   @Transactional

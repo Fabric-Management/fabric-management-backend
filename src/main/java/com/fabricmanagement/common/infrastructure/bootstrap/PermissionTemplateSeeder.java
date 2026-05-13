@@ -96,18 +96,18 @@ public class PermissionTemplateSeeder implements DataSeeder {
           List<String[]> productionRules =
               List.of(
                   new String[] {"WORKER", "fiber", "read", "OWN"},
-                  new String[] {"WORKER", "materials", "read", "OWN"},
+                  new String[] {"WORKER", "products", "read", "OWN"},
                   new String[] {"WORKER", "projects", "read", "OWN"},
                   new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
                   new String[] {"SUPERVISOR", "fiber", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "materials", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "materials", "write", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
                   new String[] {"SUPERVISOR", "projects", "read", "DEPARTMENT"},
                   new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
                   new String[] {"MANAGER", "fiber", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "fiber", "approve", "DEPARTMENT"},
-                  new String[] {"MANAGER", "materials", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "materials", "write", "DEPARTMENT"},
+                  new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                  new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "projects", "read", "ORGANIZATION"},
                   new String[] {"MANAGER", "projects", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "projects", "manage", "DEPARTMENT"});
@@ -122,13 +122,13 @@ public class PermissionTemplateSeeder implements DataSeeder {
               "QUALITY",
               List.of(
                   new String[] {"WORKER", "fiber", "read", "OWN"},
-                  new String[] {"WORKER", "materials", "read", "OWN"},
+                  new String[] {"WORKER", "products", "read", "OWN"},
                   new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "materials", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "materials", "write", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "materials", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "materials", "write", "DEPARTMENT"},
+                  new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                  new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
 
           // 5. WAREHOUSE
@@ -136,13 +136,13 @@ public class PermissionTemplateSeeder implements DataSeeder {
               templatesToSave,
               "WAREHOUSE",
               List.of(
-                  new String[] {"WORKER", "materials", "read", "OWN"},
-                  new String[] {"WORKER", "materials", "write", "OWN"},
-                  new String[] {"SUPERVISOR", "materials", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "materials", "write", "DEPARTMENT"},
+                  new String[] {"WORKER", "products", "read", "OWN"},
+                  new String[] {"WORKER", "products", "write", "OWN"},
+                  new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
                   new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-                  new String[] {"MANAGER", "materials", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "materials", "write", "DEPARTMENT"},
+                  new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                  new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"}));
 
           // 6. FINANCE
@@ -185,15 +185,15 @@ public class PermissionTemplateSeeder implements DataSeeder {
               templatesToSave,
               "PROCUREMENT",
               List.of(
-                  new String[] {"WORKER", "materials", "read", "OWN"},
-                  new String[] {"WORKER", "materials", "write", "OWN"},
+                  new String[] {"WORKER", "products", "read", "OWN"},
+                  new String[] {"WORKER", "products", "write", "OWN"},
                   new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "materials", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "materials", "write", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                  new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
                   new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
                   new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "materials", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "materials", "write", "DEPARTMENT"},
+                  new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                  new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
                   new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
                   new String[] {"MANAGER", "partners", "write", "DEPARTMENT"}));
 

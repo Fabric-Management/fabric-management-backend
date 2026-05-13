@@ -27,8 +27,8 @@ public class StockAdjustmentRequest extends BaseEntity {
   @Column(name = "location_id", nullable = false)
   private UUID locationId;
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Column(name = "lot_number", nullable = false, length = 100)
   private String lotNumber;
@@ -62,14 +62,14 @@ public class StockAdjustmentRequest extends BaseEntity {
       UUID tenantId,
       String requestNumber,
       UUID locationId,
-      UUID materialId,
+      UUID productId,
       String lotNumber,
       BigDecimal qtyAdjustment,
       String unit,
       String reason) {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
     Objects.requireNonNull(locationId, "locationId must not be null");
-    Objects.requireNonNull(materialId, "materialId must not be null");
+    Objects.requireNonNull(productId, "productId must not be null");
     if (requestNumber == null || requestNumber.isBlank()) {
       throw new IwmDomainException("requestNumber must not be blank");
     }
@@ -82,7 +82,7 @@ public class StockAdjustmentRequest extends BaseEntity {
     this.setTenantId(tenantId);
     this.requestNumber = requestNumber;
     this.locationId = locationId;
-    this.materialId = materialId;
+    this.productId = productId;
     this.lotNumber = lotNumber;
     this.qtyAdjustment = qtyAdjustment;
     this.unit = unit;

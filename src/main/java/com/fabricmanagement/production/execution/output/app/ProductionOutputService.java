@@ -11,8 +11,8 @@ import com.fabricmanagement.production.execution.output.dto.AddOutputItemRequest
 import com.fabricmanagement.production.execution.output.dto.CreateProductionOutputRequest;
 import com.fabricmanagement.production.execution.output.infra.repository.ProductionOutputItemRepository;
 import com.fabricmanagement.production.execution.output.infra.repository.ProductionOutputRecordRepository;
-import com.fabricmanagement.production.masterdata.material.api.facade.MaterialFacade;
-import com.fabricmanagement.production.masterdata.material.dto.MaterialDto;
+import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
+import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -28,19 +28,19 @@ public class ProductionOutputService {
   private final ProductionOutputRecordRepository recordRepo;
   private final ProductionOutputItemRepository itemRepo;
   private final DomainEventPublisher eventPublisher;
-  private final MaterialFacade materialFacade;
+  private final ProductFacade productFacade;
 
   @Transactional
   public ProductionOutputRecord create(CreateProductionOutputRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
 
-    MaterialDto material =
-        materialFacade
-            .findById(tenantId, request.outputMaterialId())
+    ProductDto product =
+        productFacade
+            .findById(tenantId, request.outputProductId())
             .orElseThrow(
                 () ->
                     new ProductionDomainException(
-                        "Material not found: " + request.outputMaterialId()));
+                        "Product not found: " + request.outputProductId()));
 
     ProductionOutputRecord record =
         ProductionOutputRecord.create(
@@ -48,9 +48,9 @@ public class ProductionOutputService {
             request.workOrderId(),
             request.workOrderNumber(),
             request.batchId(),
-            request.outputMaterialId(),
-            request.outputMaterialType(),
-            material.getUnit(),
+            request.outputProductId(),
+            request.outputProductType(),
+            product.getUnit(),
             request.notes());
 
     return recordRepo.save(record);

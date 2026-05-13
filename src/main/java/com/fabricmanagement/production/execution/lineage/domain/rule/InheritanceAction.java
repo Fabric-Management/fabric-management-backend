@@ -6,7 +6,7 @@ package com.fabricmanagement.production.execution.lineage.domain.rule;
  *
  * <p>Used by {@link
  * com.fabricmanagement.production.execution.lineage.domain.rule.AttributeInheritanceSchema} to
- * describe per-attribute rules for a given source→target material type pair (e.g. FIBER→YARN).
+ * describe per-attribute rules for a given source→target product type pair (e.g. FIBER→YARN).
  */
 public enum InheritanceAction {
 
@@ -44,7 +44,7 @@ public enum InheritanceAction {
 
   /**
    * Do not transfer this attribute to the child. The source attribute is irrelevant for the target
-   * material type (e.g. bale moisture when producing yarn). {@code targetAttribute} is null for
+   * product type (e.g. bale moisture when producing yarn). {@code targetAttribute} is null for
    * DROP. Engine must check action == DROP first and skip without reading targetAttribute to avoid
    * NPE.
    */

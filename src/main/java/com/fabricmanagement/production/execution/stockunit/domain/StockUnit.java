@@ -4,7 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.InsufficientWeightException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.InvalidPackageTypeException;
 import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitDomainException;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -32,7 +32,7 @@ import lombok.NoArgsConstructor;
  * <ul>
  *   <li>{@code initialWeight > 0} — always positive at creation
  *   <li>{@code 0 <= currentWeight <= initialWeight} — no negative weight, no exceeding initial
- *   <li>{@code packageType} must be compatible with {@code materialType}
+ *   <li>{@code packageType} must be compatible with {@code productType}
  *   <li>{@code status = DEPLETED} automatically when {@code currentWeight == 0}
  *   <li>{@code status = PARTIAL} automatically when {@code 0 < currentWeight < initialWeight}
  *   <li>Consumption only allowed in AVAILABLE or PARTIAL status
@@ -45,9 +45,9 @@ import lombok.NoArgsConstructor;
  * Batch is ON_HOLD or QUARANTINE, new consumptions are blocked at the service layer. StockUnit
  * statuses are <b>NOT</b> cascaded from Batch; individual units retain their own status.
  *
- * <h2>materialType Denormalization</h2>
+ * <h2>productType Denormalization</h2>
  *
- * <p>{@code materialType} is denormalized from the parent Batch to allow entity-level package type
+ * <p>{@code productType} is denormalized from the parent Batch to allow entity-level package type
  * validation without a round-trip to the database.
  */
 @Entity
@@ -99,20 +99,20 @@ public class StockUnit extends BaseEntity {
 
   // ── Physical Properties ───────────────────────────────────────────────────
 
-  /** Package type (BALE, BOBBIN, ROLL…). Must be compatible with {@code materialType}. */
+  /** Package type (BALE, BOBBIN, ROLL…). Must be compatible with {@code productType}. */
   @Enumerated(EnumType.STRING)
   @Column(name = "package_type", nullable = false, length = 20)
   private PackageType packageType;
 
   /**
-   * Denormalized material type from the parent Batch.
+   * Denormalized product type from the parent Batch.
    *
    * <p>Used exclusively for package type compatibility validation without a join. Not exposed to
    * callers via a setter — set only at creation time.
    */
   @Enumerated(EnumType.STRING)
-  @Column(name = "material_type", nullable = false, length = 20)
-  private MaterialType materialType;
+  @Column(name = "product_type", nullable = false, length = 20)
+  private ProductType productType;
 
   /**
    * Weight at creation (first weigh-in). Immutable after creation — never changes.
@@ -216,13 +216,13 @@ public class StockUnit extends BaseEntity {
    *
    * <ul>
    *   <li>initialWeight > 0
-   *   <li>packageType compatibility with materialType
+   *   <li>packageType compatibility with productType
    *   <li>required IDs are non-null
    * </ul>
    *
    * @param tenantId tenant context
    * @param batchId parent batch
-   * @param materialType denormalized from parent batch
+   * @param productType denormalized from parent batch
    * @param barcode pre-generated scannable barcode
    * @param serialNumber optional supplier serial number
    * @param packageType physical packaging type
@@ -237,7 +237,7 @@ public class StockUnit extends BaseEntity {
   public static StockUnit create(
       UUID tenantId,
       UUID batchId,
-      MaterialType materialType,
+      ProductType productType,
       String barcode,
       String serialNumber,
       PackageType packageType,
@@ -248,8 +248,8 @@ public class StockUnit extends BaseEntity {
       StockUnitSourceType sourceType,
       UUID sourceId) {
 
-    if (materialType == null) {
-      throw new StockUnitDomainException("materialType must not be null");
+    if (productType == null) {
+      throw new StockUnitDomainException("productType must not be null");
     }
     if (barcode == null || barcode.isBlank()) {
       throw new StockUnitDomainException("barcode must not be blank");
@@ -260,14 +260,14 @@ public class StockUnit extends BaseEntity {
     if (initialWeight == null || initialWeight.compareTo(BigDecimal.ZERO) <= 0) {
       throw new StockUnitDomainException("initialWeight must be positive, got: " + initialWeight);
     }
-    if (!packageType.isCompatibleWith(materialType)) {
-      throw new InvalidPackageTypeException(packageType, materialType);
+    if (!packageType.isCompatibleWith(productType)) {
+      throw new InvalidPackageTypeException(packageType, productType);
     }
 
     StockUnit stockUnit =
         StockUnit.builder()
             .batchId(batchId)
-            .materialType(materialType)
+            .productType(productType)
             .barcode(barcode.trim())
             .serialNumber(serialNumber)
             .packageType(packageType)

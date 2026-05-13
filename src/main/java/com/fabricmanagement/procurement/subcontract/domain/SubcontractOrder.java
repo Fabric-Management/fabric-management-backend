@@ -1,7 +1,7 @@
 package com.fabricmanagement.procurement.subcontract.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,11 +17,11 @@ import lombok.Setter;
  * <p>Flow:
  *
  * <ol>
- *   <li>Raw material batches are issued (MATERIAL_SENT → IWM ISSUE).
- *   <li>Subcontractor processes the material.
+ *   <li>Raw product batches are issued (PRODUCT_SENT → IWM ISSUE).
+ *   <li>Subcontractor processes the product.
  *   <li>Finished goods are returned via GoodsReceipt (sourceType=SUBCONTRACT_ORDER).
  *   <li>GoodsReceipt CONFIRMED → this order moves to COMPLETED.
- *   <li>Waste = materialSentQty − actualReturnedQty is recorded.
+ *   <li>Waste = productSentQty − actualReturnedQty is recorded.
  * </ol>
  *
  * <p>Table: {@code procurement.subcontract_order}
@@ -52,21 +52,21 @@ public class SubcontractOrder extends BaseEntity {
   @Column(name = "status", nullable = false, length = 25)
   private SubcontractOrderStatus status;
 
-  /** Material expected to process (input). */
-  @Column(name = "material_id")
-  private UUID inputMaterialId;
+  /** Product expected to process (input). */
+  @Column(name = "product_id")
+  private UUID inputProductId;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "input_material_type", length = 30)
-  private MaterialType inputMaterialType;
+  @Column(name = "input_product_type", length = 30)
+  private ProductType inputProductType;
 
-  /** Finished material expected from subcontractor. */
-  @Column(name = "output_material_id")
-  private UUID outputMaterialId;
+  /** Finished product expected from subcontractor. */
+  @Column(name = "output_product_id")
+  private UUID outputProductId;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "output_material_type", length = 30)
-  private MaterialType outputMaterialType;
+  @Column(name = "output_product_type", length = 30)
+  private ProductType outputProductType;
 
   @Column(name = "expected_output_qty", precision = 15, scale = 3)
   private BigDecimal expectedOutputQty;
@@ -74,9 +74,9 @@ public class SubcontractOrder extends BaseEntity {
   @Column(name = "output_unit", length = 20)
   private String outputUnit;
 
-  /** Quantity of raw material dispatched to subcontractor. */
-  @Column(name = "material_sent_qty", precision = 15, scale = 3)
-  private BigDecimal materialSentQty;
+  /** Quantity of raw product dispatched to subcontractor. */
+  @Column(name = "product_sent_qty", precision = 15, scale = 3)
+  private BigDecimal productSentQty;
 
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
@@ -86,7 +86,7 @@ public class SubcontractOrder extends BaseEntity {
   private BigDecimal actualReturnedQty;
 
   /**
-   * Computed waste: materialSentQty − actualReturnedQty. Populated when status transitions to
+   * Computed waste: productSentQty − actualReturnedQty. Populated when status transitions to
    * COMPLETED.
    */
   @Column(name = "waste_qty", precision = 15, scale = 3)
@@ -115,13 +115,13 @@ public class SubcontractOrder extends BaseEntity {
       UUID workOrderId,
       UUID batchId,
       UUID tradingPartnerId,
-      UUID inputMaterialId,
-      MaterialType inputMaterialType,
-      UUID outputMaterialId,
-      MaterialType outputMaterialType,
+      UUID inputProductId,
+      ProductType inputProductType,
+      UUID outputProductId,
+      ProductType outputProductType,
       BigDecimal expectedOutputQty,
       String outputUnit,
-      BigDecimal materialSentQty,
+      BigDecimal productSentQty,
       String unit,
       BigDecimal agreedUnitPrice,
       String currency,
@@ -134,13 +134,13 @@ public class SubcontractOrder extends BaseEntity {
     sc.setBatchId(batchId);
     sc.setTradingPartnerId(tradingPartnerId);
     sc.setStatus(SubcontractOrderStatus.DRAFT);
-    sc.setInputMaterialId(inputMaterialId);
-    sc.setInputMaterialType(inputMaterialType);
-    sc.setOutputMaterialId(outputMaterialId);
-    sc.setOutputMaterialType(outputMaterialType);
+    sc.setInputProductId(inputProductId);
+    sc.setInputProductType(inputProductType);
+    sc.setOutputProductId(outputProductId);
+    sc.setOutputProductType(outputProductType);
     sc.setExpectedOutputQty(expectedOutputQty);
     sc.setOutputUnit(outputUnit);
-    sc.setMaterialSentQty(materialSentQty);
+    sc.setProductSentQty(productSentQty);
     sc.setUnit(unit);
     sc.setAgreedUnitPrice(agreedUnitPrice);
     sc.setCurrency(currency);

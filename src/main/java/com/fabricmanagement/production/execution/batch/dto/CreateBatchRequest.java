@@ -2,7 +2,7 @@ package com.fabricmanagement.production.execution.batch.dto;
 
 import com.fabricmanagement.production.execution.batch.domain.attributes.FiberAttributes;
 import com.fabricmanagement.production.execution.batch.domain.attributes.YarnAttributes;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -22,23 +22,23 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Request object for creating a new material batch")
+@Schema(description = "Request object for creating a new product batch")
 public class CreateBatchRequest {
 
   @Schema(description = "Optimistic locking version")
   private Long version;
 
-  @NotNull(message = "Material ID is required")
+  @NotNull(message = "Product ID is required")
   @Schema(
-      description = "ID of the parent material this batch belongs to",
+      description = "ID of the parent product this batch belongs to",
       requiredMode = Schema.RequiredMode.REQUIRED)
-  private UUID materialId;
+  private UUID productId;
 
-  @NotNull(message = "Material type is required")
+  @NotNull(message = "Product type is required")
   @Schema(
-      description = "Type of the material (FIBER, YARN, FABRIC)",
+      description = "Type of the product (FIBER, YARN, FABRIC)",
       requiredMode = Schema.RequiredMode.REQUIRED)
-  private MaterialType materialType;
+  private ProductType productType;
 
   @NotBlank(message = "Batch code is required")
   @Schema(
@@ -80,21 +80,20 @@ public class CreateBatchRequest {
    */
   @Schema(
       description =
-          "Optional ID of the quality standard to apply. If omitted, the default for the material's ISO code is used.")
+          "Optional ID of the quality standard to apply. If omitted, the default for the product's ISO code is used.")
   private UUID qualityStandardId;
 
   @Schema(description = "Additional remarks/notes")
   private String remarks;
 
   @Schema(
-      description =
-          "Detailed specifications. REQUIRED if materialType is FIBER. Ignored otherwise.",
+      description = "Detailed specifications. REQUIRED if productType is FIBER. Ignored otherwise.",
       requiredMode = Schema.RequiredMode.NOT_REQUIRED)
   @Valid
   private FiberAttributes fiberSpecs;
 
   @Schema(
-      description = "Detailed specifications. REQUIRED if materialType is YARN. Ignored otherwise.",
+      description = "Detailed specifications. REQUIRED if productType is YARN. Ignored otherwise.",
       requiredMode = Schema.RequiredMode.NOT_REQUIRED)
   @Valid
   private YarnAttributes yarnSpecs;
@@ -106,7 +105,7 @@ public class CreateBatchRequest {
    */
   @Schema(
       description =
-          "Batch-level composition override (FIBER only). Map of Base Fiber ID to percentage. Overrides Material default.")
+          "Batch-level composition override (FIBER only). Map of Base Fiber ID to percentage. Overrides Product default.")
   private Map<UUID, BigDecimal> composition;
 
   // ── Source Tracking ──

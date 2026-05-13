@@ -1,8 +1,6 @@
 package com.fabricmanagement.sales.quote.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.sales.catalog.app.ProductCatalogService;
-import com.fabricmanagement.sales.catalog.dto.ProductCatalogDto;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
@@ -14,6 +12,8 @@ import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
+import com.fabricmanagement.sales.salesproduct.app.SalesProductService;
+import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,7 +29,7 @@ public class QuoteService {
 
   private final QuoteRepository quoteRepository;
   private final PricingEngineService pricingEngineService;
-  private final ProductCatalogService catalogService;
+  private final SalesProductService catalogService;
   private final DiscountPolicyService policyService;
 
   @Transactional(readOnly = true)
@@ -55,11 +55,7 @@ public class QuoteService {
 
   @Transactional
   public Quote addQuoteLine(
-      UUID quoteId,
-      UUID materialId,
-      BigDecimal requestedQty,
-      String unit,
-      BigDecimal offeredPrice) {
+      UUID quoteId, UUID productId, BigDecimal requestedQty, String unit, BigDecimal offeredPrice) {
     Quote quote = getActiveQuote(quoteId);
 
     if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.EVALUATION) {
@@ -67,7 +63,7 @@ public class QuoteService {
           "Cannot add lines to a quote in " + quote.getStatus() + " status");
     }
 
-    ProductCatalogDto catalogItem = catalogService.getActiveByMaterialId(materialId);
+    SalesProductDto catalogItem = catalogService.getActiveByProductId(productId);
     DiscountPolicy policy = policyService.getActivePolicy(quote.getModuleType());
 
     // Evaluate Pricing Zone
@@ -78,7 +74,7 @@ public class QuoteService {
     // Create Line
     QuoteLine line = new QuoteLine();
     line.setTenantId(quote.getTenantId());
-    line.setMaterialId(materialId);
+    line.setProductId(productId);
     line.setRequestedQty(requestedQty);
     line.setUnit(unit);
     line.setListPrice(catalogItem.getListPrice());
@@ -166,7 +162,7 @@ public class QuoteService {
     for (QuoteLine oldLine : oldQuote.getLines()) {
       QuoteLine newLine = new QuoteLine();
       newLine.setTenantId(oldLine.getTenantId());
-      newLine.setMaterialId(oldLine.getMaterialId());
+      newLine.setProductId(oldLine.getProductId());
       newLine.setProductDesc(oldLine.getProductDesc());
       newLine.setRequestedQty(oldLine.getRequestedQty());
       newLine.setUnit(oldLine.getUnit());

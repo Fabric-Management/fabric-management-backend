@@ -22,7 +22,7 @@ public class AIFunctionCaller {
   /**
    * Execute function call from AI. Caching is handled by {@link AIToolRegistry}.
    *
-   * @param functionName function name (e.g., "check_material_stock")
+   * @param functionName function name (e.g., "check_product_stock")
    * @param parameters function parameters
    * @return function result as string
    */

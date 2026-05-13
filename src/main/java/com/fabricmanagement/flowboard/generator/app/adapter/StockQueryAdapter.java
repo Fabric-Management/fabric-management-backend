@@ -20,7 +20,7 @@ public class StockQueryAdapter implements StockQueryPort {
   private final InventoryFacade inventoryFacade;
 
   @Override
-  public BigDecimal getAvailableStockByMaterial(UUID tenantId, UUID materialId) {
-    return inventoryFacade.getAvailableQuantityByMaterial(tenantId, materialId);
+  public BigDecimal getAvailableStockByProduct(UUID tenantId, UUID productId) {
+    return inventoryFacade.getAvailableQuantityByProduct(tenantId, productId);
   }
 }

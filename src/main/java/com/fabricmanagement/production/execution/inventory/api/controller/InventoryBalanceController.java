@@ -23,7 +23,7 @@ public class InventoryBalanceController {
   private final InventoryBalanceQueryService balanceQueryService;
 
   @GetMapping("/batch/{batchId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InventoryBalanceDto>>> getByBatch(
       @PathVariable UUID batchId, @Valid PageRequestDto pageRequest) {
     return ResponseEntity.ok(
@@ -33,7 +33,7 @@ public class InventoryBalanceController {
   }
 
   @GetMapping("/location/{locationId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InventoryBalanceDto>>> getByLocation(
       @PathVariable UUID locationId, @Valid PageRequestDto pageRequest) {
     return ResponseEntity.ok(
@@ -43,7 +43,7 @@ public class InventoryBalanceController {
   }
 
   @GetMapping("/batch/{batchId}/location/{locationId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<InventoryBalanceDto>> getByBatchAndLocation(
       @PathVariable UUID batchId, @PathVariable UUID locationId) {
     return ResponseEntity.ok(

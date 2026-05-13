@@ -8,7 +8,7 @@ import lombok.Getter;
 
 @Getter
 public class MinStockAlertEvent extends DomainEvent {
-  private final UUID materialId;
+  private final UUID productId;
   private final UUID locationId;
   private final BigDecimal currentQty;
   private final BigDecimal minQty;
@@ -17,13 +17,13 @@ public class MinStockAlertEvent extends DomainEvent {
   @Builder
   public MinStockAlertEvent(
       UUID tenantId,
-      UUID materialId,
+      UUID productId,
       UUID locationId,
       BigDecimal currentQty,
       BigDecimal minQty,
       String unit) {
     super(tenantId, "MIN_STOCK_ALERT");
-    this.materialId = materialId;
+    this.productId = productId;
     this.locationId = locationId;
     this.currentQty = currentQty;
     this.minQty = minQty;

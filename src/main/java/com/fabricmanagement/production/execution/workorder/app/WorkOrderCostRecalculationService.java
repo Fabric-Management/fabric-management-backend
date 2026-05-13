@@ -55,7 +55,7 @@ public class WorkOrderCostRecalculationService {
    * <ol>
    *   <li>WorkOrder must exist and belong to the current tenant
    *   <li>WorkOrder must be in COMPLETED status
-   *   <li>At least one consumption record with materialId must exist
+   *   <li>At least one consumption record with productId must exist
    *   <li>An output batch must exist (created at startProduction)
    * </ol>
    *
@@ -79,7 +79,7 @@ public class WorkOrderCostRecalculationService {
           "Cost recalculation requires COMPLETED status. Current: " + workOrder.getStatus());
     }
 
-    // 2. Output batch (provides moduleType + materialId for non-raw-material lines)
+    // 2. Output batch (provides moduleType + productId for non-raw-product lines)
     Batch outputBatch =
         batchRepository
             .findFirstByTenantIdAndSourceIdAndSourceType(
@@ -99,14 +99,14 @@ public class WorkOrderCostRecalculationService {
           "No consumption records found for WorkOrder: " + workOrderId);
     }
 
-    // 4. Map to port DTOs — Sprint 6+ records have materialId; older records may not
+    // 4. Map to port DTOs — Sprint 6+ records have productId; older records may not
     List<ConsumptionCostInput> costInputs =
         consumptions.stream()
-            .filter(c -> c.getMaterialId() != null)
+            .filter(c -> c.getProductId() != null)
             .map(
                 c ->
                     new ConsumptionCostInput(
-                        c.getMaterialId(),
+                        c.getProductId(),
                         workOrder
                             .getModuleType(), // Production spec says parent consumes same as WO
                         c.getConsumedWeight(),
@@ -115,9 +115,9 @@ public class WorkOrderCostRecalculationService {
 
     if (costInputs.isEmpty()) {
       throw new WorkOrderDomainException(
-          "No consumption records with materialId found for WorkOrder: "
+          "No consumption records with productId found for WorkOrder: "
               + workOrderId
-              + ". Records created before Sprint 6 migration lack materialId.");
+              + ". Records created before Sprint 6 migration lack productId.");
     }
 
     // 5. Compute via Port
@@ -126,7 +126,7 @@ public class WorkOrderCostRecalculationService {
             tenantId,
             workOrderId,
             workOrder.getModuleType(),
-            outputBatch.getMaterialId(),
+            outputBatch.getProductId(),
             workOrder.getActualQty(),
             workOrder.getTradingPartnerId(),
             costInputs);

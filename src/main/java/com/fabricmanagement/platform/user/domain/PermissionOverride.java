@@ -18,7 +18,7 @@ import lombok.Setter;
  * Represents a specific access override applied directly to a user for modifying default behavior.
  */
 @Entity
-@Table(name = "permission_override")
+@Table(name = "permission_override", schema = "common_user")
 @Getter
 @Setter
 @Builder

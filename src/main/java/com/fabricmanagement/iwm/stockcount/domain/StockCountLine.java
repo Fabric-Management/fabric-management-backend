@@ -23,8 +23,8 @@ public class StockCountLine extends BaseEntity {
   @Column(name = "stock_count_id", nullable = false)
   private UUID stockCountId;
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Column(name = "lot_number", nullable = false, length = 100)
   private String lotNumber;
@@ -57,20 +57,20 @@ public class StockCountLine extends BaseEntity {
   public StockCountLine(
       UUID tenantId,
       UUID stockCountId,
-      UUID materialId,
+      UUID productId,
       String lotNumber,
       UUID goodsReceiptItemId,
       String barcode,
       BigDecimal systemQty) {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
     Objects.requireNonNull(stockCountId, "stockCountId must not be null");
-    Objects.requireNonNull(materialId, "materialId must not be null");
+    Objects.requireNonNull(productId, "productId must not be null");
     if (systemQty == null || systemQty.compareTo(BigDecimal.ZERO) < 0) {
       throw new IwmDomainException("systemQty must not be negative");
     }
     this.setTenantId(tenantId);
     this.stockCountId = stockCountId;
-    this.materialId = materialId;
+    this.productId = productId;
     this.lotNumber = lotNumber;
     this.goodsReceiptItemId = goodsReceiptItemId;
     this.barcode = barcode;

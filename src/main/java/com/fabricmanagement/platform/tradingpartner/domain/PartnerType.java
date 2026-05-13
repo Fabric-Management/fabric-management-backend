@@ -10,7 +10,7 @@ package com.fabricmanagement.platform.tradingpartner.domain;
  * <h2>Trading Relationships:</h2>
  *
  * <ul>
- *   <li>{@link #SUPPLIER} - Material or service supplier
+ *   <li>{@link #SUPPLIER} - Product or service supplier
  *   <li>{@link #CUSTOMER} - Product buyer
  *   <li>{@link #FASON} - Subcontractor (outsourced production)
  *   <li>{@link #SERVICE_PROVIDER} - Service provider (logistics, maintenance, etc.)
@@ -34,7 +34,7 @@ public enum PartnerType {
 
   // ── Trading relationships ──────────────────────────────────────────────
 
-  /** Material or service supplier */
+  /** Product or service supplier */
   SUPPLIER,
 
   /** Product buyer */

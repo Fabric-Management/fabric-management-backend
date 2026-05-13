@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.lineage.infra.persistence;
 
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,5 +11,5 @@ public interface AttributeInheritanceSchemaRepository
     extends JpaRepository<AttributeInheritanceSchemaEntity, UUID> {
   Optional<AttributeInheritanceSchemaEntity>
       findByTenantIdAndSourceTypeAndTargetTypeAndIsActiveTrue(
-          UUID tenantId, MaterialType sourceType, MaterialType targetType);
+          UUID tenantId, ProductType sourceType, ProductType targetType);
 }

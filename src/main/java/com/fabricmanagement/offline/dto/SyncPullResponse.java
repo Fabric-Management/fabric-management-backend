@@ -20,7 +20,7 @@ public class SyncPullResponse {
   private Instant serverTimestamp;
 
   /**
-   * Delta data map. Key: Entity type (e.g. "TASK", "WAREHOUSE_LOCATION", "MATERIAL") Value: List of
+   * Delta data map. Key: Entity type (e.g. "TASK", "WAREHOUSE_LOCATION", "PRODUCT") Value: List of
    * entity DTOs that were modified or created since the last sync.
    */
   @Builder.Default private Map<String, List<?>> updates = new HashMap<>();

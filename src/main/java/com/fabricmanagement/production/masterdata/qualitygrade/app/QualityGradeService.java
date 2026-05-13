@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.production.masterdata.qualitygrade.infra.repository.QualityGradeRepository;
 import java.math.BigDecimal;
@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <h2>Seed Data</h2>
  *
  * <p>On tenant creation, {@link #seedDefaultGrades(UUID)} is called to bootstrap 5 default grades
- * per material type. Seed is idempotent — safe to call multiple times.
+ * per product type. Seed is idempotent — safe to call multiple times.
  *
  * <h2>Grade Transition Enforcement</h2>
  *
@@ -37,34 +37,34 @@ public class QualityGradeService {
   // ── Queries ───────────────────────────────────────────────────────────────
 
   /**
-   * Returns all active grades for the current tenant and the given material type. Ordered by rank
+   * Returns all active grades for the current tenant and the given product type. Ordered by rank
    * ascending (best quality first).
    */
   @Transactional(readOnly = true)
-  public List<QualityGrade> findByMaterialType(MaterialType materialType) {
+  public List<QualityGrade> findByProductType(ProductType productType) {
     UUID tenantId = TenantContext.requireTenantId();
     return qualityGradeRepository
-        .findByTenantIdAndMaterialTypeAndIsActiveTrue(tenantId, materialType)
+        .findByTenantIdAndProductTypeAndIsActiveTrue(tenantId, productType)
         .stream()
         .sorted(java.util.Comparator.comparingInt(QualityGrade::getRank))
         .toList();
   }
 
   /**
-   * Returns a grade by its unique code within the current tenant + material type.
+   * Returns a grade by its unique code within the current tenant + product type.
    *
    * @throws com.fabricmanagement.production.common.exception.ProductionDomainException if not found
    */
   @Transactional(readOnly = true)
-  public QualityGrade findByCode(MaterialType materialType, String code) {
+  public QualityGrade findByCode(ProductType productType, String code) {
     UUID tenantId = TenantContext.requireTenantId();
     return qualityGradeRepository
-        .findByTenantIdAndMaterialTypeAndCodeAndIsActiveTrue(tenantId, materialType, code)
+        .findByTenantIdAndProductTypeAndCodeAndIsActiveTrue(tenantId, productType, code)
         .orElseThrow(
             () ->
                 new com.fabricmanagement.common.infrastructure.web.exception.NotFoundException(
                     String.format(
-                        "QualityGrade not found: materialType=%s, code=%s", materialType, code)));
+                        "QualityGrade not found: productType=%s, code=%s", productType, code)));
   }
 
   /**
@@ -90,7 +90,7 @@ public class QualityGradeService {
   /** Creates a new grade for the current tenant. */
   @Transactional
   public QualityGrade create(
-      MaterialType materialType,
+      ProductType productType,
       String code,
       String name,
       int rank,
@@ -102,18 +102,17 @@ public class QualityGradeService {
 
     UUID tenantId = TenantContext.requireTenantId();
 
-    if (qualityGradeRepository.existsByTenantIdAndMaterialTypeAndCode(
-        tenantId, materialType, code.toUpperCase().trim())) {
+    if (qualityGradeRepository.existsByTenantIdAndProductTypeAndCode(
+        tenantId, productType, code.toUpperCase().trim())) {
       throw new com.fabricmanagement.production.execution.stockunit.domain.exception
           .StockUnitDomainException(
-          String.format(
-              "QualityGrade already exists: materialType=%s, code=%s", materialType, code));
+          String.format("QualityGrade already exists: productType=%s, code=%s", productType, code));
     }
 
     QualityGrade grade =
         QualityGrade.create(
             tenantId,
-            materialType,
+            productType,
             code,
             name,
             rank,
@@ -125,7 +124,7 @@ public class QualityGradeService {
     return qualityGradeRepository.save(grade);
   }
 
-  /** Updates mutable fields of an existing grade. Code and materialType are immutable. */
+  /** Updates mutable fields of an existing grade. Code and productType are immutable. */
   @Transactional
   public QualityGrade update(
       UUID gradeId,
@@ -156,10 +155,10 @@ public class QualityGradeService {
   /**
    * Seeds default quality grades for a given tenant.
    *
-   * <p>Called from {@code TenantCreatedEventListener}. Idempotent — skips material types that
+   * <p>Called from {@code TenantCreatedEventListener}. Idempotent — skips product types that
    * already have at least one grade.
    *
-   * <p>Default grades per material type:
+   * <p>Default grades per product type:
    *
    * <pre>
    * Rank 1: 1A — "Birinci Kalite A"  — pf=1.000 — saleable — no approval — default
@@ -173,25 +172,25 @@ public class QualityGradeService {
    */
   @Transactional
   public void seedDefaultGrades(UUID tenantId) {
-    for (MaterialType materialType : MaterialType.values()) {
-      if (qualityGradeRepository.existsByTenantIdAndMaterialType(tenantId, materialType)) {
+    for (ProductType productType : ProductType.values()) {
+      if (qualityGradeRepository.existsByTenantIdAndProductType(tenantId, productType)) {
         log.debug(
-            "Seed skipped for tenantId={} materialType={} — grades already exist.",
+            "Seed skipped for tenantId={} productType={} — grades already exist.",
             tenantId,
-            materialType);
+            productType);
         continue;
       }
-      persistSeedGrades(tenantId, materialType);
+      persistSeedGrades(tenantId, productType);
       log.info(
-          "Seeded default QualityGrades for tenantId={} materialType={}", tenantId, materialType);
+          "Seeded default QualityGrades for tenantId={} productType={}", tenantId, productType);
     }
   }
 
-  private void persistSeedGrades(UUID tenantId, MaterialType materialType) {
+  private void persistSeedGrades(UUID tenantId, ProductType productType) {
     qualityGradeRepository.save(
         QualityGrade.create(
             tenantId,
-            materialType,
+            productType,
             "1A",
             "Birinci Kalite A",
             1,
@@ -204,7 +203,7 @@ public class QualityGradeService {
     qualityGradeRepository.save(
         QualityGrade.create(
             tenantId,
-            materialType,
+            productType,
             "1B",
             "Birinci Kalite B",
             2,
@@ -217,7 +216,7 @@ public class QualityGradeService {
     qualityGradeRepository.save(
         QualityGrade.create(
             tenantId,
-            materialType,
+            productType,
             "2",
             "İkinci Kalite",
             3,
@@ -230,7 +229,7 @@ public class QualityGradeService {
     qualityGradeRepository.save(
         QualityGrade.create(
             tenantId,
-            materialType,
+            productType,
             "OF",
             "Off-Quality",
             4,
@@ -243,7 +242,7 @@ public class QualityGradeService {
     qualityGradeRepository.save(
         QualityGrade.create(
             tenantId,
-            materialType,
+            productType,
             "WT",
             "Atık/Fire",
             5,

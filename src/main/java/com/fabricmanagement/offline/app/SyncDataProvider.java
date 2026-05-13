@@ -11,7 +11,7 @@ import java.util.UUID;
  */
 public interface SyncDataProvider {
 
-  /** The distinct entity type name for the payload map keys (e.g. "TASK", "MATERIAL") */
+  /** The distinct entity type name for the payload map keys (e.g. "TASK", "PRODUCT") */
   String entityType();
 
   /**

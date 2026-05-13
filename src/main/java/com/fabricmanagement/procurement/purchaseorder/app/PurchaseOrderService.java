@@ -118,7 +118,7 @@ public class PurchaseOrderService {
           PurchaseOrderLine.builder()
               .purchaseOrderId(saved.getId())
               .rfqLineId(lineReq.getRfqLineId())
-              .materialId(lineReq.getMaterialId())
+              .productId(lineReq.getProductId())
               .productDesc(lineReq.getProductDesc())
               .qty(lineReq.getQty())
               .unit(lineReq.getUnit())
@@ -245,7 +245,7 @@ public class PurchaseOrderService {
                 l ->
                     PurchaseOrderResponse.PurchaseOrderLineResponse.builder()
                         .id(l.getId())
-                        .materialId(l.getMaterialId())
+                        .productId(l.getProductId())
                         .productDesc(l.getProductDesc())
                         .qty(l.getQty())
                         .unit(l.getUnit())

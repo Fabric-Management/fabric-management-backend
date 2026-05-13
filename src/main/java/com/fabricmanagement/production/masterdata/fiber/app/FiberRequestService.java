@@ -19,9 +19,9 @@ import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCa
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRequestRepository;
-import com.fabricmanagement.production.masterdata.material.domain.Material;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
-import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialRepository;
+import com.fabricmanagement.production.masterdata.product.domain.Product;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,7 +57,7 @@ public class FiberRequestService {
   private final FiberRequestRepository fiberRequestRepository;
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
   private final FiberCategoryRepository fiberCategoryRepository;
-  private final MaterialRepository materialRepository;
+  private final ProductRepository productRepository;
   private final FiberRepository fiberRepository;
   private final InAppNotificationService notificationService;
   private final TenantQueryPort tenantQueryPort;
@@ -122,7 +122,7 @@ public class FiberRequestService {
   /**
    * Approve a fiber request (platform only).
    *
-   * <p>Creates FiberIsoCode, Material, Fiber in system tenant context.
+   * <p>Creates FiberIsoCode, Product, Fiber in system tenant context.
    *
    * @param requestId Fiber request ID
    * @param reviewedBy Platform reviewer user ID
@@ -270,7 +270,7 @@ public class FiberRequestService {
   }
 
   /**
-   * Create FiberIsoCode, Material, Fiber from approved request (R__001 logic).
+   * Create FiberIsoCode, Product, Fiber from approved request (R__001 logic).
    *
    * <p>Runs in SYSTEM_TENANT context so entities are platform-level.
    */
@@ -289,9 +289,9 @@ public class FiberRequestService {
                   .build();
           isoCode = fiberIsoCodeRepository.save(isoCode);
 
-          // 2. prod_material INSERT
-          Material material = Material.create(MaterialType.FIBER, "KG");
-          material = materialRepository.save(material);
+          // 2. prod_product INSERT
+          Product product = Product.create(ProductType.FIBER, "KG");
+          product = productRepository.save(product);
 
           // 3. prod_fiber INSERT — resolve category by fiber_type (category_code)
           FiberCategory category =
@@ -304,13 +304,13 @@ public class FiberRequestService {
                                   + request.getFiberType()));
 
           String fiberName = request.getFiberName() + " (100%)";
-          Fiber fiber = Fiber.createPureFiber(material, category, isoCode, fiberName);
+          Fiber fiber = Fiber.createPureFiber(product, category, isoCode, fiberName);
           fiberRepository.save(fiber);
 
           log.info(
-              "Created fiber from request: isoCode={}, materialId={}, fiberId={}",
+              "Created fiber from request: isoCode={}, productId={}, fiberId={}",
               request.getIsoCode(),
-              material.getId(),
+              product.getId(),
               fiber.getId());
         });
   }

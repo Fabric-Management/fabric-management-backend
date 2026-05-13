@@ -271,7 +271,7 @@ public class WorkOrderService {
               workOrder.getId(),
               workOrder.getWorkOrderNumber(),
               workOrder.getModuleType(),
-              workOrder.getOutputMaterialId(),
+              workOrder.getOutputProductId(),
               workOrder.getPlannedQty(),
               workOrder.getTradingPartnerId(),
               SystemUser.ID));
@@ -304,7 +304,7 @@ public class WorkOrderService {
               saved.getId(),
               saved.getWorkOrderNumber(),
               saved.getModuleType(),
-              saved.getOutputMaterialId(),
+              saved.getOutputProductId(),
               saved.getPlannedQty(),
               saved.getTradingPartnerId(),
               TenantContext.getCurrentUserId()));
@@ -336,8 +336,8 @@ public class WorkOrderService {
           "Work order has no associated recipe: " + workOrder.getWorkOrderNumber());
     }
 
-    if (request.getOutputMaterialId() == null) {
-      throw new WorkOrderDomainException("Output material ID is required to start production.");
+    if (request.getOutputProductId() == null) {
+      throw new WorkOrderDomainException("Output product ID is required to start production.");
     }
 
     // Transition to IN_PROGRESS
@@ -359,8 +359,8 @@ public class WorkOrderService {
     CreateBlendedBatchRequest blendReq =
         CreateBlendedBatchRequest.builder()
             .batchCode(workOrder.getWorkOrderNumber() + "-OUT")
-            .materialId(request.getOutputMaterialId())
-            .materialType(request.getOutputMaterialType())
+            .productId(request.getOutputProductId())
+            .productType(request.getOutputProductType())
             .quantity(workOrder.getPlannedQty())
             .unit(workOrder.getUnit())
             .locationId(request.getOutputLocationId())

@@ -222,7 +222,7 @@ class CostingDomainTest {
   @DisplayName("CostItem with GLOBAL scope returns correct module code")
   void cost_item_global_scope() {
     var item = new CostItem();
-    item.setCode("RAW_MATERIAL");
+    item.setCode("RAW_PRODUCT");
     item.setScope(CostItemScope.GLOBAL);
     item.setCalculationBase(CalculationBase.PER_KG);
     assertThat(item.getScope()).isEqualTo(CostItemScope.GLOBAL);

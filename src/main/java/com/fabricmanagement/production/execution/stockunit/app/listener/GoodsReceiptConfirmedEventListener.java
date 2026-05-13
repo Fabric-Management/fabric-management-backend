@@ -11,7 +11,7 @@ import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -106,14 +106,14 @@ public class GoodsReceiptConfirmedEventListener {
             .orElseThrow(
                 () -> new IllegalStateException("Batch not found for GR confirm: " + batchId));
 
-    PackageType packageType = determineDefaultPackageType(batch.getMaterialType());
+    PackageType packageType = determineDefaultPackageType(batch.getProductType());
 
     List<StockUnitService.CreateStockUnitRequest> requests =
         event.getItems().stream()
             .map(
                 item ->
                     new StockUnitService.CreateStockUnitRequest(
-                        batch.getMaterialType(),
+                        batch.getProductType(),
                         item.barcode(),
                         null,
                         packageType,
@@ -137,21 +137,21 @@ public class GoodsReceiptConfirmedEventListener {
     SubcontractOutputInfo outputInfo =
         scQueryService.getSubcontractOutputInfo(tenantId, event.getSourceId());
 
-    if (outputInfo.outputMaterialType() == null) {
+    if (outputInfo.outputProductType() == null) {
       log.warn(
-          "SubcontractOrder {} has no output material type, skipping StockUnit creation",
+          "SubcontractOrder {} has no output product type, skipping StockUnit creation",
           outputInfo.scNumber());
       return;
     }
 
-    PackageType packageType = determineDefaultPackageType(outputInfo.outputMaterialType());
+    PackageType packageType = determineDefaultPackageType(outputInfo.outputProductType());
 
     List<StockUnitService.CreateStockUnitRequest> requests =
         event.getItems().stream()
             .map(
                 item ->
                     new StockUnitService.CreateStockUnitRequest(
-                        outputInfo.outputMaterialType(),
+                        outputInfo.outputProductType(),
                         item.barcode(),
                         null,
                         packageType,
@@ -171,8 +171,8 @@ public class GoodsReceiptConfirmedEventListener {
         event.getReceiptNumber());
   }
 
-  private PackageType determineDefaultPackageType(MaterialType materialType) {
-    return switch (materialType) {
+  private PackageType determineDefaultPackageType(ProductType productType) {
+    return switch (productType) {
       case FIBER -> PackageType.BALE;
       case YARN -> PackageType.BOBBIN;
       case FABRIC -> PackageType.ROLL;

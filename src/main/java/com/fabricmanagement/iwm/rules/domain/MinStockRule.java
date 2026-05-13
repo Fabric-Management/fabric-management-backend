@@ -25,8 +25,8 @@ public class MinStockRule extends BaseEntity {
   @Column(name = "location_id", nullable = false)
   private UUID locationId;
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Column(name = "min_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal minQty;
@@ -44,20 +44,20 @@ public class MinStockRule extends BaseEntity {
   public MinStockRule(
       UUID tenantId,
       UUID locationId,
-      UUID materialId,
+      UUID productId,
       BigDecimal minQty,
       UnitOfMeasure unit,
       Integer alertCooldownHours) {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
     Objects.requireNonNull(locationId, "locationId must not be null");
-    Objects.requireNonNull(materialId, "materialId must not be null");
+    Objects.requireNonNull(productId, "productId must not be null");
     Objects.requireNonNull(unit, "unit must not be null");
     if (minQty == null || minQty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IwmDomainException("minQty must be positive");
     }
     this.setTenantId(tenantId);
     this.locationId = locationId;
-    this.materialId = materialId;
+    this.productId = productId;
     this.minQty = minQty;
     this.unit = unit;
     this.alertCooldownHours = alertCooldownHours != null ? alertCooldownHours : 24;

@@ -2,7 +2,7 @@ package com.fabricmanagement.production.execution.lineage.domain.rule;
 
 /**
  * A single rule within an {@link AttributeInheritanceSchema}, describing how one source attribute
- * is inherited into the child batch's attributes for a given source→target material type pair.
+ * is inherited into the child batch's attributes for a given source→target product type pair.
  *
  * <p>Part of the Metadata-Driven Attribute Inheritance Engine: rules are typically loaded from JSON
  * configuration and applied by the engine when resolving {@link

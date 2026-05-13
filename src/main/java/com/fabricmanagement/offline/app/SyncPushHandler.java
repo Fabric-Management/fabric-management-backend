@@ -12,7 +12,7 @@ import java.util.UUID;
  */
 public interface SyncPushHandler {
 
-  /** The explicit entity type this handler supports (e.g. "TASK", "MATERIAL_MOVE"). */
+  /** The explicit entity type this handler supports (e.g. "TASK", "PRODUCT_MOVE"). */
   String supportedEntityType();
 
   /**

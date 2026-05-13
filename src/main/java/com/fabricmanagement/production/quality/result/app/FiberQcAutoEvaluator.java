@@ -5,7 +5,7 @@ import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberQualityStandard;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberQualityStandardRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.quality.result.domain.FiberTestResult;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import java.util.Optional;
@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>When a FiberTestResult is added:
  *
  * <ul>
- *   <li>Finds default FiberQualityStandard by batch's iso_code_id (via material → Fiber)
+ *   <li>Finds default FiberQualityStandard by batch's iso_code_id (via product → Fiber)
  *   <li>If no standard: batch stays PENDING_QC, BATCH_NO_QUALITY_STANDARD notification sent
  *   <li>If standard exists: compares all values to min/target/max:
  *       <ul>
@@ -56,17 +56,17 @@ public class FiberQcAutoEvaluator {
    */
   @Transactional(readOnly = true)
   public EvaluationResult evaluate(FiberTestResult result, Batch batch, UUID tenantId) {
-    if (batch.getMaterialType() != MaterialType.FIBER) {
-      log.debug("Skipping QC auto-eval: batch materialType={}", batch.getMaterialType());
+    if (batch.getProductType() != ProductType.FIBER) {
+      log.debug("Skipping QC auto-eval: batch productType={}", batch.getProductType());
       return new EvaluationResult(TestApprovalStatus.PENDING, false, null);
     }
 
-    Optional<Fiber> fiberOpt = fiberRepository.findByMaterialId(batch.getMaterialId());
+    Optional<Fiber> fiberOpt = fiberRepository.findByProductId(batch.getProductId());
     if (fiberOpt.isEmpty()) {
-      fiberOpt = fiberRepository.findById(batch.getMaterialId());
+      fiberOpt = fiberRepository.findById(batch.getProductId());
     }
     if (fiberOpt.isEmpty()) {
-      log.warn("Fiber not found for materialId={}, skipping QC auto-eval", batch.getMaterialId());
+      log.warn("Fiber not found for productId={}, skipping QC auto-eval", batch.getProductId());
       return new EvaluationResult(TestApprovalStatus.PENDING, false, null);
     }
 
@@ -78,7 +78,7 @@ public class FiberQcAutoEvaluator {
     } else {
       isoCodeId = fiberOpt.get().getFiberIsoCodeId();
       if (isoCodeId == null) {
-        log.warn("Fiber has no iso_code_id, materialId={}", batch.getMaterialId());
+        log.warn("Fiber has no iso_code_id, productId={}", batch.getProductId());
         return new EvaluationResult(TestApprovalStatus.PENDING, false, null);
       }
       standardOpt =

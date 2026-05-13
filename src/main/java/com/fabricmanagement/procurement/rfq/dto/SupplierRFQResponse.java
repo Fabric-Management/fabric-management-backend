@@ -41,8 +41,8 @@ public class SupplierRFQResponse {
     @Schema(description = "Line ID")
     UUID id;
 
-    @Schema(description = "Material ID")
-    UUID materialId;
+    @Schema(description = "Product ID")
+    UUID productId;
 
     @Schema(description = "Product Description")
     String productDesc;
@@ -75,7 +75,7 @@ public class SupplierRFQResponse {
                 l ->
                     RfqLineResponse.builder()
                         .id(l.getId())
-                        .materialId(l.getMaterialId())
+                        .productId(l.getProductId())
                         .productDesc(l.getProductDesc())
                         .requestedQty(l.getRequestedQty())
                         .unit(l.getUnit())

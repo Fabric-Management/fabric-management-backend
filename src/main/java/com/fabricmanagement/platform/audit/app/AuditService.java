@@ -36,15 +36,15 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <pre>{@code
  * @Service
- * public class MaterialService {
+ * public class ProductService {
  *     @Autowired
  *     private AuditService auditService;
  *
- *     public void createMaterial(CreateMaterialRequest request) {
- *         Material material = materialRepository.save(...);
+ *     public void createProduct(CreateProductRequest request) {
+ *         Product product = productRepository.save(...);
  *
- *         auditService.logAction("MATERIAL_CREATE", "material",
- *             material.getId().toString(), "Material created: " + material.getName());
+ *         auditService.logAction("PRODUCT_CREATE", "product",
+ *             product.getId().toString(), "Product created: " + product.getName());
  *     }
  * }
  * }</pre>

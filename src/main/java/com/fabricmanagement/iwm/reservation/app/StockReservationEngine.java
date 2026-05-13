@@ -7,5 +7,5 @@ import java.util.UUID;
 
 public interface StockReservationEngine {
   /** FIFO tabanlı, istenilen miktar için stok önerisinde bulunur. */
-  List<LotSuggestion> suggestLotsFifo(UUID tenantId, UUID materialId, BigDecimal requiredQty);
+  List<LotSuggestion> suggestLotsFifo(UUID tenantId, UUID productId, BigDecimal requiredQty);
 }

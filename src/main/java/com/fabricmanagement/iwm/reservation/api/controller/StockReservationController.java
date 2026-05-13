@@ -34,22 +34,22 @@ public class StockReservationController {
 
   @Operation(summary = "Get FIFO Lot Suggestions")
   @GetMapping("/suggestions/fifo")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<List<LotSuggestion>> getFifoSuggestions(
-      @RequestParam UUID materialId, @RequestParam BigDecimal requiredQty) {
-    return ResponseEntity.ok(reservationService.getFifoSuggestions(materialId, requiredQty));
+      @RequestParam UUID productId, @RequestParam BigDecimal requiredQty) {
+    return ResponseEntity.ok(reservationService.getFifoSuggestions(productId, requiredQty));
   }
 
   @Operation(summary = "Create Reservation")
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<StockReservationResponse> createReservation(
       @RequestBody @Valid CreateReservationRequest request) {
     StockReservationResponse response =
         reservationService.createReservation(
             request.getSalesOrderLineId(),
             request.getLocationId(),
-            request.getMaterialId(),
+            request.getProductId(),
             request.getLotNumber(),
             request.getGoodsReceiptItemId(),
             request.getQtyReserved());
@@ -58,7 +58,7 @@ public class StockReservationController {
 
   @Operation(summary = "Release Reservation")
   @PostMapping("/{id}/release")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<Void> releaseReservation(@PathVariable UUID id) {
     reservationService.releaseReservation(id);
     return ResponseEntity.ok().build();
@@ -66,7 +66,7 @@ public class StockReservationController {
 
   @Operation(summary = "Convert Reservation to Real Move (Shipment)")
   @PostMapping("/{id}/convert")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<Void> convertReservation(@PathVariable UUID id) {
     reservationService.convertReservation(id);
     return ResponseEntity.ok().build();

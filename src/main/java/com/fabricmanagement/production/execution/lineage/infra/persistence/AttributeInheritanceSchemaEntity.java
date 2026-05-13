@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.lineage.infra.persistence;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,11 +22,11 @@ public class AttributeInheritanceSchemaEntity extends BaseEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "source_type", nullable = false, length = 30)
-  private MaterialType sourceType;
+  private ProductType sourceType;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "target_type", nullable = false, length = 30)
-  private MaterialType targetType;
+  private ProductType targetType;
 
   @Type(JsonType.class)
   @Column(name = "rules", columnDefinition = "jsonb", nullable = false)

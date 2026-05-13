@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.infra.repository;
 
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import java.util.List;
 import java.util.Optional;
@@ -12,15 +12,15 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface QualityGradeRepository extends JpaRepository<QualityGrade, UUID> {
 
-  List<QualityGrade> findByTenantIdAndMaterialTypeAndIsActiveTrue(
-      UUID tenantId, MaterialType materialType);
+  List<QualityGrade> findByTenantIdAndProductTypeAndIsActiveTrue(
+      UUID tenantId, ProductType productType);
 
-  Optional<QualityGrade> findByTenantIdAndMaterialTypeAndCodeAndIsActiveTrue(
-      UUID tenantId, MaterialType materialType, String code);
+  Optional<QualityGrade> findByTenantIdAndProductTypeAndCodeAndIsActiveTrue(
+      UUID tenantId, ProductType productType, String code);
 
-  boolean existsByTenantIdAndMaterialTypeAndCode(
-      UUID tenantId, MaterialType materialType, String code);
+  boolean existsByTenantIdAndProductTypeAndCode(
+      UUID tenantId, ProductType productType, String code);
 
   /** Used during onboarding to check if seed data already exists. */
-  boolean existsByTenantIdAndMaterialType(UUID tenantId, MaterialType materialType);
+  boolean existsByTenantIdAndProductType(UUID tenantId, ProductType productType);
 }

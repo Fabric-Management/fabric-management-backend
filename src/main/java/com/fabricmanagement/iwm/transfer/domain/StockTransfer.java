@@ -34,8 +34,8 @@ public class StockTransfer extends BaseEntity {
   @Column(name = "to_location_id", nullable = false)
   private UUID toLocationId;
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Column(name = "lot_number", nullable = false, length = 100)
   private String lotNumber;
@@ -75,7 +75,7 @@ public class StockTransfer extends BaseEntity {
       StockTransferType transferType,
       UUID fromLocationId,
       UUID toLocationId,
-      UUID materialId,
+      UUID productId,
       String lotNumber,
       BigDecimal qty,
       String unit,
@@ -85,7 +85,7 @@ public class StockTransfer extends BaseEntity {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
     Objects.requireNonNull(fromLocationId, "fromLocationId must not be null");
     Objects.requireNonNull(toLocationId, "toLocationId must not be null");
-    Objects.requireNonNull(materialId, "materialId must not be null");
+    Objects.requireNonNull(productId, "productId must not be null");
     Objects.requireNonNull(transferType, "transferType must not be null");
     if (fromLocationId.equals(toLocationId)) {
       throw new IwmDomainException("fromLocationId and toLocationId must be different");
@@ -101,7 +101,7 @@ public class StockTransfer extends BaseEntity {
     this.transferType = transferType;
     this.fromLocationId = fromLocationId;
     this.toLocationId = toLocationId;
-    this.materialId = materialId;
+    this.productId = productId;
     this.lotNumber = lotNumber;
     this.qty = qty;
     this.unit = unit;
