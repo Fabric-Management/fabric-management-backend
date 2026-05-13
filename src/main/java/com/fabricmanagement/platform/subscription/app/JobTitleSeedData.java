@@ -209,7 +209,7 @@ public final class JobTitleSeedData {
           new Preset(
               "SC_MGR",
               "Supply Chain Manager",
-              "Manages end-to-end material flow",
+              "Manages end-to-end product flow",
               "MANAGER",
               "WAREHOUSE"),
           new Preset(
@@ -259,7 +259,7 @@ public final class JobTitleSeedData {
           new Preset(
               "YARN_BUYER",
               "Yarn & Fiber Buyer",
-              "Purchases raw materials",
+              "Purchases raw products",
               "WORKER",
               "PROCUREMENT"),
           new Preset(

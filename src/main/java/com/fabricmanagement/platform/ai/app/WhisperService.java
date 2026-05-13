@@ -172,7 +172,7 @@ public class WhisperService {
    * Fix common Whisper transcription errors for textile technical terms.
    *
    * <p>Whisper sometimes incorrectly transcribes "30'a 1" or "30'a bir" as "31". This method
-   * corrects such cases when they appear before textile material names.
+   * corrects such cases when they appear before textile product names.
    *
    * <p>Examples:
    *
@@ -190,19 +190,19 @@ public class WhisperService {
       return text;
     }
 
-    // Known textile material names (Turkish and English)
-    String[] textileMaterials = {
+    // Known textile product names (Turkish and English)
+    String[] textileProducts = {
       "gabardin", "gabardine", "pamuk", "cotton", "keten", "linen",
       "polyester", "yün", "wool", "poplin", "kadife", "velvet",
       "denim", "jean", "kumaş", "fabric", "fiber"
     };
 
-    // Pattern: number between 20-99 followed by textile material
+    // Pattern: number between 20-99 followed by textile product
     // Rule: If number = 30+1 (31), 40+1 (41), 20+1 (21), etc., convert to ratio format
     java.util.regex.Pattern pattern =
         java.util.regex.Pattern.compile(
             "\\b(2[1-9]|3[1-9]|4[1-9]|5[1-9]|6[1-9]|7[1-9]|8[1-9]|9[1-9])\\s+("
-                + String.join("|", textileMaterials)
+                + String.join("|", textileProducts)
                 + ")",
             java.util.regex.Pattern.CASE_INSENSITIVE);
 
@@ -211,7 +211,7 @@ public class WhisperService {
 
     while (matcher.find()) {
       int number = Integer.parseInt(matcher.group(1));
-      String material = matcher.group(2);
+      String product = matcher.group(2);
 
       // Check if number could be a ratio sum (e.g., 31 = 30+1, 41 = 40+1)
       // Common ratios: 20/1, 30/1, 40/1, 40/2, 50/1, 60/1
@@ -222,7 +222,7 @@ public class WhisperService {
         int base = (number / 10) * 10;
         int second = number % 10;
         if (second == 1 && base >= 20) {
-          replacement = base + "/1 " + material;
+          replacement = base + "/1 " + product;
         }
       } else if (number >= 31 && number <= 99) {
         int base = (number / 10) * 10;
@@ -230,10 +230,10 @@ public class WhisperService {
 
         // 30/1 (30+1=31), 40/1 (40+1=41), 40/2 (40+2=42), etc.
         if (second == 1 && base >= 30) {
-          replacement = base + "/1 " + material;
+          replacement = base + "/1 " + product;
         } else if (second == 2 && base >= 40) {
           // 40/2, 50/2, etc.
-          replacement = base + "/2 " + material;
+          replacement = base + "/2 " + product;
         } else if (second == 0 && base >= 20) {
           // 30, 40, 50 - might be just the base number, keep as is
           replacement = null;
@@ -241,7 +241,7 @@ public class WhisperService {
       }
 
       if (replacement != null) {
-        log.debug("Corrected Whisper transcription: '{} {}' → '{}'", number, material, replacement);
+        log.debug("Corrected Whisper transcription: '{} {}' → '{}'", number, product, replacement);
         matcher.appendReplacement(corrected, java.util.regex.Matcher.quoteReplacement(replacement));
       } else {
         // No correction needed, keep original

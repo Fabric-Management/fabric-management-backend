@@ -34,7 +34,7 @@ public class WarehouseLocationController {
   // ── Commands ────────────────────────────────────────────────────────────────
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WarehouseLocationDto>> create(
       @Valid @RequestBody CreateWarehouseLocationRequest request) {
     WarehouseLocationDto location = service.create(request);
@@ -42,7 +42,7 @@ public class WarehouseLocationController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WarehouseLocationDto>> update(
       @PathVariable UUID id, @Valid @RequestBody UpdateWarehouseLocationRequest request) {
     WarehouseLocationDto location = service.update(id, request);
@@ -50,7 +50,7 @@ public class WarehouseLocationController {
   }
 
   @PatchMapping("/{id}/status")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WarehouseLocationDto>> changeStatus(
       @PathVariable UUID id, @Valid @RequestBody ChangeLocationStatusRequest request) {
     WarehouseLocationDto location = service.changeStatus(id, request);
@@ -58,7 +58,7 @@ public class WarehouseLocationController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<Void> deactivate(@PathVariable UUID id) {
     service.deactivate(id);
     return ResponseEntity.noContent().build();
@@ -67,21 +67,21 @@ public class WarehouseLocationController {
   // ── Queries ─────────────────────────────────────────────────────────────────
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getAll() {
     List<WarehouseLocationDto> locations = service.getAll();
     return ResponseEntity.ok(ApiResponse.success(locations));
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<WarehouseLocationDto>> getById(@PathVariable UUID id) {
     WarehouseLocationDto location = service.getById(id);
     return ResponseEntity.ok(ApiResponse.success(location));
   }
 
   @GetMapping("/{id}/children")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getChildren(
       @PathVariable UUID id) {
     List<WarehouseLocationDto> children = service.getChildren(id);
@@ -89,28 +89,28 @@ public class WarehouseLocationController {
   }
 
   @GetMapping("/tree")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationTreeDto>>> getTree() {
     List<WarehouseLocationTreeDto> tree = service.getTree();
     return ResponseEntity.ok(ApiResponse.success(tree));
   }
 
   @GetMapping("/{id}/subtree")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<WarehouseLocationTreeDto>> getSubTree(@PathVariable UUID id) {
     WarehouseLocationTreeDto subtree = service.getSubTree(id);
     return ResponseEntity.ok(ApiResponse.success(subtree));
   }
 
   @GetMapping("/machines")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getMachineLocations() {
     List<WarehouseLocationDto> locations = service.getMachineLocations();
     return ResponseEntity.ok(ApiResponse.success(locations));
   }
 
   @GetMapping("/type/{type}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getByType(
       @PathVariable WarehouseLocationType type) {
     List<WarehouseLocationDto> locations = service.getByType(type);
@@ -118,7 +118,7 @@ public class WarehouseLocationController {
   }
 
   @GetMapping("/status/{status}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> getByStatus(
       @PathVariable LocationStatus status) {
     List<WarehouseLocationDto> locations = service.getByStatus(status);
@@ -126,7 +126,7 @@ public class WarehouseLocationController {
   }
 
   @GetMapping("/search")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> search(
       @RequestParam(required = false) String q) {
     List<WarehouseLocationDto> locations = service.search(q);
@@ -134,7 +134,7 @@ public class WarehouseLocationController {
   }
 
   @GetMapping("/filter")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> filter(
       @RequestParam(required = false) WarehouseLocationType type,
       @RequestParam(required = false) LocationStatus status,
@@ -144,7 +144,7 @@ public class WarehouseLocationController {
   }
 
   @GetMapping("/available")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<WarehouseLocationDto>>> findAvailable(
       @RequestParam(required = false) BigDecimal requiredWeight,
       @RequestParam(required = false) WarehouseLocationType type) {
@@ -153,7 +153,7 @@ public class WarehouseLocationController {
   }
 
   @GetMapping("/{id}/capacity-check")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<Boolean>> checkCapacity(
       @PathVariable UUID id,
       @RequestParam(required = false) BigDecimal weight,

@@ -31,8 +31,8 @@ public class CostHistory extends BaseEntity {
   @Column(name = "module_type", length = 50)
   private String moduleType;
 
-  @Column(name = "material_id")
-  private UUID materialId;
+  @Column(name = "product_id")
+  private UUID productId;
 
   @Column(name = "unit_price", nullable = false, precision = 18, scale = 4)
   private BigDecimal unitPrice;

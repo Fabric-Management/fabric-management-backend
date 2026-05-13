@@ -2,7 +2,7 @@ package com.fabricmanagement.production.execution.stockunit.dto;
 
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -12,7 +12,7 @@ import java.util.UUID;
 
 public record CreateStockUnitApiRequest(
     @NotNull UUID batchId,
-    @NotNull MaterialType materialType,
+    @NotNull ProductType productType,
     @NotBlank @Size(max = 100) String barcode,
     @Size(max = 100) String serialNumber,
     @NotNull PackageType packageType,

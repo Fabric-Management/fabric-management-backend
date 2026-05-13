@@ -26,8 +26,8 @@ public class RmaLine extends BaseEntity {
   @Column(name = "sales_order_line_id", nullable = false)
   private UUID salesOrderLineId;
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Column(name = "lot_number", nullable = false, length = 100)
   private String lotNumber;
@@ -49,14 +49,14 @@ public class RmaLine extends BaseEntity {
       UUID tenantId,
       UUID rmaId,
       UUID salesOrderLineId,
-      UUID materialId,
+      UUID productId,
       String lotNumber,
       DefectCategory defectCategory,
       BigDecimal qty,
       String unit) {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
     Objects.requireNonNull(rmaId, "rmaId must not be null");
-    Objects.requireNonNull(materialId, "materialId must not be null");
+    Objects.requireNonNull(productId, "productId must not be null");
     Objects.requireNonNull(defectCategory, "defectCategory must not be null");
     if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IwmDomainException("qty must be positive");
@@ -64,7 +64,7 @@ public class RmaLine extends BaseEntity {
     this.setTenantId(tenantId);
     this.rmaId = rmaId;
     this.salesOrderLineId = salesOrderLineId;
-    this.materialId = materialId;
+    this.productId = productId;
     this.lotNumber = lotNumber;
     this.defectCategory = defectCategory;
     this.qty = qty;

@@ -20,12 +20,12 @@ public class WorkOrderRecipeHistoryQuery {
   private final NamedParameterJdbcTemplate jdbc;
 
   /**
-   * Step 1: Find the most recently created ACTIVE recipe associated with this material (via recipe
-   * name containing the material, or through a direct FK — if materialId is stored on the recipe).
-   * For now, returns the most recently created ACTIVE recipe that references this materialId in its
+   * Step 1: Find the most recently created ACTIVE recipe associated with this product (via recipe
+   * name containing the product, or through a direct FK — if productId is stored on the recipe).
+   * For now, returns the most recently created ACTIVE recipe that references this productId in its
    * RecipeComponent table.
    */
-  public Optional<UUID> findDefaultRecipeForMaterial(UUID materialId) {
+  public Optional<UUID> findDefaultRecipeForProduct(UUID productId) {
     String sql =
         """
         SELECT r.id
@@ -33,27 +33,27 @@ public class WorkOrderRecipeHistoryQuery {
         JOIN production.prod_recipe_component rc ON rc.recipe_id = r.id
         WHERE r.status = 'ACTIVE'
           AND r.is_active = true
-          AND rc.fiber_id = :materialId
+          AND rc.fiber_id = :productId
         ORDER BY r.created_at DESC
         LIMIT 1
         """;
 
-    return querySingleUuid(sql, "materialId", materialId);
+    return querySingleUuid(sql, "productId", productId);
   }
 
   /**
-   * Step 2: Most recently used recipe for the same (customer, material) combination. Looks at
-   * confirmed WorkOrders for this trading partner linked to the same material.
+   * Step 2: Most recently used recipe for the same (customer, product) combination. Looks at
+   * confirmed WorkOrders for this trading partner linked to the same product.
    */
-  public Optional<UUID> findMostRecentRecipeForCustomerAndMaterial(
-      UUID tradingPartnerId, UUID materialId) {
+  public Optional<UUID> findMostRecentRecipeForCustomerAndProduct(
+      UUID tradingPartnerId, UUID productId) {
     String sql =
         """
         SELECT wo.recipe_id
         FROM production.prod_work_order wo
         JOIN production.prod_recipe_component rc ON rc.recipe_id = wo.recipe_id
         WHERE wo.trading_partner_id = :tradingPartnerId
-          AND rc.fiber_id = :materialId
+          AND rc.fiber_id = :productId
           AND wo.recipe_id IS NOT NULL
           AND wo.is_active = true
         ORDER BY wo.created_at DESC
@@ -63,16 +63,16 @@ public class WorkOrderRecipeHistoryQuery {
     return jdbc.query(
         sql,
         new MapSqlParameterSource("tradingPartnerId", tradingPartnerId)
-            .addValue("materialId", materialId),
+            .addValue("productId", productId),
         rs ->
             rs.next() ? Optional.of(UUID.fromString(rs.getString("recipe_id"))) : Optional.empty());
   }
 
   /**
-   * Step 3: Most frequently used ACTIVE recipe for this material (ranked by number of WorkOrders
+   * Step 3: Most frequently used ACTIVE recipe for this product (ranked by number of WorkOrders
    * using it).
    */
-  public Optional<UUID> findMostUsedRecipeForMaterial(UUID materialId) {
+  public Optional<UUID> findMostUsedRecipeForProduct(UUID productId) {
     String sql =
         """
         SELECT wo.recipe_id, COUNT(*) AS usage_count
@@ -81,14 +81,14 @@ public class WorkOrderRecipeHistoryQuery {
         JOIN production.prod_recipe_component rc ON rc.recipe_id = wo.recipe_id
         WHERE r.status = 'ACTIVE'
           AND r.is_active = true
-          AND rc.fiber_id = :materialId
+          AND rc.fiber_id = :productId
           AND wo.recipe_id IS NOT NULL
         GROUP BY wo.recipe_id
         ORDER BY usage_count DESC
         LIMIT 1
         """;
 
-    return querySingleUuid(sql, "materialId", materialId);
+    return querySingleUuid(sql, "productId", productId);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

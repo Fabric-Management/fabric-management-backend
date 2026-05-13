@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
 import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
-import com.fabricmanagement.production.masterdata.material.dto.MaterialAttributeDto;
+import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
@@ -11,7 +11,7 @@ public record BatchAttributeDto(
     UUID id,
     UUID batchId,
     UUID attributeId,
-    MaterialAttributeDto attribute,
+    ProductAttributeDto attribute,
     String value,
     Boolean isActive,
     Long version,
@@ -24,7 +24,7 @@ public record BatchAttributeDto(
         .batchId(entity.getBatch() != null ? entity.getBatch().getId() : null)
         .attributeId(entity.getAttribute() != null ? entity.getAttribute().getId() : null)
         .attribute(
-            entity.getAttribute() != null ? MaterialAttributeDto.from(entity.getAttribute()) : null)
+            entity.getAttribute() != null ? ProductAttributeDto.from(entity.getAttribute()) : null)
         .value(entity.getValue())
         .isActive(entity.getIsActive())
         .version(entity.getVersion())

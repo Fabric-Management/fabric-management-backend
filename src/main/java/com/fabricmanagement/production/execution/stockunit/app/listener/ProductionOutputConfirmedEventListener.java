@@ -58,7 +58,7 @@ public class ProductionOutputConfirmedEventListener {
                     .map(
                         item ->
                             new StockUnitService.CreateStockUnitRequest(
-                                event.getOutputMaterialType(),
+                                event.getOutputProductType(),
                                 item.barcode(),
                                 null, // serial number
                                 item.packageType(),

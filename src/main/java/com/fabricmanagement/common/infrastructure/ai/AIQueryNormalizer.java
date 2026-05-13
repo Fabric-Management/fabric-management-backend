@@ -73,8 +73,8 @@ public class AIQueryNormalizer {
     translations.put("polyamide", "polyamide");
 
     // Generic terms
-    translations.put("materyal", "material");
-    translations.put("materyali", "material");
+    translations.put("materyal", "product");
+    translations.put("materyali", "product");
     translations.put("elyaf", "fiber");
     translations.put("fiber", "fiber");
 

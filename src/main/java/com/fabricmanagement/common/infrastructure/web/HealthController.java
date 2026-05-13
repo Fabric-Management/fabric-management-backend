@@ -61,7 +61,7 @@ public class HealthController {
   private Map<String, String> buildModulesInfo() {
     return Map.of(
         "common", "Platform & Infrastructure",
-        "production", "Material, Planning, Execution, Quality",
+        "production", "Product, Planning, Execution, Quality",
         "logistics", "Inventory, Shipment, Customs",
         "finance", "AR, AP, Invoice, Costing",
         "human", "Employee, Org, Leave, Payroll",

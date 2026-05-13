@@ -7,7 +7,7 @@ import lombok.*;
 /**
  * A cost item represents a single line of cost in a production calculation.
  *
- * <p>8 global items (RAW_MATERIAL, LABOR, MACHINE, ENERGY, OVERHEAD, LOGISTICS, QUALITY, PACKAGING)
+ * <p>8 global items (RAW_PRODUCT, LABOR, MACHINE, ENERGY, OVERHEAD, LOGISTICS, QUALITY, PACKAGING)
  * are system-defined and seeded in migration. Module-specific items (e.g. FIBER_BALING) are also
  * system-defined; tenants cannot add rows.
  */
@@ -20,7 +20,7 @@ import lombok.*;
 @AllArgsConstructor
 public class CostItem extends BaseEntity {
 
-  /** Business key — globally unique (e.g. "RAW_MATERIAL", "FIBER_BALING"). */
+  /** Business key — globally unique (e.g. "RAW_PRODUCT", "FIBER_BALING"). */
   @Column(name = "code", nullable = false, unique = true, length = 50)
   private String code;
 

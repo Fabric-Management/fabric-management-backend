@@ -36,7 +36,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
 
   private static final UUID TENANT_ID = UUID.randomUUID();
   private static final UUID WORK_ORDER_ID = UUID.randomUUID();
-  private static final UUID MATERIAL_ID = UUID.randomUUID();
+  private static final UUID PRODUCT_ID = UUID.randomUUID();
   private static final UUID TRADING_PARTNER_ID = UUID.randomUUID();
   private static final WorkOrderModuleType MODULE_TYPE = WorkOrderModuleType.SPINNING;
   private static final BigDecimal PLANNED_QTY = new BigDecimal("1000.000");
@@ -57,12 +57,12 @@ class WorkOrderPlannedCostTriggerServiceTest {
   }
 
   private WorkOrder buildWorkOrder(
-      WorkOrderStatus status, UUID outputMaterialId, WorkOrderModuleType moduleType) {
+      WorkOrderStatus status, UUID outputProductId, WorkOrderModuleType moduleType) {
     WorkOrder wo =
         WorkOrder.builder()
             .workOrderNumber("WO-TEST-001")
             .status(status)
-            .outputMaterialId(outputMaterialId)
+            .outputProductId(outputProductId)
             .moduleType(moduleType)
             .plannedQty(PLANNED_QTY)
             .unit("KG")
@@ -93,7 +93,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("throws when WorkOrder belongs to different tenant")
     void throwsWhenWrongTenant() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, PRODUCT_ID, MODULE_TYPE);
       wo.setTenantId(UUID.randomUUID()); // different tenant
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
@@ -108,7 +108,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("throws when WorkOrder is soft-deleted")
     void throwsWhenSoftDeleted() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, PRODUCT_ID, MODULE_TYPE);
       wo.setIsActive(false);
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
@@ -123,7 +123,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("throws when WorkOrder is in DRAFT status")
     void throwsWhenDraftStatus() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.DRAFT, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.DRAFT, PRODUCT_ID, MODULE_TYPE);
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
 
       assertThatThrownBy(() -> triggerService.triggerPlannedCost(WORK_ORDER_ID))
@@ -137,7 +137,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("throws when WorkOrder is in PENDING_APPROVAL status")
     void throwsWhenPendingApprovalStatus() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.PENDING_APPROVAL, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.PENDING_APPROVAL, PRODUCT_ID, MODULE_TYPE);
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
 
       assertThatThrownBy(() -> triggerService.triggerPlannedCost(WORK_ORDER_ID))
@@ -149,14 +149,14 @@ class WorkOrderPlannedCostTriggerServiceTest {
     }
 
     @Test
-    @DisplayName("throws when outputMaterialId is null (pre-Sprint 12 WO)")
-    void throwsWhenOutputMaterialIdMissing() {
+    @DisplayName("throws when outputProductId is null (pre-Sprint 12 WO)")
+    void throwsWhenOutputProductIdMissing() {
       WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, null, MODULE_TYPE);
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
 
       assertThatThrownBy(() -> triggerService.triggerPlannedCost(WORK_ORDER_ID))
           .isInstanceOf(WorkOrderDomainException.class)
-          .hasMessageContaining("missing outputMaterialId");
+          .hasMessageContaining("missing outputProductId");
 
       verify(costEnginePort, never()).computePlannedCost(any(), any(), any(), any(), any(), any());
     }
@@ -164,7 +164,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("throws when moduleType is null")
     void throwsWhenModuleTypeMissing() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, MATERIAL_ID, null);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, PRODUCT_ID, null);
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
 
       assertThatThrownBy(() -> triggerService.triggerPlannedCost(WORK_ORDER_ID))
@@ -182,16 +182,16 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("computes planned cost for APPROVED WorkOrder and returns updated response")
     void computesPlannedCostForApprovedWorkOrder() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED, PRODUCT_ID, MODULE_TYPE);
       BigDecimal computedCost = new BigDecimal("5250.500");
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
       when(costEnginePort.computePlannedCost(
-              TENANT_ID, WORK_ORDER_ID, MODULE_TYPE, MATERIAL_ID, PLANNED_QTY, TRADING_PARTNER_ID))
+              TENANT_ID, WORK_ORDER_ID, MODULE_TYPE, PRODUCT_ID, PLANNED_QTY, TRADING_PARTNER_ID))
           .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, computedCost, "TRY"));
 
       // After write-back reload
-      WorkOrder updatedWo = buildWorkOrder(WorkOrderStatus.APPROVED, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder updatedWo = buildWorkOrder(WorkOrderStatus.APPROVED, PRODUCT_ID, MODULE_TYPE);
       updatedWo.setPlannedCost(computedCost);
       updatedWo.setPlannedCostCurrency("TRY");
       when(workOrderRepository.findById(WORK_ORDER_ID))
@@ -205,7 +205,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
               eq(TENANT_ID),
               eq(WORK_ORDER_ID),
               eq(MODULE_TYPE),
-              eq(MATERIAL_ID),
+              eq(PRODUCT_ID),
               eq(PLANNED_QTY),
               eq(TRADING_PARTNER_ID));
 
@@ -217,7 +217,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("works for COMPLETED WorkOrders (idempotent recalculation)")
     void worksForCompletedWorkOrders() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.COMPLETED, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.COMPLETED, PRODUCT_ID, MODULE_TYPE);
       BigDecimal computedCost = new BigDecimal("4800.000");
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
@@ -233,7 +233,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
     @Test
     @DisplayName("works for IN_PROGRESS WorkOrders")
     void worksForInProgressWorkOrders() {
-      WorkOrder wo = buildWorkOrder(WorkOrderStatus.IN_PROGRESS, MATERIAL_ID, MODULE_TYPE);
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.IN_PROGRESS, PRODUCT_ID, MODULE_TYPE);
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
       when(costEnginePort.computePlannedCost(any(), any(), any(), any(), any(), any()))

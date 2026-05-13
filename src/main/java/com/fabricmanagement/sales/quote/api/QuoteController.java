@@ -89,7 +89,7 @@ public class QuoteController {
                 QuoteResponse.from(
                     quoteService.addQuoteLine(
                         quoteId,
-                        req.getMaterialId(),
+                        req.getProductId(),
                         req.getRequestedQty(),
                         req.getUnit(),
                         req.getOfferedPrice()))));

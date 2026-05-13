@@ -25,12 +25,12 @@ public interface InventoryBalanceRepository extends JpaRepository<InventoryBalan
           FROM production.production_execution_inventory_balance ib
           JOIN production.production_execution_batch b ON b.id = ib.batch_id
           WHERE b.tenant_id = :tenantId
-            AND b.material_id = :materialId
+            AND b.product_id = :productId
             AND b.is_active = true
             AND ib.is_active = true
           """,
       nativeQuery = true)
-  java.math.BigDecimal sumAvailableByMaterial(
+  java.math.BigDecimal sumAvailableByProduct(
       @org.springframework.data.repository.query.Param("tenantId") UUID tenantId,
-      @org.springframework.data.repository.query.Param("materialId") UUID materialId);
+      @org.springframework.data.repository.query.Param("productId") UUID productId);
 }

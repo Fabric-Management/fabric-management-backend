@@ -26,8 +26,8 @@ public class SampleRequest extends BaseEntity {
   @Column(name = "customer_id", nullable = false)
   private UUID customerId;
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;

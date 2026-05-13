@@ -214,13 +214,13 @@ public class FiberAIToolProvider implements AIToolProvider {
     try {
       String fiberName = (String) parameters.get("fiberName");
       String fiberCategoryIdStr = (String) parameters.get("fiberCategoryId");
-      String materialIdStr = (String) parameters.get("materialId");
+      String productIdStr = (String) parameters.get("productId");
       String unit = (String) parameters.get("unit");
 
-      if ((materialIdStr == null || materialIdStr.isBlank()) && (unit == null || unit.isBlank())) {
-        return "❌ Either materialId or unit is required.\n\n"
-            + "Option 1: Provide materialId to use existing Material\n"
-            + "Option 2: Provide unit (e.g. 'kg') to auto-create Material with type=FIBER";
+      if ((productIdStr == null || productIdStr.isBlank()) && (unit == null || unit.isBlank())) {
+        return "❌ Either productId or unit is required.\n\n"
+            + "Option 1: Provide productId to use existing Product\n"
+            + "Option 2: Provide unit (e.g. 'kg') to auto-create Product with type=FIBER";
       }
 
       if (fiberCategoryIdStr == null || fiberCategoryIdStr.isBlank()) {
@@ -236,19 +236,19 @@ public class FiberAIToolProvider implements AIToolProvider {
         return "❌ Fiber Name is required.";
       }
 
-      UUID materialId = null;
+      UUID productId = null;
       UUID fiberCategoryId;
       UUID fiberIsoCodeId;
       try {
-        if (materialIdStr != null && !materialIdStr.isBlank()) {
-          materialId = UUID.fromString(materialIdStr);
-          // Note: existence check for material is handled inside FiberFacade/FiberService
+        if (productIdStr != null && !productIdStr.isBlank()) {
+          productId = UUID.fromString(productIdStr);
+          // Note: existence check for product is handled inside FiberFacade/FiberService
           // consistency
         }
         fiberCategoryId = UUID.fromString(fiberCategoryIdStr);
         fiberIsoCodeId = UUID.fromString(fiberIsoCodeIdStr);
       } catch (IllegalArgumentException e) {
-        return "❌ Invalid UUID format for materialId, fiberCategoryId, or fiberIsoCodeId.";
+        return "❌ Invalid UUID format for productId, fiberCategoryId, or fiberIsoCodeId.";
       }
 
       String remarks = (String) parameters.get("remarks");
@@ -258,7 +258,7 @@ public class FiberAIToolProvider implements AIToolProvider {
 
       CreateFiberRequest request =
           CreateFiberRequest.builder()
-              .materialId(materialId)
+              .productId(productId)
               .unit(unit)
               .fiberCategoryId(fiberCategoryId)
               .fiberIsoCodeId(fiberIsoCodeId)

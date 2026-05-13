@@ -9,8 +9,8 @@ import com.fabricmanagement.production.execution.batch.dto.AddBatchAttributeRequ
 import com.fabricmanagement.production.execution.batch.dto.BatchAttributeDto;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchAttributeRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
-import com.fabricmanagement.production.masterdata.material.domain.reference.MaterialAttribute;
-import com.fabricmanagement.production.masterdata.material.infra.repository.MaterialAttributeRepository;
+import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
+import com.fabricmanagement.production.masterdata.product.infra.repository.ProductAttributeRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ public class BatchAttributeService {
 
   private final BatchAttributeRepository attributeRepository;
   private final BatchRepository batchRepository;
-  private final MaterialAttributeRepository materialAttributeRepository;
+  private final ProductAttributeRepository productAttributeRepository;
 
   @Transactional(readOnly = true)
   public List<BatchAttributeDto> findByBatchId(UUID batchId) {
@@ -49,8 +49,8 @@ public class BatchAttributeService {
             .findByIdAndTenantId(batchId, tenantId)
             .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
 
-    MaterialAttribute attribute =
-        materialAttributeRepository
+    ProductAttribute attribute =
+        productAttributeRepository
             .findById(request.attributeId())
             .filter(
                 a ->

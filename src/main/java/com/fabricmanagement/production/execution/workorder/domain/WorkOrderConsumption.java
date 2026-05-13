@@ -2,7 +2,7 @@ package com.fabricmanagement.production.execution.workorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,9 +22,9 @@ import lombok.NoArgsConstructor;
 /**
  * Represents the physical consumption of a StockUnit for a specific WorkOrder.
  *
- * <p>This entity is created when an operator scans a barcode on the shop floor and consumes
- * material from a specific physical unit (bale, bobbin, roll). It links the logical production
- * requirement (WorkOrder) to the physical inventory (StockUnit).
+ * <p>This entity is created when an operator scans a barcode on the shop floor and consumes product
+ * from a specific physical unit (bale, bobbin, roll). It links the logical production requirement
+ * (WorkOrder) to the physical inventory (StockUnit).
  */
 @Entity
 @Table(
@@ -66,12 +66,12 @@ public class WorkOrderConsumption extends BaseEntity {
   private String batchCode;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "material_type", nullable = false, length = 30)
-  private MaterialType materialType;
+  @Column(name = "product_type", nullable = false, length = 30)
+  private ProductType productType;
 
-  /** Denormalized from Batch.materialId — used by the cost engine for per-material price lookup. */
-  @Column(name = "material_id")
-  private UUID materialId;
+  /** Denormalized from Batch.productId — used by the cost engine for per-product price lookup. */
+  @Column(name = "product_id")
+  private UUID productId;
 
   @Column(name = "consumed_weight", nullable = false, precision = 15, scale = 3)
   private BigDecimal consumedWeight;
@@ -98,7 +98,7 @@ public class WorkOrderConsumption extends BaseEntity {
    * @param batchId Denormalized batch ID
    * @param barcode Denormalized barcode
    * @param batchCode Denormalized batch code
-   * @param materialType Material type
+   * @param productType Product type
    * @param consumedWeight Exact weight consumed (must be positive)
    * @param unit Unit of measure
    * @param qualityGradeId Quality grade snapshot at time of consumption
@@ -112,8 +112,8 @@ public class WorkOrderConsumption extends BaseEntity {
       UUID batchId,
       String barcode,
       String batchCode,
-      MaterialType materialType,
-      UUID materialId,
+      ProductType productType,
+      UUID productId,
       BigDecimal consumedWeight,
       String unit,
       UUID qualityGradeId,
@@ -128,8 +128,8 @@ public class WorkOrderConsumption extends BaseEntity {
     if (barcode == null || barcode.isBlank() || batchCode == null || batchCode.isBlank()) {
       throw new WorkOrderDomainException("barcode and batchCode are required.");
     }
-    if (materialType == null || unit == null || unit.isBlank() || consumedBy == null) {
-      throw new WorkOrderDomainException("materialType, unit, and consumedBy are required.");
+    if (productType == null || unit == null || unit.isBlank() || consumedBy == null) {
+      throw new WorkOrderDomainException("productType, unit, and consumedBy are required.");
     }
 
     WorkOrderConsumption consumption =
@@ -139,8 +139,8 @@ public class WorkOrderConsumption extends BaseEntity {
             .batchId(batchId)
             .barcode(barcode)
             .batchCode(batchCode)
-            .materialType(materialType)
-            .materialId(materialId)
+            .productType(productType)
+            .productId(productId)
             .consumedWeight(consumedWeight)
             .unit(unit)
             .qualityGradeId(qualityGradeId)

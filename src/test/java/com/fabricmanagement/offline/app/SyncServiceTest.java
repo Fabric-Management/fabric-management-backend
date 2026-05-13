@@ -32,7 +32,7 @@ class SyncServiceTest {
   @BeforeEach
   void setUp() {
     lenient().when(pushHandler1.supportedEntityType()).thenReturn("TASK");
-    lenient().when(pushHandler2.supportedEntityType()).thenReturn("MATERIAL_MOVE");
+    lenient().when(pushHandler2.supportedEntityType()).thenReturn("PRODUCT_MOVE");
 
     syncService =
         new SyncService(List.of(dataProvider1, dataProvider2), List.of(pushHandler1, pushHandler2));
@@ -99,12 +99,12 @@ class SyncServiceTest {
     // Arrange
     UUID tenantId = UUID.randomUUID();
     SyncPullRequest request = new SyncPullRequest();
-    request.setEntityTypes("TASK,MATERIAL_MOVE"); // matches both providers
+    request.setEntityTypes("TASK,PRODUCT_MOVE"); // matches both providers
     request.setLimit(10);
     request.setLastSyncTimestamp(null);
 
     when(dataProvider1.entityType()).thenReturn("TASK");
-    when(dataProvider2.entityType()).thenReturn("MATERIAL_MOVE");
+    when(dataProvider2.entityType()).thenReturn("PRODUCT_MOVE");
 
     List<Object> mockTasks = List.of(new Object(), new Object());
     doReturn(mockTasks).when(dataProvider1).pullData(tenantId, null, 10);
@@ -116,7 +116,7 @@ class SyncServiceTest {
     // Assert
     assertThat(response.getUpdates()).containsEntry("TASK", mockTasks);
     assertThat(response.getUpdates())
-        .doesNotContainKey("MATERIAL_MOVE"); // No data returned -> not in map
+        .doesNotContainKey("PRODUCT_MOVE"); // No data returned -> not in map
     verify(dataProvider1).pullData(tenantId, null, 10);
     verify(dataProvider2).pullData(tenantId, null, 10);
   }
@@ -126,10 +126,10 @@ class SyncServiceTest {
     // Arrange
     UUID tenantId = UUID.randomUUID();
     SyncPullRequest request = new SyncPullRequest();
-    request.setEntityTypes("TASK,MATERIAL_MOVE");
+    request.setEntityTypes("TASK,PRODUCT_MOVE");
 
     when(dataProvider1.entityType()).thenReturn("TASK");
-    when(dataProvider2.entityType()).thenReturn("MATERIAL_MOVE");
+    when(dataProvider2.entityType()).thenReturn("PRODUCT_MOVE");
 
     when(dataProvider1.pullData(any(), any(), anyInt()))
         .thenThrow(new RuntimeException("DB Timeout"));
@@ -141,7 +141,7 @@ class SyncServiceTest {
 
     // Assert
     assertThat(response.getUpdates()).doesNotContainKey("TASK");
-    assertThat(response.getUpdates()).containsEntry("MATERIAL_MOVE", mockMoves);
+    assertThat(response.getUpdates()).containsEntry("PRODUCT_MOVE", mockMoves);
   }
 
   @Test
@@ -152,7 +152,7 @@ class SyncServiceTest {
     // Empty entityTypes
 
     when(dataProvider1.entityType()).thenReturn("TASK");
-    when(dataProvider2.entityType()).thenReturn("MATERIAL_MOVE");
+    when(dataProvider2.entityType()).thenReturn("PRODUCT_MOVE");
 
     // Act
     syncService.processPull(tenantId, request);

@@ -34,14 +34,14 @@ public class SupplierQuoteController {
   private final SupplierQuoteService quoteService;
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get supplier quote by ID")
   public ResponseEntity<ApiResponse<SupplierQuoteResponse>> getQuote(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(quoteService.getQuoteById(id)));
   }
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "List supplier quotes with pagination and filters")
   public ResponseEntity<ApiResponse<PagedResponse<SupplierQuoteResponse>>> listQuotes(
       @RequestParam(required = false) SupplierQuoteStatus status,
@@ -53,7 +53,7 @@ public class SupplierQuoteController {
   }
 
   @GetMapping("/by-rfq/{rfqId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "List all quotes for a specific RFQ")
   public ResponseEntity<ApiResponse<List<SupplierQuoteResponse>>> getQuotesByRfq(
       @PathVariable UUID rfqId) {
@@ -61,7 +61,7 @@ public class SupplierQuoteController {
   }
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Create a new supplier quote")
   public ResponseEntity<ApiResponse<SupplierQuoteResponse>> createQuote(
       @Valid @RequestBody CreateSupplierQuoteRequest req) {
@@ -72,7 +72,7 @@ public class SupplierQuoteController {
   }
 
   @PostMapping("/{quoteId}/lines")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Add a line to a supplier quote")
   public ResponseEntity<ApiResponse<SupplierQuoteResponse>> addLine(
       @PathVariable UUID quoteId, @Valid @RequestBody AddQuoteLineRequest req) {
@@ -83,7 +83,7 @@ public class SupplierQuoteController {
   }
 
   @PostMapping("/{quoteId}/review")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Start review process for a supplier quote")
   public ResponseEntity<ApiResponse<SupplierQuoteResponse>> startReview(
       @PathVariable UUID quoteId) {
@@ -92,7 +92,7 @@ public class SupplierQuoteController {
   }
 
   @PostMapping("/{quoteId}/accept")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Accept a supplier quote and auto-reject siblings")
   public ResponseEntity<ApiResponse<SupplierQuoteResponse>> acceptQuote(
       @PathVariable UUID quoteId) {
@@ -101,7 +101,7 @@ public class SupplierQuoteController {
   }
 
   @PostMapping("/{quoteId}/reject")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Reject a supplier quote")
   public ResponseEntity<ApiResponse<SupplierQuoteResponse>> rejectQuote(
       @PathVariable UUID quoteId) {

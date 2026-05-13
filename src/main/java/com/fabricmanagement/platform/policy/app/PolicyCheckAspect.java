@@ -33,9 +33,9 @@ import org.springframework.stereotype.Component;
  * <p>Just annotate controller methods:
  *
  * <pre>{@code
- * @PostMapping("/materials")
- * @PolicyCheck(resource="fabric.material", action="create", featureId="production.material.create")
- * public ResponseEntity<?> createMaterial(...) {
+ * @PostMapping("/products")
+ * @PolicyCheck(resource="fabric.product", action="create", featureId="production.product.create")
+ * public ResponseEntity<?> createProduct(...) {
  *     // Automatically protected!
  * }
  * }</pre>

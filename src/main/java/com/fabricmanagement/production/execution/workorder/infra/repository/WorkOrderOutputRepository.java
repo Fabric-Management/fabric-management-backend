@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.infra.repository;
 
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderOutput;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -36,26 +36,26 @@ public interface WorkOrderOutputRepository extends JpaRepository<WorkOrderOutput
       @Param("tenantId") UUID tenantId, @Param("workOrderId") UUID workOrderId);
 
   /**
-   * Returns per-materialType aggregated output stats for a WorkOrder. DB does the GROUP BY — no
+   * Returns per-productType aggregated output stats for a WorkOrder. DB does the GROUP BY — no
    * in-memory aggregation needed.
    */
   @Query(
       """
-      SELECT o.materialType        AS materialType,
+      SELECT o.productType        AS productType,
              SUM(o.outputWeight)   AS totalWeight,
              COUNT(o.id)           AS recordCount
       FROM WorkOrderOutput o
       WHERE o.tenantId    = :tenantId
         AND o.workOrderId = :workOrderId
         AND o.isActive    = true
-      GROUP BY o.materialType
+      GROUP BY o.productType
       """)
-  List<MaterialTypeAggregation> aggregateByMaterialType(
+  List<ProductTypeAggregation> aggregateByProductType(
       @Param("tenantId") UUID tenantId, @Param("workOrderId") UUID workOrderId);
 
-  /** Projection for aggregated output per material type. */
-  interface MaterialTypeAggregation {
-    MaterialType getMaterialType();
+  /** Projection for aggregated output per product type. */
+  interface ProductTypeAggregation {
+    ProductType getProductType();
 
     BigDecimal getTotalWeight();
 

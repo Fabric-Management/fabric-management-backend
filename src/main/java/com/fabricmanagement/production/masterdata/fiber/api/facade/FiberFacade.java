@@ -25,12 +25,12 @@ public interface FiberFacade {
   Optional<FiberDto> findById(UUID id);
 
   /**
-   * Find fiber by material ID.
+   * Find fiber by product ID.
    *
-   * @param materialId Material ID
+   * @param productId Product ID
    * @return Fiber DTO if found
    */
-  Optional<FiberDto> findByMaterialId(UUID materialId);
+  Optional<FiberDto> findByProductId(UUID productId);
 
   /**
    * Find all fibers for current tenant.
@@ -72,11 +72,11 @@ public interface FiberFacade {
   List<FiberCategoryDto> listActiveCategories();
 
   /**
-   * Find fibers by multiple material IDs (batch lookup). Includes both tenant-specific and global
-   * system fibers. Primarily used for cross-reference searches in the material module.
+   * Find fibers by multiple product IDs (batch lookup). Includes both tenant-specific and global
+   * system fibers. Primarily used for cross-reference searches in the product module.
    *
-   * @param materialIds Collection of material IDs to search
+   * @param productIds Collection of product IDs to search
    * @return Matching fibers as DTOs
    */
-  List<FiberDto> findByMaterialIds(java.util.Collection<java.util.UUID> materialIds);
+  List<FiberDto> findByProductIds(java.util.Collection<java.util.UUID> productIds);
 }

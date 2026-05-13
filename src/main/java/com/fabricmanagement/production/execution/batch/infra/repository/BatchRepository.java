@@ -3,7 +3,7 @@ package com.fabricmanagement.production.execution.batch.infra.repository;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -18,8 +18,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Spring Data JPA repository for the universal {@link Batch} entity.
  *
- * <p>Provides tenant-scoped and material-type-scoped queries for batch lookup and listing. Use
- * derived query methods for filtering by materialId, materialType, batchCode, or status.
+ * <p>Provides tenant-scoped and product-type-scoped queries for batch lookup and listing. Use
+ * derived query methods for filtering by productId, productType, batchCode, or status.
  */
 @Repository
 public interface BatchRepository extends JpaRepository<Batch, UUID> {
@@ -36,9 +36,9 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
   Optional<Batch> findByIdAndTenantIdForUpdate(
       @Param("id") UUID id, @Param("tenantId") UUID tenantId);
 
-  List<Batch> findByTenantIdAndMaterialId(UUID tenantId, UUID materialId);
+  List<Batch> findByTenantIdAndProductId(UUID tenantId, UUID productId);
 
-  List<Batch> findByTenantIdAndMaterialIdAndIsActiveTrue(UUID tenantId, UUID materialId);
+  List<Batch> findByTenantIdAndProductIdAndIsActiveTrue(UUID tenantId, UUID productId);
 
   Optional<Batch> findByTenantIdAndBatchCode(UUID tenantId, String batchCode);
 
@@ -46,7 +46,7 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
   /**
    * Find the first output batch produced by a specific source (e.g., WorkOrder). Used for cost
-   * calculation to determine output material and module type.
+   * calculation to determine output product and module type.
    */
   Optional<Batch> findFirstByTenantIdAndSourceIdAndSourceType(
       UUID tenantId, UUID sourceId, BatchSourceType sourceType);
@@ -58,20 +58,20 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
   List<Batch> findByTenantIdAndStatusIn(UUID tenantId, Collection<BatchStatus> statuses);
 
-  List<Batch> findByTenantIdAndMaterialIdAndStatusIn(
-      UUID tenantId, UUID materialId, Collection<BatchStatus> statuses);
+  List<Batch> findByTenantIdAndProductIdAndStatusIn(
+      UUID tenantId, UUID productId, Collection<BatchStatus> statuses);
 
   /**
-   * Find all batches for a given material (any tenant). Prefer tenant-scoped {@link
-   * #findByTenantIdAndMaterialId(UUID, UUID)} in multi-tenant contexts.
+   * Find all batches for a given product (any tenant). Prefer tenant-scoped {@link
+   * #findByTenantIdAndProductId(UUID, UUID)} in multi-tenant contexts.
    */
-  List<Batch> findAllByMaterialId(UUID materialId);
+  List<Batch> findAllByProductId(UUID productId);
 
   /**
-   * Find all batches of a given material type (e.g. FIBER, YARN). Prefer tenant-scoped queries when
+   * Find all batches of a given product type (e.g. FIBER, YARN). Prefer tenant-scoped queries when
    * tenant context is available.
    */
-  List<Batch> findAllByMaterialType(MaterialType materialType);
+  List<Batch> findAllByProductType(ProductType productType);
 
   /**
    * Find a batch by its unique batch code. In multi-tenant systems prefer {@link
@@ -92,9 +92,9 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
    * BatchStatus.PRODUCTION_ACTIVE} — i.e. the fiber still has batches in RESERVED or IN_PROGRESS
    * state on the production floor.
    *
-   * <p>This query is index-friendly: {@code (tenant_id, material_id, status)} and returns as soon
-   * as one matching row is found.
+   * <p>This query is index-friendly: {@code (tenant_id, product_id, status)} and returns as soon as
+   * one matching row is found.
    */
-  boolean existsByTenantIdAndMaterialIdAndStatusIn(
-      UUID tenantId, UUID materialId, Collection<BatchStatus> statuses);
+  boolean existsByTenantIdAndProductIdAndStatusIn(
+      UUID tenantId, UUID productId, Collection<BatchStatus> statuses);
 }

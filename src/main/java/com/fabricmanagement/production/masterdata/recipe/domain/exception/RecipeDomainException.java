@@ -9,7 +9,7 @@ import com.fabricmanagement.production.common.exception.ProductionDomainExceptio
  * Examples:
  *
  * <ul>
- *   <li>Recipe references a deactivated fiber or material
+ *   <li>Recipe references a deactivated fiber or product
  *   <li>Total composition weight or percentage is out of valid range
  *   <li>Recipe version conflict (concurrent edits)
  *   <li>A recipe used in an active production order cannot be modified

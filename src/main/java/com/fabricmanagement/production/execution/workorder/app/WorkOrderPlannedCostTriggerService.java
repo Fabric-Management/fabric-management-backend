@@ -47,7 +47,7 @@ public class WorkOrderPlannedCostTriggerService {
    * <ol>
    *   <li>WorkOrder must exist and belong to the current tenant
    *   <li>WorkOrder must be in APPROVED or later status (not DRAFT/PENDING_APPROVAL)
-   *   <li>WorkOrder must have {@code outputMaterialId} and {@code moduleType} set
+   *   <li>WorkOrder must have {@code outputProductId} and {@code moduleType} set
    * </ol>
    *
    * @param workOrderId the WorkOrder to compute planned cost for
@@ -76,11 +76,11 @@ public class WorkOrderPlannedCostTriggerService {
           "WorkOrder " + workOrderId + " missing moduleType — cannot compute planned cost.");
     }
 
-    if (workOrder.getOutputMaterialId() == null) {
+    if (workOrder.getOutputProductId() == null) {
       throw new WorkOrderDomainException(
           "WorkOrder "
               + workOrderId
-              + " missing outputMaterialId — cannot compute planned cost. "
+              + " missing outputProductId — cannot compute planned cost. "
               + "This may be a pre-Sprint 12 WorkOrder without enrichment data.");
     }
 
@@ -90,7 +90,7 @@ public class WorkOrderPlannedCostTriggerService {
         tenantId,
         workOrderId,
         workOrder.getModuleType(),
-        workOrder.getOutputMaterialId(),
+        workOrder.getOutputProductId(),
         workOrder.getPlannedQty(),
         workOrder.getTradingPartnerId());
 

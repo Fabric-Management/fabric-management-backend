@@ -14,7 +14,7 @@ import com.fabricmanagement.production.execution.lineage.domain.rule.BatchAttrib
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceAction;
 import com.fabricmanagement.production.execution.lineage.domain.rule.InheritanceRule;
 import com.fabricmanagement.production.execution.lineage.infra.configuration.AttributeInheritanceSchemaLoader;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -83,12 +83,12 @@ class FiberToYarnInheritanceTest {
                 null,
                 InheritanceAction.DROP,
                 "Bale moisture is irrelevant at yarn stage."));
-    return new AttributeInheritanceSchema(MaterialType.FIBER, MaterialType.YARN, rules);
+    return new AttributeInheritanceSchema(ProductType.FIBER, ProductType.YARN, rules);
   }
 
   @BeforeEach
   void setUp() {
-    when(schemaLoader.getSchema(eq(MaterialType.FIBER), eq(MaterialType.YARN)))
+    when(schemaLoader.getSchema(eq(ProductType.FIBER), eq(ProductType.YARN)))
         .thenReturn(Optional.of(fiberToYarnSchema()));
     engine = new BatchAttributeInheritanceEngine(schemaLoader);
 
@@ -129,7 +129,7 @@ class FiberToYarnInheritanceTest {
   void weightedAverageMicronaire_isCorrect() {
     Map<String, Object> result =
         engine.resolveInheritedAttributes(
-            List.of(batchA, batchB), MaterialType.FIBER, MaterialType.YARN);
+            List.of(batchA, batchB), ProductType.FIBER, ProductType.YARN);
 
     Object value = result.get("fiber_micronaire");
     assertInstanceOf(BigDecimal.class, value);
@@ -141,7 +141,7 @@ class FiberToYarnInheritanceTest {
   void minimumStapleLength_isCorrect() {
     Map<String, Object> result =
         engine.resolveInheritedAttributes(
-            List.of(batchA, batchB), MaterialType.FIBER, MaterialType.YARN);
+            List.of(batchA, batchB), ProductType.FIBER, ProductType.YARN);
 
     Object value = result.get("fiber_staple_length");
     assertInstanceOf(BigDecimal.class, value);
@@ -153,7 +153,7 @@ class FiberToYarnInheritanceTest {
   void requireEqual_grade_passes() {
     Map<String, Object> result =
         engine.resolveInheritedAttributes(
-            List.of(batchA, batchB), MaterialType.FIBER, MaterialType.YARN);
+            List.of(batchA, batchB), ProductType.FIBER, ProductType.YARN);
 
     assertEquals("A", result.get("raw_fiber_grade"));
   }
@@ -163,7 +163,7 @@ class FiberToYarnInheritanceTest {
   void collectToArray_certNumbers_isCorrect() {
     Map<String, Object> result =
         engine.resolveInheritedAttributes(
-            List.of(batchA, batchB), MaterialType.FIBER, MaterialType.YARN);
+            List.of(batchA, batchB), ProductType.FIBER, ProductType.YARN);
 
     Object value = result.get("fiber_organic_cert_no");
     assertInstanceOf(List.class, value);
@@ -179,7 +179,7 @@ class FiberToYarnInheritanceTest {
   void drop_baleMoisture_isAbsent() {
     Map<String, Object> result =
         engine.resolveInheritedAttributes(
-            List.of(batchA, batchB), MaterialType.FIBER, MaterialType.YARN);
+            List.of(batchA, batchB), ProductType.FIBER, ProductType.YARN);
 
     assertFalse(result.containsKey("bale_moisture"));
   }
@@ -195,7 +195,7 @@ class FiberToYarnInheritanceTest {
             BatchDomainException.class,
             () ->
                 engine.resolveInheritedAttributes(
-                    List.of(batchA, batchC), MaterialType.FIBER, MaterialType.YARN));
+                    List.of(batchA, batchC), ProductType.FIBER, ProductType.YARN));
 
     assertTrue(
         ex.getMessage().contains("fiber_shade"), "Exception message should mention fiber_shade");

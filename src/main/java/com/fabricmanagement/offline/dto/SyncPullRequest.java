@@ -17,8 +17,8 @@ public class SyncPullRequest {
   private Instant lastSyncTimestamp;
 
   /**
-   * Comma-separated list of entity types to pull (e.g. "TRADING_PARTNER,PRODUCT_CATALOG"). If null
-   * or empty, all supported entity types are pulled.
+   * Comma-separated list of entity types to pull (e.g. "TRADING_PARTNER,SALES_PRODUCT"). If null or
+   * empty, all supported entity types are pulled.
    */
   private String entityTypes;
 

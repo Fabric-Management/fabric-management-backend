@@ -21,13 +21,13 @@ import org.mapstruct.ReportingPolicy;
  *
  * <pre>{@code
  * @Mapper(config = MapStructConfig.class)
- * public interface MaterialMapper {
- *     MaterialDto toDto(Material entity);
- *     Material toEntity(CreateMaterialRequest request);
+ * public interface ProductMapper {
+ *     ProductDto toDto(Product entity);
+ *     Product toEntity(CreateProductRequest request);
  *
  *     @Mapping(target = "id", ignore = true)
  *     @Mapping(target = "tenantId", ignore = true)
- *     void updateEntity(@MappingTarget Material entity, UpdateMaterialRequest request);
+ *     void updateEntity(@MappingTarget Product entity, UpdateProductRequest request);
  * }
  * }</pre>
  *

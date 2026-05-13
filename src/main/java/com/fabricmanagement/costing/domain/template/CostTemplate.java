@@ -16,7 +16,7 @@ import org.hibernate.annotations.Type;
  * example:
  *
  * <pre>
- * [{"costItemCode": "RAW_MATERIAL", "weight": 0.60, "isIncluded": true},
+ * [{"costItemCode": "RAW_PRODUCT", "weight": 0.60, "isIncluded": true},
  *  {"costItemCode": "OVERHEAD",     "weight": 0.12, "isIncluded": true}]
  * </pre>
  */

@@ -47,13 +47,13 @@ public class FiberController {
       @Valid @RequestBody CreateFiberRequest request) {
     boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
     log.info(
-        "Creating {} fiber: name={}, materialId={}, unit={}",
+        "Creating {} fiber: name={}, productId={}, unit={}",
         isBlended ? "blended" : "pure",
         request.getFiberName(),
-        request.getMaterialId(),
+        request.getProductId(),
         request.getUnit());
 
-    // USER-FRIENDLY: Material will be auto-created if materialId is null
+    // USER-FRIENDLY: Product will be auto-created if productId is null
     // Unified endpoint: composition field determines if pure or blended
     // - Pure fiber: composition is null or empty
     // - Blended fiber: composition contains base fiber IDs with percentages
@@ -77,17 +77,16 @@ public class FiberController {
                 .orElseThrow(() -> new EntityNotFoundException("Fiber not found: " + id))));
   }
 
-  @GetMapping("/material/{materialId}")
+  @GetMapping("/product/{productId}")
   @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
-  public ResponseEntity<ApiResponse<FiberDto>> getFiberByMaterial(@PathVariable UUID materialId) {
+  public ResponseEntity<ApiResponse<FiberDto>> getFiberByProduct(@PathVariable UUID productId) {
     return ResponseEntity.ok(
         ApiResponse.success(
             fiberService
-                .getByMaterialId(materialId)
+                .getByProductId(productId)
                 .orElseThrow(
                     () ->
-                        new EntityNotFoundException(
-                            "Fiber not found for material: " + materialId))));
+                        new EntityNotFoundException("Fiber not found for product: " + productId))));
   }
 
   @GetMapping

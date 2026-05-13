@@ -53,7 +53,7 @@ public class CreatePurchaseOrderRequest {
   public static class PurchaseOrderLineRequest {
 
     private UUID rfqLineId;
-    private UUID materialId;
+    private UUID productId;
     private String productDesc;
 
     @NotNull(message = "Quantity is required")

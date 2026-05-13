@@ -39,7 +39,7 @@ public class ShipmentController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Create a new shipment")
   public ResponseEntity<ApiResponse<ShipmentDto>> createShipment(
       @Valid @RequestBody CreateShipmentRequest request) {
@@ -48,7 +48,7 @@ public class ShipmentController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get shipment by ID")
   public ResponseEntity<ApiResponse<ShipmentDto>> getShipment(@PathVariable UUID id) {
     return ResponseEntity.ok(
@@ -59,7 +59,7 @@ public class ShipmentController {
   }
 
   @GetMapping("/tracking/{trackingNumber}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get shipment by tracking number")
   public ResponseEntity<ApiResponse<ShipmentDto>> getShipmentByTracking(
       @PathVariable String trackingNumber) {
@@ -72,7 +72,7 @@ public class ShipmentController {
   }
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get all shipments (paginated)")
   public ResponseEntity<ApiResponse<PagedResponse<ShipmentDto>>> getAllShipments(
       @PageableDefault(size = 20, sort = "shipDate") Pageable pageable) {
@@ -81,7 +81,7 @@ public class ShipmentController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Delete shipment (soft delete)")
   public ResponseEntity<ApiResponse<Void>> deleteShipment(@PathVariable UUID id) {
     shipmentService.deleteShipment(id);
@@ -93,7 +93,7 @@ public class ShipmentController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @GetMapping("/partner/{partnerId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get shipments by partner ID")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getShipmentsByPartner(
       @PathVariable UUID partnerId) {
@@ -101,7 +101,7 @@ public class ShipmentController {
   }
 
   @GetMapping("/partner/{partnerId}/in-transit")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get in-transit shipments by partner")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getInTransitByPartner(
       @PathVariable UUID partnerId) {
@@ -110,7 +110,7 @@ public class ShipmentController {
   }
 
   @GetMapping("/status/{status}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get shipments by status")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getShipmentsByStatus(
       @PathVariable ShipmentStatus status) {
@@ -118,42 +118,42 @@ public class ShipmentController {
   }
 
   @GetMapping("/in-transit")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get all in-transit shipments")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getInTransit() {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.findInTransit()));
   }
 
   @GetMapping("/pending")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get pending shipments (not yet dispatched)")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getPendingShipments() {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.findPendingShipments()));
   }
 
   @GetMapping("/late")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get late shipments")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getLateShipments() {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.findLateShipments()));
   }
 
   @GetMapping("/outbound")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get outbound shipments")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getOutboundShipments() {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.findOutboundShipments()));
   }
 
   @GetMapping("/inbound")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get inbound shipments")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getInboundShipments() {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.findInboundShipments()));
   }
 
   @GetMapping("/order/{orderReference}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   @Operation(summary = "Get shipments by order reference")
   public ResponseEntity<ApiResponse<List<ShipmentDto>>> getShipmentsByOrder(
       @PathVariable String orderReference) {
@@ -166,21 +166,21 @@ public class ShipmentController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{id}/prepare")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Start preparing a shipment")
   public ResponseEntity<ApiResponse<ShipmentDto>> startPreparing(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.startPreparing(id)));
   }
 
   @PostMapping("/{id}/ready")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Mark shipment as ready for pickup")
   public ResponseEntity<ApiResponse<ShipmentDto>> markReady(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.markReady(id)));
   }
 
   @PostMapping("/{id}/pickup")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Record pickup by carrier")
   public ResponseEntity<ApiResponse<ShipmentDto>> recordPickup(
       @PathVariable UUID id,
@@ -191,21 +191,21 @@ public class ShipmentController {
   }
 
   @PostMapping("/{id}/in-transit")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Mark shipment as in transit")
   public ResponseEntity<ApiResponse<ShipmentDto>> markInTransit(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.markInTransit(id)));
   }
 
   @PostMapping("/{id}/out-for-delivery")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Mark shipment as out for delivery")
   public ResponseEntity<ApiResponse<ShipmentDto>> markOutForDelivery(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.markOutForDelivery(id)));
   }
 
   @PostMapping("/{id}/deliver")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Record delivery")
   public ResponseEntity<ApiResponse<ShipmentDto>> recordDelivery(
       @PathVariable UUID id,
@@ -216,7 +216,7 @@ public class ShipmentController {
   }
 
   @PostMapping("/{id}/delivery-failed")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Record delivery failure")
   public ResponseEntity<ApiResponse<ShipmentDto>> recordDeliveryFailure(
       @PathVariable UUID id, @RequestParam String reason) {
@@ -225,14 +225,14 @@ public class ShipmentController {
   }
 
   @PostMapping("/{id}/cancel")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Cancel a shipment")
   public ResponseEntity<ApiResponse<ShipmentDto>> cancelShipment(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(shipmentService.cancelShipment(id)));
   }
 
   @PutMapping("/{id}/tracking")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   @Operation(summary = "Update tracking info")
   public ResponseEntity<ApiResponse<ShipmentDto>> updateTracking(
       @PathVariable UUID id,

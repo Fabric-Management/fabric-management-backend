@@ -30,7 +30,7 @@ public class InventoryTransactionController {
   private final InventoryTransactionQueryService transactionQueryService;
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InventoryTransactionDto>>> getAll(
       @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
           Pageable pageable) {
@@ -39,7 +39,7 @@ public class InventoryTransactionController {
   }
 
   @GetMapping("/batch/{batchId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InventoryTransactionDto>>> getByBatch(
       @PathVariable UUID batchId,
       @PageableDefault(size = 20, sort = "transactionDate", direction = Sort.Direction.DESC)
@@ -50,7 +50,7 @@ public class InventoryTransactionController {
   }
 
   @GetMapping("/batch/{batchId}/type/{type}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InventoryTransactionDto>>> getByBatchAndType(
       @PathVariable UUID batchId,
       @PathVariable InventoryTransactionType type,
@@ -63,7 +63,7 @@ public class InventoryTransactionController {
   }
 
   @GetMapping("/reference/{referenceType}/{referenceId}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<java.util.List<InventoryTransactionDto>>> getByReference(
       @PathVariable String referenceType, @PathVariable UUID referenceId) {
     return ResponseEntity.ok(

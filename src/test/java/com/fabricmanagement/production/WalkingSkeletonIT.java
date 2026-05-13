@@ -27,7 +27,7 @@ import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
@@ -208,20 +208,20 @@ class WalkingSkeletonIT {
     // path).
     workOrderService.changeStatus(woReadyForProd.getId(), WorkOrderStatus.SENT);
 
-    // Batches must reference real prod_fiber rows (fk_exec_batch_material → prod_fiber.id).
+    // Batches must reference real prod_fiber rows (fk_exec_batch_product → prod_fiber.id).
     List<Fiber> seededFibers = fiberRepository.findByTenantIdAndIsActiveTrue(tenantId);
     assertThat(seededFibers)
         .as("R__001 fiber seeds for system tenant must be present")
         .hasSizeGreaterThanOrEqualTo(2);
     UUID fiberId1 = seededFibers.get(0).getId();
     UUID fiberId2 = seededFibers.get(1).getId();
-    // DB FK is prod_fiber only; output is typed YARN in domain while material_id stays a fiber PK.
-    UUID outputMaterialId = seededFibers.size() > 2 ? seededFibers.get(2).getId() : fiberId1;
+    // DB FK is prod_fiber only; output is typed YARN in domain while product_id stays a fiber PK.
+    UUID outputProductId = seededFibers.size() > 2 ? seededFibers.get(2).getId() : fiberId1;
 
     Batch rawBatch1 =
         Batch.builder()
-            .materialId(fiberId1)
-            .materialType(MaterialType.FIBER)
+            .productId(fiberId1)
+            .productType(ProductType.FIBER)
             .batchCode("RAW-FIBER1-" + System.currentTimeMillis() % 1000)
             .quantity(new BigDecimal("1000.00"))
             .unit("KG")
@@ -232,8 +232,8 @@ class WalkingSkeletonIT {
 
     Batch rawBatch2 =
         Batch.builder()
-            .materialId(fiberId2)
-            .materialType(MaterialType.FIBER)
+            .productId(fiberId2)
+            .productType(ProductType.FIBER)
             .batchCode("RAW-FIBER2-" + System.currentTimeMillis() % 1000)
             .quantity(new BigDecimal("1000.00"))
             .unit("KG")
@@ -265,8 +265,8 @@ class WalkingSkeletonIT {
 
     StartProductionRequest startProdReq =
         StartProductionRequest.builder()
-            .outputMaterialId(outputMaterialId)
-            .outputMaterialType(MaterialType.YARN)
+            .outputProductId(outputProductId)
+            .outputProductType(ProductType.YARN)
             .outputLocationId(outputLocationId)
             .consumptions(List.of(consumption1, consumption2))
             .remarks("Walking Skeleton Yield")
@@ -286,7 +286,7 @@ class WalkingSkeletonIT {
 
     assertThat(generatedBatches).hasSize(1);
     Batch outputBatch = generatedBatches.getFirst();
-    assertThat(outputBatch.getMaterialType()).isEqualTo(MaterialType.YARN);
+    assertThat(outputBatch.getProductType()).isEqualTo(ProductType.YARN);
     assertThat(outputBatch.getQuantity())
         .isEqualByComparingTo(new BigDecimal("1000.00")); // quantity based on plannedQty usually
   }

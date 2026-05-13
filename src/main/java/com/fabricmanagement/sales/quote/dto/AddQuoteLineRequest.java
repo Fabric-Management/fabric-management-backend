@@ -10,8 +10,8 @@ import lombok.Data;
 @Data
 public class AddQuoteLineRequest {
 
-  @NotNull(message = "Material ID is required")
-  private UUID materialId;
+  @NotNull(message = "Product ID is required")
+  private UUID productId;
 
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Requested quantity must be greater than zero")

@@ -15,10 +15,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Full cost report for a WorkOrder: PLANNED vs ACTUAL with per-material breakdown.
+ * Full cost report for a WorkOrder: PLANNED vs ACTUAL with per-product breakdown.
  *
  * <p>All nullable sections ({@code planned}, {@code actual}, {@code variance}, {@code
- * rawMaterialBreakdown}) are omitted from JSON when null — partial results are valid when only one
+ * rawProductBreakdown}) are omitted from JSON when null — partial results are valid when only one
  * stage has been calculated.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -27,7 +27,7 @@ public record WorkOrderCostReportResponse(
     CostStageDetail planned,
     CostStageDetail actual,
     VarianceSummary variance,
-    List<MaterialCostBreakdown> rawMaterialBreakdown) {
+    List<ProductCostBreakdown> rawProductBreakdown) {
 
   // ── Inner Records ────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ public record WorkOrderCostReportResponse(
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record CostLineDetail(
       String costItemCode,
-      UUID materialId,
+      UUID productId,
       BigDecimal qty,
       String unit,
       BigDecimal unitPrice,
@@ -85,7 +85,7 @@ public record WorkOrderCostReportResponse(
 
       return new CostLineDetail(
           line.getCostItemCode(),
-          line.getMaterialId(),
+          line.getProductId(),
           line.getQty(),
           line.getUnit(),
           line.getUnitPrice(),
@@ -126,12 +126,8 @@ public record WorkOrderCostReportResponse(
     }
   }
 
-  public record MaterialCostBreakdown(
-      UUID materialId,
-      BigDecimal totalCost,
-      BigDecimal totalWeight,
-      String unit,
-      String currency) {}
+  public record ProductCostBreakdown(
+      UUID productId, BigDecimal totalCost, BigDecimal totalWeight, String unit, String currency) {}
 
   // ── Factory ──────────────────────────────────────────────────
 
@@ -150,27 +146,27 @@ public record WorkOrderCostReportResponse(
     VarianceSummary variance =
         VarianceSummary.between(plannedOpt.orElse(null), actualOpt.orElse(null));
 
-    List<MaterialCostBreakdown> rawMaterialBreakdown =
-        actualOpt.map(WorkOrderCostReportResponse::buildMaterialBreakdown).orElse(null);
+    List<ProductCostBreakdown> rawProductBreakdown =
+        actualOpt.map(WorkOrderCostReportResponse::buildProductBreakdown).orElse(null);
 
     return new WorkOrderCostReportResponse(
-        workOrderId, plannedDetail, actualDetail, variance, rawMaterialBreakdown);
+        workOrderId, plannedDetail, actualDetail, variance, rawProductBreakdown);
   }
 
   /**
-   * Groups ACTUAL RAW_MATERIAL lines by materialId and aggregates cost + weight. Lines without
-   * materialId (legacy/non-raw-material) are excluded from breakdown.
+   * Groups ACTUAL RAW_PRODUCT lines by productId and aggregates cost + weight. Lines without
+   * productId (legacy/non-raw-product) are excluded from breakdown.
    */
-  private static List<MaterialCostBreakdown> buildMaterialBreakdown(CostCalculation actual) {
-    Map<UUID, List<CostCalculationLine>> byMaterial =
+  private static List<ProductCostBreakdown> buildProductBreakdown(CostCalculation actual) {
+    Map<UUID, List<CostCalculationLine>> byProduct =
         actual.getLines().stream()
-            .filter(l -> "RAW_MATERIAL".equals(l.getCostItemCode()))
-            .filter(l -> l.getMaterialId() != null)
-            .collect(Collectors.groupingBy(CostCalculationLine::getMaterialId));
+            .filter(l -> "RAW_PRODUCT".equals(l.getCostItemCode()))
+            .filter(l -> l.getProductId() != null)
+            .collect(Collectors.groupingBy(CostCalculationLine::getProductId));
 
-    if (byMaterial.isEmpty()) return null;
+    if (byProduct.isEmpty()) return null;
 
-    return byMaterial.entrySet().stream()
+    return byProduct.entrySet().stream()
         .map(
             entry -> {
               List<CostCalculationLine> lines = entry.getValue();
@@ -188,10 +184,10 @@ public record WorkOrderCostReportResponse(
                   lines.get(0).getConvertedTotal() != null
                       ? lines.get(0).getConvertedTotal().getConvertedCurrency()
                       : lines.get(0).getCurrency();
-              return new MaterialCostBreakdown(
+              return new ProductCostBreakdown(
                   entry.getKey(), totalCost, totalWeight, unit, currency);
             })
-        .sorted(Comparator.comparing(MaterialCostBreakdown::totalCost).reversed())
+        .sorted(Comparator.comparing(ProductCostBreakdown::totalCost).reversed())
         .toList();
   }
 }

@@ -23,7 +23,7 @@ import com.fabricmanagement.production.execution.workorder.domain.exception.Work
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -45,7 +45,7 @@ class WorkOrderCostRecalculationServiceTest {
   private static final UUID TENANT_ID = UUID.randomUUID();
   private static final UUID WORK_ORDER_ID = UUID.randomUUID();
   private static final UUID BATCH_ID = UUID.randomUUID();
-  private static final UUID MATERIAL_ID = UUID.randomUUID();
+  private static final UUID PRODUCT_ID = UUID.randomUUID();
   private static final UUID TRADING_PARTNER_ID = UUID.randomUUID();
 
   @Mock private WorkOrderCostEnginePort costEnginePort;
@@ -70,7 +70,7 @@ class WorkOrderCostRecalculationServiceTest {
         WorkOrder.builder()
             .workOrderNumber("WO-TEST-001")
             .status(WorkOrderStatus.COMPLETED)
-            .outputMaterialId(MATERIAL_ID)
+            .outputProductId(PRODUCT_ID)
             .moduleType(WorkOrderModuleType.SPINNING)
             .plannedQty(new BigDecimal("1000.000"))
             .actualQty(new BigDecimal("950.000"))
@@ -86,8 +86,8 @@ class WorkOrderCostRecalculationServiceTest {
   private Batch buildOutputBatch() {
     Batch batch =
         Batch.builder()
-            .materialId(MATERIAL_ID)
-            .materialType(MaterialType.YARN)
+            .productId(PRODUCT_ID)
+            .productType(ProductType.YARN)
             .sourceType(BatchSourceType.INTERNAL_PRODUCTION)
             .sourceId(WORK_ORDER_ID)
             .batchCode("BATCH-001")
@@ -98,7 +98,7 @@ class WorkOrderCostRecalculationServiceTest {
     return batch;
   }
 
-  private WorkOrderConsumption buildConsumption(UUID materialId) {
+  private WorkOrderConsumption buildConsumption(UUID productId) {
     return WorkOrderConsumption.record(
         TENANT_ID,
         WORK_ORDER_ID,
@@ -106,8 +106,8 @@ class WorkOrderCostRecalculationServiceTest {
         UUID.randomUUID(), // batchId
         "BARCODE-001",
         "BATCH-SRC-001",
-        MaterialType.FIBER,
-        materialId,
+        ProductType.FIBER,
+        productId,
         new BigDecimal("500.000"),
         "KG",
         null, // qualityGradeId
@@ -193,11 +193,11 @@ class WorkOrderCostRecalculationServiceTest {
     }
 
     @Test
-    @DisplayName("throws when consumptions exist but none have materialId (pre-Sprint 6)")
-    void throwsWhenConsumptionsLackMaterialId() {
+    @DisplayName("throws when consumptions exist but none have productId (pre-Sprint 6)")
+    void throwsWhenConsumptionsLackProductId() {
       WorkOrder wo = buildCompletedWorkOrder();
       Batch batch = buildOutputBatch();
-      WorkOrderConsumption consumptionWithoutMaterial = buildConsumption(null);
+      WorkOrderConsumption consumptionWithoutProduct = buildConsumption(null);
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
       when(batchRepository.findFirstByTenantIdAndSourceIdAndSourceType(
@@ -206,11 +206,11 @@ class WorkOrderCostRecalculationServiceTest {
       when(workOrderConsumptionRepository
               .findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
                   TENANT_ID, WORK_ORDER_ID))
-          .thenReturn(List.of(consumptionWithoutMaterial));
+          .thenReturn(List.of(consumptionWithoutProduct));
 
       assertThatThrownBy(() -> recalculationService.recalculateActualCost(WORK_ORDER_ID))
           .isInstanceOf(WorkOrderDomainException.class)
-          .hasMessageContaining("No consumption records with materialId found")
+          .hasMessageContaining("No consumption records with productId found")
           .hasMessageContaining("Sprint 6");
     }
   }
@@ -224,8 +224,8 @@ class WorkOrderCostRecalculationServiceTest {
     void computesActualCostAndWritesBack() {
       WorkOrder wo = buildCompletedWorkOrder();
       Batch batch = buildOutputBatch();
-      UUID consumptionMaterialId = UUID.randomUUID();
-      WorkOrderConsumption consumption = buildConsumption(consumptionMaterialId);
+      UUID consumptionProductId = UUID.randomUUID();
+      WorkOrderConsumption consumption = buildConsumption(consumptionProductId);
       BigDecimal computedCost = new BigDecimal("8500.000");
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
@@ -240,7 +240,7 @@ class WorkOrderCostRecalculationServiceTest {
               eq(TENANT_ID),
               eq(WORK_ORDER_ID),
               eq(WorkOrderModuleType.SPINNING),
-              eq(MATERIAL_ID),
+              eq(PRODUCT_ID),
               eq(wo.getActualQty()),
               eq(TRADING_PARTNER_ID),
               any()))
@@ -255,12 +255,12 @@ class WorkOrderCostRecalculationServiceTest {
     }
 
     @Test
-    @DisplayName("filters out consumptions without materialId and uses only valid ones")
-    void filtersConsumptionsWithoutMaterialId() {
+    @DisplayName("filters out consumptions without productId and uses only valid ones")
+    void filtersConsumptionsWithoutProductId() {
       WorkOrder wo = buildCompletedWorkOrder();
       Batch batch = buildOutputBatch();
-      UUID validMaterialId = UUID.randomUUID();
-      WorkOrderConsumption validConsumption = buildConsumption(validMaterialId);
+      UUID validProductId = UUID.randomUUID();
+      WorkOrderConsumption validConsumption = buildConsumption(validProductId);
       WorkOrderConsumption legacyConsumption = buildConsumption(null); // pre-Sprint 6
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));

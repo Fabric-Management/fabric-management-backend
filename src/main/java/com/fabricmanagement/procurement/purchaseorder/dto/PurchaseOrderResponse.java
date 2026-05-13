@@ -35,7 +35,7 @@ public class PurchaseOrderResponse {
   @Builder
   public static class PurchaseOrderLineResponse {
     UUID id;
-    UUID materialId;
+    UUID productId;
     String productDesc;
     BigDecimal qty;
     String unit;

@@ -10,6 +10,6 @@ import java.util.UUID;
 public record ComputePlannedCostRequest(
     @NotNull UUID workOrderId,
     @NotBlank String moduleType,
-    @NotNull UUID materialId,
+    @NotNull UUID productId,
     @NotNull @Positive BigDecimal plannedQuantityKg,
     UUID supplierId) {}

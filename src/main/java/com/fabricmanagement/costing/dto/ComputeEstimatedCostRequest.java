@@ -10,6 +10,6 @@ import java.util.UUID;
 public record ComputeEstimatedCostRequest(
     @NotNull UUID quoteId,
     @NotBlank String moduleType,
-    @NotNull UUID materialId,
+    @NotNull UUID productId,
     @NotNull @Positive BigDecimal totalQuantityKg,
     UUID tradingPartnerId) {}

@@ -68,7 +68,7 @@ public class FiberTestResult extends BaseEntity {
 
   // ── Extended measurements (textile-industry essentials) ────────────────────
 
-  /** Moisture / humidity percentage — critical for weight-based raw material pricing. */
+  /** Moisture / humidity percentage — critical for weight-based raw product pricing. */
   @Column(name = "moisture_percent")
   private Double moisturePercent;
 

@@ -16,20 +16,20 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
   Optional<Fiber> findByTenantIdAndId(UUID tenantId, UUID id);
 
   /**
-   * Find fiber by material ID.
+   * Find fiber by product ID.
    *
-   * <p>Uses material.id relationship since materialId field was replaced with @ManyToOne Material.
+   * <p>Uses product.id relationship since productId field was replaced with @ManyToOne Product.
    */
-  @Query("SELECT f FROM Fiber f WHERE f.material.id = :materialId")
-  Optional<Fiber> findByMaterialId(@Param("materialId") UUID materialId);
+  @Query("SELECT f FROM Fiber f WHERE f.product.id = :productId")
+  Optional<Fiber> findByProductId(@Param("productId") UUID productId);
 
   /**
-   * Find fibers by multiple material IDs (batch query for performance).
+   * Find fibers by multiple product IDs (batch query for performance).
    *
-   * <p>Used to optimize Material search when checking Fiber fiberName for multiple materials.
+   * <p>Used to optimize Product search when checking Fiber fiberName for multiple products.
    */
-  @Query("SELECT f FROM Fiber f WHERE f.material.id IN :materialIds")
-  List<Fiber> findByMaterialIdIn(@Param("materialIds") List<UUID> materialIds);
+  @Query("SELECT f FROM Fiber f WHERE f.product.id IN :productIds")
+  List<Fiber> findByProductIdIn(@Param("productIds") List<UUID> productIds);
 
   /** Find all active fibers for a tenant. */
   List<Fiber> findByTenantIdAndIsActiveTrue(UUID tenantId);
@@ -53,7 +53,7 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
   /** Find fibers by status. */
   List<Fiber> findByTenantIdAndStatusAndIsActiveTrue(UUID tenantId, FiberStatus status);
 
-  /** Find active fibers with material details. */
+  /** Find active fibers with product details. */
   @Query(
       "SELECT f FROM Fiber f "
           + "WHERE f.tenantId = :tenantId AND f.isActive = true "

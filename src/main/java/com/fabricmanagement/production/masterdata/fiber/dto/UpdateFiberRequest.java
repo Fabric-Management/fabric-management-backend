@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 /**
  * Request for updating an existing fiber.
  *
- * <p>Contains only mutable fields. Immutable fields like materialId, fiberCategoryId, and
+ * <p>Contains only mutable fields. Immutable fields like productId, fiberCategoryId, and
  * fiberIsoCodeId are excluded.
  */
 @Data

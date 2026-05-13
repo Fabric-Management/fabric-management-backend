@@ -10,7 +10,7 @@ import com.fabricmanagement.production.common.exception.ProductionDomainExceptio
  *
  * <ul>
  *   <li>{@link InsufficientWeightException} — consumption exceeds available weight
- *   <li>{@link InvalidPackageTypeException} — incompatible package/material type combination
+ *   <li>{@link InvalidPackageTypeException} — incompatible package/product type combination
  *   <li>{@link WeightReconciliationException} — Batch ↔ StockUnit weight sum mismatch
  * </ul>
  */

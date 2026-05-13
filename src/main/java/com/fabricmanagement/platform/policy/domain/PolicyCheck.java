@@ -13,9 +13,9 @@ import java.lang.annotation.Target;
  * <h2>Example:</h2>
  *
  * <pre>{@code
- * @PostMapping("/materials")
- * @PolicyCheck(resource="fabric.material", action="create")
- * public ResponseEntity<?> createMaterial(@RequestBody CreateMaterialRequest request) {
+ * @PostMapping("/products")
+ * @PolicyCheck(resource="fabric.product", action="create")
+ * public ResponseEntity<?> createProduct(@RequestBody CreateProductRequest request) {
  *     // Implementation
  * }
  * }</pre>
@@ -38,7 +38,7 @@ public @interface PolicyCheck {
    *
    * <p>Format: {domain}.{entity}
    *
-   * <p>Example: "fabric.material", "fabric.yarn", "logistics.inventory"
+   * <p>Example: "fabric.product", "fabric.yarn", "logistics.inventory"
    *
    * @return resource identifier
    */

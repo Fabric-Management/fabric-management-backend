@@ -11,7 +11,7 @@ import lombok.Data;
 public class CreateReservationRequest {
   @NotNull private UUID salesOrderLineId;
   @NotNull private UUID locationId;
-  @NotNull private UUID materialId;
+  @NotNull private UUID productId;
   @NotBlank private String lotNumber;
   private UUID goodsReceiptItemId;
   @NotNull @Positive private BigDecimal qtyReserved;

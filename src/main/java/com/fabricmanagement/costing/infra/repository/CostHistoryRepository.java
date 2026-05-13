@@ -15,11 +15,11 @@ public interface CostHistoryRepository extends JpaRepository<CostHistory, UUID> 
       SELECT ch FROM CostHistory ch
       WHERE ch.tenantId = :tenantId
         AND ch.costItemCode = :costItemCode
-        AND (:materialId IS NULL OR ch.materialId = :materialId)
+        AND (:productId IS NULL OR ch.productId = :productId)
       ORDER BY ch.validFrom DESC
       """)
   List<CostHistory> findHistory(
       @Param("tenantId") UUID tenantId,
       @Param("costItemCode") String costItemCode,
-      @Param("materialId") UUID materialId);
+      @Param("productId") UUID productId);
 }

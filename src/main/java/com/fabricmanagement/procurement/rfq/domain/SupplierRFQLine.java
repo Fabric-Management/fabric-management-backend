@@ -28,8 +28,8 @@ public class SupplierRFQLine extends BaseEntity {
   @Column(name = "rfq_id", nullable = false, insertable = false, updatable = false)
   private UUID rfqId;
 
-  @Column(name = "material_id")
-  private UUID materialId;
+  @Column(name = "product_id")
+  private UUID productId;
 
   @Column(name = "product_desc", columnDefinition = "TEXT")
   private String productDesc;

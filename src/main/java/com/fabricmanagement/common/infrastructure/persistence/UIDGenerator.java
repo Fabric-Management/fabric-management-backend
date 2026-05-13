@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  *
  * <ul>
  *   <li>{@code ACME-001-USER-00042} - User with sequence 42 in tenant ACME-001
- *   <li>{@code XYZ-002-MAT-05123} - Material with sequence 5123 in tenant XYZ-002
+ *   <li>{@code XYZ-002-MAT-05123} - Product with sequence 5123 in tenant XYZ-002
  *   <li>{@code CORP-003-INV-00891} - Invoice with sequence 891 in tenant CORP-003
  * </ul>
  *
@@ -30,18 +30,18 @@ import org.springframework.stereotype.Component;
  *
  * <pre>{@code
  * @Service
- * public class MaterialService {
+ * public class ProductService {
  *     private final UIDGenerator uidGenerator;
  *
- *     public Material create(CreateMaterialRequest request) {
- *         Material material = new Material();
- *         material.setName(request.getName());
+ *     public Product create(CreateProductRequest request) {
+ *         Product product = new Product();
+ *         product.setName(request.getName());
  *
  *         // Generate UID
- *         String uid = uidGenerator.generate("MAT", "material");
- *         material.setUid(uid);  // e.g., "ACME-001-MAT-00123"
+ *         String uid = uidGenerator.generate("MAT", "product");
+ *         product.setUid(uid);  // e.g., "ACME-001-MAT-00123"
  *
- *         return materialRepository.save(material);
+ *         return productRepository.save(product);
  *     }
  * }
  * }</pre>
@@ -60,8 +60,8 @@ public class UIDGenerator {
   /**
    * Generates a UID for an entity
    *
-   * @param moduleCode short module code (e.g., "MAT" for material, "USER" for user)
-   * @param entityType entity type (e.g., "material", "user", "invoice")
+   * @param moduleCode short module code (e.g., "MAT" for product, "USER" for user)
+   * @param entityType entity type (e.g., "product", "user", "invoice")
    * @return generated UID
    */
   public String generate(String moduleCode, String entityType) {

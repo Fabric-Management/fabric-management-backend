@@ -124,8 +124,8 @@ public class UserBehaviorLearner {
     if (normalized.contains("fiber") || normalized.contains("lif")) {
       return "FIBER_QUERY";
     }
-    if (normalized.contains("material") || normalized.contains("malzeme")) {
-      return "MATERIAL_QUERY";
+    if (normalized.contains("product") || normalized.contains("malzeme")) {
+      return "PRODUCT_QUERY";
     }
     if (normalized.contains("durum") || normalized.contains("status")) {
       return "STATUS_QUERY";

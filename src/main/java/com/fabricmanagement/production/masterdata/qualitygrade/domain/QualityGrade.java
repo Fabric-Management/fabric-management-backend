@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -18,11 +18,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * Tenant-specific quality grade definition for materials.
+ * Tenant-specific quality grade definition for products.
  *
- * <p>Each tenant can define their own quality grading system per {@link MaterialType}. Grades are
+ * <p>Each tenant can define their own quality grading system per {@link ProductType}. Grades are
  * ordered by {@code rank} (1 = best) and carry a {@code priceFactor} that adjusts the base price
- * for the material.
+ * for the product.
  *
  * <h2>Grade Demotion Rule</h2>
  *
@@ -46,7 +46,7 @@ import lombok.NoArgsConstructor;
  * FABRIC: 1A, 1B, 2, OFF, WST
  * </pre>
  *
- * @see MaterialType
+ * @see ProductType
  */
 @Entity
 @Table(
@@ -54,13 +54,13 @@ import lombok.NoArgsConstructor;
     schema = "production",
     uniqueConstraints = {
       @UniqueConstraint(
-          name = "uq_quality_grade_tenant_material_code",
-          columnNames = {"tenant_id", "material_type", "code"})
+          name = "uq_quality_grade_tenant_product_code",
+          columnNames = {"tenant_id", "product_type", "code"})
     },
     indexes = {
       @Index(
-          name = "idx_quality_grade_tenant_material_active",
-          columnList = "tenant_id, material_type, is_active")
+          name = "idx_quality_grade_tenant_product_active",
+          columnList = "tenant_id, product_type, is_active")
     })
 @Getter
 @Builder
@@ -68,10 +68,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class QualityGrade extends BaseEntity {
 
-  /** The material type this grade applies to (FIBER, YARN, FABRIC, etc.). */
+  /** The product type this grade applies to (FIBER, YARN, FABRIC, etc.). */
   @Enumerated(EnumType.STRING)
-  @Column(name = "material_type", nullable = false, length = 20)
-  private MaterialType materialType;
+  @Column(name = "product_type", nullable = false, length = 20)
+  private ProductType productType;
 
   /** Short code for this grade (e.g. "1A", "1B", "2", "OFF", "WST"). */
   @Column(name = "code", nullable = false, length = 10)
@@ -127,7 +127,7 @@ public class QualityGrade extends BaseEntity {
    * Creates a new QualityGrade with all required fields.
    *
    * @param tenantId tenant this grade belongs to
-   * @param materialType material type this grade applies to
+   * @param productType product type this grade applies to
    * @param code short unique code
    * @param name human-readable name
    * @param rank ordering rank (1 = best)
@@ -140,7 +140,7 @@ public class QualityGrade extends BaseEntity {
    */
   public static QualityGrade create(
       UUID tenantId,
-      MaterialType materialType,
+      ProductType productType,
       String code,
       String name,
       int rank,
@@ -152,8 +152,8 @@ public class QualityGrade extends BaseEntity {
     if (tenantId == null) {
       throw new IllegalArgumentException("QualityGrade tenantId must not be null");
     }
-    if (materialType == null) {
-      throw new IllegalArgumentException("QualityGrade materialType must not be null");
+    if (productType == null) {
+      throw new IllegalArgumentException("QualityGrade productType must not be null");
     }
     if (code == null || code.isBlank()) {
       throw new IllegalArgumentException("QualityGrade code must not be blank");
@@ -171,7 +171,7 @@ public class QualityGrade extends BaseEntity {
 
     QualityGrade grade =
         QualityGrade.builder()
-            .materialType(materialType)
+            .productType(productType)
             .code(code.toUpperCase().trim())
             .name(name.trim())
             .rank(rank)
@@ -237,7 +237,7 @@ public class QualityGrade extends BaseEntity {
   }
 
   /**
-   * Updates mutable fields. Code and materialType are immutable after creation (part of unique
+   * Updates mutable fields. Code and productType are immutable after creation (part of unique
    * constraint).
    */
   public void update(

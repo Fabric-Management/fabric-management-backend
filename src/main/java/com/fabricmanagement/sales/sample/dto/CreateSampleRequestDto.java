@@ -11,7 +11,7 @@ import lombok.Value;
 @Value
 public class CreateSampleRequestDto {
   @NotNull UUID customerId;
-  @NotNull UUID materialId;
+  @NotNull UUID productId;
 
   @NotNull
   @DecimalMin("0.0")

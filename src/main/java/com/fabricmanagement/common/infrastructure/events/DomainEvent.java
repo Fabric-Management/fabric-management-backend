@@ -13,14 +13,14 @@ import lombok.Getter;
  * <h2>Usage Example:</h2>
  *
  * <pre>{@code
- * public class MaterialCreatedEvent extends DomainEvent {
- *     private final UUID materialId;
- *     private final String materialName;
+ * public class ProductCreatedEvent extends DomainEvent {
+ *     private final UUID productId;
+ *     private final String productName;
  *
- *     public MaterialCreatedEvent(UUID tenantId, UUID materialId, String materialName) {
- *         super(tenantId, "MATERIAL_CREATED");
- *         this.materialId = materialId;
- *         this.materialName = materialName;
+ *     public ProductCreatedEvent(UUID tenantId, UUID productId, String productName) {
+ *         super(tenantId, "PRODUCT_CREATED");
+ *         this.productId = productId;
+ *         this.productName = productName;
  *     }
  * }
  * }</pre>

@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
-/** Code and materialType are immutable — not included here. */
+/** Code and productType are immutable — not included here. */
 public record UpdateQualityGradeRequest(
     @NotBlank @Size(max = 255) String name,
     @Min(1) int rank,

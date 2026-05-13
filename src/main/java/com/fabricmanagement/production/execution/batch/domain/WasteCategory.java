@@ -12,8 +12,8 @@ public enum WasteCategory {
   /** Waste due to machine fault or breakdown. */
   MACHINE_FAULT,
 
-  /** Waste due to raw material defect. */
-  RAW_MATERIAL_DEFECT,
+  /** Waste due to raw product defect. */
+  RAW_PRODUCT_DEFECT,
 
   /** Waste due to handling or transport damage. */
   HANDLING_DAMAGE,

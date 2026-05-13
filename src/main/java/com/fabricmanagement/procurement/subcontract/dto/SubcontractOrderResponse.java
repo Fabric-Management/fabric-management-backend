@@ -1,7 +1,7 @@
 package com.fabricmanagement.procurement.subcontract.dto;
 
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatus;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -17,11 +17,11 @@ public class SubcontractOrderResponse {
   UUID workOrderId;
   UUID tradingPartnerId;
   SubcontractOrderStatus status;
-  UUID inputMaterialId;
-  MaterialType inputMaterialType;
-  UUID outputMaterialId;
-  MaterialType outputMaterialType;
-  BigDecimal materialSentQty;
+  UUID inputProductId;
+  ProductType inputProductType;
+  UUID outputProductId;
+  ProductType outputProductType;
+  BigDecimal productSentQty;
   String unit;
   BigDecimal expectedOutputQty;
   String outputUnit;

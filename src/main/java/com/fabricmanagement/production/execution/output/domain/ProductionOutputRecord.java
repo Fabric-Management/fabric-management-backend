@@ -3,7 +3,7 @@ package com.fabricmanagement.production.execution.output.domain;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.common.exception.ProductionDomainException;
 import com.fabricmanagement.production.execution.output.domain.event.ProductionOutputConfirmedEvent;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,12 +37,12 @@ public class ProductionOutputRecord extends BaseEntity {
   @Column(name = "batch_id")
   private UUID batchId;
 
-  @Column(name = "output_material_id", nullable = false)
-  private UUID outputMaterialId;
+  @Column(name = "output_product_id", nullable = false)
+  private UUID outputProductId;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "output_material_type", nullable = false, length = 30)
-  private MaterialType outputMaterialType;
+  @Column(name = "output_product_type", nullable = false, length = 30)
+  private ProductType outputProductType;
 
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
@@ -79,8 +79,8 @@ public class ProductionOutputRecord extends BaseEntity {
       UUID workOrderId,
       String workOrderNumber,
       UUID batchId,
-      UUID outputMaterialId,
-      MaterialType outputMaterialType,
+      UUID outputProductId,
+      ProductType outputProductType,
       String unit,
       String notes) {
     ProductionOutputRecord record = new ProductionOutputRecord();
@@ -88,8 +88,8 @@ public class ProductionOutputRecord extends BaseEntity {
     record.setWorkOrderId(workOrderId);
     record.setWorkOrderNumber(workOrderNumber);
     record.setBatchId(batchId);
-    record.setOutputMaterialId(outputMaterialId);
-    record.setOutputMaterialType(outputMaterialType);
+    record.setOutputProductId(outputProductId);
+    record.setOutputProductType(outputProductType);
     record.setUnit(unit);
     record.setStatus(ProductionOutputStatus.DRAFT);
     record.setTotalItemCount(0);
@@ -160,8 +160,8 @@ public class ProductionOutputRecord extends BaseEntity {
         this.getId(),
         this.workOrderId,
         this.batchId,
-        this.outputMaterialId,
-        this.outputMaterialType,
+        this.outputProductId,
+        this.outputProductType,
         this.getUnit(),
         this.confirmedByUserId,
         eventItems);

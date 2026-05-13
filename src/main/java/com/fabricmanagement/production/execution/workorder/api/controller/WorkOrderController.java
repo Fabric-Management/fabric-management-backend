@@ -58,7 +58,7 @@ public class WorkOrderController {
           "Aggregate overview: status breakdown, overdue alerts, "
               + "cost variance (PLANNED vs ACTUAL), and yield performance.")
   @GetMapping("/dashboard")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ProductionDashboardResponse getProductionDashboard() {
     return workOrderService.getProductionDashboard();
   }
@@ -69,7 +69,7 @@ public class WorkOrderController {
           "Returns a paginated list of WorkOrders for the current tenant. "
               + "All filter parameters are optional. Combine with Pageable for sorting.")
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public PagedResponse<WorkOrderResponse> listWorkOrders(
       @Parameter(description = "Filter by status") @RequestParam(required = false)
           WorkOrderStatus status,
@@ -118,14 +118,14 @@ public class WorkOrderController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public WorkOrderResponse getWorkOrder(@PathVariable UUID id) {
     return workOrderService.getWorkOrder(id);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public WorkOrderResponse createWorkOrder(@RequestBody @Valid WorkOrderRequest request) {
     return workOrderService.createWorkOrder(request);
   }
@@ -135,7 +135,7 @@ public class WorkOrderController {
    * WorkOrderStatus state machine. Returns the updated work order.
    */
   @PatchMapping("/{id}/status")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public WorkOrderResponse changeStatus(
       @PathVariable UUID id, @RequestParam WorkOrderStatus status) {
     return workOrderService.changeStatus(id, status);
@@ -149,14 +149,14 @@ public class WorkOrderController {
    * percentages must sum to exactly 100.
    */
   @PostMapping("/{id}/start-production")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public WorkOrderResponse startProduction(
       @PathVariable UUID id, @RequestBody @Valid StartProductionRequest request) {
     return workOrderService.startProduction(id, request);
   }
 
   @PostMapping("/{id}/consume-stock-unit")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WorkOrderConsumptionResponse>> consumeStockUnit(
       @PathVariable UUID id, @Valid @RequestBody ConsumeFromStockUnitRequest request) {
     var response =
@@ -166,14 +166,14 @@ public class WorkOrderController {
   }
 
   @GetMapping("/{id}/consumptions")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public PagedResponse<WorkOrderConsumptionResponse> getConsumptions(
       @PathVariable UUID id, Pageable pageable) {
     return workOrderConsumptionService.getConsumptionsPaged(id, pageable);
   }
 
   @GetMapping("/{id}/consumption-summary")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<WorkOrderConsumptionSummaryResponse>> getConsumptionSummary(
       @PathVariable UUID id) {
     var response = workOrderConsumptionService.getConsumptionSummary(id);
@@ -181,7 +181,7 @@ public class WorkOrderController {
   }
 
   @PostMapping("/{id}/record-output")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WorkOrderOutputResponse>> recordOutput(
       @PathVariable UUID id, @Valid @RequestBody RecordOutputRequest request) {
     var response = workOrderOutputService.recordOutput(id, request.stockUnitId(), request.notes());
@@ -189,14 +189,14 @@ public class WorkOrderController {
   }
 
   @GetMapping("/{id}/outputs")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public PagedResponse<WorkOrderOutputResponse> getOutputs(
       @PathVariable UUID id, Pageable pageable) {
     return workOrderOutputService.getOutputsPaged(id, pageable);
   }
 
   @GetMapping("/{id}/output-summary")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<WorkOrderOutputSummaryResponse>> getOutputSummary(
       @PathVariable UUID id) {
     var response = workOrderOutputService.getOutputSummary(id);
@@ -204,7 +204,7 @@ public class WorkOrderController {
   }
 
   @PostMapping("/{id}/complete")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WorkOrderResponse>> completeWorkOrder(@PathVariable UUID id) {
     var response = workOrderService.completeWorkOrder(id);
     return ResponseEntity.ok(ApiResponse.success(response));
@@ -224,9 +224,9 @@ public class WorkOrderController {
       summary = "Manually trigger planned cost calculation",
       description =
           "Recalculates planned cost for an APPROVED or later WorkOrder. "
-              + "Requires outputMaterialId and moduleType to be set (Sprint 12+ WorkOrders).")
+              + "Requires outputProductId and moduleType to be set (Sprint 12+ WorkOrders).")
   @PostMapping("/{id}/recalculate-planned")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WorkOrderResponse>> recalculatePlannedCost(
       @PathVariable UUID id) {
     var response = workOrderPlannedCostTriggerService.triggerPlannedCost(id);
@@ -244,7 +244,7 @@ public class WorkOrderController {
    * @return updated WorkOrderResponse with recalculated actualCost
    */
   @PostMapping("/{id}/recalculate-cost")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public ResponseEntity<ApiResponse<WorkOrderResponse>> recalculateCost(@PathVariable UUID id) {
     var response = workOrderCostRecalculationService.recalculateActualCost(id);
     return ResponseEntity.ok(

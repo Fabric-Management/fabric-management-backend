@@ -16,7 +16,7 @@ import lombok.Setter;
 
 /** Represents a generic permission rule defined at the system or tenant level. */
 @Entity
-@Table(name = "permission_template")
+@Table(name = "permission_template", schema = "common_user")
 @AttributeOverrides({
   @AttributeOverride(
       name = "tenantId",

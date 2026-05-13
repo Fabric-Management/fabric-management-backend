@@ -29,21 +29,21 @@ public class SubcontractOrderController {
   private final SubcontractOrderService subcontractOrderService;
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public SubcontractOrderResponse getSubcontractOrder(@PathVariable UUID id) {
     return subcontractOrderService.getSubcontractOrder(id);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public SubcontractOrderResponse createSubcontractOrder(
       @RequestBody @Valid CreateSubcontractOrderRequest request) {
     return subcontractOrderService.createSubcontractOrder(request);
   }
 
   @PatchMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public SubcontractOrderResponse updateDraft(
       @PathVariable UUID id, @RequestBody @Valid UpdateSubcontractOrderRequest request) {
     return subcontractOrderService.updateDraft(id, request);
@@ -54,7 +54,7 @@ public class SubcontractOrderController {
    * (COMPLETED), actualReturnedQty must be provided — waste is then computed automatically.
    */
   @PatchMapping("/{id}/status")
-  @PreAuthorize("@auth.can(authentication, 'materials', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
   public SubcontractOrderResponse changeStatus(
       @PathVariable UUID id,
       @RequestParam SubcontractOrderStatus status,

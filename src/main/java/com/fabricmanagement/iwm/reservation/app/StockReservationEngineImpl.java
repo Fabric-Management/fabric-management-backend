@@ -33,12 +33,12 @@ public class StockReservationEngineImpl implements StockReservationEngine {
 
   @Override
   public List<LotSuggestion> suggestLotsFifo(
-      UUID tenantId, UUID materialId, BigDecimal requiredQty) {
+      UUID tenantId, UUID productId, BigDecimal requiredQty) {
     if (requiredQty == null || requiredQty.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IwmDomainException("Required quantity must be positive");
     }
-    if (tenantId == null || materialId == null) {
-      throw new IwmDomainException("tenantId and materialId must not be null");
+    if (tenantId == null || productId == null) {
+      throw new IwmDomainException("tenantId and productId must not be null");
     }
 
     String sql =
@@ -51,7 +51,7 @@ public class StockReservationEngineImpl implements StockReservationEngine {
             COALESCE(b.production_date, b.created_at) as prod_date
         FROM production.production_execution_inventory_balance ib
         JOIN production.production_execution_batch b ON ib.batch_id = b.id
-        WHERE b.material_id = ?
+        WHERE b.product_id = ?
           AND ib.tenant_id = ?
           AND ib.is_active = TRUE
           AND b.is_active = TRUE
@@ -82,7 +82,7 @@ public class StockReservationEngineImpl implements StockReservationEngine {
                     .build();
               }
             },
-            materialId,
+            productId,
             tenantId);
 
     List<LotSuggestion> suggestions = new ArrayList<>();
@@ -98,8 +98,8 @@ public class StockReservationEngineImpl implements StockReservationEngine {
 
     if (accumulated.compareTo(requiredQty) < 0) {
       log.warn(
-          "Insufficient stock for material {}. Required: {}, Available: {}",
-          materialId,
+          "Insufficient stock for product {}. Required: {}, Available: {}",
+          productId,
           requiredQty,
           accumulated);
     }

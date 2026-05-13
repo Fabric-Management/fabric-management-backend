@@ -54,7 +54,7 @@ public class CostingController {
             tenantId,
             req.quoteId(),
             req.moduleType(),
-            req.materialId(),
+            req.productId(),
             req.totalQuantityKg(),
             req.tradingPartnerId());
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -71,7 +71,7 @@ public class CostingController {
             tenantId,
             req.workOrderId(),
             req.moduleType(),
-            req.materialId(),
+            req.productId(),
             req.plannedQuantityKg(),
             req.supplierId());
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -88,7 +88,7 @@ public class CostingController {
             tenantId,
             req.batchId(),
             req.moduleType(),
-            req.materialId(),
+            req.productId(),
             req.actualQuantityKg(),
             req.supplierId());
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -96,12 +96,12 @@ public class CostingController {
   }
 
   /**
-   * Full cost report for a WorkOrder: PLANNED vs ACTUAL with per-material breakdown.
+   * Full cost report for a WorkOrder: PLANNED vs ACTUAL with per-product breakdown.
    *
    * <p>Either stage may be absent if not yet calculated. Frontend should handle null sections.
    *
    * @param workOrderId the WorkOrder UUID
-   * @return WorkOrderCostReportResponse with variance analysis and raw material breakdown
+   * @return WorkOrderCostReportResponse with variance analysis and raw product breakdown
    */
   @PreAuthorize("@auth.can(authentication, 'costing', 'read')")
   @GetMapping("/calculations/work-orders/{workOrderId}")

@@ -11,7 +11,7 @@ package com.fabricmanagement.common.infrastructure.cqrs;
  *
  * <ul>
  *   <li>Represents an intention to change state
- *   <li>Has a clear name in imperative form (CreateMaterial, UpdateUser)
+ *   <li>Has a clear name in imperative form (CreateProduct, UpdateUser)
  *   <li>Contains all data needed to execute the operation
  *   <li>Should be immutable (use @Value or final fields)
  *   <li>Validated before execution
@@ -21,22 +21,22 @@ package com.fabricmanagement.common.infrastructure.cqrs;
  *
  * <pre>{@code
  * @Value
- * public class CreateMaterialCommand implements Command {
+ * public class CreateProductCommand implements Command {
  *     UUID tenantId;
  *     String name;
- *     MaterialType type;
+ *     ProductType type;
  *     BigDecimal unitCost;
  * }
  *
  * @Service
  * @RequiredArgsConstructor
- * public class MaterialCommandHandler implements CommandHandler<CreateMaterialCommand> {
- *     private final MaterialRepository repository;
+ * public class ProductCommandHandler implements CommandHandler<CreateProductCommand> {
+ *     private final ProductRepository repository;
  *
  *     @Override
- *     public void handle(CreateMaterialCommand command) {
- *         Material material = Material.create(command);
- *         repository.save(material);
+ *     public void handle(CreateProductCommand command) {
+ *         Product product = Product.create(command);
+ *         repository.save(product);
  *     }
  * }
  * }</pre>

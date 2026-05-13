@@ -2,7 +2,7 @@ package com.fabricmanagement.production.execution.lineage.dto;
 
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +28,7 @@ public class TraceNodeDto {
 
   private UUID batchId;
   private String batchCode;
-  private MaterialType materialType;
+  private ProductType productType;
   private BigDecimal quantity;
   private String unit;
   private BatchStatus status;
@@ -49,7 +49,7 @@ public class TraceNodeDto {
     return TraceNodeDto.builder()
         .batchId(batch.getId())
         .batchCode(batch.getBatchCode())
-        .materialType(batch.getMaterialType())
+        .productType(batch.getProductType())
         .quantity(batch.getQuantity())
         .unit(batch.getUnit())
         .status(batch.getStatus())

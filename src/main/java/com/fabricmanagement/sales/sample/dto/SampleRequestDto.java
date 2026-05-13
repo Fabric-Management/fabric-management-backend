@@ -11,7 +11,7 @@ import lombok.Value;
 public class SampleRequestDto {
   UUID id;
   UUID customerId;
-  UUID materialId;
+  UUID productId;
   BigDecimal requestedQty;
   String unit;
   DeliveryMethod deliveryMethod;

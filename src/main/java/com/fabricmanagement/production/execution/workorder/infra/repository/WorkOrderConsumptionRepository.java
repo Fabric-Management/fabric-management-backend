@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.infra.repository;
 
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderConsumption;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -37,26 +37,26 @@ public interface WorkOrderConsumptionRepository extends JpaRepository<WorkOrderC
       @Param("tenantId") UUID tenantId, @Param("workOrderId") UUID workOrderId);
 
   /**
-   * Returns per-materialType aggregated consumption stats for a WorkOrder. DB does the GROUP BY —
-   * no in-memory aggregation needed.
+   * Returns per-productType aggregated consumption stats for a WorkOrder. DB does the GROUP BY — no
+   * in-memory aggregation needed.
    */
   @Query(
       """
-      SELECT c.materialType        AS materialType,
+      SELECT c.productType        AS productType,
              SUM(c.consumedWeight)  AS totalWeight,
              COUNT(c.id)            AS recordCount
       FROM WorkOrderConsumption c
       WHERE c.tenantId    = :tenantId
         AND c.workOrderId = :workOrderId
         AND c.isActive    = true
-      GROUP BY c.materialType
+      GROUP BY c.productType
       """)
-  List<MaterialTypeAggregation> aggregateByMaterialType(
+  List<ProductTypeAggregation> aggregateByProductType(
       @Param("tenantId") UUID tenantId, @Param("workOrderId") UUID workOrderId);
 
-  /** Projection for aggregated consumption per material type. */
-  interface MaterialTypeAggregation {
-    MaterialType getMaterialType();
+  /** Projection for aggregated consumption per product type. */
+  interface ProductTypeAggregation {
+    ProductType getProductType();
 
     BigDecimal getTotalWeight();
 

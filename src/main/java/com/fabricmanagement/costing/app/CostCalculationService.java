@@ -75,7 +75,7 @@ public class CostCalculationService {
    * @param tenantId owning tenant
    * @param quoteId the Quote entity ID
    * @param moduleType e.g. "FIBER"
-   * @param materialId the primary material being quoted
+   * @param productId the primary product being quoted
    * @param totalQuantityKg the projected order quantity
    * @param tradingPartnerId the target customer/supplier (for volume lookups)
    * @return the saved CostCalculation
@@ -85,14 +85,14 @@ public class CostCalculationService {
       UUID tenantId,
       UUID quoteId,
       String moduleType,
-      UUID materialId,
+      UUID productId,
       BigDecimal totalQuantityKg,
       UUID tradingPartnerId) {
     return computeEstimated(
         tenantId,
         quoteId,
         moduleType,
-        materialId,
+        productId,
         totalQuantityKg,
         tradingPartnerId,
         LocalDate.now());
@@ -104,7 +104,7 @@ public class CostCalculationService {
       UUID tenantId,
       UUID quoteId,
       String moduleType,
-      UUID materialId,
+      UUID productId,
       BigDecimal totalQuantityKg,
       UUID tradingPartnerId,
       LocalDate rateDate) {
@@ -114,7 +114,7 @@ public class CostCalculationService {
         quoteId,
         moduleType,
         CostStage.ESTIMATED,
-        materialId,
+        productId,
         totalQuantityKg,
         tradingPartnerId,
         rateDate);
@@ -126,7 +126,7 @@ public class CostCalculationService {
    * @param tenantId owning tenant
    * @param workOrderId the WorkOrder entity ID
    * @param moduleType production module
-   * @param materialId primary material
+   * @param productId primary product
    * @param plannedQuantityKg the work order planned quantity
    * @param supplierId the selected supplier (for contracted prices)
    * @return the saved CostCalculation
@@ -136,14 +136,14 @@ public class CostCalculationService {
       UUID tenantId,
       UUID workOrderId,
       String moduleType,
-      UUID materialId,
+      UUID productId,
       BigDecimal plannedQuantityKg,
       UUID supplierId) {
     return computePlanned(
         tenantId,
         workOrderId,
         moduleType,
-        materialId,
+        productId,
         plannedQuantityKg,
         supplierId,
         LocalDate.now());
@@ -157,7 +157,7 @@ public class CostCalculationService {
       UUID tenantId,
       UUID workOrderId,
       String moduleType,
-      UUID materialId,
+      UUID productId,
       BigDecimal plannedQuantityKg,
       UUID supplierId,
       LocalDate rateDate) {
@@ -168,7 +168,7 @@ public class CostCalculationService {
             workOrderId,
             moduleType,
             CostStage.PLANNED,
-            materialId,
+            productId,
             plannedQuantityKg,
             supplierId,
             rateDate);
@@ -187,7 +187,7 @@ public class CostCalculationService {
    * @param tenantId owning tenant
    * @param batchId the Batch entity ID
    * @param moduleType production module
-   * @param materialId the batch material
+   * @param productId the batch product
    * @param actualQuantityKg actual quantity produced (net of waste)
    * @param supplierId the supplier used
    * @return the saved CostCalculation
@@ -197,11 +197,11 @@ public class CostCalculationService {
       UUID tenantId,
       UUID batchId,
       String moduleType,
-      UUID materialId,
+      UUID productId,
       BigDecimal actualQuantityKg,
       UUID supplierId) {
     return computeActual(
-        tenantId, batchId, moduleType, materialId, actualQuantityKg, supplierId, LocalDate.now());
+        tenantId, batchId, moduleType, productId, actualQuantityKg, supplierId, LocalDate.now());
   }
 
   /** Compute or re-compute the ACTUAL cost (Batch completed stage) with a specific rate date. */
@@ -210,7 +210,7 @@ public class CostCalculationService {
       UUID tenantId,
       UUID batchId,
       String moduleType,
-      UUID materialId,
+      UUID productId,
       BigDecimal actualQuantityKg,
       UUID supplierId,
       LocalDate rateDate) {
@@ -220,21 +220,21 @@ public class CostCalculationService {
         batchId,
         moduleType,
         CostStage.ACTUAL,
-        materialId,
+        productId,
         actualQuantityKg,
         supplierId,
         rateDate);
   }
 
   /**
-   * Sprint 6: Compute ACTUAL cost for a WorkOrder using per-consumption material prices.
+   * Sprint 6: Compute ACTUAL cost for a WorkOrder using per-consumption product prices.
    *
-   * <p>For RAW_MATERIAL template items: iterates over each ConsumptionCostInput and resolves the
-   * per-material unit price independently. This gives accurate blending cost — e.g. 60% FIBER_A at
+   * <p>For RAW_PRODUCT template items: iterates over each ConsumptionCostInput and resolves the
+   * per-product unit price independently. This gives accurate blending cost — e.g. 60% FIBER_A at
    * 45 TRY/kg + 40% FIBER_B at 52 TRY/kg instead of pricing by the output yarn.
    *
    * <p>For all other template items (LABOR, MACHINE, OVERHEAD, etc.): standard computation against
-   * outputMaterialId + actualOutputQty, unchanged from Sprint 5.
+   * outputProductId + actualOutputQty, unchanged from Sprint 5.
    *
    * <p>Sprint 7b: Each line's cost is automatically converted from the price list currency to the
    * tenant's reporting currency via {@link ExchangeRateService}. PERCENTAGE and FIXED items are
@@ -245,7 +245,7 @@ public class CostCalculationService {
       UUID tenantId,
       UUID workOrderId,
       String outputModuleType,
-      UUID outputMaterialId,
+      UUID outputProductId,
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
       List<ConsumptionCostInput> consumptions) {
@@ -253,7 +253,7 @@ public class CostCalculationService {
         tenantId,
         workOrderId,
         outputModuleType,
-        outputMaterialId,
+        outputProductId,
         actualOutputQty,
         tradingPartnerId,
         consumptions,
@@ -261,7 +261,7 @@ public class CostCalculationService {
   }
 
   /**
-   * Compute ACTUAL cost for a WorkOrder using per-consumption material prices, explicitly defining
+   * Compute ACTUAL cost for a WorkOrder using per-consumption product prices, explicitly defining
    * the rate calculation date.
    */
   @Transactional
@@ -269,7 +269,7 @@ public class CostCalculationService {
       UUID tenantId,
       UUID workOrderId,
       String outputModuleType,
-      UUID outputMaterialId,
+      UUID outputProductId,
       BigDecimal actualOutputQty,
       UUID tradingPartnerId,
       List<ConsumptionCostInput> consumptions,
@@ -337,8 +337,8 @@ public class CostCalculationService {
       }
       CostItem costItem = costItemOpt.get();
 
-      if ("RAW_MATERIAL".equals(costItem.getCode())) {
-        // ── Multi-material path: one line per consumption record ──
+      if ("RAW_PRODUCT".equals(costItem.getCode())) {
+        // ── Multi-product path: one line per consumption record ──
         for (ConsumptionCostInput consumption : consumptions) {
 
           PriceList consumptionPriceList =
@@ -348,22 +348,21 @@ public class CostCalculationService {
 
           if (consumptionPriceList == null) {
             log.warn(
-                "No active price list for module '{}' — raw material cost skipped for materialId {}",
+                "No active price list for module '{}' — raw product cost skipped for productId {}",
                 consumption.moduleType().name(),
-                consumption.materialId());
+                consumption.productId());
             continue;
           }
 
           Optional<PriceListItem> priceItemOpt =
               priceListItemRepo.findBest(
                   consumptionPriceList.getId(),
-                  "RAW_MATERIAL",
-                  consumption.materialId(),
+                  "RAW_PRODUCT",
+                  consumption.productId(),
                   tradingPartnerId);
           if (priceItemOpt.isEmpty()) {
             log.debug(
-                "No RAW_MATERIAL price for materialId {} — skipping line",
-                consumption.materialId());
+                "No RAW_PRODUCT price for productId {} — skipping line", consumption.productId());
             continue;
           }
 
@@ -376,13 +375,13 @@ public class CostCalculationService {
 
           CostCalculationLine line = new CostCalculationLine();
           line.setTenantId(tenantId);
-          line.setCostItemCode("RAW_MATERIAL");
+          line.setCostItemCode("RAW_PRODUCT");
           line.setQty(consumption.consumedWeight());
           line.setUnit(consumption.unit());
           line.setUnitPrice(unitPrice);
           line.setCurrency(priceItem.getCurrency());
           line.setVolumeDiscountApplied(!unitPrice.equals(priceItem.getUnitPrice()));
-          line.setMaterialId(consumption.materialId());
+          line.setProductId(consumption.productId());
 
           ConvertedMoney convertedTotal =
               exchangeRateService.convert(
@@ -393,10 +392,10 @@ public class CostCalculationService {
           calc.addLine(line);
         }
       } else {
-        // ── Standard path: output material + output qty (LABOR, MACHINE, OVERHEAD vb.) ──
+        // ── Standard path: output product + output qty (LABOR, MACHINE, OVERHEAD vb.) ──
         Optional<PriceListItem> priceItemOpt =
             priceListItemRepo.findBest(
-                outputPriceList.getId(), costItem.getCode(), outputMaterialId, tradingPartnerId);
+                outputPriceList.getId(), costItem.getCode(), outputProductId, tradingPartnerId);
         if (priceItemOpt.isEmpty()) {
           log.debug("No price for '{}' in output price list — skipping", costItem.getCode());
           continue;
@@ -450,7 +449,7 @@ public class CostCalculationService {
 
     var saved = costCalcRepo.save(calc);
     log.info(
-        "Multi-material CostCalculation saved: workOrderId={} stage=ACTUAL totalCost={}",
+        "Multi-product CostCalculation saved: workOrderId={} stage=ACTUAL totalCost={}",
         workOrderId,
         saved.getTotalCost());
 
@@ -460,7 +459,7 @@ public class CostCalculationService {
 
   /**
    * Retrieves the PLANNED and ACTUAL cost calculations for a WorkOrder and builds a structured
-   * report with per-material breakdown and variance summary.
+   * report with per-product breakdown and variance summary.
    *
    * <p>Either stage may be absent (not yet calculated or calculation failed) — the response handles
    * partial data gracefully.
@@ -496,7 +495,7 @@ public class CostCalculationService {
       UUID entityId,
       String moduleType,
       CostStage stage,
-      UUID materialId,
+      UUID productId,
       BigDecimal quantityKg,
       UUID tradingPartnerId,
       LocalDate rateDate) {
@@ -556,7 +555,7 @@ public class CostCalculationService {
 
       Optional<PriceListItem> priceItemOpt =
           priceListItemRepo.findBest(
-              priceList.getId(), costItem.getCode(), materialId, tradingPartnerId);
+              priceList.getId(), costItem.getCode(), productId, tradingPartnerId);
 
       if (priceItemOpt.isEmpty()) {
         log.debug(

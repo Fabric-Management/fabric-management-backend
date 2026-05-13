@@ -57,15 +57,15 @@ public class TestCostDataFactory {
   public static PriceListItem createPriceListItem(
       UUID priceListId,
       String costItemCode,
-      UUID materialId,
+      UUID productId,
       BigDecimal unitPrice,
       String currency) {
     return PriceListItem.builder()
         .priceListId(priceListId)
         .costItemCode(costItemCode)
-        .materialId(materialId)
+        .productId(productId)
         .unitPrice(unitPrice)
-        .unit(costItemCode.equals("RAW_MATERIAL") ? "KG" : "UNIT")
+        .unit(costItemCode.equals("RAW_PRODUCT") ? "KG" : "UNIT")
         .currency(currency)
         .build();
   }

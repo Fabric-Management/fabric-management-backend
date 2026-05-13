@@ -29,8 +29,8 @@ public class InventoryNotificationListener {
   @Async
   public void onMinStockAlert(MinStockAlertEvent event) {
     log.warn(
-        "NotificationHub ← MinStockAlert [HIGH]: material={} current={} min={}",
-        event.getMaterialCode(),
+        "NotificationHub ← MinStockAlert [HIGH]: product={} current={} min={}",
+        event.getProductCode(),
         event.getCurrentStock(),
         event.getMinimumStock());
 
@@ -44,8 +44,8 @@ public class InventoryNotificationListener {
           if (!recipientIds.isEmpty()) {
             Map<String, String> payload =
                 Map.of(
-                    "materialCode", event.getMaterialCode() != null ? event.getMaterialCode() : "",
-                    "materialName", event.getMaterialName() != null ? event.getMaterialName() : "",
+                    "productCode", event.getProductCode() != null ? event.getProductCode() : "",
+                    "productName", event.getProductName() != null ? event.getProductName() : "",
                     "currentStock",
                         event.getCurrentStock() != null ? event.getCurrentStock().toString() : "0",
                     "minimumStock",
@@ -56,11 +56,10 @@ public class InventoryNotificationListener {
                 event.getTenantId(),
                 NotificationEventType.MIN_STOCK_ALERT,
                 payload,
-                event.getMaterialId(),
-                "MATERIAL");
+                event.getProductId(),
+                "PRODUCT");
           } else {
-            log.warn(
-                "No recipients found for MinStockAlert (material={})", event.getMaterialCode());
+            log.warn("No recipients found for MinStockAlert (product={})", event.getProductCode());
           }
         });
   }

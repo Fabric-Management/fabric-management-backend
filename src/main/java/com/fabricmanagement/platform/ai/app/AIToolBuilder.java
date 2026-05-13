@@ -15,21 +15,21 @@ public class AIToolBuilder {
   public static List<Map<String, Object>> getAvailableTools() {
     return List.of(
         buildTool(
-            "check_material_stock",
-            "Check stock quantity for a material by name. Use this when user asks about stock, inventory, or availability.",
+            "check_product_stock",
+            "Check stock quantity for a product by name. Use this when user asks about stock, inventory, or availability.",
             Map.of(
                 "type", "object",
                 "properties",
                     Map.of(
-                        "materialName",
+                        "productName",
                         Map.of(
                             "type",
                             "string",
                             "description",
-                            "Material name or UID to check stock for. "
+                            "Product name or UID to check stock for. "
                                 + "Preserve technical textile specifications EXACTLY as user typed (e.g., '30/1 gabardin', 'gabardin 30/1', '40/2 keten', '190 GSM cotton'). "
                                 + "DO NOT translate or reformat numeric/symbolic codes like 30/1, 40/2, Ne 20/1, 16x12, 190 GSM, %100.")),
-                "required", List.of("materialName"))),
+                "required", List.of("productName"))),
         buildTool(
             "smart_search",
             "INTELLIGENT SEARCH: Automatically detects entity type (Fiber/Yarn/Fabric) from query and searches accordingly. "
@@ -50,8 +50,8 @@ public class AIToolBuilder {
                                 + "Preserve technical textile specifications EXACTLY as user typed (30/1, 40/2, GSM, etc.).")),
                 "required", List.of("query"))),
         buildTool(
-            "search_materials",
-            "Search for materials in the system. Use this when user specifically asks about materials or when smart_search doesn't find results.",
+            "search_products",
+            "Search for products in the system. Use this when user specifically asks about products or when smart_search doesn't find results.",
             Map.of(
                 "type", "object",
                 "properties",
@@ -61,7 +61,7 @@ public class AIToolBuilder {
                             "type",
                             "string",
                             "description",
-                            "Search query to find materials. "
+                            "Search query to find products. "
                                 + "Preserve technical textile specifications EXACTLY as user typed (e.g., '30/1 gabardin', '40/2 keten'). "
                                 + "DO NOT translate numeric/symbolic codes.")),
                 "required", List.of("query"))),
@@ -111,40 +111,40 @@ public class AIToolBuilder {
                 "properties", Map.of(),
                 "required", List.of())),
         buildTool(
-            "create_material",
-            "Create a new material. Use this when user wants to create a material. REQUIRES USER CONFIRMATION.",
+            "create_product",
+            "Create a new product. Use this when user wants to create a product. REQUIRES USER CONFIRMATION.",
             Map.of(
                 "type", "object",
                 "properties",
                     Map.of(
-                        "materialType",
+                        "productType",
                             Map.of(
                                 "type", "string",
                                 "description",
-                                    "Material type: FIBER, YARN, FABRIC, CHEMICAL, or CONSUMABLE (required)"),
+                                    "Product type: FIBER, YARN, FABRIC, CHEMICAL, or CONSUMABLE (required)"),
                         "unit",
                             Map.of(
                                 "type", "string",
                                 "description",
                                     "Unit of measurement: kg, m, piece, liter, etc. (required)")),
-                "required", List.of("materialType", "unit"))),
+                "required", List.of("productType", "unit"))),
         buildTool(
             "create_fiber",
-            "Create a new fiber. USER-FRIENDLY: If materialId is not provided, Material will be auto-created with type=FIBER. REQUIRES USER CONFIRMATION.",
+            "Create a new fiber. USER-FRIENDLY: If productId is not provided, Product will be auto-created with type=FIBER. REQUIRES USER CONFIRMATION.",
             Map.of(
                 "type", "object",
                 "properties",
                     Map.of(
-                        "materialId",
+                        "productId",
                             Map.of(
                                 "type", "string",
                                 "description",
-                                    "Material ID (UUID) - Optional. If not provided, Material will be auto-created with type=FIBER using the 'unit' parameter"),
+                                    "Product ID (UUID) - Optional. If not provided, Product will be auto-created with type=FIBER using the 'unit' parameter"),
                         "unit",
                             Map.of(
                                 "type", "string",
                                 "description",
-                                    "Unit for Material (kg, ton, m, etc.) - Required if materialId is not provided. Used when auto-creating Material"),
+                                    "Unit for Product (kg, ton, m, etc.) - Required if productId is not provided. Used when auto-creating Product"),
                         "fiberCategoryId",
                             Map.of(
                                 "type", "string",
@@ -162,7 +162,7 @@ public class AIToolBuilder {
                                 "type", "string",
                                 "description", "Additional remarks (optional)")),
                 "required", List.of("fiberCategoryId", "fiberIsoCodeId", "fiberName")
-                // Note: materialId OR unit is required (handled in AIFunctionCaller)
+                // Note: productId OR unit is required (handled in AIFunctionCaller)
                 )));
   }
 

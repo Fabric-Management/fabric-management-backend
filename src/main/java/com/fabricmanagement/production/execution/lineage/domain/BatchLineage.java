@@ -14,9 +14,9 @@ import lombok.NoArgsConstructor;
 /**
  * Tracks parent→child batch relationships for full production traceability.
  *
- * <p>Each record represents a specific raw-material lot (parent) consumed to produce an output
- * batch (child). This enables "one step back, one step forward" lineage as required by ISO 22005
- * and EU Textile Regulation 1007/2011.
+ * <p>Each record represents a specific raw-product lot (parent) consumed to produce an output batch
+ * (child). This enables "one step back, one step forward" lineage as required by ISO 22005 and EU
+ * Textile Regulation 1007/2011.
  *
  * <p>Example — Blend Batch "BLEND-001" (40% Linen + 60% Wool):
  *

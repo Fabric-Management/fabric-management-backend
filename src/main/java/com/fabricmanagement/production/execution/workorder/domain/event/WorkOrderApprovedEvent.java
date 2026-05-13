@@ -13,7 +13,7 @@ public class WorkOrderApprovedEvent extends DomainEvent {
   private final UUID workOrderId;
   private final String workOrderNumber;
   private final WorkOrderModuleType moduleType;
-  private final UUID outputMaterialId;
+  private final UUID outputProductId;
   private final BigDecimal plannedQuantity;
   private final UUID tradingPartnerId;
   private final UUID approvedByUserId;
@@ -23,7 +23,7 @@ public class WorkOrderApprovedEvent extends DomainEvent {
       UUID workOrderId,
       String workOrderNumber,
       WorkOrderModuleType moduleType,
-      UUID outputMaterialId,
+      UUID outputProductId,
       BigDecimal plannedQuantity,
       UUID tradingPartnerId,
       UUID approvedByUserId) {
@@ -31,7 +31,7 @@ public class WorkOrderApprovedEvent extends DomainEvent {
     this.workOrderId = workOrderId;
     this.workOrderNumber = workOrderNumber;
     this.moduleType = moduleType;
-    this.outputMaterialId = outputMaterialId;
+    this.outputProductId = outputProductId;
     this.plannedQuantity = plannedQuantity;
     this.tradingPartnerId = tradingPartnerId;
     this.approvedByUserId = approvedByUserId;

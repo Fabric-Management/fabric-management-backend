@@ -129,8 +129,8 @@ public class InventoryTransactionCommandService implements InventoryFacade {
   }
 
   @Override
-  public BigDecimal getAvailableQuantityByMaterial(UUID tenantId, UUID materialId) {
-    BigDecimal total = inventoryBalanceRepository.sumAvailableByMaterial(tenantId, materialId);
+  public BigDecimal getAvailableQuantityByProduct(UUID tenantId, UUID productId) {
+    BigDecimal total = inventoryBalanceRepository.sumAvailableByProduct(tenantId, productId);
     return total != null ? total : BigDecimal.ZERO;
   }
 }

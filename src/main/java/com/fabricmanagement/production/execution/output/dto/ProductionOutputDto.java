@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.output.dto;
 
 import com.fabricmanagement.production.execution.output.domain.ProductionOutputStatus;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -16,8 +16,8 @@ public record ProductionOutputDto(
     UUID workOrderId,
     String workOrderNumber,
     UUID batchId,
-    UUID outputMaterialId,
-    MaterialType outputMaterialType,
+    UUID outputProductId,
+    ProductType outputProductType,
     String unit,
     ProductionOutputStatus status,
     int totalItemCount,

@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UpdateSubcontractOrderRequest {
 
-  private UUID outputMaterialId;
+  private UUID outputProductId;
 
   @DecimalMin(value = "0.001", message = "Expected output quantity must be greater than zero")
   private BigDecimal expectedOutputQty;

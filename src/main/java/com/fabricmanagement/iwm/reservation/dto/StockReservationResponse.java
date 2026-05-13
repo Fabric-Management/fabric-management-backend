@@ -13,7 +13,7 @@ public class StockReservationResponse {
   private UUID id;
   private UUID salesOrderLineId;
   private UUID locationId;
-  private UUID materialId;
+  private UUID productId;
   private String lotNumber;
   private UUID goodsReceiptItemId;
   private BigDecimal qtyReserved;

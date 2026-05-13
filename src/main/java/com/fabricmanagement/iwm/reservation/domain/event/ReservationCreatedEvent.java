@@ -18,7 +18,7 @@ import lombok.Getter;
 public class ReservationCreatedEvent extends DomainEvent {
 
   private final UUID reservationId;
-  private final UUID materialId;
+  private final UUID productId;
   private final UUID locationId;
   private final String lotNumber;
   private final BigDecimal qtyReserved;
@@ -26,13 +26,13 @@ public class ReservationCreatedEvent extends DomainEvent {
   public ReservationCreatedEvent(
       UUID tenantId,
       UUID reservationId,
-      UUID materialId,
+      UUID productId,
       UUID locationId,
       String lotNumber,
       BigDecimal qtyReserved) {
     super(tenantId, "RESERVATION_CREATED");
     this.reservationId = reservationId;
-    this.materialId = materialId;
+    this.productId = productId;
     this.locationId = locationId;
     this.lotNumber = lotNumber;
     this.qtyReserved = qtyReserved;

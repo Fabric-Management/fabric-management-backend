@@ -3,7 +3,7 @@ package com.fabricmanagement.production.masterdata.fiber.domain;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
-import com.fabricmanagement.production.masterdata.material.domain.Material;
+import com.fabricmanagement.production.masterdata.product.domain.Product;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -19,15 +19,15 @@ import org.hibernate.annotations.Type;
     schema = "production",
     indexes = {
       @Index(name = "idx_fiber_tenant", columnList = "tenant_id"),
-      @Index(name = "idx_fiber_material", columnList = "material_id"),
+      @Index(name = "idx_fiber_product", columnList = "product_id"),
       @Index(name = "idx_fiber_category", columnList = "fiber_category_id"),
       @Index(name = "idx_fiber_iso", columnList = "fiber_iso_code_id"),
       @Index(name = "idx_fiber_status", columnList = "status")
     },
     uniqueConstraints = {
       @UniqueConstraint(
-          name = "uk_fiber_material",
-          columnNames = {"material_id"})
+          name = "uk_fiber_product",
+          columnNames = {"product_id"})
     })
 @Getter
 @Setter
@@ -37,8 +37,8 @@ import org.hibernate.annotations.Type;
 public class Fiber extends BaseEntity {
 
   @OneToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "material_id", nullable = false, unique = true, updatable = false)
-  private Material material;
+  @JoinColumn(name = "product_id", nullable = false, unique = true, updatable = false)
+  private Product product;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "fiber_category_id", nullable = false)
@@ -49,8 +49,8 @@ public class Fiber extends BaseEntity {
   private FiberIsoCode fiberIsoCode;
 
   // Helper methods for accessing IDs without loading entities
-  public UUID getMaterialId() {
-    return material != null ? material.getId() : null;
+  public UUID getProductId() {
+    return product != null ? product.getId() : null;
   }
 
   public UUID getFiberCategoryId() {
@@ -102,10 +102,10 @@ public class Fiber extends BaseEntity {
   }
 
   public static Fiber createPureFiber(
-      Material material, FiberCategory fiberCategory, FiberIsoCode fiberIsoCode, String fiberName) {
+      Product product, FiberCategory fiberCategory, FiberIsoCode fiberIsoCode, String fiberName) {
 
     return Fiber.builder()
-        .material(material)
+        .product(product)
         .fiberCategory(fiberCategory)
         .fiberIsoCode(fiberIsoCode)
         .fiberName(fiberName)
@@ -115,14 +115,14 @@ public class Fiber extends BaseEntity {
   }
 
   public static Fiber createBlendedFiber(
-      Material material,
+      Product product,
       FiberCategory fiberCategory,
       FiberIsoCode fiberIsoCode,
       String fiberName,
       Map<UUID, BigDecimal> composition) {
 
     return Fiber.builder()
-        .material(material)
+        .product(product)
         .fiberCategory(fiberCategory)
         .fiberIsoCode(fiberIsoCode)
         .fiberName(fiberName)

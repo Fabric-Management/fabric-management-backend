@@ -20,8 +20,8 @@ import lombok.NoArgsConstructor;
  * <pre>{@code
  * {
  *   "success": true,
- *   "data": { "id": "123", "name": "Material A" },
- *   "message": "Material created successfully",
+ *   "data": { "id": "123", "name": "Product A" },
+ *   "message": "Product created successfully",
  *   "timestamp": "2025-01-27T10:30:00Z"
  * }
  * }</pre>
@@ -47,7 +47,7 @@ import lombok.NoArgsConstructor;
  *   "success": false,
  *   "error": {
  *     "code": "VALIDATION_ERROR",
- *     "message": "Invalid material name"
+ *     "message": "Invalid product name"
  *   },
  *   "timestamp": "2025-01-27T10:30:00Z"
  * }
@@ -57,9 +57,9 @@ import lombok.NoArgsConstructor;
  *
  * <pre>{@code
  * @PostMapping
- * public ResponseEntity<ApiResponse<MaterialDto>> create(@RequestBody CreateMaterialRequest request) {
- *     MaterialDto created = materialService.create(request);
- *     return ResponseEntity.ok(ApiResponse.success(created, "Material created successfully"));
+ * public ResponseEntity<ApiResponse<ProductDto>> create(@RequestBody CreateProductRequest request) {
+ *     ProductDto created = productService.create(request);
+ *     return ResponseEntity.ok(ApiResponse.success(created, "Product created successfully"));
  * }
  * }</pre>
  *

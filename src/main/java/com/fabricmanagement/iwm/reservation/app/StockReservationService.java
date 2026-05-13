@@ -30,16 +30,16 @@ public class StockReservationService {
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional(readOnly = true)
-  public List<LotSuggestion> getFifoSuggestions(UUID materialId, BigDecimal requiredQty) {
+  public List<LotSuggestion> getFifoSuggestions(UUID productId, BigDecimal requiredQty) {
     UUID tenantId = TenantContext.getCurrentTenantId();
-    return engine.suggestLotsFifo(tenantId, materialId, requiredQty);
+    return engine.suggestLotsFifo(tenantId, productId, requiredQty);
   }
 
   @Transactional
   public StockReservationResponse createReservation(
       UUID salesOrderLineId,
       UUID locationId,
-      UUID materialId,
+      UUID productId,
       String lotNumber,
       UUID goodsReceiptItemId,
       BigDecimal qtyReserved) {
@@ -51,7 +51,7 @@ public class StockReservationService {
             tenantId,
             salesOrderLineId,
             locationId,
-            materialId,
+            productId,
             lotNumber,
             goodsReceiptItemId,
             qtyReserved,
@@ -61,7 +61,7 @@ public class StockReservationService {
 
     eventPublisher.publishEvent(
         new ReservationCreatedEvent(
-            tenantId, saved.getId(), materialId, locationId, lotNumber, qtyReserved));
+            tenantId, saved.getId(), productId, locationId, lotNumber, qtyReserved));
 
     return toResponse(saved);
   }
@@ -76,7 +76,7 @@ public class StockReservationService {
         new ReservationReleasedEvent(
             reservation.getTenantId(),
             reservationId,
-            reservation.getMaterialId(),
+            reservation.getProductId(),
             reservation.getLocationId(),
             reservation.getQtyReserved()));
   }
@@ -91,7 +91,7 @@ public class StockReservationService {
         new ReservationConvertedEvent(
             reservation.getTenantId(),
             reservationId,
-            reservation.getMaterialId(),
+            reservation.getProductId(),
             reservation.getLocationId(),
             reservation.getQtyReserved()));
   }
@@ -109,7 +109,7 @@ public class StockReservationService {
         .id(entity.getId())
         .salesOrderLineId(entity.getSalesOrderLineId())
         .locationId(entity.getLocationId())
-        .materialId(entity.getMaterialId())
+        .productId(entity.getProductId())
         .lotNumber(entity.getLotNumber())
         .goodsReceiptItemId(entity.getGoodsReceiptItemId())
         .qtyReserved(entity.getQtyReserved())

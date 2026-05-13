@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SalesOrderLineRequest {
 
-  private UUID materialId;
+  private UUID productId;
 
   private String productDesc;
 
@@ -36,11 +36,11 @@ public class SalesOrderLineRequest {
   private Map<String, Object> moduleSpecs;
 
   /**
-   * Validates that at least one of materialId or productDesc is provided. Triggered automatically
-   * by Bean Validation via @Valid on parent request.
+   * Validates that at least one of productId or productDesc is provided. Triggered automatically by
+   * Bean Validation via @Valid on parent request.
    */
-  @AssertTrue(message = "Either materialId or productDesc must be provided")
-  public boolean isMaterialOrDescPresent() {
-    return materialId != null || (productDesc != null && !productDesc.isBlank());
+  @AssertTrue(message = "Either productId or productDesc must be provided")
+  public boolean isProductOrDescPresent() {
+    return productId != null || (productDesc != null && !productDesc.isBlank());
   }
 }

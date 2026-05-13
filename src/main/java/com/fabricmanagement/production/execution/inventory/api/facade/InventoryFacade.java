@@ -21,5 +21,5 @@ public interface InventoryFacade {
       InventoryTransactionReasonCode reasonCode,
       String idempotencyKey);
 
-  BigDecimal getAvailableQuantityByMaterial(UUID tenantId, UUID materialId);
+  BigDecimal getAvailableQuantityByProduct(UUID tenantId, UUID productId);
 }

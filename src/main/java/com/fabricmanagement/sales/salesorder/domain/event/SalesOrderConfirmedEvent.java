@@ -26,7 +26,7 @@ public class SalesOrderConfirmedEvent extends DomainEvent {
 
   public record SalesOrderLineSnapshot(
       UUID lineId,
-      UUID materialId,
+      UUID productId,
       String productCode,
       BigDecimal quantity,
       String unit,

@@ -15,7 +15,7 @@ public class SalesOrderLineResponse {
   UUID id;
   String uid;
   UUID salesOrderId;
-  UUID materialId;
+  UUID productId;
   String productDesc;
   BigDecimal requestedQty;
   BigDecimal shippedQty;

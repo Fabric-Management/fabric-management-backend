@@ -9,7 +9,7 @@ import lombok.*;
 /**
  * A single cost breakdown line within a {@link CostCalculation}.
  *
- * <p>Each line represents one {@code costItemCode} contribution (e.g. "RAW_MATERIAL", "LABOR") with
+ * <p>Each line represents one {@code costItemCode} contribution (e.g. "RAW_PRODUCT", "LABOR") with
  * its quantity, unit price, exchange rate, and resulting amount in the base currency.
  */
 @Entity
@@ -60,12 +60,12 @@ public class CostCalculationLine extends BaseEntity {
   private boolean volumeDiscountApplied = false;
 
   /**
-   * The specific material this cost line applies to. Populated for RAW_MATERIAL lines in
-   * multi-material WorkOrder cost calculations (Sprint 6+). Null for non-material cost items
-   * (LABOR, OVERHEAD, etc.) and legacy single-material calculations.
+   * The specific product this cost line applies to. Populated for RAW_PRODUCT lines in
+   * multi-product WorkOrder cost calculations (Sprint 6+). Null for non-product cost items (LABOR,
+   * OVERHEAD, etc.) and legacy single-product calculations.
    */
-  @Column(name = "material_id")
-  private UUID materialId;
+  @Column(name = "product_id")
+  private UUID productId;
 
   // Sprint 7b — Multi-Currency: conversion audit trail
   @Embedded

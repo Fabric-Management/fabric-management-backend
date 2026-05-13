@@ -10,7 +10,7 @@ package com.fabricmanagement.common.infrastructure.cqrs;
  *
  * <ul>
  *   <li>Represents a request for data
- *   <li>Has a clear name (GetMaterialQuery, SearchUsersQuery)
+ *   <li>Has a clear name (GetProductQuery, SearchUsersQuery)
  *   <li>Contains criteria/filters for data retrieval
  *   <li>Should be immutable (use @Value or final fields)
  *   <li>Does NOT modify system state
@@ -20,21 +20,21 @@ package com.fabricmanagement.common.infrastructure.cqrs;
  *
  * <pre>{@code
  * @Value
- * public class GetMaterialQuery implements Query<MaterialDto> {
+ * public class GetProductQuery implements Query<ProductDto> {
  *     UUID tenantId;
- *     UUID materialId;
+ *     UUID productId;
  * }
  *
  * @Service
  * @RequiredArgsConstructor
- * public class MaterialQueryHandler implements QueryHandler<GetMaterialQuery, MaterialDto> {
- *     private final MaterialRepository repository;
+ * public class ProductQueryHandler implements QueryHandler<GetProductQuery, ProductDto> {
+ *     private final ProductRepository repository;
  *
  *     @Override
- *     public MaterialDto handle(GetMaterialQuery query) {
- *         return repository.findByTenantIdAndId(query.getTenantId(), query.getMaterialId())
- *             .map(MaterialDto::from)
- *             .orElseThrow(() -> new EntityNotFoundException("Material not found"));
+ *     public ProductDto handle(GetProductQuery query) {
+ *         return repository.findByTenantIdAndId(query.getTenantId(), query.getProductId())
+ *             .map(ProductDto::from)
+ *             .orElseThrow(() -> new EntityNotFoundException("Product not found"));
  *     }
  * }
  * }</pre>

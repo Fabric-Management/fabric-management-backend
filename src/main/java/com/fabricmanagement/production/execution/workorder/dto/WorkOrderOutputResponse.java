@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderOutput;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -14,7 +14,7 @@ public record WorkOrderOutputResponse(
     String barcode,
     UUID batchId,
     String batchCode,
-    MaterialType materialType,
+    ProductType productType,
     BigDecimal outputWeight,
     String unit,
     UUID qualityGradeId,
@@ -33,7 +33,7 @@ public record WorkOrderOutputResponse(
         entity.getBarcode(),
         entity.getBatchId(),
         entity.getBatchCode(),
-        entity.getMaterialType(),
+        entity.getProductType(),
         entity.getOutputWeight(),
         entity.getUnit(),
         entity.getQualityGradeId(),

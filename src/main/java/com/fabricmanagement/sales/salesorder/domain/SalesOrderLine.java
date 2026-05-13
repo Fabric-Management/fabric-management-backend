@@ -17,7 +17,7 @@ import org.hibernate.annotations.Type;
 /**
  * A single product line within a SalesOrder.
  *
- * <p>Each line may reference a {@code Material} entity (via materialId) or use a free-text {@code
+ * <p>Each line may reference a {@code Product} entity (via productId) or use a free-text {@code
  * productDesc}. At least one must be non-null (validated in service layer).
  *
  * <p>On {@code SalesOrderConfirmed}, the RuleEngine will:
@@ -36,7 +36,7 @@ import org.hibernate.annotations.Type;
     schema = "sales_ord",
     indexes = {
       @Index(name = "idx_sol_sales_order_id", columnList = "sales_order_id"),
-      @Index(name = "idx_sol_material_id", columnList = "material_id"),
+      @Index(name = "idx_sol_product_id", columnList = "product_id"),
       @Index(name = "idx_sol_line_status", columnList = "line_status"),
       @Index(name = "idx_sol_recipe_id", columnList = "recipe_id")
     })
@@ -54,14 +54,14 @@ public class SalesOrderLine extends BaseEntity {
   private UUID salesOrderId;
 
   /**
-   * FK → Material. Optional — use productDesc when material is not yet catalogued. At least one of
-   * materialId / productDesc must be non-null.
+   * FK → Product. Optional — use productDesc when product is not yet catalogued. At least one of
+   * productId / productDesc must be non-null.
    */
-  @Column(name = "material_id")
-  private UUID materialId;
+  @Column(name = "product_id")
+  private UUID productId;
 
   /**
-   * Free-text product description. Used when no Material entity exists yet (custom / prototype
+   * Free-text product description. Used when no Product entity exists yet (custom / prototype
    * orders).
    */
   @Column(name = "product_desc", columnDefinition = "TEXT")
@@ -145,9 +145,9 @@ public class SalesOrderLine extends BaseEntity {
     this.lineStatus = SalesOrderLineStatus.RECIPE_ASSIGNED;
   }
 
-  /** Validates that at least one of materialId / productDesc is present. */
+  /** Validates that at least one of productId / productDesc is present. */
   public boolean isValid() {
-    return materialId != null || (productDesc != null && !productDesc.isBlank());
+    return productId != null || (productDesc != null && !productDesc.isBlank());
   }
 
   /**

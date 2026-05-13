@@ -4,7 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.common.exception.InsufficientStockException;
 import com.fabricmanagement.production.common.exception.InvalidStatusTransitionException;
 import com.fabricmanagement.production.execution.batch.domain.exception.BatchDomainException;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,16 +21,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Universal physical batch entity for all material types (Fiber, Yarn, Fabric, etc.).
+ * Universal physical batch entity for all product types (Fiber, Yarn, Fabric, etc.).
  *
  * <p>Replaces the previous module-specific batch tables (e.g. FiberBatch). All physical lots are
- * stored in {@code production_execution_batch} with {@code material_id} and {@code material_type};
- * material-specific properties live in the JSONB {@code attributes} column.
+ * stored in {@code production_execution_batch} with {@code product_id} and {@code product_type};
+ * product-specific properties live in the JSONB {@code attributes} column.
  *
  * <p>Key concepts:
  *
  * <ul>
- *   <li>Links to Material (masterdata) via materialId; materialType indicates the kind of lot
+ *   <li>Links to Product (masterdata) via productId; productType indicates the kind of lot
  *   <li>Unique batchCode per tenant for traceability
  *   <li>Tracks quantity, reserved/consumed/waste, and status (AVAILABLE, RESERVED, IN_PROGRESS,
  *       etc.)
@@ -46,12 +46,12 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Batch extends BaseEntity {
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "material_type", nullable = false)
-  private MaterialType materialType;
+  @Column(name = "product_type", nullable = false)
+  private ProductType productType;
 
   @org.hibernate.annotations.Type(io.hypersistence.utils.hibernate.type.json.JsonType.class)
   @Column(name = "attributes", columnDefinition = "jsonb")
@@ -136,8 +136,8 @@ public class Batch extends BaseEntity {
   public static Batch create(CreateBatchCommand cmd) {
     Batch batch = new Batch();
     batch.setTenantId(cmd.tenantId());
-    batch.setMaterialId(cmd.materialId());
-    batch.setMaterialType(cmd.materialType());
+    batch.setProductId(cmd.productId());
+    batch.setProductType(cmd.productType());
     batch.setBatchCode(cmd.batchCode());
     batch.setSupplierBatchCode(cmd.supplierBatchCode());
     batch.setQuantity(cmd.quantity());
@@ -168,8 +168,8 @@ public class Batch extends BaseEntity {
   @Deprecated(forRemoval = true)
   public static Batch create(
       UUID tenantId,
-      UUID materialId,
-      MaterialType materialType,
+      UUID productId,
+      ProductType productType,
       String batchCode,
       String supplierBatchCode,
       BigDecimal quantity,
@@ -183,8 +183,8 @@ public class Batch extends BaseEntity {
     return create(
         new CreateBatchCommand(
             tenantId,
-            materialId,
-            materialType,
+            productId,
+            productType,
             batchCode,
             supplierBatchCode,
             quantity,

@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AIActionRequest {
 
-  /** Action name (e.g., "check_material_stock", "create_purchase_order") */
+  /** Action name (e.g., "check_product_stock", "create_purchase_order") */
   private String action;
 
   /** Action parameters */

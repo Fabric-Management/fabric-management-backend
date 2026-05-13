@@ -27,8 +27,8 @@ public class StockReservation extends BaseEntity {
   @Column(name = "location_id", nullable = false)
   private UUID locationId;
 
-  @Column(name = "material_id", nullable = false)
-  private UUID materialId;
+  @Column(name = "product_id", nullable = false)
+  private UUID productId;
 
   @Column(name = "lot_number", nullable = false, length = 100)
   private String lotNumber;
@@ -50,7 +50,7 @@ public class StockReservation extends BaseEntity {
       UUID tenantId,
       UUID salesOrderLineId,
       UUID locationId,
-      UUID materialId,
+      UUID productId,
       String lotNumber,
       UUID goodsReceiptItemId,
       BigDecimal qtyReserved,
@@ -58,7 +58,7 @@ public class StockReservation extends BaseEntity {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
     Objects.requireNonNull(salesOrderLineId, "salesOrderLineId must not be null");
     Objects.requireNonNull(locationId, "locationId must not be null");
-    Objects.requireNonNull(materialId, "materialId must not be null");
+    Objects.requireNonNull(productId, "productId must not be null");
     if (lotNumber == null || lotNumber.isBlank()) {
       throw new IwmDomainException("lotNumber must not be blank");
     }
@@ -68,7 +68,7 @@ public class StockReservation extends BaseEntity {
     this.setTenantId(tenantId);
     this.salesOrderLineId = salesOrderLineId;
     this.locationId = locationId;
-    this.materialId = materialId;
+    this.productId = productId;
     this.lotNumber = lotNumber;
     this.goodsReceiptItemId = goodsReceiptItemId;
     this.qtyReserved = qtyReserved;

@@ -133,8 +133,8 @@ public class TenantSeedService {
         parent);
     createDepartment(
         organizationId,
-        "Fiber & Raw Material",
-        "Fiber procurement and raw material management",
+        "Fiber & Raw Product",
+        "Fiber procurement and raw product management",
         parent);
     createDepartment(organizationId, "Yarn Production", "Yarn manufacturing operations", parent);
     createDepartment(

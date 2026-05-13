@@ -2,7 +2,7 @@ package com.fabricmanagement.procurement.subcontract.api.query;
 
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.subcontract.infra.repository.SubcontractOrderRepository;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,8 +30,8 @@ public class SubcontractOrderQueryService {
 
   public record SubcontractOutputInfo(
       String scNumber,
-      UUID outputMaterialId,
-      MaterialType outputMaterialType,
+      UUID outputProductId,
+      ProductType outputProductType,
       String outputUnit,
       UUID batchId) {}
 
@@ -47,8 +47,8 @@ public class SubcontractOrderQueryService {
 
     return new SubcontractOutputInfo(
         sc.getScNumber(),
-        sc.getOutputMaterialId(),
-        sc.getOutputMaterialType(),
+        sc.getOutputProductId(),
+        sc.getOutputProductType(),
         sc.getOutputUnit(),
         sc.getBatchId());
   }

@@ -16,16 +16,16 @@ import org.springframework.stereotype.Component;
  * <pre>{@code
  * @Service
  * @RequiredArgsConstructor
- * public class MaterialService {
+ * public class ProductService {
  *     private final DomainEventPublisher eventPublisher;
  *
- *     public void createMaterial(CreateMaterialRequest request) {
- *         Material material = materialRepository.save(Material.create(request));
+ *     public void createProduct(CreateProductRequest request) {
+ *         Product product = productRepository.save(Product.create(request));
  *
- *         eventPublisher.publish(new MaterialCreatedEvent(
+ *         eventPublisher.publish(new ProductCreatedEvent(
  *             TenantContext.getCurrentTenantId(),
- *             material.getId(),
- *             material.getName()
+ *             product.getId(),
+ *             product.getName()
  *         ));
  *     }
  * }

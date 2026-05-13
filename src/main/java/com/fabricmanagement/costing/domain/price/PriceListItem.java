@@ -34,9 +34,9 @@ public class PriceListItem extends BaseEntity {
   @Column(name = "cost_item_code", nullable = false, length = 50)
   private String costItemCode;
 
-  /** Null = applies to all materials; non-null = material-specific price. */
-  @Column(name = "material_id")
-  private UUID materialId;
+  /** Null = applies to all products; non-null = product-specific price. */
+  @Column(name = "product_id")
+  private UUID productId;
 
   /** Null = general price; non-null = contracted supplier price. */
   @Column(name = "trading_partner_id")

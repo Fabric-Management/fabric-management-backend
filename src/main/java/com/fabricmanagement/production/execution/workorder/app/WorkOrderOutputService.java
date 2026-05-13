@@ -83,7 +83,7 @@ public class WorkOrderOutputService {
             batch.getId(),
             stockUnit.getBarcode(),
             batch.getBatchCode(),
-            stockUnit.getMaterialType(),
+            stockUnit.getProductType(),
             stockUnit.getInitialWeight(), // Use full produced initial weight
             stockUnit.getUnit(),
             stockUnit.getQualityGradeId(),
@@ -133,23 +133,23 @@ public class WorkOrderOutputService {
         workOrderConsumptionRepository.sumConsumedWeightByWorkOrderId(tenantId, workOrderId);
 
     // DB-level aggregation — no in-memory groupBy
-    List<WorkOrderOutputSummaryResponse.MaterialBreakdown> breakdowns =
-        workOrderOutputRepository.aggregateByMaterialType(tenantId, workOrderId).stream()
+    List<WorkOrderOutputSummaryResponse.ProductBreakdown> breakdowns =
+        workOrderOutputRepository.aggregateByProductType(tenantId, workOrderId).stream()
             .map(
                 agg ->
-                    new WorkOrderOutputSummaryResponse.MaterialBreakdown(
-                        agg.getMaterialType(), agg.getTotalWeight(), agg.getRecordCount()))
+                    new WorkOrderOutputSummaryResponse.ProductBreakdown(
+                        agg.getProductType(), agg.getTotalWeight(), agg.getRecordCount()))
             .toList();
 
     // Derive totals from aggregation — no extra DB round-trip
     BigDecimal totalOutputWeight =
         breakdowns.stream()
-            .map(WorkOrderOutputSummaryResponse.MaterialBreakdown::outputWeight)
+            .map(WorkOrderOutputSummaryResponse.ProductBreakdown::outputWeight)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
     long outputCount =
         breakdowns.stream()
-            .mapToLong(WorkOrderOutputSummaryResponse.MaterialBreakdown::outputCount)
+            .mapToLong(WorkOrderOutputSummaryResponse.ProductBreakdown::outputCount)
             .sum();
 
     // Zero division protection

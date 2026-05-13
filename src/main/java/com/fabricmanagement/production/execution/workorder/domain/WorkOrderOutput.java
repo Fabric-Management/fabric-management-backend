@@ -2,7 +2,7 @@ package com.fabricmanagement.production.execution.workorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -65,8 +65,8 @@ public class WorkOrderOutput extends BaseEntity {
   private String batchCode;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "material_type", nullable = false, length = 30)
-  private MaterialType materialType;
+  @Column(name = "product_type", nullable = false, length = 30)
+  private ProductType productType;
 
   @Column(name = "output_weight", nullable = false, precision = 15, scale = 3)
   private BigDecimal outputWeight;
@@ -95,7 +95,7 @@ public class WorkOrderOutput extends BaseEntity {
       UUID batchId,
       String barcode,
       String batchCode,
-      MaterialType materialType,
+      ProductType productType,
       BigDecimal outputWeight,
       String unit,
       UUID qualityGradeId,
@@ -111,8 +111,8 @@ public class WorkOrderOutput extends BaseEntity {
     if (barcode == null || barcode.isBlank() || batchCode == null || batchCode.isBlank()) {
       throw new WorkOrderDomainException("barcode and batchCode are required.");
     }
-    if (materialType == null || unit == null || unit.isBlank() || producedBy == null) {
-      throw new WorkOrderDomainException("materialType, unit, and producedBy are required.");
+    if (productType == null || unit == null || unit.isBlank() || producedBy == null) {
+      throw new WorkOrderDomainException("productType, unit, and producedBy are required.");
     }
 
     WorkOrderOutput output =
@@ -122,7 +122,7 @@ public class WorkOrderOutput extends BaseEntity {
             .batchId(batchId)
             .barcode(barcode)
             .batchCode(batchCode)
-            .materialType(materialType)
+            .productType(productType)
             .outputWeight(outputWeight)
             .unit(unit)
             .qualityGradeId(qualityGradeId)

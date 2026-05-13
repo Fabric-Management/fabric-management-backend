@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.dto;
 
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -11,7 +11,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public record CreateQualityGradeRequest(
-    @NotNull MaterialType materialType,
+    @NotNull ProductType productType,
     @NotBlank @Size(max = 10) String code,
     @NotBlank @Size(max = 255) String name,
     @Min(1) int rank,

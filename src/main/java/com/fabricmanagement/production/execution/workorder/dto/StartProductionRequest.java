@@ -1,6 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -28,18 +28,18 @@ public class StartProductionRequest {
   private UUID outputLocationId;
 
   /**
-   * The Material that the blended output batch will be linked to. This is NOT the recipe ID — it
-   * must be a valid Material entity ID. Example: the Yarn material produced from this blend.
+   * The Product that the blended output batch will be linked to. This is NOT the recipe ID — it
+   * must be a valid Product entity ID. Example: the Yarn product produced from this blend.
    */
-  @NotNull(message = "Output material ID is required")
-  private UUID outputMaterialId;
+  @NotNull(message = "Output product ID is required")
+  private UUID outputProductId;
 
   /**
-   * The material type of the output batch (e.g. YARN, FABRIC). Must correspond to the
-   * outputMaterialId's actual type.
+   * The product type of the output batch (e.g. YARN, FABRIC). Must correspond to the
+   * outputProductId's actual type.
    */
-  @NotNull(message = "Output material type is required")
-  private MaterialType outputMaterialType;
+  @NotNull(message = "Output product type is required")
+  private ProductType outputProductType;
 
   /** Optional remarks for the generated output batch. */
   private String remarks;

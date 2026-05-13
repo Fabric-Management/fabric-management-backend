@@ -32,8 +32,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
  *
  * <pre>{@code
  * @Entity
- * @Table(name = "prod_material")
- * public class Material extends BaseEntity {
+ * @Table(name = "prod_product")
+ * public class Product extends BaseEntity {
  *     @Column(nullable = false)
  *     private String name;
  *
@@ -157,7 +157,7 @@ public abstract class BaseEntity implements Serializable, Persistable<UUID> {
    *
    * <ul>
    *   <li>User: "ACME-001-USER-A3F5B2C9"
-   *   <li>Material: "ACME-001-MAT-B7E8F9A1"
+   *   <li>Product: "ACME-001-MAT-B7E8F9A1"
    *   <li>Company (override): "ACME-001" (no module code)
    * </ul>
    *

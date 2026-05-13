@@ -4,7 +4,7 @@ package com.fabricmanagement.production.execution.batch.domain.attributes;
  * Shared utility methods for safely converting raw JSONB attribute values ({@code Object}) into
  * strongly typed Java objects.
  *
- * <p>Used by material-specific attribute records ({@link FiberAttributes}, {@link YarnAttributes},
+ * <p>Used by product-specific attribute records ({@link FiberAttributes}, {@link YarnAttributes},
  * etc.) when deserializing from {@code Batch.attributes} map.
  *
  * <p>All methods are null-safe: {@code null} input yields {@code null} output. Unparseable strings

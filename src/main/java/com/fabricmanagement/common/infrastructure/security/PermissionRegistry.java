@@ -18,7 +18,7 @@ public final class PermissionRegistry {
           "sales",
           "fiber",
           "projects",
-          "materials",
+          "products",
           "partners",
           "flowboard",
           "settings",

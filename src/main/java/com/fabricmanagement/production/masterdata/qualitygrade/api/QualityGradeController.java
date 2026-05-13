@@ -1,7 +1,7 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.api;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.production.masterdata.material.domain.MaterialType;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.dto.CreateQualityGradeRequest;
 import com.fabricmanagement.production.masterdata.qualitygrade.dto.QualityGradeDto;
@@ -32,11 +32,11 @@ public class QualityGradeController {
 
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'quality', 'read')")
-  @Operation(summary = "List quality grades for a material type")
-  public ResponseEntity<ApiResponse<List<QualityGradeDto>>> findByMaterialType(
-      @RequestParam MaterialType materialType) {
+  @Operation(summary = "List quality grades for a product type")
+  public ResponseEntity<ApiResponse<List<QualityGradeDto>>> findByProductType(
+      @RequestParam ProductType productType) {
     List<QualityGradeDto> grades =
-        qualityGradeService.findByMaterialType(materialType).stream()
+        qualityGradeService.findByProductType(productType).stream()
             .map(QualityGradeDto::from)
             .toList();
     return ResponseEntity.ok(ApiResponse.success(grades));
@@ -57,7 +57,7 @@ public class QualityGradeController {
       @Valid @RequestBody CreateQualityGradeRequest request) {
     var grade =
         qualityGradeService.create(
-            request.materialType(),
+            request.productType(),
             request.code(),
             request.name(),
             request.rank(),
@@ -72,7 +72,7 @@ public class QualityGradeController {
 
   @PutMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'quality', 'write')")
-  @Operation(summary = "Update a quality grade (code and materialType are immutable)")
+  @Operation(summary = "Update a quality grade (code and productType are immutable)")
   public ResponseEntity<ApiResponse<QualityGradeDto>> update(
       @PathVariable UUID id, @Valid @RequestBody UpdateQualityGradeRequest request) {
     var grade =
