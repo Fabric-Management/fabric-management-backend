@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS production.quality_grade (
     deleted_at       TIMESTAMPTZ,
     version          BIGINT NOT NULL DEFAULT 0,
 
-    material_type    VARCHAR(20) NOT NULL,
+    product_type    VARCHAR(20) NOT NULL,
     code             VARCHAR(10) NOT NULL,
     name             VARCHAR(100) NOT NULL,
     rank             INT NOT NULL,
@@ -27,12 +27,12 @@ CREATE TABLE IF NOT EXISTS production.quality_grade (
     color_hex        VARCHAR(7),
     is_default       BOOLEAN NOT NULL DEFAULT false,
 
-    CONSTRAINT uq_quality_grade_tenant_material_code
-        UNIQUE (tenant_id, material_type, code)
+    CONSTRAINT uq_quality_grade_tenant_product_code
+        UNIQUE (tenant_id, product_type, code)
 );
 
-CREATE INDEX IF NOT EXISTS idx_quality_grade_tenant_material_active
-    ON production.quality_grade(tenant_id, material_type, is_active);
+CREATE INDEX IF NOT EXISTS idx_quality_grade_tenant_product_active
+    ON production.quality_grade(tenant_id, product_type, is_active);
 
 -- ─────────────────────────────────────────────────
 -- 2. Stock Unit
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS production.stock_unit (
     batch_id             UUID NOT NULL,
 
     package_type         VARCHAR(20) NOT NULL,
-    material_type        VARCHAR(20) NOT NULL,
+    product_type        VARCHAR(20) NOT NULL,
 
     initial_weight       NUMERIC(15,3) NOT NULL,
     current_weight       NUMERIC(15,3) NOT NULL,

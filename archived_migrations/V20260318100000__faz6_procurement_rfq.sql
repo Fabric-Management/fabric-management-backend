@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS procurement.supplier_rfq_line
     tenant_id      UUID         NOT NULL,
     uid            VARCHAR(100) UNIQUE,
     rfq_id         UUID         NOT NULL REFERENCES procurement.supplier_rfq (id),
-    material_id    UUID,                  -- FK → production.material
+    product_id    UUID,                  -- FK → production.product
     product_desc   TEXT,
     requested_qty  NUMERIC(15, 3) NOT NULL,
     unit           VARCHAR(20)  NOT NULL,

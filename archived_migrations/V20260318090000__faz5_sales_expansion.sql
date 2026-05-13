@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Phase 5: Sales Expansion (FAZ 5)
--- Docs: product-catalog.md, discount-policy.md, quote-approval.md, sample-management.md
+-- Docs: sales-product.md, discount-policy.md, quote-approval.md, sample-management.md
 -- Created: 2026-03-18
 -- =============================================================================
 
@@ -30,12 +30,12 @@ CREATE TABLE IF NOT EXISTS sales.discount_policy
 -- =============================================================================
 -- 2. PRODUCT CATALOG (Fuar / Offline Satış Katalog Ürünleri)
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS sales.product_catalog
+CREATE TABLE IF NOT EXISTS sales.sales_product
 (
     id             UUID PRIMARY KEY         DEFAULT gen_random_uuid(),
     tenant_id      UUID         NOT NULL,
     uid            VARCHAR(100) UNIQUE,
-    material_id    UUID         NOT NULL, -- FK → production.material
+    product_id    UUID         NOT NULL, -- FK → production.product
     module_type    VARCHAR(50)  NOT NULL,
     list_price     NUMERIC(18, 4) NOT NULL, -- Baz liste fiyatı
     currency       VARCHAR(10)  NOT NULL    DEFAULT 'TRY',
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS sales.quote_line
     tenant_id       UUID         NOT NULL,
     uid             VARCHAR(100) UNIQUE,
     quote_id        UUID         NOT NULL REFERENCES sales.quote (id),
-    material_id     UUID,                  -- katalog ürünü
+    product_id     UUID,                  -- katalog ürünü
     product_desc    TEXT,                  -- özel/serbest tanım
     requested_qty   NUMERIC(15, 3) NOT NULL,
     unit            VARCHAR(20)  NOT NULL,
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS sales.sample_request
     tenant_id        UUID         NOT NULL,
     uid              VARCHAR(100) UNIQUE,
     customer_id      UUID         NOT NULL, -- FK → master_data.trading_partner
-    material_id      UUID         NOT NULL, -- FK → production.material
+    product_id      UUID         NOT NULL, -- FK → production.product
     requested_qty    NUMERIC(15, 3) NOT NULL,
     unit             VARCHAR(20)  NOT NULL,
     delivery_method  VARCHAR(30)  NOT NULL, -- CARGO | SALESPERSON | DELIVERY_ROUTE
@@ -190,8 +190,8 @@ CREATE TABLE IF NOT EXISTS sales.sample_delivery
 -- INDEXES
 -- =============================================================================
 CREATE INDEX IF NOT EXISTS idx_sales_discount_policy_tenant ON sales.discount_policy(tenant_id, module_type);
-CREATE INDEX IF NOT EXISTS idx_sales_product_catalog_tenant ON sales.product_catalog(tenant_id, module_type);
-CREATE INDEX IF NOT EXISTS idx_sales_product_catalog_material ON sales.product_catalog(material_id);
+CREATE INDEX IF NOT EXISTS idx_sales_sales_product_tenant ON sales.sales_product(tenant_id, module_type);
+CREATE INDEX IF NOT EXISTS idx_sales_sales_product_product ON sales.sales_product(product_id);
 
 CREATE INDEX IF NOT EXISTS idx_sales_quote_tenant_customer ON sales.quote(tenant_id, customer_id);
 CREATE INDEX IF NOT EXISTS idx_sales_quote_number ON sales.quote(quote_number);

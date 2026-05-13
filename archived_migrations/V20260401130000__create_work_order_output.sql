@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS production.work_order_output (
     batch_id UUID NOT NULL,
     barcode VARCHAR(50) NOT NULL,
     batch_code VARCHAR(100) NOT NULL,
-    material_type VARCHAR(30) NOT NULL,
+    product_type VARCHAR(30) NOT NULL,
     output_weight NUMERIC(15,3) NOT NULL CHECK (output_weight > 0),
     unit VARCHAR(20) NOT NULL,
     quality_grade_id UUID,

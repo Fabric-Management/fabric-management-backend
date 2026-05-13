@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS costing.cost_item
 -- Seed: 8 Global cost items (tenant_id = NULL → visible to all tenants)
 INSERT INTO costing.cost_item (id, tenant_id, code, name, scope, calculation_base, display_order)
 VALUES
-    (gen_random_uuid(), NULL, 'RAW_MATERIAL', 'Hammadde',       'GLOBAL', 'PER_KG',   1),
+    (gen_random_uuid(), NULL, 'RAW_PRODUCT', 'Hammadde',       'GLOBAL', 'PER_KG',   1),
     (gen_random_uuid(), NULL, 'LABOR',        'İşçilik',         'GLOBAL', 'PER_HOUR',  2),
     (gen_random_uuid(), NULL, 'MACHINE',      'Makine/Ekipman', 'GLOBAL', 'PER_HOUR',  3),
     (gen_random_uuid(), NULL, 'ENERGY',       'Enerji',         'GLOBAL', 'PER_KG',   4),
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS costing.cost_template
     module_type VARCHAR(50)  NOT NULL,
     is_default  BOOLEAN      NOT NULL    DEFAULT FALSE,
     items       JSONB        NOT NULL    DEFAULT '[]'::JSONB,
-    -- items format: [{"costItemCode": "RAW_MATERIAL", "weight": 0.6, "isIncluded": true}, ...]
+    -- items format: [{"costItemCode": "RAW_PRODUCT", "weight": 0.6, "isIncluded": true}, ...]
     is_active   BOOLEAN      NOT NULL    DEFAULT TRUE,
     created_at  TIMESTAMPTZ  NOT NULL    DEFAULT NOW(),
     created_by  UUID,
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS costing.price_list_item
     uid                VARCHAR(100) UNIQUE,
     price_list_id      UUID            NOT NULL REFERENCES costing.price_list (id),
     cost_item_code     VARCHAR(50)     NOT NULL, -- FK → costing.cost_item.code (soft ref)
-    material_id        UUID,                     -- nullable: material-specific
+    product_id        UUID,                     -- nullable: product-specific
     trading_partner_id UUID,                     -- nullable: null=general, non-null=contracted
     unit_price         NUMERIC(18, 4)  NOT NULL,
     unit               VARCHAR(20)     NOT NULL,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS costing.cost_history
     uid            VARCHAR(100) UNIQUE,
     cost_item_code VARCHAR(50)     NOT NULL,
     module_type    VARCHAR(50),
-    material_id    UUID,
+    product_id    UUID,
     unit_price     NUMERIC(18, 4)  NOT NULL,
     currency       VARCHAR(10)     NOT NULL DEFAULT 'TRY',
     valid_from     DATE            NOT NULL,
@@ -255,6 +255,6 @@ CREATE INDEX IF NOT EXISTS idx_price_list_item_list ON costing.price_list_item (
 CREATE INDEX IF NOT EXISTS idx_price_list_item_partner ON costing.price_list_item (trading_partner_id) WHERE trading_partner_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_volume_break_item ON costing.volume_price_break (price_list_item_id);
 CREATE INDEX IF NOT EXISTS idx_exchange_rate_currencies ON costing.exchange_rate_snapshot (base_currency, target_currency, captured_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cost_history_item ON costing.cost_history (cost_item_code, material_id, valid_from);
+CREATE INDEX IF NOT EXISTS idx_cost_history_item ON costing.cost_history (cost_item_code, product_id, valid_from);
 CREATE INDEX IF NOT EXISTS idx_cost_calc_entity ON costing.cost_calculation (entity_type, entity_id, stage);
 CREATE INDEX IF NOT EXISTS idx_cost_calc_line_calc ON costing.cost_calculation_line (cost_calculation_id);

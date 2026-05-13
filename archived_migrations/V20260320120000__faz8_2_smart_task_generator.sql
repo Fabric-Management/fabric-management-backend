@@ -152,7 +152,7 @@ ON CONFLICT DO NOTHING;
 
 -- 9. MinStockAlert → PROCUREMENT
 INSERT INTO flowboard.task_template (tenant_id, event_type, title_template, task_type, default_priority, default_assignee_role, estimated_hours, auto_labels)
-VALUES (seed_tenant, 'MinStockAlert', 'Stok kritik — {material.name} temin et', 'PROCUREMENT', 'HIGH', 'MANAGER', 2.0, '["URGENT"]')
+VALUES (seed_tenant, 'MinStockAlert', 'Stok kritik — {product.name} temin et', 'PROCUREMENT', 'HIGH', 'MANAGER', 2.0, '["URGENT"]')
 ON CONFLICT DO NOTHING;
 
 -- 10. PoDeliveryLate → PROCUREMENT

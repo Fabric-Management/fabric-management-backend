@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS iwm.min_stock_rule (
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) NOT NULL,
     location_id UUID NOT NULL,
-    material_id UUID NOT NULL,
+    product_id UUID NOT NULL,
     min_qty DECIMAL(15,3) NOT NULL,
     unit VARCHAR(20) NOT NULL,
     last_alert_at TIMESTAMP WITH TIME ZONE,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS iwm.min_stock_rule (
 );
 
 CREATE INDEX idx_min_stock_location ON iwm.min_stock_rule(location_id);
-CREATE INDEX idx_min_stock_material ON iwm.min_stock_rule(material_id);
+CREATE INDEX idx_min_stock_product ON iwm.min_stock_rule(product_id);
 
 -- 2. LotEndRule
 CREATE TABLE IF NOT EXISTS iwm.lot_end_rule (

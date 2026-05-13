@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS procurement.purchase_order_line (
 
     purchase_order_id UUID NOT NULL,
     rfq_line_id UUID,
-    material_id UUID,
+    product_id UUID,
     product_desc TEXT,
     qty DECIMAL(15,3) NOT NULL,
     unit VARCHAR(20) NOT NULL,
@@ -81,6 +81,6 @@ CREATE INDEX IF NOT EXISTS idx_po_expected_delivery
 CREATE INDEX IF NOT EXISTS idx_pol_purchase_order_id
     ON procurement.purchase_order_line(purchase_order_id);
 
-CREATE INDEX IF NOT EXISTS idx_pol_material_id
-    ON procurement.purchase_order_line(material_id)
-    WHERE material_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pol_product_id
+    ON procurement.purchase_order_line(product_id)
+    WHERE product_id IS NOT NULL;

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS iwm.stock_reservation (
     uid VARCHAR(100) NOT NULL,
     sales_order_line_id UUID NOT NULL,
     location_id UUID NOT NULL,
-    material_id UUID NOT NULL,
+    product_id UUID NOT NULL,
     lot_number VARCHAR(100) NOT NULL,
     goods_receipt_item_id UUID,
     qty_reserved DECIMAL(15,3) NOT NULL,
@@ -28,5 +28,5 @@ CREATE TABLE IF NOT EXISTS iwm.stock_reservation (
 
 CREATE INDEX idx_stock_res_sales_line ON iwm.stock_reservation(sales_order_line_id);
 CREATE INDEX idx_stock_res_location ON iwm.stock_reservation(location_id);
-CREATE INDEX idx_stock_res_material ON iwm.stock_reservation(material_id);
+CREATE INDEX idx_stock_res_product ON iwm.stock_reservation(product_id);
 CREATE INDEX idx_stock_res_status ON iwm.stock_reservation(status);

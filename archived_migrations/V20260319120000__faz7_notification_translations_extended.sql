@@ -33,9 +33,9 @@ BEGIN
 
     -- MinStockAlert
     (gen_random_uuid(), sys_tenant, 'notification.min_stock_alert.title', 'NOTIFICATION',
-     'Low Stock: {materialCode}', 'MinStockAlert title'),
+     'Low Stock: {productCode}', 'MinStockAlert title'),
     (gen_random_uuid(), sys_tenant, 'notification.min_stock_alert.body', 'NOTIFICATION',
-     'Material {materialCode} - {materialName} is below minimum stock level. Current: {currentStock} {unit}, Min: {minimumStock} {unit}.', 'MinStockAlert body'),
+     'Product {productCode} - {productName} is below minimum stock level. Current: {currentStock} {unit}, Min: {minimumStock} {unit}.', 'MinStockAlert body'),
 
     -- PoDeliveryLate
     (gen_random_uuid(), sys_tenant, 'notification.po_delivery_late.title', 'NOTIFICATION',
@@ -122,8 +122,8 @@ BEGIN
       WHEN 'notification.approval_approved.title'            THEN 'Onaylandı: {entityCode}'
       WHEN 'notification.approval_approved.body'             THEN '{entityCode} talebiniz onaylandı.'
       -- MinStockAlert
-      WHEN 'notification.min_stock_alert.title'              THEN 'Düşük Stok: {materialCode}'
-      WHEN 'notification.min_stock_alert.body'               THEN '{materialCode} - {materialName} malzemesi minimum stok seviyesinin altında. Mevcut: {currentStock} {unit}, Min: {minimumStock} {unit}.'
+      WHEN 'notification.min_stock_alert.title'              THEN 'Düşük Stok: {productCode}'
+      WHEN 'notification.min_stock_alert.body'               THEN '{productCode} - {productName} malzemesi minimum stok seviyesinin altında. Mevcut: {currentStock} {unit}, Min: {minimumStock} {unit}.'
       -- PoDeliveryLate
       WHEN 'notification.po_delivery_late.title'             THEN 'Teslimat Gecikti: {poNumber}'
       WHEN 'notification.po_delivery_late.body'              THEN '{supplierName} tedarikçisinden {poNumber} numaralı PO {lateDays} gün gecikmeli.'

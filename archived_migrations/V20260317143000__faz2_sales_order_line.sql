@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS "order".sales_order_line (
     version BIGINT NOT NULL DEFAULT 0,
 
     sales_order_id UUID NOT NULL,
-    material_id UUID,
+    product_id UUID,
     product_desc TEXT,
     requested_qty DECIMAL(15,3) NOT NULL,
     unit VARCHAR(20) NOT NULL,
@@ -47,9 +47,9 @@ CREATE TABLE IF NOT EXISTS "order".sales_order_line (
         )),
     recipe_id UUID,
 
-    -- Ensure at least one of material_id or product_desc is non-null
-    CONSTRAINT ck_sol_material_or_desc CHECK (
-        material_id IS NOT NULL OR product_desc IS NOT NULL
+    -- Ensure at least one of product_id or product_desc is non-null
+    CONSTRAINT ck_sol_product_or_desc CHECK (
+        product_id IS NOT NULL OR product_desc IS NOT NULL
     )
 );
 
@@ -61,9 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_sol_sales_order_id
 CREATE INDEX IF NOT EXISTS idx_sol_tenant_id
     ON "order".sales_order_line(tenant_id);
 
-CREATE INDEX IF NOT EXISTS idx_sol_material_id
-    ON "order".sales_order_line(material_id)
-    WHERE material_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sol_product_id
+    ON "order".sales_order_line(product_id)
+    WHERE product_id IS NOT NULL;
 
 -- Status-based querying (RuleEngine pending assignments, IWM hooks)
 CREATE INDEX IF NOT EXISTS idx_sol_line_status

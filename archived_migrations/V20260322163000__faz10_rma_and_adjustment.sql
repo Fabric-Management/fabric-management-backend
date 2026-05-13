@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS iwm.rma_line (
     uid VARCHAR(100) NOT NULL,
     rma_id UUID NOT NULL,
     sales_order_line_id UUID NOT NULL,
-    material_id UUID NOT NULL,
+    product_id UUID NOT NULL,
     lot_number VARCHAR(100) NOT NULL,
     defect_category VARCHAR(50) NOT NULL,
     qty DECIMAL(15,3) NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS iwm.rma_line (
 );
 
 CREATE INDEX idx_rma_line_rma ON iwm.rma_line(rma_id);
-CREATE INDEX idx_rma_line_material ON iwm.rma_line(material_id);
+CREATE INDEX idx_rma_line_product ON iwm.rma_line(product_id);
 
 -- 3. StockAdjustmentRequest
 CREATE TABLE IF NOT EXISTS iwm.stock_adjustment_request (
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS iwm.stock_adjustment_request (
     uid VARCHAR(100) NOT NULL,
     request_number VARCHAR(100) NOT NULL,
     location_id UUID NOT NULL,
-    material_id UUID NOT NULL,
+    product_id UUID NOT NULL,
     lot_number VARCHAR(100) NOT NULL,
     qty_adjustment DECIMAL(15,3) NOT NULL,
     unit VARCHAR(20) NOT NULL,

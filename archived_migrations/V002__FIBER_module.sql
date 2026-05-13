@@ -106,13 +106,13 @@ CREATE INDEX idx_fiber_iso_code ON production.prod_fiber_iso_code(iso_code);
 CREATE INDEX idx_fiber_iso_active ON production.prod_fiber_iso_code(is_active) WHERE is_active = TRUE;
 
 -- =====================================================
--- prod_material (base catalog)
+-- prod_product (base catalog)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS production.prod_material (
+CREATE TABLE IF NOT EXISTS production.prod_product (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
-    material_type VARCHAR(20) NOT NULL CHECK (material_type IN ('FIBER', 'YARN', 'FABRIC', 'CHEMICAL', 'CONSUMABLE')),
+    product_type VARCHAR(20) NOT NULL CHECK (product_type IN ('FIBER', 'YARN', 'FABRIC', 'CHEMICAL', 'CONSUMABLE')),
     unit VARCHAR(20) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     deleted_at TIMESTAMPTZ,
@@ -123,9 +123,9 @@ CREATE TABLE IF NOT EXISTS production.prod_material (
     version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_material_tenant_type ON production.prod_material(tenant_id, material_type);
-CREATE INDEX idx_material_active ON production.prod_material(is_active) WHERE is_active = TRUE;
-CREATE INDEX idx_material_tenant_active ON production.prod_material(tenant_id, is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_product_tenant_type ON production.prod_product(tenant_id, product_type);
+CREATE INDEX idx_product_active ON production.prod_product(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_product_tenant_active ON production.prod_product(tenant_id, is_active) WHERE is_active = TRUE;
 
 -- =====================================================
 -- prod_fiber (final: composition JSONB, no fiber_grade, category/iso NOT NULL)
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS production.prod_fiber (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) UNIQUE NOT NULL,
-    material_id UUID NOT NULL UNIQUE REFERENCES production.prod_material(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL UNIQUE REFERENCES production.prod_product(id) ON DELETE CASCADE,
     fiber_category_id UUID NOT NULL REFERENCES production.prod_fiber_category(id),
     fiber_iso_code_id UUID NOT NULL REFERENCES production.prod_fiber_iso_code(id),
     fiber_name VARCHAR(255) NOT NULL,
@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS production.prod_fiber (
 );
 
 CREATE INDEX idx_fiber_tenant ON production.prod_fiber(tenant_id);
-CREATE INDEX idx_fiber_material ON production.prod_fiber(material_id);
+CREATE INDEX idx_fiber_product ON production.prod_fiber(product_id);
 CREATE INDEX idx_fiber_category ON production.prod_fiber(fiber_category_id);
 CREATE INDEX idx_fiber_iso ON production.prod_fiber(fiber_iso_code_id);
 CREATE INDEX idx_fiber_status ON production.prod_fiber(status);

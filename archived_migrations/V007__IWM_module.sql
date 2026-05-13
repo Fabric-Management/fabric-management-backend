@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS production.production_execution_batch (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uid VARCHAR(100) NOT NULL,
-    material_id UUID NOT NULL,
-    material_type VARCHAR(50) NOT NULL DEFAULT 'FIBER',
+    product_id UUID NOT NULL,
+    product_type VARCHAR(50) NOT NULL DEFAULT 'FIBER',
     attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
     batch_code VARCHAR(100) NOT NULL,
     supplier_batch_code VARCHAR(100),
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS production.production_execution_batch (
     updated_by UUID,
     version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_exec_batch_tenant FOREIGN KEY (tenant_id) REFERENCES common_tenant.common_tenant(id) ON DELETE RESTRICT,
-    CONSTRAINT fk_exec_batch_material FOREIGN KEY (material_id) REFERENCES production.prod_fiber(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_exec_batch_product FOREIGN KEY (product_id) REFERENCES production.prod_fiber(id) ON DELETE RESTRICT,
     CONSTRAINT fk_batch_location FOREIGN KEY (location_id) REFERENCES production.production_execution_warehouse_location(id) ON DELETE SET NULL,
     CONSTRAINT fk_batch_parent_batch FOREIGN KEY (parent_batch_id) REFERENCES production.production_execution_batch(id) ON DELETE SET NULL,
     CONSTRAINT fk_batch_quality_standard FOREIGN KEY (quality_standard_id) REFERENCES production.prod_fiber_quality_standard(id) ON DELETE SET NULL,
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS production.production_execution_batch (
 );
 
 CREATE INDEX idx_exec_batch_tenant_id ON production.production_execution_batch(tenant_id);
-CREATE INDEX idx_exec_batch_material_id ON production.production_execution_batch(material_id);
+CREATE INDEX idx_exec_batch_product_id ON production.production_execution_batch(product_id);
 CREATE INDEX idx_exec_batch_code ON production.production_execution_batch(batch_code);
 CREATE INDEX idx_exec_batch_status ON production.production_execution_batch(status);
 CREATE INDEX idx_exec_batch_location ON production.production_execution_batch(location_id);

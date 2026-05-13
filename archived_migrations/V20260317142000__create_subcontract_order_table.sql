@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS procurement.subcontract_order (
     trading_partner_id UUID NOT NULL,
     status VARCHAR(25) NOT NULL DEFAULT 'DRAFT'
         CONSTRAINT ck_sc_status CHECK (status IN (
-            'DRAFT', 'CONFIRMED', 'MATERIAL_SENT', 'IN_PROGRESS', 'COMPLETED', 'CLOSED', 'CANCELLED'
+            'DRAFT', 'CONFIRMED', 'PRODUCT_SENT', 'IN_PROGRESS', 'COMPLETED', 'CLOSED', 'CANCELLED'
         )),
-    material_id UUID,
-    material_sent_qty DECIMAL(15,3),
+    product_id UUID,
+    product_sent_qty DECIMAL(15,3),
     unit VARCHAR(20) NOT NULL,
     actual_returned_qty DECIMAL(15,3),
     waste_qty DECIMAL(15,3),
