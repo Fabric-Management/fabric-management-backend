@@ -9,9 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.workorder.app.port.ComputedCostSnapshot;
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
@@ -44,12 +41,10 @@ class WorkOrderCostRecalculationServiceTest {
 
   private static final UUID TENANT_ID = UUID.randomUUID();
   private static final UUID WORK_ORDER_ID = UUID.randomUUID();
-  private static final UUID BATCH_ID = UUID.randomUUID();
   private static final UUID PRODUCT_ID = UUID.randomUUID();
   private static final UUID TRADING_PARTNER_ID = UUID.randomUUID();
 
   @Mock private WorkOrderCostEnginePort costEnginePort;
-  @Mock private BatchRepository batchRepository;
   @Mock private WorkOrderConsumptionRepository workOrderConsumptionRepository;
   @Mock private WorkOrderRepository workOrderRepository;
 
@@ -81,21 +76,6 @@ class WorkOrderCostRecalculationServiceTest {
     wo.setTenantId(TENANT_ID);
     wo.setIsActive(true);
     return wo;
-  }
-
-  private Batch buildOutputBatch() {
-    Batch batch =
-        Batch.builder()
-            .productId(PRODUCT_ID)
-            .productType(ProductType.YARN)
-            .sourceType(BatchSourceType.INTERNAL_PRODUCTION)
-            .sourceId(WORK_ORDER_ID)
-            .batchCode("BATCH-001")
-            .build();
-    batch.setId(BATCH_ID);
-    batch.setTenantId(TENANT_ID);
-    batch.setIsActive(true);
-    return batch;
   }
 
   private WorkOrderConsumption buildConsumption(UUID productId) {
@@ -159,29 +139,22 @@ class WorkOrderCostRecalculationServiceTest {
     }
 
     @Test
-    @DisplayName("throws when no output batch exists")
-    void throwsWhenNoOutputBatch() {
+    @DisplayName("throws when WorkOrder has no outputProductId")
+    void throwsWhenNoOutputProductId() {
       WorkOrder wo = buildCompletedWorkOrder();
+      wo.setOutputProductId(null);
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
-      when(batchRepository.findFirstByTenantIdAndSourceIdAndSourceType(
-              TENANT_ID, WORK_ORDER_ID, BatchSourceType.INTERNAL_PRODUCTION))
-          .thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> recalculationService.recalculateActualCost(WORK_ORDER_ID))
           .isInstanceOf(WorkOrderDomainException.class)
-          .hasMessageContaining("No output batch found");
+          .hasMessageContaining("has no outputProductId set");
     }
 
     @Test
     @DisplayName("throws when no consumption records exist")
     void throwsWhenNoConsumptions() {
       WorkOrder wo = buildCompletedWorkOrder();
-      Batch batch = buildOutputBatch();
-
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
-      when(batchRepository.findFirstByTenantIdAndSourceIdAndSourceType(
-              TENANT_ID, WORK_ORDER_ID, BatchSourceType.INTERNAL_PRODUCTION))
-          .thenReturn(Optional.of(batch));
       when(workOrderConsumptionRepository
               .findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
                   TENANT_ID, WORK_ORDER_ID))
@@ -196,13 +169,8 @@ class WorkOrderCostRecalculationServiceTest {
     @DisplayName("throws when consumptions exist but none have productId (pre-Sprint 6)")
     void throwsWhenConsumptionsLackProductId() {
       WorkOrder wo = buildCompletedWorkOrder();
-      Batch batch = buildOutputBatch();
       WorkOrderConsumption consumptionWithoutProduct = buildConsumption(null);
-
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
-      when(batchRepository.findFirstByTenantIdAndSourceIdAndSourceType(
-              TENANT_ID, WORK_ORDER_ID, BatchSourceType.INTERNAL_PRODUCTION))
-          .thenReturn(Optional.of(batch));
       when(workOrderConsumptionRepository
               .findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
                   TENANT_ID, WORK_ORDER_ID))
@@ -223,15 +191,11 @@ class WorkOrderCostRecalculationServiceTest {
     @DisplayName("computes actual cost and writes back to WorkOrder")
     void computesActualCostAndWritesBack() {
       WorkOrder wo = buildCompletedWorkOrder();
-      Batch batch = buildOutputBatch();
       UUID consumptionProductId = UUID.randomUUID();
       WorkOrderConsumption consumption = buildConsumption(consumptionProductId);
       BigDecimal computedCost = new BigDecimal("8500.000");
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
-      when(batchRepository.findFirstByTenantIdAndSourceIdAndSourceType(
-              TENANT_ID, WORK_ORDER_ID, BatchSourceType.INTERNAL_PRODUCTION))
-          .thenReturn(Optional.of(batch));
       when(workOrderConsumptionRepository
               .findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
                   TENANT_ID, WORK_ORDER_ID))
@@ -258,15 +222,11 @@ class WorkOrderCostRecalculationServiceTest {
     @DisplayName("filters out consumptions without productId and uses only valid ones")
     void filtersConsumptionsWithoutProductId() {
       WorkOrder wo = buildCompletedWorkOrder();
-      Batch batch = buildOutputBatch();
       UUID validProductId = UUID.randomUUID();
       WorkOrderConsumption validConsumption = buildConsumption(validProductId);
       WorkOrderConsumption legacyConsumption = buildConsumption(null); // pre-Sprint 6
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
-      when(batchRepository.findFirstByTenantIdAndSourceIdAndSourceType(
-              TENANT_ID, WORK_ORDER_ID, BatchSourceType.INTERNAL_PRODUCTION))
-          .thenReturn(Optional.of(batch));
       when(workOrderConsumptionRepository
               .findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
                   TENANT_ID, WORK_ORDER_ID))

@@ -24,4 +24,7 @@ public interface BatchReservationRepository extends JpaRepository<BatchReservati
 
   List<BatchReservation> findByTenantIdAndReferenceIdAndIsActiveTrue(
       UUID tenantId, UUID referenceId);
+
+  Optional<BatchReservation> findFirstByTenantIdAndBatchIdAndReferenceIdAndStatusInAndIsActiveTrue(
+      UUID tenantId, UUID batchId, UUID referenceId, Collection<ReservationStatus> statuses);
 }

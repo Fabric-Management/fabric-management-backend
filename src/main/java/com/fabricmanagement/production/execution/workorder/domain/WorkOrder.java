@@ -27,6 +27,10 @@ import lombok.Setter;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class WorkOrder extends BaseEntity {
 
+  /**
+   * Auto-generated business key. Pre-PR-2 records use legacy WO-{YEAR}-{8-HEX} format. New records
+   * use WO-{YYYYMMDD}-{NNNNN}. Both coexist; searchText substring filter is format-agnostic.
+   */
   @Column(name = "work_order_number", nullable = false, length = 100)
   private String workOrderNumber;
 

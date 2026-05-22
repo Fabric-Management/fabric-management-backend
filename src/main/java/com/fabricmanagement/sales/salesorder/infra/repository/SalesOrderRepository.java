@@ -113,17 +113,4 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, UUID> {
   long countByTenantIdAndStatus(UUID tenantId, OrderStatus status);
 
   long countByTenantIdAndTradingPartnerIdAndIsActiveTrue(UUID tenantId, UUID tradingPartnerId);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Order Number Generation
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  @Query(
-      """
-      SELECT MAX(o.orderNumber) FROM SalesOrder o
-      WHERE o.tenantId = :tenantId
-      AND o.orderNumber LIKE :prefix%
-      """)
-  Optional<String> findMaxOrderNumber(
-      @Param("tenantId") UUID tenantId, @Param("prefix") String prefix);
 }

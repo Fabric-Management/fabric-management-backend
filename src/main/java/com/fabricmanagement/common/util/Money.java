@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.util;
 
+import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import jakarta.persistence.Embeddable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -89,10 +90,13 @@ public class Money {
   }
 
   public Money divide(double divisor) {
-    return new Money(
-        this.amount.divide(
-            BigDecimal.valueOf(divisor), currency.getDefaultFractionDigits(), RoundingMode.HALF_UP),
-        this.currency);
+    return divide(BigDecimal.valueOf(divisor));
+  }
+
+  public Money divide(BigDecimal divisor) {
+    // Use higher intermediate precision (10) to avoid double-rounding;
+    // the constructor's setScale() handles final rounding to currency fraction digits.
+    return new Money(this.amount.divide(divisor, 10, RoundingMode.HALF_UP), this.currency);
   }
 
   public boolean isGreaterThan(Money other) {
@@ -127,10 +131,8 @@ public class Money {
 
   private void assertSameCurrency(Money other) {
     if (!this.currency.equals(other.currency)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Cannot operate on different currencies: %s and %s",
-              this.currency.getCurrencyCode(), other.currency.getCurrencyCode()));
+      throw new CurrencyMismatchException(
+          this.currency.getCurrencyCode(), other.currency.getCurrencyCode());
     }
   }
 

@@ -28,11 +28,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PlaygroundTTLReaper (Unit Test)")
-class PlaygroundTTLReaperTest {
+class PlaygroundTTLReaperServiceTest {
 
   @Mock private TenantRepository tenantRepository;
 
-  @InjectMocks private PlaygroundTTLReaper reaper;
+  @InjectMocks private PlaygroundTTLReaperService reaper;
 
   @BeforeEach
   void setUp() {

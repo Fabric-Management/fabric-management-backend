@@ -11,6 +11,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -38,7 +39,14 @@ import lombok.Setter;
  * </ul>
  */
 @Entity
-@Table(name = "production_execution_batch", schema = "production")
+@Table(
+    name = "production_execution_batch",
+    schema = "production",
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uq_batch_tenant_code",
+          columnNames = {"tenant_id", "batch_code"})
+    })
 @Getter
 @Setter
 @Builder
@@ -159,6 +167,13 @@ public class Batch extends BaseEntity {
             : new java.util.HashMap<>());
     batch.onCreate();
     return batch;
+  }
+
+  public void addQuantity(BigDecimal amount) {
+    if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new BatchDomainException("Amount to add must be positive");
+    }
+    this.quantity = this.quantity.add(amount);
   }
 
   /**

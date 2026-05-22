@@ -1,8 +1,10 @@
 package com.fabricmanagement.procurement.purchaseorder.app;
 
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
+import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.purchaseorder.app.validation.PurchaseOrderValidationEngine;
@@ -18,9 +20,8 @@ import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseO
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class PurchaseOrderService {
   private final PurchaseOrderLineRepository lineRepository;
   private final PurchaseOrderValidationEngine validationEngine;
   private final ApprovalPort approvalPort;
+  private final DocumentNumberGenerator documentNumberGenerator;
 
   public PurchaseOrderResponse getPurchaseOrder(UUID id) {
     PurchaseOrder po = findEntityById(id);
@@ -88,11 +90,7 @@ public class PurchaseOrderService {
 
     validationEngine.validateOnCreate(type, specs);
 
-    BigDecimal total =
-        request.getLines().stream()
-            .map(l -> l.getUnitPrice().multiply(l.getQty()))
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
+    // 1. Save PO header first (with zero total) to obtain the generated ID
     PurchaseOrder po =
         PurchaseOrder.builder()
             .poNumber(generatePoNumber())
@@ -102,44 +100,47 @@ public class PurchaseOrderService {
             .moduleType(type)
             .moduleSpecs(specs)
             .status(PurchaseOrderStatus.DRAFT)
-            .currency(request.getCurrency())
             .paymentTerms(request.getPaymentTerms())
             .expectedDelivery(request.getExpectedDelivery())
-            .totalAmount(total)
+            .totalAmount(Money.zero(request.getCurrency()))
             .notes(request.getNotes())
             .build();
 
     PurchaseOrder saved = poRepository.save(po);
 
-    List<PurchaseOrderLine> lines = new ArrayList<>();
-    for (CreatePurchaseOrderRequest.PurchaseOrderLineRequest lineReq : request.getLines()) {
-      BigDecimal lineTotal = lineReq.getUnitPrice().multiply(lineReq.getQty());
-      lines.add(
-          PurchaseOrderLine.builder()
-              .purchaseOrderId(saved.getId())
-              .rfqLineId(lineReq.getRfqLineId())
-              .productId(lineReq.getProductId())
-              .productDesc(lineReq.getProductDesc())
-              .qty(lineReq.getQty())
-              .unit(lineReq.getUnit())
-              .unitPrice(lineReq.getUnitPrice())
-              .currency(lineReq.getCurrency())
-              .totalPrice(lineTotal)
-              .moduleSpecs(
-                  lineReq.getModuleSpecs() != null
-                      ? lineReq.getModuleSpecs()
-                      : new GenericPurchaseSpecs(null))
-              .build());
-    }
+    // 2. Create and save lines — factory method calls recalculateTotal()
+    List<PurchaseOrderLine> lines =
+        request.getLines().stream()
+            .map(
+                lineReq ->
+                    PurchaseOrderLine.create(
+                        saved.getId(),
+                        lineReq.getRfqLineId(),
+                        lineReq.getProductId(),
+                        lineReq.getProductDesc(),
+                        lineReq.getQty(),
+                        lineReq.getUnit(),
+                        Money.of(lineReq.getUnitPrice(), lineReq.getCurrency()),
+                        lineReq.getModuleSpecs()))
+            .toList();
     List<PurchaseOrderLine> savedLines = lineRepository.saveAll(lines);
+
+    // 3. Compute header total from saved lines' Money-rounded totalPrice values
+    BigDecimal total =
+        savedLines.stream()
+            .map(PurchaseOrderLine::getTotalPrice)
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    saved.updateTotalAmount(Money.of(total, saved.getCurrency()));
+    PurchaseOrder finalSaved = poRepository.save(saved);
 
     log.info(
         "PurchaseOrder created: {} [workOrder={}, supplier={}]",
-        saved.getPoNumber(),
-        saved.getWorkOrderId(),
-        saved.getTradingPartnerId());
+        finalSaved.getPoNumber(),
+        finalSaved.getWorkOrderId(),
+        finalSaved.getTradingPartnerId());
 
-    return mapToResponse(saved, savedLines);
+    return mapToResponse(finalSaved, savedLines);
   }
 
   /**
@@ -231,11 +232,9 @@ public class PurchaseOrderService {
             () -> new ProcurementDomainException("PurchaseOrder not found with id: " + id));
   }
 
-  /** Format: PO-{YEAR}-{8-char random suffix}. DB UNIQUE index provides hard safety. */
   private String generatePoNumber() {
-    String year = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy"));
-    String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
-    return String.format("PO-%s-%s", year, suffix);
+    UUID tenantId = TenantContext.requireTenantId();
+    return documentNumberGenerator.generate(tenantId, ENTITY_TYPE, "PO", LocalDate.now(), 5);
   }
 
   private PurchaseOrderResponse mapToResponse(PurchaseOrder po, List<PurchaseOrderLine> lines) {
@@ -249,8 +248,8 @@ public class PurchaseOrderService {
                         .productDesc(l.getProductDesc())
                         .qty(l.getQty())
                         .unit(l.getUnit())
-                        .unitPrice(l.getUnitPrice())
-                        .currency(l.getCurrency())
+                        .unitPrice(extractAmount(l.getUnitPrice()))
+                        .currency(extractCurrencyCode(l.getUnitPrice()))
                         .totalPrice(l.getTotalPrice())
                         .moduleSpecs(l.getModuleSpecs())
                         .build())
@@ -267,7 +266,7 @@ public class PurchaseOrderService {
         .currency(po.getCurrency())
         .paymentTerms(po.getPaymentTerms())
         .expectedDelivery(po.getExpectedDelivery())
-        .totalAmount(po.getTotalAmount())
+        .totalAmount(extractAmount(po.getTotalAmount()))
         .revisionNumber(po.getRevisionNumber())
         .notes(po.getNotes())
         .moduleType(po.getModuleType())
@@ -288,12 +287,20 @@ public class PurchaseOrderService {
         .currency(po.getCurrency())
         .paymentTerms(po.getPaymentTerms())
         .expectedDelivery(po.getExpectedDelivery())
-        .totalAmount(po.getTotalAmount())
+        .totalAmount(extractAmount(po.getTotalAmount()))
         .revisionNumber(po.getRevisionNumber())
         .notes(po.getNotes())
         .moduleType(po.getModuleType())
         .moduleSpecs(po.getModuleSpecs())
-        .lines(null) // Summary DTO mantığıyla null bırakılır
+        .lines(null) // Summary — lines loaded lazily via separate query
         .build();
+  }
+
+  private static BigDecimal extractAmount(Money money) {
+    return money != null ? money.getAmount() : null;
+  }
+
+  private static String extractCurrencyCode(Money money) {
+    return money != null ? money.getCurrency().getCurrencyCode() : null;
   }
 }

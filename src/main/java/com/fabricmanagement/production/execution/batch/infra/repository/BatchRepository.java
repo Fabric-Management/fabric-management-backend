@@ -51,6 +51,15 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
   Optional<Batch> findFirstByTenantIdAndSourceIdAndSourceType(
       UUID tenantId, UUID sourceId, BatchSourceType sourceType);
 
+  List<Batch> findByTenantIdAndSourceIdAndSourceTypeAndIsActiveTrueOrderByCreatedAtAsc(
+      UUID tenantId, UUID sourceId, BatchSourceType sourceType);
+
+  List<Batch> findByTenantIdAndSourceIdAndSourceTypeAndStatusAndIsActiveTrue(
+      UUID tenantId, UUID sourceId, BatchSourceType sourceType, BatchStatus status);
+
+  long countByTenantIdAndSourceIdAndSourceTypeAndIsActiveTrue(
+      UUID tenantId, UUID sourceId, BatchSourceType sourceType);
+
   /** Count batches that are direct children of the given parent (for split code generation). */
   long countByTenantIdAndParentBatchId(UUID tenantId, UUID parentBatchId);
 

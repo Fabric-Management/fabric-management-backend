@@ -1,10 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,11 +16,20 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class StartProductionRequest {
 
-  @NotEmpty(message = "Consumption batches list cannot be empty")
-  @Valid
+  /**
+   * @deprecated Phase 2 refactoring: Input consumption is moved to separate action.
+   */
+  @Deprecated(forRemoval = true)
+  @jakarta.validation.constraints.Null(
+      message = "Input consumption is moved to separate action. Use consumption endpoints.")
   private List<WorkOrderConsumptionDto> consumptions;
 
-  @NotNull(message = "Output location ID is required")
+  /**
+   * @deprecated Phase 2 refactoring: Lot creation (and its location) is moved to separate action.
+   */
+  @Deprecated(forRemoval = true)
+  @jakarta.validation.constraints.Null(
+      message = "Lot creation is moved to separate action. Use openLot endpoint.")
   private UUID outputLocationId;
 
   /**
@@ -50,20 +55,24 @@ public class StartProductionRequest {
   @AllArgsConstructor
   public static class WorkOrderConsumptionDto {
 
-    @NotNull(message = "Batch ID is required for consumption")
+    /**
+     * @deprecated Phase 2 refactoring: Input consumption is moved to separate action.
+     */
+    @Deprecated(forRemoval = true)
     private UUID batchId;
 
-    @NotNull(message = "Quantity to consume is required")
-    @DecimalMin(value = "0.01", message = "Consumption quantity must be greater than zero")
+    /**
+     * @deprecated Phase 2 refactoring: Input consumption is moved to separate action.
+     */
+    @Deprecated(forRemoval = true)
     private BigDecimal quantity;
 
     /**
-     * The percentage this batch contributes to the blend. All consumptions in a request must sum to
-     * exactly 100. Must match the recipe's component ratios (e.g. 60 for Cotton, 40 for Abaca).
+     * The percentage this batch contributes to the blend.
+     *
+     * @deprecated Phase 2 refactoring: Input consumption is moved to separate action.
      */
-    @NotNull(message = "Consumption percentage is required")
-    @DecimalMin(value = "0.01", message = "Consumption percentage must be greater than zero")
-    @DecimalMax(value = "100.00", message = "Consumption percentage cannot exceed 100")
+    @Deprecated(forRemoval = true)
     private BigDecimal consumptionPercentage;
   }
 }

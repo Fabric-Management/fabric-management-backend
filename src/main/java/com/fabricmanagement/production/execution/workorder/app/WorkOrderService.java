@@ -2,14 +2,15 @@ package com.fabricmanagement.production.execution.workorder.app;
 
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.platform.tenant.api.facade.TenantFacade;
-import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerCertificationService;
 import com.fabricmanagement.platform.user.domain.SystemUser;
-import com.fabricmanagement.production.execution.batch.api.facade.BatchFacade;
-import com.fabricmanagement.production.execution.batch.dto.BlendParentRequest;
-import com.fabricmanagement.production.execution.batch.dto.CreateBlendedBatchRequest;
+import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
@@ -20,16 +21,14 @@ import com.fabricmanagement.production.execution.workorder.dto.StartProductionRe
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderFilterRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
+import com.fabricmanagement.production.execution.workorder.infra.repository.ProductionRecordRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
-import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderOutputRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderSpecification;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,12 +49,15 @@ public class WorkOrderService {
 
   private final WorkOrderRepository workOrderRepository;
   private final WorkOrderConsumptionRepository workOrderConsumptionRepository;
-  private final WorkOrderOutputRepository workOrderOutputRepository;
-  private final BatchFacade batchFacade;
-  private final TradingPartnerCertificationService certificationService;
+  private final ProductionRecordRepository productionRecordRepository;
+  private final BatchRepository batchRepository;
+  private final com.fabricmanagement.production.execution.workorder.app.adapter
+          .TradingPartnerAdapter
+      tradingPartnerAdapter;
   private final DomainEventPublisher domainEventPublisher;
   private final ApprovalPort approvalPort;
   private final TenantFacade tenantFacade;
+  private final DocumentNumberGenerator documentNumberGenerator;
 
   /**
    * Paginated, filterable listing of WorkOrders for the current tenant.
@@ -240,7 +242,7 @@ public class WorkOrderService {
               line.quantity(),
               line.unit(),
               line.requestedDeliveryDate(),
-              generateWorkOrderNumber());
+              generateWorkOrderNumber(tenantId));
       workOrder = workOrderRepository.save(workOrder);
     }
 
@@ -313,12 +315,11 @@ public class WorkOrderService {
   }
 
   /**
-   * Starts production for a WorkOrder: 1. Validates status and required fields. 2. Transitions to
-   * IN_PROGRESS. 3. Consumes specified parent batches, creates the output batch via BatchService.
-   * 4. BatchLineage is recorded automatically by BatchService.createBlendedBatch.
+   * Starts production for a WorkOrder: 1. Validates status and required fields (recipeId,
+   * outputProductId). 2. Sets the outputProductId on the WorkOrder. 3. Transitions to IN_PROGRESS.
    *
-   * <p>The caller must provide the exact consumptionPercentage per batch in the request, matching
-   * the recipe's component ratios (e.g. 60% + 40%). Total must equal 100.
+   * <p>Lot creation is handled separately via {@link ProductionLotService#openLot}. Input
+   * consumption is handled via {@link WorkOrderConsumptionService#consumeFromStockUnit}.
    */
   @Transactional
   public WorkOrderResponse startProduction(UUID id, StartProductionRequest request) {
@@ -342,37 +343,11 @@ public class WorkOrderService {
 
     // Transition to IN_PROGRESS
     workOrder.setStatus(WorkOrderStatus.IN_PROGRESS);
+    workOrder.setOutputProductId(request.getOutputProductId());
     workOrder = workOrderRepository.save(workOrder);
 
-    // Prepare Blend Parent list — consumptionPercentage must come from caller (recipe-based ratios)
-    List<BlendParentRequest> parentBatches = new ArrayList<>();
-    for (StartProductionRequest.WorkOrderConsumptionDto consumption : request.getConsumptions()) {
-      parentBatches.add(
-          BlendParentRequest.builder()
-              .parentBatchId(consumption.getBatchId())
-              .consumedQuantity(consumption.getQuantity())
-              .consumptionPercentage(consumption.getConsumptionPercentage())
-              .build());
-    }
-
-    // BatchService handles consumption + lineage atomically
-    CreateBlendedBatchRequest blendReq =
-        CreateBlendedBatchRequest.builder()
-            .batchCode(workOrder.getWorkOrderNumber() + "-OUT")
-            .productId(request.getOutputProductId())
-            .productType(request.getOutputProductType())
-            .quantity(workOrder.getPlannedQty())
-            .unit(workOrder.getUnit())
-            .locationId(request.getOutputLocationId())
-            .remarks(request.getRemarks())
-            .parents(parentBatches)
-            .sourceType(
-                com.fabricmanagement.production.execution.batch.domain.BatchSourceType
-                    .INTERNAL_PRODUCTION)
-            .sourceId(workOrder.getId())
-            .build();
-
-    batchFacade.createBlendedBatch(blendReq);
+    // Phase 2 refactoring: Lot creation is now handled by ProductionLotService.
+    // The start-production action only changes the status.
 
     return mapToResponse(workOrder);
   }
@@ -400,7 +375,7 @@ public class WorkOrderService {
 
     // Rule 3: At least one output
     BigDecimal totalOutput =
-        workOrderOutputRepository.sumOutputWeightByWorkOrderId(tenantId, workOrderId);
+        productionRecordRepository.sumOutputWeightByWorkOrderId(tenantId, workOrderId);
     if (totalOutput == null || totalOutput.compareTo(BigDecimal.ZERO) == 0) {
       throw new WorkOrderDomainException("Cannot complete: no output records found");
     }
@@ -412,6 +387,16 @@ public class WorkOrderService {
     // Domain method handles transition
     workOrder.complete(totalOutput, yieldPct, actorId);
     workOrderRepository.save(workOrder);
+
+    // Auto-close open lots
+    List<Batch> openLots =
+        batchRepository.findByTenantIdAndSourceIdAndSourceTypeAndStatusAndIsActiveTrue(
+            tenantId, workOrderId, BatchSourceType.INTERNAL_PRODUCTION, BatchStatus.AVAILABLE);
+    openLots.forEach(
+        lot -> {
+          lot.setStatus(BatchStatus.DEPLETED);
+          batchRepository.save(lot);
+        });
 
     // Publish
     domainEventPublisher.publish(
@@ -430,36 +415,33 @@ public class WorkOrderService {
   }
 
   private WorkOrder findEntityById(UUID id) {
+    UUID tenantId = TenantContext.requireTenantId();
     return workOrderRepository
-        .findById(id)
+        .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
         .orElseThrow(() -> new WorkOrderDomainException("Work order not found with id: " + id));
   }
 
   private String generateWorkOrderNumber() {
-    // Format: WO-{YEAR}-{8-char random suffix}
-    // 8-char HEX ~ 4.3 billion possibilities; DB unique constraint provides absolute safety.
-    String year = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy"));
-    String uniqueExt = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
-    return String.format("WO-%s-%s", year, uniqueExt);
+    return generateWorkOrderNumber(TenantContext.requireTenantId());
+  }
+
+  private String generateWorkOrderNumber(UUID tenantId) {
+    // Note on granularity: Daily granularity (YYYYMMDD) is chosen for WO/PO/SC to align with
+    // SalesOrder,
+    // simplify date-based substring searches across the platform, and easily support 99k docs/day.
+    return documentNumberGenerator.generate(tenantId, "WORK_ORDER", "WO", LocalDate.now(), 5);
   }
 
   private void applySupplierSnapshot(WorkOrder workOrder) {
     if (workOrder.getTradingPartnerId() != null) {
-      try {
-        var certs = certificationService.findByPartnerId(workOrder.getTradingPartnerId());
-        if (certs != null && !certs.isEmpty()) {
-          var cert = certs.get(0);
-          if (cert.getCertification() != null) {
-            workOrder.setSupplierCertificationCode(cert.getCertification().certificationCode());
-          }
-          workOrder.setSupplierLicenseNo(cert.getLicenseNo());
-          workOrder.setSupplierLicenseValidUntil(cert.getValidUntil());
+      var certs = tradingPartnerAdapter.getCertifications(workOrder.getTradingPartnerId());
+      if (certs != null && !certs.isEmpty()) {
+        var cert = certs.get(0);
+        if (cert.getCertification() != null) {
+          workOrder.setSupplierCertificationCode(cert.getCertification().certificationCode());
         }
-      } catch (Exception e) {
-        log.warn(
-            "Failed to load supplier certifications for trading partner {}",
-            workOrder.getTradingPartnerId(),
-            e);
+        workOrder.setSupplierLicenseNo(cert.getLicenseNo());
+        workOrder.setSupplierLicenseValidUntil(cert.getValidUntil());
       }
     }
   }

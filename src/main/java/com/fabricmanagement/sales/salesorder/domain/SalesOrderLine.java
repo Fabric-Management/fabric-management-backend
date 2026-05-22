@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.common.util.Money;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -79,11 +80,20 @@ public class SalesOrderLine extends BaseEntity {
   @Column(name = "unit", nullable = false, length = 20)
   private String unit;
 
-  @Column(name = "unit_price", precision = 18, scale = 4)
-  private BigDecimal unitPrice;
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(
+        name = "amount",
+        column = @Column(name = "unit_price", precision = 18, scale = 4)),
+    @AttributeOverride(name = "currency", column = @Column(name = "currency", length = 3))
+  })
+  private Money unitPrice;
 
-  @Column(name = "currency", length = 3)
-  private String currency;
+  public String getCurrency() {
+    return unitPrice != null && unitPrice.getCurrency() != null
+        ? unitPrice.getCurrency().getCurrencyCode()
+        : null;
+  }
 
   @ElementCollection
   @CollectionTable(
@@ -164,5 +174,14 @@ public class SalesOrderLine extends BaseEntity {
     }
     this.shippedQty = this.shippedQty.add(quantity);
     this.processedShipmentLineIds.add(shipmentLineId);
+  }
+
+  @PrePersist
+  @PreUpdate
+  private void validateEntity() {
+    if (!isValid()) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "Either productId or productDesc must be provided for SalesOrderLine");
+    }
   }
 }
