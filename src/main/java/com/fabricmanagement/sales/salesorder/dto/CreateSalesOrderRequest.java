@@ -3,7 +3,9 @@ package com.fabricmanagement.sales.salesorder.dto;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -49,6 +51,8 @@ public class CreateSalesOrderRequest {
   private BigDecimal discountAmount;
 
   /** Currency code. */
+  @NotBlank(message = "Currency is required")
+  @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a 3-letter ISO code")
   private String currency = "TRY";
 
   /** Shipping address. */

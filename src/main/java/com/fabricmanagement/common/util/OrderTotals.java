@@ -48,6 +48,19 @@ public class OrderTotals {
     return new OrderTotals(currencyCode, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
   }
 
+  public static OrderTotals of(Money totalAmount, Money taxAmount, Money discountAmount) {
+    if (totalAmount == null || taxAmount == null || discountAmount == null) {
+      throw new IllegalArgumentException("Amounts cannot be null");
+    }
+    String currency = totalAmount.getCurrency().getCurrencyCode();
+    if (!taxAmount.getCurrency().getCurrencyCode().equals(currency)
+        || !discountAmount.getCurrency().getCurrencyCode().equals(currency)) {
+      throw new CurrencyMismatchException(currency, "Mixed currencies in OrderTotals.of()");
+    }
+    return new OrderTotals(
+        currency, totalAmount.getAmount(), taxAmount.getAmount(), discountAmount.getAmount());
+  }
+
   /** Reconstructs a {@link Money} from the stored total amount, null-safe. */
   public Money getTotalAmount() {
     return totalAmountValue != null ? Money.of(totalAmountValue, currency) : Money.zero(currency);

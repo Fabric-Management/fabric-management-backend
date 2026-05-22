@@ -75,6 +75,22 @@ public class SalesOrderService {
         request.getOrderDate() != null ? request.getOrderDate() : LocalDate.now();
     String orderNumber = generateOrderNumber(tenantId, effectiveDate);
 
+    String currency = request.getCurrency() != null ? request.getCurrency() : "TRY";
+    Money total =
+        request.getTotalAmount() != null
+            ? Money.of(request.getTotalAmount(), currency)
+            : Money.zero(currency);
+    Money tax =
+        request.getTaxAmount() != null
+            ? Money.of(request.getTaxAmount(), currency)
+            : Money.zero(currency);
+    Money discount =
+        request.getDiscountAmount() != null
+            ? Money.of(request.getDiscountAmount(), currency)
+            : Money.zero(currency);
+
+    OrderTotals totals = OrderTotals.of(total, tax, discount);
+
     SalesOrder order =
         SalesOrder.builder()
             .tradingPartnerId(tradingPartnerId)
@@ -84,29 +100,7 @@ public class SalesOrderService {
             .orderDate(request.getOrderDate())
             .requestedDeliveryDate(request.getRequestedDeliveryDate())
             .promisedDeliveryDate(request.getPromisedDeliveryDate())
-            .totals(
-                OrderTotals.zero(request.getCurrency() != null ? request.getCurrency() : "TRY")
-                    .withTotalAmount(
-                        request.getTotalAmount() != null
-                            ? Money.of(
-                                request.getTotalAmount(),
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")
-                            : Money.zero(
-                                request.getCurrency() != null ? request.getCurrency() : "TRY"))
-                    .withTaxAmount(
-                        request.getTaxAmount() != null
-                            ? Money.of(
-                                request.getTaxAmount(),
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")
-                            : Money.zero(
-                                request.getCurrency() != null ? request.getCurrency() : "TRY"))
-                    .withDiscountAmount(
-                        request.getDiscountAmount() != null
-                            ? Money.of(
-                                request.getDiscountAmount(),
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")
-                            : Money.zero(
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")))
+            .totals(totals)
             .shippingAddress(request.getShippingAddress())
             .billingAddress(request.getBillingAddress())
             .shippingMethod(request.getShippingMethod())
@@ -127,7 +121,7 @@ public class SalesOrderService {
               .map(
                   lineReq -> {
                     moduleSpecsValidator.validate(lineReq);
-                    return mapLineRequestToEntity(lineReq, saved.getId());
+                    return mapLineRequestToEntity(lineReq, saved.getId(), saved.getCurrency());
                   })
               .toList();
       lineRepository.saveAll(lines);
@@ -445,7 +439,17 @@ public class SalesOrderService {
 
   // ── Line mapping helpers ─────────────────────────────────────────────────
 
-  private SalesOrderLine mapLineRequestToEntity(SalesOrderLineRequest req, UUID salesOrderId) {
+  private SalesOrderLine mapLineRequestToEntity(
+      SalesOrderLineRequest req, UUID salesOrderId, String orderCurrency) {
+    // If unitPrice is provided, its currency MUST match the parent SalesOrder currency
+    if (req.getUnitPrice() != null
+        && req.getCurrency() != null
+        && !req.getCurrency().equals(orderCurrency)) {
+      throw new com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException(
+          orderCurrency, "Line currency must match order currency");
+    }
+
+    // Note: unitPrice can be null for draft/pending lines
     return SalesOrderLine.builder()
         .salesOrderId(salesOrderId)
         .productId(req.getProductId())
@@ -470,6 +474,7 @@ public class SalesOrderService {
         .productId(line.getProductId())
         .productDesc(line.getProductDesc())
         .requestedQty(line.getRequestedQty())
+        .shippedQty(line.getShippedQty())
         .unit(line.getUnit())
         .unitPrice(line.getUnitPrice() != null ? line.getUnitPrice().getAmount() : null)
         .currency(line.getCurrency())

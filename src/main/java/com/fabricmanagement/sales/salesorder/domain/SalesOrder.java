@@ -120,7 +120,10 @@ public class SalesOrder extends BaseEntity {
 
   /** Helper to get currency code */
   public String getCurrency() {
-    return totals != null ? totals.getCurrency() : "TRY";
+    if (totals == null) {
+      throw new IllegalStateException("SalesOrder totals cannot be null");
+    }
+    return totals.getCurrency();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -259,8 +262,10 @@ public class SalesOrder extends BaseEntity {
     this.status = OrderStatus.ON_HOLD;
   }
 
-  /** Calculate grand total. */
   public Money getGrandTotal() {
-    return totals != null ? totals.calculateGrandTotal() : Money.zero("TRY");
+    if (totals == null) {
+      throw new IllegalStateException("SalesOrder totals cannot be null");
+    }
+    return totals.calculateGrandTotal();
   }
 }

@@ -87,7 +87,12 @@ public class SalesOrderLine extends BaseEntity {
         column = @Column(name = "unit_price", precision = 18, scale = 4)),
     @AttributeOverride(name = "currency", column = @Column(name = "currency", length = 3))
   })
+  @Setter(AccessLevel.NONE)
   private Money unitPrice;
+
+  public void updateUnitPrice(Money price) {
+    this.unitPrice = price;
+  }
 
   public String getCurrency() {
     return unitPrice != null && unitPrice.getCurrency() != null
