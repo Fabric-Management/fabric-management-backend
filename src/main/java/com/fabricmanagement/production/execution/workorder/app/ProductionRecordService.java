@@ -1,24 +1,24 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
+import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.execution.workorder.domain.ProductionRecord;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
-import com.fabricmanagement.production.execution.workorder.domain.WorkOrderOutput;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
-import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderOutputRecordedEvent;
+import com.fabricmanagement.production.execution.workorder.domain.event.ProductionRecordedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.exception.WorkOrderDomainException;
-import com.fabricmanagement.production.execution.workorder.dto.WorkOrderOutputResponse;
-import com.fabricmanagement.production.execution.workorder.dto.WorkOrderOutputSummaryResponse;
+import com.fabricmanagement.production.execution.workorder.dto.ProductionRecordResponse;
+import com.fabricmanagement.production.execution.workorder.dto.ProductionSummaryResponse;
+import com.fabricmanagement.production.execution.workorder.infra.repository.ProductionRecordRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
-import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderOutputRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -31,12 +31,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Manages production records — the link between physical StockUnits produced and their parent
+ * WorkOrder. Each record captures one produced item (bobbin, bale, pallet) with its quality
+ * snapshot at production time.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class WorkOrderOutputService {
+public class ProductionRecordService {
 
-  private final WorkOrderOutputRepository workOrderOutputRepository;
+  private final ProductionRecordRepository productionRecordRepository;
   private final WorkOrderRepository workOrderRepository;
   private final StockUnitRepository stockUnitRepository;
   private final BatchRepository batchRepository;
@@ -44,7 +49,8 @@ public class WorkOrderOutputService {
   private final DomainEventPublisher domainEventPublisher;
 
   @Transactional
-  public WorkOrderOutputResponse recordOutput(UUID workOrderId, UUID stockUnitId, String notes) {
+  public ProductionRecordResponse recordProduction(
+      UUID workOrderId, UUID stockUnitId, String notes) {
     UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
 
@@ -68,15 +74,23 @@ public class WorkOrderOutputService {
           "StockUnit's batch is not an output batch of this WorkOrder");
     }
 
+    // 3.5 Validate: lot must still be AVAILABLE (not closed)
+    if (batch.getStatus() != BatchStatus.AVAILABLE) {
+      throw new WorkOrderDomainException(
+          String.format(
+              "Production lot %s is not AVAILABLE (status=%s). Cannot record production.",
+              batch.getBatchCode(), batch.getStatus()));
+    }
+
     // 4. Duplicate output prevention
-    if (workOrderOutputRepository.existsByTenantIdAndStockUnitIdAndIsActiveTrue(
+    if (productionRecordRepository.existsByTenantIdAndStockUnitIdAndIsActiveTrue(
         tenantId, stockUnitId)) {
       throw new WorkOrderDomainException("StockUnit already recorded as output for a WorkOrder");
     }
 
-    // 5. Record output link
-    WorkOrderOutput output =
-        WorkOrderOutput.record(
+    // 5. Record production record
+    ProductionRecord record =
+        ProductionRecord.record(
             tenantId,
             workOrderId,
             stockUnitId,
@@ -90,11 +104,21 @@ public class WorkOrderOutputService {
             actorId,
             notes);
 
-    WorkOrderOutput saved = workOrderOutputRepository.save(output);
+    ProductionRecord saved;
+    try {
+      saved = productionRecordRepository.saveAndFlush(record);
+    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+      throw new WorkOrderDomainException(
+          "StockUnit already recorded as output for a WorkOrder (Concurrent creation detected)");
+    }
+
+    // Sync lot quantity (Step 7)
+    batch.addQuantity(stockUnit.getInitialWeight());
+    batchRepository.save(batch);
 
     // 6. Event Publishing
     domainEventPublisher.publish(
-        new WorkOrderOutputRecordedEvent(
+        new ProductionRecordedEvent(
             tenantId,
             workOrderId,
             stockUnitId,
@@ -103,29 +127,29 @@ public class WorkOrderOutputService {
             stockUnit.getUnit()));
 
     log.info(
-        "Recorded WO {} output of {} {} (SU {})",
+        "Recorded WO {} production of {} {} (SU {})",
         workOrder.getWorkOrderNumber(),
         stockUnit.getInitialWeight(),
         stockUnit.getUnit(),
         stockUnit.getBarcode());
 
-    return WorkOrderOutputResponse.from(saved);
+    return ProductionRecordResponse.from(saved);
   }
 
   @Transactional(readOnly = true)
-  public List<WorkOrderOutputResponse> getOutputs(UUID workOrderId) {
+  public List<ProductionRecordResponse> getProductionRecords(UUID workOrderId) {
     UUID tenantId = TenantContext.requireTenantId();
     loadWorkOrder(workOrderId, tenantId);
 
-    List<WorkOrderOutput> outputs =
-        workOrderOutputRepository.findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
+    List<ProductionRecord> records =
+        productionRecordRepository.findByTenantIdAndWorkOrderIdAndIsActiveTrueOrderByCreatedAtAsc(
             tenantId, workOrderId);
 
-    return WorkOrderOutputResponse.from(outputs);
+    return ProductionRecordResponse.from(records);
   }
 
   @Transactional(readOnly = true)
-  public WorkOrderOutputSummaryResponse getOutputSummary(UUID workOrderId) {
+  public ProductionSummaryResponse getProductionSummary(UUID workOrderId) {
     UUID tenantId = TenantContext.requireTenantId();
     WorkOrder workOrder = loadWorkOrder(workOrderId, tenantId);
 
@@ -133,23 +157,23 @@ public class WorkOrderOutputService {
         workOrderConsumptionRepository.sumConsumedWeightByWorkOrderId(tenantId, workOrderId);
 
     // DB-level aggregation — no in-memory groupBy
-    List<WorkOrderOutputSummaryResponse.ProductBreakdown> breakdowns =
-        workOrderOutputRepository.aggregateByProductType(tenantId, workOrderId).stream()
+    List<ProductionSummaryResponse.ProductBreakdown> breakdowns =
+        productionRecordRepository.aggregateByProductType(tenantId, workOrderId).stream()
             .map(
                 agg ->
-                    new WorkOrderOutputSummaryResponse.ProductBreakdown(
+                    new ProductionSummaryResponse.ProductBreakdown(
                         agg.getProductType(), agg.getTotalWeight(), agg.getRecordCount()))
             .toList();
 
     // Derive totals from aggregation — no extra DB round-trip
     BigDecimal totalOutputWeight =
         breakdowns.stream()
-            .map(WorkOrderOutputSummaryResponse.ProductBreakdown::outputWeight)
+            .map(ProductionSummaryResponse.ProductBreakdown::outputWeight)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
     long outputCount =
         breakdowns.stream()
-            .mapToLong(WorkOrderOutputSummaryResponse.ProductBreakdown::outputCount)
+            .mapToLong(ProductionSummaryResponse.ProductBreakdown::outputCount)
             .sum();
 
     // Zero division protection
@@ -160,7 +184,7 @@ public class WorkOrderOutputService {
                 .multiply(new BigDecimal("100"))
                 .divide(totalConsumed, 2, RoundingMode.HALF_UP);
 
-    return new WorkOrderOutputSummaryResponse(
+    return new ProductionSummaryResponse(
         workOrder.getId(),
         workOrder.getPlannedQty(),
         totalOutputWeight,
@@ -172,25 +196,23 @@ public class WorkOrderOutputService {
   }
 
   @Transactional(readOnly = true)
-  public PagedResponse<WorkOrderOutputResponse> getOutputsPaged(
+  public PagedResponse<ProductionRecordResponse> getProductionRecordsPaged(
       UUID workOrderId, Pageable pageable) {
     UUID tenantId = TenantContext.requireTenantId();
     loadWorkOrder(workOrderId, tenantId);
 
-    Page<WorkOrderOutput> page =
-        workOrderOutputRepository.findByTenantIdAndWorkOrderIdAndIsActiveTrue(
+    Page<ProductionRecord> page =
+        productionRecordRepository.findByTenantIdAndWorkOrderIdAndIsActiveTrue(
             tenantId, workOrderId, pageable);
 
-    return PagedResponse.from(page, WorkOrderOutputResponse::from);
+    return PagedResponse.from(page, ProductionRecordResponse::from);
   }
 
   // --- Helpers --- //
 
   private WorkOrder loadWorkOrder(UUID id, UUID tenantId) {
     return workOrderRepository
-        .findById(id)
-        .filter(wo -> wo.getTenantId().equals(tenantId))
-        .filter(BaseEntity::getIsActive)
+        .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
         .orElseThrow(() -> new NotFoundException("WorkOrder not found: " + id));
   }
 

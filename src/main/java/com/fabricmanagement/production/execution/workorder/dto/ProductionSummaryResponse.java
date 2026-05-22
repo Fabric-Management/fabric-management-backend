@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-public record WorkOrderOutputSummaryResponse(
+public record ProductionSummaryResponse(
     UUID workOrderId,
     BigDecimal plannedQty,
     BigDecimal totalOutputWeight,

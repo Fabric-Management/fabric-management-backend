@@ -80,10 +80,12 @@ public class SalesOrderDto {
         .requestedDeliveryDate(order.getRequestedDeliveryDate())
         .promisedDeliveryDate(order.getPromisedDeliveryDate())
         .actualDeliveryDate(order.getActualDeliveryDate())
-        .totalAmount(order.getTotalAmount())
-        .taxAmount(order.getTaxAmount())
-        .discountAmount(order.getDiscountAmount())
-        .grandTotal(order.getGrandTotal())
+        .totalAmount(
+            order.getTotals() != null ? order.getTotals().getTotalAmount().getAmount() : null)
+        .taxAmount(order.getTotals() != null ? order.getTotals().getTaxAmount().getAmount() : null)
+        .discountAmount(
+            order.getTotals() != null ? order.getTotals().getDiscountAmount().getAmount() : null)
+        .grandTotal(order.getGrandTotal() != null ? order.getGrandTotal().getAmount() : null)
         .currency(order.getCurrency())
         .shippingAddress(order.getShippingAddress())
         .billingAddress(order.getBillingAddress())

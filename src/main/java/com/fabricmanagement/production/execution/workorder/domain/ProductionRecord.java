@@ -23,7 +23,10 @@ import lombok.NoArgsConstructor;
  * Represents a physical StockUnit produced (output) by a specific WorkOrder.
  *
  * <p>This entity links the logical production fulfillment back to the physical inventory generated
- * during the manufacturing process.
+ * during the manufacturing process. Each record captures one produced item (bobbin, bale, pallet)
+ * along with its quality snapshot at production time.
+ *
+ * <p>Note: DB table name retained as {@code work_order_output} for migration compatibility.
  */
 @Entity
 @Table(
@@ -32,7 +35,10 @@ import lombok.NoArgsConstructor;
     uniqueConstraints = {
       @UniqueConstraint(
           name = "uq_wo_output_tenant_uid",
-          columnNames = {"tenant_id", "uid"})
+          columnNames = {"tenant_id", "uid"}),
+      @UniqueConstraint(
+          name = "uq_wo_output_tenant_su",
+          columnNames = {"tenant_id", "stock_unit_id"})
     },
     indexes = {
       @Index(name = "idx_wo_output_tenant", columnList = "tenant_id"),
@@ -44,7 +50,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class WorkOrderOutput extends BaseEntity {
+public class ProductionRecord extends BaseEntity {
 
   @Column(name = "work_order_id", nullable = false)
   private UUID workOrderId;
@@ -87,8 +93,8 @@ public class WorkOrderOutput extends BaseEntity {
   @Column(name = "notes")
   private String notes;
 
-  /** Factory method to record a new WorkOrder output. */
-  public static WorkOrderOutput record(
+  /** Factory method to record a new production record for a WorkOrder. */
+  public static ProductionRecord record(
       UUID tenantId,
       UUID workOrderId,
       UUID stockUnitId,
@@ -115,8 +121,8 @@ public class WorkOrderOutput extends BaseEntity {
       throw new WorkOrderDomainException("productType, unit, and producedBy are required.");
     }
 
-    WorkOrderOutput output =
-        WorkOrderOutput.builder()
+    ProductionRecord record =
+        ProductionRecord.builder()
             .workOrderId(workOrderId)
             .stockUnitId(stockUnitId)
             .batchId(batchId)
@@ -131,8 +137,8 @@ public class WorkOrderOutput extends BaseEntity {
             .notes(notes)
             .build();
 
-    output.setTenantId(tenantId);
-    return output;
+    record.setTenantId(tenantId);
+    return record;
   }
 
   @Override

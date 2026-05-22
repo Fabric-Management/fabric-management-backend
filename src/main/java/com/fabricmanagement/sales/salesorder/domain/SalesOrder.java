@@ -1,11 +1,12 @@
 package com.fabricmanagement.sales.salesorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -36,11 +37,6 @@ import org.hibernate.annotations.Type;
       @Index(name = "idx_so_trading_partner", columnList = "trading_partner_id"),
       @Index(name = "idx_so_status", columnList = "status"),
       @Index(name = "idx_so_order_date", columnList = "order_date")
-    },
-    uniqueConstraints = {
-      @UniqueConstraint(
-          name = "uk_so_tenant_order_number",
-          columnNames = {"tenant_id", "order_number"})
     })
 @Getter
 @Setter
@@ -110,22 +106,22 @@ public class SalesOrder extends BaseEntity {
   // Financial
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Total order amount (before tax). */
-  @Column(name = "total_amount", precision = 19, scale = 4)
-  private BigDecimal totalAmount;
-
-  /** Tax amount. */
-  @Column(name = "tax_amount", precision = 19, scale = 4)
-  private BigDecimal taxAmount;
-
-  /** Discount amount. */
-  @Column(name = "discount_amount", precision = 19, scale = 4)
-  private BigDecimal discountAmount;
-
-  /** Currency code (ISO 4217). */
-  @Column(name = "currency", length = 3)
+  @Setter(AccessLevel.NONE)
+  @Embedded
   @Builder.Default
-  private String currency = "TRY";
+  private OrderTotals totals = OrderTotals.zero("TRY");
+
+  public void updateTotals(OrderTotals newTotals) {
+    if (newTotals == null) {
+      throw new IllegalArgumentException("OrderTotals cannot be null");
+    }
+    this.totals = newTotals;
+  }
+
+  /** Helper to get currency code */
+  public String getCurrency() {
+    return totals != null ? totals.getCurrency() : "TRY";
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Shipping
@@ -264,10 +260,7 @@ public class SalesOrder extends BaseEntity {
   }
 
   /** Calculate grand total. */
-  public BigDecimal getGrandTotal() {
-    BigDecimal base = totalAmount != null ? totalAmount : BigDecimal.ZERO;
-    BigDecimal tax = taxAmount != null ? taxAmount : BigDecimal.ZERO;
-    BigDecimal discount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
-    return base.add(tax).subtract(discount);
+  public Money getGrandTotal() {
+    return totals != null ? totals.calculateGrandTotal() : Money.zero("TRY");
   }
 }

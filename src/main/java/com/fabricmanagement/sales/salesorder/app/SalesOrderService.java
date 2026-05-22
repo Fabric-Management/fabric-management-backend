@@ -1,10 +1,14 @@
 package com.fabricmanagement.sales.salesorder.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -14,10 +18,10 @@ import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineResponse;
+import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,15 +47,11 @@ public class SalesOrderService {
   private final SalesOrderRepository orderRepository;
   private final TradingPartnerResolver partnerResolver;
   private final TradingPartnerService partnerService;
-  private final com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository
-      lineRepository;
-  private final com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine
-      ruleEngine;
+  private final SalesOrderLineRepository lineRepository;
+  private final SalesOrderRuleEngine ruleEngine;
   private final ModuleSpecsValidator moduleSpecsValidator;
   private final DomainEventPublisher domainEventPublisher;
-
-  private static final DateTimeFormatter ORDER_NUMBER_DATE_FORMAT =
-      DateTimeFormatter.ofPattern("yyyyMMdd");
+  private final DocumentNumberGenerator documentNumberGenerator;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -71,7 +71,9 @@ public class SalesOrderService {
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
 
     // Generate order number
-    String orderNumber = generateOrderNumber(tenantId, request.getOrderDate());
+    LocalDate effectiveDate =
+        request.getOrderDate() != null ? request.getOrderDate() : LocalDate.now();
+    String orderNumber = generateOrderNumber(tenantId, effectiveDate);
 
     SalesOrder order =
         SalesOrder.builder()
@@ -82,10 +84,29 @@ public class SalesOrderService {
             .orderDate(request.getOrderDate())
             .requestedDeliveryDate(request.getRequestedDeliveryDate())
             .promisedDeliveryDate(request.getPromisedDeliveryDate())
-            .totalAmount(request.getTotalAmount())
-            .taxAmount(request.getTaxAmount())
-            .discountAmount(request.getDiscountAmount())
-            .currency(request.getCurrency())
+            .totals(
+                OrderTotals.zero(request.getCurrency() != null ? request.getCurrency() : "TRY")
+                    .withTotalAmount(
+                        request.getTotalAmount() != null
+                            ? Money.of(
+                                request.getTotalAmount(),
+                                request.getCurrency() != null ? request.getCurrency() : "TRY")
+                            : Money.zero(
+                                request.getCurrency() != null ? request.getCurrency() : "TRY"))
+                    .withTaxAmount(
+                        request.getTaxAmount() != null
+                            ? Money.of(
+                                request.getTaxAmount(),
+                                request.getCurrency() != null ? request.getCurrency() : "TRY")
+                            : Money.zero(
+                                request.getCurrency() != null ? request.getCurrency() : "TRY"))
+                    .withDiscountAmount(
+                        request.getDiscountAmount() != null
+                            ? Money.of(
+                                request.getDiscountAmount(),
+                                request.getCurrency() != null ? request.getCurrency() : "TRY")
+                            : Money.zero(
+                                request.getCurrency() != null ? request.getCurrency() : "TRY")))
             .shippingAddress(request.getShippingAddress())
             .billingAddress(request.getBillingAddress())
             .shippingMethod(request.getShippingMethod())
@@ -431,8 +452,10 @@ public class SalesOrderService {
         .productDesc(req.getProductDesc())
         .requestedQty(req.getRequestedQty())
         .unit(req.getUnit())
-        .unitPrice(req.getUnitPrice())
-        .currency(req.getCurrency())
+        .unitPrice(
+            req.getUnitPrice() != null && req.getCurrency() != null
+                ? com.fabricmanagement.common.util.Money.of(req.getUnitPrice(), req.getCurrency())
+                : null)
         .moduleType(req.getModuleType())
         .moduleSpecs(req.getModuleSpecs())
         .lineStatus(SalesOrderLineStatus.PENDING)
@@ -448,7 +471,7 @@ public class SalesOrderService {
         .productDesc(line.getProductDesc())
         .requestedQty(line.getRequestedQty())
         .unit(line.getUnit())
-        .unitPrice(line.getUnitPrice())
+        .unitPrice(line.getUnitPrice() != null ? line.getUnitPrice().getAmount() : null)
         .currency(line.getCurrency())
         .moduleType(line.getModuleType())
         .moduleSpecs(line.getModuleSpecs())
@@ -458,14 +481,6 @@ public class SalesOrderService {
   }
 
   private String generateOrderNumber(UUID tenantId, LocalDate orderDate) {
-    String prefix = "SO-" + orderDate.format(ORDER_NUMBER_DATE_FORMAT) + "-";
-    String maxNumber =
-        orderRepository.findMaxOrderNumber(tenantId, prefix).orElse(prefix + "00000");
-
-    // Extract sequence number and increment
-    String sequencePart = maxNumber.substring(prefix.length());
-    int sequence = Integer.parseInt(sequencePart) + 1;
-
-    return prefix + String.format("%05d", sequence);
+    return documentNumberGenerator.generate(tenantId, "SALES_ORDER", "SO", orderDate, 5);
   }
 }

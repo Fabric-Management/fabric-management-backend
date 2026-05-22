@@ -2,28 +2,32 @@ package com.fabricmanagement.production.execution.workorder.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.production.execution.workorder.app.ProductionLotService;
+import com.fabricmanagement.production.execution.workorder.app.ProductionRecordService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderConsumptionService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostRecalculationService;
-import com.fabricmanagement.production.execution.workorder.app.WorkOrderOutputService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderPlannedCostTriggerService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.dto.ConsumeFromStockUnitRequest;
+import com.fabricmanagement.production.execution.workorder.dto.OpenProductionLotRequest;
 import com.fabricmanagement.production.execution.workorder.dto.ProductionDashboardResponse;
-import com.fabricmanagement.production.execution.workorder.dto.RecordOutputRequest;
+import com.fabricmanagement.production.execution.workorder.dto.ProductionLotResponse;
+import com.fabricmanagement.production.execution.workorder.dto.ProductionRecordResponse;
+import com.fabricmanagement.production.execution.workorder.dto.ProductionSummaryResponse;
+import com.fabricmanagement.production.execution.workorder.dto.RecordProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderConsumptionResponse;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderConsumptionSummaryResponse;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderFilterRequest;
-import com.fabricmanagement.production.execution.workorder.dto.WorkOrderOutputResponse;
-import com.fabricmanagement.production.execution.workorder.dto.WorkOrderOutputSummaryResponse;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -38,7 +42,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,7 +51,8 @@ public class WorkOrderController {
 
   private final WorkOrderService workOrderService;
   private final WorkOrderConsumptionService workOrderConsumptionService;
-  private final WorkOrderOutputService workOrderOutputService;
+  private final ProductionLotService productionLotService;
+  private final ProductionRecordService productionRecordService;
   private final WorkOrderCostRecalculationService workOrderCostRecalculationService;
   private final WorkOrderPlannedCostTriggerService workOrderPlannedCostTriggerService;
 
@@ -59,8 +63,8 @@ public class WorkOrderController {
               + "cost variance (PLANNED vs ACTUAL), and yield performance.")
   @GetMapping("/dashboard")
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
-  public ProductionDashboardResponse getProductionDashboard() {
-    return workOrderService.getProductionDashboard();
+  public ResponseEntity<ApiResponse<ProductionDashboardResponse>> getProductionDashboard() {
+    return ResponseEntity.ok(ApiResponse.success(workOrderService.getProductionDashboard()));
   }
 
   @Operation(
@@ -70,7 +74,7 @@ public class WorkOrderController {
               + "All filter parameters are optional. Combine with Pageable for sorting.")
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
-  public PagedResponse<WorkOrderResponse> listWorkOrders(
+  public ResponseEntity<ApiResponse<PagedResponse<WorkOrderResponse>>> listWorkOrders(
       @Parameter(description = "Filter by status") @RequestParam(required = false)
           WorkOrderStatus status,
       @Parameter(description = "Filter by module type") @RequestParam(required = false)
@@ -114,20 +118,24 @@ public class WorkOrderController {
             createdFrom,
             createdTo);
 
-    return workOrderService.listWorkOrders(filter, pageable);
+    return ResponseEntity.ok(
+        ApiResponse.success(workOrderService.listWorkOrders(filter, pageable)));
   }
 
   @GetMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
-  public WorkOrderResponse getWorkOrder(@PathVariable UUID id) {
-    return workOrderService.getWorkOrder(id);
+  public ResponseEntity<ApiResponse<WorkOrderResponse>> getWorkOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(workOrderService.getWorkOrder(id)));
   }
 
   @PostMapping
-  @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@auth.can(authentication, 'products', 'write')")
-  public WorkOrderResponse createWorkOrder(@RequestBody @Valid WorkOrderRequest request) {
-    return workOrderService.createWorkOrder(request);
+  public ResponseEntity<ApiResponse<WorkOrderResponse>> createWorkOrder(
+      @RequestBody @Valid WorkOrderRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            ApiResponse.success(
+                workOrderService.createWorkOrder(request), "Work order created successfully"));
   }
 
   /**
@@ -136,23 +144,25 @@ public class WorkOrderController {
    */
   @PatchMapping("/{id}/status")
   @PreAuthorize("@auth.can(authentication, 'products', 'write')")
-  public WorkOrderResponse changeStatus(
+  public ResponseEntity<ApiResponse<WorkOrderResponse>> changeStatus(
       @PathVariable UUID id, @RequestParam WorkOrderStatus status) {
-    return workOrderService.changeStatus(id, status);
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            workOrderService.changeStatus(id, status), "Status changed successfully"));
   }
 
   /**
-   * Starts production for a work order: - Transitions status to IN_PROGRESS - Consumes the
-   * specified parent batches - Creates the output batch (with BatchLineage recorded automatically)
+   * Starts production for a work order: - Validates status and required fields - Sets the output
+   * product on the WorkOrder - Transitions status to IN_PROGRESS
    *
-   * <p>consumptions[].consumptionPercentage must match the recipe's component ratios and all
-   * percentages must sum to exactly 100.
+   * <p>Lot creation and input consumption are separate actions (Phase 2).
    */
   @PostMapping("/{id}/start-production")
   @PreAuthorize("@auth.can(authentication, 'products', 'write')")
-  public WorkOrderResponse startProduction(
+  public ResponseEntity<ApiResponse<WorkOrderResponse>> startProduction(
       @PathVariable UUID id, @RequestBody @Valid StartProductionRequest request) {
-    return workOrderService.startProduction(id, request);
+    return ResponseEntity.ok(
+        ApiResponse.success(workOrderService.startProduction(id, request), "Production started"));
   }
 
   @PostMapping("/{id}/consume-stock-unit")
@@ -167,9 +177,10 @@ public class WorkOrderController {
 
   @GetMapping("/{id}/consumptions")
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
-  public PagedResponse<WorkOrderConsumptionResponse> getConsumptions(
+  public ResponseEntity<ApiResponse<PagedResponse<WorkOrderConsumptionResponse>>> getConsumptions(
       @PathVariable UUID id, Pageable pageable) {
-    return workOrderConsumptionService.getConsumptionsPaged(id, pageable);
+    return ResponseEntity.ok(
+        ApiResponse.success(workOrderConsumptionService.getConsumptionsPaged(id, pageable)));
   }
 
   @GetMapping("/{id}/consumption-summary")
@@ -180,26 +191,53 @@ public class WorkOrderController {
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
-  @PostMapping("/{id}/record-output")
+  @PostMapping("/{id}/production-lots")
   @PreAuthorize("@auth.can(authentication, 'products', 'write')")
-  public ResponseEntity<ApiResponse<WorkOrderOutputResponse>> recordOutput(
-      @PathVariable UUID id, @Valid @RequestBody RecordOutputRequest request) {
-    var response = workOrderOutputService.recordOutput(id, request.stockUnitId(), request.notes());
+  public ResponseEntity<ApiResponse<ProductionLotResponse>> openProductionLot(
+      @PathVariable UUID id, @Valid @RequestBody OpenProductionLotRequest request) {
+    var response = productionLotService.openLot(id, request);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(response, "Production lot opened"));
+  }
+
+  @GetMapping("/{id}/production-lots")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  public ResponseEntity<ApiResponse<List<ProductionLotResponse>>> getProductionLots(
+      @PathVariable UUID id) {
+    var response = productionLotService.getActiveLots(id);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
-  @GetMapping("/{id}/outputs")
-  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
-  public PagedResponse<WorkOrderOutputResponse> getOutputs(
-      @PathVariable UUID id, Pageable pageable) {
-    return workOrderOutputService.getOutputsPaged(id, pageable);
+  @PostMapping("/{id}/production-lots/{lotId}/close")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  public ResponseEntity<ApiResponse<ProductionLotResponse>> closeProductionLot(
+      @PathVariable UUID id, @PathVariable UUID lotId) {
+    var response = productionLotService.closeLot(id, lotId);
+    return ResponseEntity.ok(ApiResponse.success(response, "Production lot closed"));
   }
 
-  @GetMapping("/{id}/output-summary")
+  @PostMapping("/{id}/production-records")
+  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  public ResponseEntity<ApiResponse<ProductionRecordResponse>> recordProduction(
+      @PathVariable UUID id, @Valid @RequestBody RecordProductionRequest request) {
+    var response =
+        productionRecordService.recordProduction(id, request.stockUnitId(), request.notes());
+    return ResponseEntity.ok(ApiResponse.success(response));
+  }
+
+  @GetMapping("/{id}/production-records")
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
-  public ResponseEntity<ApiResponse<WorkOrderOutputSummaryResponse>> getOutputSummary(
+  public ResponseEntity<ApiResponse<PagedResponse<ProductionRecordResponse>>> getProductionRecords(
+      @PathVariable UUID id, Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(productionRecordService.getProductionRecordsPaged(id, pageable)));
+  }
+
+  @GetMapping("/{id}/production-summary")
+  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  public ResponseEntity<ApiResponse<ProductionSummaryResponse>> getProductionSummary(
       @PathVariable UUID id) {
-    var response = workOrderOutputService.getOutputSummary(id);
+    var response = productionRecordService.getProductionSummary(id);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 

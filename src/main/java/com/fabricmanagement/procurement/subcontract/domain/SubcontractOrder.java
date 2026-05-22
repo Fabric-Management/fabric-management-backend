@@ -33,7 +33,10 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SubcontractOrder extends BaseEntity {
 
-  /** Auto-generated business key. Format: SC-{YEAR}-{8-char}. */
+  /**
+   * Auto-generated business key. Pre-PR-2 records use legacy SC-{YEAR}-{8-HEX} format. New records
+   * use SC-{YYYYMMDD}-{NNNNN}. Both coexist; searchText substring filter is format-agnostic.
+   */
   @Column(name = "sc_number", nullable = false, length = 50)
   private String scNumber;
 

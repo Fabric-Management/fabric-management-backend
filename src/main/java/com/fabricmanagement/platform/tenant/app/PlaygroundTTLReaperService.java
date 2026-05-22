@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class PlaygroundTTLReaper {
+public class PlaygroundTTLReaperService {
 
   private final TenantRepository tenantRepository;
 

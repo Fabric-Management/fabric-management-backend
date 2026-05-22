@@ -6,7 +6,9 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.ReservationStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
@@ -41,6 +43,7 @@ public class WorkOrderConsumptionService {
   private final StockUnitService stockUnitService;
   private final StockUnitRepository stockUnitRepository;
   private final BatchRepository batchRepository;
+  private final BatchReservationRepository batchReservationRepository;
   private final DomainEventPublisher domainEventPublisher;
 
   /**
@@ -73,6 +76,19 @@ public class WorkOrderConsumptionService {
     // Handles validation, status transitions, event publishing, and Batch sync reliably
     if (stockUnit.getStatus() == StockUnitStatus.RESERVED) {
       stockUnitService.consumeReserved(stockUnitId, amount, workOrderId);
+
+      // Keep logical BatchReservation in sync with physical consumption
+      batchReservationRepository
+          .findFirstByTenantIdAndBatchIdAndReferenceIdAndStatusInAndIsActiveTrue(
+              tenantId,
+              batch.getId(),
+              workOrderId,
+              java.util.Set.of(ReservationStatus.ACTIVE, ReservationStatus.PARTIALLY_CONSUMED))
+          .ifPresent(
+              reservation -> {
+                reservation.consume(amount);
+                batchReservationRepository.save(reservation);
+              });
     } else {
       stockUnitService.consume(stockUnitId, amount);
     }

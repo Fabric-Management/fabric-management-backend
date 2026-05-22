@@ -23,7 +23,7 @@ public record WorkOrderFilterRequest(
     @Schema(description = "Filter by production recipe") UUID recipeId,
     @Schema(
             description = "Case-insensitive partial match on work order number or product code",
-            example = "WO-2026")
+            example = "WO-20260521")
         String searchText,
     @Schema(
             description = "Deadline range start (inclusive, ISO 8601)",

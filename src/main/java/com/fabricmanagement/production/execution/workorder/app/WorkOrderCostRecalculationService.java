@@ -2,9 +2,6 @@ package com.fabricmanagement.production.execution.workorder.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.workorder.app.port.ComputedCostSnapshot;
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import com.fabricmanagement.production.execution.workorder.app.port.WorkOrderCostEnginePort;
@@ -43,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkOrderCostRecalculationService {
 
   private final WorkOrderCostEnginePort costEnginePort;
-  private final BatchRepository batchRepository;
   private final WorkOrderConsumptionRepository workOrderConsumptionRepository;
   private final WorkOrderRepository workOrderRepository;
 
@@ -56,7 +52,7 @@ public class WorkOrderCostRecalculationService {
    *   <li>WorkOrder must exist and belong to the current tenant
    *   <li>WorkOrder must be in COMPLETED status
    *   <li>At least one consumption record with productId must exist
-   *   <li>An output batch must exist (created at startProduction)
+   *   <li>WorkOrder must have outputProductId set (assigned at creation or startProduction)
    * </ol>
    *
    * @param workOrderId the WorkOrder to recalculate cost for
@@ -79,15 +75,13 @@ public class WorkOrderCostRecalculationService {
           "Cost recalculation requires COMPLETED status. Current: " + workOrder.getStatus());
     }
 
-    // 2. Output batch (provides moduleType + productId for non-raw-product lines)
-    Batch outputBatch =
-        batchRepository
-            .findFirstByTenantIdAndSourceIdAndSourceType(
-                tenantId, workOrderId, BatchSourceType.INTERNAL_PRODUCTION)
-            .orElseThrow(
-                () ->
-                    new WorkOrderDomainException(
-                        "No output batch found for WorkOrder: " + workOrderId));
+    // 2. Output Product ID (instead of querying the batch, use the denormalized field on WO)
+    UUID outputProductId = workOrder.getOutputProductId();
+    if (outputProductId == null) {
+      throw new WorkOrderDomainException(
+          "WorkOrder has no outputProductId set. Cannot compute actual cost for WorkOrder: "
+              + workOrderId);
+    }
 
     // 3. Consumptions
     List<WorkOrderConsumption> consumptions =
@@ -126,7 +120,7 @@ public class WorkOrderCostRecalculationService {
             tenantId,
             workOrderId,
             workOrder.getModuleType(),
-            outputBatch.getProductId(),
+            outputProductId,
             workOrder.getActualQty(),
             workOrder.getTradingPartnerId(),
             costInputs);

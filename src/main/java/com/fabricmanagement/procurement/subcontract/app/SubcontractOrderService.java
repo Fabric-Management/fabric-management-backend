@@ -1,5 +1,6 @@
 package com.fabricmanagement.procurement.subcontract.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrder;
@@ -12,7 +13,6 @@ import com.fabricmanagement.production.masterdata.product.api.facade.ProductFaca
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +27,7 @@ public class SubcontractOrderService {
 
   private final SubcontractOrderRepository scRepository;
   private final ProductFacade productFacade;
+  private final DocumentNumberGenerator documentNumberGenerator;
 
   public SubcontractOrderResponse getSubcontractOrder(UUID id) {
     return mapToResponse(findEntityById(id));
@@ -168,9 +169,9 @@ public class SubcontractOrderService {
   }
 
   private String generateScNumber() {
-    String year = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy"));
-    String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
-    return String.format("SC-%s-%s", year, suffix);
+    UUID tenantId = TenantContext.requireTenantId();
+    return documentNumberGenerator.generate(
+        tenantId, "SUBCONTRACT_ORDER", "SC", LocalDate.now(), 5);
   }
 
   private SubcontractOrderResponse mapToResponse(SubcontractOrder sc) {

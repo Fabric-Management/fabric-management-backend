@@ -18,6 +18,8 @@ public interface WorkOrderRepository
     extends JpaRepository<WorkOrder, UUID>, JpaSpecificationExecutor<WorkOrder> {
   Optional<WorkOrder> findByWorkOrderNumberAndIsActiveTrue(String workOrderNumber);
 
+  Optional<WorkOrder> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);
+
   List<WorkOrder> findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
       UUID tenantId, UUID salesOrderLineId);
 
