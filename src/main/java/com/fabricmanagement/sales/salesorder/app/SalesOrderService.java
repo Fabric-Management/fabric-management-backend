@@ -491,6 +491,9 @@ public class SalesOrderService {
     // Faz 2.2 — trigger RuleEngine: recipe matching + WorkOrder DRAFT creation per line
     ruleEngine.processConfirmedOrder(saved);
 
+    TradingPartnerDto partner =
+        partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
+
     List<SalesOrderLine> orderLines =
         lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId());
 
@@ -516,23 +519,41 @@ public class SalesOrderService {
                         ))
             .toList();
 
+    UUID customerId = saved.getTradingPartnerId();
+    String customerName = partner != null ? partner.getDisplayName() : null;
+    String unit = deriveOrderUnit(orderLines);
+
     domainEventPublisher.publish(
         new SalesOrderConfirmedEvent(
             tenantId,
             saved.getId(),
             saved.getOrderNumber(),
-            null,
-            null,
+            customerId,
+            customerName,
             totalQuantity,
-            null,
+            unit,
             saved.getRequestedDeliveryDate(),
             snapshotLines));
 
-    TradingPartnerDto partner =
-        partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
     List<SalesOrderLineResponse> lineResponses =
         orderLines.stream().map(this::mapLineToResponse).toList();
     return SalesOrderDto.from(saved, partner, lineResponses);
+  }
+
+  /**
+   * Tüm aktif satırlar aynı birime sahipse o birimi döner, farklı birimler varsa veya satır yoksa
+   * null döner.
+   */
+  private String deriveOrderUnit(List<SalesOrderLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    Set<String> units =
+        lines.stream()
+            .map(SalesOrderLine::getUnit)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return units.size() == 1 ? units.iterator().next() : null;
   }
 
   /** Confirm an order as SystemUser (called after approval callback). */
