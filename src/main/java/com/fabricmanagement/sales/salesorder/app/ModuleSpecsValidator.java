@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.salesorder.app;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
+import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -30,12 +31,23 @@ public class ModuleSpecsValidator {
    * @throws OrderDomainException if a required field is missing or specs are null when needed
    */
   public void validate(SalesOrderLineRequest line) {
-    ModuleType type = line.getModuleType();
+    validate(line.getModuleType(), line.getModuleSpecs());
+  }
+
+  /**
+   * Validates the given line's {@code moduleSpecs} against its {@code moduleType} for an update
+   * request.
+   *
+   * @throws OrderDomainException if a required field is missing or specs are null when needed
+   */
+  public void validate(UpdateSalesOrderLineRequest line) {
+    validate(line.getModuleType(), line.getModuleSpecs());
+  }
+
+  private void validate(ModuleType type, Map<String, Object> specs) {
     if (type == null) {
       return; // moduleType is optional at the line level — no specs to validate
     }
-
-    Map<String, Object> specs = line.getModuleSpecs();
 
     switch (type) {
       case FIBER -> {

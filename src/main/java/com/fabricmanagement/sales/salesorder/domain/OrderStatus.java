@@ -9,6 +9,9 @@ public enum OrderStatus {
   /** Initial state - order being prepared */
   DRAFT,
 
+  /** Order is waiting for manager/finance approval */
+  PENDING_APPROVAL,
+
   /** Order confirmed by customer */
   CONFIRMED,
 
@@ -27,12 +30,15 @@ public enum OrderStatus {
   /** Order cancelled */
   CANCELLED,
 
+  /** Order rejected during approval process */
+  REJECTED,
+
   /** Order on hold (payment issue, etc.) */
   ON_HOLD;
 
   /** Check if order is in a terminal state (cannot be modified). */
   public boolean isTerminal() {
-    return this == DELIVERED || this == CANCELLED;
+    return this == DELIVERED || this == CANCELLED || this == REJECTED;
   }
 
   /** Check if order can be shipped. */
@@ -42,6 +48,16 @@ public enum OrderStatus {
 
   /** Check if order can be cancelled. */
   public boolean canCancel() {
-    return this == DRAFT || this == CONFIRMED || this == ON_HOLD;
+    return this == DRAFT || this == CONFIRMED || this == ON_HOLD || this == PENDING_APPROVAL;
+  }
+
+  /** Check if order can be deleted (hard/soft). */
+  public boolean canDelete() {
+    return this == DRAFT;
+  }
+
+  /** Check if order fields can be edited. Only DRAFT orders are editable. */
+  public boolean canEdit() {
+    return this == DRAFT;
   }
 }

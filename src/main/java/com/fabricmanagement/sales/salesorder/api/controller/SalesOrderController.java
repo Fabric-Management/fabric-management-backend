@@ -6,6 +6,7 @@ import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
+import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -48,10 +50,34 @@ public class SalesOrderController {
   @PostMapping
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   @Operation(summary = "Create a new sales order")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "201",
+      description = "Order created successfully")
   public ResponseEntity<ApiResponse<SalesOrderDto>> createOrder(
       @Valid @RequestBody CreateSalesOrderRequest request) {
     SalesOrderDto order = orderService.createOrder(request);
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(order));
+  }
+
+  @PutMapping("/{id}")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(
+      summary = "Update a draft sales order",
+      description =
+          "Only DRAFT orders can be updated. "
+              + "Requires version field for optimistic locking. "
+              + "Lines use full-replace strategy: lines with id are updated, "
+              + "lines without id are created, missing lines are soft-deleted.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "200",
+      description = "Order updated successfully")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "409",
+      description = "Optimistic locking conflict or order not in DRAFT status")
+  public ResponseEntity<ApiResponse<SalesOrderDto>> updateOrder(
+      @PathVariable UUID id, @Valid @RequestBody UpdateSalesOrderRequest request) {
+    SalesOrderDto order = orderService.updateOrder(id, request);
+    return ResponseEntity.ok(ApiResponse.success(order, "Sales order updated"));
   }
 
   @GetMapping("/{id}")
@@ -88,7 +114,7 @@ public class SalesOrderController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'delete')")
   @Operation(summary = "Delete order (soft delete)")
   public ResponseEntity<ApiResponse<Void>> deleteOrder(@PathVariable UUID id) {
     orderService.deleteOrder(id);
@@ -134,7 +160,7 @@ public class SalesOrderController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{id}/confirm")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'confirm')")
   @Operation(summary = "Confirm an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> confirmOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.confirmOrder(id)));
@@ -148,7 +174,7 @@ public class SalesOrderController {
   }
 
   @PostMapping("/{id}/ship")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'ship')")
   @Operation(summary = "Ship an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> shipOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.shipOrder(id)));
@@ -164,7 +190,7 @@ public class SalesOrderController {
   }
 
   @PostMapping("/{id}/cancel")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'cancel')")
   @Operation(summary = "Cancel an order")
   public ResponseEntity<ApiResponse<SalesOrderDto>> cancelOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id)));
