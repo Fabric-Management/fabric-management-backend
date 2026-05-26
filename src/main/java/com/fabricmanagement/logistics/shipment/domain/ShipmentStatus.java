@@ -59,4 +59,9 @@ public enum ShipmentStatus {
         || this == DELIVERED
         || this == DELIVERY_FAILED;
   }
+
+  /** Check if shipment can be deleted (hard/soft). */
+  public boolean canDelete() {
+    return this == PENDING;
+  }
 }
