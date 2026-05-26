@@ -48,9 +48,27 @@ public class ApprovalGuardService {
   @Transactional
   public boolean checkAndEnforceApproval(
       UUID tenantId, UUID userId, ApprovalEntityType entityType, UUID entityId, int expiresHours) {
+    return checkAndEnforceApproval(
+        tenantId, userId, entityType, entityId, expiresHours, null, null);
+  }
+
+  /**
+   * Bir işlem onay gerektiriyorsa ApprovalRequest oluşturur ve true döner. Eğer gerekmiyorsa false
+   * döner. (Tutar eşikli varyant)
+   */
+  @Transactional
+  public boolean checkAndEnforceApproval(
+      UUID tenantId,
+      UUID userId,
+      ApprovalEntityType entityType,
+      UUID entityId,
+      int expiresHours,
+      java.math.BigDecimal amount,
+      String currency) {
 
     // 1. Policy var mı? (Yoksa direkt geçer)
-    ApprovalPolicy policy = policyService.getActivePolicyFor(tenantId, entityType).orElse(null);
+    ApprovalPolicy policy =
+        policyService.getActivePolicyFor(tenantId, entityType, amount, currency).orElse(null);
     if (policy == null) {
       log.debug("No active policy found for {} in tenant {}, continuing", entityType, tenantId);
       return false;

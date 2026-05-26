@@ -27,10 +27,22 @@ public class ApprovalPolicyService {
     return policyRepo.findByTenantIdAndDeletedAtIsNull(tenantId);
   }
 
-  /** Bir tenant'ta belli bir işlem (Örn: WORK_ORDER) için tanımlı olan **aktif** kuralı getirir. */
+  /**
+   * Bir tenant'ta belli bir işlem (Örn: WORK_ORDER) için tanımlı olan **aktif** kuralı getirir
+   * (tutar olmayanlar için geriye dönük uyumluluk).
+   */
   @Transactional(readOnly = true)
   public Optional<ApprovalPolicy> getActivePolicyFor(UUID tenantId, ApprovalEntityType entityType) {
-    return policyRepo.findActivePoliciesForEntity(tenantId, entityType).stream().findFirst();
+    return getActivePolicyFor(tenantId, entityType, null, null);
+  }
+
+  /** Bir tenant'ta belli bir işlem (Örn: WORK_ORDER) için tanımlı olan **aktif** kuralı getirir. */
+  @Transactional(readOnly = true)
+  public Optional<ApprovalPolicy> getActivePolicyFor(
+      UUID tenantId, ApprovalEntityType entityType, java.math.BigDecimal amount, String currency) {
+    return policyRepo.findActivePoliciesForEntity(tenantId, entityType).stream()
+        .filter(p -> p.matchesAmount(amount, currency))
+        .findFirst();
   }
 
   /**

@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -37,8 +38,32 @@ public class ApprovalPolicy extends BaseEntity {
   @Column(name = "promotion_threshold", nullable = false)
   private int promotionThreshold = 10;
 
+  @Column(name = "min_amount_threshold", precision = 18, scale = 3)
+  private BigDecimal minAmountThreshold;
+
+  @Column(name = "max_amount_threshold", precision = 18, scale = 3)
+  private BigDecimal maxAmountThreshold;
+
+  @Column(name = "currency", length = 3)
+  private String currency;
+
   @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
+
+  /**
+   * Bu politika verilen tutar için geçerli mi? Tutar eşiği tanımlı değilse (null) → her zaman
+   * geçerli (legacy davranış).
+   */
+  public boolean matchesAmount(BigDecimal amount, String amountCurrency) {
+    if (minAmountThreshold == null) {
+      return true; // tutar bazlı olmayan politika — her zaman eşleşir
+    }
+    if (amount == null || !currency.equals(amountCurrency)) {
+      return false;
+    }
+    return amount.compareTo(minAmountThreshold) >= 0
+        && (maxAmountThreshold == null || amount.compareTo(maxAmountThreshold) <= 0);
+  }
 
   public ApprovalPolicy(
       UUID tenantId,

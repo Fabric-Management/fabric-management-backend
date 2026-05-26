@@ -8,5 +8,6 @@ public enum ApprovalEntityType {
   WORK_ORDER,
   RECIPE_CREATE,
   CRITICAL_ACTION,
-  PURCHASE_ORDER
+  PURCHASE_ORDER,
+  SALES_ORDER
 }
