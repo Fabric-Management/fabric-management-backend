@@ -23,8 +23,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ShipmentProgressServiceTest {
 
   @Mock private SalesOrderLineRepository salesOrderLineRepository;
@@ -111,6 +113,32 @@ class ShipmentProgressServiceTest {
     assertThat(result1).isEqualTo(orderId);
     assertThat(result2).isEqualTo(orderId);
     assertThat(line.getShippedQty()).isEqualByComparingTo(new BigDecimal("100")); // Not 200
+  }
+
+  @Test
+  void recordLineShipment_whenOverShippedPersistsPhysicalQuantityAndLogsWarn(
+      CapturedOutput output) {
+    SalesOrderLine line =
+        SalesOrderLine.builder()
+            .salesOrderId(orderId)
+            .requestedQty(new BigDecimal("100"))
+            .shippedQty(new BigDecimal("90"))
+            .lineStatus(SalesOrderLineStatus.IN_PRODUCTION)
+            .build();
+
+    when(salesOrderLineRepository.findByTenantIdAndId(
+            com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
+            lineId))
+        .thenReturn(Optional.of(line));
+
+    UUID result =
+        shipmentProgressService.recordLineShipment(lineId, shipmentLineId, new BigDecimal("20"));
+
+    assertThat(result).isEqualTo(orderId);
+    assertThat(line.getShippedQty()).isEqualByComparingTo("110");
+    assertThat(line.isOverShipped()).isTrue();
+    verify(salesOrderLineRepository).save(line);
+    assertThat(output).contains("Over-shipment detected for SalesOrderLine");
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
