@@ -5,6 +5,7 @@ import com.fabricmanagement.approval.domain.ApprovalPolicy;
 import com.fabricmanagement.approval.domain.ApproverRole;
 import com.fabricmanagement.approval.domain.PolicyTargetLevel;
 import com.fabricmanagement.approval.infra.repository.ApprovalPolicyRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,10 +28,22 @@ public class ApprovalPolicyService {
     return policyRepo.findByTenantIdAndDeletedAtIsNull(tenantId);
   }
 
-  /** Bir tenant'ta belli bir işlem (Örn: WORK_ORDER) için tanımlı olan **aktif** kuralı getirir. */
+  /**
+   * Bir tenant'ta belli bir işlem (Örn: WORK_ORDER) için tanımlı olan **aktif** kuralı getirir
+   * (tutar olmayanlar için geriye dönük uyumluluk).
+   */
   @Transactional(readOnly = true)
   public Optional<ApprovalPolicy> getActivePolicyFor(UUID tenantId, ApprovalEntityType entityType) {
-    return policyRepo.findActivePoliciesForEntity(tenantId, entityType).stream().findFirst();
+    return getActivePolicyFor(tenantId, entityType, null, null);
+  }
+
+  /** Bir tenant'ta belli bir işlem (Örn: WORK_ORDER) için tanımlı olan **aktif** kuralı getirir. */
+  @Transactional(readOnly = true)
+  public Optional<ApprovalPolicy> getActivePolicyFor(
+      UUID tenantId, ApprovalEntityType entityType, BigDecimal amount, String currency) {
+    return policyRepo.findActivePoliciesForEntity(tenantId, entityType).stream()
+        .filter(p -> p.matchesAmount(amount, currency))
+        .findFirst();
   }
 
   /**
@@ -43,11 +56,13 @@ public class ApprovalPolicyService {
       ApprovalEntityType entityType,
       PolicyTargetLevel requiredLevel,
       ApproverRole approverRole,
-      int promotionThreshold) {
+      int promotionThreshold,
+      int expiryHours) {
 
     // Varsayılan kural kontrolü vs bu araya eklenebilir
     ApprovalPolicy policy =
-        new ApprovalPolicy(tenantId, entityType, requiredLevel, approverRole, promotionThreshold);
+        new ApprovalPolicy(
+            tenantId, entityType, requiredLevel, approverRole, promotionThreshold, expiryHours);
 
     return policyRepo.save(policy);
   }
@@ -59,7 +74,8 @@ public class ApprovalPolicyService {
       UUID policyId,
       PolicyTargetLevel requiredLevel,
       ApproverRole approverRole,
-      int promotionThreshold) {
+      int promotionThreshold,
+      int expiryHours) {
 
     ApprovalPolicy policy =
         policyRepo
@@ -67,7 +83,7 @@ public class ApprovalPolicyService {
             .filter(p -> p.getTenantId().equals(tenantId))
             .orElseThrow(() -> new IllegalArgumentException("Policy not found"));
 
-    policy.update(requiredLevel, approverRole, promotionThreshold);
+    policy.update(requiredLevel, approverRole, promotionThreshold, expiryHours);
     return policyRepo.save(policy);
   }
 

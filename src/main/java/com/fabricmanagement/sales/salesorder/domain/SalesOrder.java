@@ -5,6 +5,7 @@ import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import java.time.LocalDate;
@@ -120,7 +121,10 @@ public class SalesOrder extends BaseEntity {
 
   /** Helper to get currency code */
   public String getCurrency() {
-    return totals != null ? totals.getCurrency() : "TRY";
+    if (totals == null) {
+      throw new IllegalStateException("SalesOrder totals cannot be null");
+    }
+    return totals.getCurrency();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -190,17 +194,90 @@ public class SalesOrder extends BaseEntity {
     return "SO";
   }
 
+  @Override
+  public void delete() {
+    if (!status.canDelete()) {
+      throw new OrderDomainException(
+          "Only DRAFT orders can be deleted. Current status: "
+              + status
+              + ". Use cancel() for non-draft orders.");
+    }
+    super.delete();
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Business Methods
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /** Mark order as pending approval. */
+  public void pendingApproval() {
+    if (status != OrderStatus.DRAFT) {
+      throw new OrderDomainException(
+          "Only DRAFT orders can be sent for approval. Current: " + status);
+    }
+    this.status = OrderStatus.PENDING_APPROVAL;
+  }
+
+  /** Reject the order during approval. */
+  public void reject(String reason) {
+    if (status != OrderStatus.PENDING_APPROVAL) {
+      throw new OrderDomainException(
+          "Only PENDING_APPROVAL orders can be rejected. Current: " + status);
+    }
+    this.status = OrderStatus.REJECTED;
+  }
+
+  /**
+   * Update order details. Only allowed in DRAFT status. Rich Domain Model — edit guard lives in the
+   * entity.
+   *
+   * @throws OrderDomainException with HTTP 409 if order is not in DRAFT status
+   */
+  public void updateDraft(SalesOrderUpdateCommand cmd) {
+    if (!status.canEdit()) {
+      throw new OrderDomainException(
+          "Cannot edit order "
+              + orderNumber
+              + ": current status "
+              + status
+              + " does not allow editing. Only DRAFT orders can be modified.",
+          409);
+    }
+    this.customerReference = cmd.customerReference();
+    this.orderDate = cmd.orderDate();
+    this.requestedDeliveryDate = cmd.requestedDeliveryDate();
+    this.promisedDeliveryDate = cmd.promisedDeliveryDate();
+    this.updateTotals(cmd.totals());
+    this.shippingAddress = cmd.shippingAddress();
+    this.billingAddress = cmd.billingAddress();
+    this.shippingMethod = cmd.shippingMethod();
+    this.notes = cmd.notes();
+    this.metadata = cmd.metadata();
+    this.moduleType = cmd.moduleType();
+    this.deadline = cmd.deadline();
+  }
+
   /** Confirm the order (DRAFT → CONFIRMED). */
   public void confirm() {
     if (status != OrderStatus.DRAFT) {
-      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+      if (status == OrderStatus.PENDING_APPROVAL) {
+        throw new OrderDomainException(
+            "Order is awaiting approval; cannot be confirmed manually", 409);
+      }
+      throw new OrderDomainException(
+          String.format("Order can only be confirmed from DRAFT status. Current: %s", status), 409);
+    }
+    this.status = OrderStatus.CONFIRMED;
+  }
+
+  /** Confirm the order from approval workflow (PENDING_APPROVAL → CONFIRMED). */
+  public void confirmFromApproval() {
+    if (status != OrderStatus.PENDING_APPROVAL) {
+      throw new OrderDomainException(
           String.format(
-              "Cannot confirm order %s: current status is %s (must be DRAFT)",
-              orderNumber, status));
+              "Order can only be confirmed from PENDING_APPROVAL status in this workflow. Current: %s",
+              status),
+          409);
     }
     this.status = OrderStatus.CONFIRMED;
   }
@@ -208,7 +285,7 @@ public class SalesOrder extends BaseEntity {
   /** Start processing (CONFIRMED → IN_PRODUCTION). */
   public void startProcessing() {
     if (status != OrderStatus.CONFIRMED) {
-      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+      throw new OrderDomainException(
           String.format(
               "Cannot start processing order %s: current status is %s (must be CONFIRMED)",
               orderNumber, status));
@@ -219,7 +296,7 @@ public class SalesOrder extends BaseEntity {
   /** Mark as shipped. */
   public void ship() {
     if (!status.canShip()) {
-      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+      throw new OrderDomainException(
           String.format(
               "Cannot ship order %s: current status %s does not allow shipping",
               orderNumber, status));
@@ -230,7 +307,7 @@ public class SalesOrder extends BaseEntity {
   /** Mark as delivered. */
   public void deliver(LocalDate deliveryDate) {
     if (status != OrderStatus.SHIPPED) {
-      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+      throw new OrderDomainException(
           String.format(
               "Cannot deliver order %s: current status is %s (must be SHIPPED)",
               orderNumber, status));
@@ -242,7 +319,7 @@ public class SalesOrder extends BaseEntity {
   /** Cancel the order. */
   public void cancel() {
     if (!status.canCancel()) {
-      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+      throw new OrderDomainException(
           String.format(
               "Cannot cancel order %s: current status %s does not allow cancellation",
               orderNumber, status));
@@ -253,14 +330,16 @@ public class SalesOrder extends BaseEntity {
   /** Put order on hold. */
   public void hold() {
     if (status.isTerminal()) {
-      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+      throw new OrderDomainException(
           String.format("Cannot hold order %s: status %s is terminal", orderNumber, status));
     }
     this.status = OrderStatus.ON_HOLD;
   }
 
-  /** Calculate grand total. */
   public Money getGrandTotal() {
-    return totals != null ? totals.calculateGrandTotal() : Money.zero("TRY");
+    if (totals == null) {
+      throw new IllegalStateException("SalesOrder totals cannot be null");
+    }
+    return totals.calculateGrandTotal();
   }
 }

@@ -15,7 +15,7 @@ public interface ApprovalPolicyRepository extends JpaRepository<ApprovalPolicy, 
   List<ApprovalPolicy> findByTenantIdAndDeletedAtIsNull(UUID tenantId);
 
   @Query(
-      "SELECT p FROM ApprovalPolicy p WHERE p.tenantId = :tenantId AND p.entityType = :entityType AND p.isActive = true AND p.deletedAt IS NULL ORDER BY p.createdAt DESC")
+      "SELECT p FROM ApprovalPolicy p WHERE p.tenantId = :tenantId AND p.entityType = :entityType AND p.isActive = true AND p.deletedAt IS NULL ORDER BY p.minAmountThreshold DESC NULLS LAST, p.createdAt DESC")
   List<ApprovalPolicy> findActivePoliciesForEntity(
       @Param("tenantId") UUID tenantId, @Param("entityType") ApprovalEntityType entityType);
 }

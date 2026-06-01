@@ -1,6 +1,7 @@
 package com.fabricmanagement.procurement.purchaseorder.domain;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.GenericPurchaseSpecs;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
@@ -84,14 +85,17 @@ public class PurchaseOrder extends BaseEntity {
     }
     if (this.totalAmount != null && !this.totalAmount.getCurrency().equals(amount.getCurrency())) {
       // Allow initial set or same currency update
-      throw new com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException(
+      throw new CurrencyMismatchException(
           this.totalAmount.getCurrency().getCurrencyCode(), amount.getCurrency().getCurrencyCode());
     }
     this.totalAmount = amount;
   }
 
   public String getCurrency() {
-    return totalAmount != null ? totalAmount.getCurrency().getCurrencyCode() : null;
+    if (totalAmount == null) {
+      throw new IllegalStateException("PurchaseOrder totalAmount cannot be null");
+    }
+    return totalAmount.getCurrency().getCurrencyCode();
   }
 
   /** Starts at 1, incremented on each amendment. */

@@ -34,7 +34,7 @@ public class PurchaseOrderController {
   private final PurchaseOrderService purchaseOrderService;
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'procurement', 'read')")
   @Operation(summary = "Get Purchase Order by ID")
   public ResponseEntity<ApiResponse<PurchaseOrderResponse>> getPurchaseOrder(
       @PathVariable UUID id) {
@@ -42,7 +42,7 @@ public class PurchaseOrderController {
   }
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'procurement', 'read')")
   @Operation(summary = "List Purchase Orders")
   public ResponseEntity<ApiResponse<PagedResponse<PurchaseOrderResponse>>> listPurchaseOrders(
       @RequestParam(required = false) PurchaseOrderModuleType moduleType,
@@ -53,7 +53,7 @@ public class PurchaseOrderController {
   }
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'procurement', 'write')")
   @Operation(summary = "Create Purchase Order")
   public ResponseEntity<ApiResponse<PurchaseOrderResponse>> createPurchaseOrder(
       @RequestBody @Valid CreatePurchaseOrderRequest request) {
@@ -68,7 +68,7 @@ public class PurchaseOrderController {
    * ...→CANCELLED
    */
   @PatchMapping("/{id}/status")
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'procurement', 'write')")
   @Operation(summary = "Change Purchase Order Status")
   public ResponseEntity<ApiResponse<PurchaseOrderResponse>> changeStatus(
       @PathVariable UUID id, @RequestParam PurchaseOrderStatus status) {

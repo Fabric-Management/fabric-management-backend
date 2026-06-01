@@ -20,16 +20,20 @@ public final class PermissionRegistry {
           "projects",
           "products",
           "partners",
+          "procurement",
           "flowboard",
           "settings",
           "admin",
           "reports",
           "notifications",
           "quality",
-          "members");
+          "members",
+          "logistics");
 
   public static final Set<String> VALID_ACTIONS =
-      Set.of("view", "read", "write", "manage", "access", "delete", "approve", "export");
+      Set.of(
+          "view", "read", "write", "manage", "access", "delete", "approve", "export", "confirm",
+          "ship", "cancel", "prepare", "deliver");
 
   public static boolean isValidResource(String resource) {
     return resource != null && VALID_RESOURCES.contains(resource);

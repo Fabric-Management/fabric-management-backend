@@ -105,7 +105,8 @@ public class E2EShowcaseSeeder implements DataSeeder {
                       ApprovalEntityType.WORK_ORDER,
                       PolicyTargetLevel.ALL,
                       ApproverRole.TENANT_ADMIN,
-                      10);
+                      10,
+                      48);
                   log.info("Created WORK_ORDER approval policy.");
                 }
 
@@ -117,7 +118,8 @@ public class E2EShowcaseSeeder implements DataSeeder {
                       ApprovalEntityType.RECIPE_CREATE,
                       PolicyTargetLevel.STANDARD,
                       ApproverRole.DEPARTMENT_MANAGER,
-                      5);
+                      5,
+                      48);
                   log.info("Created RECIPE_CREATE approval policy.");
                 }
 

@@ -9,6 +9,14 @@ public class OrderDomainException extends DomainException {
     super(message, "ORDER_RULE_VIOLATION", 400);
   }
 
+  /**
+   * State-conflict variant — allows 409 for edit guard violations. Only to be used for resource
+   * state conflicts, not for validation/domain rule failures.
+   */
+  public OrderDomainException(String message, int httpStatus) {
+    super(message, "ORDER_RULE_VIOLATION", httpStatus);
+  }
+
   public OrderDomainException(String message, Throwable cause) {
     super(message, "ORDER_RULE_VIOLATION", 400, cause);
   }

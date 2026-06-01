@@ -18,6 +18,7 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.user.UserTrustLevel;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -59,12 +60,12 @@ class ApprovalGuardServiceTest {
   @Test
   @DisplayName("Aktif policy yoksa -> onay gerekmez (false)")
   void whenNoPolicy_thenDoesNotRequireApproval() {
-    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER))
+    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER, null, null))
         .thenReturn(Optional.empty());
 
     boolean requiresApproval =
         guardService.checkAndEnforceApproval(
-            tenantId, userId, ApprovalEntityType.WORK_ORDER, entityId, 48);
+            tenantId, userId, ApprovalEntityType.WORK_ORDER, entityId);
 
     assertThat(requiresApproval).isFalse();
     verifyNoInteractions(requestRepo);
@@ -79,8 +80,9 @@ class ApprovalGuardServiceTest {
             ApprovalEntityType.WORK_ORDER,
             PolicyTargetLevel.PROBATION,
             ApproverRole.MANAGER,
-            10);
-    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER))
+            10,
+            48);
+    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER, null, null))
         .thenReturn(Optional.of(policy));
 
     when(userTrustLevelPort.resolveTrustLevel(tenantId, userId))
@@ -88,7 +90,7 @@ class ApprovalGuardServiceTest {
 
     boolean requiresApproval =
         guardService.checkAndEnforceApproval(
-            tenantId, userId, ApprovalEntityType.WORK_ORDER, entityId, 48);
+            tenantId, userId, ApprovalEntityType.WORK_ORDER, entityId);
 
     assertThat(requiresApproval).isTrue();
 
@@ -108,8 +110,9 @@ class ApprovalGuardServiceTest {
             ApprovalEntityType.WORK_ORDER,
             PolicyTargetLevel.PROBATION,
             ApproverRole.MANAGER,
-            10);
-    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER))
+            10,
+            48);
+    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER, null, null))
         .thenReturn(Optional.of(policy));
 
     when(userTrustLevelPort.resolveTrustLevel(tenantId, userId))
@@ -117,7 +120,7 @@ class ApprovalGuardServiceTest {
 
     boolean requiresApproval =
         guardService.checkAndEnforceApproval(
-            tenantId, userId, ApprovalEntityType.WORK_ORDER, entityId, 48);
+            tenantId, userId, ApprovalEntityType.WORK_ORDER, entityId);
 
     assertThat(requiresApproval).isFalse();
     verifyNoInteractions(requestRepo);
@@ -132,8 +135,9 @@ class ApprovalGuardServiceTest {
             ApprovalEntityType.CRITICAL_ACTION,
             PolicyTargetLevel.ALL,
             ApproverRole.CEO,
-            10);
-    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.CRITICAL_ACTION))
+            10,
+            48);
+    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.CRITICAL_ACTION, null, null))
         .thenReturn(Optional.of(policy));
 
     when(userTrustLevelPort.resolveTrustLevel(tenantId, userId))
@@ -141,9 +145,37 @@ class ApprovalGuardServiceTest {
 
     boolean requiresApproval =
         guardService.checkAndEnforceApproval(
-            tenantId, userId, ApprovalEntityType.CRITICAL_ACTION, entityId, 48);
+            tenantId, userId, ApprovalEntityType.CRITICAL_ACTION, entityId);
 
     assertThat(requiresApproval).isTrue();
     verify(requestRepo).save(any(ApprovalRequest.class));
+  }
+
+  @Test
+  @DisplayName("Custom expiryHours policy -> expiresAt is correctly calculated")
+  void whenCustomExpiryHours_thenExpiresAtIsCorrect() {
+    ApprovalPolicy policy =
+        new ApprovalPolicy(
+            tenantId,
+            ApprovalEntityType.WORK_ORDER,
+            PolicyTargetLevel.ALL,
+            ApproverRole.MANAGER,
+            10,
+            24); // 24 saat
+
+    when(policyService.getActivePolicyFor(tenantId, ApprovalEntityType.WORK_ORDER, null, null))
+        .thenReturn(Optional.of(policy));
+
+    when(userTrustLevelPort.resolveTrustLevel(tenantId, userId))
+        .thenReturn(UserTrustLevel.STANDARD);
+
+    guardService.checkAndEnforceApproval(tenantId, userId, ApprovalEntityType.WORK_ORDER, entityId);
+
+    ArgumentCaptor<ApprovalRequest> captor = ArgumentCaptor.forClass(ApprovalRequest.class);
+    verify(requestRepo).save(captor.capture());
+
+    // clock is fixed at "2026-01-01T00:00:00Z"
+    assertThat(captor.getValue().getExpiresAt())
+        .isEqualTo(OffsetDateTime.of(2026, 1, 2, 0, 0, 0, 0, ZoneOffset.UTC));
   }
 }

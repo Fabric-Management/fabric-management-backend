@@ -9,6 +9,7 @@ import com.fabricmanagement.approval.infra.repository.ApprovalRequestRepository;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.user.UserTrustLevel;
 import com.fabricmanagement.platform.approval.domain.event.ApprovalPendingEvent;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -42,15 +43,29 @@ public class ApprovalGuardService {
    * @param entityType Hangi modül? {@link ApprovalEntityType#WORK_ORDER}, {@link
    *     ApprovalEntityType#RECIPE_CREATE} vs.
    * @param entityId Yaratılan/Güncellenen hedef entity Id'si.
-   * @param expiresHours İsteğin kaç saat sonra iptal olacağı (Örn: 48)
-   * @return Onay gerektirdi mi? (True ise çağıran taraf işlemi PENDING statüsünde bekletmeli)
    */
   @Transactional
   public boolean checkAndEnforceApproval(
-      UUID tenantId, UUID userId, ApprovalEntityType entityType, UUID entityId, int expiresHours) {
+      UUID tenantId, UUID userId, ApprovalEntityType entityType, UUID entityId) {
+    return checkAndEnforceApproval(tenantId, userId, entityType, entityId, null, null);
+  }
+
+  /**
+   * Bir işlem onay gerektiriyorsa ApprovalRequest oluşturur ve true döner. Eğer gerekmiyorsa false
+   * döner. (Tutar eşikli varyant)
+   */
+  @Transactional
+  public boolean checkAndEnforceApproval(
+      UUID tenantId,
+      UUID userId,
+      ApprovalEntityType entityType,
+      UUID entityId,
+      BigDecimal amount,
+      String currency) {
 
     // 1. Policy var mı? (Yoksa direkt geçer)
-    ApprovalPolicy policy = policyService.getActivePolicyFor(tenantId, entityType).orElse(null);
+    ApprovalPolicy policy =
+        policyService.getActivePolicyFor(tenantId, entityType, amount, currency).orElse(null);
     if (policy == null) {
       log.debug("No active policy found for {} in tenant {}, continuing", entityType, tenantId);
       return false;
@@ -84,7 +99,7 @@ public class ApprovalGuardService {
         entityId,
         policy.getId());
 
-    OffsetDateTime expiresAt = OffsetDateTime.now(clock).plusHours(expiresHours);
+    OffsetDateTime expiresAt = OffsetDateTime.now(clock).plusHours(policy.getExpiryHours());
 
     ApprovalRequest request =
         new ApprovalRequest(tenantId, entityType, entityId, policy, userId, expiresAt);

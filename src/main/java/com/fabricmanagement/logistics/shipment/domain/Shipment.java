@@ -215,6 +215,17 @@ public class Shipment extends BaseEntity {
     return "SHP";
   }
 
+  @Override
+  public void delete() {
+    if (!status.canDelete()) {
+      throw new com.fabricmanagement.logistics.common.exception.LogisticsDomainException(
+          "Only PENDING shipments can be deleted. Current status: "
+              + status
+              + ". Use cancel() for non-pending shipments.");
+    }
+    super.delete();
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Business Methods
   // ═══════════════════════════════════════════════════════════════════════════

@@ -1,35 +1,45 @@
 package com.fabricmanagement.sales.salesorder.app;
 
+import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
+import com.fabricmanagement.sales.salesorder.domain.SalesOrderUpdateCommand;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineResponse;
+import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderLineRequest;
+import com.fabricmanagement.sales.salesorder.dto.UpdateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +62,7 @@ public class SalesOrderService {
   private final ModuleSpecsValidator moduleSpecsValidator;
   private final DomainEventPublisher domainEventPublisher;
   private final DocumentNumberGenerator documentNumberGenerator;
+  private final ApprovalPort approvalPort;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -75,6 +86,22 @@ public class SalesOrderService {
         request.getOrderDate() != null ? request.getOrderDate() : LocalDate.now();
     String orderNumber = generateOrderNumber(tenantId, effectiveDate);
 
+    String currency = request.getCurrency() != null ? request.getCurrency() : "TRY";
+    Money total =
+        request.getTotalAmount() != null
+            ? Money.of(request.getTotalAmount(), currency)
+            : Money.zero(currency);
+    Money tax =
+        request.getTaxAmount() != null
+            ? Money.of(request.getTaxAmount(), currency)
+            : Money.zero(currency);
+    Money discount =
+        request.getDiscountAmount() != null
+            ? Money.of(request.getDiscountAmount(), currency)
+            : Money.zero(currency);
+
+    OrderTotals totals = OrderTotals.of(total, tax, discount);
+
     SalesOrder order =
         SalesOrder.builder()
             .tradingPartnerId(tradingPartnerId)
@@ -84,29 +111,7 @@ public class SalesOrderService {
             .orderDate(request.getOrderDate())
             .requestedDeliveryDate(request.getRequestedDeliveryDate())
             .promisedDeliveryDate(request.getPromisedDeliveryDate())
-            .totals(
-                OrderTotals.zero(request.getCurrency() != null ? request.getCurrency() : "TRY")
-                    .withTotalAmount(
-                        request.getTotalAmount() != null
-                            ? Money.of(
-                                request.getTotalAmount(),
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")
-                            : Money.zero(
-                                request.getCurrency() != null ? request.getCurrency() : "TRY"))
-                    .withTaxAmount(
-                        request.getTaxAmount() != null
-                            ? Money.of(
-                                request.getTaxAmount(),
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")
-                            : Money.zero(
-                                request.getCurrency() != null ? request.getCurrency() : "TRY"))
-                    .withDiscountAmount(
-                        request.getDiscountAmount() != null
-                            ? Money.of(
-                                request.getDiscountAmount(),
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")
-                            : Money.zero(
-                                request.getCurrency() != null ? request.getCurrency() : "TRY")))
+            .totals(totals)
             .shippingAddress(request.getShippingAddress())
             .billingAddress(request.getBillingAddress())
             .shippingMethod(request.getShippingMethod())
@@ -127,7 +132,7 @@ public class SalesOrderService {
               .map(
                   lineReq -> {
                     moduleSpecsValidator.validate(lineReq);
-                    return mapLineRequestToEntity(lineReq, saved.getId());
+                    return mapLineRequestToEntity(lineReq, saved.getId(), saved.getCurrency());
                   })
               .toList();
       lineRepository.saveAll(lines);
@@ -142,6 +147,174 @@ public class SalesOrderService {
         tradingPartnerId,
         request.getLines() == null ? 0 : request.getLines().size());
     return SalesOrderDto.from(saved, partner);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UPDATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Update a draft sales order. Uses full-replace strategy for lines.
+   *
+   * @param orderId Order ID
+   * @param request Update request with version for optimistic locking
+   * @return Updated order DTO
+   */
+  @Transactional
+  public SalesOrderDto updateOrder(UUID orderId, UpdateSalesOrderRequest request) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    // 1. Fetch managed entity (Hibernate loads version)
+    SalesOrder order = getOrderOrThrow(tenantId, orderId);
+
+    // 2. Optimistic lock — compare, DON'T setVersion
+    if (!order.getVersion().equals(request.getVersion())) {
+      throw new ObjectOptimisticLockingFailureException(SalesOrder.class.getSimpleName(), orderId);
+    }
+
+    // 3. Build OrderTotals — totalAmount hesaplanacak, tax/discount request'ten
+    String currency = request.getCurrency();
+
+    // 4. Line sync (full-replace)
+    List<SalesOrderLine> existingLines =
+        lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId());
+
+    Set<UUID> incomingLineIds =
+        request.getLines().stream()
+            .map(UpdateSalesOrderLineRequest::getId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+    // 4a. Soft-delete lines not in request
+    existingLines.stream()
+        .filter(line -> !incomingLineIds.contains(line.getId()))
+        .forEach(SalesOrderLine::delete);
+
+    // 4b. Update existing + create new lines
+    List<SalesOrderLine> syncedLines = new ArrayList<>();
+    for (UpdateSalesOrderLineRequest lineReq : request.getLines()) {
+      moduleSpecsValidator.validate(lineReq);
+
+      if (lineReq.getId() != null) {
+        // Update existing
+        SalesOrderLine existing =
+            existingLines.stream()
+                .filter(l -> l.getId().equals(lineReq.getId()))
+                .findFirst()
+                .orElseThrow(() -> new OrderDomainException("Line not found: " + lineReq.getId()));
+        updateLineFromRequest(existing, lineReq, currency);
+        syncedLines.add(existing);
+      } else {
+        // Create new
+        SalesOrderLine newLine = mapUpdateLineRequestToEntity(lineReq, order.getId(), currency);
+        syncedLines.add(lineRepository.save(newLine));
+      }
+    }
+
+    // 5. Calculate totalAmount from lines (AGENTS.md: "Hesapla, input'a güvenme")
+    BigDecimal calculatedTotal =
+        syncedLines.stream()
+            .filter(l -> l.getIsActive() && l.getUnitPrice() != null)
+            .map(l -> l.getUnitPrice().getAmount().multiply(l.getRequestedQty()))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    Money total = Money.of(calculatedTotal, currency);
+    Money tax =
+        request.getTaxAmount() != null
+            ? Money.of(request.getTaxAmount(), currency)
+            : Money.zero(currency);
+    Money discount =
+        request.getDiscountAmount() != null
+            ? Money.of(request.getDiscountAmount(), currency)
+            : Money.zero(currency);
+
+    OrderTotals totals = OrderTotals.of(total, tax, discount);
+
+    // 6. Build domain command and apply
+    SalesOrderUpdateCommand cmd =
+        new SalesOrderUpdateCommand(
+            request.getCustomerReference(),
+            request.getOrderDate(),
+            request.getRequestedDeliveryDate(),
+            request.getPromisedDeliveryDate(),
+            totals,
+            request.getShippingAddress(),
+            request.getBillingAddress(),
+            request.getShippingMethod(),
+            request.getNotes(),
+            request.getMetadata(),
+            request.getModuleType(),
+            request.getDeadline());
+
+    order.updateDraft(cmd); // throws 409 if not DRAFT
+    SalesOrder saved = orderRepository.save(order);
+
+    // 7. Response
+    TradingPartnerDto partner =
+        partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
+    List<SalesOrderLineResponse> lineResponses =
+        syncedLines.stream()
+            .filter(SalesOrderLine::getIsActive)
+            .map(this::mapLineToResponse)
+            .toList();
+
+    log.info(
+        "Sales order updated: uid={}, linesAdded={}, linesRemoved={}",
+        saved.getUid(),
+        request.getLines().stream().filter(l -> l.getId() == null).count(),
+        existingLines.size() - incomingLineIds.size());
+
+    return SalesOrderDto.from(saved, partner, lineResponses);
+  }
+
+  private void updateLineFromRequest(
+      SalesOrderLine line, UpdateSalesOrderLineRequest req, String orderCurrency) {
+    if (req.getUnitPrice() != null
+        && req.getCurrency() != null
+        && !req.getCurrency().equals(orderCurrency)) {
+      throw new CurrencyMismatchException(orderCurrency, "Line currency must match order currency");
+    }
+    line.setProductId(req.getProductId());
+    line.setProductDesc(req.getProductDesc());
+    line.setRequestedQty(req.getRequestedQty());
+    line.setUnit(req.getUnit());
+
+    // Note: unitPrice can be null for draft/pending lines
+    Money newUnitPrice =
+        req.getUnitPrice() != null && req.getCurrency() != null
+            ? Money.of(req.getUnitPrice(), req.getCurrency())
+            : null;
+    line.updateUnitPrice(newUnitPrice);
+
+    line.setModuleType(req.getModuleType());
+    line.setModuleSpecs(req.getModuleSpecs());
+  }
+
+  private SalesOrderLine mapUpdateLineRequestToEntity(
+      UpdateSalesOrderLineRequest request, UUID orderId, String orderCurrency) {
+    if (request.getUnitPrice() != null
+        && request.getCurrency() != null
+        && !request.getCurrency().equals(orderCurrency)) {
+      throw new CurrencyMismatchException(orderCurrency, "Line currency must match order currency");
+    }
+
+    // Note: unitPrice can be null for draft/pending lines
+    Money unitPrice =
+        request.getUnitPrice() != null && request.getCurrency() != null
+            ? Money.of(request.getUnitPrice(), request.getCurrency())
+            : null;
+
+    return SalesOrderLine.builder()
+        .salesOrderId(orderId)
+        .productId(request.getProductId())
+        .productDesc(request.getProductDesc())
+        .requestedQty(request.getRequestedQty())
+        .unit(request.getUnit())
+        .unitPrice(unitPrice)
+        .lineStatus(SalesOrderLineStatus.PENDING)
+        .moduleType(request.getModuleType())
+        .moduleSpecs(request.getModuleSpecs())
+        .build();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -279,13 +452,85 @@ public class SalesOrderService {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+
+    if (order.getStatus() == OrderStatus.PENDING_APPROVAL) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "Order is awaiting approval; cannot be confirmed manually", 409);
+    }
+
+    if (order.getStatus() == OrderStatus.DRAFT) {
+      boolean needsApproval =
+          approvalPort.requiresApproval(
+              tenantId,
+              TenantContext.getCurrentUserId(),
+              "SALES_ORDER",
+              order.getId(),
+              order.getTotals() != null
+                  ? order.getTotals().calculateGrandTotal().getAmount()
+                  : null,
+              order.getCurrency());
+
+      if (needsApproval) {
+        log.info(
+            "Sales order {} requires approval, moving to PENDING_APPROVAL", order.getOrderNumber());
+        order.pendingApproval();
+        SalesOrder saved = orderRepository.save(order);
+        TradingPartnerDto partner =
+            partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
+        List<SalesOrderLineResponse> lineResponses =
+            lineRepository
+                .findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId())
+                .stream()
+                .map(this::mapLineToResponse)
+                .toList();
+        return SalesOrderDto.from(saved, partner, lineResponses);
+      }
+    }
+
     order.confirm();
+    return finalizeConfirmation(order, tenantId);
+  }
+
+  /**
+   * Tüm aktif satırlar aynı birime sahipse o birimi döner, farklı birimler varsa veya satır yoksa
+   * null döner.
+   */
+  private String deriveOrderUnit(List<SalesOrderLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    Set<String> units =
+        lines.stream()
+            .map(SalesOrderLine::getUnit)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return units.size() == 1 ? units.iterator().next() : null;
+  }
+
+  /** Confirm an order as SystemUser (called after approval callback). */
+  @Transactional
+  public SalesOrderDto confirmOrderAsSystem(UUID orderId) {
+    return TenantContext.executeInTenantContext(
+        TenantContext.getCurrentTenantId(),
+        () -> {
+          TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
+          UUID tenantId = TenantContext.getCurrentTenantId();
+          SalesOrder order = getOrderOrThrow(tenantId, orderId);
+          order.confirmFromApproval();
+          return finalizeConfirmation(order, tenantId);
+        });
+  }
+
+  private SalesOrderDto finalizeConfirmation(SalesOrder order, UUID tenantId) {
     SalesOrder saved = orderRepository.save(order);
 
     log.info("Sales order confirmed: uid={}", saved.getUid());
 
     // Faz 2.2 — trigger RuleEngine: recipe matching + WorkOrder DRAFT creation per line
     ruleEngine.processConfirmedOrder(saved);
+
+    TradingPartnerDto partner =
+        partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
 
     List<SalesOrderLine> orderLines =
         lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(saved.getId());
@@ -312,23 +557,35 @@ public class SalesOrderService {
                         ))
             .toList();
 
+    UUID customerId = saved.getTradingPartnerId();
+    String customerName = partner != null ? partner.getDisplayName() : null;
+    String unit = deriveOrderUnit(orderLines);
+
     domainEventPublisher.publish(
         new SalesOrderConfirmedEvent(
             tenantId,
             saved.getId(),
             saved.getOrderNumber(),
-            null,
-            null,
+            customerId,
+            customerName,
             totalQuantity,
-            null,
+            unit,
             saved.getRequestedDeliveryDate(),
             snapshotLines));
 
-    TradingPartnerDto partner =
-        partnerService.findById(tenantId, saved.getTradingPartnerId()).orElse(null);
     List<SalesOrderLineResponse> lineResponses =
         orderLines.stream().map(this::mapLineToResponse).toList();
     return SalesOrderDto.from(saved, partner, lineResponses);
+  }
+
+  /** Reject an order (called after approval rejection callback). */
+  @Transactional
+  public void rejectOrder(UUID orderId, String reason) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+    SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    order.reject(reason);
+    orderRepository.save(order);
+    log.info("Sales order rejected: uid={}, reason={}", order.getUid(), reason);
   }
 
   /**
@@ -445,7 +702,17 @@ public class SalesOrderService {
 
   // ── Line mapping helpers ─────────────────────────────────────────────────
 
-  private SalesOrderLine mapLineRequestToEntity(SalesOrderLineRequest req, UUID salesOrderId) {
+  private SalesOrderLine mapLineRequestToEntity(
+      SalesOrderLineRequest req, UUID salesOrderId, String orderCurrency) {
+    // If unitPrice is provided, its currency MUST match the parent SalesOrder currency
+    if (req.getUnitPrice() != null
+        && req.getCurrency() != null
+        && !req.getCurrency().equals(orderCurrency)) {
+      throw new com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException(
+          orderCurrency, "Line currency must match order currency");
+    }
+
+    // Note: unitPrice can be null for draft/pending lines
     return SalesOrderLine.builder()
         .salesOrderId(salesOrderId)
         .productId(req.getProductId())
@@ -470,6 +737,7 @@ public class SalesOrderService {
         .productId(line.getProductId())
         .productDesc(line.getProductDesc())
         .requestedQty(line.getRequestedQty())
+        .shippedQty(line.getShippedQty())
         .unit(line.getUnit())
         .unitPrice(line.getUnitPrice() != null ? line.getUnitPrice().getAmount() : null)
         .currency(line.getCurrency())

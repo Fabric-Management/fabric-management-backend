@@ -23,6 +23,7 @@ public class ApprovalPolicyResponse {
   private PolicyTargetLevel requiredForLevel;
   private ApproverRole approverRole;
   private int promotionThreshold;
+  private int expiryHours;
   private boolean active;
   private OffsetDateTime createdAt;
   private OffsetDateTime updatedAt;
@@ -35,6 +36,7 @@ public class ApprovalPolicyResponse {
         .requiredForLevel(entity.getRequiredForLevel())
         .approverRole(entity.getApproverRole())
         .promotionThreshold(entity.getPromotionThreshold())
+        .expiryHours(entity.getExpiryHours())
         .active(entity.isActive())
         .createdAt(
             entity.getCreatedAt() != null ? entity.getCreatedAt().atOffset(ZoneOffset.UTC) : null)
