@@ -27,6 +27,8 @@ public class SalesOrderDto {
   private String customerReference;
   private OrderType orderType;
   private OrderStatus status;
+  private OrderStatus statusBeforeHold;
+  private String rejectionReason;
   private LocalDate orderDate;
   private LocalDate requestedDeliveryDate;
   private LocalDate promisedDeliveryDate;
@@ -76,6 +78,8 @@ public class SalesOrderDto {
         .customerReference(order.getCustomerReference())
         .orderType(order.getOrderType())
         .status(order.getStatus())
+        .statusBeforeHold(order.getStatusBeforeHold())
+        .rejectionReason(order.getRejectionReason())
         .orderDate(order.getOrderDate())
         .requestedDeliveryDate(order.getRequestedDeliveryDate())
         .promisedDeliveryDate(order.getPromisedDeliveryDate())

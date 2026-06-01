@@ -83,6 +83,15 @@ public class SalesOrder extends BaseEntity {
   @Builder.Default
   private OrderStatus status = OrderStatus.DRAFT;
 
+  /** Status before ON_HOLD, used to restore on resume. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status_before_hold", length = 30)
+  private OrderStatus statusBeforeHold;
+
+  /** Reason for rejection. */
+  @Column(name = "rejection_reason", length = 500)
+  private String rejectionReason;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Dates
   // ═══════════════════════════════════════════════════════════════════════════
@@ -225,6 +234,20 @@ public class SalesOrder extends BaseEntity {
           "Only PENDING_APPROVAL orders can be rejected. Current: " + status);
     }
     this.status = OrderStatus.REJECTED;
+    this.rejectionReason = reason;
+  }
+
+  /** Revise a rejected order back to DRAFT. */
+  public void reviseRejected() {
+    if (status != OrderStatus.REJECTED) {
+      throw new OrderDomainException(
+          String.format(
+              "Cannot revise order %s: only REJECTED orders can be revised. Current: %s",
+              orderNumber, status),
+          409);
+    }
+    this.status = OrderStatus.DRAFT;
+    this.rejectionReason = null;
   }
 
   /**
@@ -322,18 +345,40 @@ public class SalesOrder extends BaseEntity {
       throw new OrderDomainException(
           String.format(
               "Cannot cancel order %s: current status %s does not allow cancellation",
-              orderNumber, status));
+              orderNumber, status),
+          409);
     }
     this.status = OrderStatus.CANCELLED;
   }
 
   /** Put order on hold. */
   public void hold() {
-    if (status.isTerminal()) {
+    if (status.isTerminal() || status == OrderStatus.ON_HOLD) {
       throw new OrderDomainException(
-          String.format("Cannot hold order %s: status %s is terminal", orderNumber, status));
+          String.format(
+              "Cannot hold order %s: status %s is terminal or already ON_HOLD",
+              orderNumber, status),
+          409);
     }
+    this.statusBeforeHold = this.status;
     this.status = OrderStatus.ON_HOLD;
+  }
+
+  /** Resume an order from hold. */
+  public void resume() {
+    if (status != OrderStatus.ON_HOLD) {
+      throw new OrderDomainException(
+          String.format(
+              "Cannot resume order %s: current status is %s (must be ON_HOLD)",
+              orderNumber, status),
+          409);
+    }
+    if (statusBeforeHold == null) {
+      throw new IllegalStateException(
+          String.format("Cannot resume order %s: statusBeforeHold is null", orderNumber));
+    }
+    this.status = this.statusBeforeHold;
+    this.statusBeforeHold = null;
   }
 
   /**

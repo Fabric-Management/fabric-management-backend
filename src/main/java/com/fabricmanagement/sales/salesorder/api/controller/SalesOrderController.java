@@ -195,4 +195,31 @@ public class SalesOrderController {
   public ResponseEntity<ApiResponse<SalesOrderDto>> cancelOrder(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id)));
   }
+
+  @PostMapping("/{id}/hold")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(
+      summary = "Put an order on hold",
+      description = "Transitions the order status to ON_HOLD")
+  public ResponseEntity<ApiResponse<SalesOrderDto>> holdOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.holdOrder(id)));
+  }
+
+  @PostMapping("/{id}/resume")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(
+      summary = "Resume an order from ON_HOLD",
+      description = "Restores the order to its pre-hold status")
+  public ResponseEntity<ApiResponse<SalesOrderDto>> resumeOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.resumeOrder(id)));
+  }
+
+  @PostMapping("/{id}/revise")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(
+      summary = "Revise a rejected order back to DRAFT",
+      description = "Allows a rejected order to be edited and resubmitted")
+  public ResponseEntity<ApiResponse<SalesOrderDto>> reviseOrder(@PathVariable UUID id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.reviseOrder(id)));
+  }
 }

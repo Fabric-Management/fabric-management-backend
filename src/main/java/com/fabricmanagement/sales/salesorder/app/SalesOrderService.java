@@ -17,6 +17,7 @@ import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLineStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderUpdateCommand;
+import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
@@ -654,10 +655,78 @@ public class SalesOrderService {
     UUID tenantId = TenantContext.getCurrentTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
+
+    // Collect active line IDs for cascade notification before cancellation
+    List<UUID> activeLineIds =
+        lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(order.getId()).stream()
+            .map(SalesOrderLine::getId)
+            .toList();
+
     order.cancel();
     SalesOrder saved = orderRepository.save(order);
 
-    log.info("Sales order cancelled: uid={}", saved.getUid());
+    domainEventPublisher.publish(
+        new SalesOrderCancelledEvent(
+            tenantId, saved.getId(), saved.getOrderNumber(), activeLineIds));
+
+    log.info("Sales order cancelled: uid={}, lineCount={}", saved.getUid(), activeLineIds.size());
+    return SalesOrderDto.from(saved);
+  }
+
+  /**
+   * Put an order on hold.
+   *
+   * @param orderId Order ID
+   * @return Updated order DTO
+   */
+  @Transactional
+  public SalesOrderDto holdOrder(UUID orderId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    order.hold();
+    SalesOrder saved = orderRepository.save(order);
+
+    log.info(
+        "Sales order put on hold: uid={}, previousStatus={}",
+        saved.getUid(),
+        saved.getStatusBeforeHold());
+    return SalesOrderDto.from(saved);
+  }
+
+  /**
+   * Resume an order from ON_HOLD.
+   *
+   * @param orderId Order ID
+   * @return Updated order DTO
+   */
+  @Transactional
+  public SalesOrderDto resumeOrder(UUID orderId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    order.resume();
+    SalesOrder saved = orderRepository.save(order);
+
+    log.info("Sales order resumed: uid={}, restoredStatus={}", saved.getUid(), saved.getStatus());
+    return SalesOrderDto.from(saved);
+  }
+
+  /**
+   * Revise a rejected order back to DRAFT.
+   *
+   * @param orderId Order ID
+   * @return Updated order DTO
+   */
+  @Transactional
+  public SalesOrderDto reviseOrder(UUID orderId) {
+    UUID tenantId = TenantContext.getCurrentTenantId();
+
+    SalesOrder order = getOrderOrThrow(tenantId, orderId);
+    order.reviseRejected();
+    SalesOrder saved = orderRepository.save(order);
+
+    log.info("Sales order revised to DRAFT: uid={}", saved.getUid());
     return SalesOrderDto.from(saved);
   }
 
