@@ -21,4 +21,19 @@ class OrderStatusTest {
   void canEdit_whenNotDraft_returnsFalse(OrderStatus status) {
     assertThat(status.canEdit()).isFalse();
   }
+
+  @Test
+  void canCancel_whenInProgress_returnsTrue() {
+    assertThat(OrderStatus.IN_PROGRESS.canCancel()).isTrue();
+  }
+
+  @Test
+  void canCancel_whenPartiallyShipped_returnsFalse() {
+    assertThat(OrderStatus.PARTIALLY_SHIPPED.canCancel()).isFalse();
+  }
+
+  @Test
+  void canCancel_whenShipped_returnsFalse() {
+    assertThat(OrderStatus.SHIPPED.canCancel()).isFalse();
+  }
 }

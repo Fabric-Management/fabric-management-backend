@@ -11,4 +11,6 @@ public record DraftProductionOrderCommand(
     BigDecimal plannedQty,
     String unit,
     String currency,
-    LocalDate deadline) {}
+    LocalDate deadline,
+    String certificationReq,
+    String originReq) {}

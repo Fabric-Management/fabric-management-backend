@@ -143,4 +143,148 @@ class SalesOrderTest {
         .extracting("httpStatus")
         .isEqualTo(409);
   }
+
+  @Test
+  void recordShipmentProgress_partial_setsPartiallyShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_allShipped_setsShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    order.recordShipmentProgress(true, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_partiallyShipped_toShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    order.recordShipmentProgress(true, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_idempotent_staysPartiallyShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_inProgress_setsPartiallyShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderStatus.class,
+      names = {"DELIVERED", "CANCELLED", "REJECTED"})
+  void recordShipmentProgress_terminal_noop(OrderStatus status) {
+    SalesOrder order = SalesOrder.builder().status(status).build();
+    order.recordShipmentProgress(true, true);
+    assertThat(order.getStatus()).isEqualTo(status);
+  }
+
+  @Test
+  void recordShipmentProgress_onHold_noop() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.ON_HOLD).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.ON_HOLD);
+  }
+
+  @Test
+  void recordShipmentProgress_noneShipped_noop() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    order.recordShipmentProgress(false, false);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+  }
+
+  @Test
+  void cancel_whenInProgress_succeeds() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    order.cancel();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderStatus.class,
+      names = {"PARTIALLY_SHIPPED", "SHIPPED"})
+  void cancel_whenPartiallyShippedOrShipped_throws409(OrderStatus status) {
+    SalesOrder order = SalesOrder.builder().status(status).build();
+    assertThatThrownBy(() -> order.cancel())
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("Cannot cancel order")
+        .extracting("httpStatus")
+        .isEqualTo(409);
+  }
+
+  @Test
+  void hold_thenResume_restoresInProgress() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    order.hold();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.ON_HOLD);
+    order.resume();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.IN_PROGRESS);
+  }
+
+  @Test
+  void hold_thenResume_restoresConfirmed() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    order.hold();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.ON_HOLD);
+    order.resume();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+  }
+
+  @Test
+  void resume_whenNotOnHold_throws409() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.DRAFT).build();
+    assertThatThrownBy(() -> order.resume())
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("must be ON_HOLD")
+        .extracting("httpStatus")
+        .isEqualTo(409);
+  }
+
+  @Test
+  void reviseRejected_whenRejected_movesToDraft() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.REJECTED).build();
+    order.reviseRejected();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.DRAFT);
+  }
+
+  @Test
+  void reviseRejected_whenNotRejected_throws409() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    assertThatThrownBy(() -> order.reviseRejected())
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("only REJECTED orders can be revised")
+        .extracting("httpStatus")
+        .isEqualTo(409);
+  }
+
+  @Test
+  void hold_whenAlreadyOnHold_throws409() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.ON_HOLD).build();
+    assertThatThrownBy(() -> order.hold())
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("terminal or already ON_HOLD")
+        .extracting("httpStatus")
+        .isEqualTo(409);
+  }
+
+  @Test
+  void reviseRejected_clearsRejectionReason() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.REJECTED).build();
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        order, "rejectionReason", "Insufficient funds");
+    order.reviseRejected();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.DRAFT);
+    assertThat(order.getRejectionReason()).isNull();
+  }
 }

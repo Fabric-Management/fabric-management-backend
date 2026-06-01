@@ -48,7 +48,11 @@ public enum OrderStatus {
 
   /** Check if order can be cancelled. */
   public boolean canCancel() {
-    return this == DRAFT || this == CONFIRMED || this == ON_HOLD || this == PENDING_APPROVAL;
+    return this == DRAFT
+        || this == CONFIRMED
+        || this == ON_HOLD
+        || this == PENDING_APPROVAL
+        || this == IN_PROGRESS;
   }
 
   /** Check if order can be deleted (hard/soft). */

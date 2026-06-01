@@ -1,13 +1,17 @@
 package com.fabricmanagement.sales.salesorder.app.listener;
 
 import com.fabricmanagement.logistics.shipment.domain.event.ShipmentLineConfirmedEvent;
-import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
-import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
+import com.fabricmanagement.sales.salesorder.app.ShipmentProgressService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.TransientDataAccessException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -16,11 +20,17 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 public class SalesOrderEventListener {
 
-  private final SalesOrderLineRepository salesOrderLineRepository;
+  private final ShipmentProgressService shipmentProgressService;
 
   @Async
-  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Retryable(
+      retryFor = {
+        ObjectOptimisticLockingFailureException.class,
+        TransientDataAccessException.class
+      },
+      maxAttempts = 3,
+      backoff = @Backoff(delay = 200, multiplier = 2))
   public void onShipmentLineConfirmed(ShipmentLineConfirmedEvent event) {
     log.debug(
         "Handling ShipmentLineConfirmedEvent: shipmentLineId={}, salesOrderLineId={}, qty={}",
@@ -28,21 +38,31 @@ public class SalesOrderEventListener {
         event.getSalesOrderLineId(),
         event.getConfirmedQuantity());
 
-    SalesOrderLine line =
-        salesOrderLineRepository.findById(event.getSalesOrderLineId()).orElse(null);
+    // Faz 1 — shippedQty yaz (ayrı tx, nadiren çakışır)
+    // ÖNEMLİ: @Retryable tüm metodu (Faz 1 + Faz 2) tekrar çalıştırır.
+    // Ancak Faz 1'deki addShippedQuantity() metodundaki 'processedShipmentLineIds' kontrolü
+    // sayesinde bu işlem idempotent'tir ve retry sırasında miktar mükerrer artmaz.
+    // Lütfen Faz 1'deki bu idempotency guard'ını KESİNLİKLE KALDIRMAYIN!
+    UUID salesOrderId =
+        shipmentProgressService.recordLineShipment(
+            event.getSalesOrderLineId(), event.getShipmentLineId(), event.getConfirmedQuantity());
 
-    if (line == null) {
-      log.error(
-          "SalesOrderLine not found for shipment line confirmed: {}", event.getSalesOrderLineId());
-      return;
+    if (salesOrderId == null) {
+      return; // Line bulunamadı, service içinde loglandı
     }
 
-    line.addShippedQuantity(event.getShipmentLineId(), event.getConfirmedQuantity());
-    salesOrderLineRepository.save(line);
+    // Faz 2 — header status güncelle (ayrı tx, retry burada çalışır)
+    shipmentProgressService.updateOrderShipmentStatus(salesOrderId);
+  }
 
-    log.info(
-        "Updated shipped quantity for SalesOrderLine {}. New shippedQty: {}",
-        line.getId(),
-        line.getShippedQty());
+  @Recover
+  public void recoverShipmentLineConfirmed(Exception ex, ShipmentLineConfirmedEvent event) {
+    log.error(
+        "Failed to process ShipmentLineConfirmedEvent after retries. "
+            + "shipmentLineId={}, salesOrderLineId={}: {}",
+        event.getShipmentLineId(),
+        event.getSalesOrderLineId(),
+        ex.getMessage(),
+        ex);
   }
 }

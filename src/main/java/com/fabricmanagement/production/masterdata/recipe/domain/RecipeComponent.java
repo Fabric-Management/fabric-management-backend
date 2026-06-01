@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.recipe.domain;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -57,6 +58,22 @@ public class RecipeComponent extends BaseEntity {
   @Override
   protected String getModuleCode() {
     return "RCPC";
+  }
+
+  @PrePersist
+  @PreUpdate
+  protected void normalizeFields() {
+    if (this.certification != null && !this.certification.isBlank()) {
+      this.certification = this.certification.strip().toUpperCase(Locale.ROOT);
+    } else {
+      this.certification = null;
+    }
+
+    if (this.origin != null && !this.origin.isBlank()) {
+      this.origin = this.origin.strip().toUpperCase(Locale.ROOT);
+    } else {
+      this.origin = null;
+    }
   }
 
   public RecipeComponentNode toNode() {
