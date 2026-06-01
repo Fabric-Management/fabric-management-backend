@@ -168,10 +168,13 @@ public class SalesOrderLine extends BaseEntity {
   /**
    * Adds confirmed shipped quantity. Uses shipmentLineId as an idempotency key to prevent
    * double-counting if the event is processed twice.
+   *
+   * @return true when the shipment quantity was applied, false when this shipment line was already
+   *     processed
    */
-  public void addShippedQuantity(UUID shipmentLineId, BigDecimal quantity) {
+  public boolean addShippedQuantity(UUID shipmentLineId, BigDecimal quantity) {
     if (this.processedShipmentLineIds.contains(shipmentLineId)) {
-      return; // Idempotent return
+      return false; // Idempotent return
     }
 
     if (this.shippedQty == null) {
@@ -179,6 +182,17 @@ public class SalesOrderLine extends BaseEntity {
     }
     this.shippedQty = this.shippedQty.add(quantity);
     this.processedShipmentLineIds.add(shipmentLineId);
+    return true;
+  }
+
+  public BigDecimal getRemainingQty() {
+    BigDecimal requested = requestedQty != null ? requestedQty : BigDecimal.ZERO;
+    BigDecimal shipped = shippedQty != null ? shippedQty : BigDecimal.ZERO;
+    return requested.subtract(shipped);
+  }
+
+  public boolean isOverShipped() {
+    return requestedQty != null && shippedQty != null && shippedQty.compareTo(requestedQty) > 0;
   }
 
   @PrePersist
@@ -187,6 +201,11 @@ public class SalesOrderLine extends BaseEntity {
     if (!isValid()) {
       throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
           "Either productId or productDesc must be provided for SalesOrderLine");
+    }
+    if (Boolean.TRUE.equals(getIsActive())
+        && (requestedQty == null || requestedQty.compareTo(BigDecimal.ZERO) <= 0)) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "Requested quantity must be greater than zero for SalesOrderLine");
     }
   }
 }

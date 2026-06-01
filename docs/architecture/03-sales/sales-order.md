@@ -1,9 +1,9 @@
 # SalesOrder — Müşteri Siparişi
 
-> Modül: Satış Zinciri (03-sales)  
-> Versiyon: 1.0 | Durum: Aktif  
-> Son güncelleme: 2026-03-17  
-> Kanonik kaynak: SalesOrder ve SalesOrderLine entity'leri burada tanımlanır.
+> Modül: Satış Zinciri (03-sales)
+> Versiyon: 2.0 | Durum: Aktif
+> Son güncelleme: 2026-06-01
+> **Bu doküman mevcut implementasyonu yansıtır. Gerçeğin kaynağı koddur; çelişki halinde `SalesOrder` / `SalesOrderLine` entity'leri esastır.**
 
 ---
 
@@ -11,79 +11,117 @@
 
 SalesOrder müşteri siparişlerini yönetir. `SalesOrder → SalesOrderLine → WorkOrder` zinciri üretim planlamasının tetikleyicisidir. Hem masaüstü hem mobil platformlardan oluşturulabilir.
 
+Tablolar: `sales_ord.sales_order`, `sales_ord.sales_order_line`. Her ikisi `BaseEntity`'den miras alır (tenant izolasyonu, soft-delete, optimistic locking `version`).
+
 ---
 
 ## 1. SalesOrder
 
-> Tablo: `sales.sales_order`  
-> `BaseEntity`'den miras alır.
+> Tablo: `sales_ord.sales_order`
 
 | Alan | Tip | Zorunlu | Açıklama |
 |---|---|---|---|
-| `orderNumber` | String | Evet | **Otomatik** — `SO-2024-001` |
-| `customerId` | UUID | Evet | FK → TradingPartner (partnerType = CUSTOMER/BOTH) |
-| `status` | SalesOrderStatus (Enum) | Evet | Bkz. `11-cross-cutting/status-enum-catalog.md` |
-| `deadline` | Date | Hayır | Teslim tarihi |
-| `moduleType` | ModuleType (Enum) | Evet | FIBER / YARN / FABRIC / DYE_FINISHING |
+| `tradingPartnerId` | UUID | Evet | FK → TradingPartner. SALES'te müşteri, PURCHASE'te tedarikçi. |
+| `orderNumber` | String | Evet | **Otomatik** — `DocumentNumberGenerator` (ör. `SO-20260202-00001`) |
+| `customerReference` | String | Hayır | Müşterinin kendi PO referansı |
+| `orderType` | OrderType (Enum) | Evet | SALES (varsayılan) / PURCHASE |
+| `status` | OrderStatus (Enum) | Evet | Bkz. [Status Akışı](#status-akışı) |
+| `orderDate` | Date | Evet | Sipariş tarihi |
+| `requestedDeliveryDate` | Date | Hayır | Müşterinin talep ettiği teslim |
+| `promisedDeliveryDate` | Date | Hayır | Bizim taahhüt ettiğimiz teslim |
+| `actualDeliveryDate` | Date | Hayır | Gerçekleşen teslim (deliver ile set edilir) |
+| `deadline` | Date | Hayır | Tüm satırlar için son teslim |
+| `totals` | OrderTotals (embedded) | Evet | `total` + `tax` + `discount` + `currency`. **Satırlardan hesaplanır** (input'a güvenilmez). Varsayılan currency `TRY`. |
+| `moduleType` | ModuleType (Enum) | Hayır | FIBER / YARN / FABRIC / DYE_FINISHING |
 | `quoteId` | UUID | Hayır | FK → Quote — dönüşümle geldiyse |
 | `sampleRequestId` | UUID | Hayır | FK → SampleRequest — numuneden geldiyse |
-| `paymentTerms` | Enum | Hayır | CASH / NET_30 / NET_60 / OPEN_ACCOUNT |
-| `leadTimeDays` | Integer | Hayır | Teslim süresi |
-| `approvalMethod` | Enum | Hayır | EMAIL_LINK / VERBAL / PHOTO / DIGITAL_SIGNATURE |
-| `approvedAt` | Timestamp | Hayır | Onay zamanı |
-| `approvedByName` | String | Hayır | Onaylayan müşteri adı |
-| `approvalEvidence` | JSONB | Hayır | Onay kanıtı (fotoğraf, konum, imza) |
+| `shippingAddress` / `billingAddress` / `shippingMethod` | String | Hayır | Sevkiyat/fatura bilgisi |
+| `statusBeforeHold` | OrderStatus | Hayır | `hold()` öncesi status; `resume()` bununla geri yükler |
+| `rejectionReason` | String | Hayır | `reject()` ile saklanır; `reviseRejected()` ile temizlenir |
 | `notes` | String (TEXT) | Hayır | Genel notlar |
-| `attachments` | JSONB | Hayır | Referans dokümanlar |
-| `offlineCreatedAt` | Timestamp | Hayır | Offline oluşturulduysa |
-| `deviceId` | String | Hayır | Hangi tabletten |
-| `syncedAt` | Timestamp | Hayır | Sunucuya sync zamanı |
+| `metadata` | JSONB | Hayır | Esnek veri (payment terms, incoterms, onay kanıtı vb.) |
+| `offlineMetadata` | embedded | Hayır | Offline oluşturma/sync bilgisi (deviceId, syncedAt) |
+
+> **Not:** Eski dokümandaki `customerId`, `paymentTerms`, `leadTimeDays`, `approvalMethod`, `approvedAt`, `approvedByName`, `approvalEvidence`, `attachments` ayrı kolon **değildir** — müşteri referansı `tradingPartnerId`'dir; ödeme/onay/ek detayları `metadata` (JSONB) içinde tutulur.
 
 ### Status Akışı
 
+`OrderStatus` 10 değer içerir:
+
 ```
-DRAFT → CONFIRMED → IN_PRODUCTION → IN_WAREHOUSE → SHIPPED → DELIVERED → CLOSED
-                  ↘ CANCELLED (DELIVERED ve CLOSED hariç)
+DRAFT, PENDING_APPROVAL, CONFIRMED, IN_PROGRESS,
+PARTIALLY_SHIPPED, SHIPPED, DELIVERED, CANCELLED, REJECTED, ON_HOLD
 ```
 
-| Geçiş | Tetikleyen |
-|---|---|
-| `DRAFT → CONFIRMED` | Kullanıcı onaylar |
-| `CONFIRMED → IN_PRODUCTION` | İlk bağlı WorkOrder IN_PROGRESS olunca — otomatik |
-| `IN_PRODUCTION → IN_WAREHOUSE` | Tüm SalesOrderLine'lar IN_WAREHOUSE olunca — otomatik |
-| `IN_WAREHOUSE → SHIPPED` | IWM ShipmentDispatchedEvent |
-| `SHIPPED → DELIVERED` | Teslimat onayı |
-| `DELIVERED → CLOSED` | Kullanıcı kapatır |
+> Not: `IN_PRODUCTION`, `IN_WAREHOUSE`, `CLOSED` **yoktur** (eski doküman hatası).
+
+```
+DRAFT ──confirm──▶ CONFIRMED ──startProcessing──▶ IN_PROGRESS ──▶ (PARTIALLY_)SHIPPED ──▶ DELIVERED
+  │                    ▲                                  ▲
+  └─onay gerekirse─▶ PENDING_APPROVAL ──sistem onayı──────┘   (sevkiyatla otomatik)
+                          └─red──▶ REJECTED ──reviseRejected──▶ DRAFT
+
+İptal: {DRAFT, PENDING_APPROVAL, CONFIRMED, IN_PROGRESS, ON_HOLD} ──cancel──▶ CANCELLED
+Beklet: non-terminal ──hold──▶ ON_HOLD ──resume──▶ (statusBeforeHold)
+Terminal: DELIVERED, CANCELLED, REJECTED
+```
+
+| Geçiş | Tetikleyen | Otomatik? |
+|---|---|---|
+| DRAFT → PENDING_APPROVAL | confirm + onay gerekiyorsa (`ApprovalPort`) | Evet |
+| DRAFT → CONFIRMED | confirm + onay gerekmiyorsa | Evet |
+| PENDING_APPROVAL → CONFIRMED | **yalnızca** sistem approval callback'i (`confirmFromApproval`) | Evet |
+| PENDING_APPROVAL → REJECTED | approval reddi | Evet |
+| REJECTED → DRAFT | `reviseRejected()` (revizyon + yeniden onay) | Manuel |
+| CONFIRMED → IN_PROGRESS | `startProcessing` endpoint | **Manuel** (üretim event'i ile otomasyon henüz yok — bkz. [Açık Kararlar](#açık-kararlar)) |
+| CONFIRMED/IN_PROGRESS/PARTIALLY_SHIPPED → PARTIALLY_SHIPPED veya SHIPPED | `ShipmentLineConfirmedEvent` aggregate'i (tüm aktif satırlar sevk → SHIPPED, kısmı → PARTIALLY_SHIPPED) | **Otomatik** |
+| SHIPPED → DELIVERED | `deliver` endpoint | Manuel |
+| → CANCELLED | `cancel` (canCancel: DRAFT/PENDING_APPROVAL/CONFIRMED/IN_PROGRESS/ON_HOLD) + WorkOrder cascade | Manuel |
+| non-terminal → ON_HOLD | `hold()` (`statusBeforeHold` saklanır) | Manuel |
+| ON_HOLD → önceki status | `resume()` | Manuel |
+
+> **Onay bypass koruması:** `confirmOrder` yalnızca DRAFT'tan ilerletir; PENDING_APPROVAL → CONFIRMED **sadece** sistem callback'inden (`confirmOrderAsSystem` → `confirmFromApproval`) gelir. Kullanıcının onay bekleyen siparişi manuel confirm etmesi 409 ile reddedilir.
 
 ### Event'ler
 
-| Geçiş | Event | Alıcı |
+| Event | Ne zaman | Alıcı |
 |---|---|---|
-| `→ CONFIRMED` | `SalesOrderConfirmed` | FlowBoard (PLANNING task), NotificationHub, RuleEngine |
-| `→ IN_WAREHOUSE` | `SalesOrderInWarehouse` | FlowBoard (SHIPMENT task), NotificationHub |
+| `SalesOrderConfirmedEvent` | → CONFIRMED | Production (`WorkOrderSalesEventListener` → WorkOrder DRAFT), FlowBoard, RuleEngine |
+| `SalesOrderCancelledEvent` | → CANCELLED | Production (`WorkOrderSalesEventListener` → COMPLETED olmayan WorkOrder'ları CANCELLED yapar) |
+| `ShipmentLineConfirmedEvent` (gelen) | logistics sevkiyat onayı | Sales (`ShipmentProgressService`): satır `shippedQty` + header PARTIALLY_SHIPPED/SHIPPED |
+
+> Eski dokümandaki `SalesOrderInWarehouse`, `ProductStoredEvent`, `ShipmentDispatchedEvent` **kodda yoktur**. Sevkiyat sinyali satır bazlı `ShipmentLineConfirmedEvent`'tir; header status bu satır event'leri aggregate edilerek türetilir.
 
 ---
 
 ## 2. SalesOrderLine
 
-> Tablo: `sales.sales_order_line`  
-> `BaseEntity`'den miras alır.
+> Tablo: `sales_ord.sales_order_line`
 
 | Alan | Tip | Zorunlu | Açıklama |
 |---|---|---|---|
 | `salesOrderId` | UUID | Evet | FK → SalesOrder |
-| `materialId` | UUID | Hayır | FK → Material — katalogdan seçildiyse |
-| `productDesc` | String (TEXT) | Hayır | Serbest ürün tanımı — katalogda yoksa |
-| `requestedQty` | Decimal | Evet | Talep edilen miktar |
-| `unit` | Enum | Evet | KG / MT / PIECE |
-| `unitPrice` | Decimal | Hayır | Birim fiyat |
-| `currency` | Enum | Hayır | USD / EUR / TRY |
-| `moduleSpecs` | JSONB | Hayır | Modüle özel alanlar — bkz. ModuleSpecs |
-| `lineStatus` | SalesOrderLineStatus (Enum) | Evet | Bkz. `11-cross-cutting/status-enum-catalog.md` |
+| `productId` | UUID | Hayır | FK → ürün (katalogdan seçildiyse) |
+| `productDesc` | String (TEXT) | Hayır | Serbest ürün tanımı (katalogda yoksa) |
+| `requestedQty` | Decimal(15,3) | Evet | Talep edilen miktar. **Aktif satırda > 0 zorunlu** (domain guard) |
+| `shippedQty` | Decimal(15,3) | Evet | Sevk edilen miktar (varsayılan 0; sevkiyat event'leriyle artar) |
+| `unit` | String | Evet | KG / MT / PIECE vb. |
+| `unitPrice` | Money (embedded) | Hayır | `amount` + `currency`. **Currency = sipariş currency'si** (zorunlu eşleşme) |
+| `processedShipmentLineIds` | Set\<UUID\> | — | Idempotency anahtarı (aynı sevkiyat satırı iki kez sayılmaz) |
+| `moduleType` | ModuleType | Hayır | FIBER / YARN / FABRIC / DYE_FINISHING |
+| `moduleSpecs` | JSONB | Hayır | Modüle özel alanlar — bkz. [ModuleSpecs](#modulespecs-jsonb-şemaları) |
+| `lineStatus` | SalesOrderLineStatus | Evet | Bkz. [LineStatus](#linestatus-akışı) |
+| `recipeId` | UUID | Hayır | RuleEngine veya manuel atama sonrası |
 
-**Validasyon:** `materialId` veya `productDesc` — en az biri zorunlu, ikisi de null olamaz.
+**Validasyon:** `productId` veya `productDesc` — en az biri zorunlu. Aktif satırda `requestedQty > 0`. Satır currency'si sipariş currency'sine eşit olmalı.
 
-> **Tasarım kararı:** Eski dökümanlardan `productId → Product` FK'sı kaldırıldı. Material entity modüller arası ortak "ürün" katmanı olarak kullanılır — Product entity'sine gerek yok.
+> **Tasarım kararı (açık):** Eski doküman `materialId`'ye geçildiğini söylüyordu; **kod hâlâ `productId` + `productDesc` kullanıyor**. Bu çözülmemiş bir karardır — bkz. [Açık Kararlar](#açık-kararlar).
+
+### Domain yardımcıları
+
+- `getRemainingQty()` = `requestedQty − shippedQty` (null-safe).
+- `isOverShipped()` = `shippedQty > requestedQty` (null-safe).
+- `addShippedQuantity(shipmentLineId, qty)` → `boolean` (yeni=true, duplicate=false). **Hard-throw etmez**; over-shipment fiziksel gerçektir, `ShipmentProgressService` WARN loglar (async sevkiyat event'i yutulmaz).
 
 ### LineStatus Akışı
 
@@ -92,123 +130,94 @@ PENDING → RECIPE_ASSIGNED → IN_PRODUCTION → COMPLETED → IN_WAREHOUSE →
         ↘ CANCELLED
 ```
 
-| Geçiş | Tetikleyen |
-|---|---|
-| `PENDING → RECIPE_ASSIGNED` | RuleEngine veya kullanıcı recipe atar |
-| `RECIPE_ASSIGNED → IN_PRODUCTION` | Bağlı WorkOrder IN_PROGRESS olunca — otomatik |
-| `IN_PRODUCTION → COMPLETED` | Tüm bağlı WorkOrder'lar COMPLETED olunca — otomatik |
-| `COMPLETED → IN_WAREHOUSE` | IWM ProductStoredEvent |
-| `IN_WAREHOUSE → SHIPPED` | IWM ShipmentDispatchedEvent |
+| Geçiş | Tetikleyen | Durum |
+|---|---|---|
+| PENDING → RECIPE_ASSIGNED | RuleEngine veya manuel recipe atama | **Bağlı (wired)** |
+| RECIPE_ASSIGNED → IN_PRODUCTION → COMPLETED → IN_WAREHOUSE → SHIPPED | üretim / IWM event'leri | **Tanımlı, henüz bağlanmadı** (event'ler wire edilmemiş — bkz. [Açık Kararlar](#açık-kararlar)) |
+
+> Dürüstlük notu: Yalnızca `PENDING → RECIPE_ASSIGNED` implement edilmiştir. Zincirin geri kalanı enum'da tanımlı ama tetikleyici event'ler bağlı değildir; "otomatik" olarak sunulmamalıdır.
 
 ---
 
 ## ModuleSpecs JSONB Şemaları
 
-Her modül için `moduleSpecs` JSONB içindeki alan şeması. Backend her `moduleType` için ayrı validasyon uygular.
+Her `moduleType` için `moduleSpecs` JSONB alan şeması (`ModuleSpecsValidator` doğrular). `certificationReq` / `originReq` RuleEngine tarafından recipe eşleştirmede kullanılır.
 
 ### FIBER
-
 ```json
-{
-  "certificationReq": "GOTS",
-  "originReq": "TR",
-  "moq": 500,
-  "leadTimeDays": 21
-}
+{ "certificationReq": "GOTS", "originReq": "TR", "moq": 500, "leadTimeDays": 21 }
 ```
-
 ### YARN
-
 ```json
-{
-  "count": "30/1 Ne",
-  "twist": "Z",
-  "construction": "Ring Spun",
-  "certificationReq": "GOTS"
-}
+{ "count": "30/1 Ne", "twist": "Z", "construction": "Ring Spun", "certificationReq": "GOTS" }
 ```
-
 ### FABRIC
-
 ```json
-{
-  "weight": "180 g/m²",
-  "width": "150 cm",
-  "weaveType": "Plain",
-  "certificationReq": "GOTS"
-}
+{ "weight": "180 g/m²", "width": "150 cm", "weaveType": "Plain", "certificationReq": "GOTS" }
 ```
-
 ### DYE_FINISHING
-
 ```json
-{
-  "color": "Pantone 19-4052 TCX",
-  "finish": "Sanforized",
-  "washInstruction": "30°C gentle",
-  "certificationReq": "OEKO-TEX"
-}
+{ "color": "Pantone 19-4052 TCX", "finish": "Sanforized", "washInstruction": "30°C gentle", "certificationReq": "OEKO-TEX" }
 ```
 
-> **UI davranışı:** `SalesOrder.moduleType` seçilince form dinamik olarak değişir.  
-> **Yeni modül eklendiğinde:** Tabloya dokunulmaz — sadece yeni JSON şeması ve backend validasyonu tanımlanır.
+> Yeni modül eklenince tabloya dokunulmaz — sadece yeni JSON şeması + backend validasyonu tanımlanır.
 
 ---
 
 ## RuleEngine — Recipe Eşleştirme
 
-`SalesOrderConfirmed` eventi tetiklendiğinde RuleEngine her `SalesOrderLine` için 4 adımlı kaskad çalıştırır:
+`SalesOrderConfirmed` tetiklendiğinde RuleEngine her PENDING `SalesOrderLine` için 4 adımlı kaskad çalıştırır. Üç eşleştirme adımı da satırın `moduleSpecs`'inden gelen `certificationReq` ve `originReq` ile filtrelenir.
 
 ```
-Adım 1 — Material varsayılan recipe
-  materialId varsa ve bağlı Fiber'in varsayılan recipe'si doluysa → recipe atandı
-  certificationReq / originReq uyuşuyor mu? → uyuşmuyorsa sonraki adım
+Hazırlık — certificationReq / originReq moduleSpecs'ten alınır,
+           Locale.ROOT ile normalize edilir (UPPER + trim).
+
+Adım 1 — productId default recipe
+  En son ACTIVE recipe (prod_recipe_component.fiber_id = productId),
+  certification/origin uyuşuyorsa.
 
 Adım 2 — Müşteri geçmişi
-  Aynı müşteri + aynı material + aynı certificationReq + originReq
-  daha önce kullanılmış mı? → en son kullanılan recipe önerilir
+  Aynı (tradingPartner + product) için son kullanılan recipe,
+  certification/origin filtreli.
 
-Adım 3 — Kısıt tabanlı filtreleme
-  ACTIVE recipe'ler arasında certificationReq + originReq ile filtrele
-  (RecipeComponent tablosu üzerinden — JSONB değil)
-  En çok kullanılan recipe önerilir
+Adım 3 — Frekans
+  Bu product için en çok kullanılan ACTIVE recipe (WorkOrder sayısı),
+  certification/origin filtreli.
 
 Adım 4 — Fallback
-  Eşleşen recipe bulunamadı
-  WorkOrder taslağı açılır, recipeId boş bırakılır
-  FlowBoard'a RECIPE_ASSIGNMENT task: "Bu kalem için recipe atanması gerekiyor"
+  Eşleşme yok → WorkOrder taslağı recipe'siz açılır,
+  FlowBoard'a RECIPE_ASSIGNMENT task'ı düşer.
 ```
+
+> **Normalizasyon:** `prod_recipe_component.certification` / `origin` hem yazma anında (`@PrePersist`, `Locale.ROOT`) hem de mevcut veri için backfill migration'ı ile normalize edilir; sorgular düz eşitlik kullanır (indexli, case-tutarlı).
+>
+> **Cert/origin → WorkOrder:** Şu an cert/origin yalnızca eşleştirmede kullanılır; WorkOrder entity'sine henüz map edilmez (`FAB-1025`).
 
 ### RuleEngine → WorkOrder Zinciri
 
 ```
 SalesOrder CONFIRMED
-    ↓
-RuleEngine her SalesOrderLine için:
-  - Recipe eşleştirme (4 adımlı kaskad)
-  - WorkOrder taslağı oluşturur (DRAFT)
-    - salesOrderLineId = SalesOrderLine.id
-    - plannedQty ← requestedQty
-    - deadline ← SalesOrder.deadline
-    ↓
-FlowBoard'a task açılır:
-  - Recipe atandıysa: "WorkOrder onaylanmayı bekliyor" (PLANNING)
-  - Recipe atanamadıysa: "Recipe atanması gerekiyor" (RECIPE_ASSIGNMENT)
+    ↓ SalesOrderConfirmedEvent
+WorkOrderSalesEventListener (production), her satır için:
+  - DRAFT WorkOrder oluşturur (salesOrderLineId, plannedQty ← requestedQty, deadline ← order.deadline)
+  - recipe atandıysa: PLANNING task; atanamadıysa: RECIPE_ASSIGNMENT task
 ```
 
-> **AI katmanı:** Sistem AI olmadan tam çalışır. RuleEngine deterministik kurallara dayanır.
+> Modül sınırı: Sales, WorkOrder'a doğrudan dokunmaz — yalnızca event yayınlar; production kendi listener'ında tepki verir. İptal cascade'i de aynı şekilde `SalesOrderCancelledEvent` üzerinden gider.
+
+> AI katmanı yok — RuleEngine deterministik kurallara dayanır.
 
 ---
 
-## SalesOrder → IWM Entegrasyonu
+## SalesOrder → Sevkiyat / IWM Entegrasyonu
 
-SalesOrder IWM'in iç detaylarını bilmez — sadece event dinler.
+Sales, logistics/IWM iç detaylarını bilmez — yalnızca event dinler.
 
-| IWM Eventi | SalesOrder Aksiyonu |
+| Gelen Event | Sales Aksiyonu |
 |---|---|
-| `ProductStoredEvent` | SalesOrderLine → IN_WAREHOUSE |
-| `ShipmentDispatchedEvent` | SalesOrderLine → SHIPPED |
-| `DeliveryConfirmedEvent` | SalesOrder → DELIVERED |
+| `ShipmentLineConfirmedEvent` | Satır `shippedQty` += confirmedQty (idempotent); aggregate'e göre header → PARTIALLY_SHIPPED / SHIPPED |
+
+> İki fazlı işlem (`ShipmentProgressService`): Faz 1 satır `shippedQty` (ayrı tx), Faz 2 header status (ayrı tx + `@Retryable` optimistic-lock). Over-shipment WARN'lanır, engellenmez (hard enforcement sevkiyat-oluşturma/logistics tarafına aittir).
 
 ---
 
@@ -216,14 +225,24 @@ SalesOrder IWM'in iç detaylarını bilmez — sadece event dinler.
 
 ```
 TradingPartner (CUSTOMER) ──→ SalesOrder ──→ SalesOrderLine (1:N)
-                                    │               │
-                                    │               ├──→ Material (FK)
-                                    │               ├──→ WorkOrder (1:N via salesOrderLineId)
-                                    │               └──→ StockReservation (lot ayırma)
-                                    │
-                                    ├──→ Quote (opsiyonel — dönüşümle geldiyse)
-                                    └──→ SampleRequest (opsiyonel)
+                                  │               │
+                                  │               ├──→ Product (productId, opsiyonel)
+                                  │               ├──→ WorkOrder (1:N, salesOrderLineId)
+                                  │               └──→ StockReservation (lot ayırma)
+                                  │
+                                  ├──→ Quote (opsiyonel)
+                                  └──→ SampleRequest (opsiyonel)
 ```
+
+---
+
+## Açık Kararlar
+
+- [ ] **`productId` vs `materialId`:** Kod `productId` + `productDesc` kullanıyor; eski dokümanın `materialId`/Material hedefi uygulanmadı. Biri seçilip tek kaynak yapılmalı.
+- [ ] **Satır-status zinciri + header üretim otomasyonu:** `RECIPE_ASSIGNED → … → SHIPPED` ve `CONFIRMED → IN_PROGRESS`, depo (`IN_WAREHOUSE` benzeri) geçişleri üretim/IWM event'lerine bağlı değil; şu an manuel. (gap)
+- [ ] **Sertifika eşleştirme semantiği (any vs all):** Sorgu, recipe'nin *herhangi* bir component'i istenen sertifikaya sahipse eşleştirir. Tüm-component uyumu (ör. %100 GOTS) gerekiyorsa `NOT EXISTS` yapısına çevrilmeli — iş tarafı kararı.
+- [ ] **cert/origin → WorkOrder mapping:** `FAB-1025` açık (WorkOrder gereksinimi taşımıyor; fallback manuel atama görevi de gereksinimi görmüyor).
+- [ ] **`moduleType` çiftlemesi:** Hem header'da hem satırda; karışık-modüllü sipariş (bazı satır FABRIC, bazı YARN) tek header `moduleType` ile temsil edilemiyor. (gap)
 
 ---
 
@@ -231,10 +250,9 @@ TradingPartner (CUSTOMER) ──→ SalesOrder ──→ SalesOrderLine (1:N)
 
 | Döküman | İlişki |
 |---|---|
-| `01-foundations/trading-partner.md` | SalesOrder.customerId → TradingPartner |
-| `02-production/material-fiber.md` | SalesOrderLine.materialId → Material |
+| `01-foundations/trading-partner.md` | SalesOrder.tradingPartnerId → TradingPartner |
 | `02-production/work-order.md` | WorkOrder.salesOrderLineId → SalesOrderLine |
-| `02-production/recipe.md` | RuleEngine recipe eşleştirme |
+| `02-production/recipe.md` | RuleEngine recipe eşleştirme (cert/origin) |
 | `03-sales/quote-approval.md` | Quote → SalesOrder dönüşümü |
 | `03-sales/sample-management.md` | SampleRequest → SalesOrder |
 | `05-iwm/stock-reservation.md` | SalesOrderLine → StockReservation |
@@ -242,16 +260,9 @@ TradingPartner (CUSTOMER) ──→ SalesOrder ──→ SalesOrderLine (1:N)
 
 ---
 
-## Açık Kararlar
-
-- [ ] moduleSpecs şemaları kesinleştirilecek — her modül için zorunlu alan kararları
-- [ ] RuleEngine eşleştirme mantığı tekrar değerlendirilecek
-- [ ] Kendi iç planlama (salesOrderLineId=null) ayrı UI mı, aynı form mu?
-
----
-
 ## Değişiklik Geçmişi
 
 | Versiyon | Tarih | Değişiklik |
 |---|---|---|
-| 1.0 | 2026-03-17 | İlk versiyon — productId→materialId değiştirildi, RuleEngine RecipeComponent'e yönlendirildi |
+| 1.0 | 2026-03-17 | İlk versiyon |
+| 2.0 | 2026-06-01 | Kod gerçeğine hizalama: gerçek 10-değerli OrderStatus + geçişler; onay bypass koruması; PARTIALLY_SHIPPED/SHIPPED sevkiyat otomasyonu; iptal/hold(resume)/REJECTED→DRAFT; cert/origin recipe eşleştirme; totals satırlardan hesaplama; qty guard'ları. Uydurma status/event'ler (IN_PRODUCTION, IN_WAREHOUSE, CLOSED, SalesOrderInWarehouse, ProductStoredEvent, ShipmentDispatchedEvent) ve `customerId`/`materialId` çıkarıldı. "Kanonik kaynak" iddiası kaldırıldı. |

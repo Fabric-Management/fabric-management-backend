@@ -41,8 +41,18 @@ public class ShipmentProgressService {
       return null;
     }
 
-    line.addShippedQuantity(shipmentLineId, confirmedQuantity);
+    boolean shipmentApplied = line.addShippedQuantity(shipmentLineId, confirmedQuantity);
     salesOrderLineRepository.save(line);
+
+    if (shipmentApplied && line.isOverShipped()) {
+      log.warn(
+          "Over-shipment detected for SalesOrderLine {}. shipmentLineId={}, requestedQty={}, shippedQty={}, remainingQty={}",
+          line.getId(),
+          shipmentLineId,
+          line.getRequestedQty(),
+          line.getShippedQty(),
+          line.getRemainingQty());
+    }
 
     log.info(
         "Updated shipped quantity for SalesOrderLine {}. shippedQty={}",
