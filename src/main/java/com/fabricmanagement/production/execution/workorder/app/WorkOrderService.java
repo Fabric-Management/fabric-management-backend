@@ -252,8 +252,7 @@ public class WorkOrderService {
             tenantId,
             com.fabricmanagement.platform.user.domain.SystemUser.ID,
             "WORK_ORDER",
-            workOrder.getId(),
-            48); // 48 hours to expire
+            workOrder.getId());
 
     workOrder.setStatus(
         needsApproval ? WorkOrderStatus.PENDING_APPROVAL : WorkOrderStatus.APPROVED);

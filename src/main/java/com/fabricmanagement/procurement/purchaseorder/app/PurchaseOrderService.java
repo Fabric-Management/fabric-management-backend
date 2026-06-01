@@ -178,7 +178,6 @@ public class PurchaseOrderService {
                 TenantContext.getCurrentUserId(),
                 ENTITY_TYPE,
                 po.getId(),
-                48, // 48 hours expiry
                 extractAmount(po.getTotalAmount()),
                 po.getCurrency());
 

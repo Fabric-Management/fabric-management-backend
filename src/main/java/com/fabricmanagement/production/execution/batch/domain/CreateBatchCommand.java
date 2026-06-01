@@ -32,15 +32,20 @@ public record CreateBatchCommand(
     BatchSourceType sourceType,
     UUID sourceId) {
 
-  /** Compact constructor — validates required fields eagerly. */
+  /**
+   * Compact constructor — validates required fields eagerly.
+   *
+   * <p>Zero quantity is allowed for production lots that start empty and accumulate quantity via
+   * {@link Batch#addQuantity(BigDecimal)}.
+   */
   public CreateBatchCommand {
     if (tenantId == null) throw new IllegalArgumentException("tenantId is required");
     if (productId == null) throw new IllegalArgumentException("productId is required");
     if (productType == null) throw new IllegalArgumentException("productType is required");
     if (batchCode == null || batchCode.isBlank())
       throw new IllegalArgumentException("batchCode is required");
-    if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0)
-      throw new IllegalArgumentException("quantity must be positive");
+    if (quantity == null || quantity.compareTo(BigDecimal.ZERO) < 0)
+      throw new IllegalArgumentException("quantity cannot be negative");
     if (unit == null || unit.isBlank()) throw new IllegalArgumentException("unit is required");
     // Normalize attributes — never null in domain
     attributes = (attributes != null) ? attributes : Map.of();

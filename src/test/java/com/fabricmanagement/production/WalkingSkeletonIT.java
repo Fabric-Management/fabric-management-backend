@@ -17,11 +17,21 @@ import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
+import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
+import com.fabricmanagement.production.execution.batch.domain.CreateBatchCommand;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
+import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
+import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
+import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
+import com.fabricmanagement.production.execution.workorder.app.ProductionLotService;
+import com.fabricmanagement.production.execution.workorder.app.ProductionRecordService;
+import com.fabricmanagement.production.execution.workorder.app.WorkOrderConsumptionService;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
+import com.fabricmanagement.production.execution.workorder.dto.OpenProductionLotRequest;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
@@ -45,6 +55,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("local")
@@ -60,9 +71,15 @@ class WalkingSkeletonIT {
   @Autowired private BatchRepository batchRepository;
   @Autowired private FiberRepository fiberRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ProductionLotService productionLotService;
+  @Autowired private WorkOrderConsumptionService workOrderConsumptionService;
+  @Autowired private ProductionRecordService productionRecordService;
+  @Autowired private StockUnitRepository stockUnitRepository;
+  @Autowired private TransactionTemplate transactionTemplate;
 
   private UUID tenantId;
   private UUID adminUserId;
+  private final String testRunSuffix = UUID.randomUUID().toString().substring(0, 8);
 
   @BeforeEach
   void setUp() {
@@ -81,6 +98,7 @@ class WalkingSkeletonIT {
             .findFirst()
             .orElseThrow();
     adminUserId = adminUser.getId();
+    TenantContext.setCurrentUserId(adminUserId);
   }
 
   @AfterEach
@@ -97,7 +115,7 @@ class WalkingSkeletonIT {
     TradingPartnerDto partner =
         tradingPartnerService.createPartner(
             CreateTradingPartnerRequest.builder()
-                .taxId("WSTAX" + System.currentTimeMillis() % 100000)
+                .taxId("WSTAX" + testRunSuffix)
                 .companyName("Walking Skeleton Co")
                 .partnerType(PartnerType.CUSTOMER)
                 .country("TUR")
@@ -117,6 +135,8 @@ class WalkingSkeletonIT {
             .productDesc("Premium WS Fabric")
             .requestedQty(new BigDecimal("1000.00"))
             .unit("KG")
+            .unitPrice(new BigDecimal("10.50"))
+            .currency("TRY")
             .build();
     req.setLines(List.of(lineReq));
 
@@ -219,56 +239,86 @@ class WalkingSkeletonIT {
     UUID outputProductId = seededFibers.size() > 2 ? seededFibers.get(2).getId() : fiberId1;
 
     Batch rawBatch1 =
-        Batch.builder()
-            .productId(fiberId1)
-            .productType(ProductType.FIBER)
-            .batchCode("RAW-FIBER1-" + System.currentTimeMillis() % 1000)
-            .quantity(new BigDecimal("1000.00"))
-            .unit("KG")
-            .status(BatchStatus.AVAILABLE)
-            .build();
-    rawBatch1.setTenantId(tenantId);
+        Batch.create(
+            new CreateBatchCommand(
+                tenantId,
+                fiberId1,
+                ProductType.FIBER,
+                "RAW-FIBER1-" + testRunSuffix,
+                null,
+                new BigDecimal("1000.00"),
+                "KG",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                BatchSourceType.INITIAL_STOCK,
+                null));
+    rawBatch1.transitionStatus(BatchStatus.AVAILABLE, adminUserId);
     rawBatch1 = batchRepository.save(rawBatch1);
 
+    StockUnit su1 =
+        StockUnit.create(
+            tenantId,
+            rawBatch1.getId(),
+            ProductType.FIBER,
+            "SU-RAW-1-" + testRunSuffix,
+            null,
+            PackageType.BALE,
+            new BigDecimal("600.00"),
+            null,
+            "KG",
+            null,
+            StockUnitSourceType.GOODS_RECEIPT,
+            rawBatch1.getId());
+    su1 = stockUnitRepository.save(su1);
+
     Batch rawBatch2 =
-        Batch.builder()
-            .productId(fiberId2)
-            .productType(ProductType.FIBER)
-            .batchCode("RAW-FIBER2-" + System.currentTimeMillis() % 1000)
-            .quantity(new BigDecimal("1000.00"))
-            .unit("KG")
-            .status(BatchStatus.AVAILABLE)
-            .build();
-    rawBatch2.setTenantId(tenantId);
+        Batch.create(
+            new CreateBatchCommand(
+                tenantId,
+                fiberId2,
+                ProductType.FIBER,
+                "RAW-FIBER2-" + testRunSuffix,
+                null,
+                new BigDecimal("1000.00"),
+                "KG",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                BatchSourceType.INITIAL_STOCK,
+                null));
+    rawBatch2.transitionStatus(BatchStatus.AVAILABLE, adminUserId);
     rawBatch2 = batchRepository.save(rawBatch2);
 
+    StockUnit su2 =
+        StockUnit.create(
+            tenantId,
+            rawBatch2.getId(),
+            ProductType.FIBER,
+            "SU-RAW-2-" + testRunSuffix,
+            null,
+            PackageType.BALE,
+            new BigDecimal("400.00"),
+            null,
+            "KG",
+            null,
+            StockUnitSourceType.GOODS_RECEIPT,
+            rawBatch2.getId());
+    su2 = stockUnitRepository.save(su2);
+
     // ----------------------------------------------------------------------------------
-    // 7. RUN: Start Production (consumes batch, creates output batch)
+    // 7. RUN: Start Production and Execute Production Steps (Phase 2)
     // ----------------------------------------------------------------------------------
-    // No warehouse_location seed for system tenant in Flyway — null is allowed on
-    // batch.location_id.
-    UUID outputLocationId = null;
-
-    StartProductionRequest.WorkOrderConsumptionDto consumption1 =
-        StartProductionRequest.WorkOrderConsumptionDto.builder()
-            .batchId(rawBatch1.getId())
-            .quantity(new BigDecimal("600.00"))
-            .consumptionPercentage(new BigDecimal("60.00"))
-            .build();
-
-    StartProductionRequest.WorkOrderConsumptionDto consumption2 =
-        StartProductionRequest.WorkOrderConsumptionDto.builder()
-            .batchId(rawBatch2.getId())
-            .quantity(new BigDecimal("400.00"))
-            .consumptionPercentage(new BigDecimal("40.00"))
-            .build();
-
     StartProductionRequest startProdReq =
         StartProductionRequest.builder()
             .outputProductId(outputProductId)
             .outputProductType(ProductType.YARN)
-            .outputLocationId(outputLocationId)
-            .consumptions(List.of(consumption1, consumption2))
             .remarks("Walking Skeleton Yield")
             .build();
 
@@ -276,18 +326,49 @@ class WalkingSkeletonIT {
         workOrderService.startProduction(woReadyForProd.getId(), startProdReq);
     assertThat(woInProgress.getStatus()).isEqualTo(WorkOrderStatus.IN_PROGRESS);
 
-    // ----------------------------------------------------------------------------------
-    // 8. ASSERT: Output Batch exists with proper source ID mapping
-    // ----------------------------------------------------------------------------------
-    List<Batch> generatedBatches =
-        batchRepository.findAll().stream()
-            .filter(b -> woReadyForProd.getId().equals(b.getSourceId()))
-            .toList();
+    // Step 7.1: Open Production Lot
+    var lotResponse =
+        productionLotService.openLot(
+            woInProgress.getId(),
+            new OpenProductionLotRequest(null, ProductType.YARN, "Walking Skeleton Output Lot"));
 
-    assertThat(generatedBatches).hasSize(1);
-    Batch outputBatch = generatedBatches.getFirst();
-    assertThat(outputBatch.getProductType()).isEqualTo(ProductType.YARN);
-    assertThat(outputBatch.getQuantity())
-        .isEqualByComparingTo(new BigDecimal("1000.00")); // quantity based on plannedQty usually
+    // Step 7.2: Consume StockUnits
+    workOrderConsumptionService.consumeFromStockUnit(
+        woInProgress.getId(), su1.getId(), new BigDecimal("600.00"));
+    workOrderConsumptionService.consumeFromStockUnit(
+        woInProgress.getId(), su2.getId(), new BigDecimal("400.00"));
+
+    // Step 7.3: Create output StockUnit and Record Production
+    StockUnit outputSu =
+        StockUnit.create(
+            tenantId,
+            lotResponse.id(),
+            ProductType.YARN,
+            "SU-YARN-OUT-1-" + testRunSuffix,
+            null,
+            PackageType.BOBBIN,
+            new BigDecimal("1000.00"),
+            null,
+            "KG",
+            null,
+            StockUnitSourceType.PRODUCTION,
+            lotResponse.id());
+    outputSu = stockUnitRepository.save(outputSu);
+
+    productionRecordService.recordProduction(
+        woInProgress.getId(), outputSu.getId(), "Output Recorded");
+
+    // ----------------------------------------------------------------------------------
+    // 8. ASSERT: Output Batch exists with proper quantity
+    // ----------------------------------------------------------------------------------
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          Batch outputBatch = batchRepository.findByIdAndTenantId(lotResponse.id(), tenantId).get();
+          assertThat(outputBatch.getProductType()).isEqualTo(ProductType.YARN);
+          assertThat(outputBatch.getQuantity()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        });
+
+    var summary = productionRecordService.getProductionSummary(woInProgress.getId());
+    assertThat(summary.yieldPercentage()).isEqualByComparingTo(new BigDecimal("100.00"));
   }
 }
