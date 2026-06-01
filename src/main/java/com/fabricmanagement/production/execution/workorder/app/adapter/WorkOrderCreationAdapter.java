@@ -23,6 +23,9 @@ public class WorkOrderCreationAdapter implements ProductionOrderPort {
             .unit(cmd.unit())
             .currency(cmd.currency())
             .deadline(cmd.deadline())
+            // TODO(FAB-1025): Map cmd.certificationReq() and cmd.originReq() to
+            // WorkOrderProductionSpecs when
+            // WorkOrder supports them (needs schema update and UI traceability).
             .build();
     workOrderService.createWorkOrder(request);
   }
