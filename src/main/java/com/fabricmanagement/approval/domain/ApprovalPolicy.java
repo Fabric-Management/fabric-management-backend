@@ -50,6 +50,19 @@ public class ApprovalPolicy extends BaseEntity {
   @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
 
+  @Column(name = "expiry_hours", nullable = false)
+  private int expiryHours = 48;
+
+  private static final int MIN_EXPIRY = 1;
+  private static final int MAX_EXPIRY = 720;
+
+  private void validateExpiryHours(int hours) {
+    if (hours < MIN_EXPIRY || hours > MAX_EXPIRY) {
+      throw new IllegalArgumentException(
+          "expiryHours must be between " + MIN_EXPIRY + " and " + MAX_EXPIRY);
+    }
+  }
+
   /**
    * Bu politika verilen tutar için geçerli mi? Tutar eşiği tanımlı değilse (null) → her zaman
    * geçerli (legacy davranış).
@@ -70,7 +83,8 @@ public class ApprovalPolicy extends BaseEntity {
       ApprovalEntityType entityType,
       PolicyTargetLevel requiredForLevel,
       ApproverRole approverRole,
-      int promotionThreshold) {
+      int promotionThreshold,
+      int expiryHours) {
     if (entityType == null) {
       throw new IllegalArgumentException("entityType cannot be null");
     }
@@ -80,11 +94,13 @@ public class ApprovalPolicy extends BaseEntity {
     if (promotionThreshold < 1) {
       throw new IllegalArgumentException("promotionThreshold must be >= 1");
     }
+    validateExpiryHours(expiryHours);
     this.setTenantId(tenantId);
     this.entityType = entityType;
     this.requiredForLevel = requiredForLevel;
     this.approverRole = approverRole;
     this.promotionThreshold = promotionThreshold;
+    this.expiryHours = expiryHours;
   }
 
   @Override
@@ -93,10 +109,15 @@ public class ApprovalPolicy extends BaseEntity {
   }
 
   public void update(
-      PolicyTargetLevel requiredForLevel, ApproverRole approverRole, int promotionThreshold) {
+      PolicyTargetLevel requiredForLevel,
+      ApproverRole approverRole,
+      int promotionThreshold,
+      int expiryHours) {
+    validateExpiryHours(expiryHours);
     this.requiredForLevel = requiredForLevel;
     this.approverRole = approverRole;
     this.promotionThreshold = promotionThreshold;
+    this.expiryHours = expiryHours;
   }
 
   public void toggleActive(boolean active) {

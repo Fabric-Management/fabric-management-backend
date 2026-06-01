@@ -8,6 +8,8 @@ import com.fabricmanagement.approval.dto.CreatePolicyRequest;
 import com.fabricmanagement.approval.dto.UpdatePolicyRequest;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -19,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /** Tenant yöneticilerinin Onay Politikalarını (Policy) yapılandırdığı REST API. */
+@Tag(name = "Approval Policy", description = "Onay Politikası Yönetimi")
 @RestController
 @RequestMapping("/api/v1/approval/policies")
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class ApprovalPolicyController {
 
   private final ApprovalPolicyService policyService;
 
+  @Operation(summary = "Tüm onay politikalarını getirir")
   @GetMapping
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
   public ResponseEntity<ApiResponse<List<ApprovalPolicyResponse>>> getAllPolicies() {
@@ -36,6 +40,7 @@ public class ApprovalPolicyController {
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
+  @Operation(summary = "Belirli bir entity tipi için aktif olan politikayı getirir")
   @GetMapping("/{entityType}")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> getActivePolicy(
@@ -52,6 +57,7 @@ public class ApprovalPolicyController {
                                 "Active approval policy not found for: " + entityType)))));
   }
 
+  @Operation(summary = "Yeni bir onay politikası oluşturur")
   @PostMapping
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> createPolicy(
@@ -63,11 +69,13 @@ public class ApprovalPolicyController {
             req.getEntityType(),
             req.getRequiredLevel(),
             req.getApproverRole(),
-            req.getPromotionThreshold());
+            req.getPromotionThreshold(),
+            req.getExpiryHours());
 
     return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }
 
+  @Operation(summary = "Mevcut bir onay politikasını günceller")
   @PutMapping("/{policyId}")
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> updatePolicy(
@@ -79,11 +87,13 @@ public class ApprovalPolicyController {
             policyId,
             req.getRequiredLevel(),
             req.getApproverRole(),
-            req.getPromotionThreshold());
+            req.getPromotionThreshold(),
+            req.getExpiryHours());
 
     return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }
 
+  @Operation(summary = "Mevcut bir onay politikasını aktif/pasif yapar")
   @PatchMapping("/{policyId}/active")
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> togglePolicy(
