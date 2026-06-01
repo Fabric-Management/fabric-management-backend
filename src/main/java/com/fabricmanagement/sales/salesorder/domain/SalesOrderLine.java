@@ -160,6 +160,32 @@ public class SalesOrderLine extends BaseEntity {
     this.lineStatus = SalesOrderLineStatus.RECIPE_ASSIGNED;
   }
 
+  /**
+   * Moves the line forward when linked production starts.
+   *
+   * @return true when the status changed, false when the event was duplicate or out of order
+   */
+  public boolean markInProduction() {
+    if (this.lineStatus != SalesOrderLineStatus.RECIPE_ASSIGNED) {
+      return false;
+    }
+    this.lineStatus = SalesOrderLineStatus.IN_PRODUCTION;
+    return true;
+  }
+
+  /**
+   * Moves the line forward when linked production is completed.
+   *
+   * @return true when the status changed, false when the event was duplicate or out of order
+   */
+  public boolean markCompleted() {
+    if (this.lineStatus != SalesOrderLineStatus.IN_PRODUCTION) {
+      return false;
+    }
+    this.lineStatus = SalesOrderLineStatus.COMPLETED;
+    return true;
+  }
+
   /** Validates that at least one of productId / productDesc is present. */
   public boolean isValid() {
     return productId != null || (productDesc != null && !productDesc.isBlank());
