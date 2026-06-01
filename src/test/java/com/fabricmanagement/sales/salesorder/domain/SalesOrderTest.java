@@ -143,4 +143,63 @@ class SalesOrderTest {
         .extracting("httpStatus")
         .isEqualTo(409);
   }
+
+  @Test
+  void recordShipmentProgress_partial_setsPartiallyShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_allShipped_setsShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    order.recordShipmentProgress(true, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_partiallyShipped_toShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    order.recordShipmentProgress(true, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_idempotent_staysPartiallyShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
+  }
+
+  @Test
+  void recordShipmentProgress_inProgress_setsPartiallyShipped() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderStatus.class,
+      names = {"DELIVERED", "CANCELLED", "REJECTED"})
+  void recordShipmentProgress_terminal_noop(OrderStatus status) {
+    SalesOrder order = SalesOrder.builder().status(status).build();
+    order.recordShipmentProgress(true, true);
+    assertThat(order.getStatus()).isEqualTo(status);
+  }
+
+  @Test
+  void recordShipmentProgress_onHold_noop() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.ON_HOLD).build();
+    order.recordShipmentProgress(false, true);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.ON_HOLD);
+  }
+
+  @Test
+  void recordShipmentProgress_noneShipped_noop() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    order.recordShipmentProgress(false, false);
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+  }
 }

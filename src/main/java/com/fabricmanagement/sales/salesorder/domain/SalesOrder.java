@@ -336,6 +336,31 @@ public class SalesOrder extends BaseEntity {
     this.status = OrderStatus.ON_HOLD;
   }
 
+  /**
+   * Sevkiyat ilerlemesine göre header status'ünü günceller. Listener, tüm aktif satırların sevk
+   * durumunu aggregate edip bu metodu çağırır.
+   *
+   * <p>Geçiş kuralları:
+   *
+   * <ul>
+   *   <li>Terminal durumlarda (DELIVERED/CANCELLED/REJECTED) → no-op (sessiz dön)
+   *   <li>allLinesFullyShipped && canShip() → SHIPPED
+   *   <li>!allLinesFullyShipped && anyLineShipped && canShip() → PARTIALLY_SHIPPED
+   *   <li>İkisi de false → değişiklik yok
+   * </ul>
+   */
+  public void recordShipmentProgress(boolean allLinesFullyShipped, boolean anyLineShipped) {
+    if (status.isTerminal()) {
+      return;
+    }
+
+    if (allLinesFullyShipped && status.canShip()) {
+      this.status = OrderStatus.SHIPPED;
+    } else if (anyLineShipped && status.canShip()) {
+      this.status = OrderStatus.PARTIALLY_SHIPPED;
+    }
+  }
+
   public Money getGrandTotal() {
     if (totals == null) {
       throw new IllegalStateException("SalesOrder totals cannot be null");
