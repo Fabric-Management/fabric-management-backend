@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.salesorder.dto;
 
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -41,7 +42,11 @@ public class CreateSalesOrderRequest {
   /** Promised delivery date. */
   private LocalDate promisedDeliveryDate;
 
-  /** Total amount (before tax). */
+  /** Total amount (before tax). Deprecated: create totals are calculated from lines. */
+  @Deprecated
+  @Schema(
+      description = "Deprecated: ignored on create; total is calculated from order lines.",
+      deprecated = true)
   private BigDecimal totalAmount;
 
   /** Tax amount. */

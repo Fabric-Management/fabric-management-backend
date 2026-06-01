@@ -88,10 +88,10 @@ public class SalesOrderService {
     String orderNumber = generateOrderNumber(tenantId, effectiveDate);
 
     String currency = request.getCurrency() != null ? request.getCurrency() : "TRY";
-    Money total =
-        request.getTotalAmount() != null
-            ? Money.of(request.getTotalAmount(), currency)
-            : Money.zero(currency);
+    BigDecimal calculatedTotal = calculateCreateTotal(request.getLines(), currency);
+    validateDiscountDoesNotExceedTotal(calculatedTotal, request.getDiscountAmount());
+
+    Money total = Money.of(calculatedTotal, currency);
     Money tax =
         request.getTaxAmount() != null
             ? Money.of(request.getTaxAmount(), currency)
@@ -218,6 +218,7 @@ public class SalesOrderService {
             .filter(l -> l.getIsActive() && l.getUnitPrice() != null)
             .map(l -> l.getUnitPrice().getAmount().multiply(l.getRequestedQty()))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+    validateDiscountDoesNotExceedTotal(calculatedTotal, request.getDiscountAmount());
 
     Money total = Money.of(calculatedTotal, currency);
     Money tax =
@@ -270,11 +271,7 @@ public class SalesOrderService {
 
   private void updateLineFromRequest(
       SalesOrderLine line, UpdateSalesOrderLineRequest req, String orderCurrency) {
-    if (req.getUnitPrice() != null
-        && req.getCurrency() != null
-        && !req.getCurrency().equals(orderCurrency)) {
-      throw new CurrencyMismatchException(orderCurrency, "Line currency must match order currency");
-    }
+    validateLineCurrency(req.getUnitPrice(), req.getCurrency(), orderCurrency);
     line.setProductId(req.getProductId());
     line.setProductDesc(req.getProductDesc());
     line.setRequestedQty(req.getRequestedQty());
@@ -293,11 +290,7 @@ public class SalesOrderService {
 
   private SalesOrderLine mapUpdateLineRequestToEntity(
       UpdateSalesOrderLineRequest request, UUID orderId, String orderCurrency) {
-    if (request.getUnitPrice() != null
-        && request.getCurrency() != null
-        && !request.getCurrency().equals(orderCurrency)) {
-      throw new CurrencyMismatchException(orderCurrency, "Line currency must match order currency");
-    }
+    validateLineCurrency(request.getUnitPrice(), request.getCurrency(), orderCurrency);
 
     // Note: unitPrice can be null for draft/pending lines
     Money unitPrice =
@@ -771,15 +764,36 @@ public class SalesOrderService {
 
   // ── Line mapping helpers ─────────────────────────────────────────────────
 
+  private BigDecimal calculateCreateTotal(List<SalesOrderLineRequest> lines, String orderCurrency) {
+    if (lines == null || lines.isEmpty()) {
+      return BigDecimal.ZERO;
+    }
+
+    return lines.stream()
+        .peek(line -> validateLineCurrency(line.getUnitPrice(), line.getCurrency(), orderCurrency))
+        .filter(line -> line.getUnitPrice() != null)
+        .map(line -> line.getUnitPrice().multiply(line.getRequestedQty()))
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private void validateDiscountDoesNotExceedTotal(
+      BigDecimal calculatedTotal, BigDecimal discountAmount) {
+    if (discountAmount != null && discountAmount.compareTo(calculatedTotal) > 0) {
+      throw new OrderDomainException("Discount amount cannot exceed calculated order total");
+    }
+  }
+
+  private void validateLineCurrency(
+      BigDecimal unitPrice, String lineCurrency, String orderCurrency) {
+    if (unitPrice != null && lineCurrency != null && !lineCurrency.equals(orderCurrency)) {
+      throw new CurrencyMismatchException(orderCurrency, "Line currency must match order currency");
+    }
+  }
+
   private SalesOrderLine mapLineRequestToEntity(
       SalesOrderLineRequest req, UUID salesOrderId, String orderCurrency) {
     // If unitPrice is provided, its currency MUST match the parent SalesOrder currency
-    if (req.getUnitPrice() != null
-        && req.getCurrency() != null
-        && !req.getCurrency().equals(orderCurrency)) {
-      throw new com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException(
-          orderCurrency, "Line currency must match order currency");
-    }
+    validateLineCurrency(req.getUnitPrice(), req.getCurrency(), orderCurrency);
 
     // Note: unitPrice can be null for draft/pending lines
     return SalesOrderLine.builder()
