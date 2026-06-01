@@ -257,13 +257,27 @@ public class SalesOrder extends BaseEntity {
     this.deadline = cmd.deadline();
   }
 
-  /** Confirm the order (DRAFT/PENDING_APPROVAL → CONFIRMED). */
+  /** Confirm the order (DRAFT → CONFIRMED). */
   public void confirm() {
-    if (status != OrderStatus.DRAFT && status != OrderStatus.PENDING_APPROVAL) {
+    if (status != OrderStatus.DRAFT) {
+      if (status == OrderStatus.PENDING_APPROVAL) {
+        throw new OrderDomainException(
+            "Order is awaiting approval; cannot be confirmed manually", 409);
+      }
+      throw new OrderDomainException(
+          String.format("Order can only be confirmed from DRAFT status. Current: %s", status), 409);
+    }
+    this.status = OrderStatus.CONFIRMED;
+  }
+
+  /** Confirm the order from approval workflow (PENDING_APPROVAL → CONFIRMED). */
+  public void confirmFromApproval() {
+    if (status != OrderStatus.PENDING_APPROVAL) {
       throw new OrderDomainException(
           String.format(
-              "Order can only be confirmed from DRAFT or PENDING_APPROVAL status. Current: %s",
-              status));
+              "Order can only be confirmed from PENDING_APPROVAL status in this workflow. Current: %s",
+              status),
+          409);
     }
     this.status = OrderStatus.CONFIRMED;
   }

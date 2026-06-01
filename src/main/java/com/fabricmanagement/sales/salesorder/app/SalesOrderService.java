@@ -453,6 +453,11 @@ public class SalesOrderService {
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
 
+    if (order.getStatus() == OrderStatus.PENDING_APPROVAL) {
+      throw new com.fabricmanagement.sales.common.exception.OrderDomainException(
+          "Order is awaiting approval; cannot be confirmed manually", 409);
+    }
+
     if (order.getStatus() == OrderStatus.DRAFT) {
       boolean needsApproval =
           approvalPort.requiresApproval(
@@ -460,7 +465,6 @@ public class SalesOrderService {
               TenantContext.getCurrentUserId(),
               "SALES_ORDER",
               order.getId(),
-              48,
               order.getTotals() != null
                   ? order.getTotals().calculateGrandTotal().getAmount()
                   : null,
@@ -484,6 +488,40 @@ public class SalesOrderService {
     }
 
     order.confirm();
+    return finalizeConfirmation(order, tenantId);
+  }
+
+  /**
+   * Tüm aktif satırlar aynı birime sahipse o birimi döner, farklı birimler varsa veya satır yoksa
+   * null döner.
+   */
+  private String deriveOrderUnit(List<SalesOrderLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    Set<String> units =
+        lines.stream()
+            .map(SalesOrderLine::getUnit)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return units.size() == 1 ? units.iterator().next() : null;
+  }
+
+  /** Confirm an order as SystemUser (called after approval callback). */
+  @Transactional
+  public SalesOrderDto confirmOrderAsSystem(UUID orderId) {
+    return TenantContext.executeInTenantContext(
+        TenantContext.getCurrentTenantId(),
+        () -> {
+          TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
+          UUID tenantId = TenantContext.getCurrentTenantId();
+          SalesOrder order = getOrderOrThrow(tenantId, orderId);
+          order.confirmFromApproval();
+          return finalizeConfirmation(order, tenantId);
+        });
+  }
+
+  private SalesOrderDto finalizeConfirmation(SalesOrder order, UUID tenantId) {
     SalesOrder saved = orderRepository.save(order);
 
     log.info("Sales order confirmed: uid={}", saved.getUid());
@@ -538,33 +576,6 @@ public class SalesOrderService {
     List<SalesOrderLineResponse> lineResponses =
         orderLines.stream().map(this::mapLineToResponse).toList();
     return SalesOrderDto.from(saved, partner, lineResponses);
-  }
-
-  /**
-   * Tüm aktif satırlar aynı birime sahipse o birimi döner, farklı birimler varsa veya satır yoksa
-   * null döner.
-   */
-  private String deriveOrderUnit(List<SalesOrderLine> lines) {
-    if (lines.isEmpty()) {
-      return null;
-    }
-    Set<String> units =
-        lines.stream()
-            .map(SalesOrderLine::getUnit)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-    return units.size() == 1 ? units.iterator().next() : null;
-  }
-
-  /** Confirm an order as SystemUser (called after approval callback). */
-  @Transactional
-  public SalesOrderDto confirmOrderAsSystem(UUID orderId) {
-    return TenantContext.executeInTenantContext(
-        TenantContext.getCurrentTenantId(),
-        () -> {
-          TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
-          return confirmOrder(orderId);
-        });
   }
 
   /** Reject an order (called after approval rejection callback). */

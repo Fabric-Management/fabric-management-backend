@@ -27,6 +27,16 @@ public class SalesOrderApprovalEventListener {
     try {
       log.info("Approval APPROVED for SALES_ORDER: {}", event.getEntityId());
       salesOrderService.confirmOrderAsSystem(event.getEntityId());
+    } catch (com.fabricmanagement.sales.common.exception.OrderDomainException e) {
+      if (e.getHttpStatus() == 409) {
+        log.info(
+            "Sales order {} approval received but state transition failed (possibly already confirmed): {}",
+            event.getEntityId(),
+            e.getMessage());
+      } else {
+        log.error(
+            "Domain error processing SALES_ORDER approval for id: {}", event.getEntityId(), e);
+      }
     } catch (Exception e) {
       log.error("Failed to process SALES_ORDER approval for id: {}", event.getEntityId(), e);
     }

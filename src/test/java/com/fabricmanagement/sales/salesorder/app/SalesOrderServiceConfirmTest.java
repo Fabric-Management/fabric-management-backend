@@ -1,8 +1,9 @@
 package com.fabricmanagement.sales.salesorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,7 +14,9 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
+import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -94,8 +97,7 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), anyInt(), any(), any()))
-        .thenReturn(false);
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     TradingPartnerDto partner = TradingPartnerDto.builder().build();
@@ -123,8 +125,7 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), anyInt(), any(), any()))
-        .thenReturn(false);
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -151,8 +152,7 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), anyInt(), any(), any()))
-        .thenReturn(false);
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -179,8 +179,7 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), anyInt(), any(), any()))
-        .thenReturn(false);
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -204,8 +203,7 @@ class SalesOrderServiceConfirmTest {
     // Arrange
     SalesOrder order = createDraftOrder();
     when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
-    when(approvalPort.requiresApproval(any(), any(), any(), any(), anyInt(), any(), any()))
-        .thenReturn(false);
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(false);
     when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
 
     when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.empty());
@@ -222,5 +220,65 @@ class SalesOrderServiceConfirmTest {
 
     assertThat(event.getCustomerId()).isEqualTo(partnerId);
     assertThat(event.getCustomerName()).isNull();
+  }
+
+  @Test
+  void confirmOrder_draftNeedsApproval_movesPendingAndNoSideEffects() {
+    // Arrange
+    SalesOrder order = createDraftOrder();
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
+    when(approvalPort.requiresApproval(any(), any(), any(), any(), any(), any())).thenReturn(true);
+    when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
+    when(partnerService.findById(any(), any())).thenReturn(Optional.empty());
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(any()))
+        .thenReturn(List.of());
+
+    // Act
+    salesOrderService.confirmOrder(orderId);
+
+    // Assert
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_APPROVAL);
+    verify(ruleEngine, never()).processConfirmedOrder(any());
+    verify(domainEventPublisher, never()).publish(any());
+  }
+
+  @Test
+  void confirmOrder_whenPendingApproval_throwsExceptionAndDoesNotTriggerRuleEngine() {
+    // Arrange
+    SalesOrder order = createDraftOrder();
+    ReflectionTestUtils.setField(order, "status", OrderStatus.PENDING_APPROVAL);
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
+
+    // Act & Assert
+    assertThatThrownBy(() -> salesOrderService.confirmOrder(orderId))
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("Order is awaiting approval; cannot be confirmed manually");
+
+    verify(ruleEngine, never()).processConfirmedOrder(any());
+    verify(domainEventPublisher, never()).publish(any());
+  }
+
+  @Test
+  void confirmOrderAsSystem_whenPendingApproval_updatesStatusToConfirmedAndTriggersRuleEngine() {
+    // Arrange
+    SalesOrder order = createDraftOrder();
+    ReflectionTestUtils.setField(order, "status", OrderStatus.PENDING_APPROVAL);
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId)).thenReturn(Optional.of(order));
+    when(orderRepository.save(any(SalesOrder.class))).thenReturn(order);
+
+    TradingPartnerDto partner = TradingPartnerDto.builder().build();
+    ReflectionTestUtils.setField(partner, "id", partnerId);
+    when(partnerService.findById(tenantId, partnerId)).thenReturn(Optional.of(partner));
+
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of());
+
+    // Act
+    SalesOrderDto result = salesOrderService.confirmOrderAsSystem(orderId);
+
+    // Assert
+    verify(ruleEngine).processConfirmedOrder(order);
+    verify(domainEventPublisher).publish(any(SalesOrderConfirmedEvent.class));
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
   }
 }

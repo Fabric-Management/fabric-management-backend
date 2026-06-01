@@ -94,4 +94,53 @@ class SalesOrderTest {
         .extracting("httpStatus")
         .isEqualTo(409);
   }
+
+  @Test
+  void confirm_whenDraft_updatesStatusToConfirmed() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.DRAFT).build();
+    order.confirm();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+  }
+
+  @Test
+  void confirm_whenPendingApproval_throwsException() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.PENDING_APPROVAL).build();
+    assertThatThrownBy(() -> order.confirm())
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("Order is awaiting approval; cannot be confirmed manually")
+        .extracting("httpStatus")
+        .isEqualTo(409);
+  }
+
+  @Test
+  void confirmFromApproval_whenPendingApproval_updatesStatusToConfirmed() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.PENDING_APPROVAL).build();
+    order.confirmFromApproval();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderStatus.class,
+      names = {"PENDING_APPROVAL"},
+      mode = EnumSource.Mode.EXCLUDE)
+  void confirmFromApproval_whenNotPendingApproval_throwsException(OrderStatus status) {
+    SalesOrder order = SalesOrder.builder().status(status).build();
+    assertThatThrownBy(() -> order.confirmFromApproval())
+        .isInstanceOf(OrderDomainException.class)
+        .hasMessageContaining("Order can only be confirmed from PENDING_APPROVAL status");
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderStatus.class,
+      names = {"DRAFT", "PENDING_APPROVAL"},
+      mode = EnumSource.Mode.EXCLUDE)
+  void confirm_whenNotDraftOrPendingApproval_throwsException(OrderStatus status) {
+    SalesOrder order = SalesOrder.builder().status(status).build();
+    assertThatThrownBy(() -> order.confirm())
+        .isInstanceOf(OrderDomainException.class)
+        .extracting("httpStatus")
+        .isEqualTo(409);
+  }
 }
