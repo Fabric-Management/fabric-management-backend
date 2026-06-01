@@ -11,6 +11,7 @@ import lombok.Getter;
 public class WorkOrderCompletedEvent extends DomainEvent {
 
   private final UUID workOrderId;
+  private final UUID salesOrderLineId;
   private final String workOrderNumber;
   private final BigDecimal plannedQty;
   private final BigDecimal actualQty;
@@ -22,6 +23,7 @@ public class WorkOrderCompletedEvent extends DomainEvent {
   public WorkOrderCompletedEvent(
       UUID tenantId,
       UUID workOrderId,
+      UUID salesOrderLineId,
       String workOrderNumber,
       BigDecimal plannedQty,
       BigDecimal actualQty,
@@ -31,6 +33,7 @@ public class WorkOrderCompletedEvent extends DomainEvent {
       UUID completedBy) {
     super(tenantId, "WORK_ORDER_COMPLETED");
     this.workOrderId = workOrderId;
+    this.salesOrderLineId = salesOrderLineId;
     this.workOrderNumber = workOrderNumber;
     this.plannedQty = plannedQty;
     this.actualQty = actualQty;

@@ -23,6 +23,9 @@ public interface WorkOrderRepository
   List<WorkOrder> findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
       UUID tenantId, UUID salesOrderLineId);
 
+  boolean existsByTenantIdAndSalesOrderLineIdAndIsActiveTrueAndStatusNotIn(
+      UUID tenantId, UUID salesOrderLineId, List<WorkOrderStatus> statuses);
+
   /**
    * @deprecated Sprint 9: Replaced by JpaSpecificationExecutor with WorkOrderSpecification
    */

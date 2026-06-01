@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
+import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
@@ -40,6 +41,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +61,7 @@ public class WorkOrderService {
   private final ApprovalPort approvalPort;
   private final TenantFacade tenantFacade;
   private final DocumentNumberGenerator documentNumberGenerator;
+  private final WorkOrderProductionCompletionService workOrderProductionCompletionService;
 
   /**
    * Paginated, filterable listing of WorkOrders for the current tenant.
@@ -347,6 +351,11 @@ public class WorkOrderService {
 
     // Phase 2 refactoring: Lot creation is now handled by ProductionLotService.
     // The start-production action only changes the status.
+    if (workOrder.getSalesOrderLineId() != null) {
+      domainEventPublisher.publish(
+          new WorkOrderStartedEvent(
+              workOrder.getTenantId(), workOrder.getId(), workOrder.getSalesOrderLineId()));
+    }
 
     return mapToResponse(workOrder);
   }
@@ -402,6 +411,7 @@ public class WorkOrderService {
         new WorkOrderCompletedEvent(
             tenantId,
             workOrderId,
+            workOrder.getSalesOrderLineId(),
             workOrder.getWorkOrderNumber(),
             workOrder.getPlannedQty(),
             totalOutput,
@@ -410,7 +420,35 @@ public class WorkOrderService {
             workOrder.getCompletedAt(),
             actorId));
 
+    scheduleLineCompletionCheckAfterCommit(
+        tenantId, workOrder.getSalesOrderLineId(), workOrder.getId());
+
     return mapToResponse(workOrder);
+  }
+
+  private void scheduleLineCompletionCheckAfterCommit(
+      UUID tenantId, UUID salesOrderLineId, UUID completedWorkOrderId) {
+    if (salesOrderLineId == null) {
+      return;
+    }
+
+    Runnable completionCheck =
+        () ->
+            workOrderProductionCompletionService.publishLineCompletedIfAllWorkOrdersCompleted(
+                tenantId, salesOrderLineId, completedWorkOrderId);
+
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      completionCheck.run();
+      return;
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            completionCheck.run();
+          }
+        });
   }
 
   private WorkOrder findEntityById(UUID id) {
