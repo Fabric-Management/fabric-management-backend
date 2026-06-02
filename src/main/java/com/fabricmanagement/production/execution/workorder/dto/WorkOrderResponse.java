@@ -5,6 +5,7 @@ import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.domain.specs.WorkOrderProductionSpecs;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -35,8 +36,16 @@ public record WorkOrderResponse(
     String plannedCostCurrency,
     WorkOrderStatus status,
     Instant deadline,
-    String certificationReq,
-    String originReq,
+    @Schema(
+            description =
+                "Customer-required certification standard (e.g. GOTS, OEKO-TEX, BCI)."
+                    + " Normalized to uppercase.")
+        String certificationReq,
+    @Schema(
+            description =
+                "Customer-required fiber origin country code (e.g. TR, US, EG)."
+                    + " Normalized to uppercase.")
+        String originReq,
     String notes,
     List<Map<String, Object>> attachments,
     BigDecimal actualQty,

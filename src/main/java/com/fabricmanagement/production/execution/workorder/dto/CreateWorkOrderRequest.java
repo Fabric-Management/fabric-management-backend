@@ -39,8 +39,16 @@ public record CreateWorkOrderRequest(
     BigDecimal unitCost,
     String currency,
     LocalDate deadline,
-    String certificationReq,
-    String originReq,
+    @Schema(
+            description =
+                "Customer-required certification standard (e.g. GOTS, OEKO-TEX, BCI)."
+                    + " Normalized to uppercase on persist.")
+        String certificationReq,
+    @Schema(
+            description =
+                "Customer-required fiber origin country code (e.g. TR, US, EG)."
+                    + " Normalized to uppercase on persist.")
+        String originReq,
     String notes,
     List<Map<String, Object>> attachments) {
 
