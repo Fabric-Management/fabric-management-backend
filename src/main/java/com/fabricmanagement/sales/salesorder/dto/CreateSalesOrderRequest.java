@@ -77,7 +77,12 @@ public class CreateSalesOrderRequest {
 
   // ── Faz 2 additions ─────────────────────────────────────────────────────
 
-  /** Production module type for this order (FIBER / YARN / FABRIC / DYE_FINISHING). */
+  /**
+   * Deprecated: ignored on create. Order module type is derived from line module types at write
+   * time.
+   */
+  @Deprecated
+  @Schema(description = "Deprecated: ignored; derived from line module types.", deprecated = true)
   private ModuleType moduleType;
 
   /** Customer-requested production and delivery deadline. */

@@ -12,6 +12,7 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
+import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -118,7 +119,7 @@ public class SalesOrderService {
             .shippingMethod(request.getShippingMethod())
             .notes(request.getNotes())
             .metadata(request.getMetadata())
-            .moduleType(request.getModuleType())
+            .moduleType(deriveOrderModuleTypeFromRequests(request.getLines()))
             .deadline(request.getDeadline())
             .quoteId(request.getQuoteId())
             .sampleRequestId(request.getSampleRequestId())
@@ -245,7 +246,7 @@ public class SalesOrderService {
             request.getShippingMethod(),
             request.getNotes(),
             request.getMetadata(),
-            request.getModuleType(),
+            deriveOrderModuleType(syncedLines),
             request.getDeadline());
 
     order.updateDraft(cmd); // throws 409 if not DRAFT
@@ -499,6 +500,24 @@ public class SalesOrderService {
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
     return units.size() == 1 ? units.iterator().next() : null;
+  }
+
+  /**
+   * Tüm aktif satırlar aynı moduleType'a sahipse o değeri döner; satır yoksa veya karışık
+   * moduleType varsa null döner. Null line moduleType değerleri deriveOrderUnit ile tutarlı şekilde
+   * yok sayılır.
+   */
+  private ModuleType deriveOrderModuleType(List<SalesOrderLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    Set<ModuleType> moduleTypes =
+        lines.stream()
+            .filter(line -> Boolean.TRUE.equals(line.getIsActive()))
+            .map(SalesOrderLine::getModuleType)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return moduleTypes.size() == 1 ? moduleTypes.iterator().next() : null;
   }
 
   /** Confirm an order as SystemUser (called after approval callback). */
@@ -774,6 +793,18 @@ public class SalesOrderService {
         .filter(line -> line.getUnitPrice() != null)
         .map(line -> line.getUnitPrice().multiply(line.getRequestedQty()))
         .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private ModuleType deriveOrderModuleTypeFromRequests(List<SalesOrderLineRequest> lines) {
+    if (lines == null || lines.isEmpty()) {
+      return null;
+    }
+    Set<ModuleType> moduleTypes =
+        lines.stream()
+            .map(SalesOrderLineRequest::getModuleType)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return moduleTypes.size() == 1 ? moduleTypes.iterator().next() : null;
   }
 
   private void validateDiscountDoesNotExceedTotal(

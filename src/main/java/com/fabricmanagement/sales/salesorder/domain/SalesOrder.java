@@ -276,7 +276,7 @@ public class SalesOrder extends BaseEntity {
     this.shippingMethod = cmd.shippingMethod();
     this.notes = cmd.notes();
     this.metadata = cmd.metadata();
-    this.moduleType = cmd.moduleType();
+    this.moduleType = cmd.derivedModuleType();
     this.deadline = cmd.deadline();
   }
 
