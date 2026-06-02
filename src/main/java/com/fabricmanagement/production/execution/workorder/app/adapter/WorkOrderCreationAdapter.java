@@ -4,6 +4,7 @@ import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.dto.CreateWorkOrderRequest;
 import com.fabricmanagement.sales.salesorder.domain.port.DraftProductionOrderCommand;
 import com.fabricmanagement.sales.salesorder.domain.port.ProductionOrderPort;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ public class WorkOrderCreationAdapter implements ProductionOrderPort {
   private final WorkOrderService workOrderService;
 
   @Override
-  public void requestDraftProductionOrder(DraftProductionOrderCommand cmd) {
+  public UUID requestDraftProductionOrder(DraftProductionOrderCommand cmd) {
     CreateWorkOrderRequest request =
         CreateWorkOrderRequest.builder()
             .recipeId(cmd.recipeId())
@@ -26,6 +27,6 @@ public class WorkOrderCreationAdapter implements ProductionOrderPort {
             .certificationReq(cmd.certificationReq())
             .originReq(cmd.originReq())
             .build();
-    workOrderService.createWorkOrder(request);
+    return workOrderService.createWorkOrder(request).id();
   }
 }

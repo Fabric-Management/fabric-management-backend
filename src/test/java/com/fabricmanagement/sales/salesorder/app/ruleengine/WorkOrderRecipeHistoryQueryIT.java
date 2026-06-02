@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -169,7 +170,10 @@ class WorkOrderRecipeHistoryQueryIT {
       ProductionOrderPort productionOrderPort = mock(ProductionOrderPort.class);
       SalesOrderRuleEngine ruleEngine =
           new SalesOrderRuleEngine(
-              lineRepository, productionOrderPort, new WorkOrderRecipeHistoryQuery(jdbc));
+              lineRepository,
+              productionOrderPort,
+              new WorkOrderRecipeHistoryQuery(jdbc),
+              mock(DomainEventPublisher.class));
 
       SalesOrder order =
           SalesOrder.builder().tradingPartnerId(partnerId).orderNumber("SO-TEST").build();

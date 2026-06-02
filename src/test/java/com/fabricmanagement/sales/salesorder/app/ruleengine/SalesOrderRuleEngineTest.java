@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -35,6 +36,8 @@ class SalesOrderRuleEngineTest {
 
   @Mock private WorkOrderRecipeHistoryQuery historyQuery;
 
+  @Mock private DomainEventPublisher domainEventPublisher;
+
   @Captor private ArgumentCaptor<DraftProductionOrderCommand> cmdCaptor;
 
   private SalesOrderRuleEngine ruleEngine;
@@ -52,7 +55,9 @@ class SalesOrderRuleEngineTest {
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(tenantId);
-    ruleEngine = new SalesOrderRuleEngine(lineRepository, productionOrderPort, historyQuery);
+    ruleEngine =
+        new SalesOrderRuleEngine(
+            lineRepository, productionOrderPort, historyQuery, domainEventPublisher);
 
     order = SalesOrder.builder().tradingPartnerId(partnerId).build();
     ReflectionTestUtils.setField(order, "id", orderId);
