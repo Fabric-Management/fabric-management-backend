@@ -98,8 +98,8 @@ class WorkOrderServiceTest {
 
     WorkOrderResponse response = workOrderService.startProduction(workOrderId, request);
 
-    assertThat(response.getStatus()).isEqualTo(WorkOrderStatus.IN_PROGRESS);
-    assertThat(response.getOutputProductId()).isEqualTo(outputProductId);
+    assertThat(response.status()).isEqualTo(WorkOrderStatus.IN_PROGRESS);
+    assertThat(response.outputProductId()).isEqualTo(outputProductId);
 
     ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
     verify(domainEventPublisher).publish(eventCaptor.capture());
@@ -141,7 +141,7 @@ class WorkOrderServiceTest {
 
     WorkOrderResponse response = workOrderService.completeWorkOrder(workOrderId);
 
-    assertThat(response.getStatus()).isEqualTo(WorkOrderStatus.COMPLETED);
+    assertThat(response.status()).isEqualTo(WorkOrderStatus.COMPLETED);
 
     ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
     verify(domainEventPublisher).publish(eventCaptor.capture());

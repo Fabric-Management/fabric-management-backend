@@ -157,8 +157,8 @@ class DomainEventsPublicationIT {
                 .unit("KG")
                 .build());
 
-    workOrderService.changeStatus(draft.getId(), WorkOrderStatus.PENDING_APPROVAL);
-    workOrderService.changeStatus(draft.getId(), WorkOrderStatus.APPROVED);
+    workOrderService.changeStatus(draft.id(), WorkOrderStatus.PENDING_APPROVAL);
+    workOrderService.changeStatus(draft.id(), WorkOrderStatus.APPROVED);
 
     verify(domainEventPublisher).publish(any(WorkOrderApprovedEvent.class));
     verify(eventRouterService, timeout(15_000)).route(any(WorkOrderApprovedEvent.class));

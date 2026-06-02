@@ -324,19 +324,19 @@ class WalkingSkeletonIT {
 
     WorkOrderResponse woInProgress =
         workOrderService.startProduction(woReadyForProd.getId(), startProdReq);
-    assertThat(woInProgress.getStatus()).isEqualTo(WorkOrderStatus.IN_PROGRESS);
+    assertThat(woInProgress.status()).isEqualTo(WorkOrderStatus.IN_PROGRESS);
 
     // Step 7.1: Open Production Lot
     var lotResponse =
         productionLotService.openLot(
-            woInProgress.getId(),
+            woInProgress.id(),
             new OpenProductionLotRequest(null, ProductType.YARN, "Walking Skeleton Output Lot"));
 
     // Step 7.2: Consume StockUnits
     workOrderConsumptionService.consumeFromStockUnit(
-        woInProgress.getId(), su1.getId(), new BigDecimal("600.00"));
+        woInProgress.id(), su1.getId(), new BigDecimal("600.00"));
     workOrderConsumptionService.consumeFromStockUnit(
-        woInProgress.getId(), su2.getId(), new BigDecimal("400.00"));
+        woInProgress.id(), su2.getId(), new BigDecimal("400.00"));
 
     // Step 7.3: Create output StockUnit and Record Production
     StockUnit outputSu =
@@ -356,7 +356,7 @@ class WalkingSkeletonIT {
     outputSu = stockUnitRepository.save(outputSu);
 
     productionRecordService.recordProduction(
-        woInProgress.getId(), outputSu.getId(), "Output Recorded");
+        woInProgress.id(), outputSu.getId(), "Output Recorded");
 
     // ----------------------------------------------------------------------------------
     // 8. ASSERT: Output Batch exists with proper quantity
@@ -368,7 +368,7 @@ class WalkingSkeletonIT {
           assertThat(outputBatch.getQuantity()).isEqualByComparingTo(new BigDecimal("1000.00"));
         });
 
-    var summary = productionRecordService.getProductionSummary(woInProgress.getId());
+    var summary = productionRecordService.getProductionSummary(woInProgress.id());
     assertThat(summary.yieldPercentage()).isEqualByComparingTo(new BigDecimal("100.00"));
   }
 }
