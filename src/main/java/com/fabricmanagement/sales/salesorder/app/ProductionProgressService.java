@@ -103,4 +103,31 @@ public class ProductionProgressService {
           previousStatus);
     }
   }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void markLineInWarehouse(UUID salesOrderLineId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    SalesOrderLine line =
+        salesOrderLineRepository.findByTenantIdAndId(tenantId, salesOrderLineId).orElse(null);
+    if (line == null) {
+      log.error("SalesOrderLine not found for warehouse storage: {}", salesOrderLineId);
+      return;
+    }
+
+    SalesOrderLineStatus previousStatus = line.getLineStatus();
+    boolean changed = line.markInWarehouse();
+    if (changed) {
+      salesOrderLineRepository.save(line);
+      log.info(
+          "SalesOrderLine {} status changed: {} -> {}",
+          line.getId(),
+          previousStatus,
+          line.getLineStatus());
+    } else {
+      log.debug(
+          "SalesOrderLine {} warehouse storage ignored. Current status={}",
+          line.getId(),
+          previousStatus);
+    }
+  }
 }

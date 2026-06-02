@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.app.listener;
 
 import com.fabricmanagement.common.domain.event.production.SalesOrderLineProductionCompletedEvent;
+import com.fabricmanagement.common.domain.event.production.SalesOrderLineStoredEvent;
 import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.app.ProductionProgressService;
@@ -77,6 +78,24 @@ public class SalesOrderProductionProgressListener {
     }
   }
 
+  @Async
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Retryable(
+      retryFor = {
+        ObjectOptimisticLockingFailureException.class,
+        TransientDataAccessException.class
+      },
+      maxAttempts = 3,
+      backoff = @Backoff(delay = 200, multiplier = 2))
+  public void onSalesOrderLineStored(SalesOrderLineStoredEvent event) {
+    TenantContext.setCurrentTenantId(event.getTenantId());
+    try {
+      productionProgressService.markLineInWarehouse(event.getSalesOrderLineId());
+    } finally {
+      TenantContext.clear();
+    }
+  }
+
   @Recover
   public void recoverWorkOrderStarted(Exception ex, WorkOrderStartedEvent event) {
     log.error(
@@ -96,6 +115,15 @@ public class SalesOrderProductionProgressListener {
             + "salesOrderLineId={}, completedByWorkOrderId={}: {}",
         event.getSalesOrderLineId(),
         event.getCompletedByWorkOrderId(),
+        ex.getMessage(),
+        ex);
+  }
+
+  @Recover
+  public void recoverSalesOrderLineStored(Exception ex, SalesOrderLineStoredEvent event) {
+    log.error(
+        "Failed to process SalesOrderLineStoredEvent after retries. salesOrderLineId={}: {}",
+        event.getSalesOrderLineId(),
         ex.getMessage(),
         ex);
   }

@@ -186,6 +186,20 @@ public class SalesOrderLine extends BaseEntity {
     return true;
   }
 
+  /**
+   * Moves the line forward when production output is fully stored in warehouse. Idempotent: returns
+   * false if already IN_WAREHOUSE or beyond (no exception thrown).
+   *
+   * @return true when the status changed, false when the event was duplicate or out of order
+   */
+  public boolean markInWarehouse() {
+    if (this.lineStatus != SalesOrderLineStatus.COMPLETED) {
+      return false;
+    }
+    this.lineStatus = SalesOrderLineStatus.IN_WAREHOUSE;
+    return true;
+  }
+
   /** Validates that at least one of productId / productDesc is present. */
   public boolean isValid() {
     return productId != null || (productDesc != null && !productDesc.isBlank());
