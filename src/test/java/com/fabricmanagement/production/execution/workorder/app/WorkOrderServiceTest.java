@@ -2,6 +2,7 @@ package com.fabricmanagement.production.execution.workorder.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,7 +20,9 @@ import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
+import com.fabricmanagement.production.execution.workorder.dto.CreateWorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
+import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.ProductionRecordRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderConsumptionRepository;
@@ -154,5 +157,62 @@ class WorkOrderServiceTest {
 
     verify(workOrderProductionCompletionService)
         .publishLineCompletedIfAllWorkOrdersCompleted(tenantId, salesOrderLineId, workOrderId);
+  }
+
+  @Test
+  void createWorkOrder_fromCreateWorkOrderRequest_withCertOrigin_persistsOnEntity() {
+    CreateWorkOrderRequest request =
+        CreateWorkOrderRequest.builder()
+            .recipeId(UUID.randomUUID())
+            .plannedQty(BigDecimal.TEN)
+            .unit("KG")
+            .certificationReq("GOTS")
+            .originReq("TR")
+            .build();
+
+    when(workOrderRepository.save(any(WorkOrder.class)))
+        .thenAnswer(
+            invocation -> {
+              WorkOrder saved = invocation.getArgument(0);
+              saved.setId(UUID.randomUUID());
+              return saved;
+            });
+    when(documentNumberGenerator.generate(any(), any(), any(), any(), anyInt()))
+        .thenReturn("WO-001");
+
+    WorkOrderResponse response = workOrderService.createWorkOrder(request);
+
+    assertThat(response.certificationReq()).isEqualTo("GOTS");
+    assertThat(response.originReq()).isEqualTo("TR");
+  }
+
+  @Test
+  void createWorkOrder_fromWorkOrderRequest_withCertOrigin_persistsOnEntity() {
+    WorkOrderRequest request =
+        WorkOrderRequest.builder()
+            .recipeId(UUID.randomUUID())
+            .outputProductId(UUID.randomUUID())
+            .moduleType(WorkOrderModuleType.GENERIC)
+            .fulfillmentType(FulfillmentType.INTERNAL)
+            .plannedQty(BigDecimal.TEN)
+            .unit("KG")
+            .certificationReq("OEKO-TEX")
+            .originReq("US")
+            .build();
+
+    when(workOrderRepository.save(any(WorkOrder.class)))
+        .thenAnswer(
+            invocation -> {
+              WorkOrder saved = invocation.getArgument(0);
+              saved.setId(UUID.randomUUID());
+              return saved;
+            });
+    when(documentNumberGenerator.generate(any(), any(), any(), any(), anyInt()))
+        .thenReturn("WO-002");
+
+    WorkOrderResponse response = workOrderService.createWorkOrder(request);
+
+    assertThat(response.certificationReq()).isEqualTo("OEKO-TEX");
+    assertThat(response.originReq()).isEqualTo("US");
   }
 }

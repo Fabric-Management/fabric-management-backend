@@ -142,6 +142,8 @@ public class WorkOrderService {
             .unitCost(request.unitCost())
             .currency(request.currency())
             .deadline(request.deadline())
+            .certificationReq(request.certificationReq())
+            .originReq(request.originReq())
             .notes(request.notes())
             .attachments(
                 request.attachments() == null ? java.util.List.of() : request.attachments())
@@ -188,6 +190,8 @@ public class WorkOrderService {
             .unitCost(request.unitCost())
             .currency(request.currency())
             .deadline(deadlineInstant)
+            .certificationReq(request.certificationReq())
+            .originReq(request.originReq())
             .notes(request.notes())
             .attachments(
                 request.attachments() == null ? java.util.List.of() : request.attachments())

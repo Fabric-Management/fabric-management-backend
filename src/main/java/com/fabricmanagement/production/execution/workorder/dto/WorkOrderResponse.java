@@ -35,6 +35,8 @@ public record WorkOrderResponse(
     String plannedCostCurrency,
     WorkOrderStatus status,
     Instant deadline,
+    String certificationReq,
+    String originReq,
     String notes,
     List<Map<String, Object>> attachments,
     BigDecimal actualQty,
@@ -73,6 +75,8 @@ public record WorkOrderResponse(
         .plannedCostCurrency(workOrder.getPlannedCostCurrency())
         .status(workOrder.getStatus())
         .deadline(workOrder.getDeadline())
+        .certificationReq(workOrder.getCertificationReq())
+        .originReq(workOrder.getOriginReq())
         .notes(workOrder.getNotes())
         .attachments(workOrder.getAttachments())
         .actualQty(workOrder.getActualQty())

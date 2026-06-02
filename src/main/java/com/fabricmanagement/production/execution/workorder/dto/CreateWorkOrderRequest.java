@@ -39,6 +39,8 @@ public record CreateWorkOrderRequest(
     BigDecimal unitCost,
     String currency,
     LocalDate deadline,
+    String certificationReq,
+    String originReq,
     String notes,
     List<Map<String, Object>> attachments) {
 
