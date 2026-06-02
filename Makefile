@@ -124,9 +124,9 @@ db-migrate: ## Run Flyway database migrations
 # DB connection for repair (match flyway.conf / application-local)
 REPAIR_DB_HOST ?= localhost
 REPAIR_DB_PORT ?= 5432
-REPAIR_DB_USER ?= fabric_user
+REPAIR_DB_USER ?= fabric_owner
 REPAIR_DB_NAME ?= fabric_management
-REPAIR_DB_PASSWORD ?= local_dev_2026
+REPAIR_DB_PASSWORD ?= owner_dev_2026
 
 db-repair: ## Fix Flyway checksum mismatches (when migration files were edited after apply). Then run 'make run'.
 	@echo "$(YELLOW)🔧 Repairing Flyway schema history (updating checksums)...$(NC)"
@@ -150,7 +150,7 @@ db-reset-local: ## Reset local PostgreSQL DB (drop + recreate fabric_management)
 	@echo "$(GREEN)✅ DB reset complete. Run: make run$(NC)"
 
 db-shell: ## Open PostgreSQL shell
-	docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_user -d fabric_management
+	docker exec -it $(POSTGRES_CONTAINER) psql -U fabric_owner -d fabric_management
 
 ##@ 🧹 CLEANUP & UTILS
 clean: ## Clean Maven build and remove Docker volumes (DESTRUCTIVE!)

@@ -1,6 +1,6 @@
 -- ============================================
 -- Adım 6 — Doğrulama (consolidated migrate sonrası)
--- Çalıştır: psql -h localhost -U fabric_user -d fabric_management -f VERIFY_AFTER_MIGRATE.sql
+-- Çalıştır: psql -h localhost -U fabric_owner -d fabric_management -f VERIFY_AFTER_MIGRATE.sql
 -- veya IDE / DBeaver ile aşağıdaki SELECT'leri çalıştır (\echo sadece psql'de çalışır).
 -- ============================================
 
