@@ -40,7 +40,7 @@ public class PermissionManagementController {
       @RequestParam(required = false) String roleCode,
       @RequestParam(required = false) String departmentCode) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<PermissionTemplateDto> templates =
         permissionManagementService.getTemplates(tenantId, roleCode, departmentCode);
     return ResponseEntity.ok(ApiResponse.success(templates));
@@ -50,7 +50,7 @@ public class PermissionManagementController {
   public ResponseEntity<ApiResponse<PermissionTemplateDto>> createTemplate(
       @Valid @RequestBody CreatePermissionTemplateRequest request) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     PermissionTemplateDto template = permissionManagementService.createTemplate(tenantId, request);
     return ResponseEntity.ok(ApiResponse.success(template));
   }
@@ -59,7 +59,7 @@ public class PermissionManagementController {
   public ResponseEntity<ApiResponse<PermissionTemplateDto>> updateTemplate(
       @PathVariable UUID id, @Valid @RequestBody UpdatePermissionTemplateRequest request) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     PermissionTemplateDto template =
         permissionManagementService.updateTemplate(tenantId, id, request);
     return ResponseEntity.ok(ApiResponse.success(template));
@@ -67,7 +67,7 @@ public class PermissionManagementController {
 
   @DeleteMapping("/templates/{id}")
   public ResponseEntity<ApiResponse<Void>> deleteTemplate(@PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     permissionManagementService.deleteTemplate(tenantId, id);
     return ResponseEntity.ok(ApiResponse.success(null));
   }
@@ -76,7 +76,7 @@ public class PermissionManagementController {
   public ResponseEntity<ApiResponse<List<PermissionOverrideDto>>> getOverrides(
       @RequestParam(required = false) UUID userId) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<PermissionOverrideDto> overrides =
         permissionManagementService.getActiveOverrides(tenantId, userId);
     return ResponseEntity.ok(ApiResponse.success(overrides));
@@ -86,7 +86,7 @@ public class PermissionManagementController {
   public ResponseEntity<ApiResponse<PermissionOverrideDto>> createOverride(
       @Valid @RequestBody CreatePermissionOverrideRequest request) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID grantedBy = TenantContext.getCurrentUserId();
     PermissionOverrideDto override =
         permissionManagementService.createOverride(tenantId, grantedBy, request);
@@ -95,7 +95,7 @@ public class PermissionManagementController {
 
   @DeleteMapping("/overrides/{id}")
   public ResponseEntity<ApiResponse<Void>> deleteOverride(@PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     permissionManagementService.deleteOverride(tenantId, id);
     return ResponseEntity.ok(ApiResponse.success(null));
   }
@@ -104,7 +104,7 @@ public class PermissionManagementController {
   public ResponseEntity<ApiResponse<Map<String, Map<String, String>>>> simulateEvaluator(
       @PathVariable UUID userId) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Map<String, Map<String, String>> result =
         permissionManagementService.simulateEvaluator(tenantId, userId);
     return ResponseEntity.ok(ApiResponse.success(result));

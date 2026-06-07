@@ -31,7 +31,7 @@ public class FiberQualityStandardService {
 
   @Transactional
   public FiberQualityStandardDto create(CreateFiberQualityStandardRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Creating fiber quality standard: tenantId={}, isoCodeId={}, standardName={}",
         tenantId,
@@ -97,7 +97,7 @@ public class FiberQualityStandardService {
 
   @Transactional(readOnly = true)
   public List<FiberQualityStandardDto> getByIsoCodeId(UUID isoCodeId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting standards for ISO code: tenantId={}, isoCodeId={}", tenantId, isoCodeId);
 
     return standardRepository
@@ -109,7 +109,7 @@ public class FiberQualityStandardService {
 
   @Transactional(readOnly = true)
   public Optional<FiberQualityStandardDto> getDefaultStandard(UUID isoCodeId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return standardRepository
         .findByTenantIdAndIsoCode_IdAndIsDefaultTrueAndIsActiveTrue(tenantId, isoCodeId)
         .map(FiberQualityStandardDto::from);
@@ -117,13 +117,13 @@ public class FiberQualityStandardService {
 
   @Transactional(readOnly = true)
   public Optional<FiberQualityStandardDto> getById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return standardRepository.findByTenantIdAndId(tenantId, id).map(FiberQualityStandardDto::from);
   }
 
   @Transactional(readOnly = true)
   public List<FiberQualityStandardDto> getAll() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return standardRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
         .map(FiberQualityStandardDto::from)
         .toList();
@@ -132,7 +132,7 @@ public class FiberQualityStandardService {
   /** Returns all profiles for the tenant, grouped by iso_code_id. */
   @Transactional(readOnly = true)
   public List<FiberQualityStandardGroupDto> getAllGroupedByIsoCode() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<FiberQualityStandard> all = standardRepository.findByTenantIdAndIsActiveTrue(tenantId);
 
     Map<UUID, List<FiberQualityStandardDto>> byIsoCode =
@@ -155,7 +155,7 @@ public class FiberQualityStandardService {
   @Transactional
   public FiberQualityStandardDto update(
       UUID standardId, UpdateFiberQualityStandardRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     FiberQualityStandard standard =
         standardRepository
@@ -217,7 +217,7 @@ public class FiberQualityStandardService {
 
   @Transactional
   public FiberQualityStandardDto setDefault(UUID standardId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     FiberQualityStandard standard =
         standardRepository
@@ -242,7 +242,7 @@ public class FiberQualityStandardService {
    */
   @Transactional
   public String delete(UUID standardId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     FiberQualityStandard standard =
         standardRepository

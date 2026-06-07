@@ -34,20 +34,20 @@ public class QuoteService {
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
   }
 
   @Transactional(readOnly = true)
   public Optional<Quote> findById(UUID quoteId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
   }
 
   @Transactional
   public Quote createQuote(QuoteCreateRequest req) {
     Quote quote = req.toQuote();
-    quote.setTenantId(TenantContext.getCurrentTenantId());
+    quote.setTenantId(TenantContext.requireTenantId());
     quote.setStatus(QuoteStatus.DRAFT);
     quote.setRevisionNumber(1);
     return quoteRepository.save(quote);
@@ -179,7 +179,7 @@ public class QuoteService {
   }
 
   private Quote getActiveQuote(UUID quoteId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));

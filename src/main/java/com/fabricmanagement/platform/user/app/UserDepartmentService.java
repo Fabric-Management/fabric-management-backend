@@ -40,7 +40,7 @@ public class UserDepartmentService {
 
   @Transactional(readOnly = true)
   public List<UserDepartment> getUserDepartments(UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Finding user departments: tenantId={}, userId={}", tenantId, userId);
 
     return userDepartmentRepository.findByTenantIdAndUserId(tenantId, userId);
@@ -56,7 +56,7 @@ public class UserDepartmentService {
   @Transactional
   public UserDepartment assignDepartment(
       UUID userId, UUID departmentId, boolean isPrimary, UUID assignedBy) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Assigning department to user: tenantId={}, userId={}, departmentId={}, isPrimary={}",
         tenantId,
@@ -103,7 +103,7 @@ public class UserDepartmentService {
 
   @Transactional
   public void removeAssignment(UUID userId, UUID departmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Removing department assignment: tenantId={}, userId={}, departmentId={}",
         tenantId,
@@ -125,7 +125,7 @@ public class UserDepartmentService {
 
   @Transactional
   public void setPrimaryDepartment(UUID userId, UUID departmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Setting primary department: tenantId={}, userId={}, departmentId={}",
         tenantId,

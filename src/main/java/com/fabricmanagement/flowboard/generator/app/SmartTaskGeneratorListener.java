@@ -1,5 +1,6 @@
 package com.fabricmanagement.flowboard.generator.app;
 
+import com.fabricmanagement.common.domain.event.production.WorkOrderRecipeAssignmentNeededEvent;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
@@ -44,6 +45,13 @@ public class SmartTaskGeneratorListener {
   @Async
   @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
   public void onGoodsReceiptConfirmed(GoodsReceiptConfirmedEvent event) {
+    eventRouterService.route(event);
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Async
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+  public void onRecipeAssignmentNeeded(WorkOrderRecipeAssignmentNeededEvent event) {
     eventRouterService.route(event);
   }
 }

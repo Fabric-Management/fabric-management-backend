@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.infrastructure.events;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -43,6 +44,7 @@ public abstract class DomainEvent {
   private final Instant occurredAt;
 
   protected DomainEvent(UUID tenantId, String eventType) {
+    Objects.requireNonNull(tenantId, "tenantId must not be null");
     this.eventId = UUID.randomUUID();
     this.tenantId = tenantId;
     this.eventType = eventType;

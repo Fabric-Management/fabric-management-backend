@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.salesorder.app.ruleengine;
 
+import java.sql.Types;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -50,8 +51,8 @@ public class WorkOrderRecipeHistoryQuery {
         sql,
         new MapSqlParameterSource("tenantId", tenantId)
             .addValue("productId", productId)
-            .addValue("certification", certification)
-            .addValue("origin", origin));
+            .addValue("certification", certification, Types.VARCHAR)
+            .addValue("origin", origin, Types.VARCHAR));
   }
 
   /**
@@ -86,8 +87,8 @@ public class WorkOrderRecipeHistoryQuery {
         new MapSqlParameterSource("tenantId", tenantId)
             .addValue("tradingPartnerId", tradingPartnerId)
             .addValue("productId", productId)
-            .addValue("certification", certification)
-            .addValue("origin", origin));
+            .addValue("certification", certification, Types.VARCHAR)
+            .addValue("origin", origin, Types.VARCHAR));
   }
 
   /**
@@ -122,8 +123,8 @@ public class WorkOrderRecipeHistoryQuery {
         sql,
         new MapSqlParameterSource("tenantId", tenantId)
             .addValue("productId", productId)
-            .addValue("certification", certification)
-            .addValue("origin", origin));
+            .addValue("certification", certification, Types.VARCHAR)
+            .addValue("origin", origin, Types.VARCHAR));
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

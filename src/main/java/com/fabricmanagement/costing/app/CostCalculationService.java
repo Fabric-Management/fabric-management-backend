@@ -659,7 +659,7 @@ public class CostCalculationService {
     if (previousStage == null) return;
 
     costCalcRepo
-        .findByEntityTypeAndEntityIdAndStage(entityType, entityId, previousStage)
+        .findActiveByEntityTypeAndEntityIdAndStage(entityType, entityId, previousStage)
         .ifPresent(
             previous -> {
               // Guard: comparing costs in different currencies is meaningless

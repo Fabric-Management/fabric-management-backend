@@ -705,4 +705,57 @@ class ConstitutionArchTest {
       rule.check(allClasses);
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Article 14: RLS System Chokepoint Access Control
+  // ═══════════════════════════════════════════════════════════════════
+
+  @Nested
+  @DisplayName("Article 14 — RLS System Chokepoint")
+  class RlsSystemChokepointTests {
+
+    @Test
+    @DisplayName("Rule 14.1: SystemTransactionExecutor only accessible from whitelist")
+    void systemTransactionExecutorOnlyFromWhitelist() {
+      // Whitelist (ADR-001 Karar 9):
+      //
+      //   - TenantSystemService         : Cross-tenant yönetim (admin, onboarding, tenant CRUD)
+      //   - TenantService               : Self-tenant okuma (tenant tablosu self-row RLS'ye tabi)
+      //   - TenantClonerService          : Onboarding: TEMPLATE→Yeni tenant klon
+      //   - PlaygroundTTLReaperService   : Scheduled job: süresi dolan playground tenant'ları
+      // temizle
+      //   - TenantQueryAdapter           : Port/Adapter: tenant lookup (auth, event yolu)
+      //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
+      //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
+      //   - SystemTransactionExecutor    : Self-reference (class itself)
+
+      ArchRule rule =
+          noClasses()
+              .that()
+              .doNotHaveSimpleName("TenantSystemService")
+              .and()
+              .doNotHaveSimpleName("TenantService")
+              .and()
+              .doNotHaveSimpleName("TenantClonerService")
+              .and()
+              .doNotHaveSimpleName("PlaygroundTTLReaperService")
+              .and()
+              .doNotHaveSimpleName("TenantQueryAdapter")
+              .and()
+              .doNotHaveSimpleName("CloneTemplateRolesStep")
+              .and()
+              .doNotHaveSimpleName("SystemDataSourceConfig")
+              .and()
+              .doNotHaveSimpleName("SystemTransactionExecutor")
+              .should()
+              .dependOnClassesThat()
+              .haveSimpleName("SystemTransactionExecutor")
+              .as(
+                  "Rule 14.1: SystemTransactionExecutor is a privileged BYPASSRLS chokepoint. "
+                      + "Only whitelisted system/admin/scheduler classes may import it. "
+                      + "See ADR-001 Karar 9 for the whitelist and rationale.");
+
+      rule.check(allClasses);
+    }
+  }
 }

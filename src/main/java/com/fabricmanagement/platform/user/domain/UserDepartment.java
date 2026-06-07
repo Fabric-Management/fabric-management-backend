@@ -88,7 +88,7 @@ public class UserDepartment {
     return UserDepartment.builder()
         .userId(user.getId())
         .departmentId(department.getId())
-        .tenantId(TenantContext.getCurrentTenantId())
+        .tenantId(TenantContext.requireTenantId())
         .user(user)
         .department(department)
         .isPrimary(isPrimary)

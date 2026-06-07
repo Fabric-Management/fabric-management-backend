@@ -300,7 +300,7 @@ public class UserCreationService {
     String trimmedLastName = lastName.trim();
     String normalizedContact = contactValue.trim().toLowerCase(Locale.ROOT);
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // --- All validations BEFORE any persistence ---
     validateContactFormat(normalizedContact, contactType);
@@ -465,7 +465,7 @@ public class UserCreationService {
       jobTitlePresetId =
           jobTitlePresetRepository
               .findByTenantIdAndJobTitleCode(
-                  TenantContext.getCurrentTenantId(), request.getJobTitleCode())
+                  TenantContext.requireTenantId(), request.getJobTitleCode())
               .map(com.fabricmanagement.platform.user.domain.JobTitlePreset::getId)
               .orElse(null);
     }

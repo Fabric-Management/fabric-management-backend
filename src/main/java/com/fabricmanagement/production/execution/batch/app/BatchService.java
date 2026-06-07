@@ -57,7 +57,7 @@ public class BatchService {
 
   @Transactional
   public BatchDto create(CreateBatchRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Creating batch: tenantId={}, request={}", tenantId, request);
 
     if (batchRepository.existsByTenantIdAndBatchCode(tenantId, request.getBatchCode())) {
@@ -111,7 +111,7 @@ public class BatchService {
    */
   private UUID resolveQualityStandardId(CreateBatchRequest request) {
     if (request.getQualityStandardId() != null) {
-      UUID tenantId = TenantContext.getCurrentTenantId();
+      UUID tenantId = TenantContext.requireTenantId();
       if (qualityStandardRepository
           .findByTenantIdAndId(tenantId, request.getQualityStandardId())
           .isEmpty()) {
@@ -123,7 +123,7 @@ public class BatchService {
     if (request.getProductType() != ProductType.FIBER) {
       return null;
     }
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Optional<Fiber> fiberOpt = fiberRepository.findByProductId(request.getProductId());
     if (fiberOpt.isEmpty()) {
       fiberOpt = fiberRepository.findById(request.getProductId());
@@ -204,7 +204,7 @@ public class BatchService {
 
   @Transactional(readOnly = true)
   public List<BatchDto> getAll() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting all batches: tenantId={}", tenantId);
 
     return batchRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
@@ -214,7 +214,7 @@ public class BatchService {
 
   @Transactional(readOnly = true)
   public Optional<BatchDto> getById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting batch: tenantId={}, id={}", tenantId, id);
 
     return batchRepository
@@ -225,7 +225,7 @@ public class BatchService {
 
   @Transactional(readOnly = true)
   public List<BatchDto> getByProductId(UUID productId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting batches by productId: tenantId={}, productId={}", tenantId, productId);
 
     return batchRepository.findByTenantIdAndProductIdAndIsActiveTrue(tenantId, productId).stream()
@@ -241,7 +241,7 @@ public class BatchService {
    */
   @Transactional
   public BatchReservationDto reserve(UUID batchId, ReserveRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Reserving batch: tenantId={}, batchId={}, qty={}, refType={}",
         tenantId,
@@ -292,7 +292,7 @@ public class BatchService {
    */
   @Transactional
   public BatchDto releaseReservation(UUID batchId, UUID reservationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Releasing reservation: tenantId={}, batchId={}, reservationId={}",
         tenantId,
@@ -340,7 +340,7 @@ public class BatchService {
    */
   @Transactional
   public BatchDto completeReservation(UUID batchId, UUID reservationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Completing reservation: tenantId={}, batchId={}, reservationId={}",
         tenantId,
@@ -385,7 +385,7 @@ public class BatchService {
   /** List all reservations for a batch (active + partially consumed). */
   @Transactional(readOnly = true)
   public List<BatchReservationDto> getReservations(UUID batchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return reservationRepository
         .findByTenantIdAndBatchIdAndStatusInAndIsActiveTrue(
             tenantId,
@@ -407,7 +407,7 @@ public class BatchService {
    */
   @Transactional
   public BatchDto consume(UUID batchId, ConsumeRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     BigDecimal qty = request.getQuantity();
 
     log.debug(
@@ -469,7 +469,7 @@ public class BatchService {
   /** Record production waste (fire/telef) against a batch. */
   @Transactional
   public BatchDto recordWaste(UUID batchId, RecordWasteRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Recording waste: tenantId={}, batchId={}, quantity={}, category={}",
         tenantId,

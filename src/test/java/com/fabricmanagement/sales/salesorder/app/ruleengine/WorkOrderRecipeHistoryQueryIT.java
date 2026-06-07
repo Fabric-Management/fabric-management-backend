@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
@@ -35,7 +36,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
 @Testcontainers
 @DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
@@ -59,6 +60,9 @@ class WorkOrderRecipeHistoryQueryIT {
     registry.add("spring.datasource.url", postgres::getJdbcUrl);
     registry.add("spring.datasource.username", postgres::getUsername);
     registry.add("spring.datasource.password", postgres::getPassword);
+    registry.add("spring.flyway.url", postgres::getJdbcUrl);
+    registry.add("spring.flyway.user", postgres::getUsername);
+    registry.add("spring.flyway.password", postgres::getPassword);
     registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
   }
 
@@ -169,7 +173,10 @@ class WorkOrderRecipeHistoryQueryIT {
       ProductionOrderPort productionOrderPort = mock(ProductionOrderPort.class);
       SalesOrderRuleEngine ruleEngine =
           new SalesOrderRuleEngine(
-              lineRepository, productionOrderPort, new WorkOrderRecipeHistoryQuery(jdbc));
+              lineRepository,
+              productionOrderPort,
+              new WorkOrderRecipeHistoryQuery(jdbc),
+              mock(DomainEventPublisher.class));
 
       SalesOrder order =
           SalesOrder.builder().tradingPartnerId(partnerId).orderNumber("SO-TEST").build();

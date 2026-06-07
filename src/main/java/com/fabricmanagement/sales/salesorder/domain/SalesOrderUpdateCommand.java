@@ -16,5 +16,5 @@ public record SalesOrderUpdateCommand(
     String shippingMethod,
     String notes,
     Map<String, Object> metadata,
-    ModuleType moduleType,
+    ModuleType derivedModuleType,
     LocalDate deadline) {}

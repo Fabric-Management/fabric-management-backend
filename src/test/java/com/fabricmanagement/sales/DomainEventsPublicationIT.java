@@ -72,6 +72,9 @@ class DomainEventsPublicationIT {
     registry.add("spring.datasource.url", postgres::getJdbcUrl);
     registry.add("spring.datasource.username", postgres::getUsername);
     registry.add("spring.datasource.password", postgres::getPassword);
+    registry.add("spring.flyway.url", postgres::getJdbcUrl);
+    registry.add("spring.flyway.user", postgres::getUsername);
+    registry.add("spring.flyway.password", postgres::getPassword);
     registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
   }
 
@@ -157,8 +160,8 @@ class DomainEventsPublicationIT {
                 .unit("KG")
                 .build());
 
-    workOrderService.changeStatus(draft.getId(), WorkOrderStatus.PENDING_APPROVAL);
-    workOrderService.changeStatus(draft.getId(), WorkOrderStatus.APPROVED);
+    workOrderService.changeStatus(draft.id(), WorkOrderStatus.PENDING_APPROVAL);
+    workOrderService.changeStatus(draft.id(), WorkOrderStatus.APPROVED);
 
     verify(domainEventPublisher).publish(any(WorkOrderApprovedEvent.class));
     verify(eventRouterService, timeout(15_000)).route(any(WorkOrderApprovedEvent.class));

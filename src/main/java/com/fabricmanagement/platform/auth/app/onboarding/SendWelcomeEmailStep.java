@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Order(8) // After CreateRegistrationTokenStep (7) - FINAL STEP
+@Order(9) // After CreateRegistrationTokenStep (8) - FINAL STEP
 @Component
 @RequiredArgsConstructor
 @Slf4j

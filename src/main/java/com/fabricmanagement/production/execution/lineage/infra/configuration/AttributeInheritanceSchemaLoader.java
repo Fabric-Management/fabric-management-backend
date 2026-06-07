@@ -134,7 +134,7 @@ public class AttributeInheritanceSchemaLoader {
    * @return the schema, or empty if no matching JSON file or DB record was found
    */
   public Optional<AttributeInheritanceSchema> getSchema(ProductType source, ProductType target) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     if (tenantId != null) {
       String dbKey = tenantId + "_" + cacheKey(source, target);

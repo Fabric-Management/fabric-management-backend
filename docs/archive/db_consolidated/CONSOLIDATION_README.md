@@ -81,7 +81,7 @@ ORDER BY schemaname;
 Hazır SQL dosyası: **`consolidated/VERIFY_AFTER_MIGRATE.sql`** — psql veya DBeaver ile çalıştırabilirsiniz:
 
 ```bash
-psql -h localhost -U fabric_user -d fabric_management -f src/main/resources/db/migration/consolidated/VERIFY_AFTER_MIGRATE.sql
+psql -h localhost -U fabric_owner -d fabric_management -f src/main/resources/db/migration/consolidated/VERIFY_AFTER_MIGRATE.sql
 ```
 
 ---

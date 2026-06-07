@@ -30,7 +30,6 @@ import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,10 +79,10 @@ public class FiberService implements FiberFacade {
     boolean isBlended = request.getComposition() != null && !request.getComposition().isEmpty();
     log.info("Creating {} fiber: name={}", isBlended ? "blended" : "pure", request.getFiberName());
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
-    // PF4: Tenants cannot create pure fibers — only platform (FiberRequest approve flow) or R__001
-    if (!isBlended && !TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
+    // PF4: Tenants cannot create pure fibers — only template/platform (FiberRequest approve flow)
+    if (!isBlended && !TenantContext.TEMPLATE_TENANT_ID.equals(tenantId)) {
       throw new ForbiddenOperationException(
           "Pure fibers can only be created by the platform. Submit a fiber request instead.");
     }
@@ -224,7 +223,7 @@ public class FiberService implements FiberFacade {
     validationService.validateNoCircularReferences(composition);
 
     // Validate tenant consistency
-    UUID currentTenantId = TenantContext.getCurrentTenantId();
+    UUID currentTenantId = TenantContext.requireTenantId();
     validationService.validateTenantConsistency(composition, currentTenantId);
   }
 
@@ -351,13 +350,10 @@ public class FiberService implements FiberFacade {
 
   @Transactional(readOnly = true)
   public Optional<FiberDto> getById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting fiber: tenantId={}, id={}", tenantId, id);
 
-    return fiberRepository
-        .findByTenantIdAndId(tenantId, id)
-        .or(() -> fiberRepository.findByTenantIdAndId(TenantContext.SYSTEM_TENANT_ID, id))
-        .map(FiberDto::from);
+    return fiberRepository.findByTenantIdAndId(tenantId, id).map(FiberDto::from);
   }
 
   @Transactional(readOnly = true)
@@ -369,15 +365,10 @@ public class FiberService implements FiberFacade {
 
   @Transactional(readOnly = true)
   public List<FiberDto> getAll() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Getting all fibers: tenantId={} (including platform seed)", tenantId);
+    UUID tenantId = TenantContext.requireTenantId();
+    log.debug("Getting all fibers: tenantId={}", tenantId);
 
-    List<UUID> tenantIds = new ArrayList<>();
-    tenantIds.add(tenantId);
-    if (!TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
-      tenantIds.add(TenantContext.SYSTEM_TENANT_ID);
-    }
-    return fiberRepository.findByTenantIdInAndIsActiveTrueOrderByFiberName(tenantIds).stream()
+    return fiberRepository.findByTenantIdAndIsActiveTrueOrderByFiberName(tenantId).stream()
         .map(FiberDto::from)
         .toList();
   }
@@ -406,20 +397,12 @@ public class FiberService implements FiberFacade {
 
   @Transactional(readOnly = true)
   public List<FiberDto> searchByName(String fiberName) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug(
-        "Searching fibers by name: tenantId={}, name={} (including platform seed)",
-        tenantId,
-        fiberName);
+    UUID tenantId = TenantContext.requireTenantId();
+    log.debug("Searching fibers by name: tenantId={}, name={}", tenantId, fiberName);
 
-    List<UUID> tenantIds = new ArrayList<>();
-    tenantIds.add(tenantId);
-    if (!TenantContext.SYSTEM_TENANT_ID.equals(tenantId)) {
-      tenantIds.add(TenantContext.SYSTEM_TENANT_ID);
-    }
     return fiberRepository
-        .findByTenantIdInAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
-            tenantIds, fiberName)
+        .findByTenantIdAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
+            tenantId, fiberName)
         .stream()
         .map(FiberDto::from)
         .toList();
@@ -446,29 +429,15 @@ public class FiberService implements FiberFacade {
       return java.util.List.of();
     }
 
-    // Step 1: Fetch tenant fibers (batch SQL query)
-    List<Fiber> tenantFibers =
-        fiberRepository.findByProductIdIn(new java.util.ArrayList<>(productIds));
-
-    // Step 2: Fetch system/global fibers (available to all tenants)
-    java.util.UUID systemTenantId =
-        com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID;
-    List<Fiber> systemFibers =
-        fiberRepository.findByTenantIdAndIsActiveTrue(systemTenantId).stream()
-            .filter(f -> f.getProduct() != null && productIds.contains(f.getProduct().getId()))
-            .toList();
-
-    // Step 3: Combine and map to DTO
-    java.util.List<FiberDto> result = new java.util.ArrayList<>();
-    tenantFibers.stream().map(FiberDto::from).forEach(result::add);
-    systemFibers.stream().map(FiberDto::from).forEach(result::add);
-
-    return result;
+    // Each tenant has its own fiber data (cloned from template during onboarding)
+    return fiberRepository.findByProductIdIn(new java.util.ArrayList<>(productIds)).stream()
+        .map(FiberDto::from)
+        .toList();
   }
 
   @Transactional
   public FiberDto updateFiber(UUID id, UpdateFiberRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Fiber fiber =
         fiberRepository
@@ -522,13 +491,13 @@ public class FiberService implements FiberFacade {
     validationService.validateBaseFibersActive(composition);
     validationService.validateNoCircularReferences(composition);
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     validationService.validateTenantConsistency(composition, tenantId);
   }
 
   @Transactional
   public void deactivateFiber(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Fiber fiber =
         fiberRepository
@@ -576,9 +545,8 @@ public class FiberService implements FiberFacade {
   @Override
   @Transactional(readOnly = true)
   public boolean exists(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent()
-        || fiberRepository.findByTenantIdAndId(TenantContext.SYSTEM_TENANT_ID, id).isPresent();
+    UUID tenantId = TenantContext.requireTenantId();
+    return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent();
   }
 
   /**
@@ -590,7 +558,7 @@ public class FiberService implements FiberFacade {
    * @return true if duplicate exists
    */
   private boolean isDuplicateComposition(Map<UUID, BigDecimal> composition) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Get all blended fibers for this tenant
     List<Fiber> allFibers = fiberRepository.findByTenantIdAndIsActiveTrue(tenantId);

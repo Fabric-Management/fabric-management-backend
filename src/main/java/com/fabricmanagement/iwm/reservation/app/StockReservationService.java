@@ -31,7 +31,7 @@ public class StockReservationService {
 
   @Transactional(readOnly = true)
   public List<LotSuggestion> getFifoSuggestions(UUID productId, BigDecimal requiredQty) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return engine.suggestLotsFifo(tenantId, productId, requiredQty);
   }
 
@@ -44,7 +44,7 @@ public class StockReservationService {
       UUID goodsReceiptItemId,
       BigDecimal qtyReserved) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     StockReservation reservation =
         new StockReservation(
@@ -98,7 +98,7 @@ public class StockReservationService {
 
   @Transactional(readOnly = true)
   public StockReservation getById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return repository
         .findByIdAndTenantIdAndDeletedAtIsNull(id, tenantId)
         .orElseThrow(() -> new IwmDomainException("StockReservation not found with id: " + id));

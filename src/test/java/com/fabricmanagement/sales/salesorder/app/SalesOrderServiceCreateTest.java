@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
+import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
@@ -120,6 +122,54 @@ class SalesOrderServiceCreateTest {
     verify(orderRepository).save(orderCaptor.capture());
     assertThat(orderCaptor.getValue().getTotals().getTotalAmount().getAmount())
         .isEqualByComparingTo("0.00");
+    assertThat(orderCaptor.getValue().getModuleType()).isNull();
+  }
+
+  @Test
+  void createOrder_homogeneousLineModuleTypes_derivesHeaderModuleType() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setModuleType(ModuleType.YARN);
+    request.setLines(
+        List.of(
+            lineRequest(new BigDecimal("3"), new BigDecimal("10.00"), "TRY", ModuleType.FABRIC),
+            lineRequest(new BigDecimal("4"), new BigDecimal("2.50"), "TRY", ModuleType.FABRIC)));
+    stubSuccessfulCreate();
+
+    salesOrderService.createOrder(request);
+
+    verify(orderRepository, times(1)).save(orderCaptor.capture());
+    assertThat(orderCaptor.getValue().getModuleType()).isEqualTo(ModuleType.FABRIC);
+  }
+
+  @Test
+  void createOrder_mixedLineModuleTypes_derivesNullHeaderModuleType() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setModuleType(ModuleType.FIBER);
+    request.setLines(
+        List.of(
+            lineRequest(new BigDecimal("3"), new BigDecimal("10.00"), "TRY", ModuleType.FABRIC),
+            lineRequest(new BigDecimal("4"), new BigDecimal("2.50"), "TRY", ModuleType.YARN)));
+    stubSuccessfulCreate();
+
+    salesOrderService.createOrder(request);
+
+    verify(orderRepository).save(orderCaptor.capture());
+    assertThat(orderCaptor.getValue().getModuleType()).isNull();
+  }
+
+  @Test
+  void createOrder_nullLineModuleTypeIsIgnoredWhenDerivingHeaderModuleType() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(
+        List.of(
+            lineRequest(new BigDecimal("3"), new BigDecimal("10.00"), "TRY", ModuleType.FABRIC),
+            lineRequest(new BigDecimal("4"), new BigDecimal("2.50"), "TRY", null)));
+    stubSuccessfulCreate();
+
+    salesOrderService.createOrder(request);
+
+    verify(orderRepository).save(orderCaptor.capture());
+    assertThat(orderCaptor.getValue().getModuleType()).isEqualTo(ModuleType.FABRIC);
   }
 
   @Test
@@ -158,12 +208,18 @@ class SalesOrderServiceCreateTest {
 
   private SalesOrderLineRequest lineRequest(
       BigDecimal requestedQty, BigDecimal unitPrice, String currency) {
+    return lineRequest(requestedQty, unitPrice, currency, null);
+  }
+
+  private SalesOrderLineRequest lineRequest(
+      BigDecimal requestedQty, BigDecimal unitPrice, String currency, ModuleType moduleType) {
     return SalesOrderLineRequest.builder()
         .productDesc("Cotton fabric")
         .requestedQty(requestedQty)
         .unit("KG")
         .unitPrice(unitPrice)
         .currency(currency)
+        .moduleType(moduleType)
         .build();
   }
 

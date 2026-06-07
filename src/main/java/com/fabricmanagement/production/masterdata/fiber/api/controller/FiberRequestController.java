@@ -42,7 +42,7 @@ public class FiberRequestController {
   @PreAuthorize("@auth.can(authentication, 'fiber', 'write')")
   public ResponseEntity<ApiResponse<FiberRequestDto>> submit(
       @Valid @RequestBody CreateFiberRequestRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID userId = TenantContext.getCurrentUserId();
     if (userId == null) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -69,7 +69,7 @@ public class FiberRequestController {
   @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<FiberRequestDto>>> list(
       @Valid PageRequestDto pageRequest) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     var page =
         fiberRequestService.listByTenant(
@@ -88,7 +88,7 @@ public class FiberRequestController {
   @GetMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
   public ResponseEntity<ApiResponse<FiberRequestDto>> getById(@PathVariable("id") UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return ResponseEntity.ok(
         ApiResponse.success(

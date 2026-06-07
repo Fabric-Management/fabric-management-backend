@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
@@ -36,6 +37,7 @@ class TenantOnboardingControllerTest {
   private com.fabricmanagement.platform.tenant.infra.repository.TenantRepository tenantRepository;
 
   @MockBean private JwtService jwtService;
+  @MockBean private TenantQueryPort tenantQueryPort;
   @MockBean private TenantOnboardingService onboardingService;
 
   @Test

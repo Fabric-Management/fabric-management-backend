@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.salesorder.dto;
 
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -39,7 +40,10 @@ public class UpdateSalesOrderRequest {
   private String notes;
   private Map<String, Object> metadata;
 
+  @Deprecated
+  @Schema(description = "Deprecated: ignored; derived from line module types.", deprecated = true)
   private ModuleType moduleType;
+
   private LocalDate deadline;
 
   @Valid private List<UpdateSalesOrderLineRequest> lines = new ArrayList<>();

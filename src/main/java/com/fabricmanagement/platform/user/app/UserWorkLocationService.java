@@ -41,7 +41,7 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
 
   @Override
   protected void validateParentExists(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     userRepository
         .findByTenantIdAndId(tenantId, parentId)
         .orElseThrow(() -> new PlatformDomainException("User not found", "USER_NOT_FOUND", 404));
@@ -49,7 +49,7 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
 
   @Override
   protected void validateChildExists(UUID childId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     OrganizationAddress oa =
         organizationAddressRepository
             .findByAddressId(childId)
@@ -78,7 +78,7 @@ public class UserWorkLocationService extends BaseAssignmentService<UserWorkLocat
 
   @Override
   protected List<UserWorkLocation> findByParent(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return userWorkLocationRepository.findByTenantIdAndUserId(tenantId, parentId);
   }
 

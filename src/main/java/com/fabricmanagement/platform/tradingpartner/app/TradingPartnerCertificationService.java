@@ -31,7 +31,7 @@ public class TradingPartnerCertificationService {
 
   @Transactional(readOnly = true)
   public List<TradingPartnerCertificationDto> findByPartnerId(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner =
         partnerRepository
             .findByTenantIdAndId(tenantId, partnerId)
@@ -69,7 +69,7 @@ public class TradingPartnerCertificationService {
 
   @Transactional(readOnly = true)
   public TradingPartnerCertificationDto findById(UUID partnerId, UUID certificationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner =
         partnerRepository
             .findByTenantIdAndId(tenantId, partnerId)
@@ -102,7 +102,7 @@ public class TradingPartnerCertificationService {
   @Transactional
   public TradingPartnerCertificationDto add(
       UUID partnerId, AddTradingPartnerCertificationRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     TradingPartner partner =
         partnerRepository
@@ -143,7 +143,7 @@ public class TradingPartnerCertificationService {
   @Transactional
   public TradingPartnerCertificationDto update(
       UUID partnerId, UUID certificationId, UpdateTradingPartnerCertificationRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     TradingPartner partner =
         partnerRepository
@@ -194,7 +194,7 @@ public class TradingPartnerCertificationService {
 
   @Transactional
   public void delete(UUID partnerId, UUID certificationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     TradingPartner partner =
         partnerRepository

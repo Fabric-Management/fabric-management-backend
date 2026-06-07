@@ -48,7 +48,7 @@ public class ContactService {
       String label,
       Boolean isPersonal,
       UUID parentContactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     ContactType resolvedType = contactType != null ? contactType : inferContactType(contactValue);
     String normalizedValue = normalizeContactValue(contactValue, resolvedType);
     log.debug(
@@ -104,7 +104,7 @@ public class ContactService {
 
   @Transactional(readOnly = true)
   public Optional<Contact> findById(UUID contactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Finding contact: tenantId={}, contactId={}", tenantId, contactId);
 
     return contactRepository.findById(contactId).filter(c -> c.getTenantId().equals(tenantId));
@@ -112,7 +112,7 @@ public class ContactService {
 
   @Transactional(readOnly = true)
   public List<Contact> findByType(ContactType contactType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Finding contacts by type: tenantId={}, type={}", tenantId, contactType);
 
     return contactRepository.findByTenantIdAndContactType(tenantId, contactType);
@@ -120,7 +120,7 @@ public class ContactService {
 
   @Transactional(readOnly = true)
   public Optional<Contact> findByValueAndType(String contactValue, ContactType contactType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String normalizedValue = normalizeContactValue(contactValue, contactType);
     log.trace(
         "Finding contact by value and type: tenantId={}, type={}, value={}",
@@ -134,7 +134,7 @@ public class ContactService {
 
   @Transactional(readOnly = true)
   public Optional<Contact> findByValue(String contactValue) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String normalizedValue = contactValue != null ? contactValue.trim() : null;
     log.trace(
         "Finding contact by value: tenantId={}, value={}",
@@ -151,7 +151,7 @@ public class ContactService {
    */
   @Transactional(readOnly = true)
   public List<Contact> searchByValue(String query) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     if (query == null || query.isBlank()) {
       return List.of();
     }
@@ -183,7 +183,7 @@ public class ContactService {
 
   @Transactional(readOnly = true)
   public List<Contact> findExtensionsByParent(UUID parentContactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Finding extensions: tenantId={}, parentContactId={}", tenantId, parentContactId);
 
     return contactRepository.findExtensionsByParentContactId(tenantId, parentContactId);
@@ -191,7 +191,7 @@ public class ContactService {
 
   @Transactional
   public Contact verifyContact(UUID contactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Verifying contact: tenantId={}, contactId={}", tenantId, contactId);
 
     Contact contact =
@@ -222,7 +222,7 @@ public class ContactService {
 
   @Transactional
   public Contact updateContact(Contact contact) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Updating contact: tenantId={}, contactId={}", tenantId, contact.getId());
 
     if (!contact.getTenantId().equals(tenantId)) {
@@ -234,7 +234,7 @@ public class ContactService {
 
   @Transactional
   public void deleteContact(UUID contactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Deleting contact: tenantId={}, contactId={}", tenantId, contactId);
 
     Contact contact =
@@ -275,7 +275,7 @@ public class ContactService {
       ContactType contactType,
       String label,
       Boolean isPersonal) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Updating contact fields: tenantId={}, contactId={}", tenantId, contactId);
 
     Contact contact =
@@ -412,7 +412,7 @@ public class ContactService {
     if (contactIds == null || contactIds.isEmpty()) {
       return List.of();
     }
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Batch loading contacts: tenantId={}, count={}", tenantId, contactIds.size());
     return contactRepository.findAllById(contactIds).stream()
         .filter(contact -> contact.getTenantId().equals(tenantId))

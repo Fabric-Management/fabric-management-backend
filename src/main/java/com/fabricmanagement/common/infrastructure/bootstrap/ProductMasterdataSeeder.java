@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.production.masterdata.product.app.ProductService;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
@@ -19,7 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class ProductMasterdataSeeder implements DataSeeder {
 
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
   private final ProductService productService;
   private final TransactionTemplate transactionTemplate;
 

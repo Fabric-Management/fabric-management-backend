@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -57,6 +58,12 @@ public class WorkOrder extends BaseEntity {
 
   @Column(name = "sales_order_line_id")
   private UUID salesOrderLineId;
+
+  @Column(name = "certification_req", length = 50)
+  private String certificationReq;
+
+  @Column(name = "origin_req", length = 10)
+  private String originReq;
 
   @Column(name = "product_code", length = 100)
   private String productCode;
@@ -195,5 +202,20 @@ public class WorkOrder extends BaseEntity {
   @Override
   protected String getModuleCode() {
     return "WO";
+  }
+
+  @PrePersist
+  @PreUpdate
+  protected void normalizeCertOrigin() {
+    if (this.certificationReq != null && !this.certificationReq.isBlank()) {
+      this.certificationReq = this.certificationReq.strip().toUpperCase(Locale.ROOT);
+    } else {
+      this.certificationReq = null;
+    }
+    if (this.originReq != null && !this.originReq.isBlank()) {
+      this.originReq = this.originReq.strip().toUpperCase(Locale.ROOT);
+    } else {
+      this.originReq = null;
+    }
   }
 }

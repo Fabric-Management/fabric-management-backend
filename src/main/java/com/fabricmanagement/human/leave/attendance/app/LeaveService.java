@@ -52,7 +52,7 @@ public class LeaveService {
 
   public LeaveAccrualResult accrueLeave(
       UUID employeeId, String leaveTypeCode, String countryOverride, Instant asOfDate) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String normalizedCode = leaveTypeCode.toUpperCase(Locale.ROOT);
     LeaveType leaveType = leaveTypeService.getActiveByCode(tenantId, normalizedCode);
 

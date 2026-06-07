@@ -214,7 +214,8 @@ public class LoginService {
             ipAddress,
             userAgent,
             DeviceInfoUtil.extractDeviceName(userAgent));
-    refreshTokenRepository.save(refreshTokenEntity);
+    TenantContext.executeInTenantContext(
+        user.getTenantId(), () -> refreshTokenRepository.save(refreshTokenEntity));
 
     // Get contact value from Contact entity
     String contactValue =
@@ -305,7 +306,8 @@ public class LoginService {
             ipAddress,
             userAgent,
             DeviceInfoUtil.extractDeviceName(userAgent));
-    refreshTokenRepository.save(refreshTokenEntity);
+    TenantContext.executeInTenantContext(
+        tenantId, () -> refreshTokenRepository.save(refreshTokenEntity));
 
     String newTrustedDeviceToken = null;
     if (Boolean.TRUE.equals(request.getRememberDevice())) {

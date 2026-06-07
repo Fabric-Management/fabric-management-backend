@@ -32,7 +32,7 @@ public class OrganizationCertificationService {
 
   @Transactional(readOnly = true)
   public List<OrganizationCertificationDto> findByOrganizationId(UUID organizationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Organization org =
         organizationRepository
             .findByTenantIdAndId(tenantId, organizationId)
@@ -75,7 +75,7 @@ public class OrganizationCertificationService {
 
   @Transactional(readOnly = true)
   public OrganizationCertificationDto findById(UUID organizationId, UUID certificationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Organization org =
         organizationRepository
             .findByTenantIdAndId(tenantId, organizationId)
@@ -116,7 +116,7 @@ public class OrganizationCertificationService {
   @Transactional
   public OrganizationCertificationDto add(
       UUID organizationId, AddOrganizationCertificationRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Organization org =
         organizationRepository
@@ -162,7 +162,7 @@ public class OrganizationCertificationService {
   @Transactional
   public OrganizationCertificationDto update(
       UUID organizationId, UUID certificationId, UpdateOrganizationCertificationRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Organization org =
         organizationRepository
@@ -220,7 +220,7 @@ public class OrganizationCertificationService {
 
   @Transactional
   public void delete(UUID organizationId, UUID certificationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Organization org =
         organizationRepository

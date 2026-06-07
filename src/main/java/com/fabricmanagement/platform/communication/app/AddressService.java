@@ -128,7 +128,7 @@ public class AddressService {
       AddressType addressType,
       String label,
       String addressLine2) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Creating address: tenantId={}, type={}, city={}", tenantId, addressType, city);
 
     Address address =
@@ -150,7 +150,7 @@ public class AddressService {
 
   @Transactional(readOnly = true)
   public Optional<Address> findById(UUID addressId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Finding address: tenantId={}, addressId={}", tenantId, addressId);
 
     return addressRepository.findById(addressId).filter(a -> a.getTenantId().equals(tenantId));
@@ -158,7 +158,7 @@ public class AddressService {
 
   @Transactional(readOnly = true)
   public List<Address> findByType(AddressType addressType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Finding addresses by type: tenantId={}, type={}", tenantId, addressType);
 
     return addressRepository.findByTenantIdAndAddressType(tenantId, addressType);
@@ -166,7 +166,7 @@ public class AddressService {
 
   @Transactional(readOnly = true)
   public List<Address> findByCity(String city) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Finding addresses by city: tenantId={}, city={}", tenantId, city);
 
     return addressRepository.findByTenantIdAndCity(tenantId, city);
@@ -174,7 +174,7 @@ public class AddressService {
 
   @Transactional(readOnly = true)
   public List<Address> findByCountry(String country) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Finding addresses by country: tenantId={}, country={}", tenantId, country);
 
     return addressRepository.findByTenantIdAndCountry(tenantId, country);
@@ -196,7 +196,7 @@ public class AddressService {
       String contactPerson,
       String contactPhone,
       String contactEmail) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Updating address: tenantId={}, addressId={}", tenantId, addressId);
 
     Address address =
@@ -232,7 +232,7 @@ public class AddressService {
    */
   @Transactional
   public void deleteAddress(UUID addressId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Deleting address: tenantId={}, addressId={}", tenantId, addressId);
 
     Address address =

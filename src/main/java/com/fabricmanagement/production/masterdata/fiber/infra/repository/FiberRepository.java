@@ -31,7 +31,12 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
   @Query("SELECT f FROM Fiber f WHERE f.product.id IN :productIds")
   List<Fiber> findByProductIdIn(@Param("productIds") List<UUID> productIds);
 
-  /** Find all active fibers for a tenant. */
+  /** Find all active fibers for a tenant, ordered by name. */
+  @Query(
+      "SELECT f FROM Fiber f WHERE f.tenantId = :tenantId AND f.isActive = true ORDER BY f.fiberName")
+  List<Fiber> findByTenantIdAndIsActiveTrueOrderByFiberName(@Param("tenantId") UUID tenantId);
+
+  /** Find all active fibers for a tenant (unordered). */
   List<Fiber> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
   /**
@@ -46,9 +51,9 @@ public interface FiberRepository extends JpaRepository<Fiber, UUID> {
   /** Find fibers by name (case-insensitive). */
   List<Fiber> findByTenantIdAndFiberNameContainingIgnoreCase(UUID tenantId, String fiberName);
 
-  /** Find fibers by name across multiple tenants (current + system for platform seed). */
-  List<Fiber> findByTenantIdInAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
-      List<UUID> tenantIds, String fiberName);
+  /** Find fibers by name (case-insensitive), single tenant. */
+  List<Fiber> findByTenantIdAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
+      UUID tenantId, String fiberName);
 
   /** Find fibers by status. */
   List<Fiber> findByTenantIdAndStatusAndIsActiveTrue(UUID tenantId, FiberStatus status);

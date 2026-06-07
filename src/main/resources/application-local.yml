@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:fabric_management}?stringtype=unspecified}
-    username: ${POSTGRES_USER:fabric_user}
-    password: ${POSTGRES_PASSWORD:local_dev_2026}
+    username: ${POSTGRES_APP_USER:fabric_app}
+    password: ${POSTGRES_APP_PASSWORD:app_dev_2026}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
@@ -50,6 +50,9 @@ spring:
     locations: classpath:db/migration
     out-of-order: false  # Reproducible order, no warning. New migrations must use version > current max (e.g. V20260308150000).
     default-schema: common_tenant
+    url: ${DATABASE_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:fabric_management}}
+    user: ${POSTGRES_OWNER_USER:fabric_owner}
+    password: ${POSTGRES_OWNER_PASSWORD:owner_dev_2026}
 
   jpa:
     show-sql: false  # SQL loglarını kapat (çok fazla log üretiyor)
@@ -86,6 +89,12 @@ application:
   auth:
     cookie:
       secure: false
+
+  # System DataSource: fabric_system role (BYPASSRLS) for cross-tenant operations
+  system-datasource:
+    enabled: true
+    username: ${POSTGRES_SYSTEM_USER:fabric_system}
+    password: ${POSTGRES_SYSTEM_PASSWORD:system_dev_2026}
 
   mail:
     from-email: ${MAIL_FROM_EMAIL:info@storeandsale.shop}

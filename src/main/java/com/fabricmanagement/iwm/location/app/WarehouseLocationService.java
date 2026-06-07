@@ -55,7 +55,7 @@ public class WarehouseLocationService {
 
   @Transactional
   public WarehouseLocationDto create(CreateWarehouseLocationRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Creating warehouse location: tenantId={}, code={}", tenantId, request.getCode());
 
     validateCodeUnique(tenantId, request.getCode());

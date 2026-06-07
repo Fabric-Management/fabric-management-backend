@@ -23,6 +23,8 @@ public class AsyncConfig implements AsyncConfigurer {
     executor.setQueueCapacity(100);
     executor.setThreadNamePrefix("async-tenant-");
     executor.setTaskDecorator(new TenantAwareTaskDecorator());
+    executor.setWaitForTasksToCompleteOnShutdown(true);
+    executor.setAwaitTerminationSeconds(15);
     executor.initialize();
     return executor;
   }

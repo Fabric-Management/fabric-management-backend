@@ -53,7 +53,7 @@ public class OrganizationContactAssignmentService
   protected void onAfterAssign(OrganizationContact junction) {
     eventPublisher.publish(
         new OrganizationContactAssignedEvent(
-            TenantContext.getCurrentTenantId(),
+            TenantContext.requireTenantId(),
             junction.getOrganizationId(),
             junction.getContactId()));
   }
@@ -65,7 +65,7 @@ public class OrganizationContactAssignmentService
 
   @Override
   protected void validateParentExists(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     organizationRepository
         .findByTenantIdAndId(tenantId, parentId)
         .orElseThrow(
@@ -74,7 +74,7 @@ public class OrganizationContactAssignmentService
 
   @Override
   protected void validateChildExists(UUID childId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Contact contact =
         contactRepository
             .findById(childId)
@@ -99,7 +99,7 @@ public class OrganizationContactAssignmentService
 
   @Override
   protected List<OrganizationContact> findByParent(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return organizationContactRepository.findWithContactByTenantIdAndOrganizationId(
         tenantId, parentId);
   }
@@ -167,7 +167,7 @@ public class OrganizationContactAssignmentService
   @Transactional
   public OrganizationContact updateContactAssignment(
       UUID organizationId, UUID contactId, String department) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Updating contact assignment: organizationId={}, contactId={}, department={}",
         organizationId,
@@ -195,7 +195,7 @@ public class OrganizationContactAssignmentService
 
   @Transactional
   public void removeContact(UUID organizationId, UUID contactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     OrganizationContact oc =
         organizationContactRepository
@@ -255,7 +255,7 @@ public class OrganizationContactAssignmentService
       Boolean isPersonal,
       Boolean isDefault,
       String department) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Atomic edit: orgId={}, contactId={}, isDefault={}, department={}",
         organizationId,

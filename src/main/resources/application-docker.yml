@@ -5,8 +5,8 @@ spring:
 
   datasource:
     url: ${DATABASE_URL_CONTAINER:jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB}}
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
+    username: ${POSTGRES_APP_USER:fabric_app}
+    password: ${POSTGRES_APP_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
@@ -19,6 +19,9 @@ spring:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+    url: ${DATABASE_URL_CONTAINER:jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB}}
+    user: ${POSTGRES_OWNER_USER:fabric_owner}
+    password: ${POSTGRES_OWNER_PASSWORD}
 
   mail:
     host: ${MAIL_HOST:smtp.hostinger.com}

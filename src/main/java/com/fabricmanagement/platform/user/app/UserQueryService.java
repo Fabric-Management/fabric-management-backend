@@ -43,7 +43,8 @@ public class UserQueryService {
         .map(
             user -> {
               UserDto dto =
-                  UserDto.from(user, employeeProjectionPort.findByUserId(userId).orElse(null));
+                  UserDto.from(
+                      user, employeeProjectionPort.findByUserId(tenantId, userId).orElse(null));
               Map<UUID, String> labelMap =
                   userWorkLocationService.getPrimaryLocationLabels(tenantId, List.of(userId));
               dto.setWorkLocationLabel(labelMap.get(userId));
@@ -59,7 +60,8 @@ public class UserQueryService {
         .map(
             user -> {
               UserDto dto =
-                  UserDto.from(user, employeeProjectionPort.findByUserId(userId).orElse(null));
+                  UserDto.from(
+                      user, employeeProjectionPort.findByUserId(tenantId, userId).orElse(null));
               Map<UUID, String> labelMap =
                   userWorkLocationService.getPrimaryLocationLabels(tenantId, List.of(userId));
               dto.setWorkLocationLabel(labelMap.get(userId));
@@ -74,7 +76,11 @@ public class UserQueryService {
         .findByContactValue(contactValue)
         .map(
             user ->
-                UserDto.from(user, employeeProjectionPort.findByUserId(user.getId()).orElse(null)));
+                UserDto.from(
+                    user,
+                    employeeProjectionPort
+                        .findByUserId(user.getTenantId(), user.getId())
+                        .orElse(null)));
   }
 
   @Transactional(readOnly = true)

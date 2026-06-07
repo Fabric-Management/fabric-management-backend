@@ -23,7 +23,7 @@ public class EmployeeProjectionAdapter implements EmployeeProjectionPort {
   @Override
   @Transactional(readOnly = true)
   public Optional<EmployeeSnapshot> findByUserId(UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return employeeRepository
         .findByTenantIdAndUserId(tenantId, userId)
         .map(EmployeeSnapshotFactory::fromEntity);

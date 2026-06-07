@@ -52,7 +52,7 @@ public class PolicyCheckAspect {
   @Around("@annotation(policyCheck)")
   public Object checkPolicy(ProceedingJoinPoint joinPoint, PolicyCheck policyCheck)
       throws Throwable {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID userId = TenantContext.getCurrentUserId();
 
     String resource = policyCheck.resource();

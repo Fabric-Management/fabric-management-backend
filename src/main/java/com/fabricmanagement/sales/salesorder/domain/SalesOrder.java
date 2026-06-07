@@ -276,7 +276,7 @@ public class SalesOrder extends BaseEntity {
     this.shippingMethod = cmd.shippingMethod();
     this.notes = cmd.notes();
     this.metadata = cmd.metadata();
-    this.moduleType = cmd.moduleType();
+    this.moduleType = cmd.derivedModuleType();
     this.deadline = cmd.deadline();
   }
 
@@ -314,6 +314,19 @@ public class SalesOrder extends BaseEntity {
               orderNumber, status));
     }
     this.status = OrderStatus.IN_PROGRESS;
+  }
+
+  /**
+   * Marks the order as in progress when production starts.
+   *
+   * @return true when the status changed, false when this event is duplicate or out of order
+   */
+  public boolean markInProgressIfConfirmed() {
+    if (status != OrderStatus.CONFIRMED) {
+      return false;
+    }
+    this.status = OrderStatus.IN_PROGRESS;
+    return true;
   }
 
   /** Mark as shipped. */

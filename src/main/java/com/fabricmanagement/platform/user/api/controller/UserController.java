@@ -47,7 +47,7 @@ public class UserController {
   private final PermissionEvaluator permissionEvaluator;
 
   private PermissionResult getPermissions(UUID requesterId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UserDto requester =
         userService
             .findByIdWithPermissionData(tenantId, requesterId)
@@ -125,7 +125,7 @@ public class UserController {
 
     UserDto user =
         userService
-            .findById(TenantContext.getCurrentTenantId(), id)
+            .findById(TenantContext.requireTenantId(), id)
             .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
     return ResponseEntity.ok(ApiResponse.success(user));
@@ -144,7 +144,7 @@ public class UserController {
   @GetMapping
   public ResponseEntity<ApiResponse<List<UserDto>>> getAllUsers() {
     UUID requesterId = TenantContext.getCurrentUserId();
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     PermissionResult perms = getPermissions(requesterId);
 
@@ -196,7 +196,7 @@ public class UserController {
         requesterId);
 
     List<UserDto> users =
-        userService.findByOrganization(TenantContext.getCurrentTenantId(), organizationId);
+        userService.findByOrganization(TenantContext.requireTenantId(), organizationId);
 
     return ResponseEntity.ok(ApiResponse.success(users));
   }
@@ -246,7 +246,7 @@ public class UserController {
       @PathVariable String contactValue) {
     log.debug("Checking contact existence: {}", PiiMaskingUtil.maskEmail(contactValue));
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     boolean exists = userService.contactExistsInTenant(tenantId, contactValue);
 
     return ResponseEntity.ok(ApiResponse.success(exists));
@@ -260,7 +260,7 @@ public class UserController {
   @GetMapping("/me")
   public ResponseEntity<ApiResponse<UserDto>> getCurrentUser() {
     UUID userId = TenantContext.getCurrentUserId();
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     if (userId == null) {
       throw new PlatformDomainException("User not authenticated", "USER_NOT_AUTHENTICATED", 401);

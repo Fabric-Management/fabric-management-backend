@@ -31,9 +31,7 @@ public class RecurringTaskController {
   public ResponseEntity<ApiResponse<List<RecurringTaskTemplateDto>>> getTemplatesForBoard(
       @PathVariable @NotNull UUID boardId) {
     List<RecurringTaskTemplateDto> result =
-        recurringTaskService
-            .getTemplatesForBoard(TenantContext.getCurrentTenantId(), boardId)
-            .stream()
+        recurringTaskService.getTemplatesForBoard(TenantContext.requireTenantId(), boardId).stream()
             .map(RecurringTaskTemplateDto::from)
             .toList();
     return ResponseEntity.ok(ApiResponse.success(result));

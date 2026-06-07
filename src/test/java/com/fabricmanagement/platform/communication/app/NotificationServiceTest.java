@@ -7,10 +7,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.platform.communication.domain.strategy.EmailStrategy;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -30,7 +30,7 @@ class NotificationServiceTest {
 
   @Mock private EmailStrategy emailStrategy;
   @Mock private EmailOutboxService emailOutboxService;
-  @Mock private TenantRepository tenantRepository;
+  @Mock private TenantQueryPort tenantQueryPort;
 
   @InjectMocks private NotificationService notificationService;
 
@@ -54,9 +54,9 @@ class NotificationServiceTest {
     @Test
     @DisplayName("Should skip email sending (async) when tenant is PLAYGROUND")
     void shouldSkipAsyncEmailWhenPlayground() {
-      Tenant playgroundTenant =
-          Tenant.create("Playground", "PG-1", "pg-1", null, TenantType.PLAYGROUND);
-      when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(playgroundTenant));
+      TenantReference playgroundTenant =
+          new TenantReference(TENANT_ID, "Playground", "pg-1", TenantType.PLAYGROUND.name());
+      when(tenantQueryPort.findById(TENANT_ID)).thenReturn(Optional.of(playgroundTenant));
 
       notificationService.sendNotification("test@test.com", "Subject", "Message");
 
@@ -67,9 +67,9 @@ class NotificationServiceTest {
     @Test
     @DisplayName("Should skip email sending (sync) when tenant is PLAYGROUND")
     void shouldSkipSyncEmailWhenPlayground() {
-      Tenant playgroundTenant =
-          Tenant.create("Playground", "PG-1", "pg-1", null, TenantType.PLAYGROUND);
-      when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(playgroundTenant));
+      TenantReference playgroundTenant =
+          new TenantReference(TENANT_ID, "Playground", "pg-1", TenantType.PLAYGROUND.name());
+      when(tenantQueryPort.findById(TENANT_ID)).thenReturn(Optional.of(playgroundTenant));
 
       notificationService.sendNotificationSync("test@test.com", "Subject", "Message");
 
@@ -80,8 +80,9 @@ class NotificationServiceTest {
     @Test
     @DisplayName("Should send email when tenant is REGULAR")
     void shouldSendEmailWhenRegular() {
-      Tenant regularTenant = Tenant.create("Regular", "REG-1", "reg-1", null, TenantType.REGULAR);
-      when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(regularTenant));
+      TenantReference regularTenant =
+          new TenantReference(TENANT_ID, "Regular", "reg-1", TenantType.REGULAR.name());
+      when(tenantQueryPort.findById(TENANT_ID)).thenReturn(Optional.of(regularTenant));
 
       notificationService.sendNotificationSync("test@test.com", "Subject", "Message");
 

@@ -62,7 +62,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto createShipment(CreateShipmentRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Resolve partner ID (handles both new and legacy IDs)
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
@@ -117,7 +117,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public Optional<ShipmentDto> findById(UUID shipmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository
         .findByTenantIdAndId(tenantId, shipmentId)
@@ -148,7 +148,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findByPartner(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Resolve partner ID
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
@@ -166,7 +166,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findInTransitByPartner(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
 
@@ -183,7 +183,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findByStatus(ShipmentStatus status) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository.findByTenantIdAndStatus(tenantId, status).stream()
         .map(ShipmentDto::from)
@@ -197,7 +197,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findInTransit() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository.findInTransit(tenantId).stream().map(ShipmentDto::from).toList();
   }
@@ -209,7 +209,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findPendingShipments() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository.findPendingShipments(tenantId).stream()
         .map(ShipmentDto::from)
@@ -223,7 +223,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findLateShipments() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository.findLateShipments(tenantId, LocalDate.now()).stream()
         .map(ShipmentDto::from)
@@ -237,7 +237,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findOutboundShipments() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository.findOutboundShipments(tenantId).stream()
         .map(ShipmentDto::from)
@@ -251,7 +251,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findInboundShipments() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository.findInboundShipments(tenantId).stream()
         .map(ShipmentDto::from)
@@ -266,7 +266,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public List<ShipmentDto> findByOrderReference(String orderReference) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository.findByTenantIdAndOrderReference(tenantId, orderReference).stream()
         .map(ShipmentDto::from)
@@ -281,7 +281,7 @@ public class ShipmentService {
    */
   @Transactional(readOnly = true)
   public Page<ShipmentDto> findAll(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return shipmentRepository
         .findByTenantIdAndIsActiveTrue(tenantId, pageable)
@@ -300,7 +300,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto startPreparing(UUID shipmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.startPreparing();
@@ -318,7 +318,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto markReady(UUID shipmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.markReady();
@@ -338,7 +338,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto recordPickup(UUID shipmentId, String carrierName, String trackingNumber) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.recordPickup(carrierName, trackingNumber);
@@ -376,7 +376,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto markInTransit(UUID shipmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.inTransit();
@@ -394,7 +394,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto markOutForDelivery(UUID shipmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.outForDelivery();
@@ -414,7 +414,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto recordDelivery(UUID shipmentId, String recipientName, String deliveryProof) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.recordDelivery(recipientName, deliveryProof);
@@ -433,7 +433,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto recordDeliveryFailure(UUID shipmentId, String reason) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.recordDeliveryFailure(reason);
@@ -451,7 +451,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto cancelShipment(UUID shipmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.cancel();
@@ -471,7 +471,7 @@ public class ShipmentService {
    */
   @Transactional
   public ShipmentDto updateTracking(UUID shipmentId, String trackingNumber, String trackingUrl) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.updateTracking(trackingNumber, trackingUrl);
@@ -488,7 +488,7 @@ public class ShipmentService {
    */
   @Transactional
   public void deleteShipment(UUID shipmentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
     shipment.delete();
@@ -503,7 +503,7 @@ public class ShipmentService {
 
   @Transactional
   public ShipmentDto addShipmentLine(UUID shipmentId, AddShipmentLineRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Adding line to shipment {}: {}", shipmentId, request);
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
@@ -534,7 +534,7 @@ public class ShipmentService {
   @Transactional
   public ShipmentDto addBatchToLine(
       UUID shipmentId, UUID shipmentLineId, AddBatchToLineRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Shipment shipment = getShipmentOrThrow(tenantId, shipmentId);
 

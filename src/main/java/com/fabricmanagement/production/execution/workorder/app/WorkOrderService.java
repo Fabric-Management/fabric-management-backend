@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
+import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
@@ -40,6 +41,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +61,7 @@ public class WorkOrderService {
   private final ApprovalPort approvalPort;
   private final TenantFacade tenantFacade;
   private final DocumentNumberGenerator documentNumberGenerator;
+  private final WorkOrderProductionCompletionService workOrderProductionCompletionService;
 
   /**
    * Paginated, filterable listing of WorkOrders for the current tenant.
@@ -129,18 +133,20 @@ public class WorkOrderService {
     WorkOrder workOrder =
         WorkOrder.builder()
             .workOrderNumber(generateWorkOrderNumber())
-            .recipeId(request.getRecipeId())
-            .tradingPartnerId(request.getTradingPartnerId())
-            .salesOrderLineId(request.getSalesOrderLineId())
-            .fulfillmentType(request.getFulfillmentType())
-            .plannedQty(request.getPlannedQty())
-            .unit(request.getUnit())
-            .unitCost(request.getUnitCost())
-            .currency(request.getCurrency())
-            .deadline(request.getDeadline())
-            .notes(request.getNotes())
+            .recipeId(request.recipeId())
+            .tradingPartnerId(request.tradingPartnerId())
+            .salesOrderLineId(request.salesOrderLineId())
+            .fulfillmentType(request.fulfillmentType())
+            .plannedQty(request.plannedQty())
+            .unit(request.unit())
+            .unitCost(request.unitCost())
+            .currency(request.currency())
+            .deadline(request.deadline())
+            .certificationReq(request.certificationReq())
+            .originReq(request.originReq())
+            .notes(request.notes())
             .attachments(
-                request.getAttachments() == null ? java.util.List.of() : request.getAttachments())
+                request.attachments() == null ? java.util.List.of() : request.attachments())
             .status(WorkOrderStatus.DRAFT)
             .moduleType(
                 com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
@@ -163,30 +169,32 @@ public class WorkOrderService {
   public WorkOrderResponse createWorkOrder(
       com.fabricmanagement.production.execution.workorder.dto.CreateWorkOrderRequest request) {
     java.time.Instant deadlineInstant =
-        request.getDeadline() != null
-            ? request.getDeadline().atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
+        request.deadline() != null
+            ? request.deadline().atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
             : null;
 
     com.fabricmanagement.production.execution.workorder.domain.FulfillmentType fulfillmentType =
-        request.getFulfillmentType() != null
-            ? request.getFulfillmentType()
+        request.fulfillmentType() != null
+            ? request.fulfillmentType()
             : com.fabricmanagement.production.execution.workorder.domain.FulfillmentType.INTERNAL;
 
     WorkOrder workOrder =
         WorkOrder.builder()
             .workOrderNumber(generateWorkOrderNumber())
-            .recipeId(request.getRecipeId())
-            .tradingPartnerId(request.getTradingPartnerId())
-            .salesOrderLineId(request.getSalesOrderLineId())
+            .recipeId(request.recipeId())
+            .tradingPartnerId(request.tradingPartnerId())
+            .salesOrderLineId(request.salesOrderLineId())
             .fulfillmentType(fulfillmentType)
-            .plannedQty(request.getPlannedQty())
-            .unit(request.getUnit())
-            .unitCost(request.getUnitCost())
-            .currency(request.getCurrency())
+            .plannedQty(request.plannedQty())
+            .unit(request.unit())
+            .unitCost(request.unitCost())
+            .currency(request.currency())
             .deadline(deadlineInstant)
-            .notes(request.getNotes())
+            .certificationReq(request.certificationReq())
+            .originReq(request.originReq())
+            .notes(request.notes())
             .attachments(
-                request.getAttachments() == null ? java.util.List.of() : request.getAttachments())
+                request.attachments() == null ? java.util.List.of() : request.attachments())
             .status(WorkOrderStatus.DRAFT)
             .moduleType(
                 com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
@@ -347,6 +355,11 @@ public class WorkOrderService {
 
     // Phase 2 refactoring: Lot creation is now handled by ProductionLotService.
     // The start-production action only changes the status.
+    if (workOrder.getSalesOrderLineId() != null) {
+      domainEventPublisher.publish(
+          new WorkOrderStartedEvent(
+              workOrder.getTenantId(), workOrder.getId(), workOrder.getSalesOrderLineId()));
+    }
 
     return mapToResponse(workOrder);
   }
@@ -402,6 +415,7 @@ public class WorkOrderService {
         new WorkOrderCompletedEvent(
             tenantId,
             workOrderId,
+            workOrder.getSalesOrderLineId(),
             workOrder.getWorkOrderNumber(),
             workOrder.getPlannedQty(),
             totalOutput,
@@ -410,7 +424,35 @@ public class WorkOrderService {
             workOrder.getCompletedAt(),
             actorId));
 
+    scheduleLineCompletionCheckAfterCommit(
+        tenantId, workOrder.getSalesOrderLineId(), workOrder.getId());
+
     return mapToResponse(workOrder);
+  }
+
+  private void scheduleLineCompletionCheckAfterCommit(
+      UUID tenantId, UUID salesOrderLineId, UUID completedWorkOrderId) {
+    if (salesOrderLineId == null) {
+      return;
+    }
+
+    Runnable completionCheck =
+        () ->
+            workOrderProductionCompletionService.publishLineCompletedIfAllWorkOrdersCompleted(
+                tenantId, salesOrderLineId, completedWorkOrderId);
+
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      completionCheck.run();
+      return;
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            completionCheck.run();
+          }
+        });
   }
 
   private WorkOrder findEntityById(UUID id) {

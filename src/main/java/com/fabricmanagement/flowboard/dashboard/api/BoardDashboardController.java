@@ -30,7 +30,7 @@ public class BoardDashboardController {
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<BoardMetricsResponse>> getBoardMetrics(
       @PathVariable UUID boardId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     BoardMetricsResponse metrics = dashboardService.getDashboardMetrics(tenantId, boardId);
     return ResponseEntity.ok(ApiResponse.success(metrics));
   }

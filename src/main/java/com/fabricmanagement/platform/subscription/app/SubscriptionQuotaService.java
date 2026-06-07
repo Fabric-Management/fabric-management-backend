@@ -26,7 +26,7 @@ public class SubscriptionQuotaService {
   /** Get all quotas for a subscription. */
   @Transactional(readOnly = true)
   public List<SubscriptionQuotaDto> getSubscriptionQuotas(UUID subscriptionId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Getting quotas for subscription: tenantId={}, subscriptionId={}",
         tenantId,
@@ -40,7 +40,7 @@ public class SubscriptionQuotaService {
   /** Get all quotas for current tenant. */
   @Transactional(readOnly = true)
   public List<SubscriptionQuotaDto> getTenantQuotas() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting quotas for tenant: tenantId={}", tenantId);
 
     List<SubscriptionQuota> quotas = quotaRepository.findByTenantId(tenantId);
@@ -51,7 +51,7 @@ public class SubscriptionQuotaService {
   /** Reset quota for a specific type. */
   @Transactional
   public SubscriptionQuotaDto resetQuota(UUID subscriptionId, String quotaType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Resetting quota: tenantId={}, subscriptionId={}, quotaType={}",
         tenantId,

@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  *         Product product = productRepository.save(Product.create(request));
  *
  *         eventPublisher.publish(new ProductCreatedEvent(
- *             TenantContext.getCurrentTenantId(),
+ *             TenantContext.requireTenantId(),
  *             product.getId(),
  *             product.getName()
  *         ));

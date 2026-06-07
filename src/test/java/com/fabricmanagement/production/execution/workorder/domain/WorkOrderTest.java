@@ -251,4 +251,50 @@ class WorkOrderTest {
       assertThat(wo.getDeadline()).isNull();
     }
   }
+
+  // ─── normalizeCertOrigin() ────────────────────────────────────
+
+  @Nested
+  @DisplayName("normalizeCertOrigin()")
+  class NormalizeCertOriginTests {
+
+    @Test
+    @DisplayName("uppercases and trims both fields")
+    void uppercasesAndTrims() {
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.DRAFT);
+      wo.setCertificationReq(" gots ");
+      wo.setOriginReq(" tr ");
+
+      wo.normalizeCertOrigin();
+
+      assertThat(wo.getCertificationReq()).isEqualTo("GOTS");
+      assertThat(wo.getOriginReq()).isEqualTo("TR");
+    }
+
+    @Test
+    @DisplayName("converts blank values to null")
+    void convertsBlankToNull() {
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.DRAFT);
+      wo.setCertificationReq("   ");
+      wo.setOriginReq("");
+
+      wo.normalizeCertOrigin();
+
+      assertThat(wo.getCertificationReq()).isNull();
+      assertThat(wo.getOriginReq()).isNull();
+    }
+
+    @Test
+    @DisplayName("leaves null values unchanged")
+    void leavesNullAsNull() {
+      WorkOrder wo = buildWorkOrder(WorkOrderStatus.DRAFT);
+      wo.setCertificationReq(null);
+      wo.setOriginReq(null);
+
+      wo.normalizeCertOrigin();
+
+      assertThat(wo.getCertificationReq()).isNull();
+      assertThat(wo.getOriginReq()).isNull();
+    }
+  }
 }

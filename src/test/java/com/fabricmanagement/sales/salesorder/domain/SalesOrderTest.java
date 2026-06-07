@@ -204,6 +204,30 @@ class SalesOrderTest {
   }
 
   @Test
+  void markInProgressIfConfirmed_whenConfirmed_setsInProgress() {
+    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+
+    boolean changed = order.markInProgressIfConfirmed();
+
+    assertThat(changed).isTrue();
+    assertThat(order.getStatus()).isEqualTo(OrderStatus.IN_PROGRESS);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = OrderStatus.class,
+      names = {"CONFIRMED"},
+      mode = EnumSource.Mode.EXCLUDE)
+  void markInProgressIfConfirmed_whenNotConfirmed_isNoop(OrderStatus status) {
+    SalesOrder order = SalesOrder.builder().status(status).build();
+
+    boolean changed = order.markInProgressIfConfirmed();
+
+    assertThat(changed).isFalse();
+    assertThat(order.getStatus()).isEqualTo(status);
+  }
+
+  @Test
   void cancel_whenInProgress_succeeds() {
     SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
     order.cancel();

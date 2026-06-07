@@ -44,7 +44,7 @@ public class BoardService {
     // before exposing the list."
     // Let's defer to the standard controller @PreAuthorize for access control.
     // For now, let's fetch active tenant users.
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return userFacade.findByTenant(tenantId).stream()
         .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
         .map(
@@ -57,7 +57,7 @@ public class BoardService {
   /** Tenant'ın tüm aktif board'larını listeler. */
   @Transactional(readOnly = true)
   public List<Board> getAllBoards() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return boardRepo.findAllByTenantIdAndIsActiveTrue(tenantId);
   }
 
@@ -72,7 +72,7 @@ public class BoardService {
   /** Belirli tipte board getirir. */
   @Transactional(readOnly = true)
   public Board getBoardByType(BoardType boardType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return boardRepo
         .findByTenantIdAndBoardType(tenantId, boardType)
         .orElseThrow(() -> new EntityNotFoundException("Board not found for type: " + boardType));
@@ -104,7 +104,7 @@ public class BoardService {
   /** Beklenen default board: GLOBAL eger o yoksa eldeki aktif boardlardan ilki. */
   @Transactional(readOnly = true)
   public Board getDefaultBoard() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return boardRepo
         .findByTenantIdAndBoardType(tenantId, BoardType.GLOBAL)
         .or(() -> boardRepo.findAllByTenantIdAndIsActiveTrue(tenantId).stream().findFirst())

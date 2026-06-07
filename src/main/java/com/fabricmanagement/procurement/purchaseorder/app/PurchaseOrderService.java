@@ -55,7 +55,7 @@ public class PurchaseOrderService {
   public PagedResponse<PurchaseOrderResponse> listPurchaseOrders(
       PurchaseOrderModuleType moduleType, PurchaseOrderStatus status, Pageable pageable) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Specification<PurchaseOrder> spec =
         (root, query, cb) -> {
@@ -174,7 +174,7 @@ public class PurchaseOrderService {
       if (po.getStatus() == PurchaseOrderStatus.DRAFT) {
         boolean needsApproval =
             approvalPort.requiresApproval(
-                TenantContext.getCurrentTenantId(),
+                TenantContext.requireTenantId(),
                 TenantContext.getCurrentUserId(),
                 ENTITY_TYPE,
                 po.getId(),
@@ -217,7 +217,7 @@ public class PurchaseOrderService {
   @Transactional
   public PurchaseOrderResponse changeStatusAsSystem(UUID id, PurchaseOrderStatus newStatus) {
     return TenantContext.executeInTenantContext(
-        TenantContext.getCurrentTenantId(),
+        TenantContext.requireTenantId(),
         () -> {
           TenantContext.setCurrentUserId(SystemUser.ID);
           return changeStatus(id, newStatus);

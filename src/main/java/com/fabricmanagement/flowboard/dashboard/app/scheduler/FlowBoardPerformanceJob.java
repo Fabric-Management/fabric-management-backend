@@ -5,7 +5,7 @@ import com.fabricmanagement.flowboard.dashboard.domain.BadgeType;
 import com.fabricmanagement.flowboard.dashboard.domain.UserPerformanceSnapshot;
 import com.fabricmanagement.flowboard.dashboard.infra.repository.UserPerformanceSnapshotRepository;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -30,7 +30,7 @@ public class FlowBoardPerformanceJob {
   private final UserPerformanceSnapshotRepository snapshotRepo;
   private final TaskRepository taskRepo;
   private final Clock clock;
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
   private final ObjectMapper objectMapper;
 
   private static final int POINTS_PER_COMPLETED = 10;

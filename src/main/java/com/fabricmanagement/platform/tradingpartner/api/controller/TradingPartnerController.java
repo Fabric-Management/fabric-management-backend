@@ -118,7 +118,7 @@ public class TradingPartnerController {
       summary = "List all trading partners",
       description = "Lists all active trading partners for current tenant")
   public ResponseEntity<ApiResponse<List<TradingPartnerDto>>> listPartners() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Listing trading partners for tenant: {}", tenantId);
 
     List<TradingPartnerDto> partners = tradingPartnerService.findAll(tenantId);
@@ -133,7 +133,7 @@ public class TradingPartnerController {
       description = "Gets a trading partner by ID. Supports both new ID and legacy Company ID.")
   public ResponseEntity<ApiResponse<TradingPartnerDto>> getPartner(
       @Parameter(description = "Partner ID (or legacy Company ID)") @PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting trading partner: id={}, tenant={}", id, tenantId);
 
     TradingPartnerDto partner =
@@ -147,7 +147,7 @@ public class TradingPartnerController {
   @GetMapping("/suppliers")
   @Operation(summary = "List suppliers", description = "Lists partners with type SUPPLIER or BOTH")
   public ResponseEntity<ApiResponse<List<TradingPartnerDto>>> listSuppliers() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Listing suppliers for tenant: {}", tenantId);
 
     List<TradingPartnerDto> suppliers = tradingPartnerService.findSuppliers(tenantId);
@@ -159,7 +159,7 @@ public class TradingPartnerController {
   @GetMapping("/customers")
   @Operation(summary = "List customers", description = "Lists partners with type CUSTOMER or BOTH")
   public ResponseEntity<ApiResponse<List<TradingPartnerDto>>> listCustomers() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Listing customers for tenant: {}", tenantId);
 
     List<TradingPartnerDto> customers = tradingPartnerService.findCustomers(tenantId);
@@ -171,7 +171,7 @@ public class TradingPartnerController {
   @GetMapping("/fason")
   @Operation(summary = "List fason partners", description = "Lists subcontractor (fason) partners")
   public ResponseEntity<ApiResponse<List<TradingPartnerDto>>> listFasonPartners() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Listing fason partners for tenant: {}", tenantId);
 
     List<TradingPartnerDto> fasonPartners = tradingPartnerService.findFasonPartners(tenantId);
@@ -186,7 +186,7 @@ public class TradingPartnerController {
       description = "Lists partners by specific type. For SUPPLIER/CUSTOMER, also includes BOTH.")
   public ResponseEntity<ApiResponse<List<TradingPartnerDto>>> listByType(
       @Parameter(description = "Partner type") @PathVariable PartnerType type) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Listing partners by type: type={}, tenant={}", type, tenantId);
 
     List<TradingPartnerDto> partners = tradingPartnerService.findByType(tenantId, type);
@@ -201,7 +201,7 @@ public class TradingPartnerController {
       description = "Searches partners by name (custom name or official name)")
   public ResponseEntity<ApiResponse<List<TradingPartnerDto>>> searchPartners(
       @Parameter(description = "Search term") @RequestParam String q) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Searching partners: term={}, tenant={}", q, tenantId);
 
     List<TradingPartnerDto> results = tradingPartnerService.searchByName(tenantId, q);
@@ -220,7 +220,7 @@ public class TradingPartnerController {
       summary = "Suspend partner",
       description = "Suspends a partner relationship. No new transactions allowed.")
   public ResponseEntity<ApiResponse<Void>> suspendPartner(@PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Suspending partner: id={}, tenant={}", id, tenantId);
 
     tradingPartnerService.suspend(tenantId, id);
@@ -234,7 +234,7 @@ public class TradingPartnerController {
       summary = "Block partner",
       description = "Blocks a partner relationship. Relationship is terminated.")
   public ResponseEntity<ApiResponse<Void>> blockPartner(@PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Blocking partner: id={}, tenant={}", id, tenantId);
 
     tradingPartnerService.block(tenantId, id);
@@ -248,7 +248,7 @@ public class TradingPartnerController {
       summary = "Reactivate partner",
       description = "Reactivates a suspended or pending partner")
   public ResponseEntity<ApiResponse<Void>> reactivatePartner(@PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Reactivating partner: id={}, tenant={}", id, tenantId);
 
     tradingPartnerService.reactivate(tenantId, id);
@@ -260,7 +260,7 @@ public class TradingPartnerController {
   @PreAuthorize("hasRole('ADMIN')")
   @Operation(summary = "Delete partner", description = "Soft-deletes a partner relationship")
   public ResponseEntity<ApiResponse<Void>> deletePartner(@PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Deleting partner: id={}, tenant={}", id, tenantId);
 
     tradingPartnerService.delete(tenantId, id);

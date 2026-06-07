@@ -68,7 +68,7 @@ public class AuditService {
   @Async
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void logAction(String action, String resource, String resourceId, String description) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID userId = TenantContext.getCurrentUserId();
 
     String userUid =
@@ -89,7 +89,7 @@ public class AuditService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void logSecurityEvent(
       String action, String description, String ipAddress, AuditSeverity severity) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID userId = TenantContext.getCurrentUserId();
 
     AuditLog auditLog =
@@ -104,14 +104,14 @@ public class AuditService {
   /** Get audit logs for tenant. */
   @Transactional(readOnly = true)
   public Page<AuditLog> getAuditLogs(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return auditLogRepository.findByTenantIdOrderByTimestampDesc(tenantId, pageable);
   }
 
   /** Get audit logs by user. */
   @Transactional(readOnly = true)
   public Page<AuditLog> getAuditLogsByUser(UUID userId, Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return auditLogRepository.findByTenantIdAndUserIdOrderByTimestampDesc(
         tenantId, userId, pageable);
   }
@@ -119,7 +119,7 @@ public class AuditService {
   /** Get audit logs by resource. */
   @Transactional(readOnly = true)
   public Page<AuditLog> getAuditLogsByResource(String resource, Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return auditLogRepository.findByTenantIdAndResourceOrderByTimestampDesc(
         tenantId, resource, pageable);
   }
@@ -127,14 +127,14 @@ public class AuditService {
   /** Get audit logs by time range. */
   @Transactional(readOnly = true)
   public List<AuditLog> getAuditLogsByTimeRange(Instant start, Instant end) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return auditLogRepository.findByTenantIdAndTimestampBetween(tenantId, start, end);
   }
 
   /** Get critical/error audit logs for security monitoring. */
   @Transactional(readOnly = true)
   public List<AuditLog> getCriticalLogs() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return auditLogRepository.findByTenantIdAndSeverity(tenantId, AuditSeverity.CRITICAL);
   }
 }

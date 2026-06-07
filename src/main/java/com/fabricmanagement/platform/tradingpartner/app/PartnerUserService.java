@@ -72,7 +72,7 @@ public class PartnerUserService {
    */
   @Transactional
   public PartnerUserDto inviteUser(UUID partnerId, InvitePartnerUserRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     TradingPartner partner = resolvePartner(tenantId, partnerId);
     validatePartnerRoleCode(request.getPartnerRoleCode());
@@ -153,7 +153,7 @@ public class PartnerUserService {
   private PartnerUserDto handleExistingUserInvitation(
       User user, TradingPartner partner, UUID partnerId, InvitePartnerUserRequest request) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     if (!partner.getOrganizationId().equals(user.getOrganizationId())) {
       throw new IllegalArgumentException(
@@ -200,7 +200,7 @@ public class PartnerUserService {
    */
   @Transactional(readOnly = true)
   public List<PartnerUserDto> listUsers(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner = resolvePartner(tenantId, partnerId);
 
     // Include both active and suspended users so the UI can show all states
@@ -224,7 +224,7 @@ public class PartnerUserService {
   @Transactional
   public PartnerUserDto updateRole(
       UUID partnerId, UUID userId, UpdatePartnerUserRoleRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner = resolvePartner(tenantId, partnerId);
     User user = resolvePartnerUser(tenantId, partner, userId);
 
@@ -257,7 +257,7 @@ public class PartnerUserService {
    */
   @Transactional
   public void suspendUser(UUID partnerId, UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner = resolvePartner(tenantId, partnerId);
     User user = resolvePartnerUser(tenantId, partner, userId);
 
@@ -275,7 +275,7 @@ public class PartnerUserService {
    */
   @Transactional
   public PartnerUserDto reactivateUser(UUID partnerId, UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner = resolvePartner(tenantId, partnerId);
 
     // Include inactive users for reactivation
@@ -301,7 +301,7 @@ public class PartnerUserService {
    */
   @Transactional
   public void removeUser(UUID partnerId, UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner = resolvePartner(tenantId, partnerId);
 
     User user =

@@ -1,14 +1,13 @@
 package com.fabricmanagement.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.communication.domain.Notification;
 import com.fabricmanagement.platform.communication.domain.NotificationDeliveryChannel;
 import com.fabricmanagement.platform.communication.domain.NotificationType;
 import com.fabricmanagement.platform.communication.dto.NotificationRequest;
 import com.fabricmanagement.platform.communication.infra.repository.NotificationRepository;
-import com.fabricmanagement.platform.tenant.domain.TenantType;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserContactRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
@@ -44,7 +43,7 @@ public class InAppNotificationService {
   private final UserRepository userRepository;
   private final UserContactRepository userContactRepository;
   private final NotificationService notificationService;
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
 
   /**
    * Send notification: save to DB and optionally send email if channel is EMAIL or BOTH.
@@ -221,9 +220,10 @@ public class InAppNotificationService {
     if (tenantId == null) {
       return false;
     }
-    return tenantRepository
+    // Uses TenantQueryPort (BYPASSRLS)
+    return tenantQueryPort
         .findById(tenantId)
-        .map(tenant -> tenant.getType() == TenantType.PLAYGROUND)
+        .map(ref -> "PLAYGROUND".equals(ref.type()))
         .orElse(false);
   }
 }

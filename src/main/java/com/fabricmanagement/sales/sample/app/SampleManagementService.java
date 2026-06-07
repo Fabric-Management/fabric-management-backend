@@ -28,19 +28,19 @@ public class SampleManagementService {
 
   @Transactional(readOnly = true)
   public Page<SampleRequest> findAll(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return requestRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
   }
 
   @Transactional(readOnly = true)
   public Optional<SampleRequest> findById(UUID requestId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return requestRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId);
   }
 
   @Transactional
   public SampleRequest requestSample(SampleRequest request) {
-    request.setTenantId(TenantContext.getCurrentTenantId());
+    request.setTenantId(TenantContext.requireTenantId());
     request.setStatus(SampleRequestStatus.REQUESTED);
     return requestRepository.save(request);
   }
@@ -83,7 +83,7 @@ public class SampleManagementService {
 
   @Transactional
   public SampleDelivery markAsDelivered(UUID deliveryId, String recipientName, String photoUrl) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Fix #6: tenant-isolated delivery lookup
     SampleDelivery delivery =
@@ -104,7 +104,7 @@ public class SampleManagementService {
   }
 
   private SampleRequest getActiveRequest(UUID requestId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return requestRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId)
         .orElseThrow(() -> new NotFoundException("Sample request not found: " + requestId));

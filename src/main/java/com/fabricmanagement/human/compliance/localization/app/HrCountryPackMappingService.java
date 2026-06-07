@@ -23,7 +23,7 @@ public class HrCountryPackMappingService {
 
   @Transactional
   public HrCountryPackMapping assign(String countryCode, String packCode) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String normalizedCountry = normalize(countryCode);
     String normalizedPackCode = packCode.toUpperCase(Locale.ROOT);
     HrPolicyPack pack = resolvePackForMapping(tenantId, normalizedPackCode);

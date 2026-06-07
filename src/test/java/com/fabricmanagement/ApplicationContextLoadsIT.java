@@ -42,10 +42,28 @@ class ApplicationContextLoadsIT {
 
   @DynamicPropertySource
   static void configureDatasource(DynamicPropertyRegistry registry) {
+    // Init: fabric_app rol oluştur (container default user = owner)
+    try (var conn =
+        java.sql.DriverManager.getConnection(
+            postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+      conn.createStatement()
+          .execute(
+              "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'test'");
+      // D3: GRANT ALL ON DATABASE YOK — tablo grant'leri migration'dan gelir
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException("Failed to create fabric_app role", e);
+    }
+
+    // Runtime datasource → fabric_app (NOBYPASSRLS)
     registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
+    registry.add("spring.datasource.username", () -> "fabric_app");
+    registry.add("spring.datasource.password", () -> "test");
     registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+
+    // Flyway → container default user (owner, tabloları oluşturan)
+    registry.add("spring.flyway.url", postgres::getJdbcUrl);
+    registry.add("spring.flyway.user", postgres::getUsername);
+    registry.add("spring.flyway.password", postgres::getPassword);
   }
 
   @Autowired private ApplicationContext context;

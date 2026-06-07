@@ -30,7 +30,7 @@ public class RoleController {
   @Cacheable(
       value = "roles",
       key =
-          "T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).getCurrentTenantId()")
+          "T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).requireTenantId()")
   public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRoles() {
     log.debug("Getting all roles");
 

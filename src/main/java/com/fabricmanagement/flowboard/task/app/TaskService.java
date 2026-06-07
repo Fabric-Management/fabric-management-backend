@@ -111,7 +111,7 @@ public class TaskService {
     // [EV1 FIX] TaskCreatedEvent artık yayınlanıyor.
     eventPublisher.publish(
         new TaskCreatedEvent(
-            TenantContext.getCurrentTenantId(),
+            TenantContext.requireTenantId(),
             saved.getId(),
             req.boardId(),
             taskNumber,
@@ -154,7 +154,7 @@ public class TaskService {
       long currentWip = taskRepo.countInProgressByUser(requestingUserId);
       int wipLimit =
           userFacade
-              .findById(TenantContext.getCurrentTenantId(), requestingUserId)
+              .findById(TenantContext.requireTenantId(), requestingUserId)
               .map(dto -> dto.getWipLimit() != null ? dto.getWipLimit() : DEFAULT_WIP_LIMIT)
               .orElse(DEFAULT_WIP_LIMIT);
 
@@ -187,7 +187,7 @@ public class TaskService {
     // [B2+EV1 FIX] Domain event yayınla — WS publish AFTER_COMMIT'te yapılacak
     eventPublisher.publish(
         new TaskStatusChangedEvent(
-            TenantContext.getCurrentTenantId(),
+            TenantContext.requireTenantId(),
             taskId,
             task.getBoardId(),
             oldStatus.name(),
@@ -233,7 +233,7 @@ public class TaskService {
     List<UUID> taskIds = tasks.stream().map(Task::getId).toList();
     List<TaskAssignee> allAssignees = assigneeRepo.findAllByTaskIdInAndIsActiveTrue(taskIds);
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<com.fabricmanagement.platform.user.dto.UserDto> allTenantUsers =
         userFacade.findByTenant(tenantId);
     Map<UUID, com.fabricmanagement.platform.user.dto.UserDto> userMap = new HashMap<>();
@@ -373,8 +373,7 @@ public class TaskService {
     // [O1 FIX] assignedByUserId artık dışarıdan alınıyor — kim atadığı bilgisi korunuyor.
     UUID assignedByUserId = (assignedBy == AssignedBy.SYSTEM) ? SystemUser.ID : requestedByUserId;
     eventPublisher.publish(
-        new TaskAssignedEvent(
-            TenantContext.getCurrentTenantId(), taskId, userId, assignedByUserId));
+        new TaskAssignedEvent(TenantContext.requireTenantId(), taskId, userId, assignedByUserId));
 
     log.info("Task assigned: taskId={} userId={} assignedBy={}", taskId, userId, assignedBy);
   }
@@ -390,7 +389,7 @@ public class TaskService {
         .map(
             a -> {
               if (a.getUserId() == null) return null;
-              var userOpt = userFacade.findById(TenantContext.getCurrentTenantId(), a.getUserId());
+              var userOpt = userFacade.findById(TenantContext.requireTenantId(), a.getUserId());
 
               String fullName =
                   userOpt
@@ -437,7 +436,7 @@ public class TaskService {
 
     eventPublisher.publish(
         new com.fabricmanagement.flowboard.task.domain.event.TaskUnassignedEvent(
-            TenantContext.getCurrentTenantId(), taskId, userId, requestedByUserId));
+            TenantContext.requireTenantId(), taskId, userId, requestedByUserId));
 
     log.info(
         "Task unassigned: taskId={} userId={} unassignedBy={}", taskId, userId, requestedByUserId);
@@ -467,7 +466,7 @@ public class TaskService {
     // Domain event yayınla — TaskStatusChangedEvent üzerinden WS yayını AFTER_COMMIT'te yapılır
     eventPublisher.publish(
         new TaskStatusChangedEvent(
-            TenantContext.getCurrentTenantId(),
+            TenantContext.requireTenantId(),
             taskId,
             task.getBoardId(),
             oldStatus.name(),

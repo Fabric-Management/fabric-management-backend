@@ -27,7 +27,7 @@ public class AIFunctionCaller {
    * @return function result as string
    */
   public String executeFunction(String functionName, Map<String, Object> parameters) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Executing AI function: functionName={}, tenantId={}", functionName, tenantId);
     return toolRegistry.execute(tenantId, functionName, parameters);
   }

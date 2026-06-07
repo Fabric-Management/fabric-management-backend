@@ -34,7 +34,7 @@ public class ApprovalPolicyController {
   @GetMapping
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
   public ResponseEntity<ApiResponse<List<ApprovalPolicyResponse>>> getAllPolicies() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<ApprovalPolicyResponse> response =
         policyService.getAllPolicies(tenantId).stream().map(ApprovalPolicyResponse::from).toList();
     return ResponseEntity.ok(ApiResponse.success(response));
@@ -45,7 +45,7 @@ public class ApprovalPolicyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> getActivePolicy(
       @PathVariable ApprovalEntityType entityType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return ResponseEntity.ok(
         ApiResponse.success(
             ApprovalPolicyResponse.from(
@@ -62,7 +62,7 @@ public class ApprovalPolicyController {
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> createPolicy(
       @RequestBody @Valid CreatePolicyRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     ApprovalPolicy policy =
         policyService.createPolicy(
             tenantId,
@@ -80,7 +80,7 @@ public class ApprovalPolicyController {
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> updatePolicy(
       @PathVariable UUID policyId, @RequestBody @Valid UpdatePolicyRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     ApprovalPolicy policy =
         policyService.updatePolicy(
             tenantId,
@@ -98,7 +98,7 @@ public class ApprovalPolicyController {
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> togglePolicy(
       @PathVariable UUID policyId, @RequestParam boolean active) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     ApprovalPolicy policy = policyService.togglePolicy(tenantId, policyId, active);
     return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }

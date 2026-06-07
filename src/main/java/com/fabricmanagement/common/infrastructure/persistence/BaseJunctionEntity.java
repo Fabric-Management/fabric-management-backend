@@ -130,7 +130,7 @@ public abstract class BaseJunctionEntity implements Serializable {
   @PrePersist
   protected void onCreate() {
     if (this.tenantId == null) {
-      this.tenantId = TenantContext.getCurrentTenantId();
+      this.tenantId = TenantContext.requireTenantId();
     }
 
     // Auto-generate UID if not set (simplified - can be enhanced with UIDGenerator)

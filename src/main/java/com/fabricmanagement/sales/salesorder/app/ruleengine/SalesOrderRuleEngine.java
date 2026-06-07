@@ -1,5 +1,7 @@
 package com.fabricmanagement.sales.salesorder.app.ruleengine;
 
+import com.fabricmanagement.common.domain.event.production.WorkOrderRecipeAssignmentNeededEvent;
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -41,6 +43,7 @@ public class SalesOrderRuleEngine {
   private final SalesOrderLineRepository lineRepository;
   private final ProductionOrderPort productionOrderPort;
   private final WorkOrderRecipeHistoryQuery historyQuery;
+  private final DomainEventPublisher domainEventPublisher;
 
   /**
    * Processes all PENDING lines of a confirmed SalesOrder: runs recipe matching and creates a
@@ -88,7 +91,19 @@ public class SalesOrderRuleEngine {
     }
 
     // Create WorkOrder (DRAFT) regardless of recipe availability
-    createDraftWorkOrder(order, line, recipeId.orElse(null), certificationReq, originReq);
+    UUID workOrderId =
+        createDraftWorkOrder(order, line, recipeId.orElse(null), certificationReq, originReq);
+
+    if (recipeId.isEmpty()) {
+      domainEventPublisher.publish(
+          new WorkOrderRecipeAssignmentNeededEvent(
+              tenantId, workOrderId, line.getId(), certificationReq, originReq));
+      log.info(
+          "RuleEngine: No recipe found for line {} — published WorkOrderRecipeAssignmentNeededEvent (cert={}, origin={})",
+          line.getId(),
+          certificationReq,
+          originReq);
+    }
   }
 
   /** 4-step cascade recipe matching. */
@@ -138,8 +153,8 @@ public class SalesOrderRuleEngine {
     return Optional.empty();
   }
 
-  /** Creates a DRAFT WorkOrder linked to the SalesOrderLine. */
-  private void createDraftWorkOrder(
+  /** Creates a DRAFT WorkOrder linked to the SalesOrderLine and returns its UUID. */
+  private UUID createDraftWorkOrder(
       SalesOrder order,
       SalesOrderLine line,
       UUID recipeId,
@@ -157,11 +172,13 @@ public class SalesOrderRuleEngine {
             certificationReq,
             originReq);
 
-    productionOrderPort.requestDraftProductionOrder(cmd);
+    UUID workOrderId = productionOrderPort.requestDraftProductionOrder(cmd);
     log.info(
-        "RuleEngine: WorkOrder (DRAFT) created for SalesOrderLine {} (recipe={})",
+        "RuleEngine: WorkOrder (DRAFT) created for SalesOrderLine {} (recipe={}, workOrder={})",
         line.getId(),
-        recipeId);
+        recipeId,
+        workOrderId);
+    return workOrderId;
   }
 
   private String extractSpecField(SalesOrderLine line, String fieldName) {

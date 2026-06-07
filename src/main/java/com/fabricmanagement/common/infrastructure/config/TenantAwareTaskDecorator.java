@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.config;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.task.TaskDecorator;
 import org.springframework.lang.NonNull;
 
@@ -15,6 +16,7 @@ import org.springframework.lang.NonNull;
  * @see AsyncConfig
  * @see TenantContext
  */
+@Slf4j
 public class TenantAwareTaskDecorator implements TaskDecorator {
 
   @Override
@@ -24,6 +26,12 @@ public class TenantAwareTaskDecorator implements TaskDecorator {
     String tenantUid = TenantContext.getCurrentTenantUid();
     UUID userId = TenantContext.getCurrentUserId();
     String country = TenantContext.getCurrentTenantCountry();
+
+    if (tenantId == null) {
+      log.warn(
+          "TenantAwareTaskDecorator: No tenantId in ThreadLocal at capture time. "
+              + "Async task will rely on event-payload restoration via aspect.");
+    }
 
     return () -> {
       try {

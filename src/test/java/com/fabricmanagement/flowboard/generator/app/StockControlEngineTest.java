@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.flowboard.generator.domain.port.out.StockQueryPort;
 import com.fabricmanagement.flowboard.task.domain.TaskType;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
@@ -11,6 +12,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +30,16 @@ class StockControlEngineTest {
   @InjectMocks private StockControlEngine engine;
 
   private static final UUID TENANT_ID = UUID.randomUUID();
+
+  @BeforeEach
+  void setUp() {
+    TenantContext.setCurrentTenantId(TENANT_ID);
+  }
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
+  }
 
   @Test
   @DisplayName("Herhangi bir sipariş için PRODUCTION task kararı döner (stub)")

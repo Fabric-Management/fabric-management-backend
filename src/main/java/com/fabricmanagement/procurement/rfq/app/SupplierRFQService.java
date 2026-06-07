@@ -35,7 +35,7 @@ public class SupplierRFQService {
   @Transactional
   public SupplierRFQ createRfq(CreateSupplierRFQRequest req) {
     SupplierRFQ rfq = new SupplierRFQ();
-    rfq.setTenantId(TenantContext.getCurrentTenantId());
+    rfq.setTenantId(TenantContext.requireTenantId());
 
     // Fix #7 — Yıl dinamik hesaplanıyor (hard-coded 2026 değil)
     String year = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy"));
@@ -136,7 +136,7 @@ public class SupplierRFQService {
    * olan RFQ'lara mutasyon yapılamaz.
    */
   private SupplierRFQ getActiveDraftRfq(UUID rfqId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     SupplierRFQ rfq =
         rfqRepository
             .findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId)

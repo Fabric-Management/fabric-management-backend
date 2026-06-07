@@ -84,8 +84,7 @@ public class SyncController {
   public ResponseEntity<SyncPullResponse> pullReferenceData(@Valid SyncPullRequest request) {
     log.info("Received sync pull request: lastSync={}", request.getLastSyncTimestamp());
 
-    SyncPullResponse response =
-        syncService.processPull(TenantContext.getCurrentTenantId(), request);
+    SyncPullResponse response = syncService.processPull(TenantContext.requireTenantId(), request);
 
     return ResponseEntity.ok(response);
   }

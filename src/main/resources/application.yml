@@ -249,3 +249,14 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
   show-actuator: false
+
+# JobRunr — DDL disabled; tables pre-created by Flyway (owner role)
+org:
+  jobrunr:
+    database:
+      skip-create: true
+      table-prefix: "public."
+    background-job-server:
+      enabled: true
+    dashboard:
+      enabled: false

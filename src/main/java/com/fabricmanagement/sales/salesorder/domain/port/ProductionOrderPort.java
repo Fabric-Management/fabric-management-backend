@@ -1,5 +1,7 @@
 package com.fabricmanagement.sales.salesorder.domain.port;
 
+import java.util.UUID;
+
 public interface ProductionOrderPort {
-  void requestDraftProductionOrder(DraftProductionOrderCommand command);
+  UUID requestDraftProductionOrder(DraftProductionOrderCommand command);
 }

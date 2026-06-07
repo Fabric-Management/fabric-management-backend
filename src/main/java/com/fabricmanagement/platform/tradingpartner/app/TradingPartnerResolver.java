@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
  *     private final TradingPartnerResolver partnerResolver;
  *
  *     public void createOrder(CreateOrderRequest request) {
- *         UUID tenantId = TenantContext.getCurrentTenantId();
+ *         UUID tenantId = TenantContext.requireTenantId();
  *         // Resolves both new and legacy partner IDs
  *         UUID partnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
  *         // Use resolved partnerId...

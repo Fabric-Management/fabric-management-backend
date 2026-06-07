@@ -35,6 +35,10 @@ public interface StockUnitRepository extends JpaRepository<StockUnit, UUID> {
 
   Page<StockUnit> findByTenantIdAndLocationId(UUID tenantId, UUID locationId, Pageable pageable);
 
+  boolean existsByTenantIdAndBatchIdAndIsActiveTrue(UUID tenantId, UUID batchId);
+
+  boolean existsByTenantIdAndBatchIdInAndIsActiveTrue(UUID tenantId, List<UUID> batchIds);
+
   /**
    * Returns the sum of current weights for all non-disposed, active stock units of a batch. Used by
    * {@code StockUnitReconciliationService} to compare against {@code Batch.quantity}.

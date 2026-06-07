@@ -187,7 +187,7 @@ public abstract class BaseEntity implements Serializable, Persistable<UUID> {
   @PrePersist
   protected void onCreate() {
     if (this.tenantId == null) {
-      this.tenantId = TenantContext.getCurrentTenantId();
+      this.tenantId = TenantContext.requireTenantId();
     }
 
     // Auto-generate UID if not set

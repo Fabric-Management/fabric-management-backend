@@ -36,7 +36,7 @@ public class UserNavPreferencesController {
   public ResponseEntity<ApiResponse<NavPreferencesResponse>> getNavPreferences(
       @PathVariable UUID id) {
     ensureSelf(id);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     NavPreferencesResponse data = userNavPreferencesService.getPreferences(tenantId, id);
     return ResponseEntity.ok(ApiResponse.success(data));
   }
@@ -51,7 +51,7 @@ public class UserNavPreferencesController {
   public ResponseEntity<ApiResponse<NavPreferencesResponse>> patchNavPreferences(
       @PathVariable UUID id, @Valid @RequestBody NavPreferencesRequest request) {
     ensureSelf(id);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     NavPreferencesResponse data =
         userNavPreferencesService.upsertPreferences(tenantId, id, request);
     return ResponseEntity.ok(ApiResponse.success(data));

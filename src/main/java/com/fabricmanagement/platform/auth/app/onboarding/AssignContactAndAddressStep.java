@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * <p>Creates address/contact via Communication module, then assigns to organization using
  * CompanyAddressAssignmentService and CompanyContactAssignmentService (common_organization table).
  */
-@Order(5) // After CreateAdminUserStep (4)
+@Order(6) // After CreateAdminUserStep (5)
 @Component
 @RequiredArgsConstructor
 @Slf4j

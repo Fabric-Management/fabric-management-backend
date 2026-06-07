@@ -130,7 +130,7 @@ class UserProfileServiceTest {
       when(permissionService.canUpdateWorkProfile(REQUESTER_ID, USER_ID)).thenReturn(true);
       when(userRepository.findByTenantIdAndId(TENANT_ID, USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-      when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
+      when(employeeProjectionPort.findByUserId(TENANT_ID, USER_ID)).thenReturn(Optional.empty());
 
       UserDto result = service.updateProfile(USER_ID, request, REQUESTER_ID);
 
@@ -187,7 +187,7 @@ class UserProfileServiceTest {
           .thenReturn(contact);
       when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
           .thenReturn(false);
-      when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
+      when(employeeProjectionPort.findByUserId(TENANT_ID, USER_ID)).thenReturn(Optional.empty());
 
       UserDto result = service.updateProfile(USER_ID, request, REQUESTER_ID);
 

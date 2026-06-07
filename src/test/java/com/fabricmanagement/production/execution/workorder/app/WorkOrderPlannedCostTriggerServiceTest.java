@@ -210,8 +210,8 @@ class WorkOrderPlannedCostTriggerServiceTest {
               eq(TRADING_PARTNER_ID));
 
       assertThat(response).isNotNull();
-      assertThat(response.getPlannedCost()).isEqualTo(computedCost);
-      assertThat(response.getPlannedCostCurrency()).isEqualTo("TRY");
+      assertThat(response.plannedCost()).isEqualTo(computedCost);
+      assertThat(response.plannedCostCurrency()).isEqualTo("TRY");
     }
 
     @Test

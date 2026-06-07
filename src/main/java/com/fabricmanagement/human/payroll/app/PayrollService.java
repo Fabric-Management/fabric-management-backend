@@ -44,7 +44,7 @@ public class PayrollService {
     PayRun payRun = payRunService.getPayRun(payRunId);
     PayPeriod period = payRun.getPayPeriod();
     payrollComplianceService.validatePayRun(payRun);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     var policyPack =
         hrPolicyPackService
             .findActiveByPackCode(tenantId, payRun.getPolicyPackCode())

@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: ${DATABASE_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    username: ${DB_APP_USERNAME}
+    password: ${DB_APP_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
@@ -11,6 +11,11 @@ spring:
       idle-timeout: ${DB_IDLE_TIMEOUT:600000}
       max-lifetime: ${DB_MAX_LIFETIME:1800000}
       leak-detection-threshold: ${DB_LEAK_DETECTION_THRESHOLD:60000}
+
+  flyway:
+    url: ${DATABASE_URL}
+    user: ${DB_OWNER_USERNAME}
+    password: ${DB_OWNER_PASSWORD}
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}

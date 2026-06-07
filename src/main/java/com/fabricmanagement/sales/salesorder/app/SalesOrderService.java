@@ -12,6 +12,7 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
+import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -77,7 +78,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto createOrder(CreateSalesOrderRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Resolve partner ID (handles both new and legacy IDs)
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
@@ -118,7 +119,7 @@ public class SalesOrderService {
             .shippingMethod(request.getShippingMethod())
             .notes(request.getNotes())
             .metadata(request.getMetadata())
-            .moduleType(request.getModuleType())
+            .moduleType(deriveOrderModuleTypeFromRequests(request.getLines()))
             .deadline(request.getDeadline())
             .quoteId(request.getQuoteId())
             .sampleRequestId(request.getSampleRequestId())
@@ -163,7 +164,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto updateOrder(UUID orderId, UpdateSalesOrderRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // 1. Fetch managed entity (Hibernate loads version)
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
@@ -245,7 +246,7 @@ public class SalesOrderService {
             request.getShippingMethod(),
             request.getNotes(),
             request.getMetadata(),
-            request.getModuleType(),
+            deriveOrderModuleType(syncedLines),
             request.getDeadline());
 
     order.updateDraft(cmd); // throws 409 if not DRAFT
@@ -323,7 +324,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public Optional<SalesOrderDto> findById(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
         .findByTenantIdAndId(tenantId, orderId)
@@ -350,7 +351,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public Optional<SalesOrderDto> findByOrderNumber(String orderNumber) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
         .findByTenantIdAndOrderNumber(tenantId, orderNumber)
@@ -365,7 +366,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findByPartner(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Resolve partner ID to ensure we query with the correct ID
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
@@ -383,7 +384,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findByStatus(OrderStatus status) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository.findByTenantIdAndStatus(tenantId, status).stream()
         .map(SalesOrderDto::from)
@@ -397,7 +398,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findOpenOrders() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository.findOpenOrders(tenantId).stream().map(SalesOrderDto::from).toList();
   }
@@ -409,7 +410,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findOverdueOrders() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository.findOverdueOrders(tenantId, LocalDate.now()).stream()
         .map(SalesOrderDto::from)
@@ -424,7 +425,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public Page<SalesOrderDto> findAll(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
         .findByTenantIdAndIsActiveTrue(tenantId, pageable)
@@ -443,7 +444,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto confirmOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
 
@@ -501,14 +502,32 @@ public class SalesOrderService {
     return units.size() == 1 ? units.iterator().next() : null;
   }
 
+  /**
+   * Tüm aktif satırlar aynı moduleType'a sahipse o değeri döner; satır yoksa veya karışık
+   * moduleType varsa null döner. Null line moduleType değerleri deriveOrderUnit ile tutarlı şekilde
+   * yok sayılır.
+   */
+  private ModuleType deriveOrderModuleType(List<SalesOrderLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    Set<ModuleType> moduleTypes =
+        lines.stream()
+            .filter(line -> Boolean.TRUE.equals(line.getIsActive()))
+            .map(SalesOrderLine::getModuleType)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return moduleTypes.size() == 1 ? moduleTypes.iterator().next() : null;
+  }
+
   /** Confirm an order as SystemUser (called after approval callback). */
   @Transactional
   public SalesOrderDto confirmOrderAsSystem(UUID orderId) {
     return TenantContext.executeInTenantContext(
-        TenantContext.getCurrentTenantId(),
+        TenantContext.requireTenantId(),
         () -> {
           TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
-          UUID tenantId = TenantContext.getCurrentTenantId();
+          UUID tenantId = TenantContext.requireTenantId();
           SalesOrder order = getOrderOrThrow(tenantId, orderId);
           order.confirmFromApproval();
           return finalizeConfirmation(order, tenantId);
@@ -575,7 +594,7 @@ public class SalesOrderService {
   /** Reject an order (called after approval rejection callback). */
   @Transactional
   public void rejectOrder(UUID orderId, String reason) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.reject(reason);
     orderRepository.save(order);
@@ -590,7 +609,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto startProcessing(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.startProcessing();
@@ -608,7 +627,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto shipOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.ship();
@@ -627,7 +646,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto deliverOrder(UUID orderId, LocalDate deliveryDate) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.deliver(deliveryDate);
@@ -645,7 +664,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto cancelOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
 
@@ -674,7 +693,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto holdOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.hold();
@@ -695,7 +714,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto resumeOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.resume();
@@ -713,7 +732,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto reviseOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.reviseRejected();
@@ -730,7 +749,7 @@ public class SalesOrderService {
    */
   @Transactional
   public void deleteOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
 
@@ -774,6 +793,18 @@ public class SalesOrderService {
         .filter(line -> line.getUnitPrice() != null)
         .map(line -> line.getUnitPrice().multiply(line.getRequestedQty()))
         .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private ModuleType deriveOrderModuleTypeFromRequests(List<SalesOrderLineRequest> lines) {
+    if (lines == null || lines.isEmpty()) {
+      return null;
+    }
+    Set<ModuleType> moduleTypes =
+        lines.stream()
+            .map(SalesOrderLineRequest::getModuleType)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return moduleTypes.size() == 1 ? moduleTypes.iterator().next() : null;
   }
 
   private void validateDiscountDoesNotExceedTotal(

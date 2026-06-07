@@ -144,7 +144,7 @@ public class OrganizationService {
    */
   @Transactional(readOnly = true)
   public Optional<OrganizationDto> findById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return organizationRepository.findByTenantIdAndId(tenantId, id).map(OrganizationDto::from);
   }
 
@@ -167,7 +167,7 @@ public class OrganizationService {
    */
   @Transactional(readOnly = true)
   public List<OrganizationDto> getAllActive() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return organizationRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
         .map(OrganizationDto::from)
         .toList();
@@ -181,7 +181,7 @@ public class OrganizationService {
    */
   @Transactional(readOnly = true)
   public List<OrganizationDto> getByType(OrganizationType organizationType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return organizationRepository
         .findByTenantIdAndOrganizationType(tenantId, organizationType)
         .stream()
@@ -197,7 +197,7 @@ public class OrganizationService {
    */
   @Transactional(readOnly = true)
   public List<OrganizationDto> getChildren(UUID parentOrganizationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return organizationRepository
         .findByTenantIdAndParentOrganizationId(tenantId, parentOrganizationId)
         .stream()
@@ -212,7 +212,7 @@ public class OrganizationService {
    */
   @Transactional(readOnly = true)
   public Optional<OrganizationDto> getRootOrganization() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return organizationRepository
         .findRootOrganization(tenantId, OrganizationType.EXTERNAL_PARTNER)
         .map(OrganizationDto::from);
@@ -281,7 +281,7 @@ public class OrganizationService {
    */
   @Transactional
   public OrganizationDto updateOrganization(UUID id, String name, String taxId, String legalName) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Organization organization =
         organizationRepository
             .findByTenantIdAndId(tenantId, id)
@@ -314,7 +314,7 @@ public class OrganizationService {
    */
   @Transactional
   public void deactivateOrganization(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Organization organization =
         organizationRepository
             .findByTenantIdAndId(tenantId, id)

@@ -57,6 +57,9 @@ class DocumentNumberGeneratorConcurrencyIT {
     registry.add("spring.datasource.url", postgres::getJdbcUrl);
     registry.add("spring.datasource.username", postgres::getUsername);
     registry.add("spring.datasource.password", postgres::getPassword);
+    registry.add("spring.flyway.url", postgres::getJdbcUrl);
+    registry.add("spring.flyway.user", postgres::getUsername);
+    registry.add("spring.flyway.password", postgres::getPassword);
     registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
   }
 

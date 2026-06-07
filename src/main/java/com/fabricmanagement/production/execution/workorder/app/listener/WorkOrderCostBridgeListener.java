@@ -1,6 +1,5 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostRecalculationService;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -33,9 +32,6 @@ public class WorkOrderCostBridgeListener {
         event.getWorkOrderId());
 
     try {
-      // Belt-and-suspenders: REQUIRES_NEW opens a new transaction; TenantContext
-      // is thread-local and normally preserved, but set it explicitly to be safe.
-      TenantContext.setCurrentTenantId(event.getTenantId());
       costRecalculationService.recalculateActualCost(event.getWorkOrderId());
     } catch (Exception e) {
       log.error(

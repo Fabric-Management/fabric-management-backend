@@ -44,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <pre>{@code
  * @PostMapping("/blend")
  * public ResponseEntity<?> createBlend(@RequestBody CreateBlendRequest request) {
- *     UUID tenantId = TenantContext.getCurrentTenantId();
+ *     UUID tenantId = TenantContext.requireTenantId();
  *
  *     // 4-Layer check
  *     subscriptionService.enforceEntitlement(

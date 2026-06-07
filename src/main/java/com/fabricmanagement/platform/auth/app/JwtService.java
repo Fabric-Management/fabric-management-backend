@@ -1,10 +1,10 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import io.jsonwebtoken.Claims;
@@ -54,17 +54,17 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class JwtService {
 
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
   private final OrganizationRepository organizationRepository;
   private final SecretKey secretKey;
   private final long accessTokenExpiration;
 
   public JwtService(
-      TenantRepository tenantRepository,
+      TenantQueryPort tenantQueryPort,
       OrganizationRepository organizationRepository,
       @Value("${application.jwt.secret}") String secret,
       @Value("${application.jwt.expiration:900000}") long accessTokenExpiration) {
-    this.tenantRepository = tenantRepository;
+    this.tenantQueryPort = tenantQueryPort;
     this.organizationRepository = organizationRepository;
     this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     this.accessTokenExpiration = accessTokenExpiration;
@@ -121,9 +121,10 @@ public class JwtService {
   }
 
   private Map<String, Object> buildCommonClaims(User user) {
-    Optional<Tenant> tenantOpt = tenantRepository.findById(user.getTenantId());
+    // Use TenantQueryPort (BYPASSRLS) — JWT generation happens before tenant context is set
+    Optional<TenantReference> tenantOpt = tenantQueryPort.findById(user.getTenantId());
     String tenantUid =
-        tenantOpt.map(Tenant::getUid).orElseGet(() -> extractTenantUid(user.getUid()));
+        tenantOpt.map(TenantReference::uid).orElseGet(() -> extractTenantUid(user.getUid()));
 
     Map<String, Object> claims = new HashMap<>();
     claims.put("tenant_id", user.getTenantId().toString());
@@ -225,9 +226,10 @@ public class JwtService {
     log.debug(
         "Generating partner access token for user: {}, partnerId: {}", contactValue, partnerId);
 
-    Optional<Tenant> tenantOpt = tenantRepository.findById(user.getTenantId());
+    // Use TenantQueryPort (BYPASSRLS) — JWT generation happens before tenant context is set
+    Optional<TenantReference> tenantOpt = tenantQueryPort.findById(user.getTenantId());
     String tenantUid =
-        tenantOpt.map(Tenant::getUid).orElseGet(() -> extractTenantUid(user.getUid()));
+        tenantOpt.map(TenantReference::uid).orElseGet(() -> extractTenantUid(user.getUid()));
 
     Map<String, Object> claims = new HashMap<>();
     claims.put("user_type", "PARTNER");

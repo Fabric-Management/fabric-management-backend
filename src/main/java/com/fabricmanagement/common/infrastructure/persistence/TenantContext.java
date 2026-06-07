@@ -60,6 +60,18 @@ public final class TenantContext {
   public static final UUID SYSTEM_ACTOR_ID =
       UUID.fromString("00000000-0000-0000-0000-000000000001");
 
+  /**
+   * Golden template tenant ID. All new tenants clone their reference data (fiber categories,
+   * certifications, roles, permissions, notification templates, etc.) from this tenant during
+   * onboarding.
+   *
+   * <p><b>Not</b> a real operational tenant — exists solely as a data source for cloning.
+   *
+   * @see com.fabricmanagement.platform.tenant.app.TenantClonerService
+   */
+  public static final UUID TEMPLATE_TENANT_ID =
+      UUID.fromString("00000000-0000-0000-ffff-000000000001");
+
   /** ThreadLocal storage for current tenant ID */
   private static final ThreadLocal<UUID> CURRENT_TENANT_ID = new ThreadLocal<>();
 
@@ -140,23 +152,10 @@ public final class TenantContext {
   public static UUID requireTenantId() {
     UUID tenantId = CURRENT_TENANT_ID.get();
     if (tenantId == null) {
-      throw new IllegalStateException("TenantContext is not set. Cannot proceed without tenant.");
-    }
-    return tenantId;
-  }
-
-  /**
-   * Gets the current tenant ID for this thread
-   *
-   * @return the current tenant ID, or SYSTEM_TENANT_ID if not set
-   */
-  public static UUID getCurrentTenantId() {
-    UUID tenantId = CURRENT_TENANT_ID.get();
-    if (tenantId == null) {
-      log.warn(
-          "No tenant ID set for thread: {}, returning SYSTEM_TENANT_ID",
-          Thread.currentThread().getName());
-      return SYSTEM_TENANT_ID;
+      IllegalStateException ex =
+          new IllegalStateException("TenantContext is not set. Cannot proceed without tenant.");
+      log.error("TenantContext is not set. Stack trace:", ex);
+      throw ex;
     }
     return tenantId;
   }

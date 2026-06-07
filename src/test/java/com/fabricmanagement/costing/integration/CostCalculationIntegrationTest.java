@@ -73,6 +73,7 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
     priceListRepo.deleteAll();
     costItemRepo.deleteAll();
     cacheRepo.deleteAll();
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.clear();
     events.clear();
   }
 
@@ -80,6 +81,8 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
   @DisplayName("Idempotent Recalculation: Soft-deletes existing stage record and inserts new one")
   void idempotentRecalculation_replacesActiveRecord() {
     UUID tenantId = UUID.randomUUID();
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        tenantId);
     UUID workOrderId = UUID.randomUUID();
 
     // 1. Minimum Viable Items & Template
@@ -138,6 +141,8 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
   @DisplayName("CostVarianceDetectedEvent emitted when ACTUAL deviates from PLANNED by threshold")
   void varianceDetection_emitsEventIfExceedsThreshold() {
     UUID tenantId = UUID.randomUUID();
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        tenantId);
     UUID workOrderId = UUID.randomUUID(); // Represents the entity ID in PLANNED
 
     // 1. Items & Template
@@ -153,6 +158,14 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
     priceListItemRepo.save(
         TestCostDataFactory.createPriceListItem(
             pl.getId(), "ENERGY", null, new BigDecimal("20.0"), "TRY"));
+
+    costService.computePlanned(
+        tenantId,
+        workOrderId,
+        "DYEING",
+        null,
+        new BigDecimal("100.0"), // Planned 100 KG -> 2000 TRY
+        null);
 
     // In CostCalculationService, ACTUAL for WorkOrder searches for the PLANNED record associated
     // with that the same WorkOrder.
@@ -190,6 +203,8 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
   @DisplayName("PERCENTAGE base bypasses exchange rate converting")
   void percentageBase_bypassesExchangeRateConversion() {
     UUID tenantId = UUID.randomUUID();
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        tenantId);
     UUID quoteId = UUID.randomUUID();
 
     // 1. Setup Items
@@ -266,6 +281,8 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
   @DisplayName("Missing Exchange Rate aborts calculation and throws 422 HTTP equivalent exception")
   void missingExchangeRate_throwsException() {
     UUID tenantId = UUID.randomUUID();
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        tenantId);
     UUID quoteId = UUID.randomUUID();
 
     // 1. Items + Template + Price List in USD

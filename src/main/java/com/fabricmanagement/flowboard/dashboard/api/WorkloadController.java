@@ -28,7 +28,7 @@ public class WorkloadController {
   @Operation(summary = "Kullanıcının anlık iş yükünü getir")
   public ResponseEntity<ApiResponse<WorkloadService.UserWorkload>> getUserWorkload(
       @PathVariable @NotNull UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return ResponseEntity.ok(
         ApiResponse.success(workloadService.getUserWorkload(tenantId, userId)));
   }

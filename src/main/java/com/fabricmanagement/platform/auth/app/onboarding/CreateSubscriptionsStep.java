@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Uses SubscriptionService directly for subscription management.
  */
-@Order(6) // After AssignContactAndAddressStep (5)
+@Order(7) // After AssignContactAndAddressStep (6)
 @Component
 @RequiredArgsConstructor
 @Slf4j

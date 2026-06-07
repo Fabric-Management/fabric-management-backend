@@ -1,6 +1,6 @@
 package com.fabricmanagement.platform.tenant.api.facade;
 
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import java.util.Optional;
@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TenantFacade {
 
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
 
   /**
    * Create a new tenant during onboarding.

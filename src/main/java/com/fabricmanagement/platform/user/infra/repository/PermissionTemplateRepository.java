@@ -8,6 +8,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for PermissionTemplate entity.
+ *
+ * <p>Each tenant has its own permission templates (cloned from the TEMPLATE tenant during
+ * onboarding). No cross-tenant OR SYSTEM fallback queries needed.
+ */
 @Repository
 public interface PermissionTemplateRepository extends JpaRepository<PermissionTemplate, UUID> {
 
@@ -16,9 +22,9 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
           + "AND ((:deptCode IS NULL AND pt.departmentCode IS NULL) "
           + "     OR pt.departmentCode = :deptCode "
           + "     OR pt.departmentCode IS NULL) "
-          + "AND (pt.tenantId = :tenantId OR pt.tenantId = :#{T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).SYSTEM_TENANT_ID}) "
+          + "AND pt.tenantId = :tenantId "
           + "AND pt.isActive = true "
-          + "ORDER BY pt.tenantId NULLS LAST")
+          + "ORDER BY pt.departmentCode NULLS LAST")
   List<PermissionTemplate> findEffectiveTemplates(
       @Param("tenantId") UUID tenantId,
       @Param("roleCode") String roleCode,
@@ -27,9 +33,9 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
   @Query(
       "SELECT pt FROM PermissionTemplate pt WHERE pt.roleCode = :roleCode "
           + "AND (pt.departmentCode IN :deptCodes OR pt.departmentCode IS NULL) "
-          + "AND (pt.tenantId = :tenantId OR pt.tenantId = :#{T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).SYSTEM_TENANT_ID}) "
+          + "AND pt.tenantId = :tenantId "
           + "AND pt.isActive = true "
-          + "ORDER BY pt.departmentCode NULLS LAST, pt.tenantId NULLS LAST")
+          + "ORDER BY pt.departmentCode NULLS LAST")
   List<PermissionTemplate> findEffectiveTemplatesForDepartments(
       @Param("tenantId") UUID tenantId,
       @Param("roleCode") String roleCode,
@@ -37,11 +43,11 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
 
   @Query(
       "SELECT pt FROM PermissionTemplate pt WHERE "
-          + "(pt.tenantId = :tenantId OR pt.tenantId = :#{T(com.fabricmanagement.common.infrastructure.persistence.TenantContext).SYSTEM_TENANT_ID}) "
+          + "pt.tenantId = :tenantId "
           + "AND (:roleCode IS NULL OR pt.roleCode = :roleCode) "
           + "AND (:deptCode IS NULL OR pt.departmentCode = :deptCode) "
           + "AND pt.isActive = true "
-          + "ORDER BY pt.roleCode ASC, pt.departmentCode ASC, pt.tenantId NULLS LAST")
+          + "ORDER BY pt.roleCode ASC, pt.departmentCode ASC")
   List<PermissionTemplate> findTemplatesList(
       @Param("tenantId") UUID tenantId,
       @Param("roleCode") String roleCode,

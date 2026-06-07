@@ -40,7 +40,7 @@ public class BatchCodeGenerator {
    * @return unique split code (e.g. {@code FIBER-2025-001-P1}, {@code FIBER-2025-001-P2})
    */
   public String generateSplitCode(UUID parentBatchId, String parentCode) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     long existingCount = batchRepository.countByTenantIdAndParentBatchId(tenantId, parentBatchId);
     int nextNum = (int) existingCount + 1;
     String code = parentCode + "-P" + nextNum;

@@ -29,7 +29,7 @@ public class BatchAttributeService {
 
   @Transactional(readOnly = true)
   public List<BatchAttributeDto> findByBatchId(UUID batchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Batch batch =
         batchRepository
             .findByIdAndTenantId(batchId, tenantId)
@@ -42,7 +42,7 @@ public class BatchAttributeService {
 
   @Transactional
   public BatchAttributeDto add(UUID batchId, AddBatchAttributeRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Batch batch =
         batchRepository
@@ -52,10 +52,7 @@ public class BatchAttributeService {
     ProductAttribute attribute =
         productAttributeRepository
             .findById(request.attributeId())
-            .filter(
-                a ->
-                    TenantContext.SYSTEM_TENANT_ID.equals(a.getTenantId())
-                        || tenantId.equals(a.getTenantId()))
+            .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(
                 () -> new NotFoundException("Attribute not found: " + request.attributeId()));
 
@@ -84,7 +81,7 @@ public class BatchAttributeService {
 
   @Transactional
   public void delete(UUID batchId, UUID attributeId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Batch batch =
         batchRepository

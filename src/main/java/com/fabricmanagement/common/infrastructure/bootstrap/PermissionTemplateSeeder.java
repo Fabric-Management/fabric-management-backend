@@ -26,8 +26,8 @@ public class PermissionTemplateSeeder implements DataSeeder {
 
   @Override
   public boolean isSeeded() {
-    // Idempotency: verify if ANY system default templates (SYSTEM_TENANT_ID) are already seeded
-    return permissionTemplateRepository.existsByTenantId(TenantContext.SYSTEM_TENANT_ID);
+    // Idempotency: verify if ANY template permission templates are already seeded
+    return permissionTemplateRepository.existsByTenantId(TenantContext.TEMPLATE_TENANT_ID);
   }
 
   @Override
@@ -255,7 +255,7 @@ public class PermissionTemplateSeeder implements DataSeeder {
               .build();
 
       // Explicitly setting System Tenant ID to establish them as System Default templates
-      template.setTenantId(TenantContext.SYSTEM_TENANT_ID);
+      template.setTenantId(TenantContext.TEMPLATE_TENANT_ID);
       template.setIsActive(true);
 
       templatesToSave.add(template);

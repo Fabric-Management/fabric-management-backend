@@ -71,7 +71,7 @@ public class TradingPartnerService {
    */
   @Transactional
   public TradingPartnerDto createPartner(CreateTradingPartnerRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String country =
         request.getCountry() != null ? request.getCountry().toUpperCase() : DEFAULT_COUNTRY;
 
@@ -154,7 +154,7 @@ public class TradingPartnerService {
    */
   @Transactional
   public TradingPartnerDto updatePartner(UUID partnerId, UpdateTradingPartnerRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     TradingPartner partner = getPartnerOrThrow(tenantId, partnerId);
 
     if (request.getCustomName() != null) {

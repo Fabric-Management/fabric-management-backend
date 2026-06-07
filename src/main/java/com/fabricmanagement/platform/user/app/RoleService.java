@@ -20,72 +20,61 @@ public class RoleService {
 
   private final RoleRepository roleRepository;
 
-  /** Returns all active platform roles (all scopes). */
+  /** Returns all active roles for the current tenant. */
   @Transactional(readOnly = true)
   public List<Role> findAll() {
-    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-    return roleRepository.findByTenantIdAndIsActiveTrue(systemTenantId);
+    UUID tenantId = TenantContext.requireTenantId();
+    return roleRepository.findByTenantIdAndIsActiveTrue(tenantId);
   }
 
-  /** Returns active platform roles filtered by scope. */
+  /** Returns active roles for the current tenant filtered by scope. */
   @Transactional(readOnly = true)
   public List<Role> findByScope(RoleScope scope) {
-    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-    return roleRepository.findByTenantIdAndRoleScopeAndIsActiveTrue(systemTenantId, scope);
+    UUID tenantId = TenantContext.requireTenantId();
+    return roleRepository.findByTenantIdAndRoleScopeAndIsActiveTrue(tenantId, scope);
   }
 
   @Transactional(readOnly = true)
   public Optional<Role> findById(UUID roleId) {
-    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-    Optional<Role> systemRole = roleRepository.findByTenantIdAndId(systemTenantId, roleId);
-    if (systemRole.isPresent()) {
-      return systemRole;
-    }
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return roleRepository.findByTenantIdAndId(tenantId, roleId);
   }
 
   @Transactional(readOnly = true)
   public Optional<Role> findByCode(String roleCode) {
-    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-    Optional<Role> systemRole = roleRepository.findByTenantIdAndRoleCode(systemTenantId, roleCode);
-    if (systemRole.isPresent()) {
-      return systemRole;
-    }
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return roleRepository.findByTenantIdAndRoleCode(tenantId, roleCode);
   }
 
   /**
-   * Resolve tenant admin role from platform. Used only during tenant onboarding.
+   * Resolve tenant admin role. Each tenant has its own ADMIN role (cloned from template).
    *
-   * @throws IllegalStateException if no ADMIN role exists
+   * @param tenantId the tenant to look up the ADMIN role for
+   * @throws PlatformDomainException if no ADMIN role exists for the tenant
    */
   @Transactional(readOnly = true)
-  public Role findTenantAdminRoleOrThrow(UUID forTenantIdLogging) {
-    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
-    Optional<Role> admin = roleRepository.findByTenantIdAndRoleCode(systemTenantId, "ADMIN");
+  public Role findTenantAdminRoleOrThrow(UUID tenantId) {
+    Optional<Role> admin = roleRepository.findByTenantIdAndRoleCode(tenantId, "ADMIN");
     if (admin.isPresent()) {
       return admin.get();
     }
     List<Role> internalRoles =
-        roleRepository.findByTenantIdAndRoleScopeAndIsActiveTrue(
-            systemTenantId, RoleScope.INTERNAL);
+        roleRepository.findByTenantIdAndRoleScopeAndIsActiveTrue(tenantId, RoleScope.INTERNAL);
     if (!internalRoles.isEmpty()) {
       log.warn(
           "ADMIN role not found, using first internal role for tenant admin: tenantId={}",
-          forTenantIdLogging);
-      return internalRoles.get(0);
+          tenantId);
+      return internalRoles.getFirst();
     }
     throw new PlatformDomainException(
-        "Platform roles not initialized. Ensure role seed migration has been executed.",
+        "Platform roles not initialized for tenant. Ensure role cloning completed during onboarding.",
         "PLATFORM_ROLES_NOT_INITIALIZED",
         500);
   }
 
   @Transactional
   public Role create(String roleName, String roleCode, String description) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     if (roleRepository.existsByTenantIdAndRoleCode(tenantId, roleCode)) {
       throw new PlatformDomainException(
           "Role with code already exists",
@@ -99,7 +88,7 @@ public class RoleService {
 
   @Transactional
   public Role update(UUID roleId, String roleName, String description) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Role role =
         roleRepository
             .findByTenantIdAndId(tenantId, roleId)
@@ -112,7 +101,7 @@ public class RoleService {
 
   @Transactional
   public void deactivate(UUID roleId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Role role =
         roleRepository
             .findByTenantIdAndId(tenantId, roleId)

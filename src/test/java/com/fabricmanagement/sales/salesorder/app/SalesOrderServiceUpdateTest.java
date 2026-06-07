@@ -17,6 +17,7 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
 import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine;
+import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -41,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("deprecation")
 class SalesOrderServiceUpdateTest {
 
   @Mock private SalesOrderRepository orderRepository;
@@ -240,6 +242,83 @@ class SalesOrderServiceUpdateTest {
   }
 
   @Test
+  void updateOrder_homogeneousLineModuleTypes_derivesHeaderModuleType() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+
+    SalesOrderLine existingLine =
+        activeLine(
+            UUID.randomUUID(), ModuleType.YARN, BigDecimal.ONE, Money.of(BigDecimal.TEN, "TRY"));
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of(existingLine));
+    when(orderRepository.save(any())).thenReturn(draftOrder);
+
+    UpdateSalesOrderLineRequest req = updateLineRequest(existingLine.getId(), ModuleType.FABRIC);
+    UpdateSalesOrderRequest request = updateRequest(List.of(req));
+    request.setModuleType(ModuleType.YARN);
+
+    salesOrderService.updateOrder(orderId, request);
+
+    verify(orderRepository).save(orderCaptor.capture());
+    assertThat(orderCaptor.getValue().getModuleType()).isEqualTo(ModuleType.FABRIC);
+  }
+
+  @Test
+  void updateOrder_mixedLineModuleTypes_derivesNullHeaderModuleType() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+
+    SalesOrderLine fabricLine =
+        activeLine(
+            UUID.randomUUID(), ModuleType.FABRIC, BigDecimal.ONE, Money.of(BigDecimal.TEN, "TRY"));
+    SalesOrderLine yarnLine =
+        activeLine(
+            UUID.randomUUID(), ModuleType.YARN, BigDecimal.ONE, Money.of(BigDecimal.TEN, "TRY"));
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of(fabricLine, yarnLine));
+    when(orderRepository.save(any())).thenReturn(draftOrder);
+
+    UpdateSalesOrderRequest request =
+        updateRequest(
+            List.of(
+                updateLineRequest(fabricLine.getId(), ModuleType.FABRIC),
+                updateLineRequest(yarnLine.getId(), ModuleType.YARN)));
+    request.setModuleType(ModuleType.FIBER);
+
+    salesOrderService.updateOrder(orderId, request);
+
+    verify(orderRepository).save(orderCaptor.capture());
+    assertThat(orderCaptor.getValue().getModuleType()).isNull();
+  }
+
+  @Test
+  void updateOrder_nullLineModuleTypeIsIgnoredWhenDerivingHeaderModuleType() {
+    when(orderRepository.findByTenantIdAndId(tenantId, orderId))
+        .thenReturn(Optional.of(draftOrder));
+
+    SalesOrderLine fabricLine =
+        activeLine(
+            UUID.randomUUID(), ModuleType.FABRIC, BigDecimal.ONE, Money.of(BigDecimal.TEN, "TRY"));
+    SalesOrderLine nullLine =
+        activeLine(
+            UUID.randomUUID(), ModuleType.YARN, BigDecimal.ONE, Money.of(BigDecimal.TEN, "TRY"));
+    when(lineRepository.findBySalesOrderIdAndIsActiveTrueOrderByCreatedAtAsc(orderId))
+        .thenReturn(List.of(fabricLine, nullLine));
+    when(orderRepository.save(any())).thenReturn(draftOrder);
+
+    UpdateSalesOrderRequest request =
+        updateRequest(
+            List.of(
+                updateLineRequest(fabricLine.getId(), ModuleType.FABRIC),
+                updateLineRequest(nullLine.getId(), null)));
+
+    salesOrderService.updateOrder(orderId, request);
+
+    verify(orderRepository).save(orderCaptor.capture());
+    assertThat(orderCaptor.getValue().getModuleType()).isEqualTo(ModuleType.FABRIC);
+  }
+
+  @Test
   void updateOrder_happyPath_updatesAndReturnsDto() {
     when(orderRepository.findByTenantIdAndId(tenantId, orderId))
         .thenReturn(Optional.of(draftOrder));
@@ -366,5 +445,52 @@ class SalesOrderServiceUpdateTest {
     assertThatThrownBy(() -> salesOrderService.updateOrder(orderId, request))
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Line not found");
+  }
+
+  private UpdateSalesOrderRequest updateRequest(List<UpdateSalesOrderLineRequest> lines) {
+    UpdateSalesOrderRequest request = new UpdateSalesOrderRequest();
+    request.setVersion(1L);
+    request.setCurrency("TRY");
+    request.setLines(lines);
+    return request;
+  }
+
+  private UpdateSalesOrderLineRequest updateLineRequest(UUID id, ModuleType moduleType) {
+    UpdateSalesOrderLineRequest req = new UpdateSalesOrderLineRequest();
+    req.setId(id);
+    req.setProductDesc("Cotton fabric");
+    req.setRequestedQty(BigDecimal.ONE);
+    req.setUnit("KG");
+    req.setUnitPrice(BigDecimal.TEN);
+    req.setCurrency("TRY");
+    req.setModuleType(moduleType);
+    return req;
+  }
+
+  private SalesOrderLine activeLine(
+      UUID id, ModuleType moduleType, BigDecimal requestedQty, Money unitPrice) {
+    SalesOrderLine line =
+        SalesOrderLine.builder()
+            .productDesc("Cotton fabric")
+            .requestedQty(requestedQty)
+            .unit("KG")
+            .unitPrice(unitPrice)
+            .moduleType(moduleType)
+            .build();
+    setBaseField(line, "id", id);
+    setBaseField(line, "isActive", true);
+    return line;
+  }
+
+  private void setBaseField(SalesOrderLine line, String fieldName, Object value) {
+    try {
+      java.lang.reflect.Field field =
+          com.fabricmanagement.common.infrastructure.persistence.BaseEntity.class.getDeclaredField(
+              fieldName);
+      field.setAccessible(true);
+      field.set(line, value);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

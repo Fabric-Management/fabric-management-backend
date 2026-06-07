@@ -1,6 +1,5 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.domain.exception.FiberDomainException;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
@@ -143,19 +142,18 @@ public class FiberValidationService {
   /**
    * Validate that base fibers are accessible to the current tenant.
    *
-   * <p>Rule: All base fibers must belong to the current tenant or the platform (system tenant).
-   * Tenant organizations can use platform seed fibers in blends.
+   * <p>Rule: All base fibers must belong to the current tenant. Each tenant has its own cloned
+   * fiber catalog — no cross-tenant access allowed.
    */
   @Transactional(readOnly = true)
   public void validateTenantConsistency(Map<UUID, BigDecimal> composition, UUID currentTenantId) {
     List<Fiber> baseFibers = fiberRepository.findAllById(composition.keySet());
-    UUID systemTenantId = TenantContext.SYSTEM_TENANT_ID;
 
     for (Fiber baseFiber : baseFibers) {
       UUID fiberTenantId = baseFiber.getTenantId();
-      if (!currentTenantId.equals(fiberTenantId) && !systemTenantId.equals(fiberTenantId)) {
+      if (!currentTenantId.equals(fiberTenantId)) {
         throw new IllegalArgumentException(
-            "All base fibers must belong to your organization or the platform catalog");
+            "All base fibers must belong to your organization's catalog");
       }
     }
   }

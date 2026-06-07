@@ -1,6 +1,7 @@
 package com.fabricmanagement.costing.domain.calculation;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -21,8 +22,11 @@ import lombok.*;
 @AllArgsConstructor
 public class CostCalculationLine extends BaseEntity {
 
-  @Column(name = "cost_calculation_id", nullable = false)
-  private UUID costCalculationId;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "cost_calculation_id", nullable = false)
+  @JsonIgnore
+  @ToString.Exclude
+  private CostCalculation costCalculation;
 
   /** References {@code costing.cost_item.code}. */
   @Column(name = "cost_item_code", nullable = false, length = 50)
