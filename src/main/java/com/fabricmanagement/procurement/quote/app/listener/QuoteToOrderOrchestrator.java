@@ -1,5 +1,6 @@
 package com.fabricmanagement.procurement.quote.app.listener;
 
+import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
@@ -20,10 +21,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Orchestrates the automatic creation of PurchaseOrder or SubcontractOrder when a SupplierQuote is
@@ -43,30 +42,39 @@ public class QuoteToOrderOrchestrator {
   private final PurchaseOrderRepository purchaseOrderRepository;
   private final SubcontractOrderService subcontractOrderService;
   private final ObjectMapper objectMapper;
+  private final IdempotentEventHandler idempotentHandler;
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Async
+  @ApplicationModuleListener
   public void onQuoteAccepted(SupplierQuoteAcceptedEvent event) {
-    log.info("QuoteToOrderOrchestrator ← QuoteAccepted: quote={}", event.getQuoteId());
-
-    TenantContext.executeInTenantContext(
-        event.getTenantId(),
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "onQuoteAccepted",
         () -> {
-          quoteRepository
-              .findByTenantIdAndIdAndIsActiveTrue(event.getTenantId(), event.getQuoteId())
-              .ifPresentOrElse(
-                  quote ->
-                      rfqRepository
-                          .findByTenantIdAndIdAndIsActiveTrue(event.getTenantId(), quote.getRfqId())
-                          .ifPresentOrElse(
-                              rfq -> routeToOrder(quote, rfq),
-                              () ->
-                                  log.warn(
-                                      "RFQ not found for quote {} (rfqId={}), skipping order creation",
-                                      event.getQuoteId(),
-                                      quote.getRfqId())),
-                  () ->
-                      log.warn("Quote not found: {}, skipping order creation", event.getQuoteId()));
+          log.info("QuoteToOrderOrchestrator ← QuoteAccepted: quote={}", event.getQuoteId());
+
+          TenantContext.executeInTenantContext(
+              event.getTenantId(),
+              () -> {
+                quoteRepository
+                    .findByTenantIdAndIdAndIsActiveTrue(event.getTenantId(), event.getQuoteId())
+                    .ifPresentOrElse(
+                        quote ->
+                            rfqRepository
+                                .findByTenantIdAndIdAndIsActiveTrue(
+                                    event.getTenantId(), quote.getRfqId())
+                                .ifPresentOrElse(
+                                    rfq -> routeToOrder(quote, rfq),
+                                    () ->
+                                        log.warn(
+                                            "RFQ not found for quote {} (rfqId={}), skipping order creation",
+                                            event.getQuoteId(),
+                                            quote.getRfqId())),
+                        () ->
+                            log.warn(
+                                "Quote not found: {}, skipping order creation",
+                                event.getQuoteId()));
+              });
         });
   }
 

@@ -31,7 +31,8 @@ public class TenantRestoringEventListenerAspect {
 
   @Around(
       "@annotation(org.springframework.transaction.event.TransactionalEventListener) "
-          + "|| @annotation(org.springframework.context.event.EventListener)")
+          + "|| @annotation(org.springframework.context.event.EventListener) "
+          + "|| @annotation(org.springframework.modulith.ApplicationModuleListener)")
   public Object restoreTenantContext(ProceedingJoinPoint pjp) throws Throwable {
     Object[] args = pjp.getArgs();
     UUID eventTenantId = extractTenantId(args);

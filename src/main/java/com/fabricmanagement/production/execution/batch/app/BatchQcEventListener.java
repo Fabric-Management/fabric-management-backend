@@ -14,11 +14,8 @@ import com.fabricmanagement.production.quality.result.domain.event.FiberTestResu
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Listens to {@link FiberTestResultApprovedEvent} and updates the associated batch status.
@@ -43,19 +40,26 @@ public class BatchQcEventListener {
   private final BatchRepository batchRepository;
   private final StockUnitRepository stockUnitRepository;
   private final InAppNotificationService notificationService;
+  private final com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler
+      idempotentHandler;
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @ApplicationModuleListener
   public void onFiberTestResultApproved(FiberTestResultApprovedEvent event) {
-    if (event.getApprovalStatus() == TestApprovalStatus.PENDING) {
-      return;
-    }
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "onFiberTestResultApproved",
+        () -> {
+          if (event.getApprovalStatus() == TestApprovalStatus.PENDING) {
+            return;
+          }
 
-    if (event.getStockUnitId() != null) {
-      handleStockUnitQcResult(event);
-    } else {
-      handleBatchQcResult(event);
-    }
+          if (event.getStockUnitId() != null) {
+            handleStockUnitQcResult(event);
+          } else {
+            handleBatchQcResult(event);
+          }
+        });
   }
 
   private void handleStockUnitQcResult(FiberTestResultApprovedEvent event) {

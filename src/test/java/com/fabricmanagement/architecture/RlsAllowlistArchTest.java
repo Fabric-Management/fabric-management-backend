@@ -41,6 +41,9 @@ class RlsAllowlistArchTest {
           // Spring Modulith outbox pattern table
           "event_publication",
 
+          // Idempotency dedup table (E2)
+          "processed_event",
+
           // Platform Registry (Global system tables)
           "common_system_role",
           "common_permission",

@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Bekleyen Onayların zaman aşımı iptalini(Cancelled) sağlayan saatlik arka plan görevi. */
 @Slf4j
@@ -27,6 +28,7 @@ public class ApprovalExpiryJob {
   private final DomainEventPublisher eventPublisher;
   private final Clock clock;
   private final TenantSystemService tenantService;
+  private final TransactionTemplate transactionTemplate;
 
   @Scheduled(fixedRateString = "${approval.expiry.interval-ms:3600000}")
   public void cancelExpiredRequests() {
@@ -39,22 +41,25 @@ public class ApprovalExpiryJob {
       UUID tenantId = tenant.getId();
       try {
         TenantContext.setCurrentTenantId(tenantId);
-        List<ApprovalRequest> expired =
-            requestRepo.findExpiredPendingRequests(ApprovalRequestStatus.PENDING, now);
+        transactionTemplate.executeWithoutResult(
+            status -> {
+              List<ApprovalRequest> expired =
+                  requestRepo.findExpiredPendingRequests(ApprovalRequestStatus.PENDING, now);
 
-        if (!expired.isEmpty()) {
-          expired.forEach(ApprovalRequest::cancel);
-          requestRepo.saveAll(expired);
-          log.warn(
-              "ApprovalExpiryJob cancelled {} EXPIRED requests for tenant {}.",
-              expired.size(),
-              tenantId);
+              if (!expired.isEmpty()) {
+                expired.forEach(ApprovalRequest::cancel);
+                requestRepo.saveAll(expired);
+                log.warn(
+                    "ApprovalExpiryJob cancelled {} EXPIRED requests for tenant {}.",
+                    expired.size(),
+                    tenantId);
 
-          List<UUID> ids = expired.stream().map(ApprovalRequest::getId).toList();
-          eventPublisher.publish(new ApprovalExpiredEvent(tenantId, ids));
-        } else {
-          log.debug("No expired approval requests found for tenant {}.", tenantId);
-        }
+                List<UUID> ids = expired.stream().map(ApprovalRequest::getId).toList();
+                eventPublisher.publish(new ApprovalExpiredEvent(tenantId, ids));
+              } else {
+                log.debug("No expired approval requests found for tenant {}.", tenantId);
+              }
+            });
       } catch (Exception e) {
         log.error(
             "Failed to cancel expired requests for tenant {}: {}", tenantId, e.getMessage(), e);

@@ -1,14 +1,12 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
+import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostRecalculationService;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Triggers automatic cost calculation when a WorkOrder is completed.
@@ -23,24 +21,30 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class WorkOrderCostBridgeListener {
 
   private final WorkOrderCostRecalculationService costRecalculationService;
+  private final IdempotentEventHandler idempotentHandler;
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @ApplicationModuleListener
   public void handleWorkOrderCompletedEvent(WorkOrderCompletedEvent event) {
-    log.info(
-        "WorkOrderCompletedEvent: initiating cost calculation for WorkOrder {}",
-        event.getWorkOrderId());
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "handleWorkOrderCompletedEvent",
+        () -> {
+          log.info(
+              "WorkOrderCompletedEvent: initiating cost calculation for WorkOrder {}",
+              event.getWorkOrderId());
 
-    try {
-      costRecalculationService.recalculateActualCost(event.getWorkOrderId());
-    } catch (Exception e) {
-      log.error(
-          "Automatic cost calculation failed for WorkOrder {}. "
-              + "Use POST /api/production/work-orders/{}/recalculate-cost after fixing configuration.",
-          event.getWorkOrderId(),
-          event.getWorkOrderId(),
-          e);
-      // Intentional: cost failure must not roll back the COMPLETED status.
-    }
+          try {
+            costRecalculationService.recalculateActualCost(event.getWorkOrderId());
+          } catch (Exception e) {
+            log.error(
+                "Automatic cost calculation failed for WorkOrder {}. "
+                    + "Use POST /api/production/work-orders/{}/recalculate-cost after fixing configuration.",
+                event.getWorkOrderId(),
+                event.getWorkOrderId(),
+                e);
+            // Intentional: cost failure must not roll back the COMPLETED status.
+          }
+        });
   }
 }
