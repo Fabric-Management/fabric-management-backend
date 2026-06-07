@@ -8,7 +8,7 @@ import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.user.app.RoleService;
 import com.fabricmanagement.platform.user.app.UserCreationService;
@@ -38,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class UserSeeder implements DataSeeder {
 
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
   private final OrganizationService organizationService;
   private final UserCreationService userCreationService;
   private final UserRepository userRepository;

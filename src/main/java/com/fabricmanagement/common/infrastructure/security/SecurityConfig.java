@@ -59,7 +59,7 @@ public class SecurityConfig {
    */
   @Bean
   @Order(1)
-  @Profile({"local", "dev"})
+  @Profile({"local", "dev", "test"})
   public SecurityFilterChain devPartnerPortalFilterChain(HttpSecurity http) throws Exception {
     return http.securityMatcher("/api/partner-portal/**")
         .csrf(AbstractHttpConfigurer::disable)
@@ -113,7 +113,7 @@ public class SecurityConfig {
   // ────────────────────────────────────────────────────────────────────────
 
   @Bean
-  @Profile({"local", "dev"})
+  @Profile({"local", "dev", "test"})
   public SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
     log.info("DEVELOPMENT MODE - URL-level auth enforced, @PreAuthorize for method-level");
 
@@ -207,7 +207,7 @@ public class SecurityConfig {
    * <p>⚠️ In production, configure specific origins for security.
    */
   @Bean
-  @Profile({"local", "dev"})
+  @Profile({"local", "dev", "test"})
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
 

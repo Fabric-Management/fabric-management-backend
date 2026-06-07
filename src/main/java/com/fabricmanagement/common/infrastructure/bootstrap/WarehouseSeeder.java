@@ -5,7 +5,7 @@ import com.fabricmanagement.iwm.location.app.WarehouseLocationService;
 import com.fabricmanagement.iwm.location.domain.WarehouseLocationType;
 import com.fabricmanagement.iwm.location.dto.CreateWarehouseLocationRequest;
 import com.fabricmanagement.iwm.location.infra.repository.WarehouseLocationRepository;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class WarehouseSeeder implements DataSeeder {
 
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
   private final WarehouseLocationService warehouseLocationService;
   private final WarehouseLocationRepository warehouseLocationRepository;
   private final TransactionTemplate transactionTemplate;

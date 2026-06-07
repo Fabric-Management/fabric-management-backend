@@ -164,3 +164,5 @@ MANIFEST.MF
 # Temporary dev/debug files
 hash.java
 test-sessions.sh
+t2_changes.diff
+tests_run.txt

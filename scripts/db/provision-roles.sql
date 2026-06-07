@@ -16,8 +16,14 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_app') THEN
     CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS;
   END IF;
+
+  -- fabric_system: runtime system operations (BYPASSRLS, no DDL)
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabric_system') THEN
+    CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS;
+  END IF;
 END $$;
 
 -- Parolaları ayarla (Eğer ortam değişkeni ile aktarılmışsa çalışır, aksi halde \set ile ayarlanmalı)
-ALTER ROLE fabric_owner WITH PASSWORD :'owner_pw';
-ALTER ROLE fabric_app   WITH PASSWORD :'app_pw';
+ALTER ROLE fabric_owner  WITH PASSWORD :'owner_pw';
+ALTER ROLE fabric_app    WITH PASSWORD :'app_pw';
+ALTER ROLE fabric_system WITH PASSWORD :'system_pw';

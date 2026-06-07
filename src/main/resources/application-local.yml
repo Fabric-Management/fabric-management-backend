@@ -90,6 +90,12 @@ application:
     cookie:
       secure: false
 
+  # System DataSource: fabric_system role (BYPASSRLS) for cross-tenant operations
+  system-datasource:
+    enabled: true
+    username: ${POSTGRES_SYSTEM_USER:fabric_system}
+    password: ${POSTGRES_SYSTEM_PASSWORD:system_dev_2026}
+
   mail:
     from-email: ${MAIL_FROM_EMAIL:info@storeandsale.shop}
     from-name: ${MAIL_FROM_NAME:Fabricode}

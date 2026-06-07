@@ -14,11 +14,7 @@ public class LoggingAsyncUncaughtExceptionHandler implements AsyncUncaughtExcept
   @Override
   public void handleUncaughtException(Throwable ex, Method method, Object... params) {
     log.error("==========================================");
-    log.error("ASYNC UNCAUGHT EXCEPTION DETECTED");
-    log.error("Method    : {}", method.getName());
-    log.error("Exception : {}", ex.getMessage());
-    log.error("Cause     : {}", ex.getCause() != null ? ex.getCause().getMessage() : "N/A");
-
+    log.error("ASYNC UNCAUGHT EXCEPTION in method: {}", method.getName(), ex);
     for (int i = 0; i < params.length; i++) {
       log.error("Parameter[{}] : {}", i, params[i]);
     }

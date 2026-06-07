@@ -2,8 +2,8 @@ package com.fabricmanagement.common.infrastructure.web;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.JwtTokenExtractor;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.platform.auth.app.JwtService;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
@@ -57,7 +57,7 @@ public class JwtContextInterceptor implements HandlerInterceptor {
   private static final String[] OPTIONAL_TENANT_PATHS = {"/api/common/company-types/**"};
 
   private final JwtService jwtService;
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
 
   /** Extract JWT token and set TenantContext before handler execution. */
   @Override
@@ -102,12 +102,13 @@ public class JwtContextInterceptor implements HandlerInterceptor {
           }
         } catch (Exception e) {
           // Fallback: Load from DB if JWT claim missing (backward compatibility)
+          // Uses TenantQueryPort (BYPASSRLS) — tenant context not set yet
           log.debug("Tenant UID not in JWT, loading from Tenant table: tenantId={}", tenantId);
-          tenantRepository
+          tenantQueryPort
               .findById(tenantId)
               .ifPresent(
-                  tenant -> {
-                    String tenantUid = tenant.getUid();
+                  tenantRef -> {
+                    String tenantUid = tenantRef.uid();
                     if (tenantUid != null) {
                       TenantContext.setCurrentTenantUid(tenantUid);
                       log.debug(

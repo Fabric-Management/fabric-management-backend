@@ -23,6 +23,7 @@ CREATE SCHEMA IF NOT EXISTS common_communication;
 CREATE SCHEMA IF NOT EXISTS common_audit;
 CREATE SCHEMA IF NOT EXISTS common_policy;
 CREATE SCHEMA IF NOT EXISTS common_ai;
+CREATE SCHEMA IF NOT EXISTS iwm;
 
 -- -----------------------------------------------------------------------------
 -- TENANT (platform root, no tenant_id)
@@ -4956,8 +4957,7 @@ ALTER TABLE common_user.common_user ALTER COLUMN trust_level SET NOT NULL;
 -- MODULE: IWM (Faz 10.1) - Lokasyon Yönetimi Birleştirme & Taşıma
 -- =========================================================================
 
--- 1. SCHEMA DEFINITION
-CREATE SCHEMA IF NOT EXISTS iwm;
+-- 1. SCHEMA DEFINITION (moved to top of file with other schemas)
 
 -- [CONSOLIDATED] warehouse_location table is created directly in iwm schema (see V007 section above)
 

@@ -1,6 +1,6 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
@@ -20,7 +20,7 @@ public class TenantSeeder implements DataSeeder {
   public static final String TENANT_SLUG =
       "nexus-fabrics"; // Derived manually based on service logic
 
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
   private final TransactionTemplate transactionTemplate;
 
   @Override

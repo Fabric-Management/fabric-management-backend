@@ -54,10 +54,11 @@ public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
     if (auth != null && auth.getPrincipal() instanceof AuthenticatedUserContext ctx) {
       if (ctx.isPlayground() && ctx.tenantId() != null) {
 
-        // 3. Increment and check quota
+        // 3. Increment first, then check (atomic — prevents TOCTOU race)
         AtomicInteger counter = quotaCache.get(ctx.tenantId(), k -> new AtomicInteger(0));
+        int currentCount = counter.incrementAndGet();
 
-        if (counter.get() >= MAX_MUTATIONS_PER_PLAYGROUND) {
+        if (currentCount > MAX_MUTATIONS_PER_PLAYGROUND) {
           log.warn(
               "Playground quota exceeded for tenantId: {} (Guest: {})",
               ctx.tenantId(),
@@ -72,7 +73,6 @@ public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
           return false;
         }
 
-        int currentCount = counter.incrementAndGet();
         response.setIntHeader(
             "X-Playground-Quota-Remaining",
             Math.max(0, MAX_MUTATIONS_PER_PLAYGROUND - currentCount));

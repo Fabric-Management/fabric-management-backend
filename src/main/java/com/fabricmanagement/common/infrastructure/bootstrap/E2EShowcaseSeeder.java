@@ -11,7 +11,7 @@ import com.fabricmanagement.flowboard.board.app.BoardService;
 import com.fabricmanagement.flowboard.board.domain.BoardType;
 import com.fabricmanagement.flowboard.board.dto.CreateBoardRequest;
 import com.fabricmanagement.flowboard.board.infra.repository.BoardRepository;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class E2EShowcaseSeeder implements DataSeeder {
 
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
   private final ExchangeRateService exchangeRateService;
   private final ApprovalPolicyService approvalPolicyService;
   private final BoardService boardService;
