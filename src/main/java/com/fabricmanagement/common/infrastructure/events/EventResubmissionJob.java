@@ -21,6 +21,19 @@ public class EventResubmissionJob {
    * poller'ı rolünü üstlenir.
    *
    * <p>60-sn eşiği, hâlâ işlenmekte olan event'lerin yanlışlıkla yeniden teslim edilmesini önler.
+   *
+   * <p><b>OBSERVABILITY FAZI NOTU (Poison-Message / DLQ):</b> Şu anki yapıda, işlenemeyen (zehirli)
+   * bir event sonsuza dek her 5 dakikada bir yeniden denenir ve event_publication tablosunda takılı
+   * kalır. Bu durum fail-closed prensibi için iyi olsa da operasyonel körlüğe yol açabilir.
+   * Observability fazının ilk adımı olarak:
+   *
+   * <ul>
+   *   <li>Micrometer ile "incomplete publication count/duration" metrikleri dışa açılmalı.
+   *   <li>Bu metriklere alert kurularak, sistemde takılı kalan event'ler görünür kılınmalı.
+   *   <li>İlerleyen safhalarda, belirli bir yeniden deneme (retry) limitini aşan event'leri bir
+   *       Dead-Letter Queue (DLQ) tablosuna taşıyıp oradan "completed" işaretleyen otomatik bir
+   *       mekanizma eklenebilir.
+   * </ul>
    */
   @Scheduled(fixedDelayString = "${modulith.events.resubmit.interval-ms:300000}")
   public void resubmitStaleEvents() {
