@@ -1,32 +1,21 @@
-# Test profile - used by integration tests.
-# Datasource URL is overridden by Testcontainers in test class when needed.
 spring:
-  jpa:
-    hibernate:
-      ddl-auto: validate
-  flyway:
-    enabled: true
-  cache:
-    type: none
-  mail:
-    host: localhost
-    port: 3025
-  kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      auto-startup: false
-    listener:
-      auto-startup: false
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    hikari:
+      maximum-pool-size: 10
 
-# Reduce noise in tests
+# CR-11: Explicit system-datasource config for test profile.
+# Testcontainers uses the same superuser for all roles — this prevents
+# the CR-4 fail-fast guard from rejecting empty credentials at startup.
+application:
+  system-datasource:
+    enabled: true
+    username: ${spring.datasource.username:test}
+    password: ${spring.datasource.password:test}
+
 logging:
   level:
-    root: WARN
-    com.fabricmanagement: INFO
-    org.springframework.security: WARN
-
-# Disable async for predictable tests
-spring.task:
-  execution:
-    pool:
-      core-size: 1
+    com.fabricmanagement.common.infrastructure.persistence.TenantConnectionProvider: TRACE
+    com.fabricmanagement.common.infrastructure.config.TenantRestoringEventListenerAspect: TRACE
+    com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor: DEBUG

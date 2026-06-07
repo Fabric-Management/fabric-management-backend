@@ -79,7 +79,86 @@ Meşru cross-tenant erişimler zaten system rolü (Karar 5) kullanılarak yapıl
 ## Ek Notlar (T2 İmplementasyon Kuralları)
 - **Boş String Tuzağı:** PostgreSQL'de `set_config('app.current_tenant', '', true)` çağrısı boş bir string'i `uuid`'ye cast etmeye çalıştığı için istisna fırlatır. T2 uygulanırken, değer varsa gerçek bir UUID atanmalı, yoksa boş string değil, `set_config` tamamen bypass edilmeli (veya NULL temizliği yapılmalıdır).
 
+### Karar 8 — Production Hosting ve BYPASSRLS Teyidi
+**Karar tarihi:** 2026-06-06
+
+Plan B (FORCE ROW LEVEL SECURITY + BYPASSRLS ayrıcalıklı rol) production'da varsayılan stratejidir.
+
+**Desteklenen Hosting Ortamları:**
+| Ortam | BYPASSRLS | Durum |
+|-------|-----------|-------|
+| Self-hosted PostgreSQL | ✅ Tam destek | Önerilen |
+| AWS RDS | ✅ `rds_superuser` üzerinden | Desteklenir |
+| Google Cloud SQL | ✅ `cloudsqlsuperuser` üzerinden | Desteklenir |
+| Neon | ✅ `neondb_owner` üzerinden | Desteklenir |
+| Supabase Free/Pro | ❌ Rol yönetimi kısıtlı | **Desteklenmez** — Plan A'ya (FORCE yok, sadece ENABLE) dönüş gerekir |
+
+**Rol matrisi (production):**
+| Rol | Yetki | Kullanım |
+|-----|-------|----------|
+| `fabric_owner` | DDL, BYPASSRLS, tablo sahibi | Flyway migration, DDL |
+| `fabric_system` | DML, BYPASSRLS, tablo sahibi DEĞİL | `SystemTransactionExecutor` — onboarding, scheduler, admin |
+| `fabric_app` | DML, NOBYPASSRLS | HTTP request-path — JPA/Hibernate |
+
+**Test ortamı notu:** Testcontainers'da tek `test` kullanıcısı (superuser) hem `fabric_app` hem `fabric_system` rolünü üstlenir. `TenantConnectionProvider` RLS parametresini set eder; `SystemTransactionExecutor` BYPASSRLS yolunu kullanır. Prod/test farkı `SystemDataSourceConfig`'te belgelidir.
+
+### Karar 9 — System Chokepoint: `SystemTransactionExecutor` Erişim Kuralları
+**Karar tarihi:** 2026-06-06
+
+`SystemTransactionExecutor`, `fabric_system` (BYPASSRLS) rolü ile bağlanan ayrıcalıklı DataSource'u saran tek giriş noktasıdır. RLS'yi bypass ettiği için erişimi **whitelist tabanlı** olarak kısıtlanır.
+
+**Erişim izni verilen sınıflar (whitelist):**
+| Sınıf | Gerekçe |
+|-------|---------|
+| `TenantSystemService` | Cross-tenant yönetim (admin, onboarding, tenant CRUD) |
+| `TenantService` | Self-tenant okuma (tenant tablosu self-row RLS'ye tabi) |
+| `TenantClonerService` | Onboarding: TEMPLATE→Yeni tenant klon |
+| `PlaygroundTTLReaperService` | Scheduled job: süresi dolan playground tenant'ları temizle |
+| `TenantQueryAdapter` | Port/Adapter: tenant lookup (auth, event yolu) |
+| `CloneTemplateRolesStep` | Onboarding: TEMPLATE rollerini yeni tenant'a kopyala |
+| `SystemDataSourceConfig` | Altyapı: DataSource bean konfigürasyonu |
+
+**Kural:** Bu whitelist dışındaki sınıflar `SystemTransactionExecutor` import edemez. Bu kural `ConstitutionArchTest` Rule 14.1 ile build-time'da enforce edilir.
+
+**Yeni sınıf eklemek için:** Whitelist'e eklenmesi gereken her sınıf, bu ADR'ye gerekçesiyle eklenmeli ve ArchUnit testi güncellenmelidir.
+
+### Karar 10 — Onboarding Klon Modeli (Template → BYPASSRLS → Yeni Tenant)
+**Karar tarihi:** 2026-06-06
+
+Yeni tenant oluşturulduğunda, TEMPLATE tenant'ından varsayılan veriler (roller, departmanlar, organizasyonlar, kullanıcılar) klonlanır.
+
+**Akış:**
+```
+TenantOnboardingOrchestrator
+  ├── Step 1 (order=1): CreateTenantStep        → TenantSystemService.createTenant() [BYPASSRLS]
+  ├── Step 2 (order=2): CreateOrganizationStep   → JPA [fabric_app, yeni tenant context'te]
+  ├── Step 3 (order=3): CloneTemplateRolesStep   → SystemTransactionExecutor [BYPASSRLS]
+  │                                                 TEMPLATE'ten oku → Yeni tenant'a yaz
+  ├── Step 4 (order=4): CreateDepartmentsStep    → JPA [fabric_app]
+  ├── Step 5 (order=5): CreateAdminUserStep      → JPA [fabric_app, klonlanan rolleri kullanır]
+  └── ...
+```
+
+**Kritik sıralama:** `CloneTemplateRolesStep` (order=3) **MUTLAKA** `CreateAdminUserStep` (order=5) öncesinde çalışmalıdır. Admin user'ın atanacağı ADMIN rolü, klonlama ile oluşturulur.
+
+**Atomiklik notu:** `SystemTransactionExecutor` ayrı bir bağlantı/transaction'da çalışır. Sonraki bir step başarısız olursa klonlanan roller geri alınmaz. Orphan veri, tenant'ın soft-delete ile temizlenmesiyle çözülür.
+
+### Karar 11 — DomainEvent Tenant Kontratı
+**Karar tarihi:** 2026-06-06
+
+Tüm `DomainEvent` alt sınıfları `tenantId` alanını payload'larında taşımalıdır.
+
+**Gerekçe:**
+- `@Async @TransactionalEventListener(AFTER_COMMIT)` listener'lar orijinal thread'in `TenantContext`'ini miras almaz.
+- `TenantRestoringEventListenerAspect` event payload'undaki `tenantId`'yi okuyarak listener thread'inde `TenantContext`'i restore eder.
+- `tenantId` eksik olan event, listener'da `TenantContext.requireTenantId()` çağrısıyla `IllegalStateException` fırlatır.
+
+**Kural:** `DomainEvent` base class `getTenantId()` abstract metodunu tanımlar. Tüm alt sınıflar bu metodu implemente etmelidir.
+
+---
+
 ## Reddedilen Alternatifler
 - **DB-per-tenant veya Schema-per-tenant:** 160'dan fazla tablonun her tenant için ayrı schema/DB olarak ayrılması connection pool patlamasına ve DDL migration işlemlerinde büyük karmaşıklığa yol açar. Cross-tenant raporlamayı imkansız hale getirir.
 - **Sadece Uygulama Filtresi:** Mevcut durumdur. Koda ve insan dikkatinin disiplinine bağlıdır. Hatalara açıktır.
 - **Sentinel Tenant (OR Clause):** Her politikada `OR tenant_id = 'SYSTEM_UUID'` kullanmak performans etkisine yol açar ve uygulamanın `app.current_tenant`'ı kasıtlı/yanlışlıkla bu UUID'ye set etmesine karşı koruma sağlamaz. BYPASSRLS gibi rol tabanlı koruma tercih edilmiştir.
+- **PlatformAdminService tam JDBC refactor:** Admin endpoint'leri `TenantContext.executeInTenantContext()` ile hedef tenant'a switch yapıp JPA sorgusu çalıştırıyor. RLS zaten koruma sağladığı ve BYPASSRLS admin'e _tüm_ tenant'ları aynı anda gösterme riski yaratacağı için, mevcut JPA + TenantContext yapısı korunmuştur.

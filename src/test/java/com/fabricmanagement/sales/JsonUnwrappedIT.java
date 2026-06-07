@@ -31,7 +31,7 @@ class JsonUnwrappedIT {
 
   @Test
   void testJsonUnwrapped() throws Exception {
-    String json = "{\"name\":\"Test\",\"unitPriceAmount\":100.5,\"unitPriceCurrency\":\"TRY\"}";
+    String json = "{\"name\":\"Test\",\"unitPriceamount\":100.5,\"unitPricecurrency\":\"TRY\"}";
     FlatRequest request = objectMapper.readValue(json, FlatRequest.class);
     assertThat(request.getName()).isEqualTo("Test");
     assertThat(request.getUnitPrice().getAmount()).isEqualTo(new BigDecimal("100.5"));

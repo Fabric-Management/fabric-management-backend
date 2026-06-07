@@ -40,11 +40,13 @@ class UserQueryServiceTest {
   void findById_Enriched() {
     User user = User.builder().firstName("John").build();
     user.setId(userId);
+    user.setTenantId(tenantId);
     EmployeeSnapshot snapshot =
         new EmployeeSnapshot(userId, null, null, null, null, "EMP-1", null, null);
 
     when(userRepository.findByTenantIdAndId(tenantId, userId)).thenReturn(Optional.of(user));
-    when(employeeProjectionPort.findByUserId(userId)).thenReturn(Optional.of(snapshot));
+    when(employeeProjectionPort.findByUserId(user.getTenantId(), user.getId()))
+        .thenReturn(Optional.of(snapshot));
     when(userWorkLocationService.getPrimaryLocationLabels(eq(tenantId), anyList()))
         .thenReturn(Map.of(userId, "Main Office"));
 

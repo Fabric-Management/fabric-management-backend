@@ -52,15 +52,58 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("local")
+@ActiveProfiles("test")
+@Testcontainers
+@DisabledIf(value = "dockerNotAvailable", disabledReason = "Docker is not available")
 @DisplayName("End-to-End Production Flow (Walking Skeleton)")
 class WalkingSkeletonIT {
+
+  static boolean dockerNotAvailable() {
+    return !org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
+  }
+
+  @Container
+  @SuppressWarnings("resource")
+  static PostgreSQLContainer<?> postgres =
+      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+          .withDatabaseName("fabric_test")
+          .withUsername("test")
+          .withPassword("test");
+
+  @DynamicPropertySource
+  static void configureDatasource(DynamicPropertyRegistry registry) {
+    try (var conn =
+        java.sql.DriverManager.getConnection(
+            postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+      conn.createStatement()
+          .execute(
+              "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'test'");
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException("Failed to create fabric_app role", e);
+    }
+
+    registry.add("spring.datasource.url", postgres::getJdbcUrl);
+    registry.add("spring.datasource.username", () -> "fabric_app");
+    registry.add("spring.datasource.password", () -> "test");
+    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+
+    registry.add("spring.flyway.url", postgres::getJdbcUrl);
+    registry.add("spring.flyway.user", postgres::getUsername);
+    registry.add("spring.flyway.password", postgres::getPassword);
+  }
 
   @Autowired private TradingPartnerService tradingPartnerService;
   @Autowired private SalesOrderService salesOrderService;

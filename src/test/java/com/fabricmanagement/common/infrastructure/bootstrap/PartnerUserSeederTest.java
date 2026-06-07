@@ -11,7 +11,7 @@ import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.user.app.RoleService;
 import com.fabricmanagement.platform.user.app.UserCreationService;
@@ -38,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ExtendWith(MockitoExtension.class)
 class PartnerUserSeederTest {
 
-  @Mock private TenantService tenantService;
+  @Mock private TenantSystemService tenantService;
   @Mock private OrganizationRepository organizationRepository;
   @Mock private UserCreationService userCreationService;
   @Mock private UserRepository userRepository;

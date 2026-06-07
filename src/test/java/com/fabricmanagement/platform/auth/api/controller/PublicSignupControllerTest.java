@@ -36,6 +36,10 @@ class PublicSignupControllerTest {
   private com.fabricmanagement.platform.tenant.infra.repository.TenantRepository tenantRepository;
 
   @MockBean private JwtService jwtService;
+
+  @MockBean
+  private com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort tenantQueryPort;
+
   @MockBean private TenantOnboardingService onboardingService;
 
   @MockBean

@@ -5,9 +5,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
@@ -16,7 +18,6 @@ import com.fabricmanagement.platform.communication.app.NotificationService;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -78,6 +79,9 @@ class JwtRoundTripIntegrationTest {
     registry.add("spring.datasource.url", postgres::getJdbcUrl);
     registry.add("spring.datasource.username", postgres::getUsername);
     registry.add("spring.datasource.password", postgres::getPassword);
+    registry.add("spring.flyway.url", postgres::getJdbcUrl);
+    registry.add("spring.flyway.user", postgres::getUsername);
+    registry.add("spring.flyway.password", postgres::getPassword);
     registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
   }
 
@@ -89,6 +93,7 @@ class JwtRoundTripIntegrationTest {
   @Autowired private AuthUserRepository authUserRepository;
   @Autowired private PasswordEncoder passwordEncoder;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private SystemTransactionExecutor systemExecutor;
 
   @MockBean private NotificationService notificationService;
   @MockBean private EmailTemplateRenderer emailTemplateRenderer;
@@ -133,19 +138,36 @@ class JwtRoundTripIntegrationTest {
         .andExpect(status().isOk());
 
     // Step 2: Setup password directly in DB (simulating password setup flow)
-    var user =
-        userRepository.findAll().stream()
-            .filter(
-                u ->
-                    u.getUserContacts().stream()
-                        .anyMatch(uc -> email.equals(uc.getContact().getContactValue())))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("User not found after signup"));
+    UUID signupUserId =
+        systemExecutor.executeQueryForObject(
+            "SELECT u.id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            email);
+    UUID signupTenantId =
+        systemExecutor.executeQueryForObject(
+            "SELECT u.tenant_id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
+            (rs, rowNum) -> rs.getObject("tenant_id", UUID.class),
+            email);
+    if (signupUserId == null || signupTenantId == null) {
+      throw new AssertionError("User not found after signup");
+    }
 
-    // Create AuthUser with password (user-based auth: one AuthUser per User)
-    AuthUser authUser = AuthUser.create(user.getId(), passwordEncoder.encode(password));
-    authUser.verify();
-    authUserRepository.save(authUser);
+    // Set TenantContext for BaseEntity.onCreate
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        signupTenantId);
+    try {
+      // Create AuthUser with password (user-based auth: one AuthUser per User)
+      AuthUser authUser = AuthUser.create(signupUserId, passwordEncoder.encode(password));
+      authUser.verify();
+      authUserRepository.save(authUser);
+
+      // Verify the contact directly in the DB
+      systemExecutor.executeUpdate(
+          "UPDATE common_communication.common_contact SET is_verified = true WHERE contact_value = ?",
+          email);
+    } finally {
+      com.fabricmanagement.common.infrastructure.persistence.TenantContext.clear();
+    }
 
     // Step 3: Login
     String loginBody =
@@ -163,13 +185,11 @@ class JwtRoundTripIntegrationTest {
                 post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(loginBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.accessToken").isString())
+            .andExpect(cookie().exists("access_token"))
             .andReturn();
 
     // Step 4: Extract and verify JWT claims
-    String responseBody = loginResult.getResponse().getContentAsString();
-    JsonNode json = objectMapper.readTree(responseBody);
-    String accessToken = json.get("data").get("accessToken").asText();
+    String accessToken = loginResult.getResponse().getCookie("access_token").getValue();
 
     // Verify token is valid
     assertThat(jwtService.validateToken(accessToken)).isTrue();
@@ -243,18 +263,34 @@ class JwtRoundTripIntegrationTest {
         .andExpect(status().isOk());
 
     // Setup password
-    var user =
-        userRepository.findAll().stream()
-            .filter(
-                u ->
-                    u.getUserContacts().stream()
-                        .anyMatch(uc -> email.equals(uc.getContact().getContactValue())))
-            .findFirst()
-            .orElseThrow();
+    UUID signupUserId =
+        systemExecutor.executeQueryForObject(
+            "SELECT u.id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            email);
+    UUID signupTenantId =
+        systemExecutor.executeQueryForObject(
+            "SELECT u.tenant_id FROM common_user.common_user u JOIN common_communication.common_contact c ON c.tenant_id = u.tenant_id WHERE c.contact_value = ?",
+            (rs, rowNum) -> rs.getObject("tenant_id", UUID.class),
+            email);
+    if (signupUserId == null || signupTenantId == null) {
+      throw new AssertionError("User not found after signup");
+    }
 
-    AuthUser authUser = AuthUser.create(user.getId(), passwordEncoder.encode(password));
-    authUser.verify();
-    authUserRepository.save(authUser);
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        signupTenantId);
+    try {
+      AuthUser authUser = AuthUser.create(signupUserId, passwordEncoder.encode(password));
+      authUser.verify();
+      authUserRepository.save(authUser);
+
+      // Verify the contact directly in the DB
+      systemExecutor.executeUpdate(
+          "UPDATE common_communication.common_contact SET is_verified = true WHERE contact_value = ?",
+          email);
+    } finally {
+      com.fabricmanagement.common.infrastructure.persistence.TenantContext.clear();
+    }
 
     // Login
     String loginBody =
@@ -270,12 +306,7 @@ class JwtRoundTripIntegrationTest {
             .andExpect(status().isOk())
             .andReturn();
 
-    String accessToken =
-        objectMapper
-            .readTree(result.getResponse().getContentAsString())
-            .get("data")
-            .get("accessToken")
-            .asText();
+    String accessToken = result.getResponse().getCookie("access_token").getValue();
 
     UUID organizationId = jwtService.getOrganizationIdFromToken(accessToken);
     assertThat(organizationId).isNotNull();

@@ -63,6 +63,7 @@ class MultiProductCostIntegrationTest extends AbstractCostingIntegrationTest {
     priceListRepo.deleteAll();
     costItemRepo.deleteAll();
     cacheRepo.deleteAll();
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.clear();
   }
 
   @Test
@@ -70,6 +71,8 @@ class MultiProductCostIntegrationTest extends AbstractCostingIntegrationTest {
       "Per-product pricing with foreign currency translates accurately to reporting currency")
   void consumesMixedProducts_withCurrencyConversion_calculatesCorrectly() {
     UUID tenantId = UUID.randomUUID();
+    com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
+        tenantId);
     UUID workOrderId = UUID.randomUUID();
     UUID outputYarnId = UUID.randomUUID();
     UUID fiberAId = UUID.randomUUID();
