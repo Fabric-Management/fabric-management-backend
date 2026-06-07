@@ -46,7 +46,7 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
   protected void onAfterAssign(UserAddress junction) {
     eventPublisher.publish(
         new AddressAssignedEvent(
-            TenantContext.getCurrentTenantId(), junction.getUserId(), junction.getAddressId()));
+            TenantContext.requireTenantId(), junction.getUserId(), junction.getAddressId()));
   }
 
   @Override
@@ -56,7 +56,7 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
 
   @Override
   protected void validateParentExists(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     userRepository
         .findByTenantIdAndId(tenantId, parentId)
         .orElseThrow(() -> new PlatformDomainException("User not found", "USER_NOT_FOUND", 404));
@@ -64,7 +64,7 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
 
   @Override
   protected void validateChildExists(UUID childId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Address address =
         addressRepository
             .findById(childId)
@@ -90,7 +90,7 @@ public class UserAddressAssignmentService extends BaseAssignmentService<UserAddr
 
   @Override
   protected List<UserAddress> findByParent(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return userAddressRepository.findByTenantIdAndUserId(tenantId, parentId);
   }
 

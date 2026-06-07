@@ -46,7 +46,7 @@ public class FabricAIService {
       throw new IllegalStateException("AI features are disabled");
     }
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "FabricAI chat request: tenantId={}, userId={}, conversationId={}, messageLength={}",
         tenantId,

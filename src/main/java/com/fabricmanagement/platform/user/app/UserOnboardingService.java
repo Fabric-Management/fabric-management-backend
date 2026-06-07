@@ -54,7 +54,7 @@ public class UserOnboardingService {
 
   @Transactional(readOnly = true)
   public OnboardingStatusResponse getStatus(UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.trace("Getting onboarding status: tenantId={}, userId={}", tenantId, userId);
 
     User user =
@@ -80,7 +80,7 @@ public class UserOnboardingService {
    */
   @Transactional
   public UserDto completeOnboarding(UUID userId, CompleteOnboardingRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Completing onboarding: tenantId={}, userId={}", tenantId, userId);
 
     User user =
@@ -93,7 +93,7 @@ public class UserOnboardingService {
       if (request != null) {
         applyEnrichment(tenantId, request);
       }
-      return UserDto.from(user, employeeProjectionPort.findByUserId(userId).orElse(null));
+      return UserDto.from(user, employeeProjectionPort.findByUserId(tenantId, userId).orElse(null));
     }
 
     if (request != null) {
@@ -107,12 +107,13 @@ public class UserOnboardingService {
 
     log.info("Onboarding completed: userId={}, uid={}", saved.getId(), saved.getUid());
 
-    return UserDto.from(saved, employeeProjectionPort.findByUserId(saved.getId()).orElse(null));
+    return UserDto.from(
+        saved, employeeProjectionPort.findByUserId(tenantId, saved.getId()).orElse(null));
   }
 
   @Transactional(readOnly = true)
   public boolean hasCompletedOnboarding(UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     User user =
         userRepository
             .findByTenantIdAndId(tenantId, userId)

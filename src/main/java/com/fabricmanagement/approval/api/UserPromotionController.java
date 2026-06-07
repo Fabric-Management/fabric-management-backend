@@ -25,7 +25,7 @@ public class UserPromotionController {
   @GetMapping("/pending")
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
   public ResponseEntity<List<UserPromotionResponse>> getPendingPromotions() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<UserPromotionResponse> response =
         promotionService.getPendingPromotions(tenantId).stream()
             .map(UserPromotionResponse::from)
@@ -36,7 +36,7 @@ public class UserPromotionController {
   @PostMapping("/{promotionId}/approve")
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
   public ResponseEntity<Void> approvePromotion(@PathVariable UUID promotionId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID adminId = TenantContext.getCurrentUserId();
 
     promotionService.approvePromotion(tenantId, promotionId, adminId);
@@ -49,7 +49,7 @@ public class UserPromotionController {
       @PathVariable UUID promotionId,
       @RequestBody(required = false) @Valid PromotionRejectDto dto) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID adminId = TenantContext.getCurrentUserId();
     String note = dto != null ? dto.getReason() : null;
 

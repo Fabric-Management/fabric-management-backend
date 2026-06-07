@@ -48,7 +48,7 @@ public class CostingController {
   @PostMapping("/calculations/estimated")
   public ResponseEntity<ApiResponse<CostCalculationResponse>> computeEstimated(
       @Valid @RequestBody ComputeEstimatedCostRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     CostCalculation calc =
         costCalculationService.computeEstimated(
             tenantId,
@@ -65,7 +65,7 @@ public class CostingController {
   @PostMapping("/calculations/planned")
   public ResponseEntity<ApiResponse<CostCalculationResponse>> computePlanned(
       @Valid @RequestBody ComputePlannedCostRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     CostCalculation calc =
         costCalculationService.computePlanned(
             tenantId,
@@ -82,7 +82,7 @@ public class CostingController {
   @PostMapping("/calculations/actual")
   public ResponseEntity<ApiResponse<CostCalculationResponse>> computeActual(
       @Valid @RequestBody ComputeActualCostRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     CostCalculation calc =
         costCalculationService.computeActual(
             tenantId,
@@ -107,7 +107,7 @@ public class CostingController {
   @GetMapping("/calculations/work-orders/{workOrderId}")
   public ResponseEntity<ApiResponse<WorkOrderCostReportResponse>> getWorkOrderCostReport(
       @PathVariable UUID workOrderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return ResponseEntity.ok(
         ApiResponse.success(costCalculationService.getWorkOrderCostReport(tenantId, workOrderId)));
   }
@@ -120,7 +120,7 @@ public class CostingController {
   @PostMapping("/price-lists")
   public ResponseEntity<ApiResponse<PriceListResponse>> createPriceList(
       @Valid @RequestBody CreatePriceListRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     PriceList pl =
         priceListService.createPriceList(
             tenantId,
@@ -138,7 +138,7 @@ public class CostingController {
   @GetMapping("/price-lists")
   public ResponseEntity<ApiResponse<List<PriceListResponse>>> listPriceLists(
       @RequestParam String moduleType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<PriceListResponse> list =
         priceListService.listPriceLists(tenantId, moduleType).stream()
             .map(PriceListResponse::from)

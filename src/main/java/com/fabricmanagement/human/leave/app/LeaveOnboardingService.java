@@ -21,7 +21,7 @@ public class LeaveOnboardingService {
 
   @Transactional
   public void initializeBalances(UUID employeeId, String countryOverride) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String country =
         countryOverride != null
             ? countryOverride.toUpperCase(Locale.ROOT)

@@ -22,7 +22,7 @@ public class SalesProductService {
 
   @Transactional(readOnly = true)
   public List<SalesProductDto> getActiveCatalogForModule(String moduleType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<SalesProduct> catalogs;
     if (moduleType == null || moduleType.isEmpty()) {
       catalogs = repository.findAllByTenantIdAndIsActiveTrue(tenantId);
@@ -34,7 +34,7 @@ public class SalesProductService {
 
   @Transactional(readOnly = true)
   public SalesProductDto getActiveByProductId(UUID productId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return repository
         .findActiveByProductId(tenantId, productId)
         .map(mapper::toDto)
@@ -47,7 +47,7 @@ public class SalesProductService {
   @Transactional
   public SalesProductDto createEntry(CreateSalesProductRequest request) {
     SalesProduct entry = mapper.toEntity(request);
-    entry.setTenantId(TenantContext.getCurrentTenantId());
+    entry.setTenantId(TenantContext.requireTenantId());
     if (entry.getSpecs() == null) entry.setSpecs("{}");
     if (entry.getPhotos() == null) entry.setPhotos("[]");
     return mapper.toDto(repository.save(entry));
@@ -55,7 +55,7 @@ public class SalesProductService {
 
   @Transactional
   public void deactivateEntry(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     SalesProduct entry =
         repository
             .findById(id)

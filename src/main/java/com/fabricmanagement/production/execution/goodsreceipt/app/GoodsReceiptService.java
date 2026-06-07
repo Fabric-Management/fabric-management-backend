@@ -160,7 +160,7 @@ public class GoodsReceiptService {
 
     eventPublisher.publishEvent(
         GoodsReceiptConfirmedEvent.builder()
-            .tenantId(TenantContext.getCurrentTenantId())
+            .tenantId(TenantContext.requireTenantId())
             .receiptId(saved.getId())
             .receiptNumber(saved.getReceiptNumber())
             .sourceType(saved.getSourceType())
@@ -213,7 +213,7 @@ public class GoodsReceiptService {
       com.fabricmanagement.production.execution.goodsreceipt.domain.GoodsReceiptSourceType
           sourceType,
       UUID sourceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return switch (sourceType) {
       case BATCH -> batchQueryService.getBatchCode(sourceId);
       case PURCHASE_ORDER -> poQueryService.getPurchaseOrderNumber(sourceId);

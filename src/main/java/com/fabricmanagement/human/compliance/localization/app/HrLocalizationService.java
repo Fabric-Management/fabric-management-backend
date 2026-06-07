@@ -19,7 +19,7 @@ public class HrLocalizationService {
   private final Clock clock;
 
   public HrLocalizationContext currentContext() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String country = TenantContext.getCurrentTenantCountry();
     if (country == null || country.isBlank()) {
       country = HrLocalizationConstants.GLOBAL_COUNTRY_CODE;

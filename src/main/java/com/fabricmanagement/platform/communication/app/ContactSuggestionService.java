@@ -69,7 +69,7 @@ public class ContactSuggestionService {
   @Transactional(readOnly = true)
   public ContactSuggestionsDto getSuggestions(
       UUID organizationId, String firstName, String lastName) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Getting contact suggestions: tenantId={}, organizationId={}, firstName={}, lastName={}",
         tenantId,

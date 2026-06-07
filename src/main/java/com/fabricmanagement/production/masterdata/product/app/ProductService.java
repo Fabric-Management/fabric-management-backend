@@ -87,7 +87,7 @@ public class ProductService implements ProductFacade {
 
   @Transactional
   public void deactivateProduct(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Product product =
         productRepository

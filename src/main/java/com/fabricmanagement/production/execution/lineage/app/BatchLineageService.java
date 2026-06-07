@@ -62,7 +62,7 @@ public class BatchLineageService {
 
   @Transactional
   public BatchLineageDto create(CreateBatchLineageRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Creating batch lineage: tenantId={}, parent={}, child={}",
         tenantId,
@@ -144,7 +144,7 @@ public class BatchLineageService {
   /** Forward trace: what input batches were consumed to produce this child batch? */
   @Transactional(readOnly = true)
   public List<BatchLineageDto> getParents(UUID childBatchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Getting parents for child batch: tenantId={}, childBatchId={}", tenantId, childBatchId);
 
@@ -158,7 +158,7 @@ public class BatchLineageService {
   /** Backward trace: where was this parent batch consumed? */
   @Transactional(readOnly = true)
   public List<BatchLineageDto> getChildren(UUID parentBatchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Getting children for parent batch: tenantId={}, parentBatchId={}",
         tenantId,
@@ -173,7 +173,7 @@ public class BatchLineageService {
 
   @Transactional(readOnly = true)
   public Page<BatchLineageDto> getAll(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting all batch lineage records: tenantId={}", tenantId);
 
     return batchLineageRepository
@@ -187,7 +187,7 @@ public class BatchLineageService {
    */
   @Transactional(readOnly = true)
   public BatchLineageDetailDto getLineageDetail(UUID batchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting lineage detail: tenantId={}, batchId={}", tenantId, batchId);
 
     Batch focalBatch = loadBatch(batchId, tenantId, "Focal");
@@ -229,7 +229,7 @@ public class BatchLineageService {
 
   @Transactional
   public void delete(UUID lineageId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Deleting batch lineage: tenantId={}, id={}", tenantId, lineageId);
 
     BatchLineage lineage =
@@ -259,7 +259,7 @@ public class BatchLineageService {
    */
   @Transactional(readOnly = true)
   public TraceNodeDto traceBackward(UUID batchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Tracing backward: tenantId={}, batchId={}", tenantId, batchId);
 
     Batch root = loadBatch(batchId, tenantId, "Trace root");
@@ -289,7 +289,7 @@ public class BatchLineageService {
    */
   @Transactional(readOnly = true)
   public TraceNodeDto traceForward(UUID batchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Tracing forward: tenantId={}, batchId={}", tenantId, batchId);
 
     Batch root = loadBatch(batchId, tenantId, "Trace root");

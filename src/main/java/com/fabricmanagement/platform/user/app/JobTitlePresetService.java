@@ -20,15 +20,14 @@ public class JobTitlePresetService {
 
   @Transactional(readOnly = true)
   public List<JobTitlePreset> findAllActive() {
-    return jobTitlePresetRepository.findByTenantIdAndIsActiveTrue(
-        TenantContext.getCurrentTenantId());
+    return jobTitlePresetRepository.findByTenantIdAndIsActiveTrue(TenantContext.requireTenantId());
   }
 
   @Transactional
   public JobTitlePreset createCustom(
       String name, String description, String roleCode, String departmentCode) {
     String code = JobTitlePreset.generateCode(name);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     if (jobTitlePresetRepository.existsByTenantIdAndJobTitleCode(tenantId, code)) {
       throw new IllegalArgumentException(
           "Job title with code '" + code + "' already exists for this tenant.");
@@ -84,7 +83,7 @@ public class JobTitlePresetService {
 
   private JobTitlePreset getById(UUID id) {
     return jobTitlePresetRepository
-        .findByTenantIdAndId(TenantContext.getCurrentTenantId(), id)
+        .findByTenantIdAndId(TenantContext.requireTenantId(), id)
         .orElseThrow(() -> new EntityNotFoundException("JobTitlePreset not found: " + id));
   }
 
@@ -94,7 +93,7 @@ public class JobTitlePresetService {
    */
   private void validateCodeUniqueness(UUID currentPresetId, String newName) {
     String newCode = JobTitlePreset.generateCode(newName);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     jobTitlePresetRepository
         .findByTenantIdAndJobTitleCode(tenantId, newCode)
         .ifPresent(

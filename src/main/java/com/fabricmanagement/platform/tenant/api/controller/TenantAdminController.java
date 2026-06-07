@@ -1,7 +1,7 @@
 package com.fabricmanagement.platform.tenant.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Tenant Admin", description = "Tenant yönetim işlemleri (Sadece PLATFORM_ADMIN)")
 public class TenantAdminController {
 
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
 
   @PostMapping("/sync-settings")
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")

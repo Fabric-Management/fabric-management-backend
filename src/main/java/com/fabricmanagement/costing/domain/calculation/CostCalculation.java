@@ -74,8 +74,11 @@ public class CostCalculation extends BaseEntity {
   @Column(name = "notes", columnDefinition = "TEXT")
   private String notes;
 
-  @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-  @JoinColumn(name = "cost_calculation_id")
+  @OneToMany(
+      mappedBy = "costCalculation",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
   @Builder.Default
   private List<CostCalculationLine> lines = new ArrayList<>();
 
@@ -106,6 +109,7 @@ public class CostCalculation extends BaseEntity {
   /** Add a line and recompute totalCost. */
   public void addLine(CostCalculationLine line) {
     lines.add(line);
+    line.setCostCalculation(this);
     this.totalCost =
         lines.stream()
             .map(CostCalculationLine::getTotalInBaseCurrency)

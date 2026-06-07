@@ -31,7 +31,7 @@ public class TenantSeedService {
     log.info(
         "Seeding departments for tenant: tenantId={}, organizationId={}", tenantId, organizationId);
 
-    UUID originalTenantId = TenantContext.getCurrentTenantId();
+    UUID originalTenantId = TenantContext.requireTenantId();
     try {
       TenantContext.setCurrentTenantId(tenantId);
 
@@ -65,7 +65,7 @@ public class TenantSeedService {
 
   @Transactional(readOnly = true)
   public boolean isTenantSeeded(UUID tenantId, UUID organizationId) {
-    UUID originalTenantId = TenantContext.getCurrentTenantId();
+    UUID originalTenantId = TenantContext.requireTenantId();
     try {
       TenantContext.setCurrentTenantId(tenantId);
       long departmentCount =
@@ -82,10 +82,10 @@ public class TenantSeedService {
   private Department createGroupDepartment(
       UUID organizationId, String name, String description, int displayOrder) {
     if (departmentRepository.existsByTenantIdAndOrganizationIdAndDepartmentName(
-        TenantContext.getCurrentTenantId(), organizationId, name)) {
+        TenantContext.requireTenantId(), organizationId, name)) {
       return departmentRepository
           .findByTenantIdAndOrganizationIdAndDepartmentName(
-              TenantContext.getCurrentTenantId(), organizationId, name)
+              TenantContext.requireTenantId(), organizationId, name)
           .orElseThrow();
     }
 
@@ -99,11 +99,11 @@ public class TenantSeedService {
   private Department createDepartment(
       UUID organizationId, String name, String description, Department parentDepartment) {
     if (departmentRepository.existsByTenantIdAndOrganizationIdAndDepartmentName(
-        TenantContext.getCurrentTenantId(), organizationId, name)) {
+        TenantContext.requireTenantId(), organizationId, name)) {
       log.debug("Department already exists: {}", name);
       return departmentRepository
           .findByTenantIdAndOrganizationIdAndDepartmentName(
-              TenantContext.getCurrentTenantId(), organizationId, name)
+              TenantContext.requireTenantId(), organizationId, name)
           .orElseThrow();
     }
 

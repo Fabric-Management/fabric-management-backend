@@ -53,7 +53,7 @@ public class OrganizationAddressAssignmentService
   protected void onAfterAssign(OrganizationAddress junction) {
     eventPublisher.publish(
         new OrganizationAddressAssignedEvent(
-            TenantContext.getCurrentTenantId(),
+            TenantContext.requireTenantId(),
             junction.getOrganizationId(),
             junction.getAddressId()));
   }
@@ -65,7 +65,7 @@ public class OrganizationAddressAssignmentService
 
   @Override
   protected void validateParentExists(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     organizationRepository
         .findByTenantIdAndId(tenantId, parentId)
         .orElseThrow(
@@ -74,7 +74,7 @@ public class OrganizationAddressAssignmentService
 
   @Override
   protected void validateChildExists(UUID childId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Address address =
         addressRepository
             .findById(childId)
@@ -99,7 +99,7 @@ public class OrganizationAddressAssignmentService
 
   @Override
   protected List<OrganizationAddress> findByParent(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return organizationAddressRepository.findWithAddressByTenantIdAndOrganizationId(
         tenantId, parentId);
   }
@@ -233,7 +233,7 @@ public class OrganizationAddressAssignmentService
    */
   @Transactional(readOnly = true)
   public AddressDeletionImpactDto getAddressDeletionImpact(UUID organizationId, UUID addressId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Analyzing deletion impact: tenantId={}, organizationId={}, addressId={}",
         tenantId,
@@ -291,7 +291,7 @@ public class OrganizationAddressAssignmentService
    */
   @Transactional
   public void safeRemoveAddress(UUID organizationId, UUID addressId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Safe-removing org address: tenantId={}, organizationId={}, addressId={}",
         tenantId,

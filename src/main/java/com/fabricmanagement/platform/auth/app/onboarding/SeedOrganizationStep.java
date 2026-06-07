@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Runs before CreateAdminUserStep so the admin user can be assigned to "Administration Office".
  */
-@Order(3) // After CreateOrganizationStep (2) — departments must exist before admin user
+@Order(4) // After CloneTemplateRolesStep (3) — roles must exist before admin user
 @Component
 @RequiredArgsConstructor
 @Slf4j

@@ -20,7 +20,9 @@ import lombok.Data;
  *   <li>Step 1 (CreateTenantStep): Creates Tenant entity → sets tenantId, tenantUid
  *   <li>Step 2 (CreateOrganizationStep): Creates Organization → sets organizationId,
  *       organizationUid
- *   <li>Step 3+ (CreateAdminUserStep, etc.): Use tenantId and organizationId
+ *   <li>Step 3 (CloneTemplateRolesStep): Clones platform roles from TEMPLATE tenant
+ *   <li>Step 4 (SeedOrganizationStep): Seeds default departments
+ *   <li>Step 5+ (CreateAdminUserStep, etc.): Use tenantId and organizationId
  * </ul>
  */
 @Data

@@ -56,7 +56,7 @@ public class ProductController {
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<ProductDto>> getProduct(
       @Parameter(description = "Product ID") @PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     ProductDto product =
         productService
@@ -70,7 +70,7 @@ public class ProductController {
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<ProductDto>>> getAllProducts() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     List<ProductDto> products = productService.findByTenant(tenantId);
 
@@ -82,7 +82,7 @@ public class ProductController {
   @PreAuthorize("@auth.can(authentication, 'products', 'read')")
   public ResponseEntity<ApiResponse<List<ProductDto>>> getProductsByType(
       @Parameter(description = "Product Type") @PathVariable ProductType type) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     List<ProductDto> products = productService.findByType(tenantId, type);
 

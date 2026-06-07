@@ -6,7 +6,7 @@ import com.fabricmanagement.flowboard.task.app.EscalationService;
 import com.fabricmanagement.flowboard.task.domain.EscalationType;
 import com.fabricmanagement.flowboard.task.domain.Task;
 import com.fabricmanagement.flowboard.task.infra.repository.TaskRepository;
-import com.fabricmanagement.platform.tenant.app.TenantService;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import java.time.Clock;
@@ -45,7 +45,7 @@ public class FlowBoardEscalationJob {
   private final TaskRepository taskRepo;
   private final EscalationService escalationService;
   private final Clock clock;
-  private final TenantService tenantService;
+  private final TenantSystemService tenantService;
   private final BoardRepository boardRepository;
 
   @Scheduled(fixedRateString = "PT15M")

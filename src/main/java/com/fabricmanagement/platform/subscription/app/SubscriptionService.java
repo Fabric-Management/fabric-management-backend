@@ -136,7 +136,7 @@ public class SubscriptionService {
 
   @Transactional(readOnly = true)
   public List<SubscriptionDto> getOrganizationSubscriptions(UUID organizationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting subscriptions: tenantId={}", tenantId);
 
     return subscriptionRepository.findByTenantId(tenantId).stream()
@@ -146,7 +146,7 @@ public class SubscriptionService {
 
   @Transactional(readOnly = true)
   public List<SubscriptionDto> getActiveSubscriptions() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting active subscriptions: tenantId={}", tenantId);
 
     return subscriptionRepository.findActiveSubscriptions(tenantId, Instant.now()).stream()
@@ -156,7 +156,7 @@ public class SubscriptionService {
 
   @Transactional
   public SubscriptionDto activateSubscription(UUID subscriptionId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Activating subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
 
     Subscription subscription =
@@ -178,7 +178,7 @@ public class SubscriptionService {
 
   @Transactional
   public void expireSubscription(UUID subscriptionId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Expiring subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
 
     Subscription subscription =
@@ -202,7 +202,7 @@ public class SubscriptionService {
    */
   @Transactional
   public SubscriptionDto cancelSubscription(UUID subscriptionId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Cancelling subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
 
     Subscription subscription =
@@ -227,7 +227,7 @@ public class SubscriptionService {
   @Transactional
   public SubscriptionDto updateSubscription(
       UUID subscriptionId, UpdateSubscriptionRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Updating subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
 
     Subscription subscription =
@@ -256,7 +256,7 @@ public class SubscriptionService {
   /** Get subscription by ID. */
   @Transactional(readOnly = true)
   public SubscriptionDto getSubscription(UUID subscriptionId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting subscription: tenantId={}, subscriptionId={}", tenantId, subscriptionId);
 
     Subscription subscription =

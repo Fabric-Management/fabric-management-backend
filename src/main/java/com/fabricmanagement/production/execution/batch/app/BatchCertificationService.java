@@ -248,7 +248,7 @@ public class BatchCertificationService {
     if (scope == null || scope == BatchCertificationScope.BATCH) {
       return null;
     }
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     if (scope == BatchCertificationScope.SUPPLIER && partnerCertificationId != null) {
       return partnerCertificationQueryService
@@ -395,7 +395,7 @@ public class BatchCertificationService {
    * lookup and tenant isolation.
    */
   private Batch getBatchOrThrow(UUID batchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return batchRepository
         .findByIdAndTenantId(batchId, tenantId)
         .orElseThrow(() -> new NotFoundException("Batch not found: " + batchId));
@@ -443,7 +443,7 @@ public class BatchCertificationService {
   public BatchCertificationResult update(
       UUID batchId, UUID certificationId, UpdateBatchCertificationRequest request) {
     Batch batch = getBatchOrThrow(batchId);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     BatchCertification entity =
         findBatchCertificationOrThrow(batch, certificationId, tenantId, true);
 
@@ -521,7 +521,7 @@ public class BatchCertificationService {
   @Transactional
   public void delete(UUID batchId, UUID certificationId) {
     Batch batch = getBatchOrThrow(batchId);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     BatchCertification entity =
         findBatchCertificationOrThrow(batch, certificationId, tenantId, true);
 

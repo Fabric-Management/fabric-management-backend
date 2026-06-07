@@ -113,7 +113,7 @@ public class UserService implements UserFacade {
 
   @Transactional
   public UserDto updateUser(UUID userId, UpdateUserRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Updating user: tenantId={}, userId={}", tenantId, userId);
 
     User user =
@@ -125,12 +125,12 @@ public class UserService implements UserFacade {
     User saved = userRepository.save(user);
 
     log.info("User updated: id={}, displayName={}", saved.getId(), saved.getDisplayName());
-    return UserDto.from(saved, employeeProjectionPort.findByUserId(userId).orElse(null));
+    return UserDto.from(saved, employeeProjectionPort.findByUserId(tenantId, userId).orElse(null));
   }
 
   @Transactional
   public void deactivateUser(UUID userId, String reason) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     deactivateUser(tenantId, userId, reason);
   }
 

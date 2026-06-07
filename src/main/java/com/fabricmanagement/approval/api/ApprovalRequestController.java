@@ -27,7 +27,7 @@ public class ApprovalRequestController {
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR') or hasAuthority('MANAGER')")
   public ResponseEntity<List<ApprovalRequestResponse>> getPendingRequests(
       @RequestParam(required = false) ApproverRole approverRole) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<ApprovalRequestResponse> response =
         requestService.getPendingRequests(tenantId, approverRole).stream()
             .map(ApprovalRequestResponse::from)
@@ -38,7 +38,7 @@ public class ApprovalRequestController {
   @PostMapping("/{requestId}/approve")
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR') or hasAuthority('MANAGER')")
   public ResponseEntity<Void> approveRequest(@PathVariable UUID requestId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID currentUserId = TenantContext.getCurrentUserId();
 
     requestService.approveRequest(tenantId, requestId, currentUserId);
@@ -49,7 +49,7 @@ public class ApprovalRequestController {
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR') or hasAuthority('MANAGER')")
   public ResponseEntity<Void> rejectRequest(
       @PathVariable UUID requestId, @RequestBody @Valid RejectRequestDto dto) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID currentUserId = TenantContext.getCurrentUserId();
 
     requestService.rejectRequest(tenantId, requestId, currentUserId, dto.getReason());

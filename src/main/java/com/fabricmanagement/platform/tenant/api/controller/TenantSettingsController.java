@@ -1,6 +1,5 @@
 package com.fabricmanagement.platform.tenant.api.controller;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.tenant.app.TenantService;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
@@ -8,7 +7,6 @@ import com.fabricmanagement.platform.tenant.dto.TenantSettingsDto;
 import com.fabricmanagement.platform.tenant.dto.UpdateTenantSettingsRequest;
 import com.fabricmanagement.platform.tenant.mapper.TenantSettingsMapper;
 import jakarta.validation.Valid;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -37,10 +35,9 @@ public class TenantSettingsController {
    */
   @GetMapping
   public ResponseEntity<ApiResponse<TenantSettingsDto>> getSettings() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.debug("Getting settings for tenant: id={}", tenantId);
+    log.debug("Getting settings for current tenant");
 
-    TenantSettings settings = tenantService.getSettings(tenantId);
+    TenantSettings settings = tenantService.getMySettings();
     TenantSettingsDto dto = tenantSettingsMapper.toDto(settings);
 
     return ResponseEntity.ok(ApiResponse.success(dto));
@@ -55,11 +52,10 @@ public class TenantSettingsController {
   @PutMapping
   public ResponseEntity<ApiResponse<TenantSettingsDto>> updateSettings(
       @Valid @RequestBody UpdateTenantSettingsRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
-    log.info("Updating settings for tenant: id={}", tenantId);
+    log.info("Updating settings for current tenant");
 
     TenantSettings settings = tenantSettingsMapper.toEntity(request);
-    TenantSettings updated = tenantService.updateSettings(tenantId, settings);
+    TenantSettings updated = tenantService.updateMySettings(settings);
     TenantSettingsDto dto = tenantSettingsMapper.toDto(updated);
 
     return ResponseEntity.ok(ApiResponse.success(dto, "Settings updated successfully"));

@@ -37,7 +37,7 @@ public class EmployeeService {
   @Transactional
   public Employee createOrUpdateEmployee(EmployeeCreationCommand command) {
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     log.debug("Creating/updating employee: userId={}, tenantId={}", command.userId(), tenantId);
 
@@ -103,7 +103,7 @@ public class EmployeeService {
   }
 
   public Optional<Employee> getEmployeeByUserId(UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return employeeRepository.findByTenantIdAndUserId(tenantId, userId);
   }
 
@@ -130,7 +130,7 @@ public class EmployeeService {
   }
 
   public Optional<Employee> getEmployeeByEmployeeNumber(String employeeNumber) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return employeeRepository.findByTenantIdAndEmployeeNumber(tenantId, employeeNumber);
   }
 
@@ -140,7 +140,7 @@ public class EmployeeService {
 
   @Transactional
   public String generateEmployeeNumber() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String tenantUid = TenantContext.getCurrentTenantUid();
 
     if (tenantUid == null) {
@@ -176,7 +176,7 @@ public class EmployeeService {
 
   @Transactional
   public Employee terminateEmployee(UUID userId, LocalDate terminationDate) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Terminating employee. userId={}, terminationDate={}", userId, terminationDate);
 
     Employee employee =

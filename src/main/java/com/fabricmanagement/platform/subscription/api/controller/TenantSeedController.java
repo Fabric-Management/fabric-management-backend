@@ -37,7 +37,7 @@ public class TenantSeedController {
    */
   @PostMapping("/departments-and-positions")
   public ResponseEntity<ApiResponse<String>> seedDepartmentsAndPositions() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID organizationId =
         organizationFacade
             .getRootOrganization()
@@ -66,7 +66,7 @@ public class TenantSeedController {
    */
   @GetMapping("/check")
   public ResponseEntity<ApiResponse<Boolean>> checkIfSeeded() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID organizationId =
         organizationFacade
             .getRootOrganization()

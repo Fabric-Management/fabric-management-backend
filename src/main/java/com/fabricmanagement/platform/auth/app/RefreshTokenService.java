@@ -70,7 +70,7 @@ public class RefreshTokenService {
           "Refresh token expired or revoked", "AUTH_REFRESH_TOKEN_INVALID", 401);
     }
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID userId = token.getUserId();
 
     // Get user

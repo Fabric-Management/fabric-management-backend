@@ -35,7 +35,7 @@ public class LogoutService {
    */
   @Transactional
   public void logout(String refreshToken, UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Logout request: tenantId={}, userId={}", tenantId, userId);
 
     // Find and revoke refresh token
@@ -107,7 +107,7 @@ public class LogoutService {
    */
   @Transactional
   public void logoutFromAllDevices(UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info("Logout from all devices: tenantId={}, userId={}", tenantId, userId);
 
     refreshTokenRepository

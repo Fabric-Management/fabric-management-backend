@@ -69,7 +69,7 @@ public class BatchOperationsService {
    */
   @Transactional
   public BatchDto createBlendedBatch(CreateBlendedBatchRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Creating blended batch: tenantId={}, batchCode={}, parents={}",
         tenantId,
@@ -187,7 +187,7 @@ public class BatchOperationsService {
    */
   @Transactional
   public BatchDto adjust(UUID batchId, AdjustmentRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Adjusting batch: tenantId={}, batchId={}, delta={}, reason={}",
         tenantId,
@@ -231,7 +231,7 @@ public class BatchOperationsService {
    */
   @Transactional
   public SplitBatchResponse splitBatch(UUID batchId, SplitBatchRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
     log.debug(
         "Splitting batch: tenantId={}, batchId={}, acceptedQty={}",
@@ -333,7 +333,7 @@ public class BatchOperationsService {
    */
   @Transactional
   public BatchDto splitPartialAcceptance(UUID batchId, PartialAcceptanceSplitRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
     log.debug(
         "Partial acceptance split: tenantId={}, batchId={}, acceptedQty={}",
@@ -447,7 +447,7 @@ public class BatchOperationsService {
    */
   @Transactional
   public BatchDto overrideStatus(UUID batchId, OverrideStatusRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID actorId = TenantContext.getCurrentUserId();
     log.debug("Override batch status: tenantId={}, batchId={}", tenantId, batchId);
 
@@ -481,7 +481,7 @@ public class BatchOperationsService {
   /** Transfer batch to a new warehouse location. */
   @Transactional
   public BatchDto transferBatch(UUID batchId, TransferBatchRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Transferring batch: tenantId={}, batchId={}, request={}", tenantId, batchId, request);
 
@@ -518,7 +518,7 @@ public class BatchOperationsService {
    */
   @Transactional
   public BatchDto startProduction(UUID batchId, StartProductionRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Starting production: tenantId={}, batchId={}, machineLocationId={}",
         tenantId,

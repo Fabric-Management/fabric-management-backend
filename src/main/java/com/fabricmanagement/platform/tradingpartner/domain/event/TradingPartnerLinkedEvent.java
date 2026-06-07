@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tradingpartner.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
@@ -8,8 +9,8 @@ import lombok.Getter;
 /**
  * Published when a registry is linked to a platform tenant.
  *
- * <p>This is a platform-level event (tenantId is null) that notifies all tenants with this registry
- * that the partner is now on the platform.
+ * <p>This is a platform-level event — uses {@link TenantContext#SYSTEM_TENANT_ID} as sentinel since
+ * registry linking is cross-tenant.
  *
  * <p>Listeners can use this event to:
  *
@@ -29,7 +30,7 @@ public class TradingPartnerLinkedEvent extends DomainEvent {
 
   public TradingPartnerLinkedEvent(
       UUID registryId, UUID linkedTenantId, List<UUID> affectedTenantIds) {
-    super(null, "TRADING_PARTNER_LINKED"); // Platform-level event
+    super(TenantContext.SYSTEM_TENANT_ID, "TRADING_PARTNER_LINKED");
     this.registryId = registryId;
     this.linkedTenantId = linkedTenantId;
     this.affectedTenantIds = affectedTenantIds;

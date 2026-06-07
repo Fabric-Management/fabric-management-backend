@@ -59,7 +59,7 @@ public class UserProfileService {
     if (!request.hasUpdates()) {
       log.debug("No profile fields to update for userId={}, returning current user", userId);
       return userQueryService
-          .findById(TenantContext.getCurrentTenantId(), userId)
+          .findById(TenantContext.requireTenantId(), userId)
           .orElseThrow(() -> new IllegalArgumentException("User not found"));
     }
 
@@ -82,7 +82,7 @@ public class UserProfileService {
 
     User user =
         userRepository
-            .findByTenantIdAndId(TenantContext.getCurrentTenantId(), userId)
+            .findByTenantIdAndId(TenantContext.requireTenantId(), userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     if (request.getFirstName() != null || request.getLastName() != null) {
@@ -104,7 +104,7 @@ public class UserProfileService {
     if (request.getRoleId() != null) {
       Role role =
           roleRepository
-              .findByTenantIdAndId(TenantContext.getCurrentTenantId(), request.getRoleId())
+              .findByTenantIdAndId(TenantContext.requireTenantId(), request.getRoleId())
               .orElseThrow(() -> new IllegalArgumentException("Role not found"));
       user.setRole(role);
     }
@@ -120,7 +120,8 @@ public class UserProfileService {
       updatePersonalContact(userId, request.getPersonalPhone(), ContactType.MOBILE);
     }
 
-    EmployeeSnapshot employeeSnapshot = updateEmployeePersonalFields(userId, request);
+    EmployeeSnapshot employeeSnapshot =
+        updateEmployeePersonalFields(TenantContext.requireTenantId(), userId, request);
 
     User saved = userRepository.save(user);
     eventPublisher.publish(
@@ -136,10 +137,10 @@ public class UserProfileService {
    * onboarding).
    */
   private EmployeeSnapshot updateEmployeePersonalFields(
-      UUID userId, UpdateUserProfileRequest request) {
+      UUID tenantId, UUID userId, UpdateUserProfileRequest request) {
     EmployeeFieldUpdates updates = buildEmployeeFieldUpdates(request);
     if (!updates.hasAny()) {
-      return employeeProjectionPort.findByUserId(userId).orElse(null);
+      return employeeProjectionPort.findByUserId(tenantId, userId).orElse(null);
     }
     return employeeMutationPort
         .applyFieldUpdates(userId, updates)

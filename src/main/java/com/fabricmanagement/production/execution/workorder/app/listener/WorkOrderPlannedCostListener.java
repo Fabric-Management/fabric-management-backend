@@ -1,6 +1,5 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderPlannedCostTriggerService;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import lombok.RequiredArgsConstructor;
@@ -41,9 +40,6 @@ public class WorkOrderPlannedCostListener {
         event.getWorkOrderNumber());
 
     try {
-      // Belt-and-suspenders: REQUIRES_NEW opens a new transaction; TenantContext
-      // is thread-local and normally preserved, but set it explicitly to be safe.
-      TenantContext.setCurrentTenantId(event.getTenantId());
       plannedCostTriggerService.triggerPlannedCost(event.getWorkOrderId());
     } catch (Exception e) {
       log.error(

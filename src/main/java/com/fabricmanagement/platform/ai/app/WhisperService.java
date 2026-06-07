@@ -57,7 +57,7 @@ public class WhisperService {
       throw new IllegalStateException("AI features are disabled");
     }
 
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UUID userId = TenantContext.getCurrentUserId();
 
     log.info(

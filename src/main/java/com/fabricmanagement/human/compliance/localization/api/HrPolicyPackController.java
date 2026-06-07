@@ -117,10 +117,7 @@ public class HrPolicyPackController {
     String normalizedRegion = regionCode != null ? regionCode.toUpperCase(Locale.ROOT) : null;
     List<HrPolicyPackResponse> packs =
         policyPackFacade.listPacks(
-            TenantContext.getCurrentTenantId(),
-            normalizedCountry,
-            normalizedRegion,
-            resolvedStatus);
+            TenantContext.requireTenantId(), normalizedCountry, normalizedRegion, resolvedStatus);
     return ResponseEntity.ok(ApiResponse.success(packs));
   }
 
@@ -131,7 +128,7 @@ public class HrPolicyPackController {
   public ResponseEntity<ApiResponse<List<HrPolicyPackResponse>>> history(
       @PathVariable String packCode) {
     List<HrPolicyPackResponse> history =
-        policyPackFacade.getHistory(TenantContext.getCurrentTenantId(), packCode);
+        policyPackFacade.getHistory(TenantContext.requireTenantId(), packCode);
     return ResponseEntity.ok(ApiResponse.success(history));
   }
 
@@ -142,7 +139,7 @@ public class HrPolicyPackController {
   public ResponseEntity<ApiResponse<HrPolicyPackLineageResponse>> lineage(
       @PathVariable String packCode, @RequestParam(required = false) Integer packVersion) {
     HrPolicyPackLineageResponse response =
-        policyPackFacade.getLineage(TenantContext.getCurrentTenantId(), packCode, packVersion);
+        policyPackFacade.getLineage(TenantContext.requireTenantId(), packCode, packVersion);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
@@ -161,7 +158,7 @@ public class HrPolicyPackController {
       description = "List country-pack mappings",
       calledBy = {"hr-admin-ui"})
   public ResponseEntity<ApiResponse<List<HrCountryPackMappingResponse>>> listMappings() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<HrCountryPackMappingResponse> responses = policyPackFacade.listMappings(tenantId);
     return ResponseEntity.ok(ApiResponse.success(responses));
   }

@@ -78,7 +78,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto createOrder(CreateSalesOrderRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Resolve partner ID (handles both new and legacy IDs)
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, request.getPartnerId());
@@ -164,7 +164,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto updateOrder(UUID orderId, UpdateSalesOrderRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // 1. Fetch managed entity (Hibernate loads version)
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
@@ -324,7 +324,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public Optional<SalesOrderDto> findById(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
         .findByTenantIdAndId(tenantId, orderId)
@@ -351,7 +351,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public Optional<SalesOrderDto> findByOrderNumber(String orderNumber) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
         .findByTenantIdAndOrderNumber(tenantId, orderNumber)
@@ -366,7 +366,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findByPartner(UUID partnerId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     // Resolve partner ID to ensure we query with the correct ID
     UUID tradingPartnerId = partnerResolver.resolvePartnerId(tenantId, partnerId);
@@ -384,7 +384,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findByStatus(OrderStatus status) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository.findByTenantIdAndStatus(tenantId, status).stream()
         .map(SalesOrderDto::from)
@@ -398,7 +398,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findOpenOrders() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository.findOpenOrders(tenantId).stream().map(SalesOrderDto::from).toList();
   }
@@ -410,7 +410,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public List<SalesOrderDto> findOverdueOrders() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository.findOverdueOrders(tenantId, LocalDate.now()).stream()
         .map(SalesOrderDto::from)
@@ -425,7 +425,7 @@ public class SalesOrderService {
    */
   @Transactional(readOnly = true)
   public Page<SalesOrderDto> findAll(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     return orderRepository
         .findByTenantIdAndIsActiveTrue(tenantId, pageable)
@@ -444,7 +444,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto confirmOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
 
@@ -524,10 +524,10 @@ public class SalesOrderService {
   @Transactional
   public SalesOrderDto confirmOrderAsSystem(UUID orderId) {
     return TenantContext.executeInTenantContext(
-        TenantContext.getCurrentTenantId(),
+        TenantContext.requireTenantId(),
         () -> {
           TenantContext.setCurrentUserId(com.fabricmanagement.platform.user.domain.SystemUser.ID);
-          UUID tenantId = TenantContext.getCurrentTenantId();
+          UUID tenantId = TenantContext.requireTenantId();
           SalesOrder order = getOrderOrThrow(tenantId, orderId);
           order.confirmFromApproval();
           return finalizeConfirmation(order, tenantId);
@@ -594,7 +594,7 @@ public class SalesOrderService {
   /** Reject an order (called after approval rejection callback). */
   @Transactional
   public void rejectOrder(UUID orderId, String reason) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.reject(reason);
     orderRepository.save(order);
@@ -609,7 +609,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto startProcessing(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.startProcessing();
@@ -627,7 +627,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto shipOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.ship();
@@ -646,7 +646,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto deliverOrder(UUID orderId, LocalDate deliveryDate) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.deliver(deliveryDate);
@@ -664,7 +664,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto cancelOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
 
@@ -693,7 +693,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto holdOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.hold();
@@ -714,7 +714,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto resumeOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.resume();
@@ -732,7 +732,7 @@ public class SalesOrderService {
    */
   @Transactional
   public SalesOrderDto reviseOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
     order.reviseRejected();
@@ -749,7 +749,7 @@ public class SalesOrderService {
    */
   @Transactional
   public void deleteOrder(UUID orderId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     SalesOrder order = getOrderOrThrow(tenantId, orderId);
 

@@ -31,7 +31,7 @@ public class PayRunService {
   @Transactional
   public PayRun createRun(String periodCode, UUID initiatedBy) {
     PayPeriod period = payPeriodService.getPeriod(periodCode);
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     int nextRunNumber =
         payRunRepository
@@ -91,11 +91,11 @@ public class PayRunService {
   }
 
   public List<PayRun> listByStatus(PayRunStatus status) {
-    return payRunRepository.findByStatus(TenantContext.getCurrentTenantId(), status);
+    return payRunRepository.findByStatus(TenantContext.requireTenantId(), status);
   }
 
   private HrPolicyPack resolvePolicyPack(String countryCode) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String normalizedCountry =
         countryCode != null
             ? countryCode.toUpperCase(Locale.ROOT)

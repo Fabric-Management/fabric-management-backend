@@ -33,7 +33,7 @@ public class ShipmentProgressService {
   public UUID recordLineShipment(
       UUID salesOrderLineId, UUID shipmentLineId, BigDecimal confirmedQuantity) {
     UUID tenantId =
-        com.fabricmanagement.common.infrastructure.persistence.TenantContext.getCurrentTenantId();
+        com.fabricmanagement.common.infrastructure.persistence.TenantContext.requireTenantId();
     SalesOrderLine line =
         salesOrderLineRepository.findByTenantIdAndId(tenantId, salesOrderLineId).orElse(null);
     if (line == null) {
@@ -92,7 +92,7 @@ public class ShipmentProgressService {
 
     // 3. Header status güncelle
     UUID tenantId =
-        com.fabricmanagement.common.infrastructure.persistence.TenantContext.getCurrentTenantId();
+        com.fabricmanagement.common.infrastructure.persistence.TenantContext.requireTenantId();
     SalesOrder order =
         salesOrderRepository.findByTenantIdAndId(tenantId, salesOrderId).orElse(null);
     if (order == null) {

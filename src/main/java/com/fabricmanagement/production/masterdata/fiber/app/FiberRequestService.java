@@ -270,13 +270,13 @@ public class FiberRequestService {
   }
 
   /**
-   * Create FiberIsoCode, Product, Fiber from approved request (R__001 logic).
+   * Create FiberIsoCode, Product, Fiber from approved request.
    *
-   * <p>Runs in SYSTEM_TENANT context so entities are platform-level.
+   * <p>Creates entities in the requesting tenant's context. Each tenant has its own fiber catalog.
    */
   private void createFiberFromRequest(FiberRequest request) {
     TenantContext.executeInTenantContext(
-        TenantContext.SYSTEM_TENANT_ID,
+        request.getTenantId(),
         () -> {
           // 1. prod_fiber_iso_code INSERT
           FiberIsoCode isoCode =
@@ -308,10 +308,11 @@ public class FiberRequestService {
           fiberRepository.save(fiber);
 
           log.info(
-              "Created fiber from request: isoCode={}, productId={}, fiberId={}",
+              "Created fiber from request: isoCode={}, productId={}, fiberId={}, tenantId={}",
               request.getIsoCode(),
               product.getId(),
-              fiber.getId());
+              fiber.getId(),
+              request.getTenantId());
         });
   }
 

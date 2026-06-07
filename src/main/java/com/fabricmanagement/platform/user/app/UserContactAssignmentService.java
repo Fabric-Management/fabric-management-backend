@@ -47,7 +47,7 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
   protected void onAfterAssign(UserContact junction) {
     eventPublisher.publish(
         new ContactAssignedEvent(
-            TenantContext.getCurrentTenantId(), junction.getUserId(), junction.getContactId()));
+            TenantContext.requireTenantId(), junction.getUserId(), junction.getContactId()));
   }
 
   @Override
@@ -57,7 +57,7 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
 
   @Override
   protected void validateParentExists(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     userRepository
         .findByTenantIdAndId(tenantId, parentId)
         .orElseThrow(() -> new PlatformDomainException("User not found", "USER_NOT_FOUND", 404));
@@ -65,7 +65,7 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
 
   @Override
   protected void validateChildExists(UUID childId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Contact contact =
         contactRepository
             .findById(childId)
@@ -91,7 +91,7 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
 
   @Override
   protected List<UserContact> findByParent(UUID parentId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return userContactRepository.findByTenantIdAndUserId(tenantId, parentId);
   }
 
@@ -111,7 +111,7 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
 
   @Transactional
   public void removeContact(UUID userId, UUID contactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UserContact userContact =
         userContactRepository
             .findByUserIdAndContactId(userId, contactId)
@@ -178,7 +178,7 @@ public class UserContactAssignmentService extends BaseAssignmentService<UserCont
 
   @Transactional(readOnly = true)
   public List<UserContact> getUserContactsByContactId(UUID contactId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return userContactRepository.findByTenantIdAndContactId(tenantId, contactId);
   }
 }

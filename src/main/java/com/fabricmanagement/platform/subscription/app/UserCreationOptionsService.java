@@ -63,7 +63,7 @@ public class UserCreationOptionsService {
   }
 
   private UserCreationOptionsDto getOptions(RoleScope scope) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting user creation options: tenantId={}, scope={}", tenantId, scope);
 
     UUID organizationId =

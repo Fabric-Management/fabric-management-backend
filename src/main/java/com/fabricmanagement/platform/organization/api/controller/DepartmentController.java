@@ -33,7 +33,7 @@ public class DepartmentController {
    */
   @GetMapping
   public ResponseEntity<ApiResponse<List<DepartmentDto>>> getAllDepartments() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting all departments: tenantId={}", tenantId);
 
     // Tenant-level departments only (platform-level departments are reference, not shown)
@@ -49,7 +49,7 @@ public class DepartmentController {
   @GetMapping("/organization/{organizationId}")
   public ResponseEntity<ApiResponse<List<DepartmentDto>>> getDepartmentsByOrganization(
       @PathVariable UUID organizationId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug(
         "Getting departments by organization: tenantId={}, organizationId={}",
         tenantId,
@@ -66,7 +66,7 @@ public class DepartmentController {
   /** Get department by ID. */
   @GetMapping("/{id}")
   public ResponseEntity<ApiResponse<DepartmentDto>> getDepartment(@PathVariable UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting department: tenantId={}, id={}", tenantId, id);
 
     DepartmentDto department =

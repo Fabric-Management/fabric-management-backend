@@ -52,7 +52,7 @@ public class DashboardController {
   @Operation(summary = "Varsayilan dashboard'u getir")
   public ResponseEntity<ApiResponse<DashboardConfigDto>> getDefaultDashboard(
       @RequestParam("userId") @NotNull UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return ResponseEntity.ok(
         ApiResponse.success(
             DashboardMapper.toDto(
@@ -67,7 +67,7 @@ public class DashboardController {
   @GetMapping("/{dashboardId}/widgets")
   public ResponseEntity<ApiResponse<List<DashboardWidgetDto>>> getWidgets(
       @PathVariable @NotNull UUID dashboardId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<DashboardWidget> widgets = dashboardService.getDashboardWidgets(tenantId, dashboardId);
     return ResponseEntity.ok(
         ApiResponse.success(widgets.stream().map(DashboardMapper::toDto).toList()));
@@ -76,7 +76,7 @@ public class DashboardController {
   @PostMapping("/default/layout")
   public ResponseEntity<ApiResponse<DashboardConfigDto>> updateDefaultLayout(
       @RequestParam("userId") @NotNull UUID userId, @RequestBody @NotBlank String layoutJsonb) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     DashboardConfig config =
         dashboardService.createOrUpdateDefaultDashboard(tenantId, userId, layoutJsonb);
     return ResponseEntity.ok(ApiResponse.success(DashboardMapper.toDto(config)));
@@ -85,7 +85,7 @@ public class DashboardController {
   @PostMapping("/{dashboardId}/widgets")
   public ResponseEntity<ApiResponse<DashboardWidgetDto>> addWidget(
       @PathVariable @NotNull UUID dashboardId, @RequestBody @Valid AddWidgetRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     DashboardWidget widget =
         dashboardService.addWidgetToDashboard(
             tenantId,

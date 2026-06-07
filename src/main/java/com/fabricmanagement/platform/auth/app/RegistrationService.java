@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.util.DeviceInfoUtil;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
@@ -18,8 +19,6 @@ import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.platform.user.dto.UserDto;
@@ -72,7 +71,7 @@ public class RegistrationService {
   private final ContactService contactService;
   private final UserContactAssignmentService userContactAssignmentService;
   private final RefreshTokenRepository refreshTokenRepository;
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
   private final VerificationCodeManager verificationCodeManager;
   private final OrganizationRepository organizationRepository;
 
@@ -140,21 +139,15 @@ public class RegistrationService {
     }
 
     // Tenant status guard: ensure tenant is active before allowing registration
-    Tenant tenant =
-        tenantRepository
-            .findActiveById(user.getTenantId())
-            .orElseThrow(
-                () ->
-                    new PlatformDomainException(
-                        "Tenant is not active. Registration is not allowed.",
-                        "AUTH_TENANT_INACTIVE",
-                        403));
-    if (!tenant.getStatus().hasAccess()) {
-      throw new PlatformDomainException(
-          "Tenant account is " + tenant.getStatus() + ". Registration is not allowed.",
-          "AUTH_TENANT_INACTIVE",
-          403);
-    }
+    // Uses TenantQueryPort (BYPASSRLS) — registration happens before tenant context is set
+    tenantQueryPort
+        .findById(user.getTenantId())
+        .orElseThrow(
+            () ->
+                new PlatformDomainException(
+                    "Tenant is not active. Registration is not allowed.",
+                    "AUTH_TENANT_INACTIVE",
+                    403));
 
     com.fabricmanagement.platform.communication.domain.Contact contact =
         findUserContactByValue(user.getId(), request.getContactValue());

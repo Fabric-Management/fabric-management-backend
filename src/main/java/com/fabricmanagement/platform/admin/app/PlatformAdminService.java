@@ -6,9 +6,8 @@ import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.subscription.infra.repository.SubscriptionRepository;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
+import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.domain.EmployeeSnapshot;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
@@ -32,26 +31,35 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>CRITICAL:</b> This service allows PLATFORM_ADMIN users to access and manage data across ALL
  * tenants in the system.
  *
- * <h2>Features:</h2>
+ * <h2>RLS Protection Model:</h2>
  *
- * <ul>
- *   <li>List all tenants in the system
- *   <li>Access any tenant's data (companies, users, subscriptions, etc.)
- *   <li>Manage tenant operations (activate, deactivate, etc.)
- *   <li>Cross-tenant reporting and analytics
- * </ul>
+ * <p>This service uses JPA repositories with {@link TenantContext#executeInTenantContext(UUID,
+ * java.util.function.Supplier)} to switch the active tenant before querying. The underlying
+ * connection uses the {@code fabric_app} role (NOBYPASSRLS), meaning PostgreSQL RLS policies are
+ * always enforced — admin can only see data belonging to the tenant they explicitly switch to.
+ *
+ * <p>This is intentionally NOT using {@code SystemTransactionExecutor} (BYPASSRLS). BYPASSRLS would
+ * expose ALL tenants' data in a single query, which is unnecessarily broad for per-tenant admin
+ * views. The current approach provides defense-in-depth: even if the admin code has a bug, RLS
+ * prevents cross-tenant data leakage.
+ *
+ * <p>Tenant listing (cross-tenant) operations delegate to {@link TenantSystemService} which
+ * correctly uses BYPASSRLS for the tenant table's self-row RLS policy.
  *
  * <h2>Security:</h2>
  *
- * <p>All methods MUST be called by users with PLATFORM_ADMIN role. Tenant context switching is
- * handled internally using TenantContext.executeInTenantContext().
+ * <p>All methods MUST be called by users with PLATFORM_ADMIN role (enforced by
+ * {@code @PreAuthorize} on the controller). Tenant existence is validated before context switch.
+ *
+ * @see com.fabricmanagement.common.infrastructure.persistence.TenantContext
+ * @see TenantSystemService
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PlatformAdminService {
 
-  private final TenantRepository tenantRepository;
+  private final TenantSystemService tenantSystemService;
   private final OrganizationRepository organizationRepository;
   private final UserRepository userRepository;
   private final SubscriptionRepository subscriptionRepository;
@@ -64,15 +72,14 @@ public class PlatformAdminService {
    *
    * @return List of all tenants
    */
-  @Transactional(readOnly = true)
   public List<TenantDto> getAllTenants() {
     log.info("Platform admin: Listing all tenants in system");
 
-    List<Tenant> tenants = tenantRepository.findAllActive();
+    List<TenantDto> tenants = tenantSystemService.getAllActive();
 
     log.info("Found {} tenants in system", tenants.size());
 
-    return tenants.stream().map(TenantDto::from).collect(Collectors.toList());
+    return tenants;
   }
 
   /**
@@ -83,18 +90,24 @@ public class PlatformAdminService {
    * @param pageable page, size and sort parameters
    * @return Page of tenants
    */
-  @Transactional(readOnly = true)
   public Page<TenantDto> getAllTenants(Pageable pageable) {
     log.info(
         "Platform admin: Listing tenants (page={}, size={})",
         pageable.getPageNumber(),
         pageable.getPageSize());
 
-    Page<Tenant> page = tenantRepository.findAllActive(pageable);
+    // TenantSystemService.getAllActive() returns unpaginated List<TenantDto>.
+    // For admin pagination, we do in-memory paging. Acceptable because tenant
+    // count is O(hundreds) not O(millions). If this becomes a bottleneck,
+    // add a paginated JDBC query to TenantSystemService.
+    List<TenantDto> all = tenantSystemService.getAllActive();
+    int start = (int) pageable.getOffset();
+    int end = Math.min(start + pageable.getPageSize(), all.size());
+    List<TenantDto> pageContent = start >= all.size() ? List.of() : all.subList(start, end);
 
-    log.debug("Found {} tenants on page {}", page.getNumberOfElements(), page.getNumber());
+    log.debug("Found {} tenants on page {}", pageContent.size(), pageable.getPageNumber());
 
-    return page.map(TenantDto::from);
+    return new org.springframework.data.domain.PageImpl<>(pageContent, pageable, all.size());
   }
 
   /**
@@ -103,16 +116,12 @@ public class PlatformAdminService {
    * @param tenantId The tenant ID to access
    * @return TenantDto for the tenant
    */
-  @Transactional(readOnly = true)
   public TenantDto getTenant(UUID tenantId) {
     log.info("Platform admin: Accessing tenant: {}", tenantId);
 
-    Tenant tenant =
-        tenantRepository
-            .findById(tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
-
-    return TenantDto.from(tenant);
+    return tenantSystemService
+        .findById(tenantId)
+        .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
   }
 
   /**
@@ -126,6 +135,7 @@ public class PlatformAdminService {
   @Transactional(readOnly = true)
   public List<UserDto> getTenantUsers(UUID tenantId) {
     log.info("Platform admin: Getting users for tenant: {}", tenantId);
+    validateTenantExists(tenantId);
 
     return TenantContext.executeInTenantContext(
         tenantId,
@@ -156,6 +166,7 @@ public class PlatformAdminService {
   @Transactional(readOnly = true)
   public List<OrganizationDto> getTenantOrganizations(UUID tenantId) {
     log.info("Platform admin: Getting organizations for tenant: {}", tenantId);
+    validateTenantExists(tenantId);
 
     return TenantContext.executeInTenantContext(
         tenantId,
@@ -244,13 +255,12 @@ public class PlatformAdminService {
    * @param tenantId The tenant ID
    * @return TenantStatistics with counts
    */
-  @Transactional(readOnly = true)
   public TenantStatistics getTenantStatistics(UUID tenantId) {
     log.info("Platform admin: Getting statistics for tenant: {}", tenantId);
 
-    // Get tenant info first
-    Tenant tenant =
-        tenantRepository
+    // Get tenant info via system executor (BYPASSRLS — tenant table has self-row RLS)
+    TenantDto tenant =
+        tenantSystemService
             .findById(tenantId)
             .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
 
@@ -269,10 +279,29 @@ public class PlatformAdminService {
               .tenantUid(tenant.getUid())
               .companyName(tenant.getName())
               .userCount(userCount)
-              .companyCount(organizationCount) // Now organization count
+              .companyCount(organizationCount)
               .subscriptionCount(subscriptionCount)
               .isActive(tenant.getIsActive())
               .build();
         });
+  }
+
+  // ========================================
+  // VALIDATION HELPERS
+  // ========================================
+
+  /**
+   * Validate that the target tenant exists before performing cross-tenant operations.
+   *
+   * <p>Prevents empty-result confusion: without this, querying a non-existent tenant returns an
+   * empty list (RLS filters everything out) rather than a clear 404.
+   *
+   * @param tenantId The tenant ID to validate
+   * @throws IllegalArgumentException if tenant does not exist
+   */
+  private void validateTenantExists(UUID tenantId) {
+    if (!tenantSystemService.exists(tenantId)) {
+      throw new IllegalArgumentException("Tenant not found: " + tenantId);
+    }
   }
 }

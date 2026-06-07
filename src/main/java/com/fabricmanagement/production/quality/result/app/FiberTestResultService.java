@@ -38,7 +38,7 @@ public class FiberTestResultService {
 
   @Transactional
   public FiberTestResultDto create(CreateFiberTestResultRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     UUID batchId;
     if (request.getStockUnitId() != null) {
@@ -118,13 +118,13 @@ public class FiberTestResultService {
 
   @Transactional(readOnly = true)
   public Optional<FiberTestResultDto> getById(UUID id) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return testResultRepository.findByTenantIdAndId(tenantId, id).map(FiberTestResultDto::from);
   }
 
   @Transactional(readOnly = true)
   public List<FiberTestResultDto> getByBatchId(UUID batchId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return testResultRepository.findByTenantIdAndBatchIdAndIsActiveTrue(tenantId, batchId).stream()
         .map(FiberTestResultDto::from)
         .toList();
@@ -132,7 +132,7 @@ public class FiberTestResultService {
 
   @Transactional(readOnly = true)
   public List<FiberTestResultDto> getAll() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return testResultRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
         .map(FiberTestResultDto::from)
         .toList();
@@ -140,7 +140,7 @@ public class FiberTestResultService {
 
   @Transactional(readOnly = true)
   public List<FiberTestResultDto> getByStockUnitId(UUID stockUnitId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return testResultRepository
         .findByTenantIdAndStockUnitIdAndIsActiveTrue(tenantId, stockUnitId)
         .stream()
@@ -150,7 +150,7 @@ public class FiberTestResultService {
 
   @Transactional(readOnly = true)
   public List<FiberTestResultDto> getByApprovalStatus(TestApprovalStatus status) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return testResultRepository.findByTenantIdAndApprovalStatus(tenantId, status).stream()
         .map(FiberTestResultDto::from)
         .toList();
@@ -162,7 +162,7 @@ public class FiberTestResultService {
    */
   @Transactional
   public FiberTestResultDto updateApproval(UUID id, UpdateApprovalRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     FiberTestResult result =
         testResultRepository

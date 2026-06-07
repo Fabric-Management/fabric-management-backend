@@ -2,6 +2,8 @@ package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.domain.RefreshToken;
@@ -20,8 +22,6 @@ import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationAddressRepository;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
-import com.fabricmanagement.platform.tenant.domain.Tenant;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.app.UserContactAssignmentService;
 import com.fabricmanagement.platform.user.domain.port.EmployeeProjectionPort;
@@ -74,7 +74,7 @@ public class PasswordSetupService {
   private final EntityManager entityManager;
   private final OrganizationRepository organizationRepository;
   private final OrganizationAddressRepository organizationAddressRepository;
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
   private final EmployeeProjectionPort employeeProjectionPort;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
@@ -126,17 +126,14 @@ public class PasswordSetupService {
     }
 
     // Tenant status guard: ensure tenant is active before allowing registration
-    Tenant tenant =
-        tenantRepository
-            .findActiveById(user.getTenantId())
+    // Uses TenantQueryPort (BYPASSRLS) — password setup happens before tenant context is set
+    TenantReference tenantRef =
+        tenantQueryPort
+            .findById(user.getTenantId())
             .orElseThrow(
                 () ->
                     new IllegalStateException(
-                        "Tenant is not active. Password setup is not allowed."));
-    if (!tenant.getStatus().hasAccess()) {
-      throw new IllegalStateException(
-          "Tenant account is " + tenant.getStatus() + ". Password setup is not allowed.");
-    }
+                        "Tenant not found or not active. Password setup is not allowed."));
 
     // Reload User entity with contacts/departments for JWT generation
     com.fabricmanagement.platform.user.domain.User userEntity =

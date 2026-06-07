@@ -16,7 +16,7 @@ public class DiscountPolicyService {
 
   @Transactional(readOnly = true)
   public DiscountPolicy getActivePolicy(String moduleType) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return repository
         .findActiveByModuleType(tenantId, moduleType)
         .orElseThrow(
@@ -27,7 +27,7 @@ public class DiscountPolicyService {
 
   @Transactional
   public DiscountPolicy savePolicy(DiscountPolicy policy) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     policy.setTenantId(tenantId);
 
     // Deactivate the old active policy for the same module type

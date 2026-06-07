@@ -1,10 +1,9 @@
 package com.fabricmanagement.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.domain.strategy.EmailStrategy;
-import com.fabricmanagement.platform.tenant.domain.TenantType;
-import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +42,7 @@ public class NotificationService {
 
   private final EmailStrategy emailStrategy;
   private final EmailOutboxService emailOutboxService;
-  private final TenantRepository tenantRepository;
+  private final TenantQueryPort tenantQueryPort;
 
   @Value("${application.email.use-outbox:true}")
   private boolean useOutbox;
@@ -125,9 +124,10 @@ public class NotificationService {
     if (tenantId == null) {
       return false;
     }
-    return tenantRepository
+    // Uses TenantQueryPort (BYPASSRLS) — @Async may not propagate tenant context to async thread
+    return tenantQueryPort
         .findById(tenantId)
-        .map(tenant -> tenant.getType() == TenantType.PLAYGROUND)
+        .map(ref -> "PLAYGROUND".equals(ref.type()))
         .orElse(false);
   }
 }

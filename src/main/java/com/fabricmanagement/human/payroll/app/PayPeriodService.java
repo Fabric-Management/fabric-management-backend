@@ -30,7 +30,7 @@ public class PayPeriodService {
       LocalDate startDate,
       LocalDate endDate,
       String frequency) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String normalizedCode = periodCode.toUpperCase(Locale.ROOT);
 
     payPeriodRepository
@@ -76,7 +76,7 @@ public class PayPeriodService {
 
   public List<PayPeriod> listOpenPeriods(String countryCode) {
     return payPeriodRepository.findByStatus(
-        TenantContext.getCurrentTenantId(),
+        TenantContext.requireTenantId(),
         countryCode != null ? countryCode.toUpperCase(Locale.ROOT) : localizationCountry(),
         PayPeriodStatus.OPEN);
   }
@@ -84,7 +84,7 @@ public class PayPeriodService {
   public PayPeriod findCoveringDate(LocalDate date, String countryCode) {
     return payPeriodRepository
         .findPeriodCoveringDate(
-            TenantContext.getCurrentTenantId(),
+            TenantContext.requireTenantId(),
             countryCode != null ? countryCode.toUpperCase(Locale.ROOT) : localizationCountry(),
             date)
         .orElseThrow(() -> new IllegalStateException("No pay period covering date: " + date));
@@ -92,7 +92,7 @@ public class PayPeriodService {
 
   private PayPeriod requirePeriod(String periodCode) {
     return payPeriodRepository
-        .findByCode(TenantContext.getCurrentTenantId(), periodCode.toUpperCase(Locale.ROOT))
+        .findByCode(TenantContext.requireTenantId(), periodCode.toUpperCase(Locale.ROOT))
         .orElseThrow(() -> new IllegalArgumentException("Pay period not found: " + periodCode));
   }
 

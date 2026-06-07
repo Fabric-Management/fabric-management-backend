@@ -38,7 +38,7 @@ public class UserProfileController {
   private final PermissionEvaluator permissionEvaluator;
 
   private PermissionResult getPermissions(UUID requesterId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     UserDto requester =
         userService
             .findByIdWithPermissionData(tenantId, requesterId)

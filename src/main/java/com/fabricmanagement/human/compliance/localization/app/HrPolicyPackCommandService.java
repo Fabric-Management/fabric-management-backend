@@ -57,7 +57,7 @@ public class HrPolicyPackCommandService {
 
   @Transactional
   public HrPolicyPackResponse createDraft(CreateHrPolicyPackRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String packCode = request.packCode().toUpperCase();
 
     Optional<HrPolicyPack> existingDraft =
@@ -105,7 +105,7 @@ public class HrPolicyPackCommandService {
 
   @Transactional
   public HrPolicyPackResponse updateDraft(String packCode, UpdateHrPolicyPackRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     HrPolicyPack draft =
         policyPackService
             .findDraftByPackCode(tenantId, packCode.toUpperCase())
@@ -150,7 +150,7 @@ public class HrPolicyPackCommandService {
 
   @Transactional
   public HrPolicyPackResponse publish(String packCode, PublishHrPolicyPackRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     HrPolicyPack draft =
         policyPackService
             .findDraftByPackCode(tenantId, packCode.toUpperCase())
@@ -190,7 +190,7 @@ public class HrPolicyPackCommandService {
 
   @Transactional
   public HrPolicyPackResponse retire(String packCode, RetireHrPolicyPackRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     HrPolicyPack pack =
         policyPackService
             .findLatestByPackCode(tenantId, packCode.toUpperCase())
@@ -244,7 +244,7 @@ public class HrPolicyPackCommandService {
       binding.setPolicyInterface(request.policyInterface());
       binding.setStrategyBean(request.strategyBean());
       binding.setConfigReference(request.configReference());
-      binding.setTenantId(TenantContext.getCurrentTenantId());
+      binding.setTenantId(TenantContext.requireTenantId());
       bindings.add(binding);
     }
     return bindings;
@@ -263,7 +263,7 @@ public class HrPolicyPackCommandService {
       version.setRuleType(request.ruleType());
       version.setPayload(request.payload());
       version.setPayloadHash(computeChecksum(request.payload()));
-      version.setTenantId(TenantContext.getCurrentTenantId());
+      version.setTenantId(TenantContext.requireTenantId());
       versions.add(version);
     }
     if (versions.stream().noneMatch(version -> version.getPayloadHash().equals(packChecksum))) {

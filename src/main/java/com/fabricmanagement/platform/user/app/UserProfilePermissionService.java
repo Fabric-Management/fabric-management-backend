@@ -35,7 +35,7 @@ public class UserProfilePermissionService {
   private final UserRepository userRepository;
 
   private PermissionResult getPermissions(UUID requesterId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     User user =
         userRepository
             .findByTenantIdAndId(tenantId, requesterId)

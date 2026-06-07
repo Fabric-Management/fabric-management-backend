@@ -3,7 +3,6 @@ package com.fabricmanagement.sales.salesorder.app.listener;
 import com.fabricmanagement.common.domain.event.production.SalesOrderLineProductionCompletedEvent;
 import com.fabricmanagement.common.domain.event.production.SalesOrderLineStoredEvent;
 import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent;
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.sales.salesorder.app.ProductionProgressService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -35,23 +34,17 @@ public class SalesOrderProductionProgressListener {
       maxAttempts = 3,
       backoff = @Backoff(delay = 200, multiplier = 2))
   public void onWorkOrderStarted(WorkOrderStartedEvent event) {
-    TenantContext.setCurrentTenantId(event.getTenantId());
-    try {
-      log.debug(
-          "Handling WorkOrderStartedEvent: workOrderId={}, salesOrderLineId={}",
-          event.getWorkOrderId(),
-          event.getSalesOrderLineId());
+    log.debug(
+        "Handling WorkOrderStartedEvent: workOrderId={}, salesOrderLineId={}",
+        event.getWorkOrderId(),
+        event.getSalesOrderLineId());
 
-      UUID salesOrderId =
-          productionProgressService.markLineInProduction(event.getSalesOrderLineId());
-      if (salesOrderId == null) {
-        return;
-      }
-
-      productionProgressService.markOrderInProgressIfConfirmed(salesOrderId);
-    } finally {
-      TenantContext.clear();
+    UUID salesOrderId = productionProgressService.markLineInProduction(event.getSalesOrderLineId());
+    if (salesOrderId == null) {
+      return;
     }
+
+    productionProgressService.markOrderInProgressIfConfirmed(salesOrderId);
   }
 
   @Async
@@ -64,18 +57,13 @@ public class SalesOrderProductionProgressListener {
       maxAttempts = 3,
       backoff = @Backoff(delay = 200, multiplier = 2))
   public void onSalesOrderLineProductionCompleted(SalesOrderLineProductionCompletedEvent event) {
-    TenantContext.setCurrentTenantId(event.getTenantId());
-    try {
-      log.debug(
-          "Handling SalesOrderLineProductionCompletedEvent: salesOrderLineId={}, "
-              + "completedByWorkOrderId={}",
-          event.getSalesOrderLineId(),
-          event.getCompletedByWorkOrderId());
+    log.debug(
+        "Handling SalesOrderLineProductionCompletedEvent: salesOrderLineId={}, "
+            + "completedByWorkOrderId={}",
+        event.getSalesOrderLineId(),
+        event.getCompletedByWorkOrderId());
 
-      productionProgressService.markLineProductionCompleted(event.getSalesOrderLineId());
-    } finally {
-      TenantContext.clear();
-    }
+    productionProgressService.markLineProductionCompleted(event.getSalesOrderLineId());
   }
 
   @Async
@@ -88,12 +76,7 @@ public class SalesOrderProductionProgressListener {
       maxAttempts = 3,
       backoff = @Backoff(delay = 200, multiplier = 2))
   public void onSalesOrderLineStored(SalesOrderLineStoredEvent event) {
-    TenantContext.setCurrentTenantId(event.getTenantId());
-    try {
-      productionProgressService.markLineInWarehouse(event.getSalesOrderLineId());
-    } finally {
-      TenantContext.clear();
-    }
+    productionProgressService.markLineInWarehouse(event.getSalesOrderLineId());
   }
 
   @Recover

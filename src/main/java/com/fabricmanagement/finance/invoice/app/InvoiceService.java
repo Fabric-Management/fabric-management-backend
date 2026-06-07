@@ -36,18 +36,18 @@ public class InvoiceService {
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAllInvoices(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository.findByTenantId(tenantId, pageable).map(invoiceMapper::toDto);
   }
 
   @Transactional(readOnly = true)
   public InvoiceDto getInvoice(UUID invoiceId) {
-    Invoice invoice = getInvoiceOrThrow(TenantContext.getCurrentTenantId(), invoiceId);
+    Invoice invoice = getInvoiceOrThrow(TenantContext.requireTenantId(), invoiceId);
     return invoiceMapper.toDto(invoice);
   }
 
   public InvoiceDto createInvoice(CreateInvoiceRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     String invoiceNumber = generateInvoiceNumber(request.invoiceType());
 
     Invoice invoice =
@@ -124,7 +124,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto updateInvoice(UUID invoiceId, UpdateInvoiceRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
 
     if (invoice.getStatus() != InvoiceStatus.DRAFT) {
@@ -153,7 +153,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto issueInvoice(UUID invoiceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.issue();
     Invoice saved = invoiceRepository.save(invoice);
@@ -167,7 +167,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto sendInvoice(UUID invoiceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.send();
     Invoice saved = invoiceRepository.save(invoice);
@@ -181,7 +181,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto recordPayment(UUID invoiceId, BigDecimal amount) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.recordPayment(Money.of(amount, invoice.getCurrency()));
     Invoice saved = invoiceRepository.save(invoice);
@@ -205,7 +205,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto cancelInvoice(UUID invoiceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.cancel();
     Invoice saved = invoiceRepository.save(invoice);
@@ -218,7 +218,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto voidInvoice(UUID invoiceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.voidInvoice();
     Invoice saved = invoiceRepository.save(invoice);
@@ -227,7 +227,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto disputeInvoice(UUID invoiceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.dispute();
     Invoice saved = invoiceRepository.save(invoice);
@@ -241,7 +241,7 @@ public class InvoiceService {
   }
 
   public InvoiceDto resolveDispute(UUID invoiceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.resolveDispute();
     Invoice saved = invoiceRepository.save(invoice);
@@ -250,7 +250,7 @@ public class InvoiceService {
   }
 
   public void deleteInvoice(UUID invoiceId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     if (invoice.getStatus() != InvoiceStatus.DRAFT) {
       throw new FinanceDomainException("Can only delete invoices in DRAFT status");
@@ -262,7 +262,7 @@ public class InvoiceService {
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getByPartner(UUID partnerId, Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository
         .findByTenantIdAndTradingPartnerId(tenantId, partnerId, pageable)
         .map(invoiceMapper::toDto);
@@ -270,7 +270,7 @@ public class InvoiceService {
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getUnpaidByPartner(UUID partnerId, Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository
         .findByTenantIdAndTradingPartnerIdAndStatusNot(
             tenantId, partnerId, InvoiceStatus.PAID, pageable)
@@ -279,7 +279,7 @@ public class InvoiceService {
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getByStatus(InvoiceStatus status, Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository
         .findByTenantIdAndStatus(tenantId, status, pageable)
         .map(invoiceMapper::toDto);
@@ -287,7 +287,7 @@ public class InvoiceService {
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getOverdue(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository
         .findOverdue(tenantId, LocalDate.now(), pageable)
         .map(invoiceMapper::toDto);
@@ -295,19 +295,19 @@ public class InvoiceService {
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAwaitingPayment(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository.findAwaitingPayment(tenantId, pageable).map(invoiceMapper::toDto);
   }
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAccountsReceivable(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository.findAccountsReceivable(tenantId, pageable).map(invoiceMapper::toDto);
   }
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAccountsPayable(Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository.findAccountsPayable(tenantId, pageable).map(invoiceMapper::toDto);
   }
 
@@ -349,7 +349,7 @@ public class InvoiceService {
 
     int attempt = 0;
     while (invoiceRepository.existsByTenantIdAndInvoiceNumber(
-            TenantContext.getCurrentTenantId(), number)
+            TenantContext.requireTenantId(), number)
         && attempt < 10) {
       seq = invoiceRepository.getNextInvoiceSequence();
       number = String.format("%s-%06d", prefix, seq);

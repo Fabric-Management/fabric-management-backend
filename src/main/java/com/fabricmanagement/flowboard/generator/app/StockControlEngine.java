@@ -49,7 +49,7 @@ public class StockControlEngine {
         event.getTotalQuantity());
 
     List<StockDecision> decisions = new ArrayList<>();
-    java.util.UUID tenantId = TenantContext.getCurrentTenantId();
+    java.util.UUID tenantId = TenantContext.requireTenantId();
 
     for (SalesOrderConfirmedEvent.SalesOrderLineSnapshot line : event.getLines()) {
       if (line.productId() == null) {

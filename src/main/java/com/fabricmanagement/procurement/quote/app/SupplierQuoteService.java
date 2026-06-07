@@ -49,7 +49,7 @@ public class SupplierQuoteService {
 
   public PagedResponse<SupplierQuoteResponse> listQuotes(
       SupplierQuoteStatus status, UUID rfqId, UUID tradingPartnerId, Pageable pageable) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     Specification<SupplierQuote> spec =
         Specification.<SupplierQuote>where(
@@ -72,7 +72,7 @@ public class SupplierQuoteService {
   }
 
   public List<SupplierQuoteResponse> getQuotesByRfq(UUID rfqId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository
         .findByTenantIdAndRfqIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId, rfqId)
         .stream()
@@ -82,7 +82,7 @@ public class SupplierQuoteService {
 
   @Transactional
   public SupplierQuoteResponse createQuote(CreateSupplierQuoteRequest req) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     SupplierQuote quote = new SupplierQuote();
     quote.setTenantId(tenantId);
 
@@ -204,7 +204,7 @@ public class SupplierQuoteService {
   // ── Private Helpers ────────────────────────────────────────────────────────
 
   private SupplierQuote getActiveQuote(UUID quoteId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> new ProcurementDomainException("SupplierQuote not found"));

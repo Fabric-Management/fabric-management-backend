@@ -99,7 +99,7 @@ public class QuoteApprovalService {
   }
 
   private Quote getActiveQuote(UUID quoteId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));

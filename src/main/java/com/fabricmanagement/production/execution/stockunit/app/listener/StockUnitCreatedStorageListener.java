@@ -1,6 +1,5 @@
 package com.fabricmanagement.production.execution.stockunit.app.listener;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
@@ -43,30 +42,25 @@ public class StockUnitCreatedStorageListener {
       maxAttempts = 3,
       backoff = @Backoff(delay = 200, multiplier = 2))
   public void onStockUnitCreated(StockUnitCreatedEvent event) {
-    TenantContext.setCurrentTenantId(event.getTenantId());
-    try {
-      // 1. Resolve batch → source check
-      Batch batch =
-          batchRepository.findByIdAndTenantId(event.getBatchId(), event.getTenantId()).orElse(null);
-      if (batch == null || batch.getSourceType() != BatchSourceType.INTERNAL_PRODUCTION) {
-        return; // Only production outputs trigger storage check
-      }
-
-      // 2. Resolve workOrder → salesOrderLineId
-      WorkOrder wo =
-          workOrderRepository
-              .findByIdAndTenantIdAndIsActiveTrue(batch.getSourceId(), event.getTenantId())
-              .orElse(null);
-      if (wo == null || wo.getSalesOrderLineId() == null) {
-        return; // Standalone WO, not linked to a sales order
-      }
-
-      // 3. Delegate to check service (REQUIRES_NEW — already post-commit, safe to query)
-      storageCheckService.publishLineStoredIfAllOutputsStored(
-          event.getTenantId(), wo.getSalesOrderLineId(), event.getStockUnitId());
-    } finally {
-      TenantContext.clear();
+    // 1. Resolve batch → source check
+    Batch batch =
+        batchRepository.findByIdAndTenantId(event.getBatchId(), event.getTenantId()).orElse(null);
+    if (batch == null || batch.getSourceType() != BatchSourceType.INTERNAL_PRODUCTION) {
+      return; // Only production outputs trigger storage check
     }
+
+    // 2. Resolve workOrder → salesOrderLineId
+    WorkOrder wo =
+        workOrderRepository
+            .findByIdAndTenantIdAndIsActiveTrue(batch.getSourceId(), event.getTenantId())
+            .orElse(null);
+    if (wo == null || wo.getSalesOrderLineId() == null) {
+      return; // Standalone WO, not linked to a sales order
+    }
+
+    // 3. Delegate to check service (REQUIRES_NEW — already post-commit, safe to query)
+    storageCheckService.publishLineStoredIfAllOutputsStored(
+        event.getTenantId(), wo.getSalesOrderLineId(), event.getStockUnitId());
   }
 
   @Recover

@@ -45,7 +45,7 @@ public class TaskController {
   public ResponseEntity<ApiResponse<List<TaskCommentResponse>>> getTaskComments(
       @PathVariable UUID id) {
     return ResponseEntity.ok(
-        ApiResponse.success(taskDetailService.getComments(TenantContext.getCurrentTenantId(), id)));
+        ApiResponse.success(taskDetailService.getComments(TenantContext.requireTenantId(), id)));
   }
 
   @PostMapping("/{id}/comments")
@@ -56,7 +56,7 @@ public class TaskController {
     var userCtx = currentUser();
     var created =
         taskDetailService.addCommentFromRequest(
-            TenantContext.getCurrentTenantId(), id, userCtx.userId(), req);
+            TenantContext.requireTenantId(), id, userCtx.userId(), req);
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
   }
 

@@ -50,7 +50,7 @@ public class ProfileUpdateRequestService {
   @Transactional
   public ProfileUpdateRequestDto createProfileUpdateRequest(
       UUID userId, CreateProfileUpdateRequestDto requestDto) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Creating profile update request: tenantId={}, userId={}, category={}",
         tenantId,
@@ -119,7 +119,7 @@ public class ProfileUpdateRequestService {
   @Transactional
   public ProfileUpdateRequestDto approveProfileUpdateRequest(
       UUID requestId, UUID reviewerId, ReviewProfileUpdateRequestDto reviewDto) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Approving profile update request: tenantId={}, requestId={}, reviewerId={}",
         tenantId,
@@ -203,7 +203,7 @@ public class ProfileUpdateRequestService {
   @Transactional
   public ProfileUpdateRequestDto rejectProfileUpdateRequest(
       UUID requestId, UUID reviewerId, ReviewProfileUpdateRequestDto reviewDto) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.info(
         "Rejecting profile update request: tenantId={}, requestId={}, reviewerId={}",
         tenantId,
@@ -271,7 +271,7 @@ public class ProfileUpdateRequestService {
    */
   @Transactional(readOnly = true)
   public List<ProfileUpdateRequestDto> getMyProfileUpdateRequests(UUID userId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting profile update requests: tenantId={}, userId={}", tenantId, userId);
 
     List<ProfileUpdateRequest> requests =
@@ -287,7 +287,7 @@ public class ProfileUpdateRequestService {
    */
   @Transactional(readOnly = true)
   public List<ProfileUpdateRequestDto> getPendingProfileUpdateRequests() {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting pending profile update requests: tenantId={}", tenantId);
 
     List<ProfileUpdateRequest> requests =

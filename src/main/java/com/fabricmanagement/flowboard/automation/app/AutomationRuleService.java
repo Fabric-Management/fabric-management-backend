@@ -29,7 +29,7 @@ public class AutomationRuleService {
 
   @Transactional(readOnly = true)
   public List<AutomationRuleResponse> getAutomations(UUID boardId) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
     List<AutomationRule> rules;
     if (boardId != null) {
       rules = ruleRepository.findAllByTenantIdAndBoardId(tenantId, boardId);
@@ -61,7 +61,7 @@ public class AutomationRuleService {
   public AutomationRuleResponse updateRule(UUID id, AutomationRuleRequest request) {
     AutomationRule rule =
         ruleRepository
-            .findByIdAndTenantId(id, TenantContext.getCurrentTenantId())
+            .findByIdAndTenantId(id, TenantContext.requireTenantId())
             .orElseThrow(() -> new NotFoundException("Automation rule not found"));
 
     rule.update(
@@ -82,7 +82,7 @@ public class AutomationRuleService {
   public AutomationRuleResponse toggleActive(UUID id, boolean active) {
     AutomationRule rule =
         ruleRepository
-            .findByIdAndTenantId(id, TenantContext.getCurrentTenantId())
+            .findByIdAndTenantId(id, TenantContext.requireTenantId())
             .orElseThrow(() -> new NotFoundException("Automation rule not found"));
 
     rule.toggleActive(active);
@@ -94,7 +94,7 @@ public class AutomationRuleService {
   public void deleteRule(UUID id) {
     AutomationRule rule =
         ruleRepository
-            .findByIdAndTenantId(id, TenantContext.getCurrentTenantId())
+            .findByIdAndTenantId(id, TenantContext.requireTenantId())
             .orElseThrow(() -> new NotFoundException("Automation rule not found"));
 
     rule.delete();

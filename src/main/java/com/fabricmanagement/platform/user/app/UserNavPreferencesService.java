@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Service for user nav preferences. Stays within the user module; no facade.
  *
- * <p>All calls must be tenant-scoped: pass {@code TenantContext.getCurrentTenantId()} as {@code
+ * <p>All calls must be tenant-scoped: pass {@code TenantContext.requireTenantId()} as {@code
  * tenantId}.
  */
 @Service
@@ -32,7 +32,7 @@ public class UserNavPreferencesService {
    * Get preferences for a user. If none exist, returns default (empty sortOrder + empty
    * hiddenItemIds). Never throws 404.
    *
-   * @param tenantId must be TenantContext.getCurrentTenantId()
+   * @param tenantId must be TenantContext.requireTenantId()
    * @param userId the user id
    * @return response with stored or default preferences
    */
@@ -52,7 +52,7 @@ public class UserNavPreferencesService {
    * Upsert preferences: update existing row (only changed fields) or create new. Null field in
    * request means "don't touch that field".
    *
-   * @param tenantId must be TenantContext.getCurrentTenantId()
+   * @param tenantId must be TenantContext.requireTenantId()
    * @param userId the user id
    * @param request partial update; null sortOrder/hiddenItemIds = leave existing or use default
    * @return response with saved preferences

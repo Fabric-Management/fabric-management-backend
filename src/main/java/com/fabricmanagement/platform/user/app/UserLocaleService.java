@@ -42,7 +42,7 @@ public class UserLocaleService {
    */
   @Transactional
   public UserDto updateLocalePreferences(UUID userId, UpdateLocalePreferencesRequest request) {
-    UUID tenantId = TenantContext.getCurrentTenantId();
+    UUID tenantId = TenantContext.requireTenantId();
 
     var user =
         userRepository

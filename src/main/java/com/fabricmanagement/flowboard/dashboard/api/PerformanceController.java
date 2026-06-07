@@ -31,7 +31,7 @@ public class PerformanceController {
   public ResponseEntity<ApiResponse<List<UserPerformanceSnapshotDto>>> getLeaderboard(
       @RequestParam("date") @NotNull LocalDate date) {
     List<UserPerformanceSnapshotDto> result =
-        performanceService.getLeaderboard(TenantContext.getCurrentTenantId(), date).stream()
+        performanceService.getLeaderboard(TenantContext.requireTenantId(), date).stream()
             .map(UserPerformanceSnapshotDto::from)
             .toList();
     return ResponseEntity.ok(ApiResponse.success(result));
