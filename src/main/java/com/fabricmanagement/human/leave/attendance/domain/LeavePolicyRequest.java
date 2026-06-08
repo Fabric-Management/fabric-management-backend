@@ -1,5 +1,6 @@
 package com.fabricmanagement.human.leave.attendance.domain;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
@@ -17,7 +18,8 @@ public record LeavePolicyRequest(
     double maxCarryOver,
     Instant lastAccrualAt,
     LocalDate employmentStartDate,
-    Map<String, Object> policyAttributes,
+    @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
+        Map<String, Object> policyAttributes,
     String policyPackCode,
     Integer policyPackVersion,
     String countryCode) {}

@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.policy.dto;
 
 import com.fabricmanagement.platform.policy.domain.Policy;
 import com.fabricmanagement.platform.policy.domain.PolicyEffect;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -23,7 +24,10 @@ public class PolicyDto {
   private Integer priority;
   private PolicyEffect effect;
   private Boolean enabled;
+
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> conditions;
+
   private String description;
   private Instant createdAt;
   private Instant updatedAt;

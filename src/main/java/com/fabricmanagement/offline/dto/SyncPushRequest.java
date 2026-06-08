@@ -1,5 +1,6 @@
 package com.fabricmanagement.offline.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -37,5 +38,6 @@ public class SyncPushRequest {
 
   /** Typed payload of the entity data. Parsed by the SyncService based on entityType. */
   @NotNull(message = "Payload is required")
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> payload;
 }

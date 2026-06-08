@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tradingpartner.dto;
 
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 import lombok.AllArgsConstructor;
@@ -45,5 +46,6 @@ public class UpdateTradingPartnerRequest {
    * <p>Replaces the existing metadata entirely when provided. Set to {@code null} to leave metadata
    * unchanged. Examples: payment_terms, credit_limit, discount_rate, notes.
    */
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> relationshipMeta;
 }

@@ -97,6 +97,7 @@ public class SupplierQuoteResponse {
     BigDecimal lineTotal;
 
     @Schema(description = "Volume Discounts")
+    @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
     Map<String, Object> volumeDiscounts;
 
     @Schema(description = "Line Notes")

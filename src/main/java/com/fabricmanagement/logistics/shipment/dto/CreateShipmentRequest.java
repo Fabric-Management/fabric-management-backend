@@ -1,6 +1,7 @@
 package com.fabricmanagement.logistics.shipment.dto;
 
 import com.fabricmanagement.logistics.shipment.domain.ShipmentType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
@@ -67,5 +68,6 @@ public class CreateShipmentRequest {
   private String notes;
 
   /** Additional metadata. */
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> metadata;
 }

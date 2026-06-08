@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.ai.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
@@ -24,5 +25,6 @@ public class ChatRequestDto {
   private UUID conversationId;
 
   /** Optional context (screen, filters, etc.) */
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> context;
 }

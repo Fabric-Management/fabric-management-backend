@@ -4,6 +4,7 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +36,8 @@ public class TradingPartnerDto {
   // Relationship
   private PartnerType partnerType;
   private PartnerStatus status;
+
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> relationshipMeta;
 
   // Platform link

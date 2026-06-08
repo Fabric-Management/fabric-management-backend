@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.tradingpartner.dto;
 
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -86,5 +87,6 @@ public class CreateTradingPartnerRequest {
    *
    * <p>Examples: payment_terms, credit_limit, discount_rate, contact_person, notes
    */
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> relationshipMeta;
 }
