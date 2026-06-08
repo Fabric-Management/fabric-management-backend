@@ -10,7 +10,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.14</version>
+        <version>3.4.13</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -50,13 +50,13 @@
         <mockito.version>5.14.2</mockito.version>
 
         <!-- Documentation Versions -->
-        <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
+        <springdoc-openapi.version>2.7.0</springdoc-openapi.version>
 
         <!-- Cache Versions -->
         <caffeine.version>3.1.8</caffeine.version>
 
         <!-- Observability -->
-        <micrometer.version>1.17.0</micrometer.version>
+        <micrometer.version>1.13.0</micrometer.version>
 
         <!-- Hibernate Types for JSONB -->
         <hibernate-types.version>3.7.2</hibernate-types.version>
