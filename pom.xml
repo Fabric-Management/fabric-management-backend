@@ -10,7 +10,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.13</version>
+        <version>3.4.13</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -31,10 +31,10 @@
 
         <!-- Spring & Framework Versions -->
         <spring-modulith.version>1.2.5</spring-modulith.version>
-        <spring-cloud.version>2023.0.1</spring-cloud.version>
+        <spring-cloud.version>2024.0.0</spring-cloud.version>
 
         <!-- Database Versions -->
-        <postgresql.version>42.7.2</postgresql.version>
+        <postgresql.version>42.7.5</postgresql.version>
         <flyway.version>10.15.0</flyway.version>
 
         <!-- Security & JWT Versions -->
@@ -50,13 +50,13 @@
         <mockito.version>5.14.2</mockito.version>
 
         <!-- Documentation Versions -->
-        <springdoc-openapi.version>2.6.0</springdoc-openapi.version>
+        <springdoc-openapi.version>2.7.0</springdoc-openapi.version>
 
         <!-- Cache Versions -->
         <caffeine.version>3.1.8</caffeine.version>
 
         <!-- Observability -->
-        <micrometer.version>1.12.5</micrometer.version>
+        <micrometer.version>1.13.0</micrometer.version>
 
         <!-- Hibernate Types for JSONB -->
         <hibernate-types.version>3.7.2</hibernate-types.version>
@@ -80,6 +80,12 @@
     </properties>
 
     <dependencies>
+        <!-- Logging -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
         <!-- ============================== -->
         <!-- SPRING BOOT STARTERS -->
         <!-- ============================== -->
@@ -296,7 +302,12 @@
 
         <dependency>
             <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
 
         <!-- ============================== -->

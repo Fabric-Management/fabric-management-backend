@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.organization.infra.repository.OrganizationR
 import com.fabricmanagement.platform.policy.infra.repository.PolicyRepository;
 import com.fabricmanagement.platform.subscription.infra.repository.SubscriptionRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -40,10 +41,11 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  */
 @RestController
-@RequestMapping("/api/dev")
+@RequestMapping("/api/v1/dev")
 @RequiredArgsConstructor
 @Slf4j
 @Profile("local") // ⚠️ ONLY in local profile
+@Tag(name = "Development Tools", description = "Development Tools operations")
 public class DevelopmentToolsController {
 
   private final OrganizationRepository organizationRepository;

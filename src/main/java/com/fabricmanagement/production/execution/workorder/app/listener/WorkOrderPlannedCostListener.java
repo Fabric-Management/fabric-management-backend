@@ -1,12 +1,12 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
+import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderPlannedCostTriggerService;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Triggers automatic planned cost calculation when a WorkOrder is approved.
@@ -15,8 +15,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * completion:
  *
  * <ul>
- *   <li>{@code AFTER_COMMIT} — approval transaction commits first; planned cost runs in isolation
- *   <li>{@code REQUIRES_NEW} — separate transaction so cost failure cannot roll back approval
+ *   <li>{@code @ApplicationModuleListener} — event runs asynchronously after the approval
+ *       transaction commits
  *   <li>Exception swallowed — approval must never fail due to costing issues
  * </ul>
  *
@@ -31,24 +31,21 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class WorkOrderPlannedCostListener {
 
   private final WorkOrderPlannedCostTriggerService plannedCostTriggerService;
+  private final IdempotentEventHandler idempotentHandler;
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @ApplicationModuleListener
   public void handleWorkOrderApprovedEvent(WorkOrderApprovedEvent event) {
-    log.info(
-        "WorkOrderApprovedEvent: initiating planned cost calculation for WorkOrder {} ({})",
-        event.getWorkOrderId(),
-        event.getWorkOrderNumber());
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "handleWorkOrderApprovedEvent",
+        () -> {
+          log.info(
+              "WorkOrderApprovedEvent: initiating planned cost calculation for WorkOrder {} ({})",
+              event.getWorkOrderId(),
+              event.getWorkOrderNumber());
 
-    try {
-      plannedCostTriggerService.triggerPlannedCost(event.getWorkOrderId());
-    } catch (Exception e) {
-      log.error(
-          "Automatic planned cost calculation failed for WorkOrder {}. "
-              + "Use POST /api/production/work-orders/{}/recalculate-planned after fixing configuration.",
-          event.getWorkOrderId(),
-          event.getWorkOrderId(),
-          e);
-      // Intentional: cost failure must not roll back the APPROVED status.
-    }
+          plannedCostTriggerService.triggerPlannedCost(event.getWorkOrderId());
+        });
   }
 }

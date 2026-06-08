@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/admin/onboarding")
+@RequestMapping("/api/v1/admin/onboarding")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(

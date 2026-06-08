@@ -1,6 +1,5 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -32,8 +31,22 @@ class WorkOrderPlannedCostListenerTest {
 
   @InjectMocks private WorkOrderPlannedCostListener listener;
 
+  @Mock
+  private com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler
+      idempotentHandler;
+
   @BeforeEach
   void setUp() {
+    if (idempotentHandler != null) {
+      org.mockito.Mockito.lenient()
+          .doAnswer(
+              invocation -> {
+                ((Runnable) invocation.getArgument(3)).run();
+                return null;
+              })
+          .when(idempotentHandler)
+          .executeOnce(any(), any(), any(), any());
+    }
     TenantContext.setCurrentTenantId(TENANT_ID);
   }
 
@@ -85,20 +98,23 @@ class WorkOrderPlannedCostListenerTest {
     }
 
     @Test
-    @DisplayName("swallows RuntimeException — approval must not fail")
-    void swallowsRuntimeException() {
+    @DisplayName("propagates RuntimeException to trigger event resubmission")
+    void propagatesRuntimeException() {
       doThrow(new RuntimeException("Price list not found"))
           .when(plannedCostTriggerService)
           .triggerPlannedCost(any());
 
       WorkOrderApprovedEvent event = buildEvent();
 
-      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
+      org.assertj.core.api.Assertions.assertThatThrownBy(
+              () -> listener.handleWorkOrderApprovedEvent(event))
+          .isInstanceOf(RuntimeException.class)
+          .hasMessage("Price list not found");
     }
 
     @Test
-    @DisplayName("swallows WorkOrderDomainException — approval must not fail")
-    void swallowsDomainException() {
+    @DisplayName("propagates WorkOrderDomainException to trigger event resubmission")
+    void propagatesDomainException() {
       doThrow(
               new com.fabricmanagement.production.execution.workorder.domain.exception
                   .WorkOrderDomainException("missing outputProductId"))
@@ -107,19 +123,27 @@ class WorkOrderPlannedCostListenerTest {
 
       WorkOrderApprovedEvent event = buildEvent();
 
-      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
+      org.assertj.core.api.Assertions.assertThatThrownBy(
+              () -> listener.handleWorkOrderApprovedEvent(event))
+          .isInstanceOf(
+              com.fabricmanagement.production.execution.workorder.domain.exception
+                  .WorkOrderDomainException.class)
+          .hasMessage("missing outputProductId");
     }
 
     @Test
-    @DisplayName("swallows NullPointerException — unexpected failures also swallowed")
-    void swallowsUnexpectedNPE() {
+    @DisplayName("propagates NullPointerException to trigger event resubmission")
+    void propagatesUnexpectedNPE() {
       doThrow(new NullPointerException("unexpected"))
           .when(plannedCostTriggerService)
           .triggerPlannedCost(any());
 
       WorkOrderApprovedEvent event = buildEvent();
 
-      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
+      org.assertj.core.api.Assertions.assertThatThrownBy(
+              () -> listener.handleWorkOrderApprovedEvent(event))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("unexpected");
     }
   }
 }

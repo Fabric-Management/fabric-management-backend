@@ -7,6 +7,7 @@ import com.fabricmanagement.costing.app.PriceListService;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
 import com.fabricmanagement.costing.domain.price.PriceList;
 import com.fabricmanagement.costing.dto.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -32,9 +33,10 @@ import org.springframework.web.bind.annotation.*;
  * </ul>
  */
 @RestController
-@RequestMapping("/api/costing")
+@RequestMapping("/api/v1/costing")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Costing", description = "Costing operations")
 public class CostingController {
 
   private final CostCalculationService costCalculationService;

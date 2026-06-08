@@ -2,6 +2,7 @@ package com.fabricmanagement.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -208,6 +209,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("EmployeeNumberSequence")
               .and()
               .doNotHaveSimpleName("BatchOverrideLog")
+              .and()
+              .doNotHaveSimpleName("ProcessedEventEntry")
               .should()
               .beAssignableTo(
                   com.fabricmanagement.common.infrastructure.persistence.BaseEntity.class)
@@ -413,6 +416,63 @@ class ConstitutionArchTest {
                   "Rule 8.1: Event classes under domain/event/ must extend"
                       + " the DomainEvent base class."
                       + " (0 frozen violations)");
+
+      rule.check(allClasses);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Article 15: Durable Event Standards
+  // ═══════════════════════════════════════════════════════════════════
+
+  @Nested
+  @DisplayName("Article 15 — Durable Event Standards")
+  class DurableEventTests {
+
+    @Test
+    @DisplayName(
+        "Rule 15.1: Durable-set listener classes must use @ApplicationModuleListener instead of @TransactionalEventListener(AFTER_COMMIT)")
+    void durableSetMustUseDurableAnnotation() {
+      // PERMANENT: notification.hub is best-effort due to external side effects (emails/SMS).
+      // Applying durable pattern here would risk duplicate notifications on retries.
+      ArchRule rule =
+          noMethods()
+              .that()
+              .areDeclaredInClassesThat()
+              .resideInAPackage("..app.listener..")
+              .and()
+              .areDeclaredInClassesThat()
+              .resideOutsideOfPackage("com.fabricmanagement.notification.hub..")
+              .should(
+                  new com.tngtech.archunit.lang.ArchCondition<
+                      com.tngtech.archunit.core.domain.JavaMethod>(
+                      "not use @TransactionalEventListener with AFTER_COMMIT phase") {
+                    @Override
+                    public void check(
+                        com.tngtech.archunit.core.domain.JavaMethod method,
+                        com.tngtech.archunit.lang.ConditionEvents events) {
+                      if (method.isAnnotatedWith(
+                          org.springframework.transaction.event.TransactionalEventListener.class)) {
+                        org.springframework.transaction.event.TransactionalEventListener
+                            annotation =
+                                method.getAnnotationOfType(
+                                    org.springframework.transaction.event.TransactionalEventListener
+                                        .class);
+                        if (annotation.phase()
+                            == org.springframework.transaction.event.TransactionPhase
+                                .AFTER_COMMIT) {
+                          events.add(
+                              com.tngtech.archunit.lang.SimpleConditionEvent.violated(
+                                  method,
+                                  "Method "
+                                      + method.getFullName()
+                                      + " uses AFTER_COMMIT (default). Use @ApplicationModuleListener instead."));
+                        }
+                      }
+                    }
+                  })
+              .as(
+                  "Rule 15.1: Durable event pattern mandates @ApplicationModuleListener over @TransactionalEventListener(AFTER_COMMIT) for cross-module integration");
 
       rule.check(allClasses);
     }

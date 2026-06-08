@@ -16,6 +16,7 @@ import com.fabricmanagement.human.compliance.localization.dto.RetireHrPolicyPack
 import com.fabricmanagement.human.compliance.localization.dto.UpdateHrPolicyPackRequest;
 import com.fabricmanagement.human.compliance.localization.dto.ValidateHrPolicyPackRequest;
 import com.fabricmanagement.human.compliance.localization.dto.ValidateHrPolicyPackResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Locale;
@@ -38,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Validated
 @Slf4j
+@Tag(name = "Hr Policy Pack", description = "Hr Policy Pack operations")
 public class HrPolicyPackController {
 
   private final HrPolicyPackCommandService commandService;

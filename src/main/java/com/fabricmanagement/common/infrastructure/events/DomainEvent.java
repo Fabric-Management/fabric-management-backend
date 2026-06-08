@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.Getter;
+import org.slf4j.MDC;
 
 /**
  * Base class for all domain events in the system.
@@ -42,6 +43,7 @@ public abstract class DomainEvent {
   private final UUID tenantId;
   private final String eventType;
   private final Instant occurredAt;
+  private final String correlationId;
 
   protected DomainEvent(UUID tenantId, String eventType) {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
@@ -49,6 +51,11 @@ public abstract class DomainEvent {
     this.tenantId = tenantId;
     this.eventType = eventType;
     this.occurredAt = Instant.now();
+
+    // Capture traceId as correlationId if present, otherwise fallback to eventId
+    String traceId = MDC.get("traceId");
+    this.correlationId =
+        (traceId != null && !traceId.isBlank()) ? traceId : this.eventId.toString();
   }
 
   @Override

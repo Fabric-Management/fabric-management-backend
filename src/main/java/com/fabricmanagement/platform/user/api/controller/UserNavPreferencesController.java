@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.user.app.UserNavPreferencesService;
 import com.fabricmanagement.platform.user.dto.NavPreferencesRequest;
 import com.fabricmanagement.platform.user.dto.NavPreferencesResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +21,9 @@ import org.springframework.web.bind.annotation.*;
  * user's ID (JWT), otherwise 403. All responses wrapped in {@link ApiResponse}.
  */
 @RestController
-@RequestMapping("/api/common/users")
+@RequestMapping("/api/v1/common/users")
 @RequiredArgsConstructor
+@Tag(name = "User Nav Preferences", description = "User Nav Preferences operations")
 public class UserNavPreferencesController {
 
   private final UserNavPreferencesService userNavPreferencesService;

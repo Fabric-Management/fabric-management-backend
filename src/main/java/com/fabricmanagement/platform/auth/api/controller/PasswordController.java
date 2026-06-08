@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.auth.dto.PasswordResetRequest;
 import com.fabricmanagement.platform.auth.dto.PasswordResetVerifyRequest;
 import com.fabricmanagement.platform.auth.dto.PasswordSetupRequest;
 import com.fabricmanagement.platform.auth.dto.UserContactInfoResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -25,9 +26,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Base path: /api/auth
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Password", description = "Password operations")
 public class PasswordController {
 
   private final PasswordSetupService passwordSetupService;

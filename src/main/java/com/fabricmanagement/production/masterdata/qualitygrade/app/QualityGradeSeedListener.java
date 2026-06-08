@@ -1,12 +1,11 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.app;
 
+import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.platform.tenant.domain.event.TenantCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Seeds default {@link com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade}
@@ -22,22 +21,28 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class QualityGradeSeedListener {
 
   private final QualityGradeService qualityGradeService;
+  private final IdempotentEventHandler idempotentHandler;
 
-  @Async
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @ApplicationModuleListener
   public void onTenantCreated(TenantCreatedEvent event) {
-    log.info(
-        "Seeding default quality grades for new tenant: tenantId={}, name={}",
-        event.getTenantId(),
-        event.getName());
-    try {
-      qualityGradeService.seedDefaultGrades(event.getTenantId());
-    } catch (Exception e) {
-      // Log but do not rethrow — seed failure must not fail tenant onboarding.
-      log.error(
-          "Failed to seed quality grades for tenantId={}. Manual seeding may be needed.",
-          event.getTenantId(),
-          e);
-    }
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "onTenantCreated",
+        () -> {
+          log.info(
+              "Seeding default quality grades for new tenant: tenantId={}, name={}",
+              event.getTenantId(),
+              event.getName());
+          try {
+            qualityGradeService.seedDefaultGrades(event.getTenantId());
+          } catch (Exception e) {
+            // Log but do not rethrow — seed failure must not fail tenant onboarding.
+            log.error(
+                "Failed to seed quality grades for tenantId={}. Manual seeding may be needed.",
+                event.getTenantId(),
+                e);
+          }
+        });
   }
 }

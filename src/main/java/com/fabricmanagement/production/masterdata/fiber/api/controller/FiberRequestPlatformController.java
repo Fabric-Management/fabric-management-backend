@@ -8,6 +8,7 @@ import com.fabricmanagement.production.masterdata.fiber.app.FiberRequestService;
 import com.fabricmanagement.production.masterdata.fiber.domain.FiberRequestStatus;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberRequestDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.RejectFiberRequestRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.Optional;
@@ -25,9 +26,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Security: All endpoints require PLATFORM_ADMIN role.
  */
 @RestController
-@RequestMapping("/api/platform/fiber-requests")
+@RequestMapping("/api/v1/platform/fiber-requests")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Fiber Request Platform", description = "Fiber Request Platform operations")
 public class FiberRequestPlatformController {
 
   private final FiberRequestService fiberRequestService;

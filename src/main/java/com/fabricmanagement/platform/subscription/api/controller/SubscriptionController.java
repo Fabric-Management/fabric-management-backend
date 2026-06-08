@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.subscription.app.SubscriptionService;
 import com.fabricmanagement.platform.subscription.dto.SubscriptionDto;
 import com.fabricmanagement.platform.subscription.dto.SubscriptionQuotaDto;
 import com.fabricmanagement.platform.subscription.dto.UpdateSubscriptionRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -20,9 +21,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Base path: /api/common/subscriptions.
  */
 @RestController
-@RequestMapping("/api/common/subscriptions")
+@RequestMapping("/api/v1/common/subscriptions")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Subscription", description = "Subscription operations")
 public class SubscriptionController {
 
   private final SubscriptionService subscriptionService;

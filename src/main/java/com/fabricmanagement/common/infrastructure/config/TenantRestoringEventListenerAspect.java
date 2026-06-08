@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -31,18 +32,23 @@ public class TenantRestoringEventListenerAspect {
 
   @Around(
       "@annotation(org.springframework.transaction.event.TransactionalEventListener) "
-          + "|| @annotation(org.springframework.context.event.EventListener)")
+          + "|| @annotation(org.springframework.context.event.EventListener) "
+          + "|| @annotation(org.springframework.modulith.ApplicationModuleListener)")
   public Object restoreTenantContext(ProceedingJoinPoint pjp) throws Throwable {
     Object[] args = pjp.getArgs();
-    UUID eventTenantId = extractTenantId(args);
+    DomainEvent event = extractDomainEvent(args);
+    UUID eventTenantId = event != null ? event.getTenantId() : null;
+    String eventCorrelationId = event != null ? event.getCorrelationId() : null;
 
     UUID previousTenantId = TenantContext.getCurrentTenantIdOrNull();
-    boolean restored = false;
+    String previousCorrelationId = MDC.get("correlationId");
+    boolean tenantRestored = false;
+    boolean correlationRestored = false;
 
     try {
       if (eventTenantId != null && !eventTenantId.equals(previousTenantId)) {
         TenantContext.setCurrentTenantId(eventTenantId);
-        restored = true;
+        tenantRestored = true;
         log.debug(
             "Aspect restored TenantContext to {} for {}",
             eventTenantId,
@@ -52,22 +58,35 @@ public class TenantRestoringEventListenerAspect {
             "Intercepted async event listener {} but payload does not contain a DomainEvent with tenantId. Aspect skipping tenant restoration.",
             pjp.getSignature().toShortString());
       }
+
+      if (eventCorrelationId != null && !eventCorrelationId.equals(previousCorrelationId)) {
+        MDC.put("correlationId", eventCorrelationId);
+        correlationRestored = true;
+      }
+
       return pjp.proceed();
     } finally {
-      if (restored) {
+      if (tenantRestored) {
         if (previousTenantId == null) {
           TenantContext.clear();
         } else {
           TenantContext.setCurrentTenantId(previousTenantId);
         }
       }
+      if (correlationRestored) {
+        if (previousCorrelationId == null) {
+          MDC.remove("correlationId");
+        } else {
+          MDC.put("correlationId", previousCorrelationId);
+        }
+      }
     }
   }
 
-  private UUID extractTenantId(Object[] args) {
+  private DomainEvent extractDomainEvent(Object[] args) {
     for (Object arg : args) {
       if (arg instanceof DomainEvent event) {
-        return event.getTenantId();
+        return event;
       }
     }
     return null;

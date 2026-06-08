@@ -4,6 +4,7 @@ import com.fabricmanagement.flowboard.generator.app.TaskTemplateService;
 import com.fabricmanagement.flowboard.generator.dto.CreateTaskTemplateRequest;
 import com.fabricmanagement.flowboard.generator.dto.TaskTemplateDto;
 import com.fabricmanagement.flowboard.generator.dto.UpdateTaskTemplateRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/flowboard/templates")
 @RequiredArgsConstructor
+@Tag(name = "Task Template", description = "Task Template operations")
 public class TaskTemplateController {
 
   private final TaskTemplateService service;

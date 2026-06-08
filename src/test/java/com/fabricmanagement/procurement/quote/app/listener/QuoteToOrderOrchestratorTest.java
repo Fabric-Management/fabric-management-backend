@@ -41,6 +41,10 @@ class QuoteToOrderOrchestratorTest {
 
   @InjectMocks private QuoteToOrderOrchestrator orchestrator;
 
+  @Mock
+  private com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler
+      idempotentHandler;
+
   private UUID tenantId;
   private UUID quoteId;
   private UUID rfqId;
@@ -50,6 +54,17 @@ class QuoteToOrderOrchestratorTest {
 
   @BeforeEach
   void setUp() {
+    if (idempotentHandler != null) {
+      lenient()
+          .doAnswer(
+              invocation -> {
+                ((Runnable) invocation.getArgument(3)).run();
+                return null;
+              })
+          .when(idempotentHandler)
+          .executeOnce(any(), any(), any(), any());
+    }
+
     tenantId = UUID.randomUUID();
     quoteId = UUID.randomUUID();
     rfqId = UUID.randomUUID();

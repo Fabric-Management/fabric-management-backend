@@ -8,6 +8,7 @@ import com.fabricmanagement.platform.user.dto.CreatePermissionTemplateRequest;
 import com.fabricmanagement.platform.user.dto.PermissionOverrideDto;
 import com.fabricmanagement.platform.user.dto.PermissionTemplateDto;
 import com.fabricmanagement.platform.user.dto.UpdatePermissionTemplateRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -28,9 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/common/permissions")
+@RequestMapping("/api/v1/common/permissions")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'PLATFORM_ADMIN')")
+@Tag(name = "Permission Management", description = "Permission Management operations")
 public class PermissionManagementController {
 
   private final PermissionManagementService permissionManagementService;

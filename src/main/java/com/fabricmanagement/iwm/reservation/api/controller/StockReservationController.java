@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/iwm/reservations")
+@RequestMapping("/api/v1/iwm/reservations")
 @RequiredArgsConstructor
 @Tag(name = "IWM Stock Reservation", description = "Stock Reservation and Lot Engine API")
 @Slf4j

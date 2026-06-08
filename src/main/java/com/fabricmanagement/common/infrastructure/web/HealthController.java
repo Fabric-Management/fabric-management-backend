@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.web;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -10,8 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 @Slf4j
+@Tag(name = "Health", description = "Health operations")
 public class HealthController {
 
   @Value("${info.app.version:1.0.0}")

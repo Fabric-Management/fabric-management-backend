@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.human.core.employee.app.EmployeeService;
 import com.fabricmanagement.human.core.employee.dto.EmployeeProfileDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,9 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/human/employees")
+@RequestMapping("/api/v1/human/employees")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Employee Profile", description = "Employee Profile operations")
 public class EmployeeProfileController {
 
   private final EmployeeService employeeService;

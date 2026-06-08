@@ -21,6 +21,7 @@ import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserDepartmentRepository;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
@@ -33,9 +34,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/users")
+@RequestMapping("/api/v1/common/users")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "User", description = "User operations")
 public class UserController {
 
   private final UserService userService;

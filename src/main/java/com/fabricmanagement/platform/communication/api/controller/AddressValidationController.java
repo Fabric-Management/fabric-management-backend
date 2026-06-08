@@ -10,6 +10,7 @@ import com.fabricmanagement.platform.communication.dto.AutocompleteResponse;
 import com.fabricmanagement.platform.communication.dto.ValidateAddressRequest;
 import com.fabricmanagement.platform.communication.infra.client.GoogleMapsClient;
 import com.fabricmanagement.platform.communication.util.PostcodeValidator;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -30,9 +31,10 @@ import org.springframework.web.bind.annotation.*;
  * </ul>
  */
 @RestController
-@RequestMapping("/api/common/addresses/validation")
+@RequestMapping("/api/v1/common/addresses/validation")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Address Validation", description = "Address Validation operations")
 public class AddressValidationController {
 
   private final GoogleMapsClient googleMapsClient;

@@ -3,6 +3,7 @@ package com.fabricmanagement.production.execution.goodsreceipt.api.controller;
 import com.fabricmanagement.production.execution.goodsreceipt.app.GoodsReceiptService;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.CreateGoodsReceiptRequest;
 import com.fabricmanagement.production.execution.goodsreceipt.dto.GoodsReceiptResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +18,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/production/goods-receipts")
+@RequestMapping("/api/v1/production/goods-receipts")
 @RequiredArgsConstructor
+@Tag(name = "Goods Receipt", description = "Goods Receipt operations")
 public class GoodsReceiptController {
 
   private final GoodsReceiptService goodsReceiptService;

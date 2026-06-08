@@ -5,6 +5,7 @@ import com.fabricmanagement.procurement.rfq.dto.AddRecipientRequest;
 import com.fabricmanagement.procurement.rfq.dto.AddRfqLineRequest;
 import com.fabricmanagement.procurement.rfq.dto.CreateSupplierRFQRequest;
 import com.fabricmanagement.procurement.rfq.dto.SupplierRFQResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/procurement/rfqs")
 @RequiredArgsConstructor
+@Tag(name = "Supplier R F Q", description = "Supplier R F Q operations")
 public class SupplierRFQController {
 
   private final SupplierRFQService rfqService;

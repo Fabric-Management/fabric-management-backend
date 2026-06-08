@@ -7,6 +7,7 @@ import com.fabricmanagement.production.execution.lineage.dto.BatchLineageDetailD
 import com.fabricmanagement.production.execution.lineage.dto.BatchLineageDto;
 import com.fabricmanagement.production.execution.lineage.dto.CreateBatchLineageRequest;
 import com.fabricmanagement.production.execution.lineage.dto.TraceNodeDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -26,9 +27,10 @@ import org.springframework.web.bind.annotation.*;
  * batch used?") queries for full production traceability.
  */
 @RestController
-@RequestMapping("/api/production/batches/lineage")
+@RequestMapping("/api/v1/production/batches/lineage")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Batch Lineage", description = "Batch Lineage operations")
 public class BatchLineageController {
 
   private final BatchLineageService batchLineageService;

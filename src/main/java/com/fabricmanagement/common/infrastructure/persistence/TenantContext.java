@@ -2,6 +2,7 @@ package com.fabricmanagement.common.infrastructure.persistence;
 
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 
 /**
  * Thread-local context for managing current tenant information.
@@ -104,6 +105,7 @@ public final class TenantContext {
       throw new IllegalArgumentException("Tenant ID cannot be null");
     }
     CURRENT_TENANT_ID.set(tenantId);
+    MDC.put("tenantId", tenantId.toString());
     log.trace("Set tenant ID: {} for thread: {}", tenantId, Thread.currentThread().getName());
   }
 
@@ -229,9 +231,64 @@ public final class TenantContext {
           tenantId);
     }
     CURRENT_TENANT_ID.remove();
+    MDC.remove("tenantId");
     CURRENT_TENANT_UID.remove();
     CURRENT_USER_ID.remove();
     CURRENT_TENANT_COUNTRY.remove();
+  }
+
+  /** Represents a snapshot of the current thread's tenant context. */
+  public record TenantSnapshot(UUID tenantId, String tenantUid, UUID userId, String country) {}
+
+  /**
+   * Captures the current tenant context into a snapshot.
+   *
+   * @return a snapshot of the current context
+   */
+  public static TenantSnapshot capture() {
+    return new TenantSnapshot(
+        CURRENT_TENANT_ID.get(),
+        CURRENT_TENANT_UID.get(),
+        CURRENT_USER_ID.get(),
+        CURRENT_TENANT_COUNTRY.get());
+  }
+
+  /**
+   * Restores the tenant context from a snapshot.
+   *
+   * @param snapshot the snapshot to restore
+   */
+  public static void restore(TenantSnapshot snapshot) {
+    if (snapshot == null) {
+      clear();
+      return;
+    }
+
+    if (snapshot.tenantId() != null) {
+      CURRENT_TENANT_ID.set(snapshot.tenantId());
+      MDC.put("tenantId", snapshot.tenantId().toString());
+    } else {
+      CURRENT_TENANT_ID.remove();
+      MDC.remove("tenantId");
+    }
+
+    if (snapshot.tenantUid() != null) {
+      CURRENT_TENANT_UID.set(snapshot.tenantUid());
+    } else {
+      CURRENT_TENANT_UID.remove();
+    }
+
+    if (snapshot.userId() != null) {
+      CURRENT_USER_ID.set(snapshot.userId());
+    } else {
+      CURRENT_USER_ID.remove();
+    }
+
+    if (snapshot.country() != null) {
+      CURRENT_TENANT_COUNTRY.set(snapshot.country());
+    } else {
+      CURRENT_TENANT_COUNTRY.remove();
+    }
   }
 
   /**
@@ -241,16 +298,12 @@ public final class TenantContext {
    * @param runnable the code to execute
    */
   public static void executeInTenantContext(UUID tenantId, Runnable runnable) {
-    UUID previousTenantId = getCurrentTenantIdOrNull();
+    TenantSnapshot previous = capture();
     try {
       setCurrentTenantId(tenantId);
       runnable.run();
     } finally {
-      if (previousTenantId != null) {
-        setCurrentTenantId(previousTenantId);
-      } else {
-        clear();
-      }
+      restore(previous);
     }
   }
 
@@ -264,16 +317,12 @@ public final class TenantContext {
    */
   public static <T> T executeInTenantContext(
       UUID tenantId, java.util.function.Supplier<T> supplier) {
-    UUID previousTenantId = getCurrentTenantIdOrNull();
+    TenantSnapshot previous = capture();
     try {
       setCurrentTenantId(tenantId);
       return supplier.get();
     } finally {
-      if (previousTenantId != null) {
-        setCurrentTenantId(previousTenantId);
-      } else {
-        clear();
-      }
+      restore(previous);
     }
   }
 }

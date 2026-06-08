@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationAddressFacade;
 import com.fabricmanagement.platform.organization.dto.AddressDeletionImpactDto;
 import com.fabricmanagement.platform.organization.dto.OrganizationAddressDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -15,9 +16,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/organizations/{organizationId}/addresses")
+@RequestMapping("/api/v1/common/organizations/{organizationId}/addresses")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Organization Address", description = "Organization Address operations")
 public class OrganizationAddressController {
 
   private final OrganizationAddressFacade facade;

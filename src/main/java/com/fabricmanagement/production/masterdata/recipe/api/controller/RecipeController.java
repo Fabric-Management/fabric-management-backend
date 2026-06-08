@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.recipe.api.controller;
 import com.fabricmanagement.production.masterdata.recipe.app.RecipeService;
 import com.fabricmanagement.production.masterdata.recipe.dto.RecipeRequest;
 import com.fabricmanagement.production.masterdata.recipe.dto.RecipeResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +19,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/production/recipes")
+@RequestMapping("/api/v1/production/recipes")
 @RequiredArgsConstructor
+@Tag(name = "Recipe", description = "Recipe operations")
 public class RecipeController {
 
   private final RecipeService recipeService;

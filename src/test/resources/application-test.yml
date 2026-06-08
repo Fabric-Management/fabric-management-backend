@@ -19,3 +19,9 @@ logging:
     com.fabricmanagement.common.infrastructure.persistence.TenantConnectionProvider: TRACE
     com.fabricmanagement.common.infrastructure.config.TenantRestoringEventListenerAspect: TRACE
     com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor: DEBUG
+
+management:
+  otlp:
+    tracing:
+      export:
+        enabled: false

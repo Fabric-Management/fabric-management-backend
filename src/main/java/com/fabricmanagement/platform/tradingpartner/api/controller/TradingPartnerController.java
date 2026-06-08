@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.*;
  * period.
  */
 @RestController
-@RequestMapping("/api/common/trading-partners")
+@RequestMapping("/api/v1/common/trading-partners")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(

@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.ai.app.FabricAIService;
 import com.fabricmanagement.platform.ai.dto.ChatRequestDto;
 import com.fabricmanagement.platform.ai.dto.ChatResponse;
 import com.fabricmanagement.platform.ai.dto.ChatResponseDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +16,10 @@ import org.springframework.web.bind.annotation.*;
 
 /** FabricAI Controller - REST endpoint for AI assistant. */
 @RestController
-@RequestMapping("/api/common/ai")
+@RequestMapping("/api/v1/common/ai")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Fabric A I", description = "Fabric A I operations")
 public class FabricAIController {
 
   private final FabricAIService fabricAIService;

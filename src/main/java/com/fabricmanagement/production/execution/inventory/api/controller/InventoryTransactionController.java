@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.execution.inventory.app.query.InventoryTransactionQueryService;
 import com.fabricmanagement.production.execution.inventory.domain.enums.InventoryTransactionType;
 import com.fabricmanagement.production.execution.inventory.dto.InventoryTransactionDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,9 +23,10 @@ import org.springframework.web.bind.annotation.*;
  * transfers, returns, and lab samples.
  */
 @RestController
-@RequestMapping("/api/production/inventory/transactions")
+@RequestMapping("/api/v1/production/inventory/transactions")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Inventory Transaction", description = "Inventory Transaction operations")
 public class InventoryTransactionController {
 
   private final InventoryTransactionQueryService transactionQueryService;

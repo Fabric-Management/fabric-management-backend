@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Admin API for cross-tenant operations. */
 @RestController
-@RequestMapping("/api/admin/tenant")
+@RequestMapping("/api/v1/admin/tenant")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Tenant Admin", description = "Tenant yönetim işlemleri (Sadece PLATFORM_ADMIN)")

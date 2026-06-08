@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/production/stock-units")
+@RequestMapping("/api/v1/production/stock-units")
 @RequiredArgsConstructor
 @Tag(name = "StockUnit", description = "Physical stock unit lifecycle management")
 public class StockUnitController {

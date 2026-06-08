@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.human.payroll.app.PayrollSelfServiceAppService;
 import com.fabricmanagement.human.payroll.dto.SalarySlipDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +16,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/human/payroll/me")
+@RequestMapping("/api/v1/human/payroll/me")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Payroll Self Service", description = "Payroll Self Service operations")
 public class PayrollSelfServiceController {
 
   private final PayrollSelfServiceAppService selfServiceAppService;

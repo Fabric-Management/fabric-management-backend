@@ -23,7 +23,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/iwm/locations")
+@RequestMapping("/api/v1/iwm/locations")
 @RequiredArgsConstructor
 @Tag(name = "IWM Location", description = "IWM Warehouse Location Management API")
 @Slf4j

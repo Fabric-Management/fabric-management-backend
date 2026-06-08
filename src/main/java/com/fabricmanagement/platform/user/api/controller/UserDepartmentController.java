@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.user.api.facade.UserDepartmentFacade;
 import com.fabricmanagement.platform.user.dto.AssignDepartmentRequest;
 import com.fabricmanagement.platform.user.dto.UserDepartmentDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -14,9 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/users/{userId}/departments")
+@RequestMapping("/api/v1/common/users/{userId}/departments")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "User Department", description = "User Department operations")
 public class UserDepartmentController {
 
   private final UserDepartmentFacade userDepartmentFacade;

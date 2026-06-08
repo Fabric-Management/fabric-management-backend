@@ -3,19 +3,18 @@ package com.fabricmanagement.sales.salesorder.app.listener;
 import com.fabricmanagement.common.domain.event.production.SalesOrderLineProductionCompletedEvent;
 import com.fabricmanagement.common.domain.event.production.SalesOrderLineStoredEvent;
 import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent;
+import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.sales.salesorder.app.ProductionProgressService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.TransientDataAccessException;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 @RequiredArgsConstructor
@@ -23,9 +22,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class SalesOrderProductionProgressListener {
 
   private final ProductionProgressService productionProgressService;
+  private final IdempotentEventHandler idempotentHandler;
 
-  @Async
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @ApplicationModuleListener
   @Retryable(
       retryFor = {
         ObjectOptimisticLockingFailureException.class,
@@ -34,21 +33,27 @@ public class SalesOrderProductionProgressListener {
       maxAttempts = 3,
       backoff = @Backoff(delay = 200, multiplier = 2))
   public void onWorkOrderStarted(WorkOrderStartedEvent event) {
-    log.debug(
-        "Handling WorkOrderStartedEvent: workOrderId={}, salesOrderLineId={}",
-        event.getWorkOrderId(),
-        event.getSalesOrderLineId());
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "onWorkOrderStarted",
+        () -> {
+          log.debug(
+              "Handling WorkOrderStartedEvent: workOrderId={}, salesOrderLineId={}",
+              event.getWorkOrderId(),
+              event.getSalesOrderLineId());
 
-    UUID salesOrderId = productionProgressService.markLineInProduction(event.getSalesOrderLineId());
-    if (salesOrderId == null) {
-      return;
-    }
+          UUID salesOrderId =
+              productionProgressService.markLineInProduction(event.getSalesOrderLineId());
+          if (salesOrderId == null) {
+            return;
+          }
 
-    productionProgressService.markOrderInProgressIfConfirmed(salesOrderId);
+          productionProgressService.markOrderInProgressIfConfirmed(salesOrderId);
+        });
   }
 
-  @Async
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @ApplicationModuleListener
   @Retryable(
       retryFor = {
         ObjectOptimisticLockingFailureException.class,
@@ -57,17 +62,22 @@ public class SalesOrderProductionProgressListener {
       maxAttempts = 3,
       backoff = @Backoff(delay = 200, multiplier = 2))
   public void onSalesOrderLineProductionCompleted(SalesOrderLineProductionCompletedEvent event) {
-    log.debug(
-        "Handling SalesOrderLineProductionCompletedEvent: salesOrderLineId={}, "
-            + "completedByWorkOrderId={}",
-        event.getSalesOrderLineId(),
-        event.getCompletedByWorkOrderId());
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "onSalesOrderLineProductionCompleted",
+        () -> {
+          log.debug(
+              "Handling SalesOrderLineProductionCompletedEvent: salesOrderLineId={}, "
+                  + "completedByWorkOrderId={}",
+              event.getSalesOrderLineId(),
+              event.getCompletedByWorkOrderId());
 
-    productionProgressService.markLineProductionCompleted(event.getSalesOrderLineId());
+          productionProgressService.markLineProductionCompleted(event.getSalesOrderLineId());
+        });
   }
 
-  @Async
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @ApplicationModuleListener
   @Retryable(
       retryFor = {
         ObjectOptimisticLockingFailureException.class,
@@ -76,7 +86,13 @@ public class SalesOrderProductionProgressListener {
       maxAttempts = 3,
       backoff = @Backoff(delay = 200, multiplier = 2))
   public void onSalesOrderLineStored(SalesOrderLineStoredEvent event) {
-    productionProgressService.markLineInWarehouse(event.getSalesOrderLineId());
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "onSalesOrderLineStored",
+        () -> {
+          productionProgressService.markLineInWarehouse(event.getSalesOrderLineId());
+        });
   }
 
   @Recover
@@ -88,6 +104,7 @@ public class SalesOrderProductionProgressListener {
         event.getSalesOrderLineId(),
         ex.getMessage(),
         ex);
+    throw new RuntimeException("Event processing failed after retries", ex);
   }
 
   @Recover
@@ -100,6 +117,7 @@ public class SalesOrderProductionProgressListener {
         event.getCompletedByWorkOrderId(),
         ex.getMessage(),
         ex);
+    throw new RuntimeException("Event processing failed after retries", ex);
   }
 
   @Recover
@@ -109,5 +127,6 @@ public class SalesOrderProductionProgressListener {
         event.getSalesOrderLineId(),
         ex.getMessage(),
         ex);
+    throw new RuntimeException("Event processing failed after retries", ex);
   }
 }

@@ -8,6 +8,7 @@ import com.fabricmanagement.platform.communication.dto.ContactDto;
 import com.fabricmanagement.platform.communication.dto.CreateContactRequest;
 import com.fabricmanagement.platform.communication.dto.WhatsAppCapabilityDto;
 import com.fabricmanagement.platform.communication.infra.client.WhatsAppClient;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -18,9 +19,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/contacts")
+@RequestMapping("/api/v1/common/contacts")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Contact", description = "Contact operations")
 public class ContactController {
 
   private final ContactFacade facade;

@@ -6,6 +6,7 @@ import com.fabricmanagement.common.infrastructure.web.PageRequestDto;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.platform.communication.app.InAppNotificationService;
 import com.fabricmanagement.platform.communication.dto.NotificationDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.UUID;
@@ -22,9 +23,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Users can only see and manage their own notifications (recipientId = current user).
  */
 @RestController("commonNotificationController")
-@RequestMapping("/api/common/notifications")
+@RequestMapping("/api/v1/common/notifications")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Notification", description = "Notification operations")
 public class NotificationController {
 
   private final InAppNotificationService inAppNotificationService;

@@ -30,12 +30,27 @@ class WorkOrderSalesEventListenerTest {
 
   @InjectMocks private WorkOrderSalesEventListener listener;
 
+  @Mock
+  private com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler
+      idempotentHandler;
+
   private UUID tenantId;
   private UUID orderId;
   private UUID lineId;
 
   @BeforeEach
   void setUp() {
+    if (idempotentHandler != null) {
+      org.mockito.Mockito.lenient()
+          .doAnswer(
+              invocation -> {
+                ((Runnable) invocation.getArgument(3)).run();
+                return null;
+              })
+          .when(idempotentHandler)
+          .executeOnce(any(), any(), any(), any());
+    }
+
     tenantId = UUID.randomUUID();
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();

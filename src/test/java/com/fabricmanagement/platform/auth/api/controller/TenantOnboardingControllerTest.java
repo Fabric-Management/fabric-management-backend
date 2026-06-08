@@ -77,7 +77,7 @@ class TenantOnboardingControllerTest {
 
     mockMvc
         .perform(
-            post("/api/admin/onboarding/tenant")
+            post("/api/v1/admin/onboarding/tenant")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))

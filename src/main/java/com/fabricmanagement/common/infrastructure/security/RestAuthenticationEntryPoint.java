@@ -1,15 +1,15 @@
 package com.fabricmanagement.common.infrastructure.security;
 
-import com.fabricmanagement.common.infrastructure.web.exception.ApiError;
+import com.fabricmanagement.common.infrastructure.web.exception.ApiProblemDetail;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -38,16 +38,15 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         authException.getMessage());
 
     response.setStatus(HttpStatus.UNAUTHORIZED.value());
-    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    response.setContentType("application/problem+json");
 
-    ApiError apiError =
-        ApiError.of(
-            HttpStatus.UNAUTHORIZED.value(),
-            "Unauthorized",
-            "UNAUTHORIZED",
-            "Authentication is required to access this resource",
-            request.getRequestURI());
+    ApiProblemDetail problemDetail =
+        ApiProblemDetail.forStatusAndDetail(
+            HttpStatus.UNAUTHORIZED, "Authentication is required to access this resource");
+    problemDetail.setTitle("Unauthorized");
+    problemDetail.setCode("UNAUTHORIZED");
+    problemDetail.setInstance(URI.create(request.getRequestURI()));
 
-    objectMapper.writeValue(response.getOutputStream(), apiError);
+    objectMapper.writeValue(response.getOutputStream(), problemDetail);
   }
 }

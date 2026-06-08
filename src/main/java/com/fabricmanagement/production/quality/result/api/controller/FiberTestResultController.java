@@ -6,6 +6,7 @@ import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
 import com.fabricmanagement.production.quality.result.dto.CreateFiberTestResultRequest;
 import com.fabricmanagement.production.quality.result.dto.FiberTestResultDto;
 import com.fabricmanagement.production.quality.result.dto.UpdateApprovalRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -25,9 +26,10 @@ import org.springframework.web.bind.annotation.*;
  * user in a production-related department.
  */
 @RestController
-@RequestMapping("/api/production/quality/fiber-tests")
+@RequestMapping("/api/v1/production/quality/fiber-tests")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Fiber Test Result", description = "Fiber Test Result operations")
 public class FiberTestResultController {
 
   private final FiberTestResultService testResultService;

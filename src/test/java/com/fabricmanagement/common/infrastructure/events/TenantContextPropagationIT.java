@@ -77,7 +77,15 @@ class TenantContextPropagationIT {
   void happyPath_withContext_restoresTenantInAsyncListener() {
     // Arrange
     UUID expectedTenantId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    String expectedTenantUid = "TENANT-UID-123";
+    UUID expectedUserId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    String expectedCountry = "TR";
+
     TenantContext.setCurrentTenantId(expectedTenantId);
+    TenantContext.setCurrentTenantUid(expectedTenantUid);
+    TenantContext.setCurrentUserId(expectedUserId);
+    TenantContext.setCurrentTenantCountry(expectedCountry);
+
     TestEvent event = new TestEvent(expectedTenantId, "HAPPY_PATH_EVENT");
 
     // Act
@@ -92,8 +100,13 @@ class TenantContextPropagationIT {
               TestListener.EventResult result = listener.getReceivedEvents().get(0);
               assertThat(result.eventId()).isEqualTo(event.getEventId());
               assertThat(result.threadName()).isNotEqualTo(Thread.currentThread().getName());
-              // MTCP validates connection is bound correctly
               assertThat(result.dbTenantId()).isEqualTo(expectedTenantId.toString());
+
+              // Validate all 4 fields of TenantContext are propagated via ThreadLocalAccessor
+              assertThat(result.threadTenantId()).isEqualTo(expectedTenantId);
+              assertThat(result.threadTenantUid()).isEqualTo(expectedTenantUid);
+              assertThat(result.threadUserId()).isEqualTo(expectedUserId);
+              assertThat(result.threadCountry()).isEqualTo(expectedCountry);
             });
   }
 
@@ -159,12 +172,25 @@ class TenantContextPropagationIT {
                             .createNativeQuery("SELECT current_setting('app.current_tenant', true)")
                             .getSingleResult());
         receivedEvents.add(
-            new EventResult(event.getEventId(), dbTenantId, Thread.currentThread().getName()));
+            new EventResult(
+                event.getEventId(),
+                dbTenantId,
+                Thread.currentThread().getName(),
+                TenantContext.getCurrentTenantIdOrNull(),
+                TenantContext.getCurrentTenantUid(),
+                TenantContext.getCurrentUserId(),
+                TenantContext.getCurrentTenantCountry()));
       } catch (Exception e) {
         log.error("Failed to execute DB query in listener", e);
         receivedEvents.add(
             new EventResult(
-                event.getEventId(), "ERROR: " + e.getMessage(), Thread.currentThread().getName()));
+                event.getEventId(),
+                "ERROR: " + e.getMessage(),
+                Thread.currentThread().getName(),
+                TenantContext.getCurrentTenantIdOrNull(),
+                TenantContext.getCurrentTenantUid(),
+                TenantContext.getCurrentUserId(),
+                TenantContext.getCurrentTenantCountry()));
       }
     }
 
@@ -172,6 +198,13 @@ class TenantContextPropagationIT {
       receivedEvents.clear();
     }
 
-    public record EventResult(UUID eventId, String dbTenantId, String threadName) {}
+    public record EventResult(
+        UUID eventId,
+        String dbTenantId,
+        String threadName,
+        UUID threadTenantId,
+        String threadTenantUid,
+        UUID threadUserId,
+        String threadCountry) {}
   }
 }

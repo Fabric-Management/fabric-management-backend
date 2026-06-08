@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
  * <p>READ is open to all production departments. WRITE is restricted to QC and R&D managers.
  */
 @RestController
-@RequestMapping("/api/production/quality-grades")
+@RequestMapping("/api/v1/production/quality-grades")
 @RequiredArgsConstructor
 @Tag(name = "QualityGrade", description = "Tenant-specific quality grading system management")
 public class QualityGradeController {

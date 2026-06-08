@@ -7,6 +7,7 @@ import com.fabricmanagement.platform.audit.app.AuditService;
 import com.fabricmanagement.platform.audit.domain.AuditLog;
 import com.fabricmanagement.platform.audit.dto.AuditLogDto;
 import com.fabricmanagement.platform.audit.mapper.AuditMapper;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/audit")
+@RequestMapping("/api/v1/common/audit")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Audit", description = "Audit operations")
 public class AuditController {
 
   private final AuditService auditService;

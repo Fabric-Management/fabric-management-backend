@@ -6,6 +6,7 @@ import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import com.fabricmanagement.costing.dto.ExchangeRateResponse;
 import com.fabricmanagement.costing.dto.ExchangeRateSubmitRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,8 +24,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/costing/exchange-rates")
+@RequestMapping("/api/v1/costing/exchange-rates")
 @RequiredArgsConstructor
+@Tag(name = "Exchange Rate", description = "Exchange Rate operations")
 public class ExchangeRateController {
 
   private final ExchangeRateService exchangeRateService;

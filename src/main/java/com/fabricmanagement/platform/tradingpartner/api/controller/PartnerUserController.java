@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
  * partner's organisation.
  */
 @RestController
-@RequestMapping("/api/common/trading-partners/{partnerId}/users")
+@RequestMapping("/api/v1/common/trading-partners/{partnerId}/users")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Partner Users", description = "Partner portal user management")
