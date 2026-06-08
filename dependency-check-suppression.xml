@@ -28,4 +28,73 @@
         <cve>CVE-2025-31650</cve>
     </suppress>
 
+    <suppress>
+        <notes><![CDATA[
+        Kotlin stdlib CVE-2020-29582 only affects Kotlin <= 1.4.21. 
+        We are on 1.9.25 (via Spring Boot dependencies), this is a false positive CPE match by ODC.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin\-stdlib.*@.*$</packageUrl>
+        <cve>CVE-2020-29582</cve>
+    </suppress>
+
+    <!-- 2026 Unpatched CVEs - Review Date: 2026-07-01 -->
+    <suppress>
+        <notes><![CDATA[
+        Recently reported Tomcat 2026 CVEs. We are on the latest patch.
+        Yama bekleniyor, 01.07.2026 tarihinde tekrar bak.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat\.embed/tomcat\-embed\-.*@.*$</packageUrl>
+        <cve>CVE-2026-41293</cve>
+        <cve>CVE-2026-43512</cve>
+        <cve>CVE-2026-43515</cve>
+        <cve>CVE-2026-41284</cve>
+        <cve>CVE-2026-43513</cve>
+        <cve>CVE-2026-42498</cve>
+        <cve>CVE-2026-43514</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+        log4j-api 2.24.x unpatched 2026 CVEs. Yama bekleniyor, 01.07.2026 tarihinde tekrar bak.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/log4j\-.*@.*$</packageUrl>
+        <cve>CVE-2026-34479</cve>
+        <cve>CVE-2026-34477</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+        opentelemetry-semconv 1.32.0 unpatched 2026 CVEs. Yama bekleniyor, 01.07.2026 tarihinde tekrar bak.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry\-semconv@.*$</packageUrl>
+        <cve>CVE-2026-39883</cve>
+        <cve>CVE-2026-39882</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+        spring-boot-web-server unpatched 2026 CVEs. Yama bekleniyor, 01.07.2026 tarihinde tekrar bak.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/spring\-boot\-.*@.*$</packageUrl>
+        <cve>CVE-2026-40974</cve>
+        <cve>CVE-2026-40971</cve>
+        <cve>CVE-2026-40976</cve>
+        <cve>CVE-2026-40972</cve>
+        <cve>CVE-2026-40975</cve>
+        <cve>CVE-2026-40973</cve>
+        <cve>CVE-2026-40970</cve>
+        <cve>CVE-2026-40977</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+        swagger-ui / DOMPurify unpatched 2026 CVEs. Yama bekleniyor, 01.07.2026 tarihinde tekrar bak.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:javascript/DOMPurify@.*$</packageUrl>
+        <cve>CVE-2026-41240</cve>
+        <cve>CVE-2026-41238</cve>
+        <cve>CVE-2026-41239</cve>
+        <vulnerabilityName>GHSA-39q2-94rc-95cp</vulnerabilityName>
+    </suppress>
+
 </suppressions>

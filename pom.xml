@@ -10,7 +10,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.13</version>
+        <version>3.5.14</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -34,7 +34,7 @@
         <spring-cloud.version>2024.0.0</spring-cloud.version>
 
         <!-- Database Versions -->
-        <postgresql.version>42.7.5</postgresql.version>
+        <postgresql.version>42.7.11</postgresql.version>
         <flyway.version>10.15.0</flyway.version>
 
         <!-- Security & JWT Versions -->
@@ -50,13 +50,13 @@
         <mockito.version>5.14.2</mockito.version>
 
         <!-- Documentation Versions -->
-        <springdoc-openapi.version>2.7.0</springdoc-openapi.version>
+        <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
 
         <!-- Cache Versions -->
         <caffeine.version>3.1.8</caffeine.version>
 
         <!-- Observability -->
-        <micrometer.version>1.13.0</micrometer.version>
+        <micrometer.version>1.17.0</micrometer.version>
 
         <!-- Hibernate Types for JSONB -->
         <hibernate-types.version>3.7.2</hibernate-types.version>
@@ -73,10 +73,10 @@
         <libphonenumber.version>8.13.27</libphonenumber.version>
 
         <!-- CVE Fix Overrides (Sprint 2) ODC -->
-        <kafka.version>3.9.1</kafka.version>
+        <kafka.version>3.9.2</kafka.version>
         <commons-fileupload.version>1.6.0</commons-fileupload.version>
         <angus-mail.version>2.0.4</angus-mail.version>
-        <commons-lang3.version>3.17.0</commons-lang3.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
     </properties>
 
     <dependencies>
