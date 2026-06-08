@@ -76,11 +76,15 @@ breaking-change kuralı), client-gen yaklaşımı. ADR'ye yaz.
 - Böylece her API değişikliği snapshot güncellemesini zorunlu kılar → değişiklik görünür + review'dan geçer.
 - Bu, code-first'ü gerçek bir kontrata çeviren mekanizma.
 
-### C5 — Frontend client gen setup'ı
-- Commit'li spec'ten tipli TS client üreten komut/config (`openapi-typescript` veya
-  `openapi-generator-cli typescript-fetch`) — frontend repo'sunda koşar.
-- Dokümante et: "backend değişir → spec değişir (C4 gate) → frontend client regen → TS compile kırılır."
-- (Frontend ayrı repo olduğu için burada setup + dokümantasyon; gerçek gen orada.)
+### C5 — Frontend Client-Gen Kuralları ve Tüketim Akışı
+- **Prensip:** `openapi-typescript` veya türevi TS/Node araçları **bu (backend) repoya eklenmez**. Backend'in tek sorumluluğu, geçerli ve güncel bir `api/openapi.yaml`'ı commit'li olarak tutmaktır.
+- **Spec Dağıtımı:** Frontend repo'sunda `openapi-typescript` komutu, backend repo'sundaki `api/openapi.yaml` dosyasını argüman olarak alarak (doğrudan dosya yolu veya url üzerinden) çalıştırılır. Aşırı mühendislik yapıp NPM registry'leri veya SwaggerHub gibi aracı sistemler kullanılmaz.
+- **Compile-Break Döngüsü:**
+  1. Backend API'yi değiştirir (ör. alan silinir, tip değişir).
+  2. Drift-gate (`OpenApiExportIT`), backend dev'ini API spec'ini güncelleyip commit'lemeye zorlar.
+  3. Frontend repo'sunda regen script'i çalıştırılarak yeni spec'ten tipler üretilir.
+  4. Değişen/silinen tipler nedeniyle Frontend **compile-time'da kırılır**.
+  5. UI developer kırılan yerleri düzeltir. Runtime hatası yaşanmadan tip güvenliği uçtan uca sağlanmış olur.
 
 ### C6 — Korkuluk
 - ArchUnit/test: her `@RestController` endpoint'inin `operationId`'si var + spec'te görünüyor.
@@ -121,14 +125,14 @@ breaking-change kuralı), client-gen yaklaşımı. ADR'ye yaz.
 
 ## Definition of Done
 
-- [ ] C0: kontrat ADR (code-first+gate, RFC7807, versiyonlama, client-gen).
-- [ ] C1: tek `@RestControllerAdvice` + `ProblemDetail`; parçalı handler'lar emekli; tutarlı error şeması.
-- [ ] C2: tüm endpoint'lerde stable operationId + tag + ana response'lar + schema.
-- [ ] C3: `api/openapi.yaml` export edilip commit'lendi (versiyonlu).
-- [ ] C4: CI drift-gate — spec değişikliği build'i kırıyor (snapshot güncellemesi zorunlu).
-- [ ] C5: frontend client-gen komutu/config + "compile-break" döngüsü dokümante.
-- [ ] C6: operationId + error-shape korkulukları yeşil.
-- [ ] Mevcut 720+ test yeşil.
+- [x] C0: kontrat ADR (code-first+gate, RFC7807, versiyonlama, client-gen).
+- [x] C1: tek `@RestControllerAdvice` + `ProblemDetail`; parçalı handler'lar emekli; tutarlı error şeması.
+- [x] C2: tüm endpoint'lerde stable operationId + tag + ana response'lar + schema.
+- [x] C3: `api/openapi.yaml` export edilip commit'lendi (versiyonlu).
+- [x] C4: CI drift-gate — spec değişikliği build'i kırıyor (snapshot güncellemesi zorunlu).
+- [x] C5: frontend client-gen komutu/config + "compile-break" döngüsü dokümante.
+- [x] C6: operationId + error-shape korkulukları yeşil.
+- [x] Mevcut 720+ test yeşil.
 
 ---
 
