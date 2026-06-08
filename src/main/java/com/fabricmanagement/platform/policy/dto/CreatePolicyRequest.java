@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.policy.dto;
 
 import com.fabricmanagement.platform.policy.domain.PolicyEffect;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
@@ -30,6 +31,7 @@ public class CreatePolicyRequest {
   @NotNull(message = "Effect is required")
   private PolicyEffect effect;
 
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> conditions;
 
   private String description;

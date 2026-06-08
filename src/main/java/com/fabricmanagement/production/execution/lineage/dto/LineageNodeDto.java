@@ -4,6 +4,7 @@ import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.lineage.domain.BatchLineage;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
@@ -43,6 +44,8 @@ public class LineageNodeDto {
   private BigDecimal availableQuantity;
   private String batchUnit;
   private BatchStatus batchStatus;
+
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> attributes;
 
   /**

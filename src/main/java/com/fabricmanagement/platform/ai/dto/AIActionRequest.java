@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.ai.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +18,7 @@ public class AIActionRequest {
   private String action;
 
   /** Action parameters */
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> parameters;
 
   /** Whether user confirmation is required */

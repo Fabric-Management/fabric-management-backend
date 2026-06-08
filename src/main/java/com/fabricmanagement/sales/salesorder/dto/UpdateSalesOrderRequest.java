@@ -38,6 +38,8 @@ public class UpdateSalesOrderRequest {
   private String billingAddress;
   private String shippingMethod;
   private String notes;
+
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> metadata;
 
   @Deprecated

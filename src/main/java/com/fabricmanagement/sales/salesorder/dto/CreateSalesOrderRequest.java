@@ -73,6 +73,7 @@ public class CreateSalesOrderRequest {
   private String notes;
 
   /** Additional metadata. */
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> metadata;
 
   // ── Faz 2 additions ─────────────────────────────────────────────────────

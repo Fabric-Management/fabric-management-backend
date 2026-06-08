@@ -5,6 +5,7 @@ import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -42,7 +43,10 @@ public class SalesOrderDto {
   private String billingAddress;
   private String shippingMethod;
   private String notes;
+
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> metadata;
+
   private Boolean isActive;
   private Instant createdAt;
   private Instant updatedAt;

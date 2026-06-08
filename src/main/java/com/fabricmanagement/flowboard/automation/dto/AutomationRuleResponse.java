@@ -6,6 +6,7 @@ import com.fabricmanagement.flowboard.automation.domain.AutomationTriggerType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -15,10 +16,13 @@ public record AutomationRuleResponse(
     String name,
     String description,
     AutomationTriggerType triggerType,
-    Map<String, Object> triggerConfig,
-    Map<String, Object> conditionConfig,
+    @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
+        Map<String, Object> triggerConfig,
+    @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
+        Map<String, Object> conditionConfig,
     AutomationActionType actionType,
-    Map<String, Object> actionConfig,
+    @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
+        Map<String, Object> actionConfig,
     UUID boardId,
     boolean isActive,
     long executionCount,

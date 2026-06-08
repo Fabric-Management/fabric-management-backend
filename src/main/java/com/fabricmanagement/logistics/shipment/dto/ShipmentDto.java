@@ -4,6 +4,7 @@ import com.fabricmanagement.logistics.shipment.domain.Shipment;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentStatus;
 import com.fabricmanagement.logistics.shipment.domain.ShipmentType;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -46,7 +47,10 @@ public class ShipmentDto {
   private String deliveryProof;
   private String recipientName;
   private String notes;
+
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> metadata;
+
   private List<ShipmentLineDto> lines;
   private Boolean isActive;
   private Boolean isLate;

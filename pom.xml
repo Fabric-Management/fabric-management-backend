@@ -34,7 +34,7 @@
         <spring-cloud.version>2024.0.0</spring-cloud.version>
 
         <!-- Database Versions -->
-        <postgresql.version>42.7.5</postgresql.version>
+        <postgresql.version>42.7.11</postgresql.version>
         <flyway.version>10.15.0</flyway.version>
 
         <!-- Security & JWT Versions -->
@@ -73,10 +73,10 @@
         <libphonenumber.version>8.13.27</libphonenumber.version>
 
         <!-- CVE Fix Overrides (Sprint 2) ODC -->
-        <kafka.version>3.9.1</kafka.version>
+        <kafka.version>3.9.2</kafka.version>
         <commons-fileupload.version>1.6.0</commons-fileupload.version>
         <angus-mail.version>2.0.4</angus-mail.version>
-        <commons-lang3.version>3.17.0</commons-lang3.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
     </properties>
 
     <dependencies>

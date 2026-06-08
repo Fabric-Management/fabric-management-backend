@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.policy.dto;
 
 import com.fabricmanagement.platform.policy.domain.PolicyEffect;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public class UpdatePolicyRequest {
 
   private Boolean enabled;
 
+  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> conditions;
 
   private String description;
