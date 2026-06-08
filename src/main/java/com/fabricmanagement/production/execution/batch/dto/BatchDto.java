@@ -39,8 +39,8 @@ public class BatchDto {
   private ProductType productType;
 
   @Schema(
-      description = "Raw JSONB attributes map. Prefer using fiberSpecs/yarnSpecs when available.")
-  @Schema(additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
+      description = "Raw JSONB attributes map. Prefer using fiberSpecs/yarnSpecs when available.",
+      additionalProperties = Schema.AdditionalPropertiesValue.TRUE)
   private Map<String, Object> attributes;
 
   @Schema(description = "Internal unique batch code/lot number", example = "B-2026-001")
