@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.organization.app.DepartmentService;
 import com.fabricmanagement.platform.organization.dto.DepartmentDto;
 import com.fabricmanagement.platform.organization.mapper.DepartmentMapper;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -14,9 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/departments")
+@RequestMapping("/api/v1/common/departments")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Department", description = "Department operations")
 public class DepartmentController {
 
   private final DepartmentService departmentService;

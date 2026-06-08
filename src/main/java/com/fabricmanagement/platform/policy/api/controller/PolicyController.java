@@ -5,6 +5,7 @@ import com.fabricmanagement.platform.policy.api.facade.PolicyFacade;
 import com.fabricmanagement.platform.policy.dto.CreatePolicyRequest;
 import com.fabricmanagement.platform.policy.dto.PolicyDto;
 import com.fabricmanagement.platform.policy.dto.UpdatePolicyRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -14,9 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/policies")
+@RequestMapping("/api/v1/common/policies")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Policy", description = "Policy operations")
 public class PolicyController {
 
   private final PolicyFacade facade;

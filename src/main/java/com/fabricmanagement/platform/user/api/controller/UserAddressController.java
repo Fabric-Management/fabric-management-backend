@@ -5,6 +5,7 @@ import com.fabricmanagement.platform.communication.dto.AssignAddressRequest;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.platform.user.api.facade.UserAddressFacade;
 import com.fabricmanagement.platform.user.dto.UserAddressDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -14,9 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/users/{userId}/addresses")
+@RequestMapping("/api/v1/common/users/{userId}/addresses")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "User Address", description = "User Address operations")
 public class UserAddressController {
 
   private final UserAddressFacade userAddressFacade;

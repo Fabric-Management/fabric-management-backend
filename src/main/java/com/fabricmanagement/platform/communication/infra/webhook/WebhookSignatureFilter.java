@@ -42,7 +42,7 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
   private static final String HMAC_SHA256 = "HmacSHA256";
   private static final String SIGNATURE_HEADER = "X-Hub-Signature-256";
   private static final String SIGNATURE_PREFIX = "sha256=";
-  private static final String WEBHOOK_PATH = "/api/webhooks/whatsapp";
+  private static final String WEBHOOK_PATH = "/api/v1/webhooks/whatsapp";
 
   @Value("${application.whatsapp.app-secret:}")
   private String appSecret;

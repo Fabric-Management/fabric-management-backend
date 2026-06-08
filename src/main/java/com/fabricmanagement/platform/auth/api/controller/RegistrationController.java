@@ -8,6 +8,7 @@ import com.fabricmanagement.platform.auth.app.RegistrationService;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.dto.RegisterCheckRequest;
 import com.fabricmanagement.platform.auth.dto.VerifyAndRegisterRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -22,9 +23,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Base path: /api/auth/register
  */
 @RestController
-@RequestMapping("/api/auth/register")
+@RequestMapping("/api/v1/auth/register")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Registration", description = "Registration operations")
 public class RegistrationController {
 
   private final RegistrationService registrationService;

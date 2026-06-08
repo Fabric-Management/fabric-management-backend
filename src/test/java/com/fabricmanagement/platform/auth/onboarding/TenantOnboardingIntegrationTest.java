@@ -98,7 +98,7 @@ class TenantOnboardingIntegrationTest {
 
     mockMvc
         .perform(
-            post("/api/public/signup")
+            post("/api/v1/public/signup")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -139,7 +139,7 @@ class TenantOnboardingIntegrationTest {
 
     mockMvc
         .perform(
-            post("/api/public/signup")
+            post("/api/v1/public/signup")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -188,7 +188,7 @@ class TenantOnboardingIntegrationTest {
 
     mockMvc
         .perform(
-            post("/api/public/signup")
+            post("/api/v1/public/signup")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))

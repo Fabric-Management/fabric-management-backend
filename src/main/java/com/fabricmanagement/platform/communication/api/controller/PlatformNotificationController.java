@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.PageRequestDto;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.platform.communication.app.InAppNotificationService;
 import com.fabricmanagement.platform.communication.dto.NotificationDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,9 +21,10 @@ import org.springframework.web.bind.annotation.*;
  * FIBER_REQUEST_SUBMITTED, NEW_TENANT_ONBOARDED).
  */
 @RestController
-@RequestMapping("/api/platform/notifications")
+@RequestMapping("/api/v1/platform/notifications")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Platform Notification", description = "Platform Notification operations")
 public class PlatformNotificationController {
 
   private final InAppNotificationService inAppNotificationService;

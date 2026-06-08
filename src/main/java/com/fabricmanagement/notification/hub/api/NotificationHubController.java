@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
  * Kanal tercihleri güncelle
  */
 @RestController("notifHubController")
-@RequestMapping("/api/notifications")
+@RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
 @Tag(name = "Notifications", description = "Bildirim yönetimi ve tercihler")
 public class NotificationHubController {

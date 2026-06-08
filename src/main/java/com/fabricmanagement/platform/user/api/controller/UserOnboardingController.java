@@ -7,6 +7,7 @@ import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
 import com.fabricmanagement.platform.user.dto.OnboardingStatusResponse;
 import com.fabricmanagement.platform.user.dto.UserDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +21,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Base path: /api/common/users/me — onboarding status and completion.
  */
 @RestController
-@RequestMapping("/api/common/users/me")
+@RequestMapping("/api/v1/common/users/me")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "User Onboarding", description = "User Onboarding operations")
 public class UserOnboardingController {
 
   private final UserService userService;

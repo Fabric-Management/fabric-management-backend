@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
  * Tenant locale ayarları
  */
 @RestController
-@RequestMapping("/api/i18n")
+@RequestMapping("/api/v1/i18n")
 @RequiredArgsConstructor
 @Tag(name = "i18n", description = "Çok dil ve yerelleştirme yönetimi")
 public class LocaleController {

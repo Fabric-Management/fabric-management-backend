@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/procurement/purchase-orders")
+@RequestMapping("/api/v1/procurement/purchase-orders")
 @RequiredArgsConstructor
 @Tag(name = "Purchase Order", description = "Procurement Purchase Order API")
 public class PurchaseOrderController {

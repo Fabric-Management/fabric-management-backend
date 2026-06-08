@@ -49,6 +49,6 @@ public class ChatResponseDto {
   public static class SuggestedAction {
     private String type; // e.g., "create_task", "check_stock"
     private String label; // e.g., "Create purchase order"
-    private String action; // e.g., "/api/procurement/purchase-orders"
+    private String action; // e.g., "/api/v1/procurement/purchase-orders"
   }
 }

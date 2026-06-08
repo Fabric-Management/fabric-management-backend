@@ -44,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
  * verified. Verification codes are only used for unverified contacts during login flows.
  */
 @RestController
-@RequestMapping("/api/public")
+@RequestMapping("/api/v1/public")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(

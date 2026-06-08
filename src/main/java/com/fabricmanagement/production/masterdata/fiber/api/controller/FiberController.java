@@ -12,6 +12,7 @@ import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,9 +32,10 @@ import org.springframework.web.bind.annotation.*;
  * user in a production-related department.
  */
 @RestController
-@RequestMapping("/api/production/fibers")
+@RequestMapping("/api/v1/production/fibers")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Fiber", description = "Fiber operations")
 public class FiberController {
 
   private final FiberService fiberService;

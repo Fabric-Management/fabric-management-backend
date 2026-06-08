@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.finance.invoice.app.InvoiceService;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.dto.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +17,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/finance/invoices")
+@RequestMapping("/api/v1/finance/invoices")
 @RequiredArgsConstructor
+@Tag(name = "Invoice", description = "Invoice operations")
 public class InvoiceController {
 
   private final InvoiceService invoiceService;

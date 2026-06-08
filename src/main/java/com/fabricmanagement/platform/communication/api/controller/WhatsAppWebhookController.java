@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.*;
  *     Webhooks</a>
  */
 @RestController
-@RequestMapping("/api/webhooks/whatsapp")
+@RequestMapping("/api/v1/webhooks/whatsapp")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "WhatsApp Webhooks", description = "WhatsApp Business API webhook endpoints")

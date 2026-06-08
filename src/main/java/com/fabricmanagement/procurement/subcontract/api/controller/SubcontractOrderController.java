@@ -5,6 +5,7 @@ import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatu
 import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.dto.SubcontractOrderResponse;
 import com.fabricmanagement.procurement.subcontract.dto.UpdateSubcontractOrderRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -22,8 +23,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/procurement/subcontract-orders")
+@RequestMapping("/api/v1/procurement/subcontract-orders")
 @RequiredArgsConstructor
+@Tag(name = "Subcontract Order", description = "Subcontract Order operations")
 public class SubcontractOrderController {
 
   private final SubcontractOrderService subcontractOrderService;

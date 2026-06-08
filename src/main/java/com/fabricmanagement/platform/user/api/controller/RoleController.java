@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.user.api.facade.RoleFacade;
 import com.fabricmanagement.platform.user.dto.CreateRoleRequest;
 import com.fabricmanagement.platform.user.dto.RoleDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -14,9 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/roles")
+@RequestMapping("/api/v1/common/roles")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Role", description = "Role operations")
 public class RoleController {
 
   private final RoleFacade roleFacade;

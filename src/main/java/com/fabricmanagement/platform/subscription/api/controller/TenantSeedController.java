@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.subscription.app.TenantSeedService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +17,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Provides endpoints to seed default departments and positions for existing tenants.
  */
 @RestController
-@RequestMapping("/api/common/tenant-seed")
+@RequestMapping("/api/v1/common/tenant-seed")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Tenant Seed", description = "Tenant Seed operations")
 public class TenantSeedController {
 
   private final TenantSeedService tenantSeedService;

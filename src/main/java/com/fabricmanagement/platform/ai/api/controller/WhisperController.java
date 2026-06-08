@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.ai.api.controller;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.ai.app.WhisperService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +17,10 @@ import org.springframework.web.multipart.MultipartFile;
  * <p>Accepts audio files and returns transcribed text using OpenAI Whisper API.
  */
 @RestController
-@RequestMapping("/api/whisper")
+@RequestMapping("/api/v1/whisper")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Whisper", description = "Whisper operations")
 public class WhisperController {
 
   private final WhisperService whisperService;

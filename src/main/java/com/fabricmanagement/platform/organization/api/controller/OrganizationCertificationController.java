@@ -19,7 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/organizations/{organizationId}/certifications")
+@RequestMapping("/api/v1/common/organizations/{organizationId}/certifications")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Organization Certifications", description = "Manage certifications for organizations")

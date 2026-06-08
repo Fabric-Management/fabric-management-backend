@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.organization.api.controller;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.CompanyTypeOptionDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,8 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
  * backward compatibility with frontend (company → organization rename).
  */
 @RestController
-@RequestMapping("/api/common/company-types")
+@RequestMapping("/api/v1/common/company-types")
 @Slf4j
+@Tag(name = "Company Type", description = "Company Type operations")
 public class CompanyTypeController {
 
   /**

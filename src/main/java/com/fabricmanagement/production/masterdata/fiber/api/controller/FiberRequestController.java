@@ -7,6 +7,7 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberRequestService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequestRequest;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberRequestDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -24,9 +25,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Security: FIBER WRITE for submit, FIBER READ for list/get.
  */
 @RestController
-@RequestMapping("/api/production/fiber-requests")
+@RequestMapping("/api/v1/production/fiber-requests")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Fiber Request", description = "Fiber Request operations")
 public class FiberRequestController {
 
   private final FiberRequestService fiberRequestService;

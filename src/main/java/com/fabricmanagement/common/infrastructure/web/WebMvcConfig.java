@@ -30,13 +30,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
   public void addInterceptors(@NonNull InterceptorRegistry registry) {
     registry
         .addInterceptor(jwtContextInterceptor)
-        .addPathPatterns("/api/**") // Apply to all /api/** paths
+        .addPathPatterns("/api/v1/**") // Apply to all /api/** paths
         .excludePathPatterns(
             // Public endpoints - no JWT required
-            "/api/health",
-            "/api/info",
-            "/api/public/**",
-            "/api/auth/**",
+            "/api/v1/health",
+            "/api/v1/info",
+            "/api/v1/public/**",
+            "/api/v1/auth/**",
             // Swagger/OpenAPI docs
             "/api-docs/**",
             "/swagger-ui/**",
@@ -48,7 +48,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     registry
         .addInterceptor(playgroundQuotaInterceptor)
-        .addPathPatterns("/api/**")
+        .addPathPatterns("/api/v1/**")
         .excludePathPatterns("/api/v1/playground/init");
 
     log.info("✅ PlaygroundQuotaInterceptor registered globally");

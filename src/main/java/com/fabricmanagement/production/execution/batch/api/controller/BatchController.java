@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
  * any authenticated user in a production-related department.
  */
 @RestController
-@RequestMapping("/api/production/batches")
+@RequestMapping("/api/v1/production/batches")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Batch", description = "Product Batch Inventory & Lifecycle Management API")

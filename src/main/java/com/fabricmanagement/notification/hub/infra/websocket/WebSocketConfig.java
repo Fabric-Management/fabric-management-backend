@@ -52,7 +52,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
     registry
-        .addEndpoint("/api/ws")
+        .addEndpoint("/api/v1/ws")
         .setAllowedOrigins(allowedOrigins)
         .addInterceptors(cookieAuthHandshakeInterceptor());
   }

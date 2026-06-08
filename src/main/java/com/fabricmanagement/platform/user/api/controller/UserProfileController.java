@@ -13,6 +13,7 @@ import com.fabricmanagement.platform.user.dto.ProfileUpdateRequestDto;
 import com.fabricmanagement.platform.user.dto.ReviewProfileUpdateRequestDto;
 import com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -28,9 +29,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Base path: /api/common/users — profile and approval workflow.
  */
 @RestController
-@RequestMapping("/api/common/users")
+@RequestMapping("/api/v1/common/users")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "User Profile", description = "User Profile operations")
 public class UserProfileController {
 
   private final UserService userService;

@@ -61,7 +61,7 @@ public class SecurityConfig {
   @Order(1)
   @Profile({"local", "dev", "test"})
   public SecurityFilterChain devPartnerPortalFilterChain(HttpSecurity http) throws Exception {
-    return http.securityMatcher("/api/partner-portal/**")
+    return http.securityMatcher("/api/v1/partner-portal/**")
         .csrf(AbstractHttpConfigurer::disable)
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .sessionManagement(
@@ -71,7 +71,8 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(
-                        "/api/partner-portal/auth/login", "/api/partner-portal/setup-password")
+                        "/api/v1/partner-portal/auth/login",
+                        "/api/v1/partner-portal/setup-password")
                     .permitAll()
                     .anyRequest()
                     .hasRole("PARTNER_USER"))
@@ -90,7 +91,7 @@ public class SecurityConfig {
   @Order(1)
   @Profile("prod")
   public SecurityFilterChain prodPartnerPortalFilterChain(HttpSecurity http) throws Exception {
-    return http.securityMatcher("/api/partner-portal/**")
+    return http.securityMatcher("/api/v1/partner-portal/**")
         .csrf(AbstractHttpConfigurer::disable)
         .cors(cors -> cors.configurationSource(productionCorsConfigurationSource()))
         .sessionManagement(
@@ -100,7 +101,8 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(
-                        "/api/partner-portal/auth/login", "/api/partner-portal/setup-password")
+                        "/api/v1/partner-portal/auth/login",
+                        "/api/v1/partner-portal/setup-password")
                     .permitAll()
                     .anyRequest()
                     .hasRole("PARTNER_USER"))
@@ -125,28 +127,33 @@ public class SecurityConfig {
             exceptions -> exceptions.authenticationEntryPoint(restAuthenticationEntryPoint))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/api/health", "/api/info")
+                auth.requestMatchers("/api/v1/health", "/api/v1/info")
                     .permitAll()
                     .requestMatchers("/actuator/**")
                     .permitAll()
                     .requestMatchers(
-                        "/swagger-ui.html", "/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**")
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/api-docs/**",
+                        "/api-docs.yaml",
+                        "/v3/api-docs/**",
+                        "/v3/api-docs.yaml")
                     .permitAll()
-                    .requestMatchers("/api/dev/**")
+                    .requestMatchers("/api/v1/dev/**")
                     .permitAll()
-                    .requestMatchers("/api/public/**")
+                    .requestMatchers("/api/v1/public/**")
                     .permitAll()
-                    .requestMatchers("/api/auth/**")
+                    .requestMatchers("/api/v1/auth/**")
                     .permitAll()
-                    .requestMatchers("/api/common/company-types/**")
+                    .requestMatchers("/api/v1/common/company-types/**")
                     .permitAll()
-                    .requestMatchers("/api/webhooks/**")
+                    .requestMatchers("/api/v1/webhooks/**")
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
-                    .requestMatchers("/api/ws/**")
+                    .requestMatchers("/api/v1/ws/**")
                     .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
                     .requestMatchers("/api/v1/playground/init")
                     .permitAll()
-                    .requestMatchers("/api/admin/**")
+                    .requestMatchers("/api/v1/admin/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated())
@@ -168,29 +175,29 @@ public class SecurityConfig {
             exceptions -> exceptions.authenticationEntryPoint(restAuthenticationEntryPoint))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/api/health", "/api/info")
+                auth.requestMatchers("/api/v1/health", "/api/v1/info")
                     .permitAll()
-                    .requestMatchers("/api/public/**")
+                    .requestMatchers("/api/v1/public/**")
                     .permitAll()
-                    .requestMatchers("/api/common/company-types/**")
+                    .requestMatchers("/api/v1/common/company-types/**")
                     .permitAll()
                     .requestMatchers(
-                        "/api/auth/login",
-                        "/api/auth/mfa/verify",
-                        "/api/auth/register/**",
-                        "/api/auth/setup-password")
+                        "/api/v1/auth/login",
+                        "/api/v1/auth/mfa/verify",
+                        "/api/v1/auth/register/**",
+                        "/api/v1/auth/setup-password")
                     .permitAll()
-                    .requestMatchers("/api/auth/password-reset/**")
+                    .requestMatchers("/api/v1/auth/password-reset/**")
                     .permitAll()
-                    .requestMatchers("/api/webhooks/**")
+                    .requestMatchers("/api/v1/webhooks/**")
                     .permitAll() // Webhooks from external services (WhatsApp, etc.)
-                    .requestMatchers("/api/ws/**")
+                    .requestMatchers("/api/v1/ws/**")
                     .permitAll() // WebSocket upgrade — real auth at STOMP CONNECT level
                     .requestMatchers("/api/v1/playground/init")
                     .permitAll()
                     .requestMatchers("/actuator/health", "/actuator/info")
                     .permitAll()
-                    .requestMatchers("/api/admin/**")
+                    .requestMatchers("/api/v1/admin/**")
                     .hasRole("PLATFORM_ADMIN")
                     .anyRequest()
                     .authenticated())
@@ -235,8 +242,8 @@ public class SecurityConfig {
         Arrays.asList("Authorization", "Content-Type", "X-Total-Count"));
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/api/**", configuration);
-    source.registerCorsConfiguration("/api/ws/**", configuration);
+    source.registerCorsConfiguration("/api/v1/**", configuration);
+    source.registerCorsConfiguration("/api/v1/ws/**", configuration);
 
     log.info("✅ CORS configured: Development origins allowed (localhost, 127.0.0.1, etc.)");
 
@@ -277,8 +284,8 @@ public class SecurityConfig {
         Arrays.asList("Authorization", "Content-Type", "X-Total-Count"));
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/api/**", configuration);
-    source.registerCorsConfiguration("/api/ws/**", configuration);
+    source.registerCorsConfiguration("/api/v1/**", configuration);
+    source.registerCorsConfiguration("/api/v1/ws/**", configuration);
 
     log.info("✅ CORS configured for production");
 

@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.communication.dto.AddressDto;
 import com.fabricmanagement.platform.communication.dto.CreateAddressRequest;
 import com.fabricmanagement.platform.communication.dto.UpdateAddressRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -15,9 +16,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/addresses")
+@RequestMapping("/api/v1/common/addresses")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Address", description = "Address operations")
 public class AddressController {
 
   private final AddressFacade facade;

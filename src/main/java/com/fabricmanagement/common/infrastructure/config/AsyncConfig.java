@@ -22,7 +22,8 @@ public class AsyncConfig implements AsyncConfigurer {
     executor.setMaxPoolSize(20);
     executor.setQueueCapacity(100);
     executor.setThreadNamePrefix("async-tenant-");
-    executor.setTaskDecorator(new TenantAwareTaskDecorator());
+    executor.setTaskDecorator(
+        new org.springframework.core.task.support.ContextPropagatingTaskDecorator());
     executor.setWaitForTasksToCompleteOnShutdown(true);
     executor.setAwaitTerminationSeconds(15);
     executor.initialize();

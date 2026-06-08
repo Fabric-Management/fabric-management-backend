@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.events;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 public class EventResubmissionJob {
 
   private final IncompleteEventPublications incompleteEvents;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Her 5 dakikada bir, 60 saniyeden eski incomplete publication'ları yeniden teslim eder.
@@ -38,6 +40,7 @@ public class EventResubmissionJob {
   @Scheduled(fixedDelayString = "${modulith.events.resubmit.interval-ms:300000}")
   public void resubmitStaleEvents() {
     log.debug("Checking for incomplete event publications older than 60s...");
+    meterRegistry.counter("events.resubmission.job.runs").increment();
     incompleteEvents.resubmitIncompletePublicationsOlderThan(Duration.ofSeconds(60));
   }
 }

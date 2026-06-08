@@ -134,7 +134,9 @@ class JwtRoundTripIntegrationTest {
 
     mockMvc
         .perform(
-            post("/api/public/signup").contentType(MediaType.APPLICATION_JSON).content(signupBody))
+            post("/api/v1/public/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(signupBody))
         .andExpect(status().isOk());
 
     // Step 2: Setup password directly in DB (simulating password setup flow)
@@ -182,7 +184,9 @@ class JwtRoundTripIntegrationTest {
     MvcResult loginResult =
         mockMvc
             .perform(
-                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(loginBody))
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(loginBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(cookie().exists("access_token"))
@@ -259,7 +263,9 @@ class JwtRoundTripIntegrationTest {
 
     mockMvc
         .perform(
-            post("/api/public/signup").contentType(MediaType.APPLICATION_JSON).content(signupBody))
+            post("/api/v1/public/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(signupBody))
         .andExpect(status().isOk());
 
     // Setup password
@@ -302,7 +308,9 @@ class JwtRoundTripIntegrationTest {
     MvcResult result =
         mockMvc
             .perform(
-                post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(loginBody))
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(loginBody))
             .andExpect(status().isOk())
             .andReturn();
 

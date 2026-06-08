@@ -4,6 +4,7 @@ import com.fabricmanagement.approval.app.UserPromotionService;
 import com.fabricmanagement.approval.dto.PromotionRejectDto;
 import com.fabricmanagement.approval.dto.UserPromotionResponse;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/approval/promotions")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "User Promotion", description = "User Promotion operations")
 public class UserPromotionController {
 
   private final UserPromotionService promotionService;

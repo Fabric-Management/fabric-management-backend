@@ -58,6 +58,12 @@ server:
 
 # Management & Actuator
 management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
   endpoints:
     web:
       exposure:
@@ -100,9 +106,6 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: OFF
     # Reduce log noise from background jobs
     com.fabricmanagement.platform.communication.app.EmailOutboxService: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
 # Auth module configuration (lockout, verification, JWT)
 auth:
@@ -253,6 +256,7 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
   show-actuator: false
+  writer-with-order-by-keys: true
 
 # JobRunr — DDL disabled; tables pre-created by Flyway (owner role)
 org:

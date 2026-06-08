@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.auth.app.RefreshTokenService;
 import com.fabricmanagement.platform.auth.dto.*;
 import com.fabricmanagement.platform.auth.dto.ActiveSessionDto;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,9 +41,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * PasswordController.
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Auth", description = "Auth operations")
 public class AuthController {
 
   private final LoginService loginService;

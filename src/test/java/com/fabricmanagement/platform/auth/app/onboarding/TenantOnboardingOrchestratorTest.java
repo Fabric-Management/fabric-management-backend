@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -21,10 +22,12 @@ class TenantOnboardingOrchestratorTest {
   @Mock private OnboardingStep step2;
 
   private TenantOnboardingOrchestrator orchestrator;
+  private SimpleMeterRegistry meterRegistry;
 
   @org.junit.jupiter.api.BeforeEach
   void setUp() {
-    orchestrator = new TenantOnboardingOrchestrator(List.of(step1, step2));
+    meterRegistry = new SimpleMeterRegistry();
+    orchestrator = new TenantOnboardingOrchestrator(List.of(step1, step2), meterRegistry);
   }
 
   @Test

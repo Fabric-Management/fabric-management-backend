@@ -25,6 +25,7 @@ import com.fabricmanagement.production.execution.workorder.dto.WorkOrderRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -45,8 +46,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/production/work-orders")
+@RequestMapping("/api/v1/production/work-orders")
 @RequiredArgsConstructor
+@Tag(name = "Work Order", description = "Work Order operations")
 public class WorkOrderController {
 
   private final WorkOrderService workOrderService;

@@ -6,6 +6,7 @@ import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberQualitySt
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberQualityStandardDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberQualityStandardGroupDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberQualityStandardRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -23,9 +24,10 @@ import org.springframework.web.bind.annotation.*;
  * create/update/delete require FIBER WRITE.
  */
 @RestController
-@RequestMapping("/api/production/fiber-quality-standards")
+@RequestMapping("/api/v1/production/fiber-quality-standards")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Fiber Quality Standard", description = "Fiber Quality Standard operations")
 public class FiberQualityStandardController {
 
   private final FiberQualityStandardService standardService;

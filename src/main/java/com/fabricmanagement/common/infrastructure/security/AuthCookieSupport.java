@@ -37,7 +37,7 @@ public class AuthCookieSupport {
       Cookie accessCookie = new Cookie(JwtTokenExtractor.ACCESS_TOKEN_COOKIE_NAME, accessToken);
       accessCookie.setHttpOnly(true);
       accessCookie.setSecure(secureCookie);
-      accessCookie.setPath("/api");
+      accessCookie.setPath("/api/v1");
       accessCookie.setMaxAge(ACCESS_TOKEN_MAX_AGE_SECONDS);
       accessCookie.setAttribute("SameSite", "Strict");
       response.addCookie(accessCookie);
@@ -46,7 +46,7 @@ public class AuthCookieSupport {
       Cookie refreshCookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       refreshCookie.setHttpOnly(true);
       refreshCookie.setSecure(secureCookie);
-      refreshCookie.setPath("/api/auth");
+      refreshCookie.setPath("/api/v1/auth");
       refreshCookie.setMaxAge(REFRESH_TOKEN_MAX_AGE_SECONDS);
       refreshCookie.setAttribute("SameSite", "Strict");
       response.addCookie(refreshCookie);
@@ -61,7 +61,7 @@ public class AuthCookieSupport {
     Cookie accessCookie = new Cookie(JwtTokenExtractor.ACCESS_TOKEN_COOKIE_NAME, "");
     accessCookie.setHttpOnly(true);
     accessCookie.setSecure(secureCookie);
-    accessCookie.setPath("/api");
+    accessCookie.setPath("/api/v1");
     accessCookie.setMaxAge(0);
     accessCookie.setAttribute("SameSite", "Strict");
     response.addCookie(accessCookie);
@@ -69,7 +69,7 @@ public class AuthCookieSupport {
     Cookie refreshCookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, "");
     refreshCookie.setHttpOnly(true);
     refreshCookie.setSecure(secureCookie);
-    refreshCookie.setPath("/api/auth");
+    refreshCookie.setPath("/api/v1/auth");
     refreshCookie.setMaxAge(0);
     refreshCookie.setAttribute("SameSite", "Strict");
     response.addCookie(refreshCookie);

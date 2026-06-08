@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.dto.TenantSettingsDto;
 import com.fabricmanagement.platform.tenant.dto.UpdateTenantSettingsRequest;
 import com.fabricmanagement.platform.tenant.mapper.TenantSettingsMapper;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,9 +21,10 @@ import org.springframework.web.bind.annotation.*;
  * branding (logo, primary color).
  */
 @RestController
-@RequestMapping("/api/common/tenant/settings")
+@RequestMapping("/api/v1/common/tenant/settings")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Tenant Settings", description = "Tenant Settings operations")
 public class TenantSettingsController {
 
   private final TenantService tenantService;

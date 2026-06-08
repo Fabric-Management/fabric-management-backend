@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.events;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import org.springframework.util.ClassUtils;
 public class IdempotentEventHandler {
 
   private final ProcessedEventRepository repository;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Executes the handler only if this (eventId, listenerId) pair hasn't been processed. Records the
@@ -35,8 +37,16 @@ public class IdempotentEventHandler {
     int inserted = repository.tryInsert(eventId, listenerId);
     if (inserted == 0) {
       log.debug("Event already processed: eventId={}, listener={}", eventId, listenerId);
+      meterRegistry.counter("events.processing.duplicate", "listener", listenerId).increment();
       return;
     }
-    handler.run();
+
+    try {
+      handler.run();
+      meterRegistry.counter("events.processing.success", "listener", listenerId).increment();
+    } catch (Exception e) {
+      meterRegistry.counter("events.processing.failure", "listener", listenerId).increment();
+      throw e;
+    }
   }
 }

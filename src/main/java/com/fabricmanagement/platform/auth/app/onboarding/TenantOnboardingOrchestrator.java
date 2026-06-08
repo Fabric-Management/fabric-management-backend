@@ -2,8 +2,9 @@ package com.fabricmanagement.platform.auth.app.onboarding;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,16 +27,30 @@ import org.springframework.transaction.annotation.Transactional;
 public class TenantOnboardingOrchestrator {
 
   private final List<OnboardingStep> steps;
+  private final MeterRegistry meterRegistry;
 
   @Transactional
   public TenantOnboardingResponse onboard(OnboardingContext context) {
+    Timer.Sample sample = Timer.start(meterRegistry);
+    try {
+      return executeOnboarding(context);
+    } finally {
+      sample.stop(
+          Timer.builder("tenant.onboarding.duration")
+              .description("Time taken to fully onboard a new tenant")
+              .tag("sales_led", String.valueOf(context.isSalesLed()))
+              .register(meterRegistry));
+    }
+  }
+
+  private TenantOnboardingResponse executeOnboarding(OnboardingContext context) {
     log.info(
         "Onboarding started: organization={}, salesLed={}",
         context.getOrganizationName(),
         context.isSalesLed());
 
     // Save TenantContext before steps (CreateTenantStep will set a new one)
-    UUID previousTenantId = TenantContext.getCurrentTenantIdOrNull();
+    TenantContext.TenantSnapshot previous = TenantContext.capture();
     try {
       for (int i = 0; i < steps.size(); i++) {
         OnboardingStep step = steps.get(i);
@@ -55,11 +70,7 @@ public class TenantOnboardingOrchestrator {
       }
     } finally {
       // Restore previous TenantContext to prevent leak
-      if (previousTenantId != null) {
-        TenantContext.setCurrentTenantId(previousTenantId);
-      } else {
-        TenantContext.clear();
-      }
+      TenantContext.restore(previous);
     }
 
     TenantOnboardingResponse result = context.toResult();

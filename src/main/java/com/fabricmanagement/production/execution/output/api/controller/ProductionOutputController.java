@@ -7,6 +7,7 @@ import com.fabricmanagement.production.execution.output.dto.AddOutputItemRequest
 import com.fabricmanagement.production.execution.output.dto.CreateProductionOutputRequest;
 import com.fabricmanagement.production.execution.output.dto.ProductionOutputDto;
 import com.fabricmanagement.production.execution.output.mapper.ProductionOutputMapper;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -17,8 +18,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/production/output-records")
+@RequestMapping("/api/v1/production/output-records")
 @RequiredArgsConstructor
+@Tag(name = "Production Output", description = "Production Output operations")
 public class ProductionOutputController {
 
   private final ProductionOutputService service;

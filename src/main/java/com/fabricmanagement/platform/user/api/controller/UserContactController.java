@@ -5,6 +5,7 @@ import com.fabricmanagement.platform.communication.dto.AssignContactRequest;
 import com.fabricmanagement.platform.communication.dto.CreateContactRequest;
 import com.fabricmanagement.platform.user.api.facade.UserContactFacade;
 import com.fabricmanagement.platform.user.dto.UserContactDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -14,9 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/users/{userId}/contacts")
+@RequestMapping("/api/v1/common/users/{userId}/contacts")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "User Contact", description = "User Contact operations")
 public class UserContactController {
 
   private final UserContactFacade userContactFacade;

@@ -5,6 +5,7 @@ import com.fabricmanagement.approval.domain.ApproverRole;
 import com.fabricmanagement.approval.dto.ApprovalRequestResponse;
 import com.fabricmanagement.approval.dto.RejectRequestDto;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/approval/requests")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "Approval Request", description = "Approval Request operations")
 public class ApprovalRequestController {
 
   private final ApprovalRequestService requestService;

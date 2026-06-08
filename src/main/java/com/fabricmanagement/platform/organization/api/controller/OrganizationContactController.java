@@ -7,6 +7,7 @@ import com.fabricmanagement.platform.organization.api.facade.OrganizationContact
 import com.fabricmanagement.platform.organization.dto.EditOrganizationContactRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationContactDto;
 import com.fabricmanagement.platform.organization.dto.UpdateContactAssignmentRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -16,9 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/organizations/{organizationId}/contacts")
+@RequestMapping("/api/v1/common/organizations/{organizationId}/contacts")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Organization Contact", description = "Organization Contact operations")
 public class OrganizationContactController {
 
   private final OrganizationContactFacade facade;

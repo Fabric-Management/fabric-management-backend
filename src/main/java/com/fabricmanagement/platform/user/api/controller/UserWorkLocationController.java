@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.user.api.facade.UserWorkLocationFacade;
 import com.fabricmanagement.platform.user.dto.AssignWorkLocationRequest;
 import com.fabricmanagement.platform.user.dto.UserWorkLocationDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -13,9 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/common/users/{userId}/work-locations")
+@RequestMapping("/api/v1/common/users/{userId}/work-locations")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "User Work Location", description = "User Work Location operations")
 public class UserWorkLocationController {
 
   private final UserWorkLocationFacade userWorkLocationFacade;

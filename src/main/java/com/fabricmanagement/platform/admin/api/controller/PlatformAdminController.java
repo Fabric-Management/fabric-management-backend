@@ -8,6 +8,7 @@ import com.fabricmanagement.platform.admin.dto.TenantStatistics;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fabricmanagement.platform.user.dto.UserDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -43,9 +44,10 @@ import org.springframework.web.bind.annotation.*;
  * <p>Or use X-Tenant-Id header for automatic context switching (if implemented in interceptor).
  */
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Platform Admin", description = "Platform Admin operations")
 public class PlatformAdminController {
 
   private final PlatformAdminService platformAdminService;

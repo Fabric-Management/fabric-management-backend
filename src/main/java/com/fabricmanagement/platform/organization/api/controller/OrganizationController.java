@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.organization.app.OrganizationService;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -21,9 +22,10 @@ import org.springframework.web.bind.annotation.*;
  * TradingPartnerController.
  */
 @RestController
-@RequestMapping("/api/common/organizations")
+@RequestMapping("/api/v1/common/organizations")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Organization", description = "Organization operations")
 public class OrganizationController {
 
   private final OrganizationService organizationService;

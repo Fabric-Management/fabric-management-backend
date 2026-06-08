@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.sales.salesproduct.app.SalesProductService;
 import com.fabricmanagement.sales.salesproduct.dto.CreateSalesProductRequest;
 import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/sales/products")
 @RequiredArgsConstructor
+@Tag(name = "Sales Product", description = "Sales Product operations")
 public class SalesProductController {
 
   private final SalesProductService salesProductService;
