@@ -9,6 +9,8 @@ spring:
 # Testcontainers uses the same superuser for all roles — this prevents
 # the CR-4 fail-fast guard from rejecting empty credentials at startup.
 application:
+  jwt:
+    secret: ${JWT_SECRET:test-only-jwt-secret-key-not-for-production-min-256-bits-long}
   system-datasource:
     enabled: true
     username: ${spring.datasource.username:test}
