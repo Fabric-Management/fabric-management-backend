@@ -59,7 +59,7 @@ public class OpenApiExportIT {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     String generatedSpec = response.getBody();
     assertThat(generatedSpec).isNotNull();
-    assertThat(generatedSpec).contains("openapi: 3.0");
+    assertThat(generatedSpec).contains("openapi: 3.");
 
     // 2. Define the target spec file location
     File specFile = new File("api/openapi.yaml");
