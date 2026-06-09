@@ -75,6 +75,10 @@ server:
     enabled: ${SERVER_COMPRESSION_ENABLED:true}
   http2:
     enabled: ${SERVER_HTTP2_ENABLED:true}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
 
 application:
   jwt:
@@ -85,3 +89,9 @@ application:
   mail:
     from-email: ${MAIL_FROM_EMAIL}
     from-name: ${MAIL_FROM_NAME}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
