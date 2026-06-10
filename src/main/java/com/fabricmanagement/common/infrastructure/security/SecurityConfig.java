@@ -59,7 +59,7 @@ public class SecurityConfig {
    */
   @Bean
   @Order(1)
-  @Profile({"local", "dev", "test"})
+  @Profile({"local", "dev", "test", "docker"})
   public SecurityFilterChain devPartnerPortalFilterChain(HttpSecurity http) throws Exception {
     return http.securityMatcher("/api/v1/partner-portal/**")
         .csrf(AbstractHttpConfigurer::disable)
@@ -115,7 +115,7 @@ public class SecurityConfig {
   // ────────────────────────────────────────────────────────────────────────
 
   @Bean
-  @Profile({"local", "dev", "test"})
+  @Profile({"local", "dev", "test", "docker"})
   public SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
     log.info("DEVELOPMENT MODE - URL-level auth enforced, @PreAuthorize for method-level");
 
@@ -214,15 +214,14 @@ public class SecurityConfig {
    * <p>⚠️ In production, configure specific origins for security.
    */
   @Bean
-  @Profile({"local", "dev", "test"})
+  @Profile({"local", "dev", "test", "docker"})
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
 
     // Allow common development origins
     // Note: Cannot use "*" with allowCredentials(true), so we list common dev
     // origins
-    configuration.setAllowedOriginPatterns(
-        Arrays.asList("http://localhost:*", "http://127.0.0.1:*", "http://0.0.0.0:*"));
+    configuration.setAllowedOriginPatterns(Arrays.asList("*"));
 
     // Allow all HTTP methods
     configuration.setAllowedMethods(
