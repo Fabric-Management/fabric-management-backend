@@ -48490,6 +48490,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        displayName:
+          type: string
+          description: Human-readable name resolved from type-specific master data;
+            falls back to uid
         id:
           type: string
           format: uuid
