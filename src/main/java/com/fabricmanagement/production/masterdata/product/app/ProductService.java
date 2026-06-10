@@ -3,8 +3,8 @@ package com.fabricmanagement.production.masterdata.product.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
-import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
+import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
@@ -36,7 +36,7 @@ public class ProductService implements ProductFacade {
 
   private final ProductRepository productRepository;
   private final ProductAttributeRepository productAttributeRepository;
-  private final FiberRepository fiberRepository;
+  private final FiberFacade fiberFacade;
   private final DomainEventPublisher eventPublisher;
 
   /** Create product (internal method). */
@@ -53,7 +53,9 @@ public class ProductService implements ProductFacade {
 
     log.info("✅ Product created: id={}, uid={}", saved.getId(), saved.getUid());
 
-    return ProductDto.from(saved);
+    ProductDto dto = ProductDto.from(saved);
+    dto.setDisplayName(dto.getUid());
+    return dto;
   }
 
   @Override
@@ -64,7 +66,11 @@ public class ProductService implements ProductFacade {
     return productRepository
         .findByTenantIdAndId(tenantId, id)
         .map(ProductDto::from)
-        .map(p -> enrichDisplayNames(List.of(p)).get(0));
+        .map(
+            p -> {
+              List<ProductDto> enriched = enrichDisplayNames(new java.util.ArrayList<>(List.of(p)));
+              return enriched.get(0);
+            });
   }
 
   @Override
@@ -75,7 +81,7 @@ public class ProductService implements ProductFacade {
     List<ProductDto> products =
         productRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
             .map(ProductDto::from)
-            .toList();
+            .collect(Collectors.toList());
     return enrichDisplayNames(products);
   }
 
@@ -87,7 +93,7 @@ public class ProductService implements ProductFacade {
     List<ProductDto> products =
         productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(tenantId, type).stream()
             .map(ProductDto::from)
-            .toList();
+            .collect(Collectors.toList());
     return enrichDisplayNames(products);
   }
 
@@ -97,7 +103,7 @@ public class ProductService implements ProductFacade {
     // Fall back to uid by default
     products.forEach(p -> p.setDisplayName(p.getUid()));
 
-    // Collect FIBER products
+    // Collect FIBER product IDs for batch lookup
     List<UUID> fiberProductIds =
         products.stream()
             .filter(p -> ProductType.FIBER.equals(p.getProductType()))
@@ -106,11 +112,11 @@ public class ProductService implements ProductFacade {
 
     if (!fiberProductIds.isEmpty()) {
       Map<UUID, String> fiberNames =
-          fiberRepository.findByProductIdIn(fiberProductIds).stream()
+          fiberFacade.findByProductIds(fiberProductIds).stream()
               .collect(
                   Collectors.toMap(
-                      f -> f.getProduct().getId(),
-                      Fiber::getFiberName,
+                      FiberDto::getProductId,
+                      FiberDto::getFiberName,
                       (a, b) -> a // ignore duplicates
                       ));
 

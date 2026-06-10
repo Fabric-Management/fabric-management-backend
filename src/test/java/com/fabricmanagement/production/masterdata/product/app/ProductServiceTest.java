@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
-import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
+import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
@@ -25,7 +25,7 @@ class ProductServiceTest {
 
   @Mock private ProductRepository productRepository;
   @Mock private ProductAttributeRepository productAttributeRepository;
-  @Mock private FiberRepository fiberRepository;
+  @Mock private FiberFacade fiberFacade;
   @Mock private DomainEventPublisher eventPublisher;
 
   private ProductService productService;
@@ -34,7 +34,7 @@ class ProductServiceTest {
   void setUp() {
     productService =
         new ProductService(
-            productRepository, productAttributeRepository, fiberRepository, eventPublisher);
+            productRepository, productAttributeRepository, fiberFacade, eventPublisher);
   }
 
   @Test
@@ -50,12 +50,9 @@ class ProductServiceTest {
     when(productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(tenantId, ProductType.FIBER))
         .thenReturn(List.of(fiberProduct));
 
-    Fiber fiber = new Fiber();
-    ReflectionTestUtils.setField(fiber, "tenantId", tenantId);
-    ReflectionTestUtils.setField(fiber, "fiberName", "Cotton Organic");
-    ReflectionTestUtils.setField(fiber, "product", fiberProduct);
+    FiberDto fiberDto = FiberDto.builder().productId(productId).fiberName("Cotton Organic").build();
 
-    when(fiberRepository.findByProductIdIn(List.of(productId))).thenReturn(List.of(fiber));
+    when(fiberFacade.findByProductIds(List.of(productId))).thenReturn(List.of(fiberDto));
 
     // Act
     List<ProductDto> result = productService.findByType(tenantId, ProductType.FIBER);
