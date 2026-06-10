@@ -86,11 +86,12 @@ public class TenantClonerService {
 
     return systemTransactionExecutor.executeInTransaction(
         jdbc -> {
-          // 1. Find the TEMPLATE tenant ID (Nexus Fabrics for playgrounds)
-          UUID templateTenantId =
-              jdbc.queryForObject(
+          // 1. Find the TEMPLATE tenant ID (nexus-fabrics for playgrounds)
+          var results =
+              jdbc.queryForList(
                   "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
                   UUID.class);
+          UUID templateTenantId = results.isEmpty() ? null : results.getFirst();
 
           if (templateTenantId == null) {
             throw new IllegalStateException("No PLAYGROUND TEMPLATE tenant found for cloning.");

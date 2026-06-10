@@ -41,14 +41,14 @@ public class PlaygroundAuthController {
   private final AuthCookieSupport authCookieSupport;
 
   /**
-   * IP-based rate limiter for playground initialization. Entries auto-expire after 1 minute via
+   * IP-based rate limiter for playground initialization. Entries auto-expire after 10 seconds via
    * Caffeine's expireAfterWrite — no manual cleanup needed.
    *
    * <p>Non-final: excluded from Lombok @RequiredArgsConstructor to avoid Spring DI failure (no
    * Cache bean in context).
    */
   private Cache<String, Instant> rateLimitCache =
-      Caffeine.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES).maximumSize(10_000).build();
+      Caffeine.newBuilder().expireAfterWrite(10, TimeUnit.SECONDS).maximumSize(10_000).build();
 
   @PostMapping("/init")
   @Operation(
@@ -81,7 +81,7 @@ public class PlaygroundAuthController {
     if (lastInit != null) {
       log.warn("Rate limit exceeded for playground init. IP: {}", clientIp);
       throw new TooManyRequestsException(
-          "Too many playground initialization requests. Please wait 1 minute.");
+          "Too many playground initialization requests. Please wait a few seconds.");
     }
 
     final String finalGuestId =

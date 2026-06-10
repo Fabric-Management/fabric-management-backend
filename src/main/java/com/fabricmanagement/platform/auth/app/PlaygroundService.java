@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +31,7 @@ public class PlaygroundService {
   private final JwtService jwtService;
   private final UserRepository userRepository;
   private final OrganizationRepository organizationRepository;
+  private final TransactionTemplate transactionTemplate;
 
   private static final Map<String, String> PLAYGROUND_JOB_TITLES =
       Map.ofEntries(
@@ -107,62 +109,82 @@ public class PlaygroundService {
           Map.entry("trade@centraltextile.com", "Trading Partner Owner"),
           Map.entry("finance@centraltextile.com", "Partner Accountant"));
 
-  @Transactional
+  /**
+   * Initializes a playground session by cloning the template tenant and selecting a default
+   * persona.
+   *
+   * <p><b>Why no @Transactional here:</b> The clone step uses BYPASSRLS (SystemTransactionExecutor)
+   * with its own JDBC connection. If we wrapped this method in @Transactional, Spring would open a
+   * Hibernate Session (and DB connection) BEFORE TenantContext is set — binding it to
+   * SYSTEM_TENANT_ID. The subsequent JPA read would reuse that connection, and RLS would filter out
+   * all rows for the new playground tenant, returning an empty user list.
+   *
+   * <p>Instead, we let the clone run in its own transaction, then set TenantContext and open a NEW
+   * read-only transaction via TransactionTemplate so the connection is bound to the correct tenant.
+   */
   public PlaygroundInitResponse initPlayground(String guestId) {
-    // 1. Clone the template
+    // 1. Clone the template (runs in its own BYPASSRLS transaction)
     Tenant playgroundTenant = tenantClonerService.cloneTemplateToPlayground();
 
-    // 2. Find the CEO / Platform Admin to be the default persona
+    // 2. Find the CEO / Platform Admin to be the default persona.
+    //    Must open a NEW transaction AFTER setting TenantContext so Hibernate binds
+    //    the connection to the correct playground tenant for RLS.
     return TenantContext.executeInTenantContext(
         playgroundTenant.getId(),
-        () -> {
-          // Two-pass fetch to avoid MultipleBagFetchException.
-          List<User> activeUsers =
-              userRepository.findByTenantIdWithRelations(playgroundTenant.getId());
-          userRepository.findByTenantIdWithContacts(playgroundTenant.getId());
+        () ->
+            transactionTemplate.execute(
+                status -> {
+                  // Two-pass fetch to avoid MultipleBagFetchException.
+                  List<User> activeUsers =
+                      userRepository.findByTenantIdWithRelations(playgroundTenant.getId());
+                  userRepository.findByTenantIdWithContacts(playgroundTenant.getId());
 
-          // Try preferred roles first, then fall back to any user
-          User defaultUser =
-              activeUsers.stream()
-                  .filter(
-                      u ->
-                          u.getRole() != null
-                              && ("PLATFORM_ADMIN".equals(u.getRole().getRoleCode())
-                                  || "MANAGER".equals(u.getRole().getRoleCode())))
-                  .findFirst()
-                  .or(() -> activeUsers.stream().filter(u -> u.getRole() != null).findFirst())
-                  .or(() -> activeUsers.stream().findFirst())
-                  .orElseThrow(
-                      () ->
-                          new IllegalStateException(
-                              "No active users found in cloned playground tenant"));
+                  // Try preferred roles first, then fall back to any user
+                  User defaultUser =
+                      activeUsers.stream()
+                          .filter(
+                              u ->
+                                  u.getRole() != null
+                                      && ("PLATFORM_ADMIN".equals(u.getRole().getRoleCode())
+                                          || "MANAGER".equals(u.getRole().getRoleCode())))
+                          .findFirst()
+                          .or(
+                              () ->
+                                  activeUsers.stream().filter(u -> u.getRole() != null).findFirst())
+                          .or(() -> activeUsers.stream().findFirst())
+                          .orElseThrow(
+                              () ->
+                                  new IllegalStateException(
+                                      "No active users found in cloned playground tenant"));
 
-          String contactValue = resolvePlaygroundContact(defaultUser);
-          String token =
-              jwtService.generatePlaygroundAccessToken(defaultUser, guestId, contactValue);
+                  String contactValue = resolvePlaygroundContact(defaultUser);
+                  String token =
+                      jwtService.generatePlaygroundAccessToken(defaultUser, guestId, contactValue);
 
-          String roleName =
-              defaultUser.getRole() != null ? defaultUser.getRole().getRoleName() : "No Role";
+                  String roleName =
+                      defaultUser.getRole() != null
+                          ? defaultUser.getRole().getRoleName()
+                          : "No Role";
 
-          Organization org =
-              organizationRepository
-                  .findByTenantIdAndIsActiveTrue(playgroundTenant.getId())
-                  .stream()
-                  .filter(o -> o.getOrganizationType() != OrganizationType.EXTERNAL_PARTNER)
-                  .findFirst()
-                  .orElse(null);
+                  Organization org =
+                      organizationRepository
+                          .findByTenantIdAndIsActiveTrue(playgroundTenant.getId())
+                          .stream()
+                          .filter(o -> o.getOrganizationType() != OrganizationType.EXTERNAL_PARTNER)
+                          .findFirst()
+                          .orElse(null);
 
-          return new PlaygroundInitResponse(
-              guestId,
-              token,
-              playgroundTenant.getId(),
-              defaultUser.getId(),
-              defaultUser.getDisplayName(),
-              roleName,
-              (org != null && org.getOrganizationType() != null)
-                  ? org.getOrganizationType().name()
-                  : "VERTICAL_MILL");
-        });
+                  return new PlaygroundInitResponse(
+                      guestId,
+                      token,
+                      playgroundTenant.getId(),
+                      defaultUser.getId(),
+                      defaultUser.getDisplayName(),
+                      roleName,
+                      (org != null && org.getOrganizationType() != null)
+                          ? org.getOrganizationType().name()
+                          : "VERTICAL_MILL");
+                }));
   }
 
   @Transactional
