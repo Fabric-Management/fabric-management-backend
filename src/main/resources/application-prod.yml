@@ -81,6 +81,14 @@ server:
     include-binding-errors: never
 
 application:
+  # System DataSource: dedicated fabric_system role (BYPASSRLS, NOCREATEDB) for cross-tenant
+  # operations. MUST NOT point at the DDL-capable owner role — SystemDataSourceConfig fails fast
+  # if unset. Credentials are required (no defaults) and injected from the prod secret store.
+  system-datasource:
+    enabled: true
+    username: ${DB_SYSTEM_USERNAME}
+    password: ${DB_SYSTEM_PASSWORD}
+
   jwt:
     secret: ${JWT_SECRET}
     expiration: 900000 # 15 minutes

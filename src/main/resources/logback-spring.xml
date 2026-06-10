@@ -27,7 +27,7 @@
     </appender>
 
     <!-- Profiles Configuration -->
-    <springProfile name="dev,local,test">
+    <springProfile name="dev,local,test,docker">
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
         </root>

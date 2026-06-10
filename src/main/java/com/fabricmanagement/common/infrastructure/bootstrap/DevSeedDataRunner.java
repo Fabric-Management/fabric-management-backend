@@ -24,7 +24,7 @@ public class DevSeedDataRunner {
 
   @EventListener(ApplicationReadyEvent.class)
   public void run() {
-    if (!environment.acceptsProfiles(Profiles.of("local", "dev"))) {
+    if (!environment.acceptsProfiles(Profiles.of("local", "dev", "docker"))) {
       log.info("DevSeedDataRunner is disabled in this profile. Terminating seeder.");
       return;
     }
