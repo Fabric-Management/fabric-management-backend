@@ -27,218 +27,227 @@ public class PermissionTemplateSeeder implements DataSeeder {
   @Override
   public boolean isSeeded() {
     // Idempotency: verify if ANY template permission templates are already seeded
-    return permissionTemplateRepository.existsByTenantId(TenantContext.TEMPLATE_TENANT_ID);
+    return TenantContext.executeInTenantContext(
+        TenantContext.TEMPLATE_TENANT_ID,
+        () -> permissionTemplateRepository.existsByTenantId(TenantContext.TEMPLATE_TENANT_ID));
   }
 
   @Override
   public void seed() {
-    transactionTemplate.executeWithoutResult(
-        status -> {
-          log.info("Seeding Permission Templates (System Defaults)...");
-          List<PermissionTemplate> templatesToSave = new ArrayList<>();
+    TenantContext.executeInTenantContext(
+        TenantContext.TEMPLATE_TENANT_ID,
+        () -> {
+          transactionTemplate.executeWithoutResult(
+              status -> {
+                log.info("Seeding Permission Templates (System Defaults)...");
+                List<PermissionTemplate> templatesToSave = new ArrayList<>();
 
-          // 1. Wildcards (All departments)
-          seedDepartment(
-              templatesToSave,
-              null,
-              List.of(
-                  new String[] {"WORKER", "dashboard", "view", "ORGANIZATION"},
-                  new String[] {"WORKER", "notifications", "view", "ORGANIZATION"},
-                  new String[] {"SUPERVISOR", "dashboard", "view", "ORGANIZATION"},
-                  new String[] {"SUPERVISOR", "notifications", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "dashboard", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "notifications", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
-                  new String[] {"VIEWER", "dashboard", "view", "ORGANIZATION"},
-                  new String[] {"VIEWER", "notifications", "view", "ORGANIZATION"},
-                  new String[] {"WORKER", "members", "read", "OWN"},
-                  new String[] {"WORKER", "settings", "read", "OWN"},
-                  new String[] {"WORKER", "settings", "write", "OWN"},
-                  new String[] {"WORKER", "flowboard", "read", "OWN"},
-                  new String[] {"WORKER", "flowboard", "write", "OWN"},
-                  new String[] {"SUPERVISOR", "members", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "settings", "read", "OWN"},
-                  new String[] {"SUPERVISOR", "settings", "write", "OWN"},
-                  new String[] {"SUPERVISOR", "flowboard", "read", "OWN"},
-                  new String[] {"SUPERVISOR", "flowboard", "write", "OWN"},
-                  new String[] {"MANAGER", "members", "read", "DEPARTMENT"},
-                  new String[] {"MANAGER", "settings", "read", "OWN"},
-                  new String[] {"MANAGER", "settings", "write", "OWN"},
-                  new String[] {"MANAGER", "flowboard", "read", "OWN"},
-                  new String[] {"MANAGER", "flowboard", "write", "OWN"}));
+                // 1. Wildcards (All departments)
+                seedDepartment(
+                    templatesToSave,
+                    null,
+                    List.of(
+                        new String[] {"WORKER", "dashboard", "view", "ORGANIZATION"},
+                        new String[] {"WORKER", "notifications", "view", "ORGANIZATION"},
+                        new String[] {"SUPERVISOR", "dashboard", "view", "ORGANIZATION"},
+                        new String[] {"SUPERVISOR", "notifications", "view", "ORGANIZATION"},
+                        new String[] {"MANAGER", "dashboard", "view", "ORGANIZATION"},
+                        new String[] {"MANAGER", "notifications", "view", "ORGANIZATION"},
+                        new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
+                        new String[] {"VIEWER", "dashboard", "view", "ORGANIZATION"},
+                        new String[] {"VIEWER", "notifications", "view", "ORGANIZATION"},
+                        new String[] {"WORKER", "members", "read", "OWN"},
+                        new String[] {"WORKER", "settings", "read", "OWN"},
+                        new String[] {"WORKER", "settings", "write", "OWN"},
+                        new String[] {"WORKER", "flowboard", "read", "OWN"},
+                        new String[] {"WORKER", "flowboard", "write", "OWN"},
+                        new String[] {"SUPERVISOR", "members", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "settings", "read", "OWN"},
+                        new String[] {"SUPERVISOR", "settings", "write", "OWN"},
+                        new String[] {"SUPERVISOR", "flowboard", "read", "OWN"},
+                        new String[] {"SUPERVISOR", "flowboard", "write", "OWN"},
+                        new String[] {"MANAGER", "members", "read", "DEPARTMENT"},
+                        new String[] {"MANAGER", "settings", "read", "OWN"},
+                        new String[] {"MANAGER", "settings", "write", "OWN"},
+                        new String[] {"MANAGER", "flowboard", "read", "OWN"},
+                        new String[] {"MANAGER", "flowboard", "write", "OWN"}));
 
-          // 2. SALES
-          seedDepartment(
-              templatesToSave,
-              "SALES",
-              List.of(
-                  new String[] {"WORKER", "sales", "read", "OWN"},
-                  new String[] {"WORKER", "sales", "write", "OWN"},
-                  new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
-                  new String[] {"WORKER", "flowboard", "view", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "sales", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "sales", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "sales", "confirm", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "sales", "ship", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "sales", "delete", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "sales", "approve", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "flowboard", "view", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "flowboard", "edit", "DEPARTMENT"},
-                  new String[] {"MANAGER", "sales", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "sales", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "sales", "delete", "DEPARTMENT"},
-                  new String[] {"MANAGER", "sales", "confirm", "ORGANIZATION"},
-                  new String[] {"MANAGER", "sales", "ship", "ORGANIZATION"},
-                  new String[] {"MANAGER", "sales", "cancel", "ORGANIZATION"},
-                  new String[] {"MANAGER", "sales", "approve", "ORGANIZATION"},
-                  new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "flowboard", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "flowboard", "edit", "DEPARTMENT"},
-                  new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
+                // 2. SALES
+                seedDepartment(
+                    templatesToSave,
+                    "SALES",
+                    List.of(
+                        new String[] {"WORKER", "sales", "read", "OWN"},
+                        new String[] {"WORKER", "sales", "write", "OWN"},
+                        new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
+                        new String[] {"WORKER", "flowboard", "view", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "sales", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "sales", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "sales", "confirm", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "sales", "ship", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "sales", "delete", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "sales", "approve", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "flowboard", "view", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "flowboard", "edit", "DEPARTMENT"},
+                        new String[] {"MANAGER", "sales", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "sales", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "sales", "delete", "DEPARTMENT"},
+                        new String[] {"MANAGER", "sales", "confirm", "ORGANIZATION"},
+                        new String[] {"MANAGER", "sales", "ship", "ORGANIZATION"},
+                        new String[] {"MANAGER", "sales", "cancel", "ORGANIZATION"},
+                        new String[] {"MANAGER", "sales", "approve", "ORGANIZATION"},
+                        new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "flowboard", "view", "ORGANIZATION"},
+                        new String[] {"MANAGER", "flowboard", "edit", "DEPARTMENT"},
+                        new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
 
-          // 3. Production sub-departments (FIBER, YARN, WEAVING, KNITTING, DYEING, GARMENT)
-          //    Each sub-dept gets the same base production permissions.
-          List<String[]> productionRules =
-              List.of(
-                  new String[] {"WORKER", "fiber", "read", "OWN"},
-                  new String[] {"WORKER", "products", "read", "OWN"},
-                  new String[] {"WORKER", "projects", "read", "OWN"},
-                  new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "fiber", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "projects", "read", "DEPARTMENT"},
-                  new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "fiber", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "fiber", "approve", "DEPARTMENT"},
-                  new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "projects", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "projects", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "projects", "manage", "DEPARTMENT"});
-          for (String deptCode :
-              List.of("FIBER", "YARN", "WEAVING", "KNITTING", "DYEING", "GARMENT")) {
-            seedDepartment(templatesToSave, deptCode, productionRules);
-          }
+                // 3. Production sub-departments (FIBER, YARN, WEAVING, KNITTING, DYEING, GARMENT)
+                //    Each sub-dept gets the same base production permissions.
+                List<String[]> productionRules =
+                    List.of(
+                        new String[] {"WORKER", "fiber", "read", "OWN"},
+                        new String[] {"WORKER", "products", "read", "OWN"},
+                        new String[] {"WORKER", "projects", "read", "OWN"},
+                        new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "fiber", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "projects", "read", "DEPARTMENT"},
+                        new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "fiber", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "fiber", "approve", "DEPARTMENT"},
+                        new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "projects", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "projects", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "projects", "manage", "DEPARTMENT"});
+                for (String deptCode :
+                    List.of("FIBER", "YARN", "WEAVING", "KNITTING", "DYEING", "GARMENT")) {
+                  seedDepartment(templatesToSave, deptCode, productionRules);
+                }
 
-          // 4. QUALITY
-          seedDepartment(
-              templatesToSave,
-              "QUALITY",
-              List.of(
-                  new String[] {"WORKER", "fiber", "read", "OWN"},
-                  new String[] {"WORKER", "products", "read", "OWN"},
-                  new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
+                // 4. QUALITY
+                seedDepartment(
+                    templatesToSave,
+                    "QUALITY",
+                    List.of(
+                        new String[] {"WORKER", "fiber", "read", "OWN"},
+                        new String[] {"WORKER", "products", "read", "OWN"},
+                        new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
 
-          // 5. WAREHOUSE
-          seedDepartment(
-              templatesToSave,
-              "WAREHOUSE",
-              List.of(
-                  new String[] {"WORKER", "products", "read", "OWN"},
-                  new String[] {"WORKER", "products", "write", "OWN"},
-                  new String[] {"WORKER", "logistics", "read", "OWN"},
-                  new String[] {"WORKER", "logistics", "write", "OWN"},
-                  new String[] {"WORKER", "logistics", "prepare", "OWN"},
-                  new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "logistics", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "logistics", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "logistics", "prepare", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "logistics", "ship", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "logistics", "deliver", "DEPARTMENT"},
-                  new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "logistics", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "logistics", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "logistics", "prepare", "DEPARTMENT"},
-                  new String[] {"MANAGER", "logistics", "ship", "ORGANIZATION"},
-                  new String[] {"MANAGER", "logistics", "deliver", "ORGANIZATION"},
-                  new String[] {"MANAGER", "logistics", "cancel", "ORGANIZATION"}));
+                // 5. WAREHOUSE
+                seedDepartment(
+                    templatesToSave,
+                    "WAREHOUSE",
+                    List.of(
+                        new String[] {"WORKER", "products", "read", "OWN"},
+                        new String[] {"WORKER", "products", "write", "OWN"},
+                        new String[] {"WORKER", "logistics", "read", "OWN"},
+                        new String[] {"WORKER", "logistics", "write", "OWN"},
+                        new String[] {"WORKER", "logistics", "prepare", "OWN"},
+                        new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "fiber", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "logistics", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "logistics", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "logistics", "prepare", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "logistics", "ship", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "logistics", "deliver", "DEPARTMENT"},
+                        new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "logistics", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "logistics", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "logistics", "prepare", "DEPARTMENT"},
+                        new String[] {"MANAGER", "logistics", "ship", "ORGANIZATION"},
+                        new String[] {"MANAGER", "logistics", "deliver", "ORGANIZATION"},
+                        new String[] {"MANAGER", "logistics", "cancel", "ORGANIZATION"}));
 
-          // 6. FINANCE
-          seedDepartment(
-              templatesToSave,
-              "FINANCE",
-              List.of(
-                  new String[] {"WORKER", "sales", "read", "ORGANIZATION"},
-                  new String[] {"WORKER", "reports", "view", "OWN"},
-                  new String[] {"SUPERVISOR", "sales", "read", "ORGANIZATION"},
-                  new String[] {"SUPERVISOR", "partners", "read", "ORGANIZATION"},
-                  new String[] {"SUPERVISOR", "reports", "view", "DEPARTMENT"},
-                  new String[] {"MANAGER", "sales", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "reports", "export", "ORGANIZATION"},
-                  new String[] {"WORKER", "members", "read", "ORGANIZATION"},
-                  new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "members", "read", "ORGANIZATION"}));
+                // 6. FINANCE
+                seedDepartment(
+                    templatesToSave,
+                    "FINANCE",
+                    List.of(
+                        new String[] {"WORKER", "sales", "read", "ORGANIZATION"},
+                        new String[] {"WORKER", "reports", "view", "OWN"},
+                        new String[] {"SUPERVISOR", "sales", "read", "ORGANIZATION"},
+                        new String[] {"SUPERVISOR", "partners", "read", "ORGANIZATION"},
+                        new String[] {"SUPERVISOR", "reports", "view", "DEPARTMENT"},
+                        new String[] {"MANAGER", "sales", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
+                        new String[] {"MANAGER", "reports", "export", "ORGANIZATION"},
+                        new String[] {"WORKER", "members", "read", "ORGANIZATION"},
+                        new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "members", "read", "ORGANIZATION"}));
 
-          // 7. HR
-          seedDepartment(
-              templatesToSave,
-              "HR",
-              List.of(
-                  new String[] {"WORKER", "settings", "view", "OWN"},
-                  new String[] {"SUPERVISOR", "settings", "view", "DEPARTMENT"},
-                  new String[] {"MANAGER", "settings", "view", "ORGANIZATION"},
-                  new String[] {"MANAGER", "settings", "manage", "DEPARTMENT"},
-                  new String[] {"WORKER", "members", "read", "ORGANIZATION"},
-                  new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
-                  new String[] {"SUPERVISOR", "members", "write", "ORGANIZATION"},
-                  new String[] {"MANAGER", "members", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "members", "write", "ORGANIZATION"},
-                  new String[] {"MANAGER", "members", "manage", "ORGANIZATION"}));
+                // 7. HR
+                seedDepartment(
+                    templatesToSave,
+                    "HR",
+                    List.of(
+                        new String[] {"WORKER", "settings", "view", "OWN"},
+                        new String[] {"SUPERVISOR", "settings", "view", "DEPARTMENT"},
+                        new String[] {"MANAGER", "settings", "view", "ORGANIZATION"},
+                        new String[] {"MANAGER", "settings", "manage", "DEPARTMENT"},
+                        new String[] {"WORKER", "members", "read", "ORGANIZATION"},
+                        new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
+                        new String[] {"SUPERVISOR", "members", "write", "ORGANIZATION"},
+                        new String[] {"MANAGER", "members", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "members", "write", "ORGANIZATION"},
+                        new String[] {"MANAGER", "members", "manage", "ORGANIZATION"}));
 
-          // 8. PROCUREMENT
-          seedDepartment(
-              templatesToSave,
-              "PROCUREMENT",
-              List.of(
-                  new String[] {"WORKER", "procurement", "read", "OWN"},
-                  new String[] {"WORKER", "procurement", "write", "OWN"},
-                  new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "procurement", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "procurement", "write", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
-                  new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "procurement", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "procurement", "write", "DEPARTMENT"},
-                  new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
-                  new String[] {"MANAGER", "partners", "write", "DEPARTMENT"}));
+                // 8. PROCUREMENT
+                seedDepartment(
+                    templatesToSave,
+                    "PROCUREMENT",
+                    List.of(
+                        new String[] {"WORKER", "procurement", "read", "OWN"},
+                        new String[] {"WORKER", "procurement", "write", "OWN"},
+                        new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "procurement", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "procurement", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "procurement", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "procurement", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "partners", "write", "DEPARTMENT"}));
 
-          // 9. PARTNER roles — visible only in partner invitation UIs
-          // Partners do not have departments, so wildcard (null) is used here.
-          // This is safe because these templates only match specific partner role codes.
-          seedDepartment(
-              templatesToSave,
-              null,
-              List.of(
-                  new String[] {"PARTNER_OWNER", "dashboard", "view", "ORGANIZATION"},
-                  new String[] {"PARTNER_OWNER", "sales", "read", "ORGANIZATION"},
-                  new String[] {"PARTNER_OWNER", "partners", "read", "OWN"},
-                  new String[] {"PARTNER_ACCOUNTANT", "dashboard", "view", "OWN"},
-                  new String[] {"PARTNER_ACCOUNTANT", "sales", "read", "ORGANIZATION"},
-                  new String[] {"PARTNER_BUYER", "sales", "read", "OWN"},
-                  new String[] {"PARTNER_BUYER", "sales", "write", "OWN"},
-                  new String[] {"PARTNER_VIEWER", "dashboard", "view", "OWN"}));
+                // 9. PARTNER roles — visible only in partner invitation UIs
+                // Partners do not have departments, so wildcard (null) is used here.
+                // This is safe because these templates only match specific partner role codes.
+                seedDepartment(
+                    templatesToSave,
+                    null,
+                    List.of(
+                        new String[] {"PARTNER_OWNER", "dashboard", "view", "ORGANIZATION"},
+                        new String[] {"PARTNER_OWNER", "sales", "read", "ORGANIZATION"},
+                        new String[] {"PARTNER_OWNER", "partners", "read", "OWN"},
+                        new String[] {"PARTNER_ACCOUNTANT", "dashboard", "view", "OWN"},
+                        new String[] {"PARTNER_ACCOUNTANT", "sales", "read", "ORGANIZATION"},
+                        new String[] {"PARTNER_BUYER", "sales", "read", "OWN"},
+                        new String[] {"PARTNER_BUYER", "sales", "write", "OWN"},
+                        new String[] {"PARTNER_VIEWER", "dashboard", "view", "OWN"}));
 
-          // Note: MANAGEMENT department removed — ADMIN role provides cross-org access globally.
+                // Note: MANAGEMENT department removed — ADMIN role provides cross-org access
+                // globally.
 
-          permissionTemplateRepository.saveAll(templatesToSave);
-          log.info("Successfully seeded {} Permission Templates", templatesToSave.size());
+                permissionTemplateRepository.saveAll(templatesToSave);
+
+                log.info("Successfully seeded {} Permission Templates", templatesToSave.size());
+              });
+          return null;
         });
   }
 

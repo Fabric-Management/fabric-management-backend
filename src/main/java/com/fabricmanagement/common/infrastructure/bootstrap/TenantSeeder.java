@@ -1,10 +1,12 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
+import com.fabricmanagement.platform.tenant.app.TenantClonerService;
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.tenant.domain.TenantSettings;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,6 +23,7 @@ public class TenantSeeder implements DataSeeder {
       "nexus-fabrics"; // Derived manually based on service logic
 
   private final TenantSystemService tenantService;
+  private final TenantClonerService tenantClonerService;
   private final TransactionTemplate transactionTemplate;
 
   @Override
@@ -45,6 +48,16 @@ public class TenantSeeder implements DataSeeder {
 
           TenantDto tenant = tenantService.createTenant(request);
           log.info("Created Default Tenant: {} with ID: {}", tenant.getName(), tenant.getId());
+
+          // Clone platform roles from Golden Template into the newly created Nexus Fabrics tenant
+          UUID goldenTemplateId = tenantClonerService.findTemplateTenantId();
+          if (goldenTemplateId != null) {
+            int clonedRoles =
+                tenantClonerService.cloneRolesToTenant(goldenTemplateId, tenant.getId());
+            log.info("Cloned {} roles into Nexus Fabrics", clonedRoles);
+          } else {
+            log.warn("Golden Template not found, roles were not cloned into Nexus Fabrics!");
+          }
         });
   }
 
