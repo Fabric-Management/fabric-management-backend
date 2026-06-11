@@ -122,7 +122,7 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
       "SELECT tp FROM TradingPartner tp JOIN FETCH tp.registry "
           + "WHERE tp.tenantId = :tenantId "
           + "AND tp.isActive = true "
-          + "AND tp.partnerType = 'FASON' "
+          + "AND tp.partnerType = 'SUBCONTRACTOR' "
           + "ORDER BY tp.customName, tp.registry.officialName")
   List<TradingPartner> findFasonPartners(@Param("tenantId") UUID tenantId);
 

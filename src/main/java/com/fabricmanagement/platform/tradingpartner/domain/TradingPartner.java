@@ -195,7 +195,7 @@ public class TradingPartner extends BaseEntity {
    *
    * <ul>
    *   <li>SUPPLIER + CUSTOMER (or vice versa) → BOTH
-   *   <li>FASON + SUPPLIER/CUSTOMER → BOTH (fason partners can also supply/buy)
+   *   <li>SUBCONTRACTOR + SUPPLIER/CUSTOMER → BOTH (fason partners can also supply/buy)
    *   <li>SERVICE_PROVIDER + any → BOTH
    *   <li>Same type → no change
    *   <li>Already BOTH → no change
