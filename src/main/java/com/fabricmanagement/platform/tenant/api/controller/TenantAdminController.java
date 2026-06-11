@@ -26,7 +26,7 @@ public class TenantAdminController {
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
   @Operation(
       summary =
-          "Tüm tenant ayarlarını (timezone vb) dinleyicilere (i18n modülü) senkronize et (One-off migration)")
+          "Sync all tenant settings (timezone etc) to listeners (i18n module) (One-off migration)")
   public ResponseEntity<ApiResponse<Integer>> syncAllSettings() {
     log.info("Manual sync of all tenant settings initialized by admin.");
     int count = tenantService.syncAllTenantSettings();
