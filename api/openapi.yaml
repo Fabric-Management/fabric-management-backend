@@ -20,6 +20,8 @@ tags:
   name: Work Order
 - description: Manage certifications for trading partners
   name: Partner Certifications
+- description: Notification management and preferences
+  name: Notifications
 - description: Organization Contact operations
   name: Organization Contact
 - description: "B2B partner management - suppliers, customers, fason partners"
@@ -28,47 +30,39 @@ tags:
   name: Shipments
 - description: Costing operations
   name: Costing
-- description: Çok dil ve yerelleştirme yönetimi
-  name: i18n
 - description: Inventory Balance operations
   name: Inventory Balance
 - description: Approval Request operations
   name: Approval Request
 - description: Physical stock unit lifecycle management
   name: StockUnit
-- description: Kullanıcı performans liderlik tablosu
-  name: FlowBoard — Performance
 - description: Procurement Purchase Order API
   name: Purchase Order
 - description: Partner portal user management
   name: Partner Users
-- description: Task yönetimi ve durum güncellemeleri
-  name: FlowBoard — Task
 - description: Payroll Self Service operations
   name: Payroll Self Service
 - description: IWM Warehouse Location Management API
   name: IWM Location
+- description: Recurring task templates
+  name: FlowBoard — Recurring Tasks
 - description: Employee Profile operations
   name: Employee Profile
 - description: Goods Receipt operations
   name: Goods Receipt
-- description: Onay Politikası Yönetimi
-  name: Approval Policy
 - description: Tenant Settings operations
   name: Tenant Settings
 - description: Organization operations
   name: Organization
+- description: Automation rules management
+  name: FlowBoard — Otomasyon
 - description: Inventory Transaction operations
   name: Inventory Transaction
 - description: Fiber operations
   name: Fiber
-- description: Tenant yönetim işlemleri (Sadece PLATFORM_ADMIN)
-  name: Tenant Admin
 - description: Policy operations
   name: Policy
-- description: Kullanıcı iş yükü analizi
-  name: FlowBoard — Workload
-- description: Board yönetimi ve kanban görünümü
+- description: Board management and kanban view
   name: FlowBoard — Board
 - description: Quote management with pricing engine integration
   name: Quotes
@@ -96,8 +90,12 @@ tags:
   name: Address
 - description: Task Template operations
   name: Task Template
+- description: Tenant management operations (PLATFORM_ADMIN only)
+  name: Tenant Admin
 - description: Organization Address operations
   name: Organization Address
+- description: Approval Policy Management
+  name: Approval Policy
 - description: Supplier R F Q operations
   name: Supplier R F Q
 - description: Health operations
@@ -114,8 +112,8 @@ tags:
   name: Recipe
 - description: Registration operations
   name: Registration
-- description: Tekrarlayan görev şablonları
-  name: FlowBoard — Recurring Tasks
+- description: Multilingual and localization management
+  name: i18n
 - description: Fiber Request operations
   name: Fiber Request
 - description: Contact operations
@@ -128,6 +126,8 @@ tags:
   name: Whisper
 - description: Platform Notification operations
   name: Platform Notification
+- description: Task management and status updates
+  name: FlowBoard — Task
 - description: Audit operations
   name: Audit
 - description: Endpoints for PLG Simulation Playground
@@ -138,6 +138,8 @@ tags:
   name: WhatsApp Webhooks
 - description: Production Output operations
   name: Production Output
+- description: User performance leaderboard
+  name: FlowBoard — Performance
 - description: Kullanici dashboard yapilandirmasi ve widget yonetimi
   name: FlowBoard — Dashboard
 - description: Tenant-specific quality grading system management
@@ -162,14 +164,10 @@ tags:
   name: Sales Product
 - description: User Promotion operations
   name: User Promotion
-- description: Otomasyon kurallarının yönetimi
-  name: FlowBoard — Otomasyon
 - description: User Onboarding operations
   name: User Onboarding
 - description: Platform Admin operations
   name: Platform Admin
-- description: Bildirim yönetimi ve tercihler
-  name: Notifications
 - description: Tenant Seed operations
   name: Tenant Seed
 - description: "Self-service tenant registration. No authentication required. Creates\
@@ -182,6 +180,8 @@ tags:
   name: Department
 - description: User Address operations
   name: User Address
+- description: User workload analysis
+  name: FlowBoard — Workload
 - description: Role operations
   name: Role
 - description: User operations
@@ -328,8 +328,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Tüm tenant ayarlarını (timezone vb) dinleyicilere (i18n modülü) senkronize
-        et (One-off migration)
+      summary: Sync all tenant settings (timezone etc) to listeners (i18n module)
+        (One-off migration)
       tags:
       - Tenant Admin
   /api/v1/admin/tenants:
@@ -1040,7 +1040,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Tüm onay politikalarını getirir
+      summary: Get all approval policies
       tags:
       - Approval Policy
     post:
@@ -1109,7 +1109,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Yeni bir onay politikası oluşturur
+      summary: Create a new approval policy
       tags:
       - Approval Policy
   /api/v1/approval/policies/{entityType}:
@@ -1185,7 +1185,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Belirli bir entity tipi için aktif olan politikayı getirir
+      summary: Get active policy for a specific entity type
       tags:
       - Approval Policy
   /api/v1/approval/policies/{policyId}:
@@ -1262,7 +1262,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Mevcut bir onay politikasını günceller
+      summary: Update an existing approval policy
       tags:
       - Approval Policy
   /api/v1/approval/policies/{policyId}/active:
@@ -1338,7 +1338,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Mevcut bir onay politikasını aktif/pasif yapar
+      summary: Activate/deactivate an existing approval policy
       tags:
       - Approval Policy
   /api/v1/approval/promotions/pending:
@@ -10122,7 +10122,7 @@ paths:
           enum:
           - SUPPLIER
           - CUSTOMER
-          - FASON
+          - SUBCONTRACTOR
           - SERVICE_PROVIDER
           - BOTH
           - SISTER_COMPANY
@@ -17051,7 +17051,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Aktif tenant'ın tüm kurallarını veya board bazlı kurallarını getirir
+      summary: Get all rules or board based rules for active tenant
       tags:
       - FlowBoard — Otomasyon
     post:
@@ -17120,7 +17120,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Yeni otomasyon kuralı oluştur
+      summary: Create new automation rule
       tags:
       - FlowBoard — Otomasyon
   /api/v1/flowboard/automations/{id}:
@@ -17191,7 +17191,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Otomasyon kuralını iptal et (soft delete)
+      summary: Cancel automation rule (soft delete)
       tags:
       - FlowBoard — Otomasyon
     put:
@@ -17267,7 +17267,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Mevcut otomasyon kuralını güncelle
+      summary: Update existing automation rule
       tags:
       - FlowBoard — Otomasyon
   /api/v1/flowboard/automations/{id}/toggle:
@@ -17343,7 +17343,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Otomasyon kuralını aktif/pasif yap
+      summary: Activate/deactivate automation rule
       tags:
       - FlowBoard — Otomasyon
   /api/v1/flowboard/boards:
@@ -17407,7 +17407,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Tüm aktif board'ları listele
+      summary: List all active boards
       tags:
       - FlowBoard — Board
     post:
@@ -17476,7 +17476,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Yeni board oluştur
+      summary: Create new board
       tags:
       - FlowBoard — Board
   /api/v1/flowboard/boards/default:
@@ -17540,7 +17540,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Tenant'ın varsayılan board'unu getir
+      summary: Get tenant's default board
       tags:
       - FlowBoard — Board
   /api/v1/flowboard/boards/{boardId}/dashboard/metrics:
@@ -17611,7 +17611,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: "Pano için özet, trend ve iş yükü metriklerini getirir"
+      summary: "Get summary, trend and workload metrics for board"
       tags:
       - FlowBoard — Dashboard
   /api/v1/flowboard/boards/{id}:
@@ -17682,7 +17682,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Board detayı
+      summary: Board details
       tags:
       - FlowBoard — Board
   /api/v1/flowboard/boards/{id}/eligible-assignees:
@@ -17753,7 +17753,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Pano için atanabilecek kullanıcıları getir
+      summary: Get assignable users for board
       tags:
       - FlowBoard — Board
   /api/v1/flowboard/boards/{id}/kanban:
@@ -17857,7 +17857,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Kanban view — status bazlı task grupları
+      summary: Kanban view — status based task groups
       tags:
       - FlowBoard — Board
   /api/v1/flowboard/boards/{id}/tasks:
@@ -17966,7 +17966,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Board'daki task'ları sayfalı getir — priorityScore DESC sıralı
+      summary: Paginated tasks in board — ordered by priorityScore DESC
       tags:
       - FlowBoard — Board
   /api/v1/flowboard/dashboards/default:
@@ -18330,7 +18330,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Haftalık performans liderlik tablosu
+      summary: Weekly performance leaderboard
       tags:
       - FlowBoard — Performance
   /api/v1/flowboard/recurring-templates/boards/{boardId}:
@@ -18401,7 +18401,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Board'a ait tekrarlayan görev şablonları
+      summary: Recurring task templates for board
       tags:
       - FlowBoard — Recurring Tasks
   /api/v1/flowboard/tasks:
@@ -18471,7 +18471,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Manuel task oluştur
+      summary: Create manual task
       tags:
       - FlowBoard — Task
   /api/v1/flowboard/tasks/{id}:
@@ -18538,7 +18538,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Task'ı iptal et (soft cancel)
+      summary: Cancel task (soft cancel)
       tags:
       - FlowBoard — Task
     get:
@@ -18608,7 +18608,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Task detayı
+      summary: Task details
       tags:
       - FlowBoard — Task
   /api/v1/flowboard/tasks/{id}/assign:
@@ -18695,7 +18695,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Task'ı kullanıcıya ata
+      summary: Assign task to user
       tags:
       - FlowBoard — Task
   /api/v1/flowboard/tasks/{id}/assignees:
@@ -18766,7 +18766,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Task'a atanmış kişileri getir
+      summary: Get users assigned to task
       tags:
       - FlowBoard — Task
   /api/v1/flowboard/tasks/{id}/assignees/{userId}:
@@ -18843,7 +18843,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Task'tan atamayı kaldır
+      summary: Unassign from task
       tags:
       - FlowBoard — Task
   /api/v1/flowboard/tasks/{id}/comments:
@@ -18914,7 +18914,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Task yorumlarını listele
+      summary: List task comments
       tags:
       - FlowBoard — Task
     post:
@@ -19067,7 +19067,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Task status güncelle — WIP kontrolü ile
+      summary: Update task status — with WIP control
       tags:
       - FlowBoard — Task
   /api/v1/flowboard/templates:
@@ -19481,7 +19481,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Kullanıcının anlık iş yükünü getir
+      summary: Get user's current workload
       tags:
       - FlowBoard — Workload
   /api/v1/health:
@@ -19735,7 +19735,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Kullanıcının aktif locale konfigürasyonunu getir
+      summary: Get user's active locale configuration
       tags:
       - i18n
     put:
@@ -19804,7 +19804,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Kullanıcının locale tercihini güncelle
+      summary: Update user's locale preference
       tags:
       - i18n
   /api/v1/i18n/tenant:
@@ -19868,7 +19868,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Tenant'ın locale konfigürasyonunu getir
+      summary: Get tenant's locale configuration
       tags:
       - i18n
   /api/v1/i18n/translate:
@@ -19943,7 +19943,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Verilen key'i çevir (debug/test amaçlı)
+      summary: Translate given key (debug/test purpose)
       tags:
       - i18n
   /api/v1/info:
@@ -21533,7 +21533,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Kullanıcının bildirimlerini listele
+      summary: List user notifications
       tags:
       - Notifications
   /api/v1/notifications/preferences:
@@ -21599,7 +21599,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Bildirim kanalı tercihini güncelle
+      summary: Update notification channel preference
       tags:
       - Notifications
   /api/v1/notifications/read-all:
@@ -21663,7 +21663,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Tüm bildirimleri okundu işaretle
+      summary: Mark all notifications as read
       tags:
       - Notifications
   /api/v1/notifications/unread/count:
@@ -21727,7 +21727,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Okunmamış bildirim sayısı
+      summary: Unread notification count
       tags:
       - Notifications
   /api/v1/notifications/{id}/read:
@@ -21798,7 +21798,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Bir bildirimi okundu işaretle
+      summary: Mark a notification as read
       tags:
       - Notifications
   /api/v1/platform/fiber-requests:
@@ -45500,7 +45500,7 @@ components:
           enum:
           - SUPPLIER
           - CUSTOMER
-          - FASON
+          - SUBCONTRACTOR
           - SERVICE_PROVIDER
           - BOTH
           - SISTER_COMPANY
@@ -45718,13 +45718,13 @@ components:
             type: array
             description: Fastness requirements
             example:
-            - Yıkama 4-5
+            - Washing 4-5
             items:
               type: string
           finishType:
             type: string
             description: Finish type
-            example: Kalandır
+            example: Calender
           labDipRef:
             type: string
             description: Lab dip reference number
@@ -45991,7 +45991,7 @@ components:
           finishType:
             type: string
             description: Finish type
-            example: Enzim Yıkama
+            example: Enzyme Wash
           gsm:
             type: integer
             format: int32
@@ -46005,7 +46005,7 @@ components:
           weavePattern:
             type: string
             description: Weave/knit pattern
-            example: Süprem
+            example: Single Jersey
           widthCm:
             type: integer
             format: int32
@@ -46243,7 +46243,7 @@ components:
           origin:
             type: string
             description: Country/region of origin
-            example: Türkiye-Ege
+            example: Turkey-Aegean
           stapleLength:
             type: number
             format: double
@@ -46969,7 +46969,7 @@ components:
           knitPattern:
             type: string
             description: Knitting pattern
-            example: Süprem
+            example: Single Jersey
           machineDiameter:
             type: integer
             format: int32
@@ -51194,7 +51194,7 @@ components:
           enum:
           - SUPPLIER
           - CUSTOMER
-          - FASON
+          - SUBCONTRACTOR
           - SERVICE_PROVIDER
           - BOTH
           - SISTER_COMPANY
@@ -51893,7 +51893,7 @@ components:
           enum:
           - SUPPLIER
           - CUSTOMER
-          - FASON
+          - SUBCONTRACTOR
           - SERVICE_PROVIDER
           - BOTH
           - SISTER_COMPANY

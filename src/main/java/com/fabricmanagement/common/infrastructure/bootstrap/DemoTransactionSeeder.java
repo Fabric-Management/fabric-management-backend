@@ -11,9 +11,9 @@ import com.fabricmanagement.production.execution.batch.dto.CreateBatchRequest;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
 import com.fabricmanagement.production.execution.workorder.dto.CreateWorkOrderRequest;
-import com.fabricmanagement.production.masterdata.product.domain.Product;
+import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
+import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
@@ -25,20 +25,20 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 /**
- * Service to seed a deterministic, demo-ready transactional dataset for a tenant. Uses shared
+ * Component to seed a deterministic, demo-ready transactional dataset for a tenant. Uses shared
  * template fibers to create sales orders, work orders, and batches. Fully idempotent and
  * tenant-parametric.
  */
-@Service
+@Component
 @RequiredArgsConstructor
 @Slf4j
 public class DemoTransactionSeeder {
 
   private final TradingPartnerService tradingPartnerService;
-  private final ProductRepository productRepository;
+  private final ProductFacade productFacade;
   private final SalesOrderService salesOrderService;
   private final WorkOrderService workOrderService;
   private final BatchService batchService;
@@ -91,9 +91,8 @@ public class DemoTransactionSeeder {
       TradingPartnerDto customer = tradingPartnerService.createPartner(partnerReq);
 
       // 3. Find Shared Template Fibers (must use TEMPLATE tenant, not current tenant)
-      List<Product> fibers =
-          productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(
-              TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
+      List<ProductDto> fibers =
+          productFacade.findByType(TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
 
       if (fibers.isEmpty()) {
         log.warn(
@@ -101,8 +100,8 @@ public class DemoTransactionSeeder {
         return;
       }
 
-      Product fiber1 = fibers.get(0);
-      Product fiber2 = fibers.size() > 1 ? fibers.get(1) : fiber1;
+      ProductDto fiber1 = fibers.get(0);
+      ProductDto fiber2 = fibers.size() > 1 ? fibers.get(1) : fiber1;
 
       // 4. Create Sales Order
       CreateSalesOrderRequest orderReq = new CreateSalesOrderRequest();

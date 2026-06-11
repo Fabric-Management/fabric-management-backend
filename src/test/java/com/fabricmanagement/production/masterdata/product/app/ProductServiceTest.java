@@ -47,7 +47,12 @@ class ProductServiceTest {
     ReflectionTestUtils.setField(fiberProduct, "tenantId", tenantId);
     ReflectionTestUtils.setField(fiberProduct, "uid", "PRD-1000");
 
-    when(productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(tenantId, ProductType.FIBER))
+    when(productRepository.findByTenantIdInAndProductTypeAndIsActiveTrue(
+            List.of(
+                tenantId,
+                com.fabricmanagement.common.infrastructure.persistence.TenantContext
+                    .TEMPLATE_TENANT_ID),
+            ProductType.FIBER))
         .thenReturn(List.of(fiberProduct));
 
     FiberDto fiberDto = FiberDto.builder().productId(productId).fiberName("Cotton Organic").build();
@@ -74,7 +79,12 @@ class ProductServiceTest {
     ReflectionTestUtils.setField(yarnProduct, "tenantId", tenantId);
     ReflectionTestUtils.setField(yarnProduct, "uid", "PRD-2000");
 
-    when(productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(tenantId, ProductType.YARN))
+    when(productRepository.findByTenantIdInAndProductTypeAndIsActiveTrue(
+            List.of(
+                tenantId,
+                com.fabricmanagement.common.infrastructure.persistence.TenantContext
+                    .TEMPLATE_TENANT_ID),
+            ProductType.YARN))
         .thenReturn(List.of(yarnProduct));
 
     // Act
