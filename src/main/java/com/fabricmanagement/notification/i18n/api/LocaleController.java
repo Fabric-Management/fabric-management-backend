@@ -23,13 +23,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/i18n")
 @RequiredArgsConstructor
-@Tag(name = "i18n", description = "Çok dil ve yerelleştirme yönetimi")
+@Tag(name = "i18n", description = "Multilingual and localization management")
 public class LocaleController {
 
   private final TranslationService translationService;
 
   @GetMapping("/my-locale")
-  @Operation(summary = "Kullanıcının aktif locale konfigürasyonunu getir")
+  @Operation(summary = "Get user's active locale configuration")
   public ApiResponse<Map<String, Object>> getMyLocale() {
     var ctx = currentUser();
     String locale = translationService.resolveLocaleForUser(ctx.tenantId(), ctx.userId());
@@ -46,7 +46,7 @@ public class LocaleController {
   }
 
   @PutMapping("/my-locale")
-  @Operation(summary = "Kullanıcının locale tercihini güncelle")
+  @Operation(summary = "Update user's locale preference")
   public ApiResponse<Void> updateMyLocale(@Valid @RequestBody UpdateLocalePreferenceRequest req) {
     var ctx = currentUser();
     translationService.updateUserLocale(
@@ -55,7 +55,7 @@ public class LocaleController {
   }
 
   @GetMapping("/translate")
-  @Operation(summary = "Verilen key'i çevir (debug/test amaçlı)")
+  @Operation(summary = "Translate given key (debug/test purpose)")
   public ApiResponse<String> translate(
       @RequestParam String keyCode, @RequestParam(required = false) String locale) {
     var ctx = currentUser();
@@ -68,7 +68,7 @@ public class LocaleController {
   }
 
   @GetMapping("/tenant")
-  @Operation(summary = "Tenant'ın locale konfigürasyonunu getir")
+  @Operation(summary = "Get tenant's locale configuration")
   public ApiResponse<Map<String, Object>> getTenantLocale() {
     var ctx = currentUser();
     return ApiResponse.success(translationService.getTenantLocaleConfig(ctx.tenantId()));

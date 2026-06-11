@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * Manuel task oluşturma isteği.
+ * Create manual taskma isteği.
  *
  * @param boardId Bağlı board
  * @param title Task başlığı

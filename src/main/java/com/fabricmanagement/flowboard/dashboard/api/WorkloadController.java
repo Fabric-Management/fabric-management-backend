@@ -19,13 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/flowboard/workloads")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
-@Tag(name = "FlowBoard — Workload", description = "Kullanıcı iş yükü analizi")
+@Tag(name = "FlowBoard — Workload", description = "User workload analysis")
 public class WorkloadController {
 
   private final WorkloadService workloadService;
 
   @GetMapping("/users/{userId}")
-  @Operation(summary = "Kullanıcının anlık iş yükünü getir")
+  @Operation(summary = "Get user's current workload")
   public ResponseEntity<ApiResponse<WorkloadService.UserWorkload>> getUserWorkload(
       @PathVariable @NotNull UUID userId) {
     UUID tenantId = TenantContext.requireTenantId();

@@ -14,7 +14,7 @@ public record KnittingProductionSpecs(
     @Schema(description = "Machine speed in RPM", example = "26") Integer machineSpeed,
     @Schema(description = "Stitch length in mm", example = "2.75") Double stitchLength,
     @Schema(description = "Yarn tension in cN", example = "4.5") Double yarnTension,
-    @Schema(description = "Knitting pattern", example = "Süprem") String knitPattern,
+    @Schema(description = "Knitting pattern", example = "Single Jersey") String knitPattern,
     @Schema(description = "Number of feeders", example = "96") Integer feederCount,
     @Schema(description = "Target fabric weight in GSM", example = "180") Integer targetGsm,
     @Schema(description = "Target tube width in cm", example = "90.0") Double targetWidth)

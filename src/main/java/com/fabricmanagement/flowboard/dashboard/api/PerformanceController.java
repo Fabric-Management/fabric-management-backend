@@ -21,13 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/flowboard/performance")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
-@Tag(name = "FlowBoard — Performance", description = "Kullanıcı performans liderlik tablosu")
+@Tag(name = "FlowBoard — Performance", description = "User performance leaderboard")
 public class PerformanceController {
 
   private final PerformanceService performanceService;
 
   @GetMapping("/leaderboard")
-  @Operation(summary = "Haftalık performans liderlik tablosu")
+  @Operation(summary = "Weekly performance leaderboard")
   public ResponseEntity<ApiResponse<List<UserPerformanceSnapshotDto>>> getLeaderboard(
       @RequestParam("date") @NotNull LocalDate date) {
     List<UserPerformanceSnapshotDto> result =

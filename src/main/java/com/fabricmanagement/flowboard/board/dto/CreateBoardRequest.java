@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Yeni board oluşturma isteği.
+ * Create new boardma isteği.
  *
  * @param name Board adı
  * @param boardType Board tipi

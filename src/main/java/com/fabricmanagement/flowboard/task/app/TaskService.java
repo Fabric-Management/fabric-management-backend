@@ -328,7 +328,7 @@ public class TaskService {
     return kanban;
   }
 
-  /** Task detayını getirir. */
+  /** Task detailsnı getirir. */
   @Transactional(readOnly = true)
   public Task getTask(UUID taskId) {
     return taskRepo

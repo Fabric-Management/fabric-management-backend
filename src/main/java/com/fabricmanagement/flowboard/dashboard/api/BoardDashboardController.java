@@ -26,7 +26,7 @@ public class BoardDashboardController {
   private final BoardDashboardService dashboardService;
 
   @GetMapping("/metrics")
-  @Operation(summary = "Pano için özet, trend ve iş yükü metriklerini getirir")
+  @Operation(summary = "Get summary, trend and workload metrics for board")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<BoardMetricsResponse>> getBoardMetrics(
       @PathVariable UUID boardId) {

@@ -21,7 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /** Tenant yöneticilerinin Onay Politikalarını (Policy) yapılandırdığı REST API. */
-@Tag(name = "Approval Policy", description = "Onay Politikası Yönetimi")
+@Tag(name = "Approval Policy", description = "Approval Policy Management")
 @RestController
 @RequestMapping("/api/v1/approval/policies")
 @RequiredArgsConstructor
@@ -30,7 +30,7 @@ public class ApprovalPolicyController {
 
   private final ApprovalPolicyService policyService;
 
-  @Operation(summary = "Tüm onay politikalarını getirir")
+  @Operation(summary = "Get all approval policies")
   @GetMapping
   @PreAuthorize("hasAuthority('TENANT_ADMIN') or hasAuthority('HR')")
   public ResponseEntity<ApiResponse<List<ApprovalPolicyResponse>>> getAllPolicies() {
@@ -40,7 +40,7 @@ public class ApprovalPolicyController {
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
-  @Operation(summary = "Belirli bir entity tipi için aktif olan politikayı getirir")
+  @Operation(summary = "Get active policy for a specific entity type")
   @GetMapping("/{entityType}")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> getActivePolicy(
@@ -57,7 +57,7 @@ public class ApprovalPolicyController {
                                 "Active approval policy not found for: " + entityType)))));
   }
 
-  @Operation(summary = "Yeni bir onay politikası oluşturur")
+  @Operation(summary = "Create a new approval policy")
   @PostMapping
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> createPolicy(
@@ -75,7 +75,7 @@ public class ApprovalPolicyController {
     return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }
 
-  @Operation(summary = "Mevcut bir onay politikasını günceller")
+  @Operation(summary = "Update an existing approval policy")
   @PutMapping("/{policyId}")
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> updatePolicy(
@@ -93,7 +93,7 @@ public class ApprovalPolicyController {
     return ResponseEntity.ok(ApiResponse.success(ApprovalPolicyResponse.from(policy)));
   }
 
-  @Operation(summary = "Mevcut bir onay politikasını aktif/pasif yapar")
+  @Operation(summary = "Activate/deactivate an existing approval policy")
   @PatchMapping("/{policyId}/active")
   @PreAuthorize("hasAuthority('TENANT_ADMIN')")
   public ResponseEntity<ApiResponse<ApprovalPolicyResponse>> togglePolicy(

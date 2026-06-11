@@ -28,14 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/flowboard/automations")
 @RequiredArgsConstructor
-@Tag(name = "FlowBoard — Otomasyon", description = "Otomasyon kurallarının yönetimi")
+@Tag(name = "FlowBoard — Otomasyon", description = "Automation rules management")
 @Slf4j
 public class AutomationController {
 
   private final AutomationRuleService automationRuleService;
 
   @GetMapping
-  @Operation(summary = "Aktif tenant'ın tüm kurallarını veya board bazlı kurallarını getirir")
+  @Operation(summary = "Get all rules or board based rules for active tenant")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<List<AutomationRuleResponse>>> getAutomations(
       @RequestParam(required = false) UUID boardId) {
@@ -44,7 +44,7 @@ public class AutomationController {
   }
 
   @PostMapping
-  @Operation(summary = "Yeni otomasyon kuralı oluştur")
+  @Operation(summary = "Create new automation rule")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<AutomationRuleResponse>> createRule(
       @Valid @RequestBody AutomationRuleRequest request) {
@@ -53,7 +53,7 @@ public class AutomationController {
   }
 
   @PutMapping("/{id}")
-  @Operation(summary = "Mevcut otomasyon kuralını güncelle")
+  @Operation(summary = "Update existing automation rule")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<AutomationRuleResponse>> updateRule(
       @PathVariable UUID id, @Valid @RequestBody AutomationRuleRequest request) {
@@ -62,7 +62,7 @@ public class AutomationController {
   }
 
   @PatchMapping("/{id}/toggle")
-  @Operation(summary = "Otomasyon kuralını aktif/pasif yap")
+  @Operation(summary = "Activate/deactivate automation rule")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<AutomationRuleResponse>> toggleActive(
       @PathVariable UUID id, @RequestParam boolean active) {
@@ -71,7 +71,7 @@ public class AutomationController {
   }
 
   @DeleteMapping("/{id}")
-  @Operation(summary = "Otomasyon kuralını iptal et (soft delete)")
+  @Operation(summary = "Cancel automation rule (soft delete)")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<Void>> deleteRule(@PathVariable UUID id) {
     automationRuleService.deleteRule(id);

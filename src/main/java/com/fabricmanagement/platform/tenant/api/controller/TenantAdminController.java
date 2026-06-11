@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin/tenant")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Tenant Admin", description = "Tenant yönetim işlemleri (Sadece PLATFORM_ADMIN)")
+@Tag(name = "Tenant Admin", description = "Tenant management operations (PLATFORM_ADMIN only)")
 public class TenantAdminController {
 
   private final TenantSystemService tenantService;
