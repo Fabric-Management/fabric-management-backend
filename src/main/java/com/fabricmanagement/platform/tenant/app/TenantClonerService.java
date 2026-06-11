@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tenant.app;
 
+import com.fabricmanagement.common.infrastructure.bootstrap.DemoTransactionSeeder;
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.platform.tenant.domain.Tenant;
 import com.fabricmanagement.platform.tenant.domain.TenantType;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 public class TenantClonerService {
 
   private final SystemTransactionExecutor systemTransactionExecutor;
+  private final DemoTransactionSeeder demoTransactionSeeder;
 
   /**
    * Find the TEMPLATE tenant ID. Returns null if no template tenant exists.
@@ -81,270 +83,375 @@ public class TenantClonerService {
         });
   }
 
-  public Tenant cloneTemplateToPlayground() {
-    log.info("Starting template clone process for new playground tenant (JDBC BYPASSRLS).");
+  /**
+   * Clone production reference data (categories, ISO codes, certifications, attributes) from the
+   * golden-template to a target tenant.
+   *
+   * <p>Idempotent: skips tables that already have rows in the target tenant. Uses BYPASSRLS.
+   *
+   * @param targetTenantId the tenant to copy reference data into
+   * @return number of tables cloned
+   */
+  public int cloneReferenceDataToTenant(UUID targetTenantId) {
+    UUID goldenTemplateId = findTemplateTenantId();
+    if (goldenTemplateId == null) {
+      log.warn("Golden Template not found — cannot clone reference data.");
+      return 0;
+    }
 
     return systemTransactionExecutor.executeInTransaction(
         jdbc -> {
-          // 1. Find the TEMPLATE tenant ID (nexus-fabrics for playgrounds)
-          var results =
-              jdbc.queryForList(
-                  "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
-                  UUID.class);
-          UUID templateTenantId = results.isEmpty() ? null : results.getFirst();
+          int tablesCloned = 0;
 
-          if (templateTenantId == null) {
-            throw new IllegalStateException("No PLAYGROUND TEMPLATE tenant found for cloning.");
-          }
+          tablesCloned +=
+              cloneIfEmpty(
+                  jdbc,
+                  "production.prod_fiber_category",
+                  "uid, category_code, category_name, description, is_active",
+                  goldenTemplateId,
+                  targetTenantId);
+          tablesCloned +=
+              cloneIfEmpty(
+                  jdbc,
+                  "production.prod_fiber_certification",
+                  "uid, certification_code, certification_name, certifying_body, description, is_active",
+                  goldenTemplateId,
+                  targetTenantId);
+          tablesCloned +=
+              cloneIfEmpty(
+                  jdbc,
+                  "production.prod_fiber_iso_code",
+                  "uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active",
+                  goldenTemplateId,
+                  targetTenantId);
+          tablesCloned +=
+              cloneIfEmpty(
+                  jdbc,
+                  "production.prod_product_attribute",
+                  "uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active",
+                  goldenTemplateId,
+                  targetTenantId);
+          tablesCloned +=
+              cloneIfEmpty(
+                  jdbc,
+                  "production.prod_yarn_category",
+                  "uid, category_code, category_name, description, is_active",
+                  goldenTemplateId,
+                  targetTenantId);
+          tablesCloned +=
+              cloneIfEmpty(
+                  jdbc,
+                  "production.prod_yarn_attribute",
+                  "uid, attribute_code, attribute_name, attribute_type, unit, description, is_active",
+                  goldenTemplateId,
+                  targetTenantId);
+          tablesCloned +=
+              cloneIfEmpty(
+                  jdbc,
+                  "production.prod_yarn_certification",
+                  "uid, certification_code, certification_name, certifying_body, description, is_active",
+                  goldenTemplateId,
+                  targetTenantId);
 
-          // 2. Create the new PLAYGROUND tenant
-          String playgroundSuffix = UUID.randomUUID().toString().substring(0, 8);
-          UUID newTenantId = UUID.randomUUID();
-          String uid = "PG-" + playgroundSuffix;
-          String slug = "playground-" + playgroundSuffix;
-          String name = "Playground " + playgroundSuffix;
-
-          jdbc.update(
-              "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, status, settings, is_active, created_at, updated_at, version) "
-                  + "VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb, true, now(), now(), 0)",
-              newTenantId,
-              uid,
-              slug,
-              name,
-              TenantType.PLAYGROUND.name(),
-              "ACTIVE");
-
-          log.info("Created new PLAYGROUND tenant: {}", newTenantId);
-
-          // 3. Clone Hierarchical Data (Requires mapping old UUIDs to new UUIDs)
-
-          // 3.1 Organization
-          Map<UUID, UUID> orgMap = new HashMap<>();
-          jdbc.query(
-              "SELECT id, name, organization_type, tax_id, description FROM common_company.common_organization WHERE tenant_id = ? AND is_active = true",
-              rs -> {
-                UUID oldId = (UUID) rs.getObject("id");
-                UUID newId = UUID.randomUUID();
-                jdbc.update(
-                    "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, organization_type, tax_id, description, is_active, created_at, updated_at, version) "
-                        + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, true, now(), now(), 0)",
-                    newId,
-                    newTenantId,
-                    rs.getString("name"),
-                    rs.getString("organization_type"),
-                    rs.getString("tax_id"),
-                    rs.getString("description"));
-                orgMap.put(oldId, newId);
-              },
-              templateTenantId);
-
-          // 3.2 Department
-          Map<UUID, UUID> deptMap = new HashMap<>();
-          jdbc.query(
-              "SELECT id, organization_id, department_name, department_code, description, is_system_department, department_group, display_order FROM common_company.common_department WHERE tenant_id = ? AND is_active = true",
-              rs -> {
-                UUID oldId = (UUID) rs.getObject("id");
-                UUID newId = UUID.randomUUID();
-                UUID oldOrgId = (UUID) rs.getObject("organization_id");
-                jdbc.update(
-                    "INSERT INTO common_company.common_department (id, tenant_id, uid, organization_id, department_name, department_code, description, is_system_department, department_group, display_order, is_active, created_at, updated_at, version) "
-                        + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, ?, ?, true, now(), now(), 0)",
-                    newId,
-                    newTenantId,
-                    orgMap.get(oldOrgId),
-                    rs.getString("department_name"),
-                    rs.getString("department_code"),
-                    rs.getString("description"),
-                    rs.getBoolean("is_system_department"),
-                    rs.getString("department_group"),
-                    rs.getInt("display_order"));
-                deptMap.put(oldId, newId);
-              },
-              templateTenantId);
-
-          // 3.3 Role
-          Map<UUID, UUID> roleMap = new HashMap<>();
-          jdbc.query(
-              "SELECT id, role_name, role_code, description, role_scope FROM common_user.common_role WHERE tenant_id = ? AND is_active = true",
-              rs -> {
-                UUID oldId = (UUID) rs.getObject("id");
-                UUID newId = UUID.randomUUID();
-                jdbc.update(
-                    "INSERT INTO common_user.common_role (id, tenant_id, uid, role_name, role_code, description, role_scope, is_active, created_at, updated_at, version) "
-                        + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, true, now(), now(), 0)",
-                    newId,
-                    newTenantId,
-                    rs.getString("role_name"),
-                    rs.getString("role_code"),
-                    rs.getString("description"),
-                    rs.getString("role_scope"));
-                roleMap.put(oldId, newId);
-              },
-              templateTenantId);
-
-          // 3.4 User
-          Map<UUID, UUID> userMap = new HashMap<>();
-          jdbc.query(
-              "SELECT id, organization_id, role_id, first_name, last_name, user_type FROM common_user.common_user WHERE tenant_id = ?",
-              rs -> {
-                UUID oldId = (UUID) rs.getObject("id");
-                UUID newId = UUID.randomUUID();
-                UUID oldOrgId = (UUID) rs.getObject("organization_id");
-                UUID oldRoleId = (UUID) rs.getObject("role_id");
-                jdbc.update(
-                    "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) "
-                        + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, true, now(), now(), 0)",
-                    newId,
-                    newTenantId,
-                    oldOrgId != null ? orgMap.get(oldOrgId) : null,
-                    oldRoleId != null ? roleMap.get(oldRoleId) : null,
-                    rs.getString("first_name"),
-                    rs.getString("last_name"),
-                    rs.getString("user_type"));
-                userMap.put(oldId, newId);
-              },
-              templateTenantId);
-
-          // 3.5 User Department
-          jdbc.query(
-              "SELECT user_id, department_id, is_primary FROM common_user.common_user_department WHERE tenant_id = ?",
-              rs -> {
-                UUID oldUserId = (UUID) rs.getObject("user_id");
-                UUID oldDeptId = (UUID) rs.getObject("department_id");
-                jdbc.update(
-                    "INSERT INTO common_user.common_user_department (tenant_id, user_id, department_id, is_primary, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, now(), now())",
-                    newTenantId,
-                    userMap.get(oldUserId),
-                    deptMap.get(oldDeptId),
-                    rs.getBoolean("is_primary"));
-              },
-              templateTenantId);
-
-          // 3.6 Contact
-          Map<UUID, UUID> contactMap = new HashMap<>();
-          jdbc.query(
-              "SELECT id, contact_value, contact_type, is_verified, label, is_personal FROM common_communication.common_contact WHERE tenant_id = ?",
-              rs -> {
-                UUID oldId = (UUID) rs.getObject("id");
-                UUID newId = UUID.randomUUID();
-                jdbc.update(
-                    "INSERT INTO common_communication.common_contact (id, tenant_id, uid, contact_value, contact_type, is_verified, label, is_personal, created_at, updated_at, version) "
-                        + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, now(), now(), 0)",
-                    newId,
-                    newTenantId,
-                    rs.getString("contact_value"),
-                    rs.getString("contact_type"),
-                    rs.getBoolean("is_verified"),
-                    rs.getString("label"),
-                    rs.getBoolean("is_personal"));
-                contactMap.put(oldId, newId);
-              },
-              templateTenantId);
-
-          // 3.7 User Contact
-          jdbc.query(
-              "SELECT user_id, contact_id, is_default FROM common_user.common_user_contact WHERE tenant_id = ?",
-              rs -> {
-                UUID oldUserId = (UUID) rs.getObject("user_id");
-                UUID oldContactId = (UUID) rs.getObject("contact_id");
-                jdbc.update(
-                    "INSERT INTO common_user.common_user_contact (tenant_id, user_id, contact_id, uid, is_default, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, gen_random_uuid()::varchar, ?, now(), now())",
-                    newTenantId,
-                    userMap.get(oldUserId),
-                    contactMap.get(oldContactId),
-                    rs.getBoolean("is_default"));
-              },
-              templateTenantId);
-
-          // 4. Clone Reference Data Tables (No internal hierarchical dependencies)
-
-          // 5. PRODUCTION MASTERDATA
-          cloneTableWithoutFKs(
-              jdbc,
-              "production.prod_fiber_category",
-              "uid, category_code, category_name, description, is_active",
-              templateTenantId,
-              newTenantId);
-          cloneTableWithoutFKs(
-              jdbc,
-              "production.prod_fiber_certification",
-              "uid, certification_code, certification_name, certifying_body, description, is_active",
-              templateTenantId,
-              newTenantId);
-          cloneTableWithoutFKs(
-              jdbc,
-              "production.prod_yarn_category",
-              "uid, category_code, category_name, description, is_active",
-              templateTenantId,
-              newTenantId);
-          cloneTableWithoutFKs(
-              jdbc,
-              "production.prod_yarn_attribute",
-              "uid, attribute_code, attribute_name, attribute_type, unit, description, is_active",
-              templateTenantId,
-              newTenantId);
-          cloneTableWithoutFKs(
-              jdbc,
-              "production.prod_yarn_certification",
-              "uid, certification_code, certification_name, certifying_body, description, is_active",
-              templateTenantId,
-              newTenantId);
-          cloneTableWithoutFKs(
-              jdbc,
-              "production.prod_product_attribute",
-              "uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active",
-              templateTenantId,
-              newTenantId);
-
-          cloneTableWithoutFKs(
-              jdbc,
-              "production.prod_fiber_iso_code",
-              "uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active",
-              templateTenantId,
-              newTenantId);
-
-          // hr_policy_pack has parent_pack_id FK, need special handling!
-          cloneHrPolicyPacks(jdbc, templateTenantId, newTenantId);
-
-          cloneTableWithoutFKs(
-              jdbc,
-              "notification.notification_template",
-              "uid, event_type, channel, title_key, body_key, importance, delivery_type, grouping_window_minutes, is_active",
-              templateTenantId,
-              newTenantId);
-
-          // i18n
-          cloneTableWithoutFKs(
-              jdbc,
-              "i18n.supported_locale",
-              "uid, code, name, is_rtl, is_active",
-              templateTenantId,
-              newTenantId);
-          cloneI18nKeysAndValues(jdbc, templateTenantId, newTenantId);
-
-          cloneTableWithoutFKs(
-              jdbc,
-              "costing.cost_item",
-              "uid, code, name, description, scope, module_type, calculation_base, display_order, is_active",
-              templateTenantId,
-              newTenantId);
-          cloneTableWithoutFKs(
-              jdbc,
-              "common_communication.common_routing_config",
-              "uid, country_code, primary_channel, fallback_channel, timeout_seconds, is_active",
-              templateTenantId,
-              newTenantId);
-
-          log.info("Cloning completed for playground tenant: {}", newTenantId);
-
-          // We can't return the full JPA entity. The caller usually just needs the ID or simple
-          // info.
-          Tenant tenant = Tenant.create(name, uid, slug, null, TenantType.PLAYGROUND);
-          tenant.setId(newTenantId);
-          return tenant;
+          return tablesCloned;
         });
+  }
+
+  /**
+   * Clone a table only if the target tenant has no rows yet (idempotent). Returns 1 if cloned, 0 if
+   * skipped.
+   */
+  private int cloneIfEmpty(
+      org.springframework.jdbc.core.JdbcTemplate jdbc,
+      String tableName,
+      String columns,
+      UUID sourceId,
+      UUID targetId) {
+    Integer existing =
+        jdbc.queryForObject(
+            String.format("SELECT COUNT(*) FROM %s WHERE tenant_id = ?", tableName),
+            Integer.class,
+            targetId);
+    if (existing != null && existing > 0) {
+      log.debug("Skipping {} — target already has {} rows.", tableName, existing);
+      return 0;
+    }
+    cloneTableWithoutFKs(jdbc, tableName, columns, sourceId, targetId);
+    log.info("Cloned reference data: {} (source={}, target={})", tableName, sourceId, targetId);
+    return 1;
+  }
+
+  public Tenant cloneTemplateToPlayground() {
+    log.info("Starting template clone process for new playground tenant (JDBC BYPASSRLS).");
+
+    Tenant clonedTenant =
+        systemTransactionExecutor.executeInTransaction(
+            jdbc -> {
+              // 1. Find the PLAYGROUND SOURCE tenant (demo company nexus-fabrics,
+              //    itself provisioned from golden-template)
+              var results =
+                  jdbc.queryForList(
+                      "SELECT id FROM common_tenant.common_tenant WHERE slug = 'nexus-fabrics' LIMIT 1",
+                      UUID.class);
+              UUID templateTenantId = results.isEmpty() ? null : results.getFirst();
+
+              if (templateTenantId == null) {
+                throw new IllegalStateException("No PLAYGROUND TEMPLATE tenant found for cloning.");
+              }
+
+              // 2. Create the new PLAYGROUND tenant
+              String playgroundSuffix = UUID.randomUUID().toString().substring(0, 8);
+              UUID newTenantId = UUID.randomUUID();
+              String uid = "PG-" + playgroundSuffix;
+              String slug = "playground-" + playgroundSuffix;
+              String name = "Playground " + playgroundSuffix;
+
+              jdbc.update(
+                  "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, status, settings, is_active, created_at, updated_at, version) "
+                      + "VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb, true, now(), now(), 0)",
+                  newTenantId,
+                  uid,
+                  slug,
+                  name,
+                  TenantType.PLAYGROUND.name(),
+                  "ACTIVE");
+
+              log.info("Created new PLAYGROUND tenant: {}", newTenantId);
+
+              // 3. Clone Hierarchical Data (Requires mapping old UUIDs to new UUIDs)
+
+              // 3.1 Organization
+              Map<UUID, UUID> orgMap = new HashMap<>();
+              jdbc.query(
+                  "SELECT id, name, organization_type, tax_id, description FROM common_company.common_organization WHERE tenant_id = ? AND is_active = true",
+                  rs -> {
+                    UUID oldId = (UUID) rs.getObject("id");
+                    UUID newId = UUID.randomUUID();
+                    jdbc.update(
+                        "INSERT INTO common_company.common_organization (id, tenant_id, uid, name, organization_type, tax_id, description, is_active, created_at, updated_at, version) "
+                            + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, true, now(), now(), 0)",
+                        newId,
+                        newTenantId,
+                        rs.getString("name"),
+                        rs.getString("organization_type"),
+                        rs.getString("tax_id"),
+                        rs.getString("description"));
+                    orgMap.put(oldId, newId);
+                  },
+                  templateTenantId);
+
+              // 3.2 Department
+              Map<UUID, UUID> deptMap = new HashMap<>();
+              jdbc.query(
+                  "SELECT id, organization_id, department_name, department_code, description, is_system_department, department_group, display_order FROM common_company.common_department WHERE tenant_id = ? AND is_active = true",
+                  rs -> {
+                    UUID oldId = (UUID) rs.getObject("id");
+                    UUID newId = UUID.randomUUID();
+                    UUID oldOrgId = (UUID) rs.getObject("organization_id");
+                    jdbc.update(
+                        "INSERT INTO common_company.common_department (id, tenant_id, uid, organization_id, department_name, department_code, description, is_system_department, department_group, display_order, is_active, created_at, updated_at, version) "
+                            + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, ?, ?, true, now(), now(), 0)",
+                        newId,
+                        newTenantId,
+                        orgMap.get(oldOrgId),
+                        rs.getString("department_name"),
+                        rs.getString("department_code"),
+                        rs.getString("description"),
+                        rs.getBoolean("is_system_department"),
+                        rs.getString("department_group"),
+                        rs.getInt("display_order"));
+                    deptMap.put(oldId, newId);
+                  },
+                  templateTenantId);
+
+              // 3.3 Role
+              Map<UUID, UUID> roleMap = new HashMap<>();
+              jdbc.query(
+                  "SELECT id, role_name, role_code, description, role_scope FROM common_user.common_role WHERE tenant_id = ? AND is_active = true",
+                  rs -> {
+                    UUID oldId = (UUID) rs.getObject("id");
+                    UUID newId = UUID.randomUUID();
+                    jdbc.update(
+                        "INSERT INTO common_user.common_role (id, tenant_id, uid, role_name, role_code, description, role_scope, is_active, created_at, updated_at, version) "
+                            + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, true, now(), now(), 0)",
+                        newId,
+                        newTenantId,
+                        rs.getString("role_name"),
+                        rs.getString("role_code"),
+                        rs.getString("description"),
+                        rs.getString("role_scope"));
+                    roleMap.put(oldId, newId);
+                  },
+                  templateTenantId);
+
+              // 3.4 User
+              Map<UUID, UUID> userMap = new HashMap<>();
+              jdbc.query(
+                  "SELECT id, organization_id, role_id, first_name, last_name, user_type FROM common_user.common_user WHERE tenant_id = ?",
+                  rs -> {
+                    UUID oldId = (UUID) rs.getObject("id");
+                    UUID newId = UUID.randomUUID();
+                    UUID oldOrgId = (UUID) rs.getObject("organization_id");
+                    UUID oldRoleId = (UUID) rs.getObject("role_id");
+                    jdbc.update(
+                        "INSERT INTO common_user.common_user (id, tenant_id, uid, organization_id, role_id, first_name, last_name, user_type, is_active, created_at, updated_at, version) "
+                            + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, true, now(), now(), 0)",
+                        newId,
+                        newTenantId,
+                        oldOrgId != null ? orgMap.get(oldOrgId) : null,
+                        oldRoleId != null ? roleMap.get(oldRoleId) : null,
+                        rs.getString("first_name"),
+                        rs.getString("last_name"),
+                        rs.getString("user_type"));
+                    userMap.put(oldId, newId);
+                  },
+                  templateTenantId);
+
+              // 3.5 User Department
+              jdbc.query(
+                  "SELECT user_id, department_id, is_primary FROM common_user.common_user_department WHERE tenant_id = ?",
+                  rs -> {
+                    UUID oldUserId = (UUID) rs.getObject("user_id");
+                    UUID oldDeptId = (UUID) rs.getObject("department_id");
+                    jdbc.update(
+                        "INSERT INTO common_user.common_user_department (tenant_id, user_id, department_id, is_primary, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, now(), now())",
+                        newTenantId,
+                        userMap.get(oldUserId),
+                        deptMap.get(oldDeptId),
+                        rs.getBoolean("is_primary"));
+                  },
+                  templateTenantId);
+
+              // 3.6 Contact
+              Map<UUID, UUID> contactMap = new HashMap<>();
+              jdbc.query(
+                  "SELECT id, contact_value, contact_type, is_verified, label, is_personal FROM common_communication.common_contact WHERE tenant_id = ?",
+                  rs -> {
+                    UUID oldId = (UUID) rs.getObject("id");
+                    UUID newId = UUID.randomUUID();
+                    jdbc.update(
+                        "INSERT INTO common_communication.common_contact (id, tenant_id, uid, contact_value, contact_type, is_verified, label, is_personal, created_at, updated_at, version) "
+                            + "VALUES (?, ?, gen_random_uuid()::varchar, ?, ?, ?, ?, ?, now(), now(), 0)",
+                        newId,
+                        newTenantId,
+                        rs.getString("contact_value"),
+                        rs.getString("contact_type"),
+                        rs.getBoolean("is_verified"),
+                        rs.getString("label"),
+                        rs.getBoolean("is_personal"));
+                    contactMap.put(oldId, newId);
+                  },
+                  templateTenantId);
+
+              // 3.7 User Contact
+              jdbc.query(
+                  "SELECT user_id, contact_id, is_default FROM common_user.common_user_contact WHERE tenant_id = ?",
+                  rs -> {
+                    UUID oldUserId = (UUID) rs.getObject("user_id");
+                    UUID oldContactId = (UUID) rs.getObject("contact_id");
+                    jdbc.update(
+                        "INSERT INTO common_user.common_user_contact (tenant_id, user_id, contact_id, uid, is_default, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, gen_random_uuid()::varchar, ?, now(), now())",
+                        newTenantId,
+                        userMap.get(oldUserId),
+                        contactMap.get(oldContactId),
+                        rs.getBoolean("is_default"));
+                  },
+                  templateTenantId);
+
+              // 4. Clone Reference Data Tables (No internal hierarchical dependencies)
+
+              // 5. PRODUCTION MASTERDATA
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "production.prod_fiber_category",
+                  "uid, category_code, category_name, description, is_active",
+                  templateTenantId,
+                  newTenantId);
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "production.prod_fiber_certification",
+                  "uid, certification_code, certification_name, certifying_body, description, is_active",
+                  templateTenantId,
+                  newTenantId);
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "production.prod_yarn_category",
+                  "uid, category_code, category_name, description, is_active",
+                  templateTenantId,
+                  newTenantId);
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "production.prod_yarn_attribute",
+                  "uid, attribute_code, attribute_name, attribute_type, unit, description, is_active",
+                  templateTenantId,
+                  newTenantId);
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "production.prod_yarn_certification",
+                  "uid, certification_code, certification_name, certifying_body, description, is_active",
+                  templateTenantId,
+                  newTenantId);
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "production.prod_product_attribute",
+                  "uid, attribute_code, attribute_name, attribute_group, description, display_order, product_scope, is_active",
+                  templateTenantId,
+                  newTenantId);
+
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "production.prod_fiber_iso_code",
+                  "uid, iso_code, fiber_name, fiber_type, description, is_official_iso, display_order, is_active",
+                  templateTenantId,
+                  newTenantId);
+
+              // hr_policy_pack has parent_pack_id FK, need special handling!
+              cloneHrPolicyPacks(jdbc, templateTenantId, newTenantId);
+
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "notification.notification_template",
+                  "uid, event_type, channel, title_key, body_key, importance, delivery_type, grouping_window_minutes, is_active",
+                  templateTenantId,
+                  newTenantId);
+
+              // i18n
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "i18n.supported_locale",
+                  "uid, code, name, is_rtl, is_active",
+                  templateTenantId,
+                  newTenantId);
+              cloneI18nKeysAndValues(jdbc, templateTenantId, newTenantId);
+
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "costing.cost_item",
+                  "uid, code, name, description, scope, module_type, calculation_base, display_order, is_active",
+                  templateTenantId,
+                  newTenantId);
+              cloneTableWithoutFKs(
+                  jdbc,
+                  "common_communication.common_routing_config",
+                  "uid, country_code, primary_channel, fallback_channel, timeout_seconds, is_active",
+                  templateTenantId,
+                  newTenantId);
+
+              log.info("Cloning completed for playground tenant: {}", newTenantId);
+
+              // We can't return the full JPA entity. The caller usually just needs the ID or simple
+              // info.
+              Tenant tenant = Tenant.create(name, uid, slug, null, TenantType.PLAYGROUND);
+              tenant.setId(newTenantId);
+              return tenant;
+            });
+
+    // Execute Seeder AFTER tenant is fully committed to DB
+    demoTransactionSeeder.seedFor(clonedTenant.getId());
+
+    return clonedTenant;
   }
 
   private void cloneTableWithoutFKs(

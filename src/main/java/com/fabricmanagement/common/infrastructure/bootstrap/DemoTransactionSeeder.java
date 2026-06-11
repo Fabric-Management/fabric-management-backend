@@ -1,0 +1,177 @@
+package com.fabricmanagement.common.infrastructure.bootstrap;
+
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
+import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
+import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
+import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.production.execution.batch.app.BatchService;
+import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
+import com.fabricmanagement.production.execution.batch.dto.CreateBatchRequest;
+import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
+import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.production.execution.workorder.dto.CreateWorkOrderRequest;
+import com.fabricmanagement.production.masterdata.product.domain.Product;
+import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
+import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
+import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service to seed a deterministic, demo-ready transactional dataset for a tenant. Uses shared
+ * template fibers to create sales orders, work orders, and batches. Fully idempotent and
+ * tenant-parametric.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class DemoTransactionSeeder {
+
+  private final TradingPartnerService tradingPartnerService;
+  private final ProductRepository productRepository;
+  private final SalesOrderService salesOrderService;
+  private final WorkOrderService workOrderService;
+  private final BatchService batchService;
+
+  @Value("${app.seed.demo-transactions.enabled:false}")
+  private boolean enabled;
+
+  private static final String DEMO_CUSTOMER_NAME = "Global Fashion Wear Corp.";
+  private static final String DEMO_SO_REFERENCE = "PO-DEMO-2026-001";
+  private static final String DEMO_WO_NOTES = "Expedite for new collection";
+
+  /**
+   * Seeds demo transactions for the specified tenant.
+   *
+   * @param tenantId The UUID of the tenant to seed
+   */
+  public void seedFor(UUID tenantId) {
+    if (!enabled) {
+      log.info("Demo transactions seeding is disabled via properties.");
+      return;
+    }
+
+    // Capture previous context to restore safely if called in middle of another process
+    UUID previousTenantId = null;
+    try {
+      previousTenantId = TenantContext.getCurrentTenantIdOrNull();
+    } catch (Exception e) {
+      // Ignored if tenant id not set
+    }
+
+    TenantContext.setCurrentTenantId(tenantId);
+    try {
+      // 1. Idempotency Check
+      List<TradingPartnerDto> existing =
+          tradingPartnerService.searchByName(tenantId, DEMO_CUSTOMER_NAME);
+      if (!existing.isEmpty()) {
+        log.info("Demo transactions already exist for tenant: {}. Skipping.", tenantId);
+        return;
+      }
+
+      log.info("Provisioning demo transactions for tenant: {}", tenantId);
+
+      // 2. Create Demo Customer
+      CreateTradingPartnerRequest partnerReq = new CreateTradingPartnerRequest();
+      partnerReq.setCompanyName(DEMO_CUSTOMER_NAME);
+      partnerReq.setCustomName(DEMO_CUSTOMER_NAME);
+      partnerReq.setTaxId("TR-GFW-990001");
+      partnerReq.setPartnerType(PartnerType.CUSTOMER);
+      partnerReq.setCountry("USA");
+      TradingPartnerDto customer = tradingPartnerService.createPartner(partnerReq);
+
+      // 3. Find Shared Template Fibers (must use TEMPLATE tenant, not current tenant)
+      List<Product> fibers =
+          productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(
+              TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
+
+      if (fibers.isEmpty()) {
+        log.warn(
+            "No template fibers found. Cannot seed demo transactions for tenant: {}", tenantId);
+        return;
+      }
+
+      Product fiber1 = fibers.get(0);
+      Product fiber2 = fibers.size() > 1 ? fibers.get(1) : fiber1;
+
+      // 4. Create Sales Order
+      CreateSalesOrderRequest orderReq = new CreateSalesOrderRequest();
+      orderReq.setPartnerId(customer.getId());
+      orderReq.setCustomerReference(DEMO_SO_REFERENCE);
+      orderReq.setOrderDate(LocalDate.now());
+      orderReq.setCurrency("USD");
+      orderReq.setNotes("Demo Sales Order for initial evaluation");
+
+      SalesOrderLineRequest line1 =
+          SalesOrderLineRequest.builder()
+              .productId(fiber1.getId())
+              .requestedQty(new BigDecimal("1500.00"))
+              .unit("KG")
+              .unitPrice(new BigDecimal("12.50"))
+              .currency("USD")
+              .build();
+
+      SalesOrderLineRequest line2 =
+          SalesOrderLineRequest.builder()
+              .productId(fiber2.getId())
+              .requestedQty(new BigDecimal("2000.00"))
+              .unit("KG")
+              .unitPrice(new BigDecimal("14.00"))
+              .currency("USD")
+              .build();
+
+      orderReq.setLines(List.of(line1, line2));
+      SalesOrderDto salesOrder = salesOrderService.createOrder(orderReq);
+      UUID firstLineId = salesOrder.getLines().get(0).getId();
+
+      // 5. Create Work Order (Fulfilling Line 1)
+      CreateWorkOrderRequest woReq =
+          CreateWorkOrderRequest.builder()
+              .outputProductId(fiber1.getId())
+              .moduleType(WorkOrderModuleType.SPINNING)
+              .salesOrderLineId(firstLineId)
+              .plannedQty(new BigDecimal("1550.00"))
+              .unit("KG")
+              .deadline(LocalDate.now().plusDays(15))
+              .notes(DEMO_WO_NOTES)
+              .build();
+      var workOrder = workOrderService.createWorkOrder(woReq);
+
+      // 6. Create Production Batch (Linked to Work Order)
+      CreateBatchRequest batchReq =
+          CreateBatchRequest.builder()
+              .productId(fiber1.getId())
+              .productType(ProductType.FIBER)
+              .batchCode("B-DEMO-" + LocalDate.now().getYear() + "-001")
+              .quantity(new BigDecimal("500.00"))
+              .unit("KG")
+              .sourceType(BatchSourceType.INTERNAL_PRODUCTION)
+              .sourceId(workOrder.id())
+              .remarks("Demo Initial Batch")
+              .build();
+      batchService.create(batchReq);
+
+      log.info("Successfully provisioned demo transactions for tenant: {}", tenantId);
+
+    } catch (Exception e) {
+      log.error("Failed to seed demo transactions for tenant: {}", tenantId, e);
+      throw new RuntimeException("Failed to seed demo transactions", e);
+    } finally {
+      if (previousTenantId != null) {
+        TenantContext.setCurrentTenantId(previousTenantId);
+      } else {
+        TenantContext.clear();
+      }
+    }
+  }
+}

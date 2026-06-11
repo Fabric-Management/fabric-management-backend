@@ -109,6 +109,10 @@ application:
   frontend:
     base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
+  seed:
+    demo-transactions:
+      enabled: true
+
   # Google Maps Platform Configuration
   google:
     maps:
