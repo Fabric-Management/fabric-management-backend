@@ -85,7 +85,7 @@ public class DemoTransactionSeeder {
       CreateTradingPartnerRequest partnerReq = new CreateTradingPartnerRequest();
       partnerReq.setCompanyName(DEMO_CUSTOMER_NAME);
       partnerReq.setCustomName(DEMO_CUSTOMER_NAME);
-      partnerReq.setTaxId("TR-GFW-990001");
+      partnerReq.setTaxId("US-GFW-990001");
       partnerReq.setPartnerType(PartnerType.CUSTOMER);
       partnerReq.setCountry("USA");
       TradingPartnerDto customer = tradingPartnerService.createPartner(partnerReq);
