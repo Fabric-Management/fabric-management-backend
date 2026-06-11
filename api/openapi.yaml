@@ -46141,6 +46141,8 @@ components:
     FiberDto:
       type: object
       properties:
+        category:
+          $ref: "#/components/schemas/FiberCategoryDto"
         composition:
           type: object
           additionalProperties:

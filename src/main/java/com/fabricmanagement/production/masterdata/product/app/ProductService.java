@@ -36,7 +36,7 @@ public class ProductService implements ProductFacade {
 
   private final ProductRepository productRepository;
   private final ProductAttributeRepository productAttributeRepository;
-  private final FiberFacade fiberFacade;
+  private final @org.springframework.context.annotation.Lazy FiberFacade fiberFacade;
   private final DomainEventPublisher eventPublisher;
 
   /** Create product (internal method). */
@@ -64,7 +64,7 @@ public class ProductService implements ProductFacade {
     log.debug("Finding product: tenantId={}, id={}", tenantId, id);
 
     return productRepository
-        .findByTenantIdAndId(tenantId, id)
+        .findByTenantIdInAndId(tenantScope(tenantId), id)
         .map(ProductDto::from)
         .map(
             p -> {
@@ -79,7 +79,7 @@ public class ProductService implements ProductFacade {
     log.debug("Finding all products: tenantId={}", tenantId);
 
     List<ProductDto> products =
-        productRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+        productRepository.findByTenantIdInAndIsActiveTrue(tenantScope(tenantId)).stream()
             .map(ProductDto::from)
             .collect(Collectors.toList());
     return enrichDisplayNames(products);
@@ -91,7 +91,9 @@ public class ProductService implements ProductFacade {
     log.debug("Finding products by type: tenantId={}, type={}", tenantId, type);
 
     List<ProductDto> products =
-        productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(tenantId, type).stream()
+        productRepository
+            .findByTenantIdInAndProductTypeAndIsActiveTrue(tenantScope(tenantId), type)
+            .stream()
             .map(ProductDto::from)
             .collect(Collectors.toList());
     return enrichDisplayNames(products);
@@ -173,5 +175,16 @@ public class ProductService implements ProductFacade {
     return productAttributeRepository.findByIsActiveTrue().stream()
         .map(ProductAttributeDto::from)
         .toList();
+  }
+
+  /**
+   * Returns the tenant scope for read queries: current tenant + template tenant.
+   *
+   * <p>This ensures tenant users see both their own products and the platform seed products.
+   */
+  private List<UUID> tenantScope(UUID tenantId) {
+    return List.of(
+        tenantId,
+        com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID);
   }
 }
