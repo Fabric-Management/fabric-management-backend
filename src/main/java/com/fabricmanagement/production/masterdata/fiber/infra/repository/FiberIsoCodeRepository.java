@@ -12,6 +12,9 @@ public interface FiberIsoCodeRepository extends JpaRepository<FiberIsoCode, UUID
 
   List<FiberIsoCode> findByIsActiveTrue();
 
+  /** Tenant-scoped active ISO codes — prevents double rows when RLS carve-out is active. */
+  List<FiberIsoCode> findByTenantIdAndIsActiveTrue(UUID tenantId);
+
   /** Task F1: Only official ISO 2076 codes (52 records). Used when baseOnly=true. */
   List<FiberIsoCode> findByIsOfficialIsoTrueAndIsActiveTrue();
 

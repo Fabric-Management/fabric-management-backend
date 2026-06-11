@@ -24,6 +24,7 @@ public class FiberDto {
   private UUID productId;
   private UUID fiberCategoryId;
   private UUID fiberIsoCodeId;
+  private FiberCategoryDto category;
   private FiberIsoCodeDto isoCode;
   private String fiberName;
   private FiberStatus status;
@@ -48,6 +49,10 @@ public class FiberDto {
         .productId(entity.getProductId())
         .fiberCategoryId(entity.getFiberCategoryId())
         .fiberIsoCodeId(entity.getFiberIsoCodeId())
+        .category(
+            entity.getFiberCategory() != null
+                ? FiberCategoryDto.from(entity.getFiberCategory())
+                : null)
         .isoCode(
             entity.getFiberIsoCode() != null
                 ? FiberIsoCodeDto.from(entity.getFiberIsoCode())

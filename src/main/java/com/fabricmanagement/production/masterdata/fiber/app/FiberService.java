@@ -15,19 +15,13 @@ import com.fabricmanagement.production.masterdata.fiber.domain.exception.RecipeI
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberCategory;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberCatalogSummaryDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberCategoryDto;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberCertificationDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
-import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.production.masterdata.fiber.dto.UpdateFiberRequest;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCategoryRepository;
-import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberCertificationRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
-import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.Product;
-import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -55,8 +49,6 @@ public class FiberService implements FiberFacade {
   private final ProductRepository productRepository;
   private final FiberCategoryRepository fiberCategoryRepository;
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
-  private final ProductFacade productFacade;
-  private final FiberCertificationRepository fiberCertificationRepository;
   private final DomainEventPublisher eventPublisher;
   private final FiberValidationService validationService;
   private final BatchRepository batchRepository;
@@ -353,7 +345,7 @@ public class FiberService implements FiberFacade {
     UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting fiber: tenantId={}, id={}", tenantId, id);
 
-    return fiberRepository.findByTenantIdAndId(tenantId, id).map(FiberDto::from);
+    return fiberRepository.findByTenantIdInAndId(tenantScope(tenantId), id).map(FiberDto::from);
   }
 
   @Transactional(readOnly = true)
@@ -368,31 +360,11 @@ public class FiberService implements FiberFacade {
     UUID tenantId = TenantContext.requireTenantId();
     log.debug("Getting all fibers: tenantId={}", tenantId);
 
-    return fiberRepository.findByTenantIdAndIsActiveTrueOrderByFiberName(tenantId).stream()
+    return fiberRepository
+        .findByTenantIdInAndIsActiveTrueOrderByFiberName(tenantScope(tenantId))
+        .stream()
         .map(FiberDto::from)
         .toList();
-  }
-
-  /** Catalog summary: reference data + all fibers (tenant + platform seed) for one-shot UI load. */
-  @Transactional(readOnly = true)
-  public FiberCatalogSummaryDto getCatalogSummary() {
-    List<FiberCategoryDto> categories =
-        fiberCategoryRepository.findByIsActiveTrue().stream().map(FiberCategoryDto::from).toList();
-    List<FiberIsoCodeDto> isoCodes =
-        fiberIsoCodeRepository.findByIsActiveTrue().stream().map(FiberIsoCodeDto::from).toList();
-    List<ProductAttributeDto> attributes = productFacade.getAttributes("FIBER");
-    List<FiberCertificationDto> certifications =
-        fiberCertificationRepository.findByIsActiveTrue().stream()
-            .map(FiberCertificationDto::from)
-            .toList();
-    List<FiberDto> fibers = getAll();
-    return FiberCatalogSummaryDto.builder()
-        .categories(categories)
-        .isoCodes(isoCodes)
-        .attributes(attributes)
-        .certifications(certifications)
-        .fibers(fibers)
-        .build();
   }
 
   @Transactional(readOnly = true)
@@ -401,8 +373,8 @@ public class FiberService implements FiberFacade {
     log.debug("Searching fibers by name: tenantId={}, name={}", tenantId, fiberName);
 
     return fiberRepository
-        .findByTenantIdAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
-            tenantId, fiberName)
+        .findByTenantIdInAndIsActiveTrueAndFiberNameContainingIgnoreCaseOrderByFiberName(
+            tenantScope(tenantId), fiberName)
         .stream()
         .map(FiberDto::from)
         .toList();
@@ -441,8 +413,10 @@ public class FiberService implements FiberFacade {
 
     Fiber fiber =
         fiberRepository
-            .findByTenantIdAndId(tenantId, id)
+            .findByTenantIdInAndId(tenantScope(tenantId), id)
             .orElseThrow(() -> new FiberDomainException("Fiber not found", "FIBER_NOT_FOUND", 404));
+
+    rejectIfTemplateFiber(fiber);
 
     if (fiber.getStatus() == FiberStatus.OBSOLETE) {
       throw new FiberDomainException(
@@ -501,8 +475,10 @@ public class FiberService implements FiberFacade {
 
     Fiber fiber =
         fiberRepository
-            .findByTenantIdAndId(tenantId, id)
+            .findByTenantIdInAndId(tenantScope(tenantId), id)
             .orElseThrow(() -> new FiberDomainException("Fiber not found", "FIBER_NOT_FOUND", 404));
+
+    rejectIfTemplateFiber(fiber);
 
     if (batchRepository.existsByTenantIdAndProductIdAndStatusIn(
         tenantId, fiber.getProduct().getId(), BatchStatus.PRODUCTION_ACTIVE)) {
@@ -546,7 +522,7 @@ public class FiberService implements FiberFacade {
   @Transactional(readOnly = true)
   public boolean exists(UUID id) {
     UUID tenantId = TenantContext.requireTenantId();
-    return fiberRepository.findByTenantIdAndId(tenantId, id).isPresent();
+    return fiberRepository.findByTenantIdInAndId(tenantScope(tenantId), id).isPresent();
   }
 
   /**
@@ -721,5 +697,39 @@ public class FiberService implements FiberFacade {
     }
 
     return "XXX"; // Unknown fiber type
+  }
+
+  // =====================================================
+  // Template-tenant helpers
+  // =====================================================
+
+  /**
+   * Returns the tenant scope for read queries: current tenant + template tenant.
+   *
+   * <p>This ensures tenant users see both their own fibers and the platform seed fibers from the
+   * golden template tenant.
+   */
+  private List<UUID> tenantScope(UUID tenantId) {
+    return List.of(tenantId, TenantContext.TEMPLATE_TENANT_ID);
+  }
+
+  /**
+   * Guard: template-tenant fibers are read-only for non-template tenants.
+   *
+   * <p>Must be called in every mutating method (update, deactivate, status-change) after the fiber
+   * lookup. When the read path is widened to include template fibers, the UI will know their IDs
+   * and may send them to write endpoints — this guard prevents unauthorized mutations.
+   *
+   * @param fiber the fiber entity loaded from the database
+   * @throws ForbiddenOperationException if a non-template tenant attempts to mutate a template
+   *     fiber
+   */
+  private void rejectIfTemplateFiber(Fiber fiber) {
+    UUID currentTenant = TenantContext.requireTenantId();
+    if (TenantContext.TEMPLATE_TENANT_ID.equals(fiber.getTenantId())
+        && !TenantContext.TEMPLATE_TENANT_ID.equals(currentTenant)) {
+      throw new ForbiddenOperationException(
+          "Template fibers are read-only and cannot be modified by tenants.");
+    }
   }
 }

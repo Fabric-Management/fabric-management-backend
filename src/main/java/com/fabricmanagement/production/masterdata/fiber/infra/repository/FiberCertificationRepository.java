@@ -12,6 +12,9 @@ public interface FiberCertificationRepository extends JpaRepository<FiberCertifi
 
   List<FiberCertification> findByIsActiveTrue();
 
+  /** Tenant-scoped active certifications — prevents double rows when RLS carve-out is active. */
+  List<FiberCertification> findByTenantIdAndIsActiveTrue(UUID tenantId);
+
   List<FiberCertification> findAllByIdInAndIsActiveTrue(java.util.Collection<UUID> ids);
 
   /** Find certification by id only if it is active (used when adding to batch). */

@@ -148,8 +148,10 @@ public class ProductService implements ProductFacade {
 
     Product product =
         productRepository
-            .findByTenantIdAndId(tenantId, id)
+            .findByTenantIdInAndId(tenantScope(tenantId), id)
             .orElseThrow(() -> new NotFoundException("Product not found: " + id));
+
+    rejectIfTemplateProduct(product);
 
     product.delete();
     productRepository.save(product);
@@ -186,5 +188,23 @@ public class ProductService implements ProductFacade {
     return List.of(
         tenantId,
         com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID);
+  }
+
+  /**
+   * Guard: template-tenant products are read-only for non-template tenants.
+   *
+   * @param product the product entity loaded from the database
+   * @throws com.fabricmanagement.production.common.exception.ForbiddenOperationException if a
+   *     non-template tenant attempts to mutate a template product
+   */
+  private void rejectIfTemplateProduct(Product product) {
+    UUID currentTenant = TenantContext.requireTenantId();
+    if (com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID
+            .equals(product.getTenantId())
+        && !com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID
+            .equals(currentTenant)) {
+      throw new com.fabricmanagement.production.common.exception.ForbiddenOperationException(
+          "Template products are read-only and cannot be modified by tenants.");
+    }
   }
 }
