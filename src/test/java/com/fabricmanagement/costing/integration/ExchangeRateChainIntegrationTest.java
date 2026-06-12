@@ -32,11 +32,14 @@ import org.springframework.boot.test.mock.mockito.MockBean;
  */
 @DisplayName("Exchange Rate Provider Chain Integration")
 class ExchangeRateChainIntegrationTest
-    extends com.fabricmanagement.costing.integration.AbstractCostingIntegrationTest {
+    extends com.fabricmanagement.testsupport.AbstractIntegrationTest {
 
   @Autowired private ExchangeRateService exchangeRateService;
   @Autowired private ExchangeRateCacheRepository cacheRepo;
   @MockBean private TenantReportingCurrencyPort tenantReportingCurrencyPort;
+
+  // Mock ECB Provider (Order 1.5) so we don't do real HTTP requests
+  @MockBean private com.fabricmanagement.costing.infra.exchange.EcbExchangeRateProvider ecbProvider;
 
   // Mock TCMB Provider (Order 2) so we don't do real HTTP requests
   @MockBean private TcmbExchangeRateProvider tcmbProvider;
@@ -79,7 +82,8 @@ class ExchangeRateChainIntegrationTest
       assertThat(result).isPresent();
       assertThat(result.get()).isEqualByComparingTo(new BigDecimal("35.00"));
 
-      // Verify TCMB provider was never called because Manual returned a value
+      // Verify TCMB and ECB providers were never called because Manual returned a value
+      verify(ecbProvider, never()).getRate(any(), any(), any(), any());
       verify(tcmbProvider, never()).getRate(any(), any(), any(), any());
     }
 
@@ -88,6 +92,9 @@ class ExchangeRateChainIntegrationTest
     void noManual_tcmbIsCalled() {
       UUID tenantId = UUID.randomUUID();
       LocalDate today = LocalDate.now();
+
+      // Setup ECB Mock to return empty so it falls through to TCMB
+      when(ecbProvider.getRate(tenantId, "EUR", "TRY", today)).thenReturn(Optional.empty());
 
       // Setup TCMB Mock to return 36.50
       when(tcmbProvider.getRate(tenantId, "EUR", "TRY", today))

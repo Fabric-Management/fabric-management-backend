@@ -47,23 +47,36 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
   Page<Invoice> findAwaitingPayment(@Param("tenantId") UUID tenantId, Pageable pageable);
 
   @Query(
-      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.invoiceType = 'SALES' "
-          + "AND i.status NOT IN ('CANCELLED','VOIDED','DRAFT')")
-  Page<Invoice> findAccountsReceivable(@Param("tenantId") UUID tenantId, Pageable pageable);
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId "
+          + "AND (i.invoiceType IN :arTypes "
+          + "  OR (i.invoiceType = :cnType AND i.originalInvoiceId IN "
+          + "      (SELECT o.id FROM Invoice o WHERE o.invoiceType IN :arTypes))) "
+          + "AND i.status NOT IN :excludedStatuses")
+  Page<Invoice> findAccountsReceivable(
+      @Param("tenantId") UUID tenantId,
+      @Param("arTypes") List<InvoiceType> arTypes,
+      @Param("cnType") InvoiceType cnType,
+      @Param("excludedStatuses") List<InvoiceStatus> excludedStatuses,
+      Pageable pageable);
 
   @Query(
-      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.invoiceType = 'PURCHASE' "
-          + "AND i.status NOT IN ('CANCELLED','VOIDED','DRAFT')")
-  Page<Invoice> findAccountsPayable(@Param("tenantId") UUID tenantId, Pageable pageable);
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId "
+          + "AND (i.invoiceType = :apType "
+          + "  OR (i.invoiceType = :cnType AND i.originalInvoiceId IN "
+          + "      (SELECT o.id FROM Invoice o WHERE o.invoiceType = :apType))) "
+          + "AND i.status NOT IN :excludedStatuses")
+  Page<Invoice> findAccountsPayable(
+      @Param("tenantId") UUID tenantId,
+      @Param("apType") InvoiceType apType,
+      @Param("cnType") InvoiceType cnType,
+      @Param("excludedStatuses") List<InvoiceStatus> excludedStatuses,
+      Pageable pageable);
 
   @Query(
       "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.paymentStatus != 'PAID' "
           + "AND i.status NOT IN ('CANCELLED','VOIDED','DRAFT') AND i.dueDate < :today")
   List<Invoice> findInvoicesEligibleForOverdue(
       @Param("tenantId") UUID tenantId, @Param("today") LocalDate today);
-
-  @Query(value = "SELECT nextval('finance.invoice_number_seq')", nativeQuery = true)
-  Long getNextInvoiceSequence();
 
   boolean existsByTenantIdAndInvoiceNumber(UUID tenantId, String invoiceNumber);
 }

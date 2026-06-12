@@ -16276,6 +16276,223 @@ paths:
           description: Internal Server Error
       tags:
       - Invoice
+  /api/v1/finance/invoices/{creditNoteId}/applications:
+    get:
+      operationId: getCreditNoteApplications
+      parameters:
+      - in: path
+        name: creditNoteId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListCreditNoteApplicationDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Invoice
+    post:
+      operationId: applyCreditNote
+      parameters:
+      - in: path
+        name: creditNoteId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCreditNoteApplicationRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCreditNoteApplicationDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Invoice
+  /api/v1/finance/invoices/{creditNoteId}/applications/{applicationId}:
+    delete:
+      operationId: reverseCreditNoteApplication
+      parameters:
+      - in: path
+        name: creditNoteId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: applicationId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Invoice
   /api/v1/finance/invoices/{id}:
     delete:
       operationId: delete_1
@@ -39940,6 +40157,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseCreditNoteApplicationDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CreditNoteApplicationDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseDashboardConfigDto:
       type: object
       properties:
@@ -40476,6 +40711,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ContactDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListCreditNoteApplicationDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreditNoteApplicationDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -44697,6 +44952,17 @@ components:
           format: uuid
       required:
       - contactValue
+    CreateCreditNoteApplicationRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+        targetInvoiceId:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - targetInvoiceId
     CreateExternalUserRequest:
       type: object
       properties:
@@ -46111,6 +46377,25 @@ components:
       - code
       - name
       - type
+    CreditNoteApplicationDto:
+      type: object
+      properties:
+        amount:
+          type: number
+        appliedAt:
+          type: string
+          format: date-time
+        creditNoteId:
+          type: string
+          format: uuid
+        currency:
+          type: string
+        id:
+          type: string
+          format: uuid
+        targetInvoiceId:
+          type: string
+          format: uuid
     CustomerApprovalRequest:
       type: object
       properties:
@@ -47396,6 +47681,8 @@ components:
     InvoiceDto:
       type: object
       properties:
+        amountCredited:
+          type: number
         amountDue:
           type: number
         amountPaid:

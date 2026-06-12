@@ -1,4 +1,4 @@
-package com.fabricmanagement.costing.integration;
+package com.fabricmanagement.testsupport;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -8,13 +8,13 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Base abstract class for Costing integration tests. Consolidates the Testcontainers PostgreSQL
- * configuration to ensure all costing integration tests share a single JVM-level DB container
- * instance, significantly reducing test execution time and resource consumption.
+ * Base abstract class for integration tests. Consolidates the Testcontainers PostgreSQL
+ * configuration to ensure all integration tests share a single JVM-level DB container instance,
+ * significantly reducing test execution time and resource consumption.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-public abstract class AbstractCostingIntegrationTest {
+public abstract class AbstractIntegrationTest {
 
   @SuppressWarnings("resource")
   protected static final PostgreSQLContainer<?> postgres =

@@ -7,7 +7,6 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -23,7 +22,4 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
       UUID tenantId, PaymentDirection direction, Pageable pageable);
 
   boolean existsByTenantIdAndPaymentNumber(UUID tenantId, String paymentNumber);
-
-  @Query(value = "SELECT nextval('finance.payment_number_seq')", nativeQuery = true)
-  Long getNextPaymentSequence();
 }

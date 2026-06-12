@@ -142,6 +142,18 @@ public class Invoice extends BaseEntity {
   @AttributeOverrides({
     @AttributeOverride(
         name = "amount",
+        column = @Column(name = "amount_credited", precision = 19, scale = 4)),
+    @AttributeOverride(
+        name = "currency",
+        column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
+  })
+  @Setter(AccessLevel.NONE)
+  private Money amountCredited;
+
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(
+        name = "amount",
         column = @Column(name = "amount_due", precision = 19, scale = 4)),
     @AttributeOverride(
         name = "currency",
@@ -256,9 +268,13 @@ public class Invoice extends BaseEntity {
     this.totalAmount = this.subtotal.subtract(this.discountAmount).add(this.taxAmount);
 
     // Recompute amountDue from the corrected totalAmount
-    Money currentPaid = this.amountPaid != null ? this.amountPaid : Money.zero(curr);
-    this.amountPaid = Money.of(currentPaid.getAmount(), curr);
-    this.amountDue = this.totalAmount.subtract(this.amountPaid);
+    this.amountPaid =
+        Money.of((this.amountPaid != null ? this.amountPaid : Money.zero(curr)).getAmount(), curr);
+    this.amountCredited =
+        Money.of(
+            (this.amountCredited != null ? this.amountCredited : Money.zero(curr)).getAmount(),
+            curr);
+    recomputePaymentStatus(null);
   }
 
   /**
@@ -337,25 +353,40 @@ public class Invoice extends BaseEntity {
     this.amountPaid =
         (this.amountPaid != null ? this.amountPaid : Money.zero(getCurrency()))
             .add(allocationAmount);
-    this.amountDue = this.totalAmount.subtract(this.amountPaid);
-
-    if (this.amountDue.isZero() || this.amountDue.isNegative()) {
-      this.paymentStatus = InvoicePaymentStatus.PAID;
-      this.paymentDate = paymentDate;
-    } else {
-      this.paymentStatus = InvoicePaymentStatus.PARTIALLY_PAID;
-    }
+    recomputePaymentStatus(paymentDate);
   }
 
   public void reverseAllocation(Money allocationAmount) {
     this.amountPaid = this.amountPaid.subtract(allocationAmount);
-    this.amountDue = this.totalAmount.subtract(this.amountPaid);
+    recomputePaymentStatus(null);
+  }
 
-    if (this.amountDue.isGreaterThan(Money.zero(getCurrency()))) {
+  public void applyCredit(Money creditAmount, LocalDate applicationDate) {
+    this.amountCredited =
+        (this.amountCredited != null ? this.amountCredited : Money.zero(getCurrency()))
+            .add(creditAmount);
+    recomputePaymentStatus(applicationDate);
+  }
+
+  public void reverseCredit(Money creditAmount) {
+    this.amountCredited = this.amountCredited.subtract(creditAmount);
+    recomputePaymentStatus(null);
+  }
+
+  private void recomputePaymentStatus(LocalDate dateForPaidStatus) {
+    Money paid = this.amountPaid != null ? this.amountPaid : Money.zero(getCurrency());
+    Money credited = this.amountCredited != null ? this.amountCredited : Money.zero(getCurrency());
+    this.amountDue = this.totalAmount.subtract(paid).subtract(credited);
+
+    if (this.amountDue.isZero() || this.amountDue.isNegative()) {
+      this.paymentStatus = InvoicePaymentStatus.PAID;
+      if (dateForPaidStatus != null) {
+        this.paymentDate = dateForPaidStatus;
+      }
+    } else if (paid.isPositive() || credited.isPositive()) {
       this.paymentStatus = InvoicePaymentStatus.PARTIALLY_PAID;
       this.paymentDate = null;
-    }
-    if (this.amountPaid.isZero() || this.amountPaid.isNegative()) {
+    } else {
       this.paymentStatus = InvoicePaymentStatus.UNPAID;
       this.paymentDate = null;
     }
@@ -422,7 +453,11 @@ public class Invoice extends BaseEntity {
 
     Money currentPaid = this.amountPaid != null ? this.amountPaid : Money.zero(curr);
     this.amountPaid = Money.of(currentPaid.getAmount(), curr);
-    this.amountDue = this.totalAmount.subtract(this.amountPaid);
+
+    Money currentCredited = this.amountCredited != null ? this.amountCredited : Money.zero(curr);
+    this.amountCredited = Money.of(currentCredited.getAmount(), curr);
+
+    this.amountDue = this.totalAmount.subtract(this.amountPaid).subtract(this.amountCredited);
   }
 
   public boolean isOverdue() {

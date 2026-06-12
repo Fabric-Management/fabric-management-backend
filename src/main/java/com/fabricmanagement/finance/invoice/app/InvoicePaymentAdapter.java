@@ -28,7 +28,7 @@ public class InvoicePaymentAdapter implements InvoicePaymentPort {
         invoice.getId(),
         invoice.getAmountDue(),
         invoice.getCurrency(),
-        invoice.getStatus().canReceivePayment());
+        invoice.getStatus().canReceivePayment() && invoice.getInvoiceType().isSettleable());
   }
 
   @Override
@@ -39,7 +39,10 @@ public class InvoicePaymentAdapter implements InvoicePaymentPort {
             .orElseThrow(() -> new FinanceDomainException("Invoice not found: " + invoiceId));
 
     if (!invoice.getStatus().canReceivePayment()) {
-      throw new FinanceDomainException("Invoice is not in a payable state");
+      throw new FinanceDomainException("Invoice is not in a payable status");
+    }
+    if (!invoice.getInvoiceType().isSettleable()) {
+      throw new FinanceDomainException("Invoice type cannot be settled directly");
     }
 
     invoice.applyAllocation(amount, paymentDate);

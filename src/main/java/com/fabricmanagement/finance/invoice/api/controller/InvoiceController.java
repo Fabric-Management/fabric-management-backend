@@ -2,6 +2,7 @@ package com.fabricmanagement.finance.invoice.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.finance.invoice.app.CreditNoteApplicationService;
 import com.fabricmanagement.finance.invoice.app.InvoiceService;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.dto.*;
@@ -29,6 +30,7 @@ public class InvoiceController {
 
   private final InvoiceService invoiceService;
   private final PaymentService paymentService;
+  private final CreditNoteApplicationService creditNoteApplicationService;
 
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
@@ -180,5 +182,36 @@ public class InvoiceController {
       @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
         ApiResponse.success(PagedResponse.from(invoiceService.getAccountsPayable(pageable))));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Credit Note Applications
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @PostMapping("/{creditNoteId}/applications")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  public ResponseEntity<ApiResponse<CreditNoteApplicationDto>> applyCreditNote(
+      @PathVariable UUID creditNoteId,
+      @Valid @RequestBody CreateCreditNoteApplicationRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            ApiResponse.success(
+                creditNoteApplicationService.applyCreditNote(creditNoteId, request)));
+  }
+
+  @DeleteMapping("/{creditNoteId}/applications/{applicationId}")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  public ResponseEntity<Void> reverseCreditNoteApplication(
+      @PathVariable UUID creditNoteId, @PathVariable UUID applicationId) {
+    creditNoteApplicationService.reverseCreditNoteApplication(creditNoteId, applicationId);
+    return ResponseEntity.noContent().build();
+  }
+
+  @GetMapping("/{creditNoteId}/applications")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  public ResponseEntity<ApiResponse<List<CreditNoteApplicationDto>>> getCreditNoteApplications(
+      @PathVariable UUID creditNoteId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(creditNoteApplicationService.getCreditNoteApplications(creditNoteId)));
   }
 }

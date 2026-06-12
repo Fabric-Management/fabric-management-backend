@@ -36,7 +36,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
 @DisplayName("Multi-Product Cost Integration Test")
-class MultiProductCostIntegrationTest extends AbstractCostingIntegrationTest {
+class MultiProductCostIntegrationTest
+    extends com.fabricmanagement.testsupport.AbstractIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;

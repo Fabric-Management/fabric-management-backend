@@ -25,6 +25,7 @@ public record InvoiceDto(
     BigDecimal discountAmount,
     BigDecimal totalAmount,
     BigDecimal amountPaid,
+    BigDecimal amountCredited,
     BigDecimal amountDue,
     String currency,
     BigDecimal taxRate,

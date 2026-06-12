@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.common.app.FinanceDocumentNumberGenerator;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceLine;
@@ -35,6 +36,7 @@ public class InvoiceService {
   private final InvoiceMapper invoiceMapper;
   private final ApplicationEventPublisher eventPublisher;
   private final TenantReportingCurrencyPort reportingCurrencyPort;
+  private final FinanceDocumentNumberGenerator documentNumberGenerator;
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAllInvoices(Pageable pageable) {
@@ -50,7 +52,25 @@ public class InvoiceService {
 
   public InvoiceDto createInvoice(CreateInvoiceRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
-    String invoiceNumber = generateInvoiceNumber(request.invoiceType());
+    InvoiceType type = InvoiceType.valueOf(request.invoiceType());
+    if (type == InvoiceType.CREDIT_NOTE) {
+      if (request.originalInvoiceId() == null) {
+        throw new FinanceDomainException("originalInvoiceId is required for CREDIT_NOTE");
+      }
+      Invoice original = getInvoiceOrThrow(tenantId, request.originalInvoiceId());
+      if (!original.getTradingPartnerId().equals(request.tradingPartnerId())) {
+        throw new FinanceDomainException(
+            "CREDIT_NOTE tradingPartnerId must match original invoice");
+      }
+      if (!original.getInvoiceType().isSettleable()) {
+        throw new FinanceDomainException(
+            "Original invoice type is not settleable (e.g. cannot be PROFORMA)");
+      }
+    }
+
+    String prefix = getPrefixForType(type);
+    String invoiceNumber =
+        documentNumberGenerator.nextNumber(tenantId, prefix, request.issueDate().getYear());
 
     String resolvedCurrency =
         request.currency() != null
@@ -63,7 +83,7 @@ public class InvoiceService {
             .invoiceNumber(invoiceNumber)
             .orderReference(request.orderReference())
             .externalReference(request.externalReference())
-            .invoiceType(InvoiceType.valueOf(request.invoiceType()))
+            .invoiceType(type)
             .issueDate(request.issueDate())
             .dueDate(request.dueDate())
             .subtotal(Money.of(request.subtotal(), resolvedCurrency))
@@ -295,14 +315,26 @@ public class InvoiceService {
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAccountsReceivable(Pageable pageable) {
-    UUID tenantId = TenantContext.requireTenantId();
-    return invoiceRepository.findAccountsReceivable(tenantId, pageable).map(invoiceMapper::toDto);
+    return invoiceRepository
+        .findAccountsReceivable(
+            TenantContext.requireTenantId(),
+            List.of(InvoiceType.SALES, InvoiceType.DEBIT_NOTE),
+            InvoiceType.CREDIT_NOTE,
+            List.of(InvoiceStatus.CANCELLED, InvoiceStatus.VOIDED, InvoiceStatus.DRAFT),
+            pageable)
+        .map(invoiceMapper::toDto);
   }
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAccountsPayable(Pageable pageable) {
-    UUID tenantId = TenantContext.requireTenantId();
-    return invoiceRepository.findAccountsPayable(tenantId, pageable).map(invoiceMapper::toDto);
+    return invoiceRepository
+        .findAccountsPayable(
+            TenantContext.requireTenantId(),
+            InvoiceType.PURCHASE,
+            InvoiceType.CREDIT_NOTE,
+            List.of(InvoiceStatus.CANCELLED, InvoiceStatus.VOIDED, InvoiceStatus.DRAFT),
+            pageable)
+        .map(invoiceMapper::toDto);
   }
 
   public int notifyOverdueInvoices(UUID tenantId) {
@@ -326,29 +358,14 @@ public class InvoiceService {
     return count;
   }
 
-  private String generateInvoiceNumber(String invoiceType) {
-    String prefix;
-    switch (invoiceType) {
-      case "PURCHASE" -> prefix = "PF";
-      case "CREDIT_NOTE" -> prefix = "CN";
-      case "DEBIT_NOTE" -> prefix = "DN";
-      case "PROFORMA" -> prefix = "PQ";
-      default -> prefix = "SF";
-    }
-
-    Long seq = invoiceRepository.getNextInvoiceSequence();
-    String number = String.format("%s-%06d", prefix, seq);
-
-    int attempt = 0;
-    while (invoiceRepository.existsByTenantIdAndInvoiceNumber(
-            TenantContext.requireTenantId(), number)
-        && attempt < 10) {
-      seq = invoiceRepository.getNextInvoiceSequence();
-      number = String.format("%s-%06d", prefix, seq);
-      attempt++;
-    }
-
-    return number;
+  private String getPrefixForType(InvoiceType type) {
+    return switch (type) {
+      case SALES -> "SF";
+      case PURCHASE -> "PF";
+      case CREDIT_NOTE -> "CN";
+      case DEBIT_NOTE -> "DN";
+      case PROFORMA -> "PQ";
+    };
   }
 
   private Invoice getInvoiceOrThrow(UUID tenantId, UUID invoiceId) {

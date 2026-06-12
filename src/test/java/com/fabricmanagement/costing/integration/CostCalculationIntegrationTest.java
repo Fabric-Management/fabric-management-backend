@@ -42,7 +42,8 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 
 @RecordApplicationEvents
 @DisplayName("Cost Calculation Pipeline Integration Test")
-class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
+class CostCalculationIntegrationTest
+    extends com.fabricmanagement.testsupport.AbstractIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;
@@ -57,6 +58,7 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
   private ApplicationEvents events;
 
   @MockBean private TenantReportingCurrencyPort tenantPort;
+  @MockBean private com.fabricmanagement.costing.infra.exchange.EcbExchangeRateProvider ecbProvider;
   @MockBean private TcmbExchangeRateProvider tcmbProvider;
   @MockBean private WorkOrderPlanningUpdatePort planningPort;
 
@@ -300,6 +302,7 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
             pl.getId(), "LABOR", null, new BigDecimal("10.0"), "USD"));
 
     // Intentionally no cache & mock returns empty
+    when(ecbProvider.getRate(any(), any(), any(), any())).thenReturn(java.util.Optional.empty());
     when(tcmbProvider.getRate(any(), any(), any(), any())).thenReturn(java.util.Optional.empty());
 
     // Action -> Throw Required Exception

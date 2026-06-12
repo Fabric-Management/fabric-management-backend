@@ -2,6 +2,7 @@ package com.fabricmanagement.finance.payment.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.common.app.FinanceDocumentNumberGenerator;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
 import com.fabricmanagement.finance.payment.app.port.InvoiceAllocationView;
 import com.fabricmanagement.finance.payment.app.port.InvoicePaymentPort;
@@ -44,14 +45,15 @@ public class PaymentService {
 
   private final PaymentRepository paymentRepository;
   private final PaymentMapper paymentMapper;
+  private final FinanceDocumentNumberGenerator documentNumberGenerator;
   private final InvoicePaymentPort invoicePaymentPort;
   private final ApplicationEventPublisher eventPublisher;
 
   public PaymentDto createPayment(CreatePaymentRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
 
-    Long nextSeq = paymentRepository.getNextPaymentSequence();
-    String paymentNumber = "PAY-" + String.format("%06d", nextSeq);
+    String paymentNumber =
+        documentNumberGenerator.nextNumber(tenantId, "PAY", request.paymentDate().getYear());
 
     Payment payment =
         Payment.builder()

@@ -221,6 +221,8 @@ class ConstitutionArchTest {
               .and()
               .doNotHaveSimpleName("UserDepartment")
               .and()
+              .doNotHaveSimpleName("DocumentNumberCounter")
+              .and()
               .doNotHaveSimpleName("TaskLabelAssignment")
               .and()
               .doNotHaveSimpleName("EmployeeNumberSequence")
