@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
  *
  * <pre>{@code
  * Tenant tenant = tenantRepository.findById(tenantId);
- * String timezone = tenant.getSettings().getTimezone(); // "Europe/Istanbul"
+ * String timezone = tenant.getSettings().getTimezone(); // "Europe/London"
  * boolean betaEnabled = tenant.getSettings().isBetaFeaturesEnabled();
  * }</pre>
  *
