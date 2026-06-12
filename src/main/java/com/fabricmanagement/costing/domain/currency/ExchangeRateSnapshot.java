@@ -44,7 +44,7 @@ public class ExchangeRateSnapshot extends BaseEntity {
    * Factory method to capture an exchange rate snapshot.
    *
    * @param tenantId owning tenant
-   * @param baseCurrency the base/denomination currency (typically "TRY")
+   * @param baseCurrency the base/denomination currency (the tenant's reporting currency)
    * @param targetCurrency the foreign currency
    * @param rate how many base units equal 1 target unit
    * @param source where the rate was obtained

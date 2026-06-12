@@ -37,7 +37,7 @@ public class TenantSeeder implements DataSeeder {
     UUID tenantId =
         transactionTemplate.execute(
             status -> {
-              TenantSettings settings = TenantSettings.forDefault();
+              TenantSettings settings = TenantSettings.defaults();
               CreateTenantRequest request =
                   CreateTenantRequest.builder()
                       .name(TENANT_NAME)
