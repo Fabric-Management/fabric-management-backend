@@ -6,7 +6,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import lombok.AccessLevel;
@@ -17,13 +16,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(
-    name = "exchange_rate_cache",
-    schema = "costing",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uq_exchange_rate_tenant_pair_date",
-            columnNames = {"tenant_id", "base_currency", "target_currency", "rate_date"}))
+@Table(name = "exchange_rate_cache", schema = "costing")
+// Partial unique index: (tenant_id, base_currency, target_currency, rate_date) WHERE is_active =
+// true
+// Managed by V20260612120000__partial_unique_exchange_rate.sql
 @Getter
 @Setter
 @Builder
@@ -35,7 +31,7 @@ public class ExchangeRateCache extends BaseEntity {
   private String baseCurrency; // USD
 
   @Column(name = "target_currency", nullable = false, length = 3)
-  private String targetCurrency; // TRY
+  private String targetCurrency; // GBP
 
   @Column(name = "rate", nullable = false, precision = 15, scale = 6)
   private BigDecimal rate; // 38.500000

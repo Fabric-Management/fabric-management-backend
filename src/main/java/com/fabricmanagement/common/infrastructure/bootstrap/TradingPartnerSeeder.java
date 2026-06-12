@@ -83,7 +83,7 @@ public class TradingPartnerSeeder implements DataSeeder {
                 seedPartner(
                     "South Dyeing Facilities",
                     "3333333333",
-                    PartnerType.FASON,
+                    PartnerType.SUBCONTRACTOR,
                     "South Dyeing",
                     existingTaxIds);
                 seedPartner(

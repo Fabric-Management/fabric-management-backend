@@ -109,6 +109,10 @@ application:
   frontend:
     base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
+  seed:
+    demo-transactions:
+      enabled: true
+
   # Google Maps Platform Configuration
   google:
     maps:
@@ -128,3 +132,10 @@ application:
     timeout: ${PLATFORM_WHATSAPP_TIMEOUT:5000}
     app-secret: ${PLATFORM_WHATSAPP_APP_SECRET:}
     webhook-signature-enabled: ${PLATFORM_WHATSAPP_WEBHOOK_SIGNATURE_ENABLED:false}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+

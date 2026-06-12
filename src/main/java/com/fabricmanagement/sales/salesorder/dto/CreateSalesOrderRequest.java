@@ -58,7 +58,7 @@ public class CreateSalesOrderRequest {
   /** Currency code. */
   @NotBlank(message = "Currency is required")
   @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a 3-letter ISO code")
-  private String currency = "TRY";
+  private String currency;
 
   /** Shipping address. */
   private String shippingAddress;

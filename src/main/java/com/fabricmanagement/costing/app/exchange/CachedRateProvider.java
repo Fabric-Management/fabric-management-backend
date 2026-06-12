@@ -11,10 +11,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+/** Serves any active cached rate regardless of source. MANUAL entries win by insert-precedence. */
 @Component
-@Order(1)
+@Order(10)
 @RequiredArgsConstructor
-public class ManualExchangeRateProvider implements ExchangeRateProvider {
+public class CachedRateProvider implements ExchangeRateProvider {
 
   private final ExchangeRateCacheRepository cacheRepo;
 
@@ -25,19 +26,10 @@ public class ManualExchangeRateProvider implements ExchangeRateProvider {
       return Optional.of(BigDecimal.ONE);
     }
 
-    // 1. Exact date
-    Optional<ExchangeRateCache> exact =
-        cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, from, to, date);
-    if (exact.isPresent()) {
-      return Optional.of(exact.get().getRate());
-    }
-
-    // 2. Nearest previous date (max 7 days back — bounded at DB level)
-    LocalDate cutoff = date.minusDays(7);
+    // Exact date only
     return cacheRepo
-        .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
-            tenantId, from, to, cutoff, date)
+        .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
+            tenantId, from, to, date)
         .map(ExchangeRateCache::getRate);
   }
 }

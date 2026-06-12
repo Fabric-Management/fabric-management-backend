@@ -62,7 +62,7 @@ public class CreateShipmentRequest {
   private BigDecimal shippingCost;
 
   /** Currency code. */
-  private String currency = "TRY";
+  private String currency;
 
   /** Notes. */
   private String notes;

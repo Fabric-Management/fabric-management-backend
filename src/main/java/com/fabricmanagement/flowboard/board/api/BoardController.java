@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/flowboard/boards")
 @RequiredArgsConstructor
-@Tag(name = "FlowBoard — Board", description = "Board yönetimi ve kanban görünümü")
+@Tag(name = "FlowBoard — Board", description = "Board management and kanban view")
 public class BoardController {
 
   private final BoardService boardService;
@@ -36,7 +36,7 @@ public class BoardController {
   private final Clock clock;
 
   @GetMapping
-  @Operation(summary = "Tüm aktif board'ları listele")
+  @Operation(summary = "List all active boards")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<List<BoardResponse>>> getAllBoards() {
     return ResponseEntity.ok(
@@ -45,14 +45,14 @@ public class BoardController {
   }
 
   @GetMapping("/{id}")
-  @Operation(summary = "Board detayı")
+  @Operation(summary = "Board details")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<BoardResponse>> getBoard(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(BoardResponse.from(boardService.getBoard(id))));
   }
 
   @GetMapping("/{id}/tasks")
-  @Operation(summary = "Board'daki task'ları sayfalı getir — priorityScore DESC sıralı")
+  @Operation(summary = "Paginated tasks in board — ordered by priorityScore DESC")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<TaskResponse>>> getTasksByBoard(
       @PathVariable UUID id,
@@ -85,7 +85,7 @@ public class BoardController {
   }
 
   @GetMapping("/{id}/kanban")
-  @Operation(summary = "Kanban view — status bazlı task grupları")
+  @Operation(summary = "Kanban view — status based task groups")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<Map<String, List<TaskResponse>>>> getKanbanView(
       @PathVariable UUID id,
@@ -125,7 +125,7 @@ public class BoardController {
   }
 
   @GetMapping("/{id}/eligible-assignees")
-  @Operation(summary = "Pano için atanabilecek kullanıcıları getir")
+  @Operation(summary = "Get assignable users for board")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<
           ApiResponse<java.util.List<com.fabricmanagement.flowboard.common.dto.UserSummaryDto>>>
@@ -134,7 +134,7 @@ public class BoardController {
   }
 
   @PostMapping
-  @Operation(summary = "Yeni board oluştur")
+  @Operation(summary = "Create new board")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<BoardResponse>> createBoard(
       @Valid @RequestBody CreateBoardRequest req) {
@@ -143,7 +143,7 @@ public class BoardController {
   }
 
   @GetMapping("/default")
-  @Operation(summary = "Tenant'ın varsayılan board'unu getir")
+  @Operation(summary = "Get tenant's default board")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<BoardResponse>> getDefaultBoard() {
     return ResponseEntity.ok(

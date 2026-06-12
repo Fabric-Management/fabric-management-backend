@@ -188,12 +188,12 @@ class WorkOrderPlannedCostTriggerServiceTest {
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
       when(costEnginePort.computePlannedCost(
               TENANT_ID, WORK_ORDER_ID, MODULE_TYPE, PRODUCT_ID, PLANNED_QTY, TRADING_PARTNER_ID))
-          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, computedCost, "TRY"));
+          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, computedCost, "GBP"));
 
       // After write-back reload
       WorkOrder updatedWo = buildWorkOrder(WorkOrderStatus.APPROVED, PRODUCT_ID, MODULE_TYPE);
       updatedWo.setPlannedCost(computedCost);
-      updatedWo.setPlannedCostCurrency("TRY");
+      updatedWo.setPlannedCostCurrency("GBP");
       when(workOrderRepository.findById(WORK_ORDER_ID))
           .thenReturn(Optional.of(wo))
           .thenReturn(Optional.of(updatedWo));
@@ -211,7 +211,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
 
       assertThat(response).isNotNull();
       assertThat(response.plannedCost()).isEqualTo(computedCost);
-      assertThat(response.plannedCostCurrency()).isEqualTo("TRY");
+      assertThat(response.plannedCostCurrency()).isEqualTo("GBP");
     }
 
     @Test
@@ -222,7 +222,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
       when(costEnginePort.computePlannedCost(any(), any(), any(), any(), any(), any()))
-          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, computedCost, "TRY"));
+          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, computedCost, "GBP"));
 
       WorkOrderResponse response = triggerService.triggerPlannedCost(WORK_ORDER_ID);
 
@@ -237,7 +237,7 @@ class WorkOrderPlannedCostTriggerServiceTest {
 
       when(workOrderRepository.findById(WORK_ORDER_ID)).thenReturn(Optional.of(wo));
       when(costEnginePort.computePlannedCost(any(), any(), any(), any(), any(), any()))
-          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, BigDecimal.TEN, "TRY"));
+          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, BigDecimal.TEN, "GBP"));
 
       WorkOrderResponse response = triggerService.triggerPlannedCost(WORK_ORDER_ID);
 

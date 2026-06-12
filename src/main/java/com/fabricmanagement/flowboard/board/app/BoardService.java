@@ -61,7 +61,7 @@ public class BoardService {
     return boardRepo.findAllByTenantIdAndIsActiveTrue(tenantId);
   }
 
-  /** Board detayını getirir. */
+  /** Board detailsnı getirir. */
   @Transactional(readOnly = true)
   public Board getBoard(UUID boardId) {
     return boardRepo
@@ -78,7 +78,7 @@ public class BoardService {
         .orElseThrow(() -> new EntityNotFoundException("Board not found for type: " + boardType));
   }
 
-  /** Yeni board oluşturur — genellikle tenant onboard sırasında çağrılır. */
+  /** Create new boardur — genellikle tenant onboard sırasında çağrılır. */
   @Transactional
   public Board createBoard(CreateBoardRequest req) {
     Board board =

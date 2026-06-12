@@ -102,10 +102,10 @@ class WorkOrderTest {
       WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED);
       BigDecimal cost = new BigDecimal("5250.500");
 
-      wo.updatePlannedCost(cost, "TRY");
+      wo.updatePlannedCost(cost, "GBP");
 
       assertThat(wo.getPlannedCost()).isEqualByComparingTo(cost);
-      assertThat(wo.getPlannedCostCurrency()).isEqualTo("TRY");
+      assertThat(wo.getPlannedCostCurrency()).isEqualTo("GBP");
     }
 
     @Test
@@ -123,7 +123,7 @@ class WorkOrderTest {
     void rejectsNullCost() {
       WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED);
 
-      assertThatThrownBy(() -> wo.updatePlannedCost(null, "TRY"))
+      assertThatThrownBy(() -> wo.updatePlannedCost(null, "GBP"))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("Planned cost must be non-negative");
     }
@@ -133,7 +133,7 @@ class WorkOrderTest {
     void rejectsNegativeCost() {
       WorkOrder wo = buildWorkOrder(WorkOrderStatus.APPROVED);
 
-      assertThatThrownBy(() -> wo.updatePlannedCost(new BigDecimal("-100"), "TRY"))
+      assertThatThrownBy(() -> wo.updatePlannedCost(new BigDecimal("-100"), "GBP"))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("Planned cost must be non-negative");
     }

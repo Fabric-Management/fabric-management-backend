@@ -208,13 +208,13 @@ class WorkOrderCostRecalculationServiceTest {
               eq(wo.getActualQty()),
               eq(TRADING_PARTNER_ID),
               any()))
-          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, computedCost, "TRY"));
+          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, computedCost, "GBP"));
 
       WorkOrderResponse response = recalculationService.recalculateActualCost(WORK_ORDER_ID);
 
       assertThat(response).isNotNull();
       assertThat(wo.getActualCost()).isEqualTo(computedCost);
-      assertThat(wo.getActualCostCurrency()).isEqualTo("TRY");
+      assertThat(wo.getActualCostCurrency()).isEqualTo("GBP");
       verify(workOrderRepository).save(wo);
     }
 
@@ -233,7 +233,7 @@ class WorkOrderCostRecalculationServiceTest {
           .thenReturn(List.of(validConsumption, legacyConsumption));
       when(costEnginePort.computeActualCostFromConsumptions(
               any(), any(), any(), any(), any(), any(), any()))
-          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, BigDecimal.TEN, "TRY"));
+          .thenReturn(new ComputedCostSnapshot(WORK_ORDER_ID, BigDecimal.TEN, "GBP"));
 
       recalculationService.recalculateActualCost(WORK_ORDER_ID);
 

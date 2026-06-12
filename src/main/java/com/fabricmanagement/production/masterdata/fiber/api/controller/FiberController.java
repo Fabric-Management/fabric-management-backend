@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.masterdata.fiber.api.controller;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.production.masterdata.fiber.app.FiberCatalogQueryService;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberIsoCodeService;
 import com.fabricmanagement.production.masterdata.fiber.app.FiberService;
 import com.fabricmanagement.production.masterdata.fiber.dto.CreateFiberRequest;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.*;
 public class FiberController {
 
   private final FiberService fiberService;
+  private final FiberCatalogQueryService fiberCatalogQueryService;
   private final FiberIsoCodeService fiberIsoCodeService;
   private final FiberCategoryRepository fiberCategoryRepository;
   private final FiberCertificationRepository fiberCertificationRepository;
@@ -105,7 +107,7 @@ public class FiberController {
   @GetMapping("/catalog-summary")
   @PreAuthorize("@auth.can(authentication, 'fiber', 'read')")
   public ResponseEntity<ApiResponse<FiberCatalogSummaryDto>> getCatalogSummary() {
-    FiberCatalogSummaryDto summary = fiberService.getCatalogSummary();
+    FiberCatalogSummaryDto summary = fiberCatalogQueryService.getCatalogSummary();
     return ResponseEntity.ok(ApiResponse.success(summary));
   }
 

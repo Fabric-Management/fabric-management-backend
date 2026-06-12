@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.app;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.tenant.domain.event.TenantCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,17 +26,21 @@ public class QualityGradeSeedListener {
 
   @ApplicationModuleListener
   public void onTenantCreated(TenantCreatedEvent event) {
-    idempotentHandler.executeOnce(
-        event.getEventId(),
-        this.getClass(),
-        "onTenantCreated",
+    TenantContext.executeInTenantContext(
+        event.getTenantId(),
         () -> {
-          log.info(
-              "Seeding default quality grades for new tenant: tenantId={}, name={}",
-              event.getTenantId(),
-              event.getName());
           try {
-            qualityGradeService.seedDefaultGrades(event.getTenantId());
+            idempotentHandler.executeOnce(
+                event.getEventId(),
+                this.getClass(),
+                "onTenantCreated",
+                () -> {
+                  log.info(
+                      "Seeding default quality grades for new tenant: tenantId={}, name={}",
+                      event.getTenantId(),
+                      event.getName());
+                  qualityGradeService.seedDefaultGrades(event.getTenantId());
+                });
           } catch (Exception e) {
             // Log but do not rethrow — seed failure must not fail tenant onboarding.
             log.error(
@@ -43,6 +48,7 @@ public class QualityGradeSeedListener {
                 event.getTenantId(),
                 e);
           }
+          return null;
         });
   }
 }

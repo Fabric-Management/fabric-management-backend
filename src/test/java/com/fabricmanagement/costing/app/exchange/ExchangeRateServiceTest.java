@@ -81,15 +81,15 @@ class ExchangeRateServiceTest {
     LocalDate date = LocalDate.now();
     BigDecimal rate = new BigDecimal("38.50");
 
-    when(rateProvider.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+    when(rateProvider.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.of(rate));
 
-    ConvertedMoney result = service.convert(amount, "USD", "TRY", date);
+    ConvertedMoney result = service.convert(amount, "USD", "GBP", date);
 
     assertThat(result.getOriginalAmount()).isEqualTo(amount);
     assertThat(result.getOriginalCurrency()).isEqualTo("USD");
     // 100 * 38.50 = 3850.0000 (scale 4)
     assertThat(result.getConvertedAmount()).isEqualByComparingTo("3850.0000");
-    assertThat(result.getConvertedCurrency()).isEqualTo("TRY");
+    assertThat(result.getConvertedCurrency()).isEqualTo("GBP");
     assertThat(result.getExchangeRate()).isEqualTo(rate);
     assertThat(result.getRateDate()).isEqualTo(date);
   }
@@ -99,12 +99,12 @@ class ExchangeRateServiceTest {
     BigDecimal amount = new BigDecimal("100");
     LocalDate date = LocalDate.now();
 
-    when(rateProvider.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
+    when(rateProvider.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.convert(amount, "USD", "TRY", date))
+    assertThatThrownBy(() -> service.convert(amount, "USD", "GBP", date))
         .isInstanceOf(ExchangeRateRequiredException.class)
         .hasMessageContaining("USD")
-        .hasMessageContaining("TRY");
+        .hasMessageContaining("GBP");
   }
 
   @Test
@@ -114,12 +114,12 @@ class ExchangeRateServiceTest {
     UUID explicitTenantId = UUID.randomUUID();
     BigDecimal rate = new BigDecimal("38.50");
 
-    when(rateProvider.getRate(explicitTenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+    when(rateProvider.getRate(explicitTenantId, "USD", "GBP", date)).thenReturn(Optional.of(rate));
 
-    ConvertedMoney result = service.convert(explicitTenantId, amount, "USD", "TRY", date);
+    ConvertedMoney result = service.convert(explicitTenantId, amount, "USD", "GBP", date);
 
     assertThat(result.getConvertedAmount()).isEqualByComparingTo("3850.0000");
-    verify(rateProvider).getRate(explicitTenantId, "USD", "TRY", date);
+    verify(rateProvider).getRate(explicitTenantId, "USD", "GBP", date);
   }
 
   // ─── getRequiredRate() ────────────────────────────────
@@ -128,11 +128,54 @@ class ExchangeRateServiceTest {
   void getRequiredRate_RateFound_ShouldReturnRate() {
     LocalDate date = LocalDate.now();
     BigDecimal rate = new BigDecimal("38.50");
-    when(rateProvider.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+    when(rateProvider.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.of(rate));
 
-    BigDecimal result = service.getRequiredRate("USD", "TRY", date);
+    BigDecimal result = service.getRequiredRate("USD", "GBP", date);
 
     assertThat(result).isEqualTo(rate);
+  }
+
+  @Test
+  void getRate_FallbackWithinCutoff_ShouldReturnRateAndProperDateInConvertedMoney() {
+    LocalDate requestedDate = LocalDate.now();
+    LocalDate cutoffDate = requestedDate.minusDays(7);
+    LocalDate actualRateDate = requestedDate.minusDays(3);
+    BigDecimal rate = new BigDecimal("38.00");
+
+    ExchangeRateCache cache = ExchangeRateCache.builder().build();
+    cache.setRate(rate);
+    cache.setRateDate(actualRateDate);
+
+    when(rateProvider.getRate(tenantId, "USD", "GBP", requestedDate)).thenReturn(Optional.empty());
+
+    when(cacheRepo
+            .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
+                tenantId, "USD", "GBP", cutoffDate, requestedDate))
+        .thenReturn(Optional.of(cache));
+
+    ConvertedMoney result = service.convert(new BigDecimal("100"), "USD", "GBP", requestedDate);
+
+    // 100 * 38.00 = 3800.0000 (scale 4)
+    assertThat(result.getConvertedAmount()).isEqualByComparingTo("3800.0000");
+    assertThat(result.getExchangeRate()).isEqualTo(rate);
+    assertThat(result.getRateDate())
+        .isEqualTo(actualRateDate); // Assert correct actual date is passed!
+  }
+
+  @Test
+  void getRate_FallbackOutsideCutoff_ShouldReturnEmpty() {
+    LocalDate requestedDate = LocalDate.now();
+    LocalDate cutoffDate = requestedDate.minusDays(7);
+
+    when(rateProvider.getRate(tenantId, "USD", "GBP", requestedDate)).thenReturn(Optional.empty());
+
+    when(cacheRepo
+            .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
+                tenantId, "USD", "GBP", cutoffDate, requestedDate))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.convert(new BigDecimal("100"), "USD", "GBP", requestedDate))
+        .isInstanceOf(ExchangeRateRequiredException.class);
   }
 
   // ─── saveRate() ───────────────────────────────────────
@@ -143,13 +186,13 @@ class ExchangeRateServiceTest {
     BigDecimal forwardRate = new BigDecimal("38.50");
 
     when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, "USD", "TRY", date))
+            tenantId, "USD", "GBP", date))
         .thenReturn(Optional.empty());
     when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, "TRY", "USD", date))
+            tenantId, "GBP", "USD", date))
         .thenReturn(Optional.empty());
 
-    service.saveRate("USD", "TRY", forwardRate, date, ExchangeRateSource.MANUAL);
+    service.saveRate("USD", "GBP", forwardRate, date, ExchangeRateSource.MANUAL);
 
     verify(cacheRepo, times(2)).save(cacheCaptor.capture());
 
@@ -158,12 +201,12 @@ class ExchangeRateServiceTest {
 
     ExchangeRateCache forwardCache = savedCaches.get(0);
     assertThat(forwardCache.getBaseCurrency()).isEqualTo("USD");
-    assertThat(forwardCache.getTargetCurrency()).isEqualTo("TRY");
+    assertThat(forwardCache.getTargetCurrency()).isEqualTo("GBP");
     assertThat(forwardCache.getRate()).isEqualTo(forwardRate);
     assertThat(forwardCache.getSource()).isEqualTo(ExchangeRateSource.MANUAL);
 
     ExchangeRateCache reverseCache = savedCaches.get(1);
-    assertThat(reverseCache.getBaseCurrency()).isEqualTo("TRY");
+    assertThat(reverseCache.getBaseCurrency()).isEqualTo("GBP");
     assertThat(reverseCache.getTargetCurrency()).isEqualTo("USD");
     // 1 / 38.50 = 0.025974 (scale 6 with HALF_UP)
     assertThat(reverseCache.getRate()).isEqualByComparingTo("0.025974");
@@ -184,13 +227,13 @@ class ExchangeRateServiceTest {
     existingReverse.setSource(ExchangeRateSource.MANUAL);
 
     when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, "USD", "TRY", date))
+            tenantId, "USD", "GBP", date))
         .thenReturn(Optional.of(existingForward));
     when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, "TRY", "USD", date))
+            tenantId, "GBP", "USD", date))
         .thenReturn(Optional.of(existingReverse));
 
-    service.saveRate("USD", "TRY", newForwardRate, date, ExchangeRateSource.ECB);
+    service.saveRate("USD", "GBP", newForwardRate, date, ExchangeRateSource.ECB);
 
     verify(cacheRepo, times(2)).save(cacheCaptor.capture());
 
@@ -219,12 +262,12 @@ class ExchangeRateServiceTest {
       LocalDate date = LocalDate.now();
       BigDecimal rate = new BigDecimal("38.50");
 
-      when(provider1.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+      when(provider1.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.of(rate));
 
-      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "TRY", date);
+      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "GBP", date);
 
       assertThat(result).isPresent().contains(rate);
-      verify(provider1).getRate(tenantId, "USD", "TRY", date);
+      verify(provider1).getRate(tenantId, "USD", "GBP", date);
       verify(provider2, never()).getRate(any(), any(), any(), any());
     }
 
@@ -235,14 +278,14 @@ class ExchangeRateServiceTest {
       LocalDate date = LocalDate.now();
       BigDecimal rate = new BigDecimal("38.50");
 
-      when(provider1.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
-      when(provider2.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.of(rate));
+      when(provider1.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.empty());
+      when(provider2.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.of(rate));
 
-      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "TRY", date);
+      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "GBP", date);
 
       assertThat(result).isPresent().contains(rate);
-      verify(provider1).getRate(tenantId, "USD", "TRY", date);
-      verify(provider2).getRate(tenantId, "USD", "TRY", date);
+      verify(provider1).getRate(tenantId, "USD", "GBP", date);
+      verify(provider2).getRate(tenantId, "USD", "GBP", date);
     }
 
     @Test
@@ -251,10 +294,10 @@ class ExchangeRateServiceTest {
           new ExchangeRateService(List.of(provider1, provider2), cacheRepo);
       LocalDate date = LocalDate.now();
 
-      when(provider1.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
-      when(provider2.getRate(tenantId, "USD", "TRY", date)).thenReturn(Optional.empty());
+      when(provider1.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.empty());
+      when(provider2.getRate(tenantId, "USD", "GBP", date)).thenReturn(Optional.empty());
 
-      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "TRY", date);
+      Optional<BigDecimal> result = chainService.getRate(tenantId, "USD", "GBP", date);
 
       assertThat(result).isEmpty();
     }

@@ -179,7 +179,7 @@ class WalkingSkeletonIT {
             .requestedQty(new BigDecimal("1000.00"))
             .unit("KG")
             .unitPrice(new BigDecimal("10.50"))
-            .currency("TRY")
+            .currency("GBP")
             .build();
     req.setLines(List.of(lineReq));
 

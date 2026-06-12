@@ -11,8 +11,8 @@ public record FabricPurchaseSpecs(
     @Schema(description = "Width in cm (100-320)", example = "150") Integer widthCm,
     @Schema(description = "Fabric type") FabricConstructionType fabricType,
     @Schema(description = "Fiber composition", example = "%100 Pamuk") String composition,
-    @Schema(description = "Weave/knit pattern", example = "Süprem") String weavePattern,
+    @Schema(description = "Weave/knit pattern", example = "Single Jersey") String weavePattern,
     @Schema(description = "Color name or Pantone", example = "Pantone 7621C") String color,
     @Schema(description = "Shrinkage tolerance (%)", example = "-3.5") Double shrinkage,
-    @Schema(description = "Finish type", example = "Enzim Yıkama") String finishType)
+    @Schema(description = "Finish type", example = "Enzyme Wash") String finishType)
     implements PurchaseOrderSpecs {}

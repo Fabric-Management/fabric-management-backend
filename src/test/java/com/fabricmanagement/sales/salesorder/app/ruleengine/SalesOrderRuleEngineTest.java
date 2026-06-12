@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -59,7 +60,8 @@ class SalesOrderRuleEngineTest {
         new SalesOrderRuleEngine(
             lineRepository, productionOrderPort, historyQuery, domainEventPublisher);
 
-    order = SalesOrder.builder().tradingPartnerId(partnerId).build();
+    order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).tradingPartnerId(partnerId).build();
     ReflectionTestUtils.setField(order, "id", orderId);
 
     line = SalesOrderLine.builder().productId(productId).moduleType(ModuleType.FIBER).build();

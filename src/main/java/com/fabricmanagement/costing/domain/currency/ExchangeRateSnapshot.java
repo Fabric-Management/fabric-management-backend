@@ -1,6 +1,7 @@
 package com.fabricmanagement.costing.domain.currency;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,8 +26,7 @@ import lombok.*;
 public class ExchangeRateSnapshot extends BaseEntity {
 
   @Column(name = "base_currency", nullable = false, length = 10)
-  @Builder.Default
-  private String baseCurrency = "TRY";
+  private String baseCurrency;
 
   @Column(name = "target_currency", nullable = false, length = 10)
   private String targetCurrency;
@@ -45,7 +45,7 @@ public class ExchangeRateSnapshot extends BaseEntity {
    * Factory method to capture an exchange rate snapshot.
    *
    * @param tenantId owning tenant
-   * @param baseCurrency the base/denomination currency (typically "TRY")
+   * @param baseCurrency the base/denomination currency (the tenant's reporting currency)
    * @param targetCurrency the foreign currency
    * @param rate how many base units equal 1 target unit
    * @param source where the rate was obtained
@@ -60,7 +60,7 @@ public class ExchangeRateSnapshot extends BaseEntity {
       Instant capturedAt) {
     var snap = new ExchangeRateSnapshot();
     snap.setTenantId(tenantId);
-    snap.setBaseCurrency(baseCurrency != null ? baseCurrency : "TRY");
+    snap.setBaseCurrency(baseCurrency);
     snap.setTargetCurrency(targetCurrency);
     snap.setRate(rate);
     snap.setSource(source);

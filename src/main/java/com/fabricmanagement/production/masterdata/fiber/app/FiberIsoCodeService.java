@@ -1,9 +1,11 @@
 package com.fabricmanagement.production.masterdata.fiber.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.masterdata.fiber.domain.reference.FiberIsoCode;
 import com.fabricmanagement.production.masterdata.fiber.dto.FiberIsoCodeDto;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberIsoCodeRepository;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,10 +22,11 @@ public class FiberIsoCodeService {
   private final FiberIsoCodeRepository fiberIsoCodeRepository;
 
   public List<FiberIsoCodeDto> getIsoCodes(boolean baseOnly) {
+    UUID tenantId = TenantContext.requireTenantId();
     List<FiberIsoCode> codes =
         baseOnly
             ? fiberIsoCodeRepository.findByIsOfficialIsoTrueAndIsActiveTrue()
-            : fiberIsoCodeRepository.findByIsActiveTrue();
+            : fiberIsoCodeRepository.findByTenantIdAndIsActiveTrue(tenantId);
     return codes.stream().map(FiberIsoCodeDto::from).toList();
   }
 }

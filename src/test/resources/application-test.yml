@@ -27,3 +27,11 @@ management:
     tracing:
       export:
         enabled: false
+
+# OpenApiExportIT requires springdoc enabled to fetch /api-docs.yaml.
+# Default profile disables it for security (CVE mitigations for swagger-ui/DOMPurify).
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

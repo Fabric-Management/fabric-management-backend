@@ -39,6 +39,9 @@ import org.hibernate.annotations.Type;
 @AllArgsConstructor
 public class Invoice extends BaseEntity {
 
+  /** Maximum acceptable rounding discrepancy between client-supplied and line-derived totals. */
+  private static final BigDecimal AMOUNT_TOLERANCE = new BigDecimal("0.01");
+
   @Column(name = "trading_partner_id", nullable = false)
   private UUID tradingPartnerId;
 
@@ -91,8 +94,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
-  @Builder.Default
-  private Money taxAmount = Money.zero("TRY");
+  private Money taxAmount;
 
   @Embedded
   @AttributeOverrides({
@@ -103,8 +105,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
-  @Builder.Default
-  private Money discountAmount = Money.zero("TRY");
+  private Money discountAmount;
 
   @Embedded
   @AttributeOverrides({
@@ -126,8 +127,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
-  @Builder.Default
-  private Money amountPaid = Money.zero("TRY");
+  private Money amountPaid;
 
   @Embedded
   @AttributeOverrides({
@@ -142,9 +142,10 @@ public class Invoice extends BaseEntity {
 
   @Transient
   public String getCurrency() {
-    return subtotal != null && subtotal.getCurrency() != null
-        ? subtotal.getCurrency().getCurrencyCode()
-        : "TRY";
+    if (subtotal == null || subtotal.getCurrency() == null) {
+      throw new IllegalStateException("Invoice subtotal or currency cannot be null");
+    }
+    return subtotal.getCurrency().getCurrencyCode();
   }
 
   @Column(name = "tax_rate", precision = 5, scale = 2)
@@ -160,7 +161,8 @@ public class Invoice extends BaseEntity {
   @Column(name = "metadata", columnDefinition = "jsonb")
   private Map<String, Object> metadata;
 
-  @OneToMany(mappedBy = "invoiceId", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+  @JoinColumn(name = "invoice_id", nullable = false, updatable = false)
   @OrderBy("lineNumber ASC")
   @Builder.Default
   private List<InvoiceLine> lines = new ArrayList<>();
@@ -178,7 +180,6 @@ public class Invoice extends BaseEntity {
     if (status != InvoiceStatus.DRAFT) {
       throw new FinanceDomainException("Can only add lines to invoices in DRAFT status");
     }
-    line.setInvoiceId(this.getId());
     if (line.getLineNumber() == null) {
       line.setLineNumber(lines.size() + 1);
     }
@@ -193,15 +194,104 @@ public class Invoice extends BaseEntity {
     resequenceLines();
   }
 
+  /**
+   * Derives all header monetary amounts from line-level totals.
+   *
+   * <p><b>Rounding policy:</b> Line-level arithmetic uses scale 4, HALF_UP (see {@link
+   * InvoiceLine#calculate()}). Header {@link Money} values are rounded once at aggregation to the
+   * currency's default fraction digits (scale 2 for TRY/USD/EUR) — no per-line rounding to scale 2.
+   *
+   * <p><b>totalAmount derivation:</b> {@code totalAmount} is computed from the <em>rounded</em>
+   * header Money fields ({@code subtotal − discountAmount + taxAmount}), <b>not</b> from {@code Σ
+   * lineTotal}. This guarantees internal header consistency required by e-invoice validators (TR
+   * e-Fatura). The difference between derived totalAmount and {@code Σ lineTotal} is expected to be
+   * at most 1 kuruş due to independent rounding of each component.
+   *
+   * <p>When lines are present, client-sent header amounts (subtotal, taxAmount, discountAmount) are
+   * <b>ignored</b> — all values are derived.
+   *
+   * <p><b>Status invariant:</b> This method intentionally does <em>not</em> enforce a DRAFT-only
+   * guard. Callers (e.g. {@link #issue()}, service layer) are responsible for verifying status
+   * before invoking recalculation.
+   */
   public void recalculateFromLines() {
     if (lines.isEmpty()) {
       return;
     }
+
+    // Ensure every line's calculated fields are final before we sum.
+    // This avoids depending on JPA @PrePersist/@PreUpdate ordering.
+    lines.forEach(InvoiceLine::calculate);
+
     String curr = getCurrency();
-    BigDecimal newSubtotal =
-        lines.stream().map(InvoiceLine::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
-    this.subtotal = Money.of(newSubtotal, curr);
-    calculateAmounts();
+
+    BigDecimal sumSubtotal = BigDecimal.ZERO;
+    BigDecimal sumDiscount = BigDecimal.ZERO;
+    BigDecimal sumTax = BigDecimal.ZERO;
+
+    for (InvoiceLine line : lines) {
+      sumSubtotal = sumSubtotal.add(line.getLineSubtotal());
+      sumDiscount = sumDiscount.add(line.getLineDiscount());
+      sumTax = sumTax.add(line.getLineTax());
+    }
+
+    this.subtotal = Money.of(sumSubtotal, curr);
+    this.discountAmount = Money.of(sumDiscount, curr);
+    this.taxAmount = Money.of(sumTax, curr);
+
+    // Derive totalAmount from rounded header Money fields — guarantees
+    // internal header arithmetic consistency (subtotal − discount + tax == total)
+    // required by e-invoice validators. May differ from Σ lineTotal by ≤ 0.01
+    // due to independent rounding of each component.
+    this.totalAmount = this.subtotal.subtract(this.discountAmount).add(this.taxAmount);
+
+    // Recompute amountDue from the corrected totalAmount
+    Money currentPaid = this.amountPaid != null ? this.amountPaid : Money.zero(curr);
+    this.amountPaid = Money.of(currentPaid.getAmount(), curr);
+    this.amountDue = this.totalAmount.subtract(this.amountPaid);
+  }
+
+  /**
+   * Validates that client-supplied amounts match the line-derived amounts.
+   *
+   * @param clientSubtotal the subtotal sent by the client (nullable)
+   * @param clientTotal the totalAmount sent by the client (nullable)
+   * @throws FinanceDomainException if the difference exceeds 0.01
+   */
+  public void validateClientAmounts(BigDecimal clientSubtotal, BigDecimal clientTotal) {
+    if (lines.isEmpty()) {
+      return;
+    }
+
+    if (clientSubtotal != null) {
+      BigDecimal derivedSubtotal = this.subtotal.getAmount();
+      if (clientSubtotal.subtract(derivedSubtotal).abs().compareTo(AMOUNT_TOLERANCE) > 0) {
+        throw new FinanceDomainException(
+            String.format(
+                "Provided subtotal (%s) does not match line-derived subtotal (%s); "
+                    + "tolerance is ±%s",
+                clientSubtotal.toPlainString(),
+                derivedSubtotal.toPlainString(),
+                AMOUNT_TOLERANCE.toPlainString()));
+      }
+    }
+
+    if (clientTotal != null) {
+      BigDecimal derivedTotal = this.totalAmount.getAmount();
+      if (clientTotal.subtract(derivedTotal).abs().compareTo(AMOUNT_TOLERANCE) > 0) {
+        throw new FinanceDomainException(
+            String.format(
+                "Provided totalAmount (%s) does not match line-derived total (%s); "
+                    + "tolerance is ±%s",
+                clientTotal.toPlainString(),
+                derivedTotal.toPlainString(),
+                AMOUNT_TOLERANCE.toPlainString()));
+      }
+    }
+  }
+
+  public boolean hasLines() {
+    return lines != null && !lines.isEmpty();
   }
 
   private void resequenceLines() {
@@ -218,7 +308,11 @@ public class Invoice extends BaseEntity {
     if (!status.canIssue()) {
       throw new InvoiceStatusTransitionException(status, InvoiceStatus.ISSUED);
     }
-    calculateAmounts();
+    if (hasLines()) {
+      recalculateFromLines();
+    } else {
+      calculateAmounts();
+    }
     this.status = InvoiceStatus.ISSUED;
   }
 
@@ -302,7 +396,7 @@ public class Invoice extends BaseEntity {
     this.taxAmount = Money.of(this.taxAmount.getAmount(), curr);
     this.discountAmount = Money.of(this.discountAmount.getAmount(), curr);
 
-    this.totalAmount = this.subtotal.add(this.taxAmount).subtract(this.discountAmount);
+    this.totalAmount = this.subtotal.subtract(this.discountAmount).add(this.taxAmount);
 
     Money currentPaid = this.amountPaid != null ? this.amountPaid : Money.zero(curr);
     this.amountPaid = Money.of(currentPaid.getAmount(), curr);

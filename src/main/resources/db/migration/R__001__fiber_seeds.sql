@@ -1,12 +1,13 @@
 -- ============================================================================
--- R001: Seed System 100% Pure Fiber Entities (Repeatable) — Kural 6
+-- R001: Seed Canonical 100% Pure Fiber Entities (Repeatable) — PF4
 -- ============================================================================
 -- product_id_var: gen_random_uuid() sadece IF product_id_var IS NULL bloğunda
 -- is_official_iso = true: Only official ISO 2076 codes (52 records)
 --
 -- Creates Product + Fiber for each ISO code
--- SYSTEM_TENANT_ID so all users can access system fibers
--- Users create BLENDED fibers using system fiber compositions
+-- TEMPLATE_TENANT_ID: canonical platform fibers visible to all tenants
+-- via RLS shared-read carve-out. Users create BLENDED fibers using
+-- these canonical fiber compositions.
 --
 -- Repeatable Migration: Runs every time Flyway checks migrations
 -- Depends on: V008 (fiber reference tables)
@@ -52,7 +53,7 @@ BEGIN
                  is_active, created_at, updated_at, version)
             VALUES
                 (product_id_var,
-                 '00000000-0000-0000-0000-000000000000',
+                 '00000000-0000-0000-ffff-000000000001',
                  'SYS-MAT-' || LPAD(fiber_counter::TEXT, 6, '0'),
                  'FIBER', 'KG', true,
                  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
@@ -64,7 +65,7 @@ BEGIN
              fiber_iso_code_id, fiber_name, status, composition,
              is_active, created_at, updated_at, version)
         VALUES
-            ('00000000-0000-0000-0000-000000000000',
+            ('00000000-0000-0000-ffff-000000000001',
              'SYS-FIB-' || LPAD(fiber_counter::TEXT, 6, '0'),
              product_id_var,
              category_id_var,

@@ -80,10 +80,7 @@ public class TenantSystemService {
     // Prepare settings
     TenantSettings settings = request.getSettings();
     if (settings == null) {
-      settings =
-          "TR".equalsIgnoreCase(request.getCountry())
-              ? TenantSettings.forTurkey()
-              : TenantSettings.defaults();
+      settings = TenantSettings.defaults();
     }
 
     // Generate collision-safe slug (uses system executor)

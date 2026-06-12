@@ -23,4 +23,14 @@
         <cve>CVE-2020-29582</cve>
     </suppress>
 
+    <suppress until="2026-09-01Z">
+        <notes>DOMPurify 3.3.2 bundled inside swagger-ui (via springdoc 2.8.17).
+        No upstream swagger-ui release with DOMPurify >= 3.4.0 yet.
+        Mitigated: swagger-ui disabled outside dev profile. Re-check at Q3 review.</notes>
+        <packageUrl regex="true">^pkg:javascript/DOMPurify@3\.3\.2$</packageUrl>
+        <cve>CVE-2026-41238</cve>
+        <cve>CVE-2026-41239</cve>
+        <cve>CVE-2026-41240</cve>
+    </suppress>
+
 </suppressions>

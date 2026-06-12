@@ -12,7 +12,7 @@ package com.fabricmanagement.platform.tradingpartner.domain;
  * <ul>
  *   <li>{@link #SUPPLIER} - Product or service supplier
  *   <li>{@link #CUSTOMER} - Product buyer
- *   <li>{@link #FASON} - Subcontractor (outsourced production)
+ *   <li>{@link #SUBCONTRACTOR} - Subcontractor (outsourced production)
  *   <li>{@link #SERVICE_PROVIDER} - Service provider (logistics, maintenance, etc.)
  *   <li>{@link #BOTH} - Both supplier and customer
  * </ul>
@@ -41,7 +41,7 @@ public enum PartnerType {
   CUSTOMER,
 
   /** Subcontractor (fason) - outsourced production */
-  FASON,
+  SUBCONTRACTOR,
 
   /** Service provider (logistics, maintenance, lab, etc.) */
   SERVICE_PROVIDER,

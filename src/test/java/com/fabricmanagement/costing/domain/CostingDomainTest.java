@@ -7,7 +7,7 @@ import com.fabricmanagement.costing.domain.calculation.CostCalculationLine;
 import com.fabricmanagement.costing.domain.calculation.CostEntityType;
 import com.fabricmanagement.costing.domain.calculation.CostStage;
 import com.fabricmanagement.costing.domain.currency.ExchangeRateSnapshot;
-import com.fabricmanagement.costing.domain.currency.ExchangeRateSource;
+import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import com.fabricmanagement.costing.domain.item.CalculationBase;
 import com.fabricmanagement.costing.domain.item.CostItem;
 import com.fabricmanagement.costing.domain.item.CostItemScope;

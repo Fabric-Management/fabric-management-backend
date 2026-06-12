@@ -49,8 +49,7 @@ public class PriceListItem extends BaseEntity {
   private String unit;
 
   @Column(name = "currency", nullable = false, length = 10)
-  @Builder.Default
-  private String currency = "TRY";
+  private String currency;
 
   /** Volume-based price breaks; loaded lazily only when needed for calculation. */
   @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

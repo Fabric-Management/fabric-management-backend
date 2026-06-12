@@ -1,7 +1,13 @@
 package com.fabricmanagement.costing.domain.exchange;
 
+/** Source of an exchange rate snapshot. */
 public enum ExchangeRateSource {
+  /** Rate entered manually by a finance user (e.g. negotiated rate, forward contract). */
   MANUAL,
+
+  /** TCMB (Central Bank of the Republic of Turkey) — official rate. */
   TCMB,
+
+  /** ECB (European Central Bank) official rate. */
   ECB
 }

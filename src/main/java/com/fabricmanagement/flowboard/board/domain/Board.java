@@ -52,7 +52,7 @@ public class Board extends BaseEntity {
   }
 
   /**
-   * Yeni board oluşturur.
+   * Create new boardur.
    *
    * @param name Board adı
    * @param boardType Board tipi

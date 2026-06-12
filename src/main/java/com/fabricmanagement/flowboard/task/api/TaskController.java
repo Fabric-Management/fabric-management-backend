@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/flowboard/tasks")
 @RequiredArgsConstructor
-@Tag(name = "FlowBoard — Task", description = "Task yönetimi ve durum güncellemeleri")
+@Tag(name = "FlowBoard — Task", description = "Task management and status updates")
 public class TaskController {
 
   private final TaskService taskService;
@@ -40,7 +40,7 @@ public class TaskController {
   private final Clock clock;
 
   @GetMapping("/{id}/comments")
-  @Operation(summary = "Task yorumlarını listele")
+  @Operation(summary = "List task comments")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<List<TaskCommentResponse>>> getTaskComments(
       @PathVariable UUID id) {
@@ -61,7 +61,7 @@ public class TaskController {
   }
 
   @GetMapping("/{id}")
-  @Operation(summary = "Task detayı")
+  @Operation(summary = "Task details")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<ApiResponse<TaskResponse>> getTask(@PathVariable UUID id) {
     var task = taskService.getTask(id);
@@ -73,7 +73,7 @@ public class TaskController {
   }
 
   @PostMapping
-  @Operation(summary = "Manuel task oluştur")
+  @Operation(summary = "Create manual task")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<TaskResponse>> createTask(
       @Valid @RequestBody CreateTaskRequest req) {
@@ -87,7 +87,7 @@ public class TaskController {
   }
 
   @PutMapping("/{id}/status")
-  @Operation(summary = "Task status güncelle — WIP kontrolü ile")
+  @Operation(summary = "Update task status — with WIP control")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<TaskResponse>> updateStatus(
       @PathVariable UUID id, @Valid @RequestBody UpdateTaskStatusRequest req) {
@@ -102,7 +102,7 @@ public class TaskController {
   }
 
   @PutMapping("/{id}/assign")
-  @Operation(summary = "Task'ı kullanıcıya ata")
+  @Operation(summary = "Assign task to user")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<Void>> assignTask(
       @PathVariable UUID id,
@@ -120,7 +120,7 @@ public class TaskController {
   }
 
   @GetMapping("/{id}/assignees")
-  @Operation(summary = "Task'a atanmış kişileri getir")
+  @Operation(summary = "Get users assigned to task")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'read')")
   public ResponseEntity<
           ApiResponse<java.util.List<com.fabricmanagement.flowboard.task.dto.TaskAssigneeResponse>>>
@@ -129,7 +129,7 @@ public class TaskController {
   }
 
   @DeleteMapping("/{id}/assignees/{userId}")
-  @Operation(summary = "Task'tan atamayı kaldır")
+  @Operation(summary = "Unassign from task")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<ApiResponse<Void>> unassignUser(
       @PathVariable UUID id, @PathVariable UUID userId) {
@@ -139,7 +139,7 @@ public class TaskController {
   }
 
   @DeleteMapping("/{id}")
-  @Operation(summary = "Task'ı iptal et (soft cancel)")
+  @Operation(summary = "Cancel task (soft cancel)")
   @PreAuthorize("@auth.can(authentication, 'flowboard', 'write')")
   public ResponseEntity<Void> cancelTask(@PathVariable UUID id) {
     taskService.cancelTask(id);

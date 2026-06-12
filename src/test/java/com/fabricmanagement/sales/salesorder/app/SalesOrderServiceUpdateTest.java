@@ -13,6 +13,7 @@ import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGene
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.sales.common.exception.OrderDomainException;
@@ -68,6 +69,7 @@ class SalesOrderServiceUpdateTest {
     TenantContext.setCurrentTenantId(tenantId);
     draftOrder =
         SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .orderType(OrderType.SALES)

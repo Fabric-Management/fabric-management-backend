@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
@@ -35,12 +36,18 @@ import org.w3c.dom.NodeList;
  * feed and stores them in a JVM-level in-memory cache. Subsequent calls return from cache. Writes
  * an audit trail to the DB for each tenant.
  *
- * <p>Runs after ManualExchangeRateProvider (@Order(2)). Manually entered rates always override TCMB
- * because they are resolved first in the chain, so this provider is never reached.
+ * <p>Runs after CachedRateProvider (@Order(10)) and EcbExchangeRateProvider (@Order(20)). Manually
+ * entered rates always override TCMB because they are resolved first via CachedRateProvider in the
+ * chain, so this provider is never reached.
  */
 @Slf4j
 @Component
-@Order(2)
+@Order(30)
+@ConditionalOnProperty(
+    prefix = "costing.fx.tcmb",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false)
 public class TcmbExchangeRateProvider implements ExchangeRateProvider {
 
   private static final int MAX_CACHE_DAYS = 30;
@@ -67,9 +74,14 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
 
     evictStaleCacheEntries();
 
-    // Lazy fetch: computeIfAbsent never receives null (we return emptyMap on failure)
-    Map<String, BigDecimal> dayRates =
-        tcmbDailyRates.computeIfAbsent(date, this::fetchRatesForDate);
+    // Lazy fetch: only cache successful results (empty = transient failure, allow retry)
+    Map<String, BigDecimal> dayRates = tcmbDailyRates.get(date);
+    if (dayRates == null) {
+      dayRates = fetchRatesForDate(date);
+      if (!dayRates.isEmpty()) {
+        tcmbDailyRates.put(date, dayRates);
+      }
+    }
 
     if (dayRates.isEmpty()) {
       return Optional.empty(); // Network error, holiday, or failed parsing
@@ -179,7 +191,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
     }
   }
 
-  /** Updates existing record or inserts a new one — per-tenant audit trail. */
+  /** Persist to audit cache (skip if an active row exists to respect MANUAL precedence). */
   void saveToAuditCache(
       UUID tenantId, String base, String target, BigDecimal rate, LocalDate date) {
     ExchangeRateCache existing =
@@ -189,20 +201,19 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
             .orElse(null);
 
     if (existing != null) {
-      existing.setRate(rate);
-      cacheRepo.save(existing);
-    } else {
-      ExchangeRateCache cache =
-          ExchangeRateCache.builder()
-              .baseCurrency(base)
-              .targetCurrency(target)
-              .rate(rate)
-              .rateDate(date)
-              .source(ExchangeRateSource.TCMB)
-              .build();
-      cache.setTenantId(tenantId);
-      cacheRepo.save(cache);
+      return;
     }
+
+    ExchangeRateCache cache =
+        ExchangeRateCache.builder()
+            .baseCurrency(base)
+            .targetCurrency(target)
+            .rate(rate)
+            .rateDate(date)
+            .source(ExchangeRateSource.TCMB)
+            .build();
+    cache.setTenantId(tenantId);
+    cacheRepo.save(cache);
   }
 
   /** Evicts cache entries older than 30 days — memory hygiene. */

@@ -2,6 +2,7 @@ package com.fabricmanagement.production.masterdata.product.dto;
 
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -19,6 +20,12 @@ public class ProductDto {
   private UUID id;
   private UUID tenantId;
   private String uid;
+
+  @Schema(
+      description =
+          "Human-readable name resolved from type-specific master data; falls back to uid")
+  private String displayName;
+
   private ProductType productType;
   private String unit;
   private Boolean isActive;

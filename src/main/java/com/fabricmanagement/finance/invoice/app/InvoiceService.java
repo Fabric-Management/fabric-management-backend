@@ -1,6 +1,7 @@
 package com.fabricmanagement.finance.invoice.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
@@ -33,6 +34,7 @@ public class InvoiceService {
   private final InvoiceRepository invoiceRepository;
   private final InvoiceMapper invoiceMapper;
   private final ApplicationEventPublisher eventPublisher;
+  private final TenantReportingCurrencyPort reportingCurrencyPort;
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAllInvoices(Pageable pageable) {
@@ -50,6 +52,11 @@ public class InvoiceService {
     UUID tenantId = TenantContext.requireTenantId();
     String invoiceNumber = generateInvoiceNumber(request.invoiceType());
 
+    String resolvedCurrency =
+        request.currency() != null
+            ? request.currency()
+            : reportingCurrencyPort.getReportingCurrency(tenantId);
+
     Invoice invoice =
         Invoice.builder()
             .tradingPartnerId(request.tradingPartnerId())
@@ -59,20 +66,16 @@ public class InvoiceService {
             .invoiceType(InvoiceType.valueOf(request.invoiceType()))
             .issueDate(request.issueDate())
             .dueDate(request.dueDate())
-            .subtotal(
-                Money.of(
-                    request.subtotal(), request.currency() != null ? request.currency() : "TRY"))
+            .subtotal(Money.of(request.subtotal(), resolvedCurrency))
             .taxAmount(
                 Money.of(
                     request.taxAmount() != null ? request.taxAmount() : BigDecimal.ZERO,
-                    request.currency() != null ? request.currency() : "TRY"))
+                    resolvedCurrency))
             .discountAmount(
                 Money.of(
                     request.discountAmount() != null ? request.discountAmount() : BigDecimal.ZERO,
-                    request.currency() != null ? request.currency() : "TRY"))
-            .totalAmount(
-                Money.of(
-                    request.totalAmount(), request.currency() != null ? request.currency() : "TRY"))
+                    resolvedCurrency))
+            .totalAmount(Money.of(request.totalAmount(), resolvedCurrency))
             .taxRate(request.taxRate())
             .billingAddress(request.billingAddress())
             .notes(request.notes())
@@ -80,14 +83,11 @@ public class InvoiceService {
             .build();
 
     invoice.setTenantId(tenantId);
-    invoice.calculateAmounts();
 
     if (request.lines() != null && !request.lines().isEmpty()) {
-      int lineNumber = 1;
       for (CreateInvoiceLineRequest lineReq : request.lines()) {
         InvoiceLine line =
             InvoiceLine.builder()
-                .lineNumber(lineNumber++)
                 .description(lineReq.description())
                 .productCode(lineReq.productCode())
                 .unit(lineReq.unit() != null ? lineReq.unit() : "PCS")
@@ -96,15 +96,15 @@ public class InvoiceService {
                 .discountRate(
                     lineReq.discountRate() != null ? lineReq.discountRate() : BigDecimal.ZERO)
                 .taxRate(lineReq.taxRate() != null ? lineReq.taxRate() : BigDecimal.ZERO)
-                .lineSubtotal(BigDecimal.ZERO)
-                .lineTotal(BigDecimal.ZERO)
                 .notes(lineReq.notes())
                 .build();
         line.setTenantId(tenantId);
-        line.calculate();
-        invoice.getLines().add(line);
+        invoice.addLine(line);
       }
       invoice.recalculateFromLines();
+      invoice.validateClientAmounts(request.subtotal(), request.totalAmount());
+    } else {
+      invoice.calculateAmounts();
     }
 
     Invoice saved = invoiceRepository.save(invoice);
@@ -131,6 +131,17 @@ public class InvoiceService {
       throw new FinanceDomainException("Can only update invoices in DRAFT status");
     }
 
+    if (invoice.hasLines()) {
+      if (request.subtotal() != null
+          || request.taxAmount() != null
+          || request.discountAmount() != null
+          || request.totalAmount() != null) {
+        throw new FinanceDomainException(
+            "Cannot directly update monetary amounts on an invoice with lines; "
+                + "modify the lines instead");
+      }
+    }
+
     if (request.orderReference() != null) invoice.setOrderReference(request.orderReference());
     if (request.externalReference() != null)
       invoice.setExternalReference(request.externalReference());
@@ -147,7 +158,11 @@ public class InvoiceService {
     if (request.billingAddress() != null) invoice.setBillingAddress(request.billingAddress());
     if (request.notes() != null) invoice.setNotes(request.notes());
 
-    invoice.calculateAmounts();
+    if (invoice.hasLines()) {
+      invoice.recalculateFromLines();
+    } else {
+      invoice.calculateAmounts();
+    }
     Invoice saved = invoiceRepository.save(invoice);
     return invoiceMapper.toDto(saved);
   }

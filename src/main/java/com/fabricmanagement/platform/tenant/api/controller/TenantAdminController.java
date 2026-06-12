@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin/tenant")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Tenant Admin", description = "Tenant yönetim işlemleri (Sadece PLATFORM_ADMIN)")
+@Tag(name = "Tenant Admin", description = "Tenant management operations (PLATFORM_ADMIN only)")
 public class TenantAdminController {
 
   private final TenantSystemService tenantService;
@@ -26,7 +26,7 @@ public class TenantAdminController {
   @PreAuthorize("hasRole('PLATFORM_ADMIN')")
   @Operation(
       summary =
-          "Tüm tenant ayarlarını (timezone vb) dinleyicilere (i18n modülü) senkronize et (One-off migration)")
+          "Sync all tenant settings (timezone etc) to listeners (i18n module) (One-off migration)")
   public ResponseEntity<ApiResponse<Integer>> syncAllSettings() {
     log.info("Manual sync of all tenant settings initialized by admin.");
     int count = tenantService.syncAllTenantSettings();

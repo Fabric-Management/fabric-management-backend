@@ -59,6 +59,14 @@ spring:
         order_updates: ${HIBERNATE_ORDER_UPDATES:true}
 
 application:
+  # System DataSource: fabric_system role (BYPASSRLS, no DDL) for cross-tenant operations.
+  # Required by SystemDataSourceConfig (CR-4 fail-fast). Role is provisioned by
+  # scripts/db/docker-init-roles.sh; password is supplied via docker-compose env.
+  system-datasource:
+    enabled: true
+    username: ${POSTGRES_SYSTEM_USER:fabric_system}
+    password: ${POSTGRES_SYSTEM_PASSWORD}
+
   frontend:
     base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
@@ -73,3 +81,9 @@ logging:
 
 server:
   port: ${SERVER_PORT:8080}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

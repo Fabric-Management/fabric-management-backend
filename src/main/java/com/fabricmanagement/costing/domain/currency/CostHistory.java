@@ -38,8 +38,7 @@ public class CostHistory extends BaseEntity {
   private BigDecimal unitPrice;
 
   @Column(name = "currency", nullable = false, length = 10)
-  @Builder.Default
-  private String currency = "TRY";
+  private String currency;
 
   @Column(name = "valid_from", nullable = false)
   private LocalDate validFrom;

@@ -30,14 +30,14 @@ import org.springframework.web.bind.annotation.*;
 @RestController("notifHubController")
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
-@Tag(name = "Notifications", description = "Bildirim yönetimi ve tercihler")
+@Tag(name = "Notifications", description = "Notification management and preferences")
 public class NotificationHubController {
 
   private final NotificationHubService notificationHubService;
   private final NotificationLogRepository logRepo;
 
   @GetMapping
-  @Operation(summary = "Kullanıcının bildirimlerini listele")
+  @Operation(summary = "List user notifications")
   public ApiResponse<PagedResponse<NotificationLogResponse>> listNotifications(
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
     UUID userId = currentUser().userId();
@@ -47,27 +47,27 @@ public class NotificationHubController {
   }
 
   @GetMapping("/unread/count")
-  @Operation(summary = "Okunmamış bildirim sayısı")
+  @Operation(summary = "Unread notification count")
   public ApiResponse<Long> unreadCount() {
     return ApiResponse.success(notificationHubService.countUnread(currentUser().userId()));
   }
 
   @PostMapping("/{id}/read")
-  @Operation(summary = "Bir bildirimi okundu işaretle")
+  @Operation(summary = "Mark a notification as read")
   public ApiResponse<Void> markRead(@PathVariable UUID id) {
     notificationHubService.markRead(id, currentUser().userId());
     return ApiResponse.success(null);
   }
 
   @PostMapping("/read-all")
-  @Operation(summary = "Tüm bildirimleri okundu işaretle")
+  @Operation(summary = "Mark all notifications as read")
   public ApiResponse<Integer> markAllRead() {
     int count = notificationHubService.markAllRead(currentUser().userId());
     return ApiResponse.success(count);
   }
 
   @PutMapping("/preferences")
-  @Operation(summary = "Bildirim kanalı tercihini güncelle")
+  @Operation(summary = "Update notification channel preference")
   public ResponseEntity<Void> updatePreference(
       @Valid @RequestBody UpdateNotificationPreferenceRequest req) {
     var ctx = currentUser();

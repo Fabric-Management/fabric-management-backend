@@ -19,6 +19,7 @@ class SalesOrderTest {
   void updateDraft_whenDraft_appliesChanges() {
     SalesOrder order =
         SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .orderType(OrderType.SALES)
@@ -65,6 +66,7 @@ class SalesOrderTest {
   void updateDraft_whenNotDraft_throwsExceptionWith409(OrderStatus status) {
     SalesOrder order =
         SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .orderType(OrderType.SALES)
@@ -97,14 +99,19 @@ class SalesOrderTest {
 
   @Test
   void confirm_whenDraft_updatesStatusToConfirmed() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.DRAFT).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.DRAFT).build();
     order.confirm();
     assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
   }
 
   @Test
   void confirm_whenPendingApproval_throwsException() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PENDING_APPROVAL).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.PENDING_APPROVAL)
+            .build();
     assertThatThrownBy(() -> order.confirm())
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Order is awaiting approval; cannot be confirmed manually")
@@ -114,7 +121,11 @@ class SalesOrderTest {
 
   @Test
   void confirmFromApproval_whenPendingApproval_updatesStatusToConfirmed() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PENDING_APPROVAL).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.PENDING_APPROVAL)
+            .build();
     order.confirmFromApproval();
     assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
   }
@@ -125,7 +136,7 @@ class SalesOrderTest {
       names = {"PENDING_APPROVAL"},
       mode = EnumSource.Mode.EXCLUDE)
   void confirmFromApproval_whenNotPendingApproval_throwsException(OrderStatus status) {
-    SalesOrder order = SalesOrder.builder().status(status).build();
+    SalesOrder order = SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(status).build();
     assertThatThrownBy(() -> order.confirmFromApproval())
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Order can only be confirmed from PENDING_APPROVAL status");
@@ -137,7 +148,7 @@ class SalesOrderTest {
       names = {"DRAFT", "PENDING_APPROVAL"},
       mode = EnumSource.Mode.EXCLUDE)
   void confirm_whenNotDraftOrPendingApproval_throwsException(OrderStatus status) {
-    SalesOrder order = SalesOrder.builder().status(status).build();
+    SalesOrder order = SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(status).build();
     assertThatThrownBy(() -> order.confirm())
         .isInstanceOf(OrderDomainException.class)
         .extracting("httpStatus")
@@ -146,35 +157,49 @@ class SalesOrderTest {
 
   @Test
   void recordShipmentProgress_partial_setsPartiallyShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     order.recordShipmentProgress(false, true);
     assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
   }
 
   @Test
   void recordShipmentProgress_allShipped_setsShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     order.recordShipmentProgress(true, true);
     assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
   }
 
   @Test
   void recordShipmentProgress_partiallyShipped_toShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.PARTIALLY_SHIPPED)
+            .build();
     order.recordShipmentProgress(true, true);
     assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
   }
 
   @Test
   void recordShipmentProgress_idempotent_staysPartiallyShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.PARTIALLY_SHIPPED)
+            .build();
     order.recordShipmentProgress(false, true);
     assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
   }
 
   @Test
   void recordShipmentProgress_inProgress_setsPartiallyShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.IN_PROGRESS)
+            .build();
     order.recordShipmentProgress(false, true);
     assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_SHIPPED);
   }
@@ -184,28 +209,31 @@ class SalesOrderTest {
       value = OrderStatus.class,
       names = {"DELIVERED", "CANCELLED", "REJECTED"})
   void recordShipmentProgress_terminal_noop(OrderStatus status) {
-    SalesOrder order = SalesOrder.builder().status(status).build();
+    SalesOrder order = SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(status).build();
     order.recordShipmentProgress(true, true);
     assertThat(order.getStatus()).isEqualTo(status);
   }
 
   @Test
   void recordShipmentProgress_onHold_noop() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.ON_HOLD).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.ON_HOLD).build();
     order.recordShipmentProgress(false, true);
     assertThat(order.getStatus()).isEqualTo(OrderStatus.ON_HOLD);
   }
 
   @Test
   void recordShipmentProgress_noneShipped_noop() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     order.recordShipmentProgress(false, false);
     assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
   }
 
   @Test
   void markInProgressIfConfirmed_whenConfirmed_setsInProgress() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
 
     boolean changed = order.markInProgressIfConfirmed();
 
@@ -219,7 +247,7 @@ class SalesOrderTest {
       names = {"CONFIRMED"},
       mode = EnumSource.Mode.EXCLUDE)
   void markInProgressIfConfirmed_whenNotConfirmed_isNoop(OrderStatus status) {
-    SalesOrder order = SalesOrder.builder().status(status).build();
+    SalesOrder order = SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(status).build();
 
     boolean changed = order.markInProgressIfConfirmed();
 
@@ -229,7 +257,11 @@ class SalesOrderTest {
 
   @Test
   void cancel_whenInProgress_succeeds() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.IN_PROGRESS)
+            .build();
     order.cancel();
     assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
   }
@@ -239,7 +271,7 @@ class SalesOrderTest {
       value = OrderStatus.class,
       names = {"PARTIALLY_SHIPPED", "SHIPPED"})
   void cancel_whenPartiallyShippedOrShipped_throws409(OrderStatus status) {
-    SalesOrder order = SalesOrder.builder().status(status).build();
+    SalesOrder order = SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(status).build();
     assertThatThrownBy(() -> order.cancel())
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Cannot cancel order")
@@ -249,7 +281,11 @@ class SalesOrderTest {
 
   @Test
   void hold_thenResume_restoresInProgress() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.IN_PROGRESS)
+            .build();
     order.hold();
     assertThat(order.getStatus()).isEqualTo(OrderStatus.ON_HOLD);
     order.resume();
@@ -258,7 +294,8 @@ class SalesOrderTest {
 
   @Test
   void hold_thenResume_restoresConfirmed() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     order.hold();
     assertThat(order.getStatus()).isEqualTo(OrderStatus.ON_HOLD);
     order.resume();
@@ -267,7 +304,8 @@ class SalesOrderTest {
 
   @Test
   void resume_whenNotOnHold_throws409() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.DRAFT).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.DRAFT).build();
     assertThatThrownBy(() -> order.resume())
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("must be ON_HOLD")
@@ -277,14 +315,19 @@ class SalesOrderTest {
 
   @Test
   void reviseRejected_whenRejected_movesToDraft() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.REJECTED).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.REJECTED).build();
     order.reviseRejected();
     assertThat(order.getStatus()).isEqualTo(OrderStatus.DRAFT);
   }
 
   @Test
   void reviseRejected_whenNotRejected_throws409() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.IN_PROGRESS).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(OrderTotals.zero("GBP"))
+            .status(OrderStatus.IN_PROGRESS)
+            .build();
     assertThatThrownBy(() -> order.reviseRejected())
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("only REJECTED orders can be revised")
@@ -294,7 +337,8 @@ class SalesOrderTest {
 
   @Test
   void hold_whenAlreadyOnHold_throws409() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.ON_HOLD).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.ON_HOLD).build();
     assertThatThrownBy(() -> order.hold())
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("terminal or already ON_HOLD")
@@ -304,7 +348,8 @@ class SalesOrderTest {
 
   @Test
   void reviseRejected_clearsRejectionReason() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.REJECTED).build();
+    SalesOrder order =
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.REJECTED).build();
     org.springframework.test.util.ReflectionTestUtils.setField(
         order, "rejectionReason", "Insufficient funds");
     order.reviseRejected();

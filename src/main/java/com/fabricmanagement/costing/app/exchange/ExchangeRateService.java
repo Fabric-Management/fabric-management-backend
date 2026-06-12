@@ -14,15 +14,23 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExchangeRateService {
 
   private final List<ExchangeRateProvider> rateProviders;
   private final ExchangeRateCacheRepository cacheRepo;
+
+  @Value("${costing.fx.max-stale-days:7}")
+  private int maxStaleDays = 7;
+
+  record RateResult(BigDecimal rate, LocalDate rateDate) {}
 
   /**
    * Fetches the rate. Throws ExchangeRateRequiredException if not found. Resolves tenantId from
@@ -50,14 +58,40 @@ public class ExchangeRateService {
 
   /**
    * Iterates through the ordered provider chain with explicit tenantId — returns first rate found.
+   * If not found exactly, falls back to stale cache lookup.
    */
   public Optional<BigDecimal> getRate(UUID tenantId, String from, String to, LocalDate date) {
+    return getRateWithDate(tenantId, from, to, date).map(RateResult::rate);
+  }
+
+  private Optional<RateResult> getRateWithDate(
+      UUID tenantId, String from, String to, LocalDate date) {
+    // 1. Exact date lookup through providers
     for (ExchangeRateProvider provider : rateProviders) {
       Optional<BigDecimal> rate = provider.getRate(tenantId, from, to, date);
       if (rate.isPresent()) {
-        return rate;
+        return Optional.of(new RateResult(rate.get(), date));
       }
     }
+
+    // 2. Generic stale-rate fallback (cache lookup)
+    LocalDate cutoff = date.minusDays(maxStaleDays);
+    Optional<ExchangeRateCache> staleCache =
+        cacheRepo
+            .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
+                tenantId, from, to, cutoff, date);
+
+    if (staleCache.isPresent()) {
+      ExchangeRateCache cache = staleCache.get();
+      log.info(
+          "Serving stale rate for {}/{} — requested {} but using {} rate",
+          from,
+          to,
+          date,
+          cache.getRateDate());
+      return Optional.of(new RateResult(cache.getRate(), cache.getRateDate()));
+    }
+
     return Optional.empty();
   }
 
@@ -83,14 +117,25 @@ public class ExchangeRateService {
       return ConvertedMoney.sameUnit(originalAmount, originalCurrency);
     }
 
-    BigDecimal rate = getRequiredRate(tenantId, originalCurrency, targetCurrency, date);
+    RateResult result =
+        getRateWithDate(tenantId, originalCurrency, targetCurrency, date)
+            .orElseThrow(
+                () -> new ExchangeRateRequiredException(originalCurrency, targetCurrency, date));
+
+    BigDecimal rate = result.rate();
     BigDecimal convertedAmount = originalAmount.multiply(rate).setScale(4, RoundingMode.HALF_UP);
 
     return ConvertedMoney.of(
-        originalAmount, originalCurrency, convertedAmount, targetCurrency, rate, date);
+        originalAmount, originalCurrency, convertedAmount, targetCurrency, rate, result.rateDate());
   }
 
-  /** Saves the rate to cache and automatically creates the reverse rate. */
+  /**
+   * Saves (upserts) the rate to cache and automatically creates the reverse rate.
+   *
+   * <p>Unlike provider-level writes (which skip if an active row exists to respect MANUAL
+   * precedence), this is an explicit user/admin action that intentionally overwrites any existing
+   * rate for the same (tenant, pair, date).
+   */
   @Transactional
   public void saveRate(
       String baseCurrency,
@@ -100,10 +145,10 @@ public class ExchangeRateService {
       ExchangeRateSource source) {
     UUID tenantId = TenantContext.requireTenantId();
 
-    // Forward rate: USD → TRY = 38.50
+    // Forward rate: USD → GBP = 0.81
     saveOrUpdate(tenantId, baseCurrency, targetCurrency, rate, date, source);
 
-    // Reverse rate: TRY → USD = 1/38.50
+    // Reverse rate: GBP → USD = 1/0.81
     BigDecimal reverseRate = BigDecimal.ONE.divide(rate, 6, RoundingMode.HALF_UP);
     saveOrUpdate(tenantId, targetCurrency, baseCurrency, reverseRate, date, source);
   }

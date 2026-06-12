@@ -43,8 +43,7 @@ public class CostCalculationLine extends BaseEntity {
   private BigDecimal unitPrice;
 
   @Column(name = "currency", nullable = false, length = 10)
-  @Builder.Default
-  private String currency = "TRY";
+  private String currency;
 
   @Column(name = "total_in_base_currency", nullable = false, precision = 18, scale = 4)
   @Builder.Default

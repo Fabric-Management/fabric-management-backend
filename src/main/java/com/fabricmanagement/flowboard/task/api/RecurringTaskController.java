@@ -21,13 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/flowboard/recurring-templates")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
-@Tag(name = "FlowBoard — Recurring Tasks", description = "Tekrarlayan görev şablonları")
+@Tag(name = "FlowBoard — Recurring Tasks", description = "Recurring task templates")
 public class RecurringTaskController {
 
   private final RecurringTaskService recurringTaskService;
 
   @GetMapping("/boards/{boardId}")
-  @Operation(summary = "Board'a ait tekrarlayan görev şablonları")
+  @Operation(summary = "Recurring task templates for board")
   public ResponseEntity<ApiResponse<List<RecurringTaskTemplateDto>>> getTemplatesForBoard(
       @PathVariable @NotNull UUID boardId) {
     List<RecurringTaskTemplateDto> result =

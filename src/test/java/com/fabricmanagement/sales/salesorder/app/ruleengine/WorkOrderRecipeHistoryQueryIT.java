@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -179,7 +180,11 @@ class WorkOrderRecipeHistoryQueryIT {
               mock(DomainEventPublisher.class));
 
       SalesOrder order =
-          SalesOrder.builder().tradingPartnerId(partnerId).orderNumber("SO-TEST").build();
+          SalesOrder.builder()
+              .totals(OrderTotals.zero("GBP"))
+              .tradingPartnerId(partnerId)
+              .orderNumber("SO-TEST")
+              .build();
       ReflectionTestUtils.setField(order, "id", orderId);
 
       SalesOrderLine line =

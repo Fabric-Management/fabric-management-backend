@@ -46,7 +46,7 @@ class WorkOrderCreationAdapterTest {
             salesOrderLineId,
             new BigDecimal("500.000"),
             "KG",
-            "TRY",
+            "GBP",
             deadline,
             "GOTS",
             "TR");
@@ -64,7 +64,7 @@ class WorkOrderCreationAdapterTest {
     assertThat(captured.salesOrderLineId()).isEqualTo(salesOrderLineId);
     assertThat(captured.plannedQty()).isEqualByComparingTo(new BigDecimal("500.000"));
     assertThat(captured.unit()).isEqualTo("KG");
-    assertThat(captured.currency()).isEqualTo("TRY");
+    assertThat(captured.currency()).isEqualTo("GBP");
     assertThat(captured.deadline()).isEqualTo(deadline);
     assertThat(captured.certificationReq()).isEqualTo("GOTS");
     assertThat(captured.originReq()).isEqualTo("TR");

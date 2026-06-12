@@ -3,6 +3,8 @@ package com.fabricmanagement.production.masterdata.product.app;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
+import com.fabricmanagement.production.masterdata.fiber.api.facade.FiberFacade;
+import com.fabricmanagement.production.masterdata.fiber.dto.FiberDto;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
@@ -13,8 +15,10 @@ import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductAttributeRepository;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,7 @@ public class ProductService implements ProductFacade {
 
   private final ProductRepository productRepository;
   private final ProductAttributeRepository productAttributeRepository;
+  private final @org.springframework.context.annotation.Lazy FiberFacade fiberFacade;
   private final DomainEventPublisher eventPublisher;
 
   /** Create product (internal method). */
@@ -48,7 +53,9 @@ public class ProductService implements ProductFacade {
 
     log.info("✅ Product created: id={}, uid={}", saved.getId(), saved.getUid());
 
-    return ProductDto.from(saved);
+    ProductDto dto = ProductDto.from(saved);
+    dto.setDisplayName(dto.getUid());
+    return dto;
   }
 
   @Override
@@ -56,7 +63,14 @@ public class ProductService implements ProductFacade {
   public Optional<ProductDto> findById(UUID tenantId, UUID id) {
     log.debug("Finding product: tenantId={}, id={}", tenantId, id);
 
-    return productRepository.findByTenantIdAndId(tenantId, id).map(ProductDto::from);
+    return productRepository
+        .findByTenantIdInAndId(tenantScope(tenantId), id)
+        .map(ProductDto::from)
+        .map(
+            p -> {
+              List<ProductDto> enriched = enrichDisplayNames(new java.util.ArrayList<>(List.of(p)));
+              return enriched.get(0);
+            });
   }
 
   @Override
@@ -64,9 +78,11 @@ public class ProductService implements ProductFacade {
   public List<ProductDto> findByTenant(UUID tenantId) {
     log.debug("Finding all products: tenantId={}", tenantId);
 
-    return productRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-        .map(ProductDto::from)
-        .toList();
+    List<ProductDto> products =
+        productRepository.findByTenantIdInAndIsActiveTrue(tenantScope(tenantId)).stream()
+            .map(ProductDto::from)
+            .collect(Collectors.toList());
+    return enrichDisplayNames(products);
   }
 
   @Override
@@ -74,9 +90,50 @@ public class ProductService implements ProductFacade {
   public List<ProductDto> findByType(UUID tenantId, ProductType type) {
     log.debug("Finding products by type: tenantId={}, type={}", tenantId, type);
 
-    return productRepository.findByTenantIdAndProductTypeAndIsActiveTrue(tenantId, type).stream()
-        .map(ProductDto::from)
-        .toList();
+    List<ProductDto> products =
+        productRepository
+            .findByTenantIdInAndProductTypeAndIsActiveTrue(tenantScope(tenantId), type)
+            .stream()
+            .map(ProductDto::from)
+            .collect(Collectors.toList());
+    return enrichDisplayNames(products);
+  }
+
+  private List<ProductDto> enrichDisplayNames(List<ProductDto> products) {
+    if (products.isEmpty()) return products;
+
+    // Fall back to uid by default
+    products.forEach(p -> p.setDisplayName(p.getUid()));
+
+    // Collect FIBER product IDs for batch lookup
+    List<UUID> fiberProductIds =
+        products.stream()
+            .filter(p -> ProductType.FIBER.equals(p.getProductType()))
+            .map(ProductDto::getId)
+            .toList();
+
+    if (!fiberProductIds.isEmpty()) {
+      Map<UUID, String> fiberNames =
+          fiberFacade.findByProductIds(fiberProductIds).stream()
+              .collect(
+                  Collectors.toMap(
+                      FiberDto::getProductId,
+                      FiberDto::getFiberName,
+                      (a, b) -> a // ignore duplicates
+                      ));
+
+      products.stream()
+          .filter(p -> ProductType.FIBER.equals(p.getProductType()))
+          .forEach(
+              p -> {
+                String name = fiberNames.get(p.getId());
+                if (name != null) {
+                  p.setDisplayName(name);
+                }
+              });
+    }
+
+    return products;
   }
 
   @Override
@@ -91,8 +148,10 @@ public class ProductService implements ProductFacade {
 
     Product product =
         productRepository
-            .findByTenantIdAndId(tenantId, id)
+            .findByTenantIdInAndId(tenantScope(tenantId), id)
             .orElseThrow(() -> new NotFoundException("Product not found: " + id));
+
+    rejectIfTemplateProduct(product);
 
     product.delete();
     productRepository.save(product);
@@ -118,5 +177,34 @@ public class ProductService implements ProductFacade {
     return productAttributeRepository.findByIsActiveTrue().stream()
         .map(ProductAttributeDto::from)
         .toList();
+  }
+
+  /**
+   * Returns the tenant scope for read queries: current tenant + template tenant.
+   *
+   * <p>This ensures tenant users see both their own products and the platform seed products.
+   */
+  private List<UUID> tenantScope(UUID tenantId) {
+    return List.of(
+        tenantId,
+        com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID);
+  }
+
+  /**
+   * Guard: template-tenant products are read-only for non-template tenants.
+   *
+   * @param product the product entity loaded from the database
+   * @throws com.fabricmanagement.production.common.exception.ForbiddenOperationException if a
+   *     non-template tenant attempts to mutate a template product
+   */
+  private void rejectIfTemplateProduct(Product product) {
+    UUID currentTenant = TenantContext.requireTenantId();
+    if (com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID
+            .equals(product.getTenantId())
+        && !com.fabricmanagement.common.infrastructure.persistence.TenantContext.TEMPLATE_TENANT_ID
+            .equals(currentTenant)) {
+      throw new com.fabricmanagement.production.common.exception.ForbiddenOperationException(
+          "Template products are read-only and cannot be modified by tenants.");
+    }
   }
 }

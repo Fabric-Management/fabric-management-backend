@@ -13,7 +13,7 @@ public record FiberPurchaseSpecs(
     @Schema(description = "Length uniformity index (%)", example = "83.0") Double uniformityIndex,
     @Schema(description = "Trash/foreign matter content (%)", example = "1.2") Double trashContent,
     @Schema(description = "Color grade (Rd/+b)", example = "41-3") String colorGrade,
-    @Schema(description = "Country/region of origin", example = "Türkiye-Ege") String origin,
+    @Schema(description = "Country/region of origin", example = "Turkey-Aegean") String origin,
     @Schema(description = "Certifications", example = "[\"BCI\",\"GOTS\"]")
         List<String> certifications,
     @Schema(description = "Crop year", example = "2025/2026") String cropYear)

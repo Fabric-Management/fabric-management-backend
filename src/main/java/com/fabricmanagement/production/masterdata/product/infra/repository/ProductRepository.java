@@ -18,11 +18,18 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
   Optional<Product> findByTenantIdAndId(UUID tenantId, UUID id);
 
+  Optional<Product> findByTenantIdInAndId(List<UUID> tenantIds, UUID id);
+
   List<Product> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
   List<Product> findByTenantIdAndProductType(UUID tenantId, ProductType productType);
 
+  List<Product> findByTenantIdInAndIsActiveTrue(List<UUID> tenantIds);
+
   List<Product> findByTenantIdAndProductTypeAndIsActiveTrue(UUID tenantId, ProductType productType);
+
+  List<Product> findByTenantIdInAndProductTypeAndIsActiveTrue(
+      List<UUID> tenantIds, ProductType productType);
 
   boolean existsByTenantIdAndId(UUID tenantId, UUID id);
 

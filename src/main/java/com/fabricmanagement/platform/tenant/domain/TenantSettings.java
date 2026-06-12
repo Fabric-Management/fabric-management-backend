@@ -1,8 +1,8 @@
 package com.fabricmanagement.platform.tenant.domain;
 
+import com.fabricmanagement.common.domain.CurrencyConstants;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.Serializable;
-import java.util.Locale;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
  *
  * <pre>{@code
  * Tenant tenant = tenantRepository.findById(tenantId);
- * String timezone = tenant.getSettings().getTimezone(); // "Europe/Istanbul"
+ * String timezone = tenant.getSettings().getTimezone(); // "Europe/London"
  * boolean betaEnabled = tenant.getSettings().isBetaFeaturesEnabled();
  * }</pre>
  *
@@ -46,17 +46,17 @@ public class TenantSettings implements Serializable {
   // LOCALIZATION
   // ========================================
 
-  /** Timezone for date/time display (IANA format). Default: UTC */
-  @Builder.Default private String timezone = "UTC";
+  /** Timezone for date/time display (IANA format). Default: Europe/London */
+  @Builder.Default private String timezone = "Europe/London";
 
-  /** Locale for number/date formatting. Default: en-US */
-  @Builder.Default private String locale = Locale.US.toLanguageTag();
+  /** Locale for number/date formatting. Default: en-GB */
+  @Builder.Default private String locale = "en-GB";
 
-  /** Primary currency code (ISO 4217). Default: USD */
-  @Builder.Default private String currency = "USD";
+  /** Primary currency code (ISO 4217). Default: PLATFORM_DEFAULT_CURRENCY (GBP) */
+  @Builder.Default private String currency = CurrencyConstants.PLATFORM_DEFAULT_CURRENCY;
 
-  /** Primary country code (ISO 3166-1 alpha-2). Default: null */
-  private String country;
+  /** Primary country code (ISO 3166-1 alpha-2). Default: GB */
+  @Builder.Default private String country = "GB";
 
   // ========================================
   // FEATURE TOGGLES
@@ -105,19 +105,5 @@ public class TenantSettings implements Serializable {
    */
   public static TenantSettings defaults() {
     return TenantSettings.builder().build();
-  }
-
-  /**
-   * Create settings for Turkish tenant.
-   *
-   * @return settings configured for Turkey
-   */
-  public static TenantSettings forTurkey() {
-    return TenantSettings.builder()
-        .timezone("Europe/Istanbul")
-        .locale("tr-TR")
-        .currency("TRY")
-        .country("TR")
-        .build();
   }
 }

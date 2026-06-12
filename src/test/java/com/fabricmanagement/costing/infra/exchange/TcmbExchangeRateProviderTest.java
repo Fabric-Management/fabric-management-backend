@@ -2,6 +2,7 @@ package com.fabricmanagement.costing.infra.exchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -120,7 +121,7 @@ class TcmbExchangeRateProviderTest {
   }
 
   @Test
-  void saveToAuditCache_ExistingTCMBRate_ShouldUpdate() {
+  void saveToAuditCache_ExistingRate_ShouldSkipSave() {
     LocalDate date = LocalDate.now();
     ExchangeRateCache existing = ExchangeRateCache.builder().build();
     existing.setSource(ExchangeRateSource.TCMB);
@@ -132,27 +133,7 @@ class TcmbExchangeRateProviderTest {
 
     provider.saveToAuditCache(tenantId, "USD", "TRY", new BigDecimal("38.50"), date);
 
-    verify(cacheRepo).save(cacheCaptor.capture());
-    assertThat(cacheCaptor.getValue().getRate()).isEqualByComparingTo("38.50");
-  }
-
-  @Test
-  void saveToAuditCache_ExistingAnySourceRate_ShouldStillUpdate() {
-    // When this provider is reached, it means the Manual provider did not find a cache entry.
-    // Therefore, even if an existing record exists, TCMB can update it.
-    LocalDate date = LocalDate.now();
-    ExchangeRateCache existing = ExchangeRateCache.builder().build();
-    existing.setSource(ExchangeRateSource.MANUAL);
-    existing.setRate(new BigDecimal("99.99"));
-
-    when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, "USD", "TRY", date))
-        .thenReturn(Optional.of(existing));
-
-    provider.saveToAuditCache(tenantId, "USD", "TRY", new BigDecimal("38.50"), date);
-
-    // Update goes through — dead code guard was removed
-    verify(cacheRepo).save(any());
+    verify(cacheRepo, never()).save(any());
   }
 
   // ─── parseXml() ───────────────────────────────────────────

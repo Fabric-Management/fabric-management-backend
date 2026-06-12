@@ -8,8 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
-import com.fabricmanagement.costing.app.port.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.domain.exchange.ExchangeRateCache;
 import com.fabricmanagement.costing.infra.exchange.TcmbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.repository.ExchangeRateCacheRepository;
@@ -63,7 +63,7 @@ class ExchangeRateChainIntegrationTest
       TenantContext.setCurrentTenantId(tenantId);
       LocalDate today = LocalDate.now();
 
-      // Seed a Manual rate in the database (this is picked up by ManualExchangeRateProvider)
+      // Seed a Manual rate in the database (this is picked up by CachedRateProvider)
       ExchangeRateCache manualRate =
           TestCostDataFactory.createRate(
               tenantId,

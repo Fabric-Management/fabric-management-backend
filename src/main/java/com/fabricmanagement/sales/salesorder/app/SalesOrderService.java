@@ -4,6 +4,7 @@ import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.common.util.OrderTotals;
@@ -65,6 +66,7 @@ public class SalesOrderService {
   private final DomainEventPublisher domainEventPublisher;
   private final DocumentNumberGenerator documentNumberGenerator;
   private final ApprovalPort approvalPort;
+  private final TenantReportingCurrencyPort reportingCurrencyPort;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CREATION
@@ -88,7 +90,10 @@ public class SalesOrderService {
         request.getOrderDate() != null ? request.getOrderDate() : LocalDate.now();
     String orderNumber = generateOrderNumber(tenantId, effectiveDate);
 
-    String currency = request.getCurrency() != null ? request.getCurrency() : "TRY";
+    String currency =
+        request.getCurrency() != null
+            ? request.getCurrency()
+            : reportingCurrencyPort.getReportingCurrency(tenantId);
     BigDecimal calculatedTotal = calculateCreateTotal(request.getLines(), currency);
     validateDiscountDoesNotExceedTotal(calculatedTotal, request.getDiscountAmount());
 
@@ -835,7 +840,7 @@ public class SalesOrderService {
         .unit(req.getUnit())
         .unitPrice(
             req.getUnitPrice() != null && req.getCurrency() != null
-                ? com.fabricmanagement.common.util.Money.of(req.getUnitPrice(), req.getCurrency())
+                ? Money.of(req.getUnitPrice(), req.getCurrency())
                 : null)
         .moduleType(req.getModuleType())
         .moduleSpecs(req.getModuleSpecs())

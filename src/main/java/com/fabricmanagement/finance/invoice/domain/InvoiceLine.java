@@ -22,7 +22,7 @@ import lombok.*;
 @AllArgsConstructor
 public class InvoiceLine extends BaseEntity {
 
-  @Column(name = "invoice_id", nullable = false)
+  @Column(name = "invoice_id", nullable = false, insertable = false, updatable = false)
   private UUID invoiceId;
 
   @Column(name = "line_number", nullable = false)
