@@ -7,12 +7,14 @@ import com.fabricmanagement.finance.invoice.domain.CreditNoteApplication;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
 import com.fabricmanagement.finance.invoice.domain.event.CreditNoteAppliedEvent;
+import com.fabricmanagement.finance.invoice.domain.event.CreditNoteReversedEvent;
 import com.fabricmanagement.finance.invoice.dto.CreateCreditNoteApplicationRequest;
 import com.fabricmanagement.finance.invoice.dto.CreditNoteApplicationDto;
 import com.fabricmanagement.finance.invoice.infra.repository.CreditNoteApplicationRepository;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -104,6 +106,7 @@ public class CreditNoteApplicationService {
             .creditNoteId(creditNote.getId())
             .targetInvoiceId(targetInvoice.getId())
             .amount(applicationAmount)
+            .appliedAt(Instant.now(clock))
             .build();
     application.setTenantId(tenantId);
     CreditNoteApplication saved = applicationRepository.save(application);
@@ -146,6 +149,14 @@ public class CreditNoteApplicationService {
 
     application.delete();
     applicationRepository.save(application);
+
+    eventPublisher.publishEvent(
+        new CreditNoteReversedEvent(
+            tenantId,
+            creditNoteId,
+            application.getTargetInvoiceId(),
+            application.getAmount(),
+            targetInvoice.getPaymentStatus().name()));
 
     log.info("Reversed credit note application {}", applicationId);
   }

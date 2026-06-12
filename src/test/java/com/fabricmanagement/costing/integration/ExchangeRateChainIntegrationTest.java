@@ -11,9 +11,11 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exchange.ExchangeRateCache;
+import com.fabricmanagement.costing.infra.exchange.EcbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.exchange.TcmbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.repository.ExchangeRateCacheRepository;
 import com.fabricmanagement.costing.integration.support.TestCostDataFactory;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -31,15 +33,14 @@ import org.springframework.boot.test.mock.mockito.MockBean;
  * and mocked via @MockBean.
  */
 @DisplayName("Exchange Rate Provider Chain Integration")
-class ExchangeRateChainIntegrationTest
-    extends com.fabricmanagement.testsupport.AbstractIntegrationTest {
+class ExchangeRateChainIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private ExchangeRateService exchangeRateService;
   @Autowired private ExchangeRateCacheRepository cacheRepo;
   @MockBean private TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   // Mock ECB Provider (Order 1.5) so we don't do real HTTP requests
-  @MockBean private com.fabricmanagement.costing.infra.exchange.EcbExchangeRateProvider ecbProvider;
+  @MockBean private EcbExchangeRateProvider ecbProvider;
 
   // Mock TCMB Provider (Order 2) so we don't do real HTTP requests
   @MockBean private TcmbExchangeRateProvider tcmbProvider;

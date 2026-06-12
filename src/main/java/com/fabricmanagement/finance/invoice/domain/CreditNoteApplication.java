@@ -50,8 +50,7 @@ public class CreditNoteApplication extends BaseEntity {
   private Money amount;
 
   @Column(name = "applied_at", nullable = false)
-  @Builder.Default
-  private Instant appliedAt = Instant.now();
+  private Instant appliedAt;
 
   @Override
   protected String getModuleCode() {

@@ -13,6 +13,7 @@ import com.fabricmanagement.costing.domain.item.CalculationBase;
 import com.fabricmanagement.costing.domain.item.CostItemScope;
 import com.fabricmanagement.costing.domain.price.PriceList;
 import com.fabricmanagement.costing.domain.template.CostTemplateItem;
+import com.fabricmanagement.costing.infra.exchange.EcbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.exchange.TcmbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.repository.CostCalculationRepository;
 import com.fabricmanagement.costing.infra.repository.CostItemRepository;
@@ -23,6 +24,7 @@ import com.fabricmanagement.costing.infra.repository.PriceListRepository;
 import com.fabricmanagement.costing.integration.support.TestCostDataFactory;
 import com.fabricmanagement.production.execution.workorder.app.port.ConsumptionCostInput;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -36,8 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
 @DisplayName("Multi-Product Cost Integration Test")
-class MultiProductCostIntegrationTest
-    extends com.fabricmanagement.testsupport.AbstractIntegrationTest {
+class MultiProductCostIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;
@@ -48,6 +49,7 @@ class MultiProductCostIntegrationTest
   @Autowired private CostCalculationRepository calcRepo;
 
   @MockBean private TenantReportingCurrencyPort tenantPort;
+  @MockBean private EcbExchangeRateProvider ecbProvider; // Mock external calls
   @MockBean private TcmbExchangeRateProvider tcmbProvider; // Mock external calls
   @MockBean private WorkOrderPlanningUpdatePort planningPort; // Ignore upstream updates
 
