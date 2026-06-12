@@ -18,8 +18,8 @@ public class ConvertedMoney {
   private BigDecimal originalAmount;
   private String originalCurrency; // USD
   private BigDecimal convertedAmount;
-  private String convertedCurrency; // TRY (tenant reporting currency)
-  private BigDecimal exchangeRate; // 38.50
+  private String convertedCurrency; // GBP (tenant reporting currency)
+  private BigDecimal exchangeRate; // 1.18
   private LocalDate rateDate; // 2026-04-01
 
   /** Creates a converted money between different currencies. */

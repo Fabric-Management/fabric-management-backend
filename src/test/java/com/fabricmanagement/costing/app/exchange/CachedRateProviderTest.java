@@ -2,7 +2,6 @@ package com.fabricmanagement.costing.app.exchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
@@ -22,11 +21,11 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class ManualExchangeRateProviderTest {
+class CachedRateProviderTest {
 
   @Mock private ExchangeRateCacheRepository cacheRepo;
 
-  @InjectMocks private ManualExchangeRateProvider provider;
+  @InjectMocks private CachedRateProvider provider;
 
   private final UUID tenantId = UUID.randomUUID();
   private MockedStatic<TenantContext> tenantContextMock;
@@ -67,63 +66,11 @@ class ManualExchangeRateProviderTest {
   }
 
   @Test
-  void getRate_FallbackWithinCutoff_ShouldReturnRate() {
-    LocalDate date = LocalDate.now();
-    LocalDate cutoffDate = date.minusDays(7);
-    BigDecimal rate = new BigDecimal("38.00");
-    ExchangeRateCache cache = ExchangeRateCache.builder().build();
-    cache.setRate(rate);
-    cache.setRateDate(date.minusDays(3));
-
-    when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, "USD", "TRY", date))
-        .thenReturn(Optional.empty());
-
-    when(cacheRepo
-            .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
-                tenantId, "USD", "TRY", cutoffDate, date))
-        .thenReturn(Optional.of(cache));
-
-    Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "TRY", date);
-
-    assertThat(result).isPresent().contains(rate);
-    verify(cacheRepo)
-        .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
-            tenantId, "USD", "TRY", cutoffDate, date);
-  }
-
-  @Test
-  void getRate_FallbackOutsideCutoff_ShouldReturnEmpty() {
-    LocalDate date = LocalDate.now();
-    LocalDate cutoffDate = date.minusDays(7);
-
-    when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
-            tenantId, "USD", "TRY", date))
-        .thenReturn(Optional.empty());
-
-    // The repository returns empty (the bounded query natively excludes records outside cutoff)
-    when(cacheRepo
-            .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
-                tenantId, "USD", "TRY", cutoffDate, date))
-        .thenReturn(Optional.empty());
-
-    Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "TRY", date);
-
-    assertThat(result).isEmpty();
-  }
-
-  @Test
   void getRate_NoRecordFound_ShouldReturnEmpty() {
     LocalDate date = LocalDate.now();
-    LocalDate cutoffDate = date.minusDays(7);
 
     when(cacheRepo.findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateAndIsActiveTrue(
             tenantId, "USD", "TRY", date))
-        .thenReturn(Optional.empty());
-
-    when(cacheRepo
-            .findFirstByTenantIdAndBaseCurrencyAndTargetCurrencyAndRateDateBetweenAndIsActiveTrueOrderByRateDateDesc(
-                tenantId, "USD", "TRY", cutoffDate, date))
         .thenReturn(Optional.empty());
 
     Optional<BigDecimal> result = provider.getRate(tenantId, "USD", "TRY", date);

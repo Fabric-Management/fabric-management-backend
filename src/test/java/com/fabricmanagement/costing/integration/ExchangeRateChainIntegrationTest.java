@@ -63,7 +63,7 @@ class ExchangeRateChainIntegrationTest
       TenantContext.setCurrentTenantId(tenantId);
       LocalDate today = LocalDate.now();
 
-      // Seed a Manual rate in the database (this is picked up by ManualExchangeRateProvider)
+      // Seed a Manual rate in the database (this is picked up by CachedRateProvider)
       ExchangeRateCache manualRate =
           TestCostDataFactory.createRate(
               tenantId,

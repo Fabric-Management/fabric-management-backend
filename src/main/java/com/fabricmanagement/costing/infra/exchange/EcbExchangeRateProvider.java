@@ -13,7 +13,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -30,40 +30,42 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 /**
- * TCMB (Central Bank of the Republic of Turkey) exchange rate provider.
+ * ECB (European Central Bank) exchange rate provider.
  *
- * <p>Uses a lazy cache pattern: On the first getRate() call, fetches daily rates from the TCMB XML
- * feed and stores them in a JVM-level in-memory cache. Subsequent calls return from cache. Writes
- * an audit trail to the DB for each tenant.
+ * <p>Uses a lazy cache pattern: On the first getRate() call, fetches daily or 90-day rates from the
+ * ECB XML feed and stores them in a JVM-level in-memory cache.
  *
- * <p>Runs after CachedRateProvider (@Order(10)) and EcbExchangeRateProvider (@Order(20)). Manually
- * entered rates always override TCMB because they are resolved first via CachedRateProvider in the
- * chain, so this provider is never reached.
+ * <p>Note: ECB hist-90d boundary means requests older than 90 days will not find a rate in the
+ * feed. For such deep historical recalculations, a MANUAL rate must be provided.
  */
 @Slf4j
 @Component
-@Order(30)
+@Order(20)
 @ConditionalOnProperty(
-    prefix = "costing.fx.tcmb",
+    prefix = "costing.fx.ecb",
     name = "enabled",
     havingValue = "true",
-    matchIfMissing = false)
-public class TcmbExchangeRateProvider implements ExchangeRateProvider {
+    matchIfMissing = true)
+public class EcbExchangeRateProvider implements ExchangeRateProvider {
 
   private static final int MAX_CACHE_DAYS = 30;
 
   private final ExchangeRateCacheRepository cacheRepo;
 
   // Global in-memory lazy cache: JVM level, Tenant agnostic
-  // Structure: Date -> (Currency -> TRY Rate)
-  // Empty map = fetch attempted but failed (prevents retry storm)
-  private final Map<LocalDate, Map<String, BigDecimal>> tcmbDailyRates = new ConcurrentHashMap<>();
+  // Structure: Date -> (Currency -> Units per 1 EUR)
+  private final Map<LocalDate, Map<String, BigDecimal>> ecbDailyRates = new ConcurrentHashMap<>();
 
-  private final HttpClient httpClient =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+  private final HttpClient httpClient;
+  private final int timeoutSeconds;
 
-  public TcmbExchangeRateProvider(ExchangeRateCacheRepository cacheRepo) {
+  public EcbExchangeRateProvider(
+      ExchangeRateCacheRepository cacheRepo,
+      @Value("${costing.fx.ecb.timeout-seconds:5}") int timeoutSeconds) {
     this.cacheRepo = cacheRepo;
+    this.timeoutSeconds = timeoutSeconds;
+    this.httpClient =
+        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(timeoutSeconds)).build();
   }
 
   @Override
@@ -74,12 +76,11 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
 
     evictStaleCacheEntries();
 
-    // Lazy fetch: only cache successful results (empty = transient failure, allow retry)
-    Map<String, BigDecimal> dayRates = tcmbDailyRates.get(date);
+    Map<String, BigDecimal> dayRates = ecbDailyRates.get(date);
     if (dayRates == null) {
       dayRates = fetchRatesForDate(date);
       if (!dayRates.isEmpty()) {
-        tcmbDailyRates.put(date, dayRates);
+        ecbDailyRates.put(date, dayRates);
       }
     }
 
@@ -89,21 +90,22 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
 
     Optional<BigDecimal> calculatedRate = calculateCrossRate(from, to, dayRates);
 
-    // Write to audit trail for this tenant (only if rate was successfully found/calculated)
+    // Persist to audit cache (skip if an active row exists to respect MANUAL precedence)
     calculatedRate.ifPresent(rate -> saveToAuditCache(tenantId, from, to, rate, date));
 
     return calculatedRate;
   }
 
-  private Map<String, BigDecimal> fetchRatesForDate(LocalDate date) {
-    String url = buildTcmbUrl(date);
-    log.info("Fetching TCMB rates from: {}", url);
+  // Visible for testing (spy-based stubbing avoids spinning up an HTTP server)
+  Map<String, BigDecimal> fetchRatesForDate(LocalDate date) {
+    String url = buildEcbUrl(date);
+    log.info("Fetching ECB rates from: {}", url);
 
     try {
       HttpRequest request =
           HttpRequest.newBuilder()
               .uri(URI.create(url))
-              .timeout(Duration.ofSeconds(5))
+              .timeout(Duration.ofSeconds(timeoutSeconds))
               .GET()
               .build();
 
@@ -111,32 +113,29 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
           httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
       if (response.statusCode() != 200) {
-        log.warn("TCMB returned status {} for URL: {}", response.statusCode(), url);
+        log.warn("ECB returned status {} for URL: {}", response.statusCode(), url);
         return Collections.emptyMap();
       }
 
-      Map<String, BigDecimal> parsed = parseXml(response.body());
+      Map<String, BigDecimal> parsed = parseXml(response.body(), date);
       return parsed.isEmpty() ? Collections.emptyMap() : parsed;
 
     } catch (Exception e) {
-      log.error("Failed to fetch TCMB rates from URL {}: {}", url, e.getMessage());
+      log.error("Failed to fetch ECB rates from URL {}: {}", url, e.getMessage());
       return Collections.emptyMap();
     }
   }
 
-  /**
-   * Always uses date-based URL. today.xml is not used due to inconsistent format and update timing.
-   */
-  String buildTcmbUrl(LocalDate date) {
-    String yearMonth = date.format(DateTimeFormatter.ofPattern("yyyyMM"));
-    String dayMonthYear = date.format(DateTimeFormatter.ofPattern("ddMMyyyy"));
-    return String.format("https://www.tcmb.gov.tr/kurlar/%s/%s.xml", yearMonth, dayMonthYear);
+  String buildEcbUrl(LocalDate date) {
+    if (date.isEqual(LocalDate.now())) {
+      return "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
+    } else {
+      return "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml";
+    }
   }
 
-  Map<String, BigDecimal> parseXml(InputStream is) throws Exception {
+  Map<String, BigDecimal> parseXml(InputStream is, LocalDate targetDate) throws Exception {
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-
-    // XXE protection — defense-in-depth
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
     factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
     factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
@@ -146,27 +145,42 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
     doc.getDocumentElement().normalize();
 
     Map<String, BigDecimal> rates = new ConcurrentHashMap<>();
-    rates.put("TRY", BigDecimal.ONE); // Base is TRY
 
-    NodeList nList = doc.getElementsByTagName("Currency");
-    for (int temp = 0; temp < nList.getLength(); temp++) {
-      Element element = (Element) nList.item(temp);
-      String currencyCode = element.getAttribute("Kod");
+    NodeList timeNodes = doc.getElementsByTagName("Cube");
+    Element targetTimeElement = null;
 
-      if (currencyCode.equals("XDR")) continue; // Skip Special Drawing Rights
-
-      String forexBuying = element.getElementsByTagName("ForexBuying").item(0).getTextContent();
-      try {
-        if (forexBuying == null || forexBuying.isBlank()) {
-          log.debug("Empty ForexBuying for currency: {}", currencyCode);
-          continue;
+    // Find the Cube with the matching time attribute (if available)
+    for (int i = 0; i < timeNodes.getLength(); i++) {
+      Element el = (Element) timeNodes.item(i);
+      if (el.hasAttribute("time")) {
+        LocalDate cubeDate = LocalDate.parse(el.getAttribute("time"));
+        if (cubeDate.isEqual(targetDate)) {
+          targetTimeElement = el;
+          break;
         }
-        BigDecimal rate = new BigDecimal(forexBuying.trim());
-        if (rate.compareTo(BigDecimal.ZERO) > 0) {
-          rates.put(currencyCode, rate);
+      }
+    }
+
+    if (targetTimeElement == null) {
+      log.debug("No ECB rate data found for exact date: {}", targetDate);
+      return rates;
+    }
+
+    rates.put("EUR", BigDecimal.ONE); // Base is EUR
+
+    NodeList rateNodes = targetTimeElement.getElementsByTagName("Cube");
+    for (int j = 0; j < rateNodes.getLength(); j++) {
+      Element element = (Element) rateNodes.item(j);
+      if (element.hasAttribute("currency") && element.hasAttribute("rate")) {
+        String currencyCode = element.getAttribute("currency");
+        try {
+          BigDecimal rate = new BigDecimal(element.getAttribute("rate").trim());
+          if (rate.compareTo(BigDecimal.ZERO) > 0) {
+            rates.put(currencyCode, rate);
+          }
+        } catch (NumberFormatException e) {
+          log.debug("Skipping unparseable rate for currency: {}", currencyCode);
         }
-      } catch (NumberFormatException e) {
-        log.debug("Skipping unparseable rate for currency: {}", currencyCode);
       }
     }
     return rates;
@@ -178,20 +192,19 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
       return Optional.empty();
     }
 
-    BigDecimal fromToTry = dayRates.get(from);
-    BigDecimal toToTry = dayRates.get(to);
+    BigDecimal eurToFrom = dayRates.get(from);
+    BigDecimal eurToTo = dayRates.get(to);
 
-    // Cross-rate calculation: USD->EUR = USD->TRY / EUR->TRY
-    // Using scale 6, RoundingMode.HALF_UP (NUMERIC(15,6) uyumlu)
+    // Cross-rate calculation: USD->GBP = rate(EUR->GBP) / rate(EUR->USD)
+    // Using scale 6, RoundingMode.HALF_UP
     try {
-      BigDecimal rate = fromToTry.divide(toToTry, 6, RoundingMode.HALF_UP);
+      BigDecimal rate = eurToTo.divide(eurToFrom, 6, RoundingMode.HALF_UP);
       return Optional.of(rate);
     } catch (ArithmeticException e) {
       return Optional.empty();
     }
   }
 
-  /** Persist to audit cache (skip if an active row exists to respect MANUAL precedence). */
   void saveToAuditCache(
       UUID tenantId, String base, String target, BigDecimal rate, LocalDate date) {
     ExchangeRateCache existing =
@@ -201,6 +214,7 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
             .orElse(null);
 
     if (existing != null) {
+      // R1: Skip if active row exists (e.g. MANUAL rate) to maintain determinism.
       return;
     }
 
@@ -210,15 +224,14 @@ public class TcmbExchangeRateProvider implements ExchangeRateProvider {
             .targetCurrency(target)
             .rate(rate)
             .rateDate(date)
-            .source(ExchangeRateSource.TCMB)
+            .source(ExchangeRateSource.ECB)
             .build();
     cache.setTenantId(tenantId);
     cacheRepo.save(cache);
   }
 
-  /** Evicts cache entries older than 30 days — memory hygiene. */
   private void evictStaleCacheEntries() {
     LocalDate cutoff = LocalDate.now().minusDays(MAX_CACHE_DAYS);
-    tcmbDailyRates.keySet().removeIf(date -> date.isBefore(cutoff));
+    ecbDailyRates.keySet().removeIf(date -> date.isBefore(cutoff));
   }
 }

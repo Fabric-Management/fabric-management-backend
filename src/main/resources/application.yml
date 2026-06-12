@@ -269,3 +269,12 @@ org:
       enabled: true
     dashboard:
       enabled: false
+
+costing:
+  fx:
+    max-stale-days: 7
+    ecb:
+      enabled: true
+      timeout-seconds: 5
+    tcmb:
+      enabled: false

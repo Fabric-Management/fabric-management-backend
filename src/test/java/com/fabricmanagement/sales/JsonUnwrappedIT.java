@@ -31,10 +31,10 @@ class JsonUnwrappedIT {
 
   @Test
   void testJsonUnwrapped() throws Exception {
-    String json = "{\"name\":\"Test\",\"unitPriceamount\":100.5,\"unitPricecurrency\":\"TRY\"}";
+    String json = "{\"name\":\"Test\",\"unitPriceamount\":100.5,\"unitPricecurrency\":\"GBP\"}";
     FlatRequest request = objectMapper.readValue(json, FlatRequest.class);
     assertThat(request.getName()).isEqualTo("Test");
     assertThat(request.getUnitPrice().getAmount()).isEqualTo(new BigDecimal("100.5"));
-    assertThat(request.getUnitPrice().getCurrency()).isEqualTo("TRY");
+    assertThat(request.getUnitPrice().getCurrency()).isEqualTo("GBP");
   }
 }

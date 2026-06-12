@@ -1,6 +1,7 @@
 package com.fabricmanagement.costing.domain.currency;
 
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.costing.domain.exchange.ExchangeRateSource;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
