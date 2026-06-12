@@ -80,14 +80,11 @@ public class InvoiceService {
             .build();
 
     invoice.setTenantId(tenantId);
-    invoice.calculateAmounts();
 
     if (request.lines() != null && !request.lines().isEmpty()) {
-      int lineNumber = 1;
       for (CreateInvoiceLineRequest lineReq : request.lines()) {
         InvoiceLine line =
             InvoiceLine.builder()
-                .lineNumber(lineNumber++)
                 .description(lineReq.description())
                 .productCode(lineReq.productCode())
                 .unit(lineReq.unit() != null ? lineReq.unit() : "PCS")
@@ -96,15 +93,15 @@ public class InvoiceService {
                 .discountRate(
                     lineReq.discountRate() != null ? lineReq.discountRate() : BigDecimal.ZERO)
                 .taxRate(lineReq.taxRate() != null ? lineReq.taxRate() : BigDecimal.ZERO)
-                .lineSubtotal(BigDecimal.ZERO)
-                .lineTotal(BigDecimal.ZERO)
                 .notes(lineReq.notes())
                 .build();
         line.setTenantId(tenantId);
-        line.calculate();
-        invoice.getLines().add(line);
+        invoice.addLine(line);
       }
       invoice.recalculateFromLines();
+      invoice.validateClientAmounts(request.subtotal(), request.totalAmount());
+    } else {
+      invoice.calculateAmounts();
     }
 
     Invoice saved = invoiceRepository.save(invoice);
@@ -131,6 +128,17 @@ public class InvoiceService {
       throw new FinanceDomainException("Can only update invoices in DRAFT status");
     }
 
+    if (invoice.hasLines()) {
+      if (request.subtotal() != null
+          || request.taxAmount() != null
+          || request.discountAmount() != null
+          || request.totalAmount() != null) {
+        throw new FinanceDomainException(
+            "Cannot directly update monetary amounts on an invoice with lines; "
+                + "modify the lines instead");
+      }
+    }
+
     if (request.orderReference() != null) invoice.setOrderReference(request.orderReference());
     if (request.externalReference() != null)
       invoice.setExternalReference(request.externalReference());
@@ -147,7 +155,11 @@ public class InvoiceService {
     if (request.billingAddress() != null) invoice.setBillingAddress(request.billingAddress());
     if (request.notes() != null) invoice.setNotes(request.notes());
 
-    invoice.calculateAmounts();
+    if (invoice.hasLines()) {
+      invoice.recalculateFromLines();
+    } else {
+      invoice.calculateAmounts();
+    }
     Invoice saved = invoiceRepository.save(invoice);
     return invoiceMapper.toDto(saved);
   }
