@@ -18,6 +18,8 @@ tags:
   name: FlowBoard — Dashboard
 - description: Work Order operations
   name: Work Order
+- description: Payment operations
+  name: Payment
 - description: Manage certifications for trading partners
   name: Partner Certifications
 - description: Notification management and preferences
@@ -16206,9 +16208,6 @@ paths:
           - DRAFT
           - ISSUED
           - SENT
-          - PARTIALLY_PAID
-          - PAID
-          - OVERDUE
           - DISPUTED
           - CANCELLED
           - VOIDED
@@ -16699,6 +16698,7 @@ paths:
       - Invoice
   /api/v1/finance/invoices/{id}/payment:
     patch:
+      deprecated: true
       operationId: recordPayment
       parameters:
       - in: path
@@ -16983,6 +16983,441 @@ paths:
           description: Internal Server Error
       tags:
       - Invoice
+  /api/v1/finance/payments:
+    get:
+      operationId: getPayments
+      parameters:
+      - in: query
+        name: tradingPartnerId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: pageable
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagePaymentDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Payment
+    post:
+      operationId: createPayment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaymentDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Payment
+  /api/v1/finance/payments/{id}:
+    get:
+      operationId: getPayment
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaymentDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Payment
+  /api/v1/finance/payments/{id}/allocations:
+    post:
+      operationId: allocatePayment
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAllocationRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaymentAllocationDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Payment
+  /api/v1/finance/payments/{id}/allocations/{allocationId}:
+    delete:
+      operationId: deallocatePayment
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: allocationId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseVoid"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Payment
+  /api/v1/finance/payments/{id}/void:
+    patch:
+      operationId: voidPayment
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePaymentDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Payment
   /api/v1/flowboard/automations:
     get:
       operationId: getAutomations
@@ -41338,6 +41773,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePagePaymentDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagePaymentDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePagedResponseAuditLogDto:
       type: object
       properties:
@@ -41703,6 +42156,42 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PartnerUserDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePaymentAllocationDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PaymentAllocationDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePaymentDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PaymentDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -43957,6 +44446,18 @@ components:
       - country
       - label
       - streetAddress
+    CreateAllocationRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          minimum: 0.01
+        invoiceId:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - invoiceId
     CreateBatchLineageRequest:
       type: object
       properties:
@@ -44675,6 +45176,42 @@ components:
       - name
       - organizationType
       - taxId
+    CreatePaymentRequest:
+      type: object
+      properties:
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateAllocationRequest"
+        amount:
+          type: number
+          minimum: 0.01
+        bankReference:
+          type: string
+        currency:
+          type: string
+          minLength: 1
+        direction:
+          type: string
+          minLength: 1
+        method:
+          type: string
+          minLength: 1
+        notes:
+          type: string
+        paymentDate:
+          type: string
+          format: date
+        tradingPartnerId:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - currency
+      - direction
+      - method
+      - paymentDate
+      - tradingPartnerId
     CreatePermissionOverrideRequest:
       type: object
       properties:
@@ -45271,7 +45808,7 @@ components:
         currency:
           type: string
           description: Currency code
-          example: TRY
+          example: GBP
           minLength: 1
         entryMethod:
           type: string
@@ -46903,6 +47440,8 @@ components:
         paymentDate:
           type: string
           format: date
+        paymentStatus:
+          type: string
         status:
           type: string
         subtotal:
@@ -47569,6 +48108,38 @@ components:
           minLength: 10
       required:
       - reason
+    PagePaymentDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentDto"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PageRequestDto:
       type: object
       properties:
@@ -47601,6 +48172,24 @@ components:
           type: array
           items:
             type: string
+    PageableObject:
+      type: object
+      properties:
+        offset:
+          type: integer
+          format: int64
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        paged:
+          type: boolean
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
     PagedResponseAuditLogDto:
       type: object
       properties:
@@ -48160,6 +48749,70 @@ components:
       required:
       - password
       - token
+    PaymentAllocationDto:
+      type: object
+      properties:
+        allocatedAt:
+          type: string
+          format: date-time
+        amount:
+          type: number
+        currency:
+          type: string
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+    PaymentDto:
+      type: object
+      properties:
+        allocatedAmount:
+          type: number
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentAllocationDto"
+        amount:
+          type: number
+        bankReference:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        currency:
+          type: string
+        direction:
+          type: string
+        id:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          additionalProperties: {}
+        method:
+          type: string
+        notes:
+          type: string
+        paymentDate:
+          type: string
+          format: date
+        paymentNumber:
+          type: string
+        status:
+          type: string
+        tradingPartnerId:
+          type: string
+          format: uuid
+        unallocatedAmount:
+          type: number
+        updatedAt:
+          type: string
+          format: date-time
     PermissionOverrideDto:
       type: object
       properties:
@@ -50008,6 +50661,15 @@ components:
           - METER
           - PIECE
           - ROLL
+    SortObject:
+      type: object
+      properties:
+        empty:
+          type: boolean
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
     SpinningProductionSpecs:
       allOf:
       - $ref: "#/components/schemas/WorkOrderProductionSpecs"

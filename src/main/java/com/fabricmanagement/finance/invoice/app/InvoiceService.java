@@ -195,30 +195,6 @@ public class InvoiceService {
     return invoiceMapper.toDto(saved);
   }
 
-  public InvoiceDto recordPayment(UUID invoiceId, BigDecimal amount) {
-    UUID tenantId = TenantContext.requireTenantId();
-    Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
-    invoice.recordPayment(Money.of(amount, invoice.getCurrency()));
-    Invoice saved = invoiceRepository.save(invoice);
-
-    eventPublisher.publishEvent(
-        new PaymentRecordedEvent(
-            tenantId,
-            saved.getId(),
-            saved.getInvoiceNumber(),
-            amount,
-            saved.getAmountPaid().getAmount(),
-            saved.getAmountDue().getAmount(),
-            saved.getStatus() == InvoiceStatus.PAID));
-
-    log.info(
-        "Payment recorded for invoice {}: {} (remaining: {})",
-        saved.getInvoiceNumber(),
-        amount,
-        saved.getAmountDue());
-    return invoiceMapper.toDto(saved);
-  }
-
   public InvoiceDto cancelInvoice(UUID invoiceId) {
     UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
@@ -287,8 +263,11 @@ public class InvoiceService {
   public Page<InvoiceDto> getUnpaidByPartner(UUID partnerId, Pageable pageable) {
     UUID tenantId = TenantContext.requireTenantId();
     return invoiceRepository
-        .findByTenantIdAndTradingPartnerIdAndStatusNot(
-            tenantId, partnerId, InvoiceStatus.PAID, pageable)
+        .findByTenantIdAndTradingPartnerIdAndPaymentStatusNot(
+            tenantId,
+            partnerId,
+            com.fabricmanagement.finance.invoice.domain.InvoicePaymentStatus.PAID,
+            pageable)
         .map(invoiceMapper::toDto);
   }
 
@@ -326,13 +305,11 @@ public class InvoiceService {
     return invoiceRepository.findAccountsPayable(tenantId, pageable).map(invoiceMapper::toDto);
   }
 
-  public int markOverdueInvoices(UUID tenantId) {
+  public int notifyOverdueInvoices(UUID tenantId) {
     List<Invoice> eligibles =
         invoiceRepository.findInvoicesEligibleForOverdue(tenantId, LocalDate.now());
     int count = 0;
     for (Invoice invoice : eligibles) {
-      invoice.markOverdue();
-      invoiceRepository.save(invoice);
 
       eventPublisher.publishEvent(
           new InvoiceOverdueEvent(
@@ -344,7 +321,7 @@ public class InvoiceService {
       count++;
     }
     if (count > 0) {
-      log.info("Marked {} invoices as overdue for tenant {}", count, tenantId);
+      log.info("Sent overdue notifications for {} invoices for tenant {}", count, tenantId);
     }
     return count;
   }

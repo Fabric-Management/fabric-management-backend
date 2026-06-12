@@ -15,6 +15,7 @@ public record InvoiceDto(
     String externalReference,
     String invoiceType,
     String status,
+    String paymentStatus,
     UUID originalInvoiceId,
     LocalDate issueDate,
     LocalDate dueDate,

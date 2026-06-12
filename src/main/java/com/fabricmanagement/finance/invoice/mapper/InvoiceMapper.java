@@ -20,6 +20,7 @@ public interface InvoiceMapper {
   @Mapping(target = "daysOverdue", expression = "java(entity.getDaysOverdue())")
   @Mapping(target = "invoiceType", expression = "java(entity.getInvoiceType().name())")
   @Mapping(target = "status", expression = "java(entity.getStatus().name())")
+  @Mapping(target = "paymentStatus", expression = "java(entity.getPaymentStatus().name())")
   InvoiceDto toDto(Invoice entity);
 
   List<InvoiceDto> toDtoList(List<Invoice> entities);

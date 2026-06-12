@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -197,12 +198,12 @@ class InvoiceTaxReconciliationTest {
     invoice.issue();
     invoice.send();
 
-    invoice.recordPayment(Money.of(new BigDecimal("2000.00"), "GBP"));
-    assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.PARTIALLY_PAID);
+    invoice.applyAllocation(Money.of(new BigDecimal("2000.00"), "GBP"), LocalDate.now());
+    assertThat(invoice.getPaymentStatus()).isEqualTo(InvoicePaymentStatus.PARTIALLY_PAID);
     assertThat(invoice.getAmountDue().getAmount()).isEqualByComparingTo(new BigDecimal("3000.00"));
 
-    invoice.recordPayment(Money.of(new BigDecimal("3000.00"), "GBP"));
-    assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.PAID);
+    invoice.applyAllocation(Money.of(new BigDecimal("3000.00"), "GBP"), LocalDate.now());
+    assertThat(invoice.getPaymentStatus()).isEqualTo(InvoicePaymentStatus.PAID);
     assertThat(invoice.getAmountDue().getAmount()).isEqualByComparingTo(BigDecimal.ZERO);
   }
 }

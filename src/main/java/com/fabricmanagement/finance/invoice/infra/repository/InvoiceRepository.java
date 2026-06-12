@@ -29,18 +29,21 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
   Page<Invoice> findByTenantIdAndInvoiceType(
       UUID tenantId, InvoiceType invoiceType, Pageable pageable);
 
-  Page<Invoice> findByTenantIdAndTradingPartnerIdAndStatusNot(
-      UUID tenantId, UUID tradingPartnerId, InvoiceStatus status, Pageable pageable);
+  Page<Invoice> findByTenantIdAndTradingPartnerIdAndPaymentStatusNot(
+      UUID tenantId,
+      UUID tradingPartnerId,
+      com.fabricmanagement.finance.invoice.domain.InvoicePaymentStatus paymentStatus,
+      Pageable pageable);
 
   @Query(
-      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.status IN "
-          + "('SENT','PARTIALLY_PAID','OVERDUE') AND i.dueDate < :today")
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.paymentStatus != 'PAID' "
+          + "AND i.status NOT IN ('CANCELLED','VOIDED') AND i.dueDate < :today")
   Page<Invoice> findOverdue(
       @Param("tenantId") UUID tenantId, @Param("today") LocalDate today, Pageable pageable);
 
   @Query(
-      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.status IN "
-          + "('SENT','PARTIALLY_PAID','OVERDUE')")
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.paymentStatus != 'PAID' "
+          + "AND i.status NOT IN ('CANCELLED','VOIDED','DRAFT')")
   Page<Invoice> findAwaitingPayment(@Param("tenantId") UUID tenantId, Pageable pageable);
 
   @Query(
@@ -54,8 +57,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
   Page<Invoice> findAccountsPayable(@Param("tenantId") UUID tenantId, Pageable pageable);
 
   @Query(
-      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.status IN "
-          + "('SENT','PARTIALLY_PAID') AND i.dueDate < :today")
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.paymentStatus != 'PAID' "
+          + "AND i.status NOT IN ('CANCELLED','VOIDED','DRAFT') AND i.dueDate < :today")
   List<Invoice> findInvoicesEligibleForOverdue(
       @Param("tenantId") UUID tenantId, @Param("today") LocalDate today);
 

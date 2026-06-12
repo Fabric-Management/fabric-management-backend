@@ -5,8 +5,13 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.finance.invoice.app.InvoiceService;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.dto.*;
+import com.fabricmanagement.finance.payment.app.PaymentService;
+import com.fabricmanagement.finance.payment.dto.CreateAllocationRequest;
+import com.fabricmanagement.finance.payment.dto.CreatePaymentRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class InvoiceController {
 
   private final InvoiceService invoiceService;
+  private final PaymentService paymentService;
 
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
@@ -65,12 +71,27 @@ public class InvoiceController {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.sendInvoice(id)));
   }
 
+  @Deprecated
   @PatchMapping("/{id}/payment")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> recordPayment(
       @PathVariable UUID id, @Valid @RequestBody RecordPaymentRequest request) {
-    return ResponseEntity.ok(
-        ApiResponse.success(invoiceService.recordPayment(id, request.amount())));
+
+    InvoiceDto invoice = invoiceService.getInvoice(id);
+    CreatePaymentRequest paymentReq =
+        new CreatePaymentRequest(
+            invoice.tradingPartnerId(),
+            "INBOUND",
+            "OTHER",
+            request.amount(),
+            invoice.currency(),
+            LocalDate.now(),
+            "Legacy API",
+            "Auto-generated from deprecated /payment endpoint",
+            List.of(new CreateAllocationRequest(id, request.amount())));
+    paymentService.createPayment(paymentReq);
+
+    return ResponseEntity.ok(ApiResponse.success(invoiceService.getInvoice(id)));
   }
 
   @PatchMapping("/{id}/cancel")

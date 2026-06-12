@@ -62,7 +62,14 @@ public class Invoice extends BaseEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 30)
   @Builder.Default
+  @Setter(AccessLevel.NONE)
   private InvoiceStatus status = InvoiceStatus.DRAFT;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "payment_status", nullable = false, length = 30)
+  @Builder.Default
+  @Setter(AccessLevel.NONE)
+  private InvoicePaymentStatus paymentStatus = InvoicePaymentStatus.UNPAID;
 
   @Column(name = "original_invoice_id")
   private UUID originalInvoiceId;
@@ -74,6 +81,7 @@ public class Invoice extends BaseEntity {
   private LocalDate dueDate;
 
   @Column(name = "payment_date")
+  @Setter(AccessLevel.NONE)
   private LocalDate paymentDate;
 
   @Embedded
@@ -127,6 +135,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
+  @Setter(AccessLevel.NONE)
   private Money amountPaid;
 
   @Embedded
@@ -138,6 +147,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
+  @Setter(AccessLevel.NONE)
   private Money amountDue;
 
   @Transient
@@ -323,28 +333,40 @@ public class Invoice extends BaseEntity {
     this.status = InvoiceStatus.SENT;
   }
 
-  public void recordPayment(Money amount) {
-    if (!status.canReceivePayment()) {
-      throw new InvoiceStatusTransitionException(
-          status, InvoiceStatus.PARTIALLY_PAID, "Cannot record payment in current status");
-    }
-
+  public void applyAllocation(Money allocationAmount, LocalDate paymentDate) {
     this.amountPaid =
-        (this.amountPaid != null ? this.amountPaid : Money.zero(getCurrency())).add(amount);
+        (this.amountPaid != null ? this.amountPaid : Money.zero(getCurrency()))
+            .add(allocationAmount);
     this.amountDue = this.totalAmount.subtract(this.amountPaid);
 
     if (this.amountDue.isZero() || this.amountDue.isNegative()) {
-      this.status = InvoiceStatus.PAID;
-      this.paymentDate = LocalDate.now();
+      this.paymentStatus = InvoicePaymentStatus.PAID;
+      this.paymentDate = paymentDate;
     } else {
-      this.status = InvoiceStatus.PARTIALLY_PAID;
+      this.paymentStatus = InvoicePaymentStatus.PARTIALLY_PAID;
     }
   }
 
-  public void markOverdue() {
-    if (status.isAwaitingPayment()) {
-      this.status = InvoiceStatus.OVERDUE;
+  public void reverseAllocation(Money allocationAmount) {
+    this.amountPaid = this.amountPaid.subtract(allocationAmount);
+    this.amountDue = this.totalAmount.subtract(this.amountPaid);
+
+    if (this.amountDue.isGreaterThan(Money.zero(getCurrency()))) {
+      this.paymentStatus = InvoicePaymentStatus.PARTIALLY_PAID;
+      this.paymentDate = null;
     }
+    if (this.amountPaid.isZero() || this.amountPaid.isNegative()) {
+      this.paymentStatus = InvoicePaymentStatus.UNPAID;
+      this.paymentDate = null;
+    }
+  }
+
+  public boolean isOverdue(LocalDate referenceDate) {
+    return this.dueDate != null
+        && referenceDate.isAfter(this.dueDate)
+        && this.paymentStatus != InvoicePaymentStatus.PAID
+        && this.status != InvoiceStatus.CANCELLED
+        && this.status != InvoiceStatus.VOIDED;
   }
 
   public void cancel() {
@@ -404,13 +426,17 @@ public class Invoice extends BaseEntity {
   }
 
   public boolean isOverdue() {
-    return status.isAwaitingPayment() && LocalDate.now().isAfter(dueDate);
+    return isOverdue(LocalDate.now());
   }
 
   public long getDaysOverdue() {
-    if (!isOverdue()) {
+    return getDaysOverdue(LocalDate.now());
+  }
+
+  public long getDaysOverdue(LocalDate referenceDate) {
+    if (!isOverdue(referenceDate)) {
       return 0;
     }
-    return java.time.temporal.ChronoUnit.DAYS.between(dueDate, LocalDate.now());
+    return java.time.temporal.ChronoUnit.DAYS.between(dueDate, referenceDate);
   }
 }
