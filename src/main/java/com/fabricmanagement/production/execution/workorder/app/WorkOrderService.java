@@ -93,7 +93,10 @@ public class WorkOrderService {
     Instant now = Instant.now();
 
     String dashboardCurrency =
-        tenantFacade.findById(tenantId).map(t -> t.getSettings().getCurrency()).orElse("TRY");
+        tenantFacade
+            .findById(tenantId)
+            .map(t -> t.getSettings().getCurrency())
+            .orElse(com.fabricmanagement.common.domain.CurrencyConstants.PLATFORM_DEFAULT_CURRENCY);
 
     // Query 1: Status counts
     List<WorkOrderRepository.StatusCountProjection> statusCounts =

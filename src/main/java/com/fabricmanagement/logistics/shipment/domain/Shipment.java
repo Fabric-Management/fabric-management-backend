@@ -178,8 +178,7 @@ public class Shipment extends BaseEntity {
 
   /** Currency code (ISO 4217). */
   @Column(name = "currency", length = 3)
-  @Builder.Default
-  private String currency = "TRY";
+  private String currency;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Delivery Info

@@ -37,7 +37,7 @@ class TenantReportingCurrencyAdapterTest {
   }
 
   @Test
-  void getReportingCurrency_OrgExistsButCurrencyNull_ShouldReturnFallbackTRY() {
+  void getReportingCurrency_OrgExistsButCurrencyNull_ShouldReturnFallbackGBP() {
     Organization org = new Organization();
     org.setReportingCurrency(null);
 
@@ -46,17 +46,17 @@ class TenantReportingCurrencyAdapterTest {
 
     String result = adapter.getReportingCurrency(tenantId);
 
-    assertThat(result).isEqualTo("TRY");
+    assertThat(result).isEqualTo("GBP");
   }
 
   @Test
-  void getReportingCurrency_OrgNotFound_ShouldReturnFallbackTRY() {
+  void getReportingCurrency_OrgNotFound_ShouldReturnFallbackGBP() {
     when(organizationRepo.findRootOrganization(tenantId, OrganizationType.EXTERNAL_PARTNER))
         .thenReturn(Optional.empty());
 
     String result = adapter.getReportingCurrency(tenantId);
 
-    assertThat(result).isEqualTo("TRY");
+    assertThat(result).isEqualTo("GBP");
   }
 
   // Note: Testing @Cacheable explicitly in a pure Mockito unit test is not feasible

@@ -1,6 +1,7 @@
 package com.fabricmanagement.finance.invoice.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
@@ -33,6 +34,7 @@ public class InvoiceService {
   private final InvoiceRepository invoiceRepository;
   private final InvoiceMapper invoiceMapper;
   private final ApplicationEventPublisher eventPublisher;
+  private final TenantReportingCurrencyPort reportingCurrencyPort;
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAllInvoices(Pageable pageable) {
@@ -50,6 +52,11 @@ public class InvoiceService {
     UUID tenantId = TenantContext.requireTenantId();
     String invoiceNumber = generateInvoiceNumber(request.invoiceType());
 
+    String resolvedCurrency =
+        request.currency() != null
+            ? request.currency()
+            : reportingCurrencyPort.getReportingCurrency(tenantId);
+
     Invoice invoice =
         Invoice.builder()
             .tradingPartnerId(request.tradingPartnerId())
@@ -59,20 +66,16 @@ public class InvoiceService {
             .invoiceType(InvoiceType.valueOf(request.invoiceType()))
             .issueDate(request.issueDate())
             .dueDate(request.dueDate())
-            .subtotal(
-                Money.of(
-                    request.subtotal(), request.currency() != null ? request.currency() : "TRY"))
+            .subtotal(Money.of(request.subtotal(), resolvedCurrency))
             .taxAmount(
                 Money.of(
                     request.taxAmount() != null ? request.taxAmount() : BigDecimal.ZERO,
-                    request.currency() != null ? request.currency() : "TRY"))
+                    resolvedCurrency))
             .discountAmount(
                 Money.of(
                     request.discountAmount() != null ? request.discountAmount() : BigDecimal.ZERO,
-                    request.currency() != null ? request.currency() : "TRY"))
-            .totalAmount(
-                Money.of(
-                    request.totalAmount(), request.currency() != null ? request.currency() : "TRY"))
+                    resolvedCurrency))
+            .totalAmount(Money.of(request.totalAmount(), resolvedCurrency))
             .taxRate(request.taxRate())
             .billingAddress(request.billingAddress())
             .notes(request.notes())

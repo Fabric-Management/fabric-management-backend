@@ -118,8 +118,7 @@ public class SalesOrder extends BaseEntity {
 
   @Setter(AccessLevel.NONE)
   @Embedded
-  @Builder.Default
-  private OrderTotals totals = OrderTotals.zero("TRY");
+  private OrderTotals totals;
 
   public void updateTotals(OrderTotals newTotals) {
     if (newTotals == null) {

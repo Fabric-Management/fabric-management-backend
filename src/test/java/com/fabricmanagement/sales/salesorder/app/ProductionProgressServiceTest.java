@@ -99,7 +99,11 @@ class ProductionProgressServiceTest {
   @Test
   void markOrderInProgressIfConfirmed_whenConfirmed_updatesOrder() {
     SalesOrder order =
-        SalesOrder.builder().orderNumber("SO-001").status(OrderStatus.CONFIRMED).build();
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .orderNumber("SO-001")
+            .status(OrderStatus.CONFIRMED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(tenantId, orderId))
         .thenReturn(Optional.of(order));
 
@@ -112,7 +116,11 @@ class ProductionProgressServiceTest {
   @Test
   void markOrderInProgressIfConfirmed_whenAlreadyInProgress_isNoop() {
     SalesOrder order =
-        SalesOrder.builder().orderNumber("SO-001").status(OrderStatus.IN_PROGRESS).build();
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .orderNumber("SO-001")
+            .status(OrderStatus.IN_PROGRESS)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(tenantId, orderId))
         .thenReturn(Optional.of(order));
 

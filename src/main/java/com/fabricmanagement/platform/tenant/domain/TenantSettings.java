@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tenant.domain;
 
+import com.fabricmanagement.common.domain.CurrencyConstants;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.Serializable;
 import java.util.Locale;
@@ -52,8 +53,8 @@ public class TenantSettings implements Serializable {
   /** Locale for number/date formatting. Default: en-US */
   @Builder.Default private String locale = Locale.US.toLanguageTag();
 
-  /** Primary currency code (ISO 4217). Default: USD */
-  @Builder.Default private String currency = "USD";
+  /** Primary currency code (ISO 4217). Default: PLATFORM_DEFAULT_CURRENCY (GBP) */
+  @Builder.Default private String currency = CurrencyConstants.PLATFORM_DEFAULT_CURRENCY;
 
   /** Primary country code (ISO 3166-1 alpha-2). Default: null */
   private String country;
@@ -116,7 +117,7 @@ public class TenantSettings implements Serializable {
     return TenantSettings.builder()
         .timezone("Europe/Istanbul")
         .locale("tr-TR")
-        .currency("TRY")
+        .currency(com.fabricmanagement.common.domain.CurrencyConstants.PLATFORM_DEFAULT_CURRENCY)
         .country("TR")
         .build();
   }

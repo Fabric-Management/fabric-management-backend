@@ -56,9 +56,9 @@ public class E2EShowcaseSeeder implements DataSeeder {
                   .getActivePolicyFor(tenantId, ApprovalEntityType.RECIPE_CREATE)
                   .isPresent();
           boolean hasUsdRate =
-              exchangeRateService.getRate(tenantId, "USD", "TRY", LocalDate.now()).isPresent();
+              exchangeRateService.getRate(tenantId, "USD", "GBP", LocalDate.now()).isPresent();
           boolean hasEurRate =
-              exchangeRateService.getRate(tenantId, "EUR", "TRY", LocalDate.now()).isPresent();
+              exchangeRateService.getRate(tenantId, "EUR", "GBP", LocalDate.now()).isPresent();
           boolean hasBoard =
               boardRepository.findByTenantIdAndBoardType(tenantId, BoardType.GLOBAL).isPresent();
 
@@ -84,13 +84,13 @@ public class E2EShowcaseSeeder implements DataSeeder {
                 // semantics)
                 exchangeRateService.saveRate(
                     "USD",
-                    "TRY",
+                    "GBP",
                     BigDecimal.valueOf(35.50),
                     LocalDate.now(),
                     ExchangeRateSource.MANUAL);
                 exchangeRateService.saveRate(
                     "EUR",
-                    "TRY",
+                    "GBP",
                     BigDecimal.valueOf(38.20),
                     LocalDate.now(),
                     ExchangeRateSource.MANUAL);

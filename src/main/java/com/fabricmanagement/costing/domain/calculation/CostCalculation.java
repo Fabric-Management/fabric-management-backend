@@ -55,8 +55,7 @@ public class CostCalculation extends BaseEntity {
   private BigDecimal totalCost = BigDecimal.ZERO;
 
   @Column(name = "currency", nullable = false, length = 10)
-  @Builder.Default
-  private String currency = "TRY";
+  private String currency;
 
   @Column(name = "calculated_at", nullable = false)
   @Builder.Default
@@ -99,7 +98,7 @@ public class CostCalculation extends BaseEntity {
     calc.setEntityId(entityId);
     calc.setModuleType(moduleType);
     calc.setStage(stage);
-    calc.setCurrency(currency != null ? currency : "TRY");
+    calc.setCurrency(currency);
     calc.setCalculatedAt(Instant.now());
     calc.setTotalCost(BigDecimal.ZERO);
     calc.onCreate();

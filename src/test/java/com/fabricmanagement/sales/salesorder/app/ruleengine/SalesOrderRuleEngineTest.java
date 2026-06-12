@@ -59,7 +59,11 @@ class SalesOrderRuleEngineTest {
         new SalesOrderRuleEngine(
             lineRepository, productionOrderPort, historyQuery, domainEventPublisher);
 
-    order = SalesOrder.builder().tradingPartnerId(partnerId).build();
+    order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .tradingPartnerId(partnerId)
+            .build();
     ReflectionTestUtils.setField(order, "id", orderId);
 
     line = SalesOrderLine.builder().productId(productId).moduleType(ModuleType.FIBER).build();

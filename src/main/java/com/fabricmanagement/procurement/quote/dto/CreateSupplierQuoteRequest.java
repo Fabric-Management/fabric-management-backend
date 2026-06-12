@@ -26,7 +26,7 @@ public record CreateSupplierQuoteRequest(
     @NotBlank(message = "Currency is required")
         @Schema(
             description = "Currency code",
-            example = "TRY",
+            example = "GBP",
             requiredMode = Schema.RequiredMode.REQUIRED)
         String currency,
     @Schema(description = "Payment terms") String paymentTerms,

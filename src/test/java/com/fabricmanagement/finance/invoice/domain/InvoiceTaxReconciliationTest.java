@@ -13,7 +13,11 @@ class InvoiceTaxReconciliationTest {
 
   @Test
   void recalculate_twoLines_derivesCorrectHeaderAmounts() {
-    Invoice invoice = Invoice.builder().tradingPartnerId(UUID.randomUUID()).build();
+    Invoice invoice =
+        Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
+            .tradingPartnerId(UUID.randomUUID())
+            .build();
 
     // qty=100 × price=50.00, taxRate=18%, discountRate=10%
     // lineSubtotal: 5000.0000
@@ -72,7 +76,11 @@ class InvoiceTaxReconciliationTest {
 
   @Test
   void recalculate_headerTaxAlsoSupplied_derivedValuesWin() {
-    Invoice invoice = Invoice.builder().tradingPartnerId(UUID.randomUUID()).build();
+    Invoice invoice =
+        Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
+            .tradingPartnerId(UUID.randomUUID())
+            .build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -83,7 +91,7 @@ class InvoiceTaxReconciliationTest {
     invoice.addLine(line1);
 
     // Client maliciously/erroneously sets header tax
-    invoice.setTaxAmount(Money.of(new BigDecimal("9999.00"), "TRY"));
+    invoice.setTaxAmount(Money.of(new BigDecimal("9999.00"), "GBP"));
 
     invoice.recalculateFromLines();
 
@@ -97,9 +105,10 @@ class InvoiceTaxReconciliationTest {
   void recalculate_emptyLines_noOpPreservesHeaderValues() {
     Invoice invoice =
         Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
-            .subtotal(Money.of(new BigDecimal("1000.00"), "TRY"))
-            .taxAmount(Money.of(new BigDecimal("180.00"), "TRY"))
+            .subtotal(Money.of(new BigDecimal("1000.00"), "GBP"))
+            .taxAmount(Money.of(new BigDecimal("180.00"), "GBP"))
             .build();
 
     invoice.recalculateFromLines();
@@ -113,10 +122,11 @@ class InvoiceTaxReconciliationTest {
   void calculateAmounts_headerOnlyInvoice_usesClientSuppliedValues() {
     Invoice invoice =
         Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
-            .subtotal(Money.of(new BigDecimal("1000.00"), "TRY"))
-            .discountAmount(Money.of(new BigDecimal("100.00"), "TRY"))
-            .taxAmount(Money.of(new BigDecimal("162.00"), "TRY"))
+            .subtotal(Money.of(new BigDecimal("1000.00"), "GBP"))
+            .discountAmount(Money.of(new BigDecimal("100.00"), "GBP"))
+            .taxAmount(Money.of(new BigDecimal("162.00"), "GBP"))
             .build();
 
     invoice.calculateAmounts();
@@ -127,7 +137,11 @@ class InvoiceTaxReconciliationTest {
 
   @Test
   void validateClientAmounts_totalMismatch_throwsExceptionWithDiagnosticValues() {
-    Invoice invoice = Invoice.builder().tradingPartnerId(UUID.randomUUID()).build();
+    Invoice invoice =
+        Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
+            .tradingPartnerId(UUID.randomUUID())
+            .build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -145,7 +159,11 @@ class InvoiceTaxReconciliationTest {
 
   @Test
   void validateClientAmounts_subtotalMismatch_throwsExceptionWithDiagnosticValues() {
-    Invoice invoice = Invoice.builder().tradingPartnerId(UUID.randomUUID()).build();
+    Invoice invoice =
+        Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
+            .tradingPartnerId(UUID.randomUUID())
+            .build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -163,7 +181,11 @@ class InvoiceTaxReconciliationTest {
 
   @Test
   void validateClientAmounts_withinTolerance_noException() {
-    Invoice invoice = Invoice.builder().tradingPartnerId(UUID.randomUUID()).build();
+    Invoice invoice =
+        Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
+            .tradingPartnerId(UUID.randomUUID())
+            .build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -179,7 +201,11 @@ class InvoiceTaxReconciliationTest {
 
   @Test
   void recordPayment_afterRecalculation_correctTransition() {
-    Invoice invoice = Invoice.builder().tradingPartnerId(UUID.randomUUID()).build();
+    Invoice invoice =
+        Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
+            .tradingPartnerId(UUID.randomUUID())
+            .build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -191,11 +217,11 @@ class InvoiceTaxReconciliationTest {
     invoice.issue();
     invoice.send();
 
-    invoice.recordPayment(Money.of(new BigDecimal("2000.00"), "TRY"));
+    invoice.recordPayment(Money.of(new BigDecimal("2000.00"), "GBP"));
     assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.PARTIALLY_PAID);
     assertThat(invoice.getAmountDue().getAmount()).isEqualByComparingTo(new BigDecimal("3000.00"));
 
-    invoice.recordPayment(Money.of(new BigDecimal("3000.00"), "TRY"));
+    invoice.recordPayment(Money.of(new BigDecimal("3000.00"), "GBP"));
     assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.PAID);
     assertThat(invoice.getAmountDue().getAmount()).isEqualByComparingTo(BigDecimal.ZERO);
   }

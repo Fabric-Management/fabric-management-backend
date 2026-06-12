@@ -1,4 +1,4 @@
-package com.fabricmanagement.costing.app.port;
+package com.fabricmanagement.common.infrastructure.tenant;
 
 import java.util.UUID;
 

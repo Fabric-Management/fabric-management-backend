@@ -48,6 +48,7 @@ class SalesOrderServiceCancelTest {
 
     order =
         SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .status(OrderStatus.IN_PROGRESS)

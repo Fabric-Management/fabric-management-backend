@@ -94,8 +94,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
-  @Builder.Default
-  private Money taxAmount = Money.zero("TRY");
+  private Money taxAmount;
 
   @Embedded
   @AttributeOverrides({
@@ -106,8 +105,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
-  @Builder.Default
-  private Money discountAmount = Money.zero("TRY");
+  private Money discountAmount;
 
   @Embedded
   @AttributeOverrides({
@@ -129,8 +127,7 @@ public class Invoice extends BaseEntity {
         name = "currency",
         column = @Column(name = "currency", length = 3, insertable = false, updatable = false))
   })
-  @Builder.Default
-  private Money amountPaid = Money.zero("TRY");
+  private Money amountPaid;
 
   @Embedded
   @AttributeOverrides({
@@ -145,9 +142,10 @@ public class Invoice extends BaseEntity {
 
   @Transient
   public String getCurrency() {
-    return subtotal != null && subtotal.getCurrency() != null
-        ? subtotal.getCurrency().getCurrencyCode()
-        : "TRY";
+    if (subtotal == null || subtotal.getCurrency() == null) {
+      throw new IllegalStateException("Invoice subtotal or currency cannot be null");
+    }
+    return subtotal.getCurrency().getCurrencyCode();
   }
 
   @Column(name = "tax_rate", precision = 5, scale = 2)

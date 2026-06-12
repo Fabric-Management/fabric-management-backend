@@ -1,5 +1,6 @@
 package com.fabricmanagement.notification.i18n.domain;
 
+import com.fabricmanagement.common.domain.CurrencyConstants;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
@@ -34,7 +35,7 @@ public class TenantLocaleConfig extends BaseEntity {
   private String timezone = "Europe/Istanbul";
 
   @Column(nullable = false, length = 10)
-  private String currency = "TRY";
+  private String currency = CurrencyConstants.PLATFORM_DEFAULT_CURRENCY;
 
   @Override
   protected String getModuleCode() {

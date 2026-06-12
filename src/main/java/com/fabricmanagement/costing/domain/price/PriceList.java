@@ -27,8 +27,7 @@ public class PriceList extends BaseEntity {
   private String moduleType;
 
   @Column(name = "currency", nullable = false, length = 10)
-  @Builder.Default
-  private String currency = "TRY";
+  private String currency;
 
   @Column(name = "valid_from", nullable = false)
   private LocalDate validFrom;
@@ -64,7 +63,7 @@ public class PriceList extends BaseEntity {
     pl.setTenantId(tenantId);
     pl.setName(name);
     pl.setModuleType(moduleType);
-    pl.setCurrency(currency != null ? currency : "TRY");
+    pl.setCurrency(currency);
     pl.setValidFrom(validFrom);
     pl.setValidUntil(validUntil);
     pl.setSeasonTag(seasonTag);

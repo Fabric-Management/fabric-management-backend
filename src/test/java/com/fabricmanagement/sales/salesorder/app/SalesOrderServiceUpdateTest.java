@@ -68,6 +68,7 @@ class SalesOrderServiceUpdateTest {
     TenantContext.setCurrentTenantId(tenantId);
     draftOrder =
         SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .orderNumber("SO-123")
             .orderType(OrderType.SALES)

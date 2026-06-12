@@ -50,7 +50,7 @@ public class SupplierQuote extends BaseEntity {
   private LocalDate validUntil;
 
   @Column(name = "currency", nullable = false, length = 10)
-  private String currency = "TRY";
+  private String currency;
 
   @Column(name = "payment_terms", length = 50)
   private String paymentTerms;

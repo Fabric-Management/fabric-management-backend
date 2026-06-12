@@ -12,6 +12,7 @@ import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
@@ -53,6 +54,7 @@ class SalesOrderServiceCreateTest {
   @Mock private DomainEventPublisher domainEventPublisher;
   @Mock private DocumentNumberGenerator documentNumberGenerator;
   @Mock private ApprovalPort approvalPort;
+  @Mock private TenantReportingCurrencyPort reportingCurrencyPort;
 
   @InjectMocks private SalesOrderService salesOrderService;
 

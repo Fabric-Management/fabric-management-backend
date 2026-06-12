@@ -136,7 +136,7 @@ class InvoicePersistenceIT {
             null, // taxAmount
             null, // discountAmount
             new BigDecimal("2242.00"), // totalAmount
-            "TRY", // currency
+            "GBP", // currency
             new BigDecimal("18"), // taxRate
             null, // billingAddress
             null, // notes
@@ -215,7 +215,7 @@ class InvoicePersistenceIT {
             null,
             null,
             new BigDecimal("9999.00"), // Mismatched total
-            "TRY",
+            "GBP",
             new BigDecimal("18"),
             null,
             null,

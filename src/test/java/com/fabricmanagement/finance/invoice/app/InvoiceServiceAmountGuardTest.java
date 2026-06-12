@@ -1,13 +1,19 @@
 package com.fabricmanagement.finance.invoice.app;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceLine;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
+import com.fabricmanagement.finance.invoice.domain.InvoiceType;
+import com.fabricmanagement.finance.invoice.dto.CreateInvoiceRequest;
 import com.fabricmanagement.finance.invoice.dto.UpdateInvoiceRequest;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
 import com.fabricmanagement.finance.invoice.mapper.InvoiceMapper;
@@ -33,6 +39,7 @@ class InvoiceServiceAmountGuardTest {
   @Mock private InvoiceRepository invoiceRepository;
   @Mock private InvoiceMapper invoiceMapper;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private TenantReportingCurrencyPort reportingCurrencyPort;
 
   @InjectMocks private InvoiceService invoiceService;
 
@@ -51,12 +58,60 @@ class InvoiceServiceAmountGuardTest {
     TenantContext.clear();
   }
 
+  @org.junit.jupiter.api.Test
+  void createInvoice_withNullCurrency_resolvesFromPort() {
+    // Arrange
+    CreateInvoiceRequest request =
+        new CreateInvoiceRequest(
+            UUID.randomUUID(),
+            null,
+            null,
+            InvoiceType.SALES.name(),
+            java.time.LocalDate.now(),
+            java.time.LocalDate.now().plusDays(30),
+            BigDecimal.valueOf(1000), // subtotal
+            BigDecimal.valueOf(180), // tax
+            BigDecimal.ZERO, // discount
+            BigDecimal.valueOf(1180), // total
+            null, // currency
+            BigDecimal.valueOf(18), // taxRate
+            "Address", // billingAddress
+            "Notes", // notes
+            null, // originalInvoiceId
+            java.util.Collections.emptyList()); // lines
+
+    when(reportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    // We only want to intercept the invoice entity passed to the mapper
+    when(invoiceMapper.toDto(any(Invoice.class)))
+        .thenAnswer(
+            inv -> {
+              Invoice saved = inv.getArgument(0);
+              // the test focuses on the entity state before save/map
+              assertThat(saved.getCurrency()).isEqualTo("GBP");
+              assertThat(saved.getSubtotal().getCurrency().getCurrencyCode()).isEqualTo("GBP");
+              return null;
+            });
+
+    when(invoiceRepository.save(any(Invoice.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    // Act
+    invoiceService.createInvoice(request);
+
+    // Assert
+    verify(reportingCurrencyPort).getReportingCurrency(tenantId);
+  }
+
   @ParameterizedTest(name = "reject monetary field update: {0}")
   @MethodSource("monetaryFieldRequests")
   void updateInvoice_withLines_rejectMonetaryFieldUpdate(
       String fieldName, UpdateInvoiceRequest request) {
     // Arrange
-    Invoice invoice = Invoice.builder().status(InvoiceStatus.DRAFT).build();
+    Invoice invoice =
+        Invoice.builder()
+            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
+            .status(InvoiceStatus.DRAFT)
+            .build();
     ReflectionTestUtils.setField(invoice, "id", invoiceId);
 
     InvoiceLine line =

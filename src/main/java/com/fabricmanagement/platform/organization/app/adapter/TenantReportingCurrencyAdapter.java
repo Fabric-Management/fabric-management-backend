@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.organization.app.adapter;
 
-import com.fabricmanagement.costing.app.port.TenantReportingCurrencyPort;
+import com.fabricmanagement.common.domain.CurrencyConstants;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import java.util.UUID;
@@ -28,7 +29,11 @@ public class TenantReportingCurrencyAdapter implements TenantReportingCurrencyPo
     // → returns the tenant's own root org (COMPANY type)
     return organizationRepo
         .findRootOrganization(tenantId, OrganizationType.EXTERNAL_PARTNER)
-        .map(org -> org.getReportingCurrency() != null ? org.getReportingCurrency() : "TRY")
-        .orElse("TRY");
+        .map(
+            org ->
+                org.getReportingCurrency() != null
+                    ? org.getReportingCurrency()
+                    : CurrencyConstants.PLATFORM_DEFAULT_CURRENCY)
+        .orElse(CurrencyConstants.PLATFORM_DEFAULT_CURRENCY);
   }
 }

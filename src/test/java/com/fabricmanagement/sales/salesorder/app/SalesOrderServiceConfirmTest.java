@@ -75,6 +75,7 @@ class SalesOrderServiceConfirmTest {
   private SalesOrder createDraftOrder() {
     SalesOrder order =
         SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
             .tradingPartnerId(partnerId)
             .orderNumber("SO-001")
             .orderType(OrderType.SALES)

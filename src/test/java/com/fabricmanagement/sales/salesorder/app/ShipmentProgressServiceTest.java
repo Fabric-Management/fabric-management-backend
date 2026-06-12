@@ -147,7 +147,11 @@ class ShipmentProgressServiceTest {
 
   @Test
   void updateOrderShipmentStatus_whenPartialShipment_setsPartiallyShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .status(OrderStatus.CONFIRMED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -178,7 +182,11 @@ class ShipmentProgressServiceTest {
 
   @Test
   void updateOrderShipmentStatus_whenAllShipped_setsShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .status(OrderStatus.CONFIRMED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -208,7 +216,11 @@ class ShipmentProgressServiceTest {
 
   @Test
   void updateOrderShipmentStatus_whenPartialQty_setsPartiallyShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .status(OrderStatus.CONFIRMED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -232,7 +244,11 @@ class ShipmentProgressServiceTest {
 
   @Test
   void updateOrderShipmentStatus_whenOverShipmentAndOthersFull_setsShipped() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .status(OrderStatus.PARTIALLY_SHIPPED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -262,7 +278,11 @@ class ShipmentProgressServiceTest {
 
   @Test
   void updateOrderShipmentStatus_whenCancelledLinesPresent_ignoresCancelledLines() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.CONFIRMED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .status(OrderStatus.CONFIRMED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -293,7 +313,11 @@ class ShipmentProgressServiceTest {
 
   @Test
   void updateOrderShipmentStatus_whenOrderDelivered_noop() {
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.DELIVERED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .status(OrderStatus.DELIVERED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -333,7 +357,11 @@ class ShipmentProgressServiceTest {
   @Test
   void updateOrderShipmentStatus_whenStatusUnchanged_doesNotSave() {
     // Already PARTIALLY_SHIPPED
-    SalesOrder order = SalesOrder.builder().status(OrderStatus.PARTIALLY_SHIPPED).build();
+    SalesOrder order =
+        SalesOrder.builder()
+            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .status(OrderStatus.PARTIALLY_SHIPPED)
+            .build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))

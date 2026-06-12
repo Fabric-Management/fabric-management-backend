@@ -25,8 +25,7 @@ import lombok.*;
 public class ExchangeRateSnapshot extends BaseEntity {
 
   @Column(name = "base_currency", nullable = false, length = 10)
-  @Builder.Default
-  private String baseCurrency = "TRY";
+  private String baseCurrency;
 
   @Column(name = "target_currency", nullable = false, length = 10)
   private String targetCurrency;
@@ -60,7 +59,7 @@ public class ExchangeRateSnapshot extends BaseEntity {
       Instant capturedAt) {
     var snap = new ExchangeRateSnapshot();
     snap.setTenantId(tenantId);
-    snap.setBaseCurrency(baseCurrency != null ? baseCurrency : "TRY");
+    snap.setBaseCurrency(baseCurrency);
     snap.setTargetCurrency(targetCurrency);
     snap.setRate(rate);
     snap.setSource(source);

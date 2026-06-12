@@ -179,7 +179,11 @@ class WorkOrderRecipeHistoryQueryIT {
               mock(DomainEventPublisher.class));
 
       SalesOrder order =
-          SalesOrder.builder().tradingPartnerId(partnerId).orderNumber("SO-TEST").build();
+          SalesOrder.builder()
+              .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+              .tradingPartnerId(partnerId)
+              .orderNumber("SO-TEST")
+              .build();
       ReflectionTestUtils.setField(order, "id", orderId);
 
       SalesOrderLine line =
