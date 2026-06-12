@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -100,7 +101,7 @@ class ProductionProgressServiceTest {
   void markOrderInProgressIfConfirmed_whenConfirmed_updatesOrder() {
     SalesOrder order =
         SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .totals(OrderTotals.zero("GBP"))
             .orderNumber("SO-001")
             .status(OrderStatus.CONFIRMED)
             .build();
@@ -117,7 +118,7 @@ class ProductionProgressServiceTest {
   void markOrderInProgressIfConfirmed_whenAlreadyInProgress_isNoop() {
     SalesOrder order =
         SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .totals(OrderTotals.zero("GBP"))
             .orderNumber("SO-001")
             .status(OrderStatus.IN_PROGRESS)
             .build();

@@ -14,10 +14,7 @@ class InvoiceTaxReconciliationTest {
   @Test
   void recalculate_twoLines_derivesCorrectHeaderAmounts() {
     Invoice invoice =
-        Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
-            .tradingPartnerId(UUID.randomUUID())
-            .build();
+        Invoice.builder().subtotal(Money.zero("GBP")).tradingPartnerId(UUID.randomUUID()).build();
 
     // qty=100 × price=50.00, taxRate=18%, discountRate=10%
     // lineSubtotal: 5000.0000
@@ -77,10 +74,7 @@ class InvoiceTaxReconciliationTest {
   @Test
   void recalculate_headerTaxAlsoSupplied_derivedValuesWin() {
     Invoice invoice =
-        Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
-            .tradingPartnerId(UUID.randomUUID())
-            .build();
+        Invoice.builder().subtotal(Money.zero("GBP")).tradingPartnerId(UUID.randomUUID()).build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -105,7 +99,6 @@ class InvoiceTaxReconciliationTest {
   void recalculate_emptyLines_noOpPreservesHeaderValues() {
     Invoice invoice =
         Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .subtotal(Money.of(new BigDecimal("1000.00"), "GBP"))
             .taxAmount(Money.of(new BigDecimal("180.00"), "GBP"))
@@ -122,7 +115,6 @@ class InvoiceTaxReconciliationTest {
   void calculateAmounts_headerOnlyInvoice_usesClientSuppliedValues() {
     Invoice invoice =
         Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
             .tradingPartnerId(UUID.randomUUID())
             .subtotal(Money.of(new BigDecimal("1000.00"), "GBP"))
             .discountAmount(Money.of(new BigDecimal("100.00"), "GBP"))
@@ -138,10 +130,7 @@ class InvoiceTaxReconciliationTest {
   @Test
   void validateClientAmounts_totalMismatch_throwsExceptionWithDiagnosticValues() {
     Invoice invoice =
-        Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
-            .tradingPartnerId(UUID.randomUUID())
-            .build();
+        Invoice.builder().subtotal(Money.zero("GBP")).tradingPartnerId(UUID.randomUUID()).build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -160,10 +149,7 @@ class InvoiceTaxReconciliationTest {
   @Test
   void validateClientAmounts_subtotalMismatch_throwsExceptionWithDiagnosticValues() {
     Invoice invoice =
-        Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
-            .tradingPartnerId(UUID.randomUUID())
-            .build();
+        Invoice.builder().subtotal(Money.zero("GBP")).tradingPartnerId(UUID.randomUUID()).build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -182,10 +168,7 @@ class InvoiceTaxReconciliationTest {
   @Test
   void validateClientAmounts_withinTolerance_noException() {
     Invoice invoice =
-        Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
-            .tradingPartnerId(UUID.randomUUID())
-            .build();
+        Invoice.builder().subtotal(Money.zero("GBP")).tradingPartnerId(UUID.randomUUID()).build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))
@@ -202,10 +185,7 @@ class InvoiceTaxReconciliationTest {
   @Test
   void recordPayment_afterRecalculation_correctTransition() {
     Invoice invoice =
-        Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
-            .tradingPartnerId(UUID.randomUUID())
-            .build();
+        Invoice.builder().subtotal(Money.zero("GBP")).tradingPartnerId(UUID.randomUUID()).build();
     InvoiceLine line1 =
         InvoiceLine.builder()
             .quantity(new BigDecimal("100"))

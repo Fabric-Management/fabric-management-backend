@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -148,10 +149,7 @@ class ShipmentProgressServiceTest {
   @Test
   void updateOrderShipmentStatus_whenPartialShipment_setsPartiallyShipped() {
     SalesOrder order =
-        SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
-            .status(OrderStatus.CONFIRMED)
-            .build();
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -183,10 +181,7 @@ class ShipmentProgressServiceTest {
   @Test
   void updateOrderShipmentStatus_whenAllShipped_setsShipped() {
     SalesOrder order =
-        SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
-            .status(OrderStatus.CONFIRMED)
-            .build();
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -217,10 +212,7 @@ class ShipmentProgressServiceTest {
   @Test
   void updateOrderShipmentStatus_whenPartialQty_setsPartiallyShipped() {
     SalesOrder order =
-        SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
-            .status(OrderStatus.CONFIRMED)
-            .build();
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -246,7 +238,7 @@ class ShipmentProgressServiceTest {
   void updateOrderShipmentStatus_whenOverShipmentAndOthersFull_setsShipped() {
     SalesOrder order =
         SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .totals(OrderTotals.zero("GBP"))
             .status(OrderStatus.PARTIALLY_SHIPPED)
             .build();
     when(salesOrderRepository.findByTenantIdAndId(
@@ -279,10 +271,7 @@ class ShipmentProgressServiceTest {
   @Test
   void updateOrderShipmentStatus_whenCancelledLinesPresent_ignoresCancelledLines() {
     SalesOrder order =
-        SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
-            .status(OrderStatus.CONFIRMED)
-            .build();
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.CONFIRMED).build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -314,10 +303,7 @@ class ShipmentProgressServiceTest {
   @Test
   void updateOrderShipmentStatus_whenOrderDelivered_noop() {
     SalesOrder order =
-        SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
-            .status(OrderStatus.DELIVERED)
-            .build();
+        SalesOrder.builder().totals(OrderTotals.zero("GBP")).status(OrderStatus.DELIVERED).build();
     when(salesOrderRepository.findByTenantIdAndId(
             com.fabricmanagement.common.infrastructure.persistence.TenantContext.SYSTEM_TENANT_ID,
             orderId))
@@ -359,7 +345,7 @@ class ShipmentProgressServiceTest {
     // Already PARTIALLY_SHIPPED
     SalesOrder order =
         SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .totals(OrderTotals.zero("GBP"))
             .status(OrderStatus.PARTIALLY_SHIPPED)
             .build();
     when(salesOrderRepository.findByTenantIdAndId(

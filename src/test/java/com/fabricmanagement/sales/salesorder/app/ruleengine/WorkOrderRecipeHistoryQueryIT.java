@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
@@ -180,7 +181,7 @@ class WorkOrderRecipeHistoryQueryIT {
 
       SalesOrder order =
           SalesOrder.builder()
-              .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+              .totals(OrderTotals.zero("GBP"))
               .tradingPartnerId(partnerId)
               .orderNumber("SO-TEST")
               .build();

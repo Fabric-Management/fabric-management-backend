@@ -109,15 +109,18 @@ public class TenantSettings implements Serializable {
   }
 
   /**
-   * Create settings for Turkish tenant.
+   * Create default tenant settings.
    *
-   * @return settings configured for Turkey
+   * <p>Uses the platform default currency (GBP), Europe/Istanbul timezone, and Turkish locale for
+   * backward compatibility with existing tenants.
+   *
+   * @return default tenant settings
    */
-  public static TenantSettings forTurkey() {
+  public static TenantSettings forDefault() {
     return TenantSettings.builder()
         .timezone("Europe/Istanbul")
         .locale("tr-TR")
-        .currency(com.fabricmanagement.common.domain.CurrencyConstants.PLATFORM_DEFAULT_CURRENCY)
+        .currency(CurrencyConstants.PLATFORM_DEFAULT_CURRENCY)
         .country("TR")
         .build();
   }

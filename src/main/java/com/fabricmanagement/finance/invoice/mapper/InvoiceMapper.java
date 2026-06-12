@@ -1,10 +1,12 @@
 package com.fabricmanagement.finance.invoice.mapper;
 
 import com.fabricmanagement.common.infrastructure.mapping.MapStructConfig;
+import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceLine;
 import com.fabricmanagement.finance.invoice.dto.InvoiceDto;
 import com.fabricmanagement.finance.invoice.dto.InvoiceLineDto;
+import java.math.BigDecimal;
 import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -26,7 +28,7 @@ public interface InvoiceMapper {
 
   List<InvoiceLineDto> toLineDtoList(List<InvoiceLine> lines);
 
-  default java.math.BigDecimal map(com.fabricmanagement.common.util.Money value) {
+  default BigDecimal map(Money value) {
     return value != null ? value.getAmount() : null;
   }
 }

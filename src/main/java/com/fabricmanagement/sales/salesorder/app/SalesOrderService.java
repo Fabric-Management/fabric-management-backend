@@ -840,7 +840,7 @@ public class SalesOrderService {
         .unit(req.getUnit())
         .unitPrice(
             req.getUnitPrice() != null && req.getCurrency() != null
-                ? com.fabricmanagement.common.util.Money.of(req.getUnitPrice(), req.getCurrency())
+                ? Money.of(req.getUnitPrice(), req.getCurrency())
                 : null)
         .moduleType(req.getModuleType())
         .moduleSpecs(req.getModuleSpecs())

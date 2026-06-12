@@ -11,6 +11,7 @@ import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.util.OrderTotals;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
@@ -75,7 +76,7 @@ class SalesOrderServiceConfirmTest {
   private SalesOrder createDraftOrder() {
     SalesOrder order =
         SalesOrder.builder()
-            .totals(com.fabricmanagement.common.util.OrderTotals.zero("GBP"))
+            .totals(OrderTotals.zero("GBP"))
             .tradingPartnerId(partnerId)
             .orderNumber("SO-001")
             .orderType(OrderType.SALES)

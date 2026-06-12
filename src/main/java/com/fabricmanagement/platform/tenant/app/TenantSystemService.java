@@ -82,7 +82,7 @@ public class TenantSystemService {
     if (settings == null) {
       settings =
           "TR".equalsIgnoreCase(request.getCountry())
-              ? TenantSettings.forTurkey()
+              ? TenantSettings.forDefault()
               : TenantSettings.defaults();
     }
 

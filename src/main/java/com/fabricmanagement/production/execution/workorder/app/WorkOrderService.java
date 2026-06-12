@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.workorder.app;
 
+import com.fabricmanagement.common.domain.CurrencyConstants;
 import com.fabricmanagement.common.domain.event.production.WorkOrderStartedEvent;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
@@ -96,7 +97,7 @@ public class WorkOrderService {
         tenantFacade
             .findById(tenantId)
             .map(t -> t.getSettings().getCurrency())
-            .orElse(com.fabricmanagement.common.domain.CurrencyConstants.PLATFORM_DEFAULT_CURRENCY);
+            .orElse(CurrencyConstants.PLATFORM_DEFAULT_CURRENCY);
 
     // Query 1: Status counts
     List<WorkOrderRepository.StatusCountProjection> statusCounts =

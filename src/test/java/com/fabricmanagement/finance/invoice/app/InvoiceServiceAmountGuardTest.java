@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
+import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceLine;
@@ -108,10 +109,7 @@ class InvoiceServiceAmountGuardTest {
       String fieldName, UpdateInvoiceRequest request) {
     // Arrange
     Invoice invoice =
-        Invoice.builder()
-            .subtotal(com.fabricmanagement.common.util.Money.zero("GBP"))
-            .status(InvoiceStatus.DRAFT)
-            .build();
+        Invoice.builder().subtotal(Money.zero("GBP")).status(InvoiceStatus.DRAFT).build();
     ReflectionTestUtils.setField(invoice, "id", invoiceId);
 
     InvoiceLine line =
