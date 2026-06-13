@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.tenant.domain;
 import com.fabricmanagement.common.domain.CurrencyConstants;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -80,6 +81,16 @@ public class TenantSettings implements Serializable {
 
   /** Primary brand color (hex, e.g., "#1E88E5"). */
   private String primaryColor;
+
+  // ========================================
+  // COSTING
+  // ========================================
+
+  /**
+   * Cost variance threshold — fractional (0.10 = 10%). When the deviation between two cost stages
+   * exceeds this, a CostVarianceDetectedEvent is published. Null = platform default (0.10).
+   */
+  private BigDecimal costVarianceThreshold;
 
   // ========================================
   // SECURITY

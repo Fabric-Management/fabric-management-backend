@@ -3,6 +3,7 @@ package com.fabricmanagement.costing.app;
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
+import com.fabricmanagement.costing.app.port.TenantCostingSettingsPort;
 import com.fabricmanagement.costing.app.port.WorkOrderPlanningUpdatePort;
 import com.fabricmanagement.costing.domain.calculation.*;
 import com.fabricmanagement.costing.domain.event.CostVarianceDetectedEvent;
@@ -38,24 +39,20 @@ import org.springframework.transaction.annotation.Transactional;
  * re-calculates and overwrites the existing record for that stage.
  *
  * <p>Variance detection: when a new stage total deviates from the previous stage total by more than
- * {@link #VARIANCE_THRESHOLD}, a {@link CostVarianceDetectedEvent} is published.
+ * the tenant-configured variance threshold (see {@link TenantCostingSettingsPort}), a {@link
+ * CostVarianceDetectedEvent} is published.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class CostCalculationService {
 
-  /** Variance threshold — 10 % deviation triggers the CostVarianceDetectedEvent. */
-  private static final BigDecimal VARIANCE_THRESHOLD = new BigDecimal("0.10");
-
-  // Since Sprint 8+: All public compute methods accept an optional rateDate parameter.
-  // Callers omitting rateDate default to LocalDate.now() (today's exchange rate).
-
   private final CostItemRepository costItemRepo;
   private final CostTemplateRepository costTemplateRepo;
   private final PriceListRepository priceListRepo;
   private final PriceListItemRepository priceListItemRepo;
   private final CostCalculationRepository costCalcRepo;
+  private final TenantCostingSettingsPort tenantCostingSettingsPort;
   private final ApplicationEventPublisher eventPublisher;
   private final Optional<WorkOrderPlanningUpdatePort> workOrderPlanningUpdatePort;
   private final ExchangeRateService exchangeRateService;
@@ -323,7 +320,7 @@ public class CostCalculationService {
 
     List<CostItem> relevantItems = costItemRepo.findActiveForModule(outputModuleType);
 
-    // 4. Process template items
+    // Pass 1: Quantity-based (PER_KG, PER_HOUR, PER_UNIT) and FIXED items
     for (CostTemplateItem templateItem : template.getItems()) {
       if (!templateItem.isIncluded()) continue;
 
@@ -333,9 +330,14 @@ public class CostCalculationService {
               .findFirst();
       if (costItemOpt.isEmpty()) {
         log.warn("CostItem '{}' in template not found — skipping", templateItem.costItemCode());
+        calc.recordMissing(templateItem.costItemCode(), null, "CostItem not found for module");
         continue;
       }
       CostItem costItem = costItemOpt.get();
+
+      if (costItem.getCalculationBase() == CalculationBase.PERCENTAGE) {
+        continue; // Processed in Pass 2
+      }
 
       if ("RAW_PRODUCT".equals(costItem.getCode())) {
         // ── Multi-product path: one line per consumption record ──
@@ -351,6 +353,10 @@ public class CostCalculationService {
                 "No active price list for module '{}' — raw product cost skipped for productId {}",
                 consumption.moduleType().name(),
                 consumption.productId());
+            calc.recordMissing(
+                "RAW_PRODUCT",
+                consumption.productId(),
+                "No active price list for module " + consumption.moduleType().name());
             continue;
           }
 
@@ -363,6 +369,8 @@ public class CostCalculationService {
           if (priceItemOpt.isEmpty()) {
             log.debug(
                 "No RAW_PRODUCT price for productId {} — skipping line", consumption.productId());
+            calc.recordMissing(
+                "RAW_PRODUCT", consumption.productId(), "No RAW_PRODUCT price for product");
             continue;
           }
 
@@ -398,6 +406,7 @@ public class CostCalculationService {
                 outputPriceList.getId(), costItem.getCode(), outputProductId, tradingPartnerId);
         if (priceItemOpt.isEmpty()) {
           log.debug("No price for '{}' in output price list — skipping", costItem.getCode());
+          calc.recordMissing(costItem.getCode(), null, "No price found in price list");
           continue;
         }
 
@@ -405,13 +414,14 @@ public class CostCalculationService {
         BigDecimal effectiveUnitPrice = priceItem.resolveUnitPrice(actualOutputQty);
         boolean volumeDiscountApplied = !effectiveUnitPrice.equals(priceItem.getUnitPrice());
 
+        // For Pass 1 items, currentTotal is irrelevant except as a dummy.
         BigDecimal lineTotal =
             computeLineTotal(
                 costItem,
                 effectiveUnitPrice,
                 actualOutputQty,
                 templateItem.weight(),
-                calc.getTotalCost());
+                BigDecimal.ZERO);
 
         String unit =
             switch (costItem.getCalculationBase()) {
@@ -432,8 +442,7 @@ public class CostCalculationService {
 
         // PERCENTAGE/FIXED: lineTotal derived from running total (already targetCurrency)
         ConvertedMoney convertedTotal;
-        if (costItem.getCalculationBase() == CalculationBase.PERCENTAGE
-            || costItem.getCalculationBase() == CalculationBase.FIXED) {
+        if (costItem.getCalculationBase() == CalculationBase.FIXED) {
           convertedTotal = ConvertedMoney.sameUnit(lineTotal, targetCurrency);
         } else {
           convertedTotal =
@@ -445,6 +454,60 @@ public class CostCalculationService {
 
         calc.addLine(line);
       }
+    }
+
+    // Pass 2: PERCENTAGE items
+    BigDecimal pass1Total = calc.getTotalCost(); // Deterministic base for percentages
+
+    for (CostTemplateItem templateItem : template.getItems()) {
+      if (!templateItem.isIncluded()) continue;
+
+      Optional<CostItem> costItemOpt =
+          relevantItems.stream()
+              .filter(ci -> ci.getCode().equals(templateItem.costItemCode()))
+              .findFirst();
+      if (costItemOpt.isEmpty()) continue; // Already logged in Pass 1
+
+      CostItem costItem = costItemOpt.get();
+      if (costItem.getCalculationBase() != CalculationBase.PERCENTAGE) {
+        continue; // Handled in Pass 1
+      }
+
+      // Percentage items only apply to the standard path (never RAW_PRODUCT blending)
+      Optional<PriceListItem> priceItemOpt =
+          priceListItemRepo.findBest(
+              outputPriceList.getId(), costItem.getCode(), outputProductId, tradingPartnerId);
+      if (priceItemOpt.isEmpty()) {
+        log.debug(
+            "No percentage rate for '{}' in output price list — skipping", costItem.getCode());
+        calc.recordMissing(costItem.getCode(), null, "No price found in price list");
+        continue;
+      }
+
+      PriceListItem priceItem = priceItemOpt.get();
+      BigDecimal effectiveUnitPrice = priceItem.resolveUnitPrice(actualOutputQty);
+      boolean volumeDiscountApplied = !effectiveUnitPrice.equals(priceItem.getUnitPrice());
+
+      // Line total uses pass1Total as its base
+      BigDecimal lineTotal =
+          computeLineTotal(
+              costItem, effectiveUnitPrice, actualOutputQty, templateItem.weight(), pass1Total);
+
+      CostCalculationLine line = new CostCalculationLine();
+      line.setTenantId(tenantId);
+      line.setCostItemCode(costItem.getCode());
+      line.setQty(actualOutputQty);
+      line.setUnit(null);
+      line.setUnitPrice(effectiveUnitPrice);
+      line.setCurrency(priceItem.getCurrency());
+      line.setVolumeDiscountApplied(volumeDiscountApplied);
+
+      // PERCENTAGE is already in targetCurrency because it was calculated from pass1Total
+      ConvertedMoney convertedTotal = ConvertedMoney.sameUnit(lineTotal, targetCurrency);
+      line.setConvertedTotal(convertedTotal);
+      line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
+
+      calc.addLine(line);
     }
 
     var saved = costCalcRepo.save(calc);
@@ -539,6 +602,7 @@ public class CostCalculationService {
 
     List<CostItem> relevantItems = costItemRepo.findActiveForModule(moduleType);
 
+    // Pass 1: Quantity-based (PER_KG, PER_HOUR, PER_UNIT) and FIXED items
     for (CostTemplateItem templateItem : template.getItems()) {
       if (!templateItem.isIncluded()) continue;
 
@@ -548,10 +612,14 @@ public class CostCalculationService {
               .findFirst();
       if (costItemOpt.isEmpty()) {
         log.warn("CostItem '{}' in template not found — skipping", templateItem.costItemCode());
+        calc.recordMissing(templateItem.costItemCode(), null, "CostItem not found for module");
         continue;
       }
 
       CostItem costItem = costItemOpt.get();
+      if (costItem.getCalculationBase() == CalculationBase.PERCENTAGE) {
+        continue; // Processed in Pass 2
+      }
 
       Optional<PriceListItem> priceItemOpt =
           priceListItemRepo.findBest(
@@ -562,6 +630,7 @@ public class CostCalculationService {
             "No price found for cost item '{}' in price list {} — skipping",
             costItem.getCode(),
             priceList.getId());
+        calc.recordMissing(costItem.getCode(), null, "No price found in price list");
         continue;
       }
 
@@ -569,10 +638,10 @@ public class CostCalculationService {
       BigDecimal effectiveUnitPrice = priceItem.resolveUnitPrice(quantityKg);
       boolean volumeDiscountApplied = !effectiveUnitPrice.equals(priceItem.getUnitPrice());
 
-      // Calculate line total
+      // Calculate line total. For Pass 1 items, currentTotal is irrelevant except as a dummy.
       BigDecimal lineTotal =
           computeLineTotal(
-              costItem, effectiveUnitPrice, quantityKg, templateItem.weight(), calc.getTotalCost());
+              costItem, effectiveUnitPrice, quantityKg, templateItem.weight(), BigDecimal.ZERO);
 
       // Unit is derived from CalculationBase — not hardcoded
       String unit =
@@ -584,11 +653,6 @@ public class CostCalculationService {
             case PERCENTAGE, FIXED -> null;
           };
 
-      // Lombok @Builder does not include inherited BaseEntity fields — use setter approach
-      // NOTE: costCalculationId is intentionally NOT set here.
-      // JPA resolves it automatically via @JoinColumn(name="cost_calculation_id") on
-      // CostCalculation.lines when the parent is cascade-persisted. Setting it to
-      // calc.getId() before the parent is flushed would write null to the FK column.
       CostCalculationLine line = new CostCalculationLine();
       line.setTenantId(tenantId);
       line.setCostItemCode(costItem.getCode());
@@ -598,18 +662,70 @@ public class CostCalculationService {
       line.setCurrency(priceItem.getCurrency());
       line.setVolumeDiscountApplied(volumeDiscountApplied);
 
-      // PERCENTAGE/FIXED: lineTotal is derived from running totalCost (already in targetCurrency)
-      // → no currency conversion needed. PER_KG/PER_HOUR/PER_UNIT: lineTotal is in priceItem
-      // currency → needs conversion.
       ConvertedMoney convertedTotal;
-      if (costItem.getCalculationBase() == CalculationBase.PERCENTAGE
-          || costItem.getCalculationBase() == CalculationBase.FIXED) {
+      if (costItem.getCalculationBase() == CalculationBase.FIXED) {
         convertedTotal = ConvertedMoney.sameUnit(lineTotal, targetCurrency);
       } else {
         convertedTotal =
             exchangeRateService.convert(
                 lineTotal, priceItem.getCurrency(), targetCurrency, rateDate);
       }
+      line.setConvertedTotal(convertedTotal);
+      line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
+
+      calc.addLine(line);
+    }
+
+    // Pass 2: PERCENTAGE items
+    BigDecimal pass1Total = calc.getTotalCost(); // Deterministic base for percentages
+
+    for (CostTemplateItem templateItem : template.getItems()) {
+      if (!templateItem.isIncluded()) continue;
+
+      Optional<CostItem> costItemOpt =
+          relevantItems.stream()
+              .filter(ci -> ci.getCode().equals(templateItem.costItemCode()))
+              .findFirst();
+      if (costItemOpt.isEmpty()) continue; // Already logged in Pass 1
+
+      CostItem costItem = costItemOpt.get();
+      if (costItem.getCalculationBase() != CalculationBase.PERCENTAGE) {
+        continue; // Handled in Pass 1
+      }
+
+      Optional<PriceListItem> priceItemOpt =
+          priceListItemRepo.findBest(
+              priceList.getId(), costItem.getCode(), productId, tradingPartnerId);
+
+      if (priceItemOpt.isEmpty()) {
+        log.debug(
+            "No percentage rate found for cost item '{}' in price list {} — skipping",
+            costItem.getCode(),
+            priceList.getId());
+        calc.recordMissing(costItem.getCode(), null, "No price found in price list");
+        continue;
+      }
+
+      PriceListItem priceItem = priceItemOpt.get();
+      BigDecimal effectiveUnitPrice = priceItem.resolveUnitPrice(quantityKg);
+      boolean volumeDiscountApplied = !effectiveUnitPrice.equals(priceItem.getUnitPrice());
+
+      // Line total uses pass1Total as its base
+      BigDecimal lineTotal =
+          computeLineTotal(
+              costItem, effectiveUnitPrice, quantityKg, templateItem.weight(), pass1Total);
+
+      CostCalculationLine line = new CostCalculationLine();
+      line.setTenantId(tenantId);
+      line.setCostItemCode(costItem.getCode());
+      line.setQty(quantityKg);
+      line.setUnit(null);
+      line.setUnitPrice(effectiveUnitPrice);
+      line.setCurrency(priceItem.getCurrency());
+      line.setVolumeDiscountApplied(volumeDiscountApplied);
+
+      // PERCENTAGE is already in targetCurrency because it was calculated from pass1Total
+      ConvertedMoney convertedTotal = ConvertedMoney.sameUnit(lineTotal, targetCurrency);
       line.setConvertedTotal(convertedTotal);
       line.setTotalInBaseCurrency(convertedTotal.getConvertedAmount());
 
@@ -630,7 +746,21 @@ public class CostCalculationService {
     return saved;
   }
 
-  /** Compute the total amount for a single cost line based on the item's calculation base. */
+  /**
+   * Two-pass computation:
+   *
+   * <ol>
+   *   <li>Pass 1 — quantity-based (PER_KG, PER_HOUR, PER_UNIT) and FIXED items
+   *   <li>Pass 2 — PERCENTAGE items; base = sum of all pass-1 line totals
+   * </ol>
+   *
+   * <p>The percentage base <b>includes fixed costs</b> — i.e. overhead is computed on top of both
+   * variable and fixed production costs. This is an intentional business decision: a 12% overhead
+   * on a 1000 TRY batch includes the 50 TRY packaging (FIXED) in its base.
+   *
+   * <p>PERCENTAGE-on-PERCENTAGE is not supported. All PERCENTAGE items compute against the same
+   * deterministic base (pass-1 total), making the result independent of template item order.
+   */
   private BigDecimal computeLineTotal(
       CostItem item,
       BigDecimal unitPrice,
@@ -655,6 +785,13 @@ public class CostCalculationService {
 
   private void detectAndPublishVariance(
       UUID tenantId, CostCalculation current, CostEntityType entityType, UUID entityId) {
+
+    // R1: Incomplete calculation → skip variance (understated cost = guaranteed false positive)
+    if (!current.isComplete()) {
+      log.info("Variance skip: current calculation is incomplete (entityId={})", entityId);
+      return;
+    }
+
     CostStage previousStage = previousStageOf(current.getStage());
     if (previousStage == null) return;
 
@@ -662,6 +799,12 @@ public class CostCalculationService {
         .findActiveByEntityTypeAndEntityIdAndStage(entityType, entityId, previousStage)
         .ifPresent(
             previous -> {
+              // R1: Previous stage also must be complete
+              if (!previous.isComplete()) {
+                log.info("Variance skip: previous stage is incomplete (entityId={})", entityId);
+                return;
+              }
+
               // Guard: comparing costs in different currencies is meaningless
               if (!current.getCurrency().equals(previous.getCurrency())) {
                 log.warn(
@@ -672,9 +815,10 @@ public class CostCalculationService {
                 return;
               }
 
+              BigDecimal threshold = tenantCostingSettingsPort.getVarianceThreshold(tenantId);
               BigDecimal ratioSigned = current.varianceRatioVs(previous.getTotalCost());
               BigDecimal ratioAbs = ratioSigned.abs();
-              if (ratioAbs.compareTo(VARIANCE_THRESHOLD) > 0) {
+              if (ratioAbs.compareTo(threshold) > 0) {
                 var event =
                     CostVarianceDetectedEvent.builder()
                         .tenantId(tenantId)

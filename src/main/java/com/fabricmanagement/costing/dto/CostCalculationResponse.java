@@ -3,8 +3,10 @@ package com.fabricmanagement.costing.dto;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
 import com.fabricmanagement.costing.domain.calculation.CostEntityType;
 import com.fabricmanagement.costing.domain.calculation.CostStage;
+import com.fabricmanagement.costing.domain.calculation.MissingCostItemEntry;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /** Read-only response for a CostCalculation. */
@@ -16,7 +18,9 @@ public record CostCalculationResponse(
     CostStage stage,
     BigDecimal totalCost,
     String currency,
-    Instant calculatedAt) {
+    Instant calculatedAt,
+    boolean complete,
+    List<MissingCostItemEntry> missingItems) {
 
   public static CostCalculationResponse from(CostCalculation calc) {
     return new CostCalculationResponse(
@@ -27,6 +31,8 @@ public record CostCalculationResponse(
         calc.getStage(),
         calc.getTotalCost(),
         calc.getCurrency(),
-        calc.getCalculatedAt());
+        calc.getCalculatedAt(),
+        calc.isComplete(),
+        calc.getMissingItems());
   }
 }

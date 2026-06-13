@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Root aggregate for a multi-line cost calculation result.
@@ -62,6 +64,19 @@ public class CostCalculation extends BaseEntity {
   private Instant calculatedAt = Instant.now();
 
   /**
+   * False when one or more cost items were skipped due to missing price data. Historic rows
+   * (pre-COST-2) default to true — we cannot retroactively determine completeness.
+   */
+  @Column(name = "complete", nullable = false)
+  @Builder.Default
+  private boolean complete = true;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "missing_items", columnDefinition = "jsonb")
+  @Builder.Default
+  private List<MissingCostItemEntry> missingItems = new ArrayList<>();
+
+  /**
    * @deprecated Since Sprint 7b — exchange rate info is now embedded per-line in
    *     CostCalculationLine.convertedTotal. Retained for backward compatibility with existing data.
    *     Will be removed in a future migration.
@@ -101,6 +116,8 @@ public class CostCalculation extends BaseEntity {
     calc.setCurrency(currency);
     calc.setCalculatedAt(Instant.now());
     calc.setTotalCost(BigDecimal.ZERO);
+    calc.setComplete(true);
+    calc.setMissingItems(new ArrayList<>());
     calc.onCreate();
     return calc;
   }
@@ -114,6 +131,12 @@ public class CostCalculation extends BaseEntity {
             .map(CostCalculationLine::getTotalInBaseCurrency)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     onUpdate();
+  }
+
+  /** Record a missing cost item and mark the calculation as incomplete. */
+  public void recordMissing(String costItemCode, UUID productId, String reason) {
+    this.missingItems.add(new MissingCostItemEntry(costItemCode, productId, reason));
+    this.complete = false;
   }
 
   /** Compute variance ratio vs. a previous stage's total. Returns 0 if previousTotal is zero. */

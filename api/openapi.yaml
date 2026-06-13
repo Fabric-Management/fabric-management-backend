@@ -44563,6 +44563,8 @@ components:
         calculatedAt:
           type: string
           format: date-time
+        complete:
+          type: boolean
         currency:
           type: string
         entityId:
@@ -44577,6 +44579,10 @@ components:
         id:
           type: string
           format: uuid
+        missingItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissingCostItemEntry"
         moduleType:
           type: string
         stage:
@@ -44621,12 +44627,18 @@ components:
         calculatedAt:
           type: string
           format: date-time
+        complete:
+          type: boolean
         currency:
           type: string
         lines:
           type: array
           items:
             $ref: "#/components/schemas/CostLineDetail"
+        missingItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissingCostItemEntry"
         stage:
           type: string
           enum:
@@ -48097,6 +48109,26 @@ components:
           format: int32
           description: Number of trusted devices
           example: 2
+    MissingCostItemEntry:
+      type: object
+      description: A cost item that was skipped during calculation due to missing
+        data
+      properties:
+        costItemCode:
+          type: string
+          description: The cost item code that was skipped
+          example: RAW_PRODUCT
+        productId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Product ID if applicable (e.g. for per-product RAW_PRODUCT
+            lookups)
+        reason:
+          type: string
+          description: Human-readable reason for the skip
+          example: No price found in price list
     NavPreferencesRequest:
       type: object
       properties:
@@ -51932,6 +51964,8 @@ components:
             type: string
         betaFeaturesEnabled:
           type: boolean
+        costVarianceThreshold:
+          type: number
         country:
           type: string
         currency:
@@ -51962,6 +51996,8 @@ components:
             type: string
         betaFeaturesEnabled:
           type: boolean
+        costVarianceThreshold:
+          type: number
         country:
           type: string
         currency:
@@ -52772,8 +52808,20 @@ components:
             type: string
         betaFeaturesEnabled:
           type: boolean
+          description: Enable beta features
+          example: false
+        costVarianceThreshold:
+          type:
+          - number
+          - "null"
+          description: "Cost variance threshold (fractional, e.g. 0.10 for 10%)"
+          example: 0.1
+          maximum: 1.00
+          minimum: 0.01
         country:
           type: string
+          description: Country code (ISO 3166-1 alpha-2)
+          example: TR
           maxLength: 2
           minLength: 2
         currency:
