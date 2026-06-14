@@ -52,6 +52,11 @@ public class InvoiceLine extends BaseEntity {
   @Builder.Default
   private BigDecimal taxRate = BigDecimal.ZERO;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "tax_category", nullable = false, length = 20)
+  @Builder.Default
+  private TaxCategory taxCategory = TaxCategory.STANDARD;
+
   @Column(name = "line_subtotal", nullable = false, precision = 19, scale = 4)
   private BigDecimal lineSubtotal;
 
@@ -92,6 +97,10 @@ public class InvoiceLine extends BaseEntity {
                 .multiply(this.taxRate)
                 .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
             : BigDecimal.ZERO;
+
+    if (this.taxCategory == TaxCategory.REVERSE_CHARGE) {
+      this.lineTax = BigDecimal.ZERO; // buyer self-assesses; taxRate kept for info
+    }
 
     this.lineTotal = afterDiscount.add(this.lineTax);
   }

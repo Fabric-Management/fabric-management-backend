@@ -32,5 +32,6 @@ public record InvoiceDto(
     String billingAddress,
     String notes,
     List<InvoiceLineDto> lines,
+    List<InvoiceTaxLineDto> taxBreakdown,
     long daysOverdue,
     boolean overdue) {}

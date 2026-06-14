@@ -13,4 +13,8 @@ public record CreateInvoiceLineRequest(
     @NotNull @DecimalMin("0") BigDecimal unitPrice,
     BigDecimal discountRate,
     BigDecimal taxRate,
+    @io.swagger.v3.oas.annotations.media.Schema(
+            description = "Tax category for VAT reporting",
+            example = "STANDARD")
+        String taxCategory,
     String notes) {}

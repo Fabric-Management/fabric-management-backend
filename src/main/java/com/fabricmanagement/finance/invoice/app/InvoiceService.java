@@ -116,6 +116,7 @@ public class InvoiceService {
                 .discountRate(
                     lineReq.discountRate() != null ? lineReq.discountRate() : BigDecimal.ZERO)
                 .taxRate(lineReq.taxRate() != null ? lineReq.taxRate() : BigDecimal.ZERO)
+                .taxCategory(parseTaxCategory(lineReq.taxCategory()))
                 .notes(lineReq.notes())
                 .build();
         line.setTenantId(tenantId);
@@ -372,5 +373,19 @@ public class InvoiceService {
     return invoiceRepository
         .findByTenantIdAndId(tenantId, invoiceId)
         .orElseThrow(() -> new NotFoundException("Invoice not found: " + invoiceId));
+  }
+
+  private com.fabricmanagement.finance.invoice.domain.TaxCategory parseTaxCategory(String value) {
+    if (value == null) return com.fabricmanagement.finance.invoice.domain.TaxCategory.STANDARD;
+    try {
+      return com.fabricmanagement.finance.invoice.domain.TaxCategory.valueOf(value);
+    } catch (IllegalArgumentException e) {
+      throw new FinanceDomainException(
+          "Invalid tax category: "
+              + value
+              + ". Valid values: "
+              + java.util.Arrays.toString(
+                  com.fabricmanagement.finance.invoice.domain.TaxCategory.values()));
+    }
   }
 }

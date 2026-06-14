@@ -189,6 +189,11 @@ public class Invoice extends BaseEntity {
   @Builder.Default
   private List<InvoiceLine> lines = new ArrayList<>();
 
+  @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+  @JoinColumn(name = "invoice_id", nullable = false, updatable = false)
+  @Builder.Default
+  private List<InvoiceTaxLine> taxLines = new ArrayList<>();
+
   @Override
   protected String getModuleCode() {
     return "INV";
@@ -249,17 +254,16 @@ public class Invoice extends BaseEntity {
 
     BigDecimal sumSubtotal = BigDecimal.ZERO;
     BigDecimal sumDiscount = BigDecimal.ZERO;
-    BigDecimal sumTax = BigDecimal.ZERO;
 
     for (InvoiceLine line : lines) {
       sumSubtotal = sumSubtotal.add(line.getLineSubtotal());
       sumDiscount = sumDiscount.add(line.getLineDiscount());
-      sumTax = sumTax.add(line.getLineTax());
     }
 
     this.subtotal = Money.of(sumSubtotal, curr);
     this.discountAmount = Money.of(sumDiscount, curr);
-    this.taxAmount = Money.of(sumTax, curr);
+
+    rebuildTaxLines(curr);
 
     // Derive totalAmount from rounded header Money fields — guarantees
     // internal header arithmetic consistency (subtotal − discount + tax == total)
@@ -275,6 +279,66 @@ public class Invoice extends BaseEntity {
             (this.amountCredited != null ? this.amountCredited : Money.zero(curr)).getAmount(),
             curr);
     recomputePaymentStatus(null);
+  }
+
+  private void rebuildTaxLines(String currency) {
+    // TODO(FIN-5): Optimization - orphanRemoval triggers DELETE for all existing rows on every
+    // recalculate.
+    // Consider diff-and-update or skipping rebuild if lines haven't changed.
+    this.taxLines.clear();
+
+    record TaxGroupKey(TaxCategory category, BigDecimal rate) {
+      TaxGroupKey {
+        rate = rate != null ? rate.stripTrailingZeros() : BigDecimal.ZERO;
+      }
+    }
+
+    java.util.Map<TaxGroupKey, java.util.List<InvoiceLine>> grouped = new java.util.HashMap<>();
+    for (InvoiceLine line : this.lines) {
+      TaxGroupKey key =
+          new TaxGroupKey(
+              line.getTaxCategory() != null ? line.getTaxCategory() : TaxCategory.STANDARD,
+              line.getTaxRate() != null ? line.getTaxRate() : BigDecimal.ZERO);
+      grouped.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(line);
+    }
+
+    BigDecimal totalTaxAmount = BigDecimal.ZERO;
+
+    for (java.util.Map.Entry<TaxGroupKey, java.util.List<InvoiceLine>> entry : grouped.entrySet()) {
+      TaxGroupKey key = entry.getKey();
+      BigDecimal groupTaxableBase = BigDecimal.ZERO;
+      BigDecimal groupTaxAmount = BigDecimal.ZERO;
+
+      for (InvoiceLine line : entry.getValue()) {
+        groupTaxableBase =
+            groupTaxableBase.add(line.getLineSubtotal().subtract(line.getLineDiscount()));
+        groupTaxAmount = groupTaxAmount.add(line.getLineTax());
+      }
+
+      // Round to scale 2
+      groupTaxAmount = groupTaxAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+      groupTaxableBase = groupTaxableBase.setScale(2, java.math.RoundingMode.HALF_UP);
+
+      InvoiceTaxLine taxLine =
+          InvoiceTaxLine.builder()
+              .taxCategory(key.category())
+              .taxRate(key.rate())
+              .taxableBase(groupTaxableBase)
+              .taxAmount(groupTaxAmount)
+              .build();
+
+      this.taxLines.add(taxLine);
+      totalTaxAmount = totalTaxAmount.add(groupTaxAmount);
+    }
+
+    this.taxAmount = Money.of(totalTaxAmount, currency);
+
+    // Header taxRate deprecation logic:
+    if (grouped.size() == 1) {
+      this.taxRate = grouped.keySet().iterator().next().rate();
+    } else {
+      this.taxRate = null;
+    }
   }
 
   /**

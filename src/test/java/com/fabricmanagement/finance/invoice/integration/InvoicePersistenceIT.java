@@ -150,6 +150,7 @@ class InvoicePersistenceIT {
                     new BigDecimal("10"),
                     BigDecimal.ZERO,
                     new BigDecimal("18"),
+                    "STANDARD",
                     null),
                 new CreateInvoiceLineRequest(
                     "Item 2",
@@ -159,6 +160,7 @@ class InvoicePersistenceIT {
                     new BigDecimal("20"),
                     new BigDecimal("10"),
                     new BigDecimal("18"),
+                    "STANDARD",
                     null)));
 
     InvoiceDto createdDto = invoiceService.createInvoice(request);
@@ -229,6 +231,7 @@ class InvoicePersistenceIT {
                     new BigDecimal("10"), // subtotal 1000
                     BigDecimal.ZERO,
                     new BigDecimal("18"), // tax 180, total 1180
+                    "STANDARD",
                     null)));
 
     // Should throw FinanceDomainException with message mentioning line-derived subtotal or total
