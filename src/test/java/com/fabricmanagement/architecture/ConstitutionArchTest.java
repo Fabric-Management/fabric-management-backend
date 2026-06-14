@@ -168,6 +168,23 @@ class ConstitutionArchTest {
 
       rule.check(allClasses);
     }
+
+    @Test
+    @DisplayName(
+        "Rule 3.3: finance.payment must not depend on finance.invoice.domain.Invoice entity")
+    void financePaymentShouldNotDependOnInvoiceEntity() {
+      ArchRule rule =
+          noClasses()
+              .that()
+              .resideInAPackage("com.fabricmanagement.finance.payment..")
+              .should()
+              .dependOnClassesThat()
+              .haveFullyQualifiedName("com.fabricmanagement.finance.invoice.domain.Invoice")
+              .as(
+                  "Rule 3.3: finance.payment must use InvoicePaymentPort — direct Invoice entity import is forbidden");
+
+      rule.check(allClasses);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -203,6 +220,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("TradingPartnerRegistry")
               .and()
               .doNotHaveSimpleName("UserDepartment")
+              .and()
+              .doNotHaveSimpleName("DocumentNumberCounter")
               .and()
               .doNotHaveSimpleName("TaskLabelAssignment")
               .and()

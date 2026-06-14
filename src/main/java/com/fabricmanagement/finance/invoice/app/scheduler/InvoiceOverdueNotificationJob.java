@@ -13,14 +13,14 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class InvoiceOverdueJob {
+public class InvoiceOverdueNotificationJob {
 
   private final InvoiceService invoiceService;
   private final TenantQueryPort tenantQueryPort;
 
   @Scheduled(cron = "0 0 2 * * *")
-  public void markOverdueInvoicesForAllTenants() {
-    log.info("Starting overdue invoice scan for all tenants");
+  public void notifyOverdueInvoicesForAllTenants() {
+    log.info("Starting overdue invoice notification scan for all tenants");
 
     List<TenantReference> activeTenants = tenantQueryPort.findAllActiveTenants();
     int totalMarked = 0;
@@ -32,17 +32,17 @@ public class InvoiceOverdueJob {
                 tenant.id(),
                 () -> {
                   TenantContext.setCurrentTenantUid(tenant.uid());
-                  return invoiceService.markOverdueInvoices(tenant.id());
+                  return invoiceService.notifyOverdueInvoices(tenant.id());
                 });
         totalMarked += marked;
       } catch (Exception e) {
         log.error(
-            "Failed to mark overdue invoices for tenant {}: {}", tenant.uid(), e.getMessage());
+            "Failed to notify overdue invoices for tenant {}: {}", tenant.uid(), e.getMessage());
       }
     }
 
     log.info(
-        "Overdue invoice scan completed. Processed {} tenants, marked {} invoices as overdue.",
+        "Overdue invoice notification scan completed. Processed {} tenants, notified {} invoices.",
         activeTenants.size(),
         totalMarked);
   }

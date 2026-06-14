@@ -18,6 +18,7 @@ import com.fabricmanagement.costing.domain.item.CalculationBase;
 import com.fabricmanagement.costing.domain.item.CostItemScope;
 import com.fabricmanagement.costing.domain.price.PriceList;
 import com.fabricmanagement.costing.domain.template.CostTemplateItem;
+import com.fabricmanagement.costing.infra.exchange.EcbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.exchange.TcmbExchangeRateProvider;
 import com.fabricmanagement.costing.infra.repository.CostCalculationRepository;
 import com.fabricmanagement.costing.infra.repository.CostItemRepository;
@@ -26,10 +27,12 @@ import com.fabricmanagement.costing.infra.repository.ExchangeRateCacheRepository
 import com.fabricmanagement.costing.infra.repository.PriceListItemRepository;
 import com.fabricmanagement.costing.infra.repository.PriceListRepository;
 import com.fabricmanagement.costing.integration.support.TestCostDataFactory;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +45,7 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 
 @RecordApplicationEvents
 @DisplayName("Cost Calculation Pipeline Integration Test")
-class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
+class CostCalculationIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private CostCalculationService costService;
   @Autowired private CostItemRepository costItemRepo;
@@ -57,6 +60,7 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
   private ApplicationEvents events;
 
   @MockBean private TenantReportingCurrencyPort tenantPort;
+  @MockBean private EcbExchangeRateProvider ecbProvider;
   @MockBean private TcmbExchangeRateProvider tcmbProvider;
   @MockBean private WorkOrderPlanningUpdatePort planningPort;
 
@@ -300,7 +304,8 @@ class CostCalculationIntegrationTest extends AbstractCostingIntegrationTest {
             pl.getId(), "LABOR", null, new BigDecimal("10.0"), "USD"));
 
     // Intentionally no cache & mock returns empty
-    when(tcmbProvider.getRate(any(), any(), any(), any())).thenReturn(java.util.Optional.empty());
+    when(ecbProvider.getRate(any(), any(), any(), any())).thenReturn(Optional.empty());
+    when(tcmbProvider.getRate(any(), any(), any(), any())).thenReturn(Optional.empty());
 
     // Action -> Throw Required Exception
     assertThatThrownBy(

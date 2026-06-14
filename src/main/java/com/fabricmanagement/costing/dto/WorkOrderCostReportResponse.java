@@ -3,6 +3,7 @@ package com.fabricmanagement.costing.dto;
 import com.fabricmanagement.costing.domain.calculation.CostCalculation;
 import com.fabricmanagement.costing.domain.calculation.CostCalculationLine;
 import com.fabricmanagement.costing.domain.calculation.CostStage;
+import com.fabricmanagement.costing.domain.calculation.MissingCostItemEntry;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -37,6 +38,8 @@ public record WorkOrderCostReportResponse(
       BigDecimal totalCost,
       String currency,
       Instant calculatedAt,
+      boolean complete,
+      List<MissingCostItemEntry> missingItems,
       List<CostLineDetail> lines) {
 
     public static CostStageDetail from(CostCalculation calc) {
@@ -46,7 +49,13 @@ public record WorkOrderCostReportResponse(
               .map(CostLineDetail::from)
               .toList();
       return new CostStageDetail(
-          calc.getStage(), calc.getTotalCost(), calc.getCurrency(), calc.getCalculatedAt(), lines);
+          calc.getStage(),
+          calc.getTotalCost(),
+          calc.getCurrency(),
+          calc.getCalculatedAt(),
+          calc.isComplete(),
+          calc.getMissingItems(),
+          lines);
     }
   }
 

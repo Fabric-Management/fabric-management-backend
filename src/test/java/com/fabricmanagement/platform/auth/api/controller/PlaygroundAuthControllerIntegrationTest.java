@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fabricmanagement.costing.integration.AbstractCostingIntegrationTest;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import com.jayway.jsonpath.JsonPath;
 import java.util.List;
 import java.util.UUID;
@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @AutoConfigureMockMvc
-class PlaygroundAuthControllerIntegrationTest extends AbstractCostingIntegrationTest {
+class PlaygroundAuthControllerIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
   @Autowired private JdbcTemplate jdbc;

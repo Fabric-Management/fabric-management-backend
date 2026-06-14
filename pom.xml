@@ -79,6 +79,7 @@
         <angus-mail.version>2.0.4</angus-mail.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <tomcat.version>10.1.55</tomcat.version>
+        <spring-security.version>6.5.11</spring-security.version>
     </properties>
 
     <dependencies>
@@ -410,6 +411,12 @@
                 <groupId>commons-fileupload</groupId>
                 <artifactId>commons-fileupload</artifactId>
                 <version>${commons-fileupload.version}</version>
+            </dependency>
+            <!-- Override swagger-ui to fix DOMPurify GHSA-39q2-94rc-95cp -->
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>swagger-ui</artifactId>
+                <version>5.32.6</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>

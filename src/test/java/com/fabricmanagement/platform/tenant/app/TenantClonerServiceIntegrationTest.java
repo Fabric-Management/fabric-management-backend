@@ -2,7 +2,6 @@ package com.fabricmanagement.platform.tenant.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fabricmanagement.costing.integration.AbstractCostingIntegrationTest;
 import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
@@ -13,6 +12,7 @@ import com.fabricmanagement.platform.tenant.infra.repository.TenantRepository;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.RoleRepository;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-class TenantClonerServiceIntegrationTest extends AbstractCostingIntegrationTest {
+class TenantClonerServiceIntegrationTest extends AbstractIntegrationTest {
 
   @Autowired private TenantClonerService tenantClonerService;
   @Autowired private TenantRepository tenantRepository;

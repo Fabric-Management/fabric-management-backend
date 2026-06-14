@@ -42,6 +42,10 @@ class InvoiceServiceAmountGuardTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private TenantReportingCurrencyPort reportingCurrencyPort;
 
+  @Mock
+  private com.fabricmanagement.finance.common.app.FinanceDocumentNumberGenerator
+      documentNumberGenerator;
+
   @InjectMocks private InvoiceService invoiceService;
 
   private final UUID tenantId = UUID.randomUUID();

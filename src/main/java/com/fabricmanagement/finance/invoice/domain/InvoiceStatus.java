@@ -1,41 +1,34 @@
 package com.fabricmanagement.finance.invoice.domain;
 
 /**
- * Invoice lifecycle status.
+ * Invoice document lifecycle status.
  *
- * <p>Flow: DRAFT -> ISSUED -> SENT -> PARTIALLY_PAID -> PAID
+ * <p>Flow: DRAFT -> ISSUED -> SENT -> (terminal)
  *
- * <p>Side flows: SENT/PARTIALLY_PAID/OVERDUE -> DISPUTED -> (resolved) SENT
+ * <p>Side flows: SENT -> DISPUTED -> (resolved) SENT
  */
 public enum InvoiceStatus {
   DRAFT,
   ISSUED,
   SENT,
-  PARTIALLY_PAID,
-  PAID,
-  OVERDUE,
   DISPUTED,
   CANCELLED,
   VOIDED;
 
   public boolean isTerminal() {
-    return this == PAID || this == CANCELLED || this == VOIDED;
+    return this == CANCELLED || this == VOIDED;
   }
 
   public boolean canReceivePayment() {
-    return this == SENT || this == PARTIALLY_PAID || this == OVERDUE;
+    return this == SENT;
   }
 
   public boolean canCancel() {
     return this == DRAFT || this == ISSUED;
   }
 
-  public boolean isAwaitingPayment() {
-    return this == SENT || this == PARTIALLY_PAID || this == OVERDUE;
-  }
-
   public boolean canDispute() {
-    return this == SENT || this == PARTIALLY_PAID || this == OVERDUE;
+    return this == SENT;
   }
 
   public boolean canResolveDispute() {
