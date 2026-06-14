@@ -14,6 +14,7 @@ public record InvoiceLineDto(
     BigDecimal unitPrice,
     BigDecimal discountRate,
     BigDecimal taxRate,
+    String taxCategory,
     BigDecimal lineSubtotal,
     BigDecimal lineTax,
     BigDecimal lineDiscount,
