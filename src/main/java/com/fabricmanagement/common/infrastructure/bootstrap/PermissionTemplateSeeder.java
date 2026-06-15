@@ -54,6 +54,7 @@ public class PermissionTemplateSeeder implements DataSeeder {
                         new String[] {"MANAGER", "dashboard", "view", "ORGANIZATION"},
                         new String[] {"MANAGER", "notifications", "view", "ORGANIZATION"},
                         new String[] {"MANAGER", "reports", "view", "ORGANIZATION"},
+                        new String[] {"MANAGER", "finance", "read", "ORGANIZATION"},
                         new String[] {"VIEWER", "dashboard", "view", "ORGANIZATION"},
                         new String[] {"VIEWER", "notifications", "view", "ORGANIZATION"},
                         new String[] {"WORKER", "members", "read", "OWN"},
@@ -102,7 +103,10 @@ public class PermissionTemplateSeeder implements DataSeeder {
                         new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
                         new String[] {"MANAGER", "flowboard", "view", "ORGANIZATION"},
                         new String[] {"MANAGER", "flowboard", "edit", "DEPARTMENT"},
-                        new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
+                        new String[] {"MANAGER", "reports", "export", "DEPARTMENT"},
+                        new String[] {"WORKER", "finance", "read", "OWN"},
+                        new String[] {"SUPERVISOR", "finance", "read", "DEPARTMENT"},
+                        new String[] {"MANAGER", "finance", "read", "ORGANIZATION"}));
 
                 // 3. Production sub-departments (FIBER, YARN, WEAVING, KNITTING, DYEING, GARMENT)
                 //    Each sub-dept gets the same base production permissions.
@@ -189,7 +193,13 @@ public class PermissionTemplateSeeder implements DataSeeder {
                         new String[] {"MANAGER", "reports", "export", "ORGANIZATION"},
                         new String[] {"WORKER", "members", "read", "ORGANIZATION"},
                         new String[] {"SUPERVISOR", "members", "read", "ORGANIZATION"},
-                        new String[] {"MANAGER", "members", "read", "ORGANIZATION"}));
+                        new String[] {"MANAGER", "members", "read", "ORGANIZATION"},
+                        new String[] {"WORKER", "finance", "read", "OWN"},
+                        new String[] {"WORKER", "finance", "write", "OWN"},
+                        new String[] {"SUPERVISOR", "finance", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "finance", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "finance", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "finance", "write", "DEPARTMENT"}));
 
                 // 7. HR
                 seedDepartment(
