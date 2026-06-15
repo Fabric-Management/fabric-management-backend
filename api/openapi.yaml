@@ -24,6 +24,8 @@ tags:
   name: Partner Certifications
 - description: Notification management and preferences
   name: Notifications
+- description: Financial period close and FX revaluation
+  name: FinancialPeriod
 - description: Organization Contact operations
   name: Organization Contact
 - description: "B2B partner management - suppliers, customers, fason partners"
@@ -17635,6 +17637,495 @@ paths:
           description: Internal Server Error
       tags:
       - Payment
+  /api/v1/finance/periods:
+    post:
+      operationId: ensurePeriod
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnsureFinancialPeriodRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinancialPeriodDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Ensure a monthly financial period exists
+      tags:
+      - FinancialPeriod
+  /api/v1/finance/periods/latest-closed/unrealized-fx:
+    get:
+      operationId: getLatestClosedPosition
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseUnrealizedFxPositionDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get unrealized FX position for the latest closed financial period
+      tags:
+      - FinancialPeriod
+  /api/v1/finance/periods/{periodId}:
+    get:
+      operationId: getPeriod
+      parameters:
+      - in: path
+        name: periodId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseFinancialPeriodDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get a financial period
+      tags:
+      - FinancialPeriod
+  /api/v1/finance/periods/{periodId}/close:
+    post:
+      operationId: closePeriod
+      parameters:
+      - in: path
+        name: periodId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseCloseFinancialPeriodResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Close a financial period and book unrealized FX revaluation
+      tags:
+      - FinancialPeriod
+  /api/v1/finance/periods/{periodId}/reopen:
+    post:
+      operationId: reopenPeriod
+      parameters:
+      - in: path
+        name: periodId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseReopenFinancialPeriodResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reopen the latest closed financial period
+      tags:
+      - FinancialPeriod
+  /api/v1/finance/periods/{periodId}/revaluations:
+    get:
+      operationId: getRevaluations
+      parameters:
+      - in: path
+        name: periodId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListFxRevaluationDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List FX revaluation ledger entries for a financial period
+      tags:
+      - FinancialPeriod
+  /api/v1/finance/periods/{periodId}/unrealized-fx:
+    get:
+      operationId: getPosition
+      parameters:
+      - in: path
+        name: periodId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseUnrealizedFxPositionDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get unrealized FX position for a financial period
+      tags:
+      - FinancialPeriod
   /api/v1/flowboard/automations:
     get:
       operationId: getAutomations
@@ -40103,6 +40594,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseCloseFinancialPeriodResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CloseFinancialPeriodResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseContactDto:
       type: object
       properties:
@@ -40342,6 +40851,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/FiberTestResultDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseFinancialPeriodDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FinancialPeriodDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -40911,6 +41438,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FiberTestResultDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListFxRevaluationDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxRevaluationDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -42730,6 +43277,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseReopenFinancialPeriodResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ReopenFinancialPeriodResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseRoleDto:
       type: object
       properties:
@@ -43077,6 +43642,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/TradingPartnerDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseUnrealizedFxPositionDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/UnrealizedFxPositionDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -44264,6 +44847,23 @@ components:
             $ref: "#/components/schemas/SuggestedAction"
         tokenUsage:
           $ref: "#/components/schemas/TokenUsageDto"
+    CloseFinancialPeriodResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxRevaluationDto"
+        period:
+          $ref: "#/components/schemas/FinancialPeriodDto"
+        periodMovement:
+          type: number
+        revaluationEntryCount:
+          type: integer
+          format: int32
+        reversedEntryCount:
+          type: integer
+          format: int32
     CompanyTypeOptionDto:
       type: object
       properties:
@@ -46741,6 +47341,23 @@ components:
         userId:
           type: string
           format: uuid
+    EnsureFinancialPeriodRequest:
+      type: object
+      properties:
+        month:
+          type: integer
+          format: int32
+          example: 6
+          maximum: 12
+          minimum: 1
+        year:
+          type: integer
+          format: int32
+          example: 2026
+          minimum: 2000
+      required:
+      - month
+      - year
     Entry:
       type: object
       properties:
@@ -47331,6 +47948,41 @@ components:
         version:
           type: integer
           format: int64
+    FinancialPeriodDto:
+      type: object
+      properties:
+        closedAt:
+          type: string
+          format: date-time
+        closedBy:
+          type: string
+          format: uuid
+        endDate:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
+        periodMonth:
+          type: integer
+          format: int32
+        periodYear:
+          type: integer
+          format: int32
+        reopenedAt:
+          type: string
+          format: date-time
+        reopenedBy:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
     FinishingProductionSpecs:
       allOf:
       - $ref: "#/components/schemas/WorkOrderProductionSpecs"
@@ -47387,6 +48039,52 @@ components:
             format: double
             description: Target fabric width in cm
             example: 155.0
+    FxRevaluationDto:
+      type: object
+      properties:
+        asOfDate:
+          type: string
+          format: date
+        closingExchangeRate:
+          type: number
+        closingExchangeRateDate:
+          type: string
+          format: date
+        documentCurrency:
+          type: string
+        entryType:
+          type: string
+          enum:
+          - REVALUATION
+          - REVERSAL
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceSide:
+          type: string
+        issueExchangeRate:
+          type: number
+        issueExchangeRateDate:
+          type: string
+          format: date
+        openDocumentAmount:
+          type: number
+        periodId:
+          type: string
+          format: uuid
+        reportingCurrency:
+          type: string
+        revaluedAt:
+          type: string
+          format: date-time
+        reversalOfId:
+          type: string
+          format: uuid
+        unrealizedGainLoss:
+          type: number
     GenerateQuoteTokenRequest:
       type: object
       properties:
@@ -50387,6 +51085,20 @@ components:
           minLength: 1
       required:
       - reason
+    ReopenFinancialPeriodResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxRevaluationDto"
+        period:
+          $ref: "#/components/schemas/FinancialPeriodDto"
+        reversalEntryCount:
+          type: integer
+          format: int32
+        reversalMovement:
+          type: number
     ReserveRequest:
       type: object
       properties:
@@ -52268,6 +52980,17 @@ components:
           type: string
       required:
       - newLocationId
+    UnrealizedFxPositionDto:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxRevaluationDto"
+        period:
+          $ref: "#/components/schemas/FinancialPeriodDto"
+        unrealizedFxPosition:
+          type: number
     UpdateAddressRequest:
       type: object
       properties:

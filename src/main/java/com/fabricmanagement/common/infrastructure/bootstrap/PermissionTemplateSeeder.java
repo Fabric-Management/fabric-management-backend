@@ -199,7 +199,8 @@ public class PermissionTemplateSeeder implements DataSeeder {
                         new String[] {"SUPERVISOR", "finance", "read", "DEPARTMENT"},
                         new String[] {"SUPERVISOR", "finance", "write", "DEPARTMENT"},
                         new String[] {"MANAGER", "finance", "read", "ORGANIZATION"},
-                        new String[] {"MANAGER", "finance", "write", "DEPARTMENT"}));
+                        new String[] {"MANAGER", "finance", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "finance", "manage", "ORGANIZATION"}));
 
                 // 7. HR
                 seedDepartment(

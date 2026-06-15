@@ -39,7 +39,8 @@ public class FinancePermissionBackfillRunner {
         ) t
         CROSS JOIN (
             VALUES ('WORKER', 'read', 'OWN'), ('WORKER', 'write', 'OWN'), ('SUPERVISOR', 'read', 'DEPARTMENT'),
-                   ('SUPERVISOR', 'write', 'DEPARTMENT'), ('MANAGER', 'read', 'ORGANIZATION'), ('MANAGER', 'write', 'DEPARTMENT')
+                   ('SUPERVISOR', 'write', 'DEPARTMENT'), ('MANAGER', 'read', 'ORGANIZATION'), ('MANAGER', 'write', 'DEPARTMENT'),
+                   ('MANAGER', 'manage', 'ORGANIZATION')
         ) AS r(role_code, action, data_scope)
         WHERE NOT EXISTS (
             SELECT 1 FROM common_user.permission_template pt
