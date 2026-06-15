@@ -36,7 +36,11 @@ public class TenantSettingsEventListener {
               .ifPresentOrElse(
                   cfg -> {
                     cfg.update(
-                        event.getLocale() != null ? event.getLocale() : cfg.getDefaultLocale(),
+                        event.getLocale() != null
+                            ? java.util.Locale.forLanguageTag(event.getLocale())
+                                .getLanguage()
+                                .toUpperCase(java.util.Locale.ENGLISH)
+                            : cfg.getDefaultLocale(),
                         cfg.getSupportedLocales(),
                         cfg.getDateFormat(),
                         cfg.getTimeFormat(),
@@ -49,7 +53,11 @@ public class TenantSettingsEventListener {
                     // but in case it's missing, we create one.
                     var newCfg = TenantLocaleConfig.createDefault(event.getTenantId());
                     newCfg.update(
-                        event.getLocale() != null ? event.getLocale() : newCfg.getDefaultLocale(),
+                        event.getLocale() != null
+                            ? java.util.Locale.forLanguageTag(event.getLocale())
+                                .getLanguage()
+                                .toUpperCase(java.util.Locale.ENGLISH)
+                            : newCfg.getDefaultLocale(),
                         newCfg.getSupportedLocales(),
                         newCfg.getDateFormat(),
                         newCfg.getTimeFormat(),

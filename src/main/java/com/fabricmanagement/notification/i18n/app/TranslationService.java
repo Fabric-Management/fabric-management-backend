@@ -161,7 +161,13 @@ public class TranslationService {
                     "timeFormat", cfg.getTimeFormat(),
                     "timezone", cfg.getTimezone(),
                     "currency", cfg.getCurrency()))
-        .orElse(Map.of("defaultLocale", "TR", "supportedLocales", java.util.List.of("TR", "EN")));
+        .orElse(
+            Map.of(
+                "defaultLocale",
+                com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_LOCALE,
+                "supportedLocales",
+                com.fabricmanagement.common.domain.LocaleConstants
+                    .PLATFORM_DEFAULT_SUPPORTED_LOCALES));
   }
 
   @Transactional
