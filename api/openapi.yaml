@@ -46409,6 +46409,15 @@ components:
         id:
           type: string
           format: uuid
+        realizedFxGainLoss:
+          type: number
+        reportingCurrency:
+          type: string
+        settlementExchangeRate:
+          type: number
+        settlementExchangeRateDate:
+          type: string
+          format: date
         targetInvoiceId:
           type: string
           format: uuid
@@ -47727,6 +47736,11 @@ components:
         issueDate:
           type: string
           format: date
+        issueExchangeRate:
+          type: number
+        issueExchangeRateDate:
+          type: string
+          format: date
         lines:
           type: array
           items:
@@ -47745,6 +47759,10 @@ components:
           format: date
         paymentStatus:
           type: string
+        reportingCurrency:
+          type: string
+        reportingTotal:
+          type: number
         status:
           type: string
         subtotal:
@@ -49113,6 +49131,15 @@ components:
         paymentId:
           type: string
           format: uuid
+        realizedFxGainLoss:
+          type: number
+        reportingCurrency:
+          type: string
+        settlementExchangeRate:
+          type: number
+        settlementExchangeRateDate:
+          type: string
+          format: date
     PaymentDto:
       type: object
       properties:

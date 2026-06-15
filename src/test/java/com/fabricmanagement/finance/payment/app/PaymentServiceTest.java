@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.common.app.SettlementFxResult;
 import com.fabricmanagement.finance.payment.app.port.InvoiceAllocationView;
 import com.fabricmanagement.finance.payment.app.port.InvoicePaymentPort;
 import com.fabricmanagement.finance.payment.domain.Payment;
@@ -16,6 +17,7 @@ import com.fabricmanagement.finance.payment.domain.PaymentAllocation;
 import com.fabricmanagement.finance.payment.domain.PaymentDirection;
 import com.fabricmanagement.finance.payment.domain.event.PaymentAllocatedEvent;
 import com.fabricmanagement.finance.payment.dto.CreateAllocationRequest;
+import com.fabricmanagement.finance.payment.infra.repository.PaymentAllocationRepository;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentRepository;
 import com.fabricmanagement.finance.payment.mapper.PaymentMapper;
 import java.math.BigDecimal;
@@ -37,6 +39,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PaymentServiceTest {
 
   @Mock private PaymentRepository paymentRepository;
+  @Mock private PaymentAllocationRepository paymentAllocationRepository;
   @Mock private InvoicePaymentPort invoicePaymentPort;
   @Mock private DomainEventPublisher eventPublisher;
   @Spy private PaymentMapper paymentMapper = Mappers.getMapper(PaymentMapper.class);
@@ -73,10 +76,38 @@ class PaymentServiceTest {
 
     when(paymentRepository.findByTenantIdAndId(tenantId, paymentId))
         .thenReturn(Optional.of(payment));
+    when(paymentRepository.saveAndFlush(payment))
+        .thenAnswer(
+            invocation -> {
+              payment
+                  .getAllocations()
+                  .forEach(
+                      allocation -> {
+                        if (allocation.getId() == null) {
+                          allocation.setId(UUID.randomUUID());
+                        }
+                      });
+              return payment;
+            });
+    when(paymentAllocationRepository
+            .findFirstByTenantIdAndPaymentIdAndInvoiceIdAndIsActiveTrueOrderByCreatedAtDesc(
+                eq(tenantId), eq(paymentId), eq(invoiceId)))
+        .thenAnswer(
+            invocation ->
+                payment.getAllocations().stream()
+                    .filter(allocation -> allocation.getId() != null)
+                    .findFirst());
     when(invoicePaymentPort.getInvoiceForAllocation(tenantId, invoiceId))
         .thenReturn(
             new InvoiceAllocationView(
                 invoiceId, Money.of(new java.math.BigDecimal("50.00"), "USD"), "USD", true));
+    when(invoicePaymentPort.recordAllocationFx(
+            eq(tenantId),
+            eq(invoiceId),
+            any(UUID.class),
+            eq(Money.of(new java.math.BigDecimal("40.00"), "USD")),
+            any()))
+        .thenReturn(SettlementFxResult.zero("USD", BigDecimal.ONE, LocalDate.now()));
 
     CreateAllocationRequest req = new CreateAllocationRequest(invoiceId, new BigDecimal("40.00"));
 
@@ -88,7 +119,7 @@ class PaymentServiceTest {
             eq(invoiceId),
             eq(Money.of(new java.math.BigDecimal("40.00"), "USD")),
             any());
-    verify(paymentRepository).save(payment);
+    verify(paymentRepository).saveAndFlush(payment);
     verify(eventPublisher).publish(any(PaymentAllocatedEvent.class));
 
     assertThat(payment.getAllocatedAmount())
@@ -128,6 +159,7 @@ class PaymentServiceTest {
     verify(invoicePaymentPort)
         .reverseAllocation(
             eq(tenantId), eq(invoiceId), eq(Money.of(new java.math.BigDecimal("40.00"), "USD")));
+    verify(invoicePaymentPort).reverseAllocationFx(tenantId, allocationId);
     verify(paymentRepository).save(payment);
 
     assertThat(allocation.getIsActive()).isFalse();

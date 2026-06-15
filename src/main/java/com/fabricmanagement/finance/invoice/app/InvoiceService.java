@@ -37,6 +37,7 @@ public class InvoiceService {
   private final DomainEventPublisher eventPublisher;
   private final TenantReportingCurrencyPort reportingCurrencyPort;
   private final FinanceDocumentNumberGenerator documentNumberGenerator;
+  private final InvoiceReportingSnapshotService reportingSnapshotService;
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAllInvoices(Pageable pageable) {
@@ -192,6 +193,7 @@ public class InvoiceService {
     UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
     invoice.issue();
+    reportingSnapshotService.captureAtIssue(tenantId, invoice);
     Invoice saved = invoiceRepository.save(invoice);
 
     eventPublisher.publish(

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.fx.infra.repository.FxRealizationRepository;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
@@ -53,6 +54,7 @@ class PaymentPersistenceIT {
 
   @Autowired private PaymentService paymentService;
   @Autowired private PaymentRepository paymentRepository;
+  @Autowired private FxRealizationRepository fxRealizationRepository;
   @Autowired private InvoiceRepository invoiceRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -92,6 +94,7 @@ class PaymentPersistenceIT {
 
   @AfterEach
   void tearDown() {
+    fxRealizationRepository.deleteAll();
     paymentRepository.deleteAll();
     invoiceRepository.deleteAll();
     jdbcTemplate.update(
@@ -114,6 +117,7 @@ class PaymentPersistenceIT {
             .totalAmount(Money.of(new java.math.BigDecimal("100.00"), "USD"))
             .amountDue(Money.of(new java.math.BigDecimal("100.00"), "USD"))
             .amountPaid(Money.of(java.math.BigDecimal.ZERO, "USD"))
+            .amountCredited(Money.of(java.math.BigDecimal.ZERO, "USD"))
             .status(InvoiceStatus.SENT)
             .build();
     invoice.setTenantId(tenantId);

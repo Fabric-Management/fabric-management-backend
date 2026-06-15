@@ -2,6 +2,7 @@ package com.fabricmanagement.finance.payment.mapper;
 
 import com.fabricmanagement.common.infrastructure.mapping.MapStructConfig;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.common.app.SettlementFxResult;
 import com.fabricmanagement.finance.payment.domain.Payment;
 import com.fabricmanagement.finance.payment.domain.PaymentAllocation;
 import com.fabricmanagement.finance.payment.dto.PaymentAllocationDto;
@@ -30,9 +31,28 @@ public interface PaymentMapper {
       target = "currency",
       expression = "java(entity.getAmount().getCurrency().getCurrencyCode())")
   @Mapping(target = "amount", expression = "java(map(entity.getAmount()))")
+  @Mapping(target = "reportingCurrency", ignore = true)
+  @Mapping(target = "realizedFxGainLoss", ignore = true)
+  @Mapping(target = "settlementExchangeRate", ignore = true)
+  @Mapping(target = "settlementExchangeRateDate", ignore = true)
   PaymentAllocationDto toAllocationDto(PaymentAllocation entity);
 
   List<PaymentAllocationDto> toAllocationDtoList(List<PaymentAllocation> entities);
+
+  default PaymentAllocationDto toAllocationDto(
+      PaymentAllocation entity, SettlementFxResult fxResult) {
+    return new PaymentAllocationDto(
+        entity.getId(),
+        entity.getPaymentId(),
+        entity.getInvoiceId(),
+        map(entity.getAmount()),
+        entity.getAmount().getCurrency().getCurrencyCode(),
+        entity.getAllocatedAt(),
+        fxResult.reportingCurrency(),
+        fxResult.realizedFxGainLoss(),
+        fxResult.settlementExchangeRate(),
+        fxResult.settlementExchangeRateDate());
+  }
 
   default BigDecimal map(Money value) {
     return value != null ? value.getAmount() : null;
