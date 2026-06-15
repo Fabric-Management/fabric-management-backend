@@ -1,5 +1,6 @@
 package com.fabricmanagement.finance.invoice.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
@@ -20,7 +21,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,7 +34,7 @@ public class InvoiceService {
 
   private final InvoiceRepository invoiceRepository;
   private final InvoiceMapper invoiceMapper;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
   private final TenantReportingCurrencyPort reportingCurrencyPort;
   private final FinanceDocumentNumberGenerator documentNumberGenerator;
 
@@ -130,7 +130,7 @@ public class InvoiceService {
 
     Invoice saved = invoiceRepository.save(invoice);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new InvoiceCreatedEvent(
             tenantId,
             saved.getId(),
@@ -194,7 +194,7 @@ public class InvoiceService {
     invoice.issue();
     Invoice saved = invoiceRepository.save(invoice);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new InvoiceIssuedEvent(
             tenantId, saved.getId(), saved.getInvoiceNumber(), saved.getTotalAmount().getAmount()));
 
@@ -208,7 +208,7 @@ public class InvoiceService {
     invoice.send();
     Invoice saved = invoiceRepository.save(invoice);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new InvoiceSentEvent(
             tenantId, saved.getId(), saved.getInvoiceNumber(), saved.getTradingPartnerId()));
 
@@ -222,7 +222,7 @@ public class InvoiceService {
     invoice.cancel();
     Invoice saved = invoiceRepository.save(invoice);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new InvoiceCancelledEvent(tenantId, saved.getId(), saved.getInvoiceNumber()));
 
     log.info("Invoice cancelled: {}", saved.getInvoiceNumber());
@@ -244,7 +244,7 @@ public class InvoiceService {
     invoice.dispute();
     Invoice saved = invoiceRepository.save(invoice);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new InvoiceDisputedEvent(
             tenantId, saved.getId(), saved.getInvoiceNumber(), saved.getTradingPartnerId()));
 
@@ -344,7 +344,7 @@ public class InvoiceService {
     int count = 0;
     for (Invoice invoice : eligibles) {
 
-      eventPublisher.publishEvent(
+      eventPublisher.publish(
           new InvoiceOverdueEvent(
               tenantId,
               invoice.getId(),

@@ -27,6 +27,9 @@ public final class NotificationEventType {
   public static final String PO_DELIVERY_LATE = "PO_DELIVERY_LATE";
   public static final String RFQ_DEADLINE_APPROACHING = "RFQ_DEADLINE_APPROACHING";
   public static final String RFQ_NO_RESPONSE = "RFQ_NO_RESPONSE";
+  public static final String INVOICE_OVERDUE = "INVOICE_OVERDUE";
+  public static final String INVOICE_DISPUTED = "INVOICE_DISPUTED";
+  public static final String COST_VARIANCE_DETECTED = "COST_VARIANCE_DETECTED";
 
   // ---- NORMAL ----
   public static final String WORK_ORDER_APPROVED = "WORK_ORDER_APPROVED";
@@ -40,4 +43,5 @@ public final class NotificationEventType {
   public static final String SUPPLIER_QUOTE_RECEIVED = "SUPPLIER_QUOTE_RECEIVED";
   public static final String TASK_BLOCKED = "TASK_BLOCKED";
   public static final String AUTOMATION_ALERT = "AUTOMATION_ALERT";
+  public static final String PAYMENT_RECEIVED = "PAYMENT_RECEIVED";
 }

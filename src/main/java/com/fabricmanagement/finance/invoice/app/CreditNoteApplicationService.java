@@ -1,5 +1,6 @@
 package com.fabricmanagement.finance.invoice.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
@@ -20,7 +21,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +32,7 @@ public class CreditNoteApplicationService {
 
   private final InvoiceRepository invoiceRepository;
   private final CreditNoteApplicationRepository applicationRepository;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
   private final Clock clock;
 
   public CreditNoteApplicationDto applyCreditNote(
@@ -111,7 +111,7 @@ public class CreditNoteApplicationService {
     application.setTenantId(tenantId);
     CreditNoteApplication saved = applicationRepository.save(application);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new CreditNoteAppliedEvent(
             tenantId,
             creditNote.getId(),
@@ -150,7 +150,7 @@ public class CreditNoteApplicationService {
     application.delete();
     applicationRepository.save(application);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new CreditNoteReversedEvent(
             tenantId,
             creditNoteId,

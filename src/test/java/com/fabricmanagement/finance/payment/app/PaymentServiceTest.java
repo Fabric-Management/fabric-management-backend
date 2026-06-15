@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.payment.app.port.InvoiceAllocationView;
@@ -31,14 +32,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
 
   @Mock private PaymentRepository paymentRepository;
   @Mock private InvoicePaymentPort invoicePaymentPort;
-  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private DomainEventPublisher eventPublisher;
   @Spy private PaymentMapper paymentMapper = Mappers.getMapper(PaymentMapper.class);
 
   @InjectMocks private PaymentService paymentService;
@@ -89,7 +89,7 @@ class PaymentServiceTest {
             eq(Money.of(new java.math.BigDecimal("40.00"), "USD")),
             any());
     verify(paymentRepository).save(payment);
-    verify(eventPublisher).publishEvent(any(PaymentAllocatedEvent.class));
+    verify(eventPublisher).publish(any(PaymentAllocatedEvent.class));
 
     assertThat(payment.getAllocatedAmount())
         .isEqualTo(Money.of(new java.math.BigDecimal("40.00"), "USD"));

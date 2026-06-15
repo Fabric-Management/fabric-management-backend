@@ -1,5 +1,6 @@
 package com.fabricmanagement.finance.payment.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.app.FinanceDocumentNumberGenerator;
@@ -23,7 +24,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -47,7 +47,7 @@ public class PaymentService {
   private final PaymentMapper paymentMapper;
   private final FinanceDocumentNumberGenerator documentNumberGenerator;
   private final InvoicePaymentPort invoicePaymentPort;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
 
   public PaymentDto createPayment(CreatePaymentRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
@@ -69,7 +69,7 @@ public class PaymentService {
 
     Payment saved = paymentRepository.save(payment);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new PaymentReceivedEvent(
             tenantId,
             saved.getId(),
@@ -117,7 +117,7 @@ public class PaymentService {
     invoicePaymentPort.applyAllocation(
         tenantId, invoiceView.invoiceId(), allocation.getAmount(), payment.getPaymentDate());
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new PaymentAllocatedEvent(
             tenantId, payment.getId(), invoiceView.invoiceId(), allocationAmount));
 
@@ -162,7 +162,7 @@ public class PaymentService {
 
     paymentRepository.save(payment);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new PaymentVoidedEvent(
             tenantId, payment.getId(), payment.getPaymentNumber(), affectedInvoiceIds));
 
