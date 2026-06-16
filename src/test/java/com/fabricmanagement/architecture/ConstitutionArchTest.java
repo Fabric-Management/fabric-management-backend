@@ -571,7 +571,8 @@ class ConstitutionArchTest {
                   "com.fabricmanagement.finance..",
                   "com.fabricmanagement.logistics..",
                   "com.fabricmanagement.notification..",
-                  "com.fabricmanagement.offline..")
+                  "com.fabricmanagement.offline..",
+                  "com.fabricmanagement.analytics..")
               .as(
                   "Rule 11.2: Platform modules must not depend on domain modules"
                       + " (one-way dependency only)."

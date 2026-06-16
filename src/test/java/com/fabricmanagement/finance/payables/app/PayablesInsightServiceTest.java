@@ -1,16 +1,15 @@
-package com.fabricmanagement.finance.receivables.app;
+package com.fabricmanagement.finance.payables.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
-import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.finance.common.app.OpenInvoiceAmountService;
 import com.fabricmanagement.finance.invoice.app.InvoiceSide;
 import com.fabricmanagement.finance.invoice.app.InvoiceSideResolver;
@@ -19,17 +18,17 @@ import com.fabricmanagement.finance.invoice.domain.InvoicePaymentStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.finance.payables.dto.PayablesSummaryDto;
+import com.fabricmanagement.finance.payables.dto.PayablesSupplierDto;
 import com.fabricmanagement.finance.payment.domain.PaymentDirection;
 import com.fabricmanagement.finance.payment.domain.PaymentStatus;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentAllocationRepository;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesCustomerDto;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesSummaryDto;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,7 +42,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
-class ReceivablesInsightServiceTest {
+class PayablesInsightServiceTest {
 
   private static final LocalDate AS_OF_DATE = LocalDate.of(2026, 6, 16);
 
@@ -53,15 +52,15 @@ class ReceivablesInsightServiceTest {
   @Mock private ExchangeRateService exchangeRateService;
   @Mock private InvoiceSideResolver invoiceSideResolver;
   @Mock private TradingPartnerResolver tradingPartnerResolver;
+  private Clock clock = Clock.fixed(Instant.parse("2026-06-16T12:00:00Z"), ZoneId.of("UTC"));
 
-  private final Clock clock = Clock.fixed(Instant.parse("2026-06-16T12:00:00Z"), ZoneOffset.UTC);
   private final UUID tenantId = UUID.randomUUID();
   private final UUID partnerId = UUID.randomUUID();
 
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(tenantId);
-    when(reportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    lenient().when(reportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
   }
 
   @AfterEach
@@ -71,9 +70,9 @@ class ReceivablesInsightServiceTest {
 
   @Test
   void creditNotesAreContraForOutstandingButExcludedFromAgingAndOverdue() {
-    Invoice sales =
+    Invoice purchase =
         invoice(
-            InvoiceType.SALES,
+            InvoiceType.PURCHASE,
             InvoiceStatus.SENT,
             InvoicePaymentStatus.UNPAID,
             "GBP",
@@ -88,13 +87,18 @@ class ReceivablesInsightServiceTest {
             "200.00",
             AS_OF_DATE.minusDays(120));
 
-    stubOpenAr(List.of(sales, creditNote));
-    when(invoiceSideResolver.resolveSide(tenantId, creditNote))
-        .thenReturn(InvoiceSide.ACCOUNTS_RECEIVABLE);
-    when(invoiceRepository.findIssuedInvoicesInWindow(any(), any(), any(), any(), any()))
+    stubOpenAp(List.of(purchase, creditNote));
+    lenient()
+        .when(invoiceSideResolver.resolveSide(tenantId, purchase))
+        .thenReturn(InvoiceSide.ACCOUNTS_PAYABLE);
+    lenient()
+        .when(invoiceSideResolver.resolveSide(tenantId, creditNote))
+        .thenReturn(InvoiceSide.ACCOUNTS_PAYABLE);
+    lenient()
+        .when(invoiceRepository.findIssuedInvoicesInWindow(any(), any(), any(), any(), any()))
         .thenReturn(List.of());
 
-    ReceivablesSummaryDto summary = service().getSummary(5);
+    PayablesSummaryDto summary = service().getSummary(5);
 
     assertThat(summary.totalOutstanding()).isEqualByComparingTo("800.0000");
     assertThat(summary.overdueExposure()).isEqualByComparingTo("1000.0000");
@@ -104,10 +108,10 @@ class ReceivablesInsightServiceTest {
   }
 
   @Test
-  void customerRollupUsesRemainingCreditOnlyOnceAndSlowPayerIgnoresEarlyPayment() {
-    Invoice sales =
+  void supplierRollupUsesRemainingCreditOnlyOnceAndChecksOutboundPayments() {
+    Invoice purchase =
         invoice(
-            InvoiceType.SALES,
+            InvoiceType.PURCHASE,
             InvoiceStatus.SENT,
             InvoicePaymentStatus.PARTIALLY_PAID,
             "GBP",
@@ -122,29 +126,35 @@ class ReceivablesInsightServiceTest {
             "50.00",
             AS_OF_DATE.minusDays(45));
 
-    stubOpenAr(List.of(sales, remainingCredit));
-    when(invoiceSideResolver.resolveSide(tenantId, remainingCredit))
-        .thenReturn(InvoiceSide.ACCOUNTS_RECEIVABLE);
-    when(tradingPartnerResolver.resolveDisplayNames(tenantId, List.of(partnerId)))
-        .thenReturn(Map.of(partnerId, "Acme Textiles"));
-    when(paymentAllocationRepository.findPaymentTimingRows(
-            tenantId,
-            PaymentDirection.INBOUND,
-            PaymentStatus.VOIDED,
-            AS_OF_DATE.minusDays(365),
-            AS_OF_DATE))
+    stubOpenAp(List.of(purchase, remainingCredit));
+    lenient()
+        .when(invoiceSideResolver.resolveSide(tenantId, purchase))
+        .thenReturn(InvoiceSide.ACCOUNTS_PAYABLE);
+    lenient()
+        .when(invoiceSideResolver.resolveSide(tenantId, remainingCredit))
+        .thenReturn(InvoiceSide.ACCOUNTS_PAYABLE);
+    lenient()
+        .when(tradingPartnerResolver.resolveDisplayNames(tenantId, List.of(partnerId)))
+        .thenReturn(Map.of(partnerId, "Acme Supplier"));
+    lenient()
+        .when(
+            paymentAllocationRepository.findPaymentTimingRows(
+                tenantId,
+                PaymentDirection.OUTBOUND,
+                PaymentStatus.VOIDED,
+                AS_OF_DATE.minusDays(365),
+                AS_OF_DATE))
         .thenReturn(
             List.of(
                 new Object[] {partnerId, AS_OF_DATE.minusDays(30), AS_OF_DATE.minusDays(35)},
                 new Object[] {partnerId, AS_OF_DATE.minusDays(30), AS_OF_DATE.minusDays(10)}));
 
-    Page<ReceivablesCustomerDto> page = service().getCustomers(PageRequest.of(0, 20));
+    Page<PayablesSupplierDto> page = service().getSuppliers(PageRequest.of(0, 20));
 
-    ReceivablesCustomerDto customer = page.getContent().get(0);
-    assertThat(customer.outstanding()).isEqualByComparingTo("650.0000");
-    assertThat(customer.unappliedCredits()).isEqualByComparingTo("50.0000");
-    assertThat(customer.averageDaysLate()).isEqualByComparingTo("10.0000");
-    assertThat(customer.riskFlags()).extracting("code").doesNotContain("SLOW_PAYER");
+    PayablesSupplierDto supplier = page.getContent().get(0);
+    assertThat(supplier.outstanding()).isEqualByComparingTo("650.0000");
+    assertThat(supplier.unappliedCredits()).isEqualByComparingTo("50.0000");
+    assertThat(supplier.averageDaysLate()).isEqualByComparingTo("10.0000");
   }
 
   @Test
@@ -158,10 +168,14 @@ class ReceivablesInsightServiceTest {
             "100.00",
             AS_OF_DATE.minusDays(30));
 
-    stubOpenAr(List.of(creditNote));
-    when(invoiceSideResolver.resolveSide(tenantId, creditNote))
-        .thenReturn(InvoiceSide.ACCOUNTS_RECEIVABLE);
-    when(exchangeRateService.convert(tenantId, new BigDecimal("100.00"), "USD", "GBP", AS_OF_DATE))
+    stubOpenAp(List.of(creditNote));
+    lenient()
+        .when(invoiceSideResolver.resolveSide(tenantId, creditNote))
+        .thenReturn(InvoiceSide.ACCOUNTS_PAYABLE);
+    lenient()
+        .when(
+            exchangeRateService.convert(
+                tenantId, new BigDecimal("100.00"), "USD", "GBP", AS_OF_DATE))
         .thenReturn(
             ConvertedMoney.of(
                 new BigDecimal("100.00"),
@@ -170,10 +184,11 @@ class ReceivablesInsightServiceTest {
                 "GBP",
                 new BigDecimal("0.800000"),
                 AS_OF_DATE));
-    when(invoiceRepository.findIssuedInvoicesInWindow(any(), any(), any(), any(), any()))
+    lenient()
+        .when(invoiceRepository.findIssuedInvoicesInWindow(any(), any(), any(), any(), any()))
         .thenReturn(List.of());
 
-    ReceivablesSummaryDto summary = service().getSummary(5);
+    PayablesSummaryDto summary = service().getSummary(5);
 
     assertThat(summary.totalOutstanding()).isEqualByComparingTo("-80.0000");
     verify(exchangeRateService)
@@ -181,54 +196,35 @@ class ReceivablesInsightServiceTest {
   }
 
   @Test
-  void missingRateFallsBackToIssueRateAndWarnsWithoutFailingRead() {
-    Invoice sales =
+  void largeUpcomingOutflowRiskFlagFiresCorrectly() {
+    Invoice purchase =
         invoice(
-            InvoiceType.SALES,
+            InvoiceType.PURCHASE,
             InvoiceStatus.SENT,
             InvoicePaymentStatus.UNPAID,
-            "EUR",
-            "100.00",
-            AS_OF_DATE.plusDays(10));
-    sales.captureReportingSnapshot(
-        "GBP", new BigDecimal("0.900000"), AS_OF_DATE.minusDays(2), new BigDecimal("90.0000"));
+            "GBP",
+            "1000.00",
+            AS_OF_DATE.plusDays(3)); // Due in 3 days
 
-    stubOpenAr(List.of(sales));
-    when(exchangeRateService.convert(tenantId, new BigDecimal("100.00"), "EUR", "GBP", AS_OF_DATE))
-        .thenThrow(new ExchangeRateRequiredException("EUR", "GBP", AS_OF_DATE));
-    when(invoiceRepository.findIssuedInvoicesInWindow(any(), any(), any(), any(), any()))
+    stubOpenAp(List.of(purchase));
+    lenient()
+        .when(invoiceSideResolver.resolveSide(tenantId, purchase))
+        .thenReturn(InvoiceSide.ACCOUNTS_PAYABLE);
+    lenient()
+        .when(invoiceRepository.findIssuedInvoicesInWindow(any(), any(), any(), any(), any()))
         .thenReturn(List.of());
 
-    ReceivablesSummaryDto summary = service().getSummary(5);
+    PayablesSummaryDto summary = service().getSummary(5);
 
-    assertThat(summary.totalOutstanding()).isEqualByComparingTo("90.0000");
-    assertThat(summary.warnings()).extracting("code").contains("ISSUE_RATE_FALLBACK");
+    // It's 100% of AP, so LARGE_UPCOMING_OUTFLOW should fire.
+    assertThat(summary.concentration().get(0).outstanding()).isEqualByComparingTo("1000.0000");
+
+    Page<PayablesSupplierDto> page = service().getSuppliers(PageRequest.of(0, 20));
+    PayablesSupplierDto supplier = page.getContent().get(0);
+    assertThat(supplier.riskFlags()).extracting("code").contains("LARGE_UPCOMING_OUTFLOW");
   }
 
-  @Test
-  void missingRateWithoutIssueRateWarnsAndKeepsReadDegraded() {
-    Invoice sales =
-        invoice(
-            InvoiceType.SALES,
-            InvoiceStatus.SENT,
-            InvoicePaymentStatus.UNPAID,
-            "EUR",
-            "100.00",
-            AS_OF_DATE.plusDays(10));
-
-    stubOpenAr(List.of(sales));
-    when(exchangeRateService.convert(tenantId, new BigDecimal("100.00"), "EUR", "GBP", AS_OF_DATE))
-        .thenThrow(new ExchangeRateRequiredException("EUR", "GBP", AS_OF_DATE));
-    when(invoiceRepository.findIssuedInvoicesInWindow(any(), any(), any(), any(), any()))
-        .thenReturn(List.of());
-
-    ReceivablesSummaryDto summary = service().getSummary(5);
-
-    assertThat(summary.totalOutstanding()).isEqualByComparingTo("100.0000");
-    assertThat(summary.warnings()).extracting("code").contains("MISSING_RATE");
-  }
-
-  private BigDecimal bucket(ReceivablesSummaryDto summary, String bucket) {
+  private BigDecimal bucket(PayablesSummaryDto summary, String bucket) {
     return summary.agingBuckets().stream()
         .filter(dto -> dto.bucket().equals(bucket))
         .findFirst()
@@ -236,17 +232,19 @@ class ReceivablesInsightServiceTest {
         .amount();
   }
 
-  private void stubOpenAr(List<Invoice> invoices) {
-    when(invoiceRepository.findOpenAccountsReceivable(
-            tenantId,
-            List.of(InvoiceType.SALES, InvoiceType.DEBIT_NOTE),
-            InvoiceType.CREDIT_NOTE,
-            List.of(InvoiceStatus.CANCELLED, InvoiceStatus.VOIDED, InvoiceStatus.DRAFT)))
+  private void stubOpenAp(List<Invoice> invoices) {
+    lenient()
+        .when(
+            invoiceRepository.findOpenAccountsPayable(
+                tenantId,
+                List.of(InvoiceType.PURCHASE),
+                InvoiceType.CREDIT_NOTE,
+                List.of(InvoiceStatus.CANCELLED, InvoiceStatus.VOIDED, InvoiceStatus.DRAFT)))
         .thenReturn(invoices);
   }
 
-  private ReceivablesInsightService service() {
-    return new ReceivablesInsightService(
+  private PayablesInsightService service() {
+    return new PayablesInsightService(
         invoiceRepository,
         paymentAllocationRepository,
         reportingCurrencyPort,

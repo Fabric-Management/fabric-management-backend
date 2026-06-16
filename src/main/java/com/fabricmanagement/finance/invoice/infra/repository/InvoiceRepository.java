@@ -100,6 +100,21 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
       Pageable pageable);
 
   @Query(
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId "
+          + "AND (i.invoiceType IN :apTypes "
+          + "  OR (i.invoiceType = :cnType AND i.originalInvoiceId IN "
+          + "      (SELECT o.id FROM Invoice o WHERE o.tenantId = :tenantId "
+          + "       AND o.invoiceType IN :apTypes))) "
+          + "AND i.status NOT IN :excludedStatuses "
+          + "AND i.paymentStatus <> 'PAID' "
+          + "AND i.amountDue.amount > 0")
+  List<Invoice> findOpenAccountsPayable(
+      @Param("tenantId") UUID tenantId,
+      @Param("apTypes") List<InvoiceType> apTypes,
+      @Param("cnType") InvoiceType cnType,
+      @Param("excludedStatuses") List<InvoiceStatus> excludedStatuses);
+
+  @Query(
       "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId AND i.paymentStatus != 'PAID' "
           + "AND i.status NOT IN ('CANCELLED','VOIDED','DRAFT') AND i.dueDate < :today")
   List<Invoice> findInvoicesEligibleForOverdue(

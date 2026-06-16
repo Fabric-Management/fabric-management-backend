@@ -46,4 +46,19 @@ public interface CostCalculationRepository extends JpaRepository<CostCalculation
       CostEntityType entityType,
       CostStage stage,
       org.springframework.data.domain.Pageable pageable);
+
+  @Query(
+      """
+      SELECT cc FROM CostCalculation cc
+      WHERE cc.tenantId = :tenantId
+        AND cc.entityType = :entityType
+        AND cc.stage = :stage
+        AND cc.entityId IN :entityIds
+        AND cc.isActive = true
+      """)
+  List<CostCalculation> findActiveByTenantIdAndEntityTypeAndStageAndEntityIdIn(
+      @Param("tenantId") UUID tenantId,
+      @Param("entityType") CostEntityType entityType,
+      @Param("stage") CostStage stage,
+      @Param("entityIds") java.util.Set<UUID> entityIds);
 }

@@ -1,4 +1,4 @@
-package com.fabricmanagement.finance.receivables.app;
+package com.fabricmanagement.finance.payables.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
@@ -11,17 +11,17 @@ import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.finance.payables.dto.DpoDto;
+import com.fabricmanagement.finance.payables.dto.PayablesAgingBucketDto;
+import com.fabricmanagement.finance.payables.dto.PayablesConcentrationDto;
+import com.fabricmanagement.finance.payables.dto.PayablesCurrencyBreakdownDto;
+import com.fabricmanagement.finance.payables.dto.PayablesRiskFlagDto;
+import com.fabricmanagement.finance.payables.dto.PayablesSummaryDto;
+import com.fabricmanagement.finance.payables.dto.PayablesSupplierDto;
+import com.fabricmanagement.finance.payables.dto.PayablesWarningDto;
 import com.fabricmanagement.finance.payment.domain.PaymentDirection;
 import com.fabricmanagement.finance.payment.domain.PaymentStatus;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentAllocationRepository;
-import com.fabricmanagement.finance.receivables.dto.AgingBucketDto;
-import com.fabricmanagement.finance.receivables.dto.DsoDto;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesConcentrationDto;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesCurrencyBreakdownDto;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesCustomerDto;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesRiskFlagDto;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesSummaryDto;
-import com.fabricmanagement.finance.receivables.dto.ReceivablesWarningDto;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -48,17 +48,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ReceivablesInsightService {
+public class PayablesInsightService {
 
   private static final int REPORTING_SCALE = 4;
   private static final int PERCENT_SCALE = 4;
-  private static final int DSO_WINDOW_DAYS = 90;
+  private static final int DPO_WINDOW_DAYS = 90;
   private static final int PAYMENT_BEHAVIOR_WINDOW_DAYS = 365;
   private static final BigDecimal HIGH_CONCENTRATION_PERCENT = new BigDecimal("25.0000");
-  private static final BigDecimal SLOW_PAYER_DAYS = new BigDecimal("10.0000");
-  private static final List<InvoiceType> AR_TYPES =
-      List.of(InvoiceType.SALES, InvoiceType.DEBIT_NOTE);
-  private static final List<InvoiceStatus> EXCLUDED_OPEN_AR_STATUSES =
+  private static final List<InvoiceType> AP_TYPES = List.of(InvoiceType.PURCHASE);
+  private static final List<InvoiceStatus> EXCLUDED_OPEN_AP_STATUSES =
       List.of(InvoiceStatus.CANCELLED, InvoiceStatus.VOIDED, InvoiceStatus.DRAFT);
 
   private final InvoiceRepository invoiceRepository;
@@ -68,14 +66,14 @@ public class ReceivablesInsightService {
   private final TradingPartnerResolver tradingPartnerResolver;
   private final Clock clock;
 
-  public ReceivablesSummaryDto getSummary(Integer topN) {
+  public PayablesSummaryDto getSummary(Integer topN) {
     UUID tenantId = TenantContext.requireTenantId();
     LocalDate asOfDate = LocalDate.now(clock);
-    ReceivablesModel model = buildModel(tenantId, asOfDate);
-    List<ReceivablesCustomerDto> customers = buildCustomers(tenantId, model);
+    PayablesModel model = buildModel(tenantId, asOfDate);
+    List<PayablesSupplierDto> suppliers = buildSuppliers(tenantId, model);
     int concentrationLimit = topN == null || topN <= 0 ? 5 : topN;
 
-    return new ReceivablesSummaryDto(
+    return new PayablesSummaryDto(
         asOfDate,
         model.reportingCurrency(),
         model.totalOutstanding(),
@@ -83,19 +81,19 @@ public class ReceivablesInsightService {
         percentage(model.overdueExposure(), model.totalOutstanding()),
         agingDtos(model.agingTotals()),
         currencyDtos(model.currencyTotals()),
-        customers.stream()
-            .filter(customer -> customer.outstanding().compareTo(BigDecimal.ZERO) > 0)
-            .sorted(Comparator.comparing(ReceivablesCustomerDto::outstanding).reversed())
+        suppliers.stream()
+            .filter(supplier -> supplier.outstanding().compareTo(BigDecimal.ZERO) > 0)
+            .sorted(Comparator.comparing(PayablesSupplierDto::outstanding).reversed())
             .limit(concentrationLimit)
             .map(
-                customer ->
-                    new ReceivablesConcentrationDto(
-                        customer.tradingPartnerId(),
-                        customer.tradingPartnerName(),
-                        customer.outstanding(),
-                        customer.concentrationPercent()))
+                supplier ->
+                    new PayablesConcentrationDto(
+                        supplier.tradingPartnerId(),
+                        supplier.tradingPartnerName(),
+                        supplier.outstanding(),
+                        supplier.concentrationPercent()))
             .toList(),
-        buildDso(
+        buildDpo(
             tenantId,
             asOfDate,
             model.reportingCurrency(),
@@ -104,43 +102,43 @@ public class ReceivablesInsightService {
         model.warnings());
   }
 
-  public Page<ReceivablesCustomerDto> getCustomers(Pageable pageable) {
+  public Page<PayablesSupplierDto> getSuppliers(Pageable pageable) {
     UUID tenantId = TenantContext.requireTenantId();
-    ReceivablesModel model = buildModel(tenantId, LocalDate.now(clock));
-    List<ReceivablesCustomerDto> customers =
-        sortCustomers(buildCustomers(tenantId, model), pageable);
-    int fromIndex = Math.min((int) pageable.getOffset(), customers.size());
-    int toIndex = Math.min(fromIndex + pageable.getPageSize(), customers.size());
-    return new PageImpl<>(customers.subList(fromIndex, toIndex), pageable, customers.size());
+    PayablesModel model = buildModel(tenantId, LocalDate.now(clock));
+    List<PayablesSupplierDto> suppliers = sortSuppliers(buildSuppliers(tenantId, model), pageable);
+    int fromIndex = Math.min((int) pageable.getOffset(), suppliers.size());
+    int toIndex = Math.min(fromIndex + pageable.getPageSize(), suppliers.size());
+    return new PageImpl<>(suppliers.subList(fromIndex, toIndex), pageable, suppliers.size());
   }
 
-  private ReceivablesModel buildModel(UUID tenantId, LocalDate asOfDate) {
+  private PayablesModel buildModel(UUID tenantId, LocalDate asOfDate) {
     String reportingCurrency = reportingCurrencyPort.getReportingCurrency(tenantId);
-    List<ReceivablesWarningDto> warnings = new ArrayList<>();
-    List<ReceivableLine> lines =
+    List<PayablesWarningDto> warnings = new ArrayList<>();
+    List<PayableLine> lines =
         invoiceRepository
-            .findOpenAccountsReceivable(
-                tenantId, AR_TYPES, InvoiceType.CREDIT_NOTE, EXCLUDED_OPEN_AR_STATUSES)
+            .findOpenAccountsPayable(
+                tenantId, AP_TYPES, InvoiceType.CREDIT_NOTE, EXCLUDED_OPEN_AP_STATUSES)
             .stream()
             .map(invoice -> toLine(tenantId, invoice, reportingCurrency, asOfDate, warnings))
             .toList();
 
     BigDecimal totalOutstanding =
         lines.stream()
-            .map(ReceivableLine::signedReportingAmount)
+            .map(PayableLine::signedReportingAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(REPORTING_SCALE, RoundingMode.HALF_UP);
+
     BigDecimal overdueExposure =
         lines.stream()
-            .filter(ReceivableLine::agingEligible)
+            .filter(PayableLine::agingEligible)
             .filter(line -> line.invoice().isOverdue(asOfDate))
-            .map(ReceivableLine::signedReportingAmount)
+            .map(PayableLine::signedReportingAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(REPORTING_SCALE, RoundingMode.HALF_UP);
 
     Map<AgingBucket, BigDecimal> agingTotals = emptyAgingMap();
     lines.stream()
-        .filter(ReceivableLine::agingEligible)
+        .filter(PayableLine::agingEligible)
         .forEach(
             line ->
                 agingTotals.merge(
@@ -155,14 +153,14 @@ public class ReceivablesInsightService {
                 .computeIfAbsent(line.documentCurrency(), ignored -> new CurrencyAccumulator())
                 .add(line.signedDocumentAmount(), line.signedReportingAmount()));
 
-    Map<UUID, List<ReceivableLine>> byCustomer =
+    Map<UUID, List<PayableLine>> bySupplier =
         lines.stream().collect(Collectors.groupingBy(line -> line.invoice().getTradingPartnerId()));
 
-    return new ReceivablesModel(
+    return new PayablesModel(
         asOfDate,
         reportingCurrency,
         lines,
-        byCustomer,
+        bySupplier,
         totalOutstanding,
         overdueExposure,
         agingTotals,
@@ -170,22 +168,22 @@ public class ReceivablesInsightService {
         warnings);
   }
 
-  private ReceivableLine toLine(
+  private PayableLine toLine(
       UUID tenantId,
       Invoice invoice,
       String reportingCurrency,
       LocalDate asOfDate,
-      List<ReceivablesWarningDto> warnings) {
+      List<PayablesWarningDto> warnings) {
 
     OpenAmountResult openAmount =
         openInvoiceAmountService.signedOpenAmountForSide(
-            tenantId, invoice, InvoiceSide.ACCOUNTS_RECEIVABLE, reportingCurrency, asOfDate);
+            tenantId, invoice, InvoiceSide.ACCOUNTS_PAYABLE, reportingCurrency, asOfDate);
 
     for (FinanceWarningDto w : openAmount.warnings()) {
-      warnings.add(new ReceivablesWarningDto(w.code(), w.invoiceId(), w.message()));
+      warnings.add(new PayablesWarningDto(w.code(), w.invoiceId(), w.message()));
     }
 
-    return new ReceivableLine(
+    return new PayableLine(
         invoice,
         openAmount.signedDocumentAmount(),
         openAmount.signedReportingAmount(),
@@ -193,31 +191,29 @@ public class ReceivablesInsightService {
         isAgingEligible(invoice));
   }
 
-  // Helper methods removed
-
   private boolean isAgingEligible(Invoice invoice) {
-    return invoice.getInvoiceType().isReceivable();
+    return invoice.getInvoiceType().isPayable();
   }
 
-  private List<ReceivablesCustomerDto> buildCustomers(UUID tenantId, ReceivablesModel model) {
+  private List<PayablesSupplierDto> buildSuppliers(UUID tenantId, PayablesModel model) {
     Map<UUID, String> names =
         tradingPartnerResolver.resolveDisplayNames(
-            tenantId, new ArrayList<>(model.linesByCustomer().keySet()));
+            tenantId, new ArrayList<>(model.linesBySupplier().keySet()));
     Map<UUID, BigDecimal> averageDaysLate = averageDaysLate(tenantId, model.asOfDate());
 
-    return model.linesByCustomer().entrySet().stream()
+    return model.linesBySupplier().entrySet().stream()
         .map(
             entry -> {
               UUID partnerId = entry.getKey();
-              List<ReceivableLine> lines = entry.getValue();
+              List<PayableLine> lines = entry.getValue();
               BigDecimal outstanding =
-                  sum(lines, ReceivableLine::signedReportingAmount)
+                  sum(lines, PayableLine::signedReportingAmount)
                       .setScale(REPORTING_SCALE, RoundingMode.HALF_UP);
               BigDecimal overdue =
                   lines.stream()
-                      .filter(ReceivableLine::agingEligible)
+                      .filter(PayableLine::agingEligible)
                       .filter(line -> line.invoice().isOverdue(model.asOfDate()))
-                      .map(ReceivableLine::signedReportingAmount)
+                      .map(PayableLine::signedReportingAmount)
                       .reduce(BigDecimal.ZERO, BigDecimal::add)
                       .setScale(REPORTING_SCALE, RoundingMode.HALF_UP);
               BigDecimal unappliedCredits =
@@ -228,7 +224,7 @@ public class ReceivablesInsightService {
                       .setScale(REPORTING_SCALE, RoundingMode.HALF_UP);
               Map<AgingBucket, BigDecimal> aging = emptyAgingMap();
               lines.stream()
-                  .filter(ReceivableLine::agingEligible)
+                  .filter(PayableLine::agingEligible)
                   .forEach(
                       line ->
                           aging.merge(
@@ -246,7 +242,7 @@ public class ReceivablesInsightService {
                   averageDaysLate
                       .getOrDefault(partnerId, BigDecimal.ZERO)
                       .setScale(PERCENT_SCALE, RoundingMode.HALF_UP);
-              return new ReceivablesCustomerDto(
+              return new PayablesSupplierDto(
                   partnerId,
                   names.getOrDefault(partnerId, "Unknown partner"),
                   outstanding,
@@ -259,12 +255,7 @@ public class ReceivablesInsightService {
                   agingDtos(aging),
                   currencyDtos(currencyTotals),
                   riskFlags(
-                      lines,
-                      outstanding,
-                      overdue,
-                      avgLate,
-                      model.asOfDate(),
-                      model.totalOutstanding()));
+                      lines, outstanding, overdue, model.asOfDate(), model.totalOutstanding()));
             })
         .toList();
   }
@@ -279,7 +270,7 @@ public class ReceivablesInsightService {
     Map<UUID, LateDays> totals = new HashMap<>();
     paymentAllocationRepository
         .findPaymentTimingRows(
-            tenantId, PaymentDirection.INBOUND, PaymentStatus.VOIDED, fromDate, asOfDate)
+            tenantId, PaymentDirection.OUTBOUND, PaymentStatus.VOIDED, fromDate, asOfDate)
         .forEach(
             row -> {
               UUID partnerId = (UUID) row[0];
@@ -301,17 +292,17 @@ public class ReceivablesInsightService {
                             RoundingMode.HALF_UP)));
   }
 
-  private DsoDto buildDso(
+  private DpoDto buildDpo(
       UUID tenantId,
       LocalDate asOfDate,
       String reportingCurrency,
-      BigDecimal netAccountsReceivable,
-      List<ReceivablesWarningDto> warnings) {
-    LocalDate fromDate = asOfDate.minusDays(DSO_WINDOW_DAYS - 1L);
-    BigDecimal creditSales =
+      BigDecimal netAccountsPayable,
+      List<PayablesWarningDto> warnings) {
+    LocalDate fromDate = asOfDate.minusDays(DPO_WINDOW_DAYS - 1L);
+    BigDecimal purchases =
         invoiceRepository
             .findIssuedInvoicesInWindow(
-                tenantId, InvoiceType.SALES, EXCLUDED_OPEN_AR_STATUSES, fromDate, asOfDate)
+                tenantId, InvoiceType.PURCHASE, EXCLUDED_OPEN_AP_STATUSES, fromDate, asOfDate)
             .stream()
             .map(
                 invoice -> {
@@ -326,81 +317,93 @@ public class ReceivablesInsightService {
                           asOfDate,
                           localWarnings);
                   for (FinanceWarningDto w : localWarnings) {
-                    warnings.add(new ReceivablesWarningDto(w.code(), w.invoiceId(), w.message()));
+                    warnings.add(new PayablesWarningDto(w.code(), w.invoiceId(), w.message()));
                   }
                   return converted.amount();
                 })
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(REPORTING_SCALE, RoundingMode.HALF_UP);
-    if (creditSales.compareTo(BigDecimal.ZERO) == 0) {
-      return new DsoDto(
-          DSO_WINDOW_DAYS, null, netAccountsReceivable, creditSales, "INSUFFICIENT_SALES_WINDOW");
+
+    if (purchases.compareTo(BigDecimal.ZERO) == 0) {
+      return new DpoDto(
+          DPO_WINDOW_DAYS, null, netAccountsPayable, purchases, "INSUFFICIENT_PURCHASE_WINDOW");
     }
-    BigDecimal dso =
-        netAccountsReceivable
-            .multiply(BigDecimal.valueOf(DSO_WINDOW_DAYS))
-            .divide(creditSales, REPORTING_SCALE, RoundingMode.HALF_UP);
-    return new DsoDto(DSO_WINDOW_DAYS, dso, netAccountsReceivable, creditSales, "OK");
+    BigDecimal dpo =
+        netAccountsPayable
+            .multiply(BigDecimal.valueOf(DPO_WINDOW_DAYS))
+            .divide(purchases, REPORTING_SCALE, RoundingMode.HALF_UP);
+    return new DpoDto(DPO_WINDOW_DAYS, dpo, netAccountsPayable, purchases, "OK");
   }
 
-  private List<ReceivablesRiskFlagDto> riskFlags(
-      List<ReceivableLine> lines,
+  private List<PayablesRiskFlagDto> riskFlags(
+      List<PayableLine> lines,
       BigDecimal outstanding,
       BigDecimal overdue,
-      BigDecimal averageDaysLate,
       LocalDate asOfDate,
       BigDecimal totalOutstanding) {
-    List<ReceivablesRiskFlagDto> flags = new ArrayList<>();
+    List<PayablesRiskFlagDto> flags = new ArrayList<>();
+
     if (overdue.compareTo(BigDecimal.ZERO) > 0) {
-      flags.add(new ReceivablesRiskFlagDto("OVERDUE_BALANCE", "Customer has overdue receivables"));
+      flags.add(new PayablesRiskFlagDto("OVERDUE_PAYABLE", "Supplier has overdue payables"));
     }
-    boolean severeOverdue =
-        lines.stream()
-            .filter(ReceivableLine::agingEligible)
-            .anyMatch(line -> line.invoice().getDaysOverdue(asOfDate) >= 61);
-    if (severeOverdue) {
-      flags.add(
-          new ReceivablesRiskFlagDto("SEVERE_OVERDUE", "Customer has receivables 61+ days late"));
-    }
+
     if (percentage(outstanding.max(BigDecimal.ZERO), totalOutstanding)
             .compareTo(HIGH_CONCENTRATION_PERCENT)
         >= 0) {
       flags.add(
-          new ReceivablesRiskFlagDto(
-              "HIGH_CONCENTRATION", "Customer represents at least 25% of total net AR"));
+          new PayablesRiskFlagDto(
+              "HIGH_DEPENDENCY", "Supplier represents at least 25% of total net AP"));
     }
-    if (averageDaysLate.compareTo(SLOW_PAYER_DAYS) > 0) {
+
+    boolean hasLargeUpcomingOutflow =
+        lines.stream()
+            .filter(PayableLine::agingEligible)
+            .anyMatch(
+                line -> {
+                  long daysToDue = asOfDate.until(line.invoice().getDueDate(), ChronoUnit.DAYS);
+                  if (daysToDue >= 0 && daysToDue <= 7) {
+                    return percentage(
+                                line.signedReportingAmount().max(BigDecimal.ZERO), totalOutstanding)
+                            .compareTo(HIGH_CONCENTRATION_PERCENT)
+                        >= 0;
+                  }
+                  return false;
+                });
+
+    if (hasLargeUpcomingOutflow) {
       flags.add(
-          new ReceivablesRiskFlagDto(
-              "SLOW_PAYER", "Average historical payment lateness is greater than 10 days"));
+          new PayablesRiskFlagDto(
+              "LARGE_UPCOMING_OUTFLOW",
+              "Supplier has an invoice due within 7 days whose reporting amount is ≥ 25% of total net AP"));
     }
+
     return flags;
   }
 
-  private List<ReceivablesCustomerDto> sortCustomers(
-      List<ReceivablesCustomerDto> customers, Pageable pageable) {
-    Comparator<ReceivablesCustomerDto> comparator = null;
+  private List<PayablesSupplierDto> sortSuppliers(
+      List<PayablesSupplierDto> suppliers, Pageable pageable) {
+    Comparator<PayablesSupplierDto> comparator = null;
     for (Sort.Order order : pageable.getSort()) {
-      Comparator<ReceivablesCustomerDto> next = comparatorFor(order.getProperty());
+      Comparator<PayablesSupplierDto> next = comparatorFor(order.getProperty());
       if (order.isDescending()) {
         next = next.reversed();
       }
       comparator = comparator == null ? next : comparator.thenComparing(next);
     }
     if (comparator == null) {
-      comparator = Comparator.comparing(ReceivablesCustomerDto::outstanding).reversed();
+      comparator = Comparator.comparing(PayablesSupplierDto::outstanding).reversed();
     }
-    return customers.stream().sorted(comparator).toList();
+    return suppliers.stream().sorted(comparator).toList();
   }
 
-  private Comparator<ReceivablesCustomerDto> comparatorFor(String property) {
+  private Comparator<PayablesSupplierDto> comparatorFor(String property) {
     return switch (property) {
-      case "tradingPartnerName" -> Comparator.comparing(ReceivablesCustomerDto::tradingPartnerName);
-      case "overdueExposure" -> Comparator.comparing(ReceivablesCustomerDto::overdueExposure);
+      case "tradingPartnerName" -> Comparator.comparing(PayablesSupplierDto::tradingPartnerName);
+      case "overdueExposure" -> Comparator.comparing(PayablesSupplierDto::overdueExposure);
       case "concentrationPercent" ->
-          Comparator.comparing(ReceivablesCustomerDto::concentrationPercent);
-      case "averageDaysLate" -> Comparator.comparing(ReceivablesCustomerDto::averageDaysLate);
-      default -> Comparator.comparing(ReceivablesCustomerDto::outstanding);
+          Comparator.comparing(PayablesSupplierDto::concentrationPercent);
+      case "averageDaysLate" -> Comparator.comparing(PayablesSupplierDto::averageDaysLate);
+      default -> Comparator.comparing(PayablesSupplierDto::outstanding);
     };
   }
 
@@ -429,11 +432,11 @@ public class ReceivablesInsightService {
     return aging;
   }
 
-  private List<AgingBucketDto> agingDtos(Map<AgingBucket, BigDecimal> aging) {
+  private List<PayablesAgingBucketDto> agingDtos(Map<AgingBucket, BigDecimal> aging) {
     return List.of(AgingBucket.values()).stream()
         .map(
             bucket ->
-                new AgingBucketDto(
+                new PayablesAgingBucketDto(
                     bucket.name(),
                     aging
                         .getOrDefault(bucket, BigDecimal.ZERO)
@@ -441,13 +444,13 @@ public class ReceivablesInsightService {
         .toList();
   }
 
-  private List<ReceivablesCurrencyBreakdownDto> currencyDtos(
+  private List<PayablesCurrencyBreakdownDto> currencyDtos(
       Map<String, CurrencyAccumulator> currencyTotals) {
     return currencyTotals.entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
         .map(
             entry ->
-                new ReceivablesCurrencyBreakdownDto(
+                new PayablesCurrencyBreakdownDto(
                     entry.getKey(),
                     entry
                         .getValue()
@@ -460,7 +463,7 @@ public class ReceivablesInsightService {
         .toList();
   }
 
-  private BigDecimal sum(List<ReceivableLine> lines, Function<ReceivableLine, BigDecimal> getter) {
+  private BigDecimal sum(List<PayableLine> lines, Function<PayableLine, BigDecimal> getter) {
     return lines.stream().map(getter).reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
@@ -481,23 +484,23 @@ public class ReceivablesInsightService {
     DAYS_90_PLUS
   }
 
-  private record ReceivableLine(
+  private record PayableLine(
       Invoice invoice,
       BigDecimal signedDocumentAmount,
       BigDecimal signedReportingAmount,
       String documentCurrency,
       boolean agingEligible) {}
 
-  private record ReceivablesModel(
+  private record PayablesModel(
       LocalDate asOfDate,
       String reportingCurrency,
-      List<ReceivableLine> lines,
-      Map<UUID, List<ReceivableLine>> linesByCustomer,
+      List<PayableLine> lines,
+      Map<UUID, List<PayableLine>> linesBySupplier,
       BigDecimal totalOutstanding,
       BigDecimal overdueExposure,
       Map<AgingBucket, BigDecimal> agingTotals,
       Map<String, CurrencyAccumulator> currencyTotals,
-      List<ReceivablesWarningDto> warnings) {}
+      List<PayablesWarningDto> warnings) {}
 
   private static final class CurrencyAccumulator {
     private BigDecimal documentAmount = BigDecimal.ZERO;
