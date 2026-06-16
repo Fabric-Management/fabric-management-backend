@@ -11,6 +11,7 @@ import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrency
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
+import com.fabricmanagement.finance.common.app.OpenInvoiceAmountService;
 import com.fabricmanagement.finance.invoice.app.InvoiceSide;
 import com.fabricmanagement.finance.invoice.app.InvoiceSideResolver;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
@@ -249,8 +250,7 @@ class ReceivablesInsightServiceTest {
         invoiceRepository,
         paymentAllocationRepository,
         reportingCurrencyPort,
-        exchangeRateService,
-        invoiceSideResolver,
+        new OpenInvoiceAmountService(exchangeRateService, invoiceSideResolver),
         tradingPartnerResolver,
         clock);
   }

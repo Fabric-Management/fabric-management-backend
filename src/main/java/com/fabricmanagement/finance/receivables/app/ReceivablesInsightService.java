@@ -1,12 +1,12 @@
 package com.fabricmanagement.finance.receivables.app;
 
-import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
-import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
-import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
+import com.fabricmanagement.finance.common.app.OpenInvoiceAmountService;
+import com.fabricmanagement.finance.common.app.OpenInvoiceAmountService.ConvertedAmount;
+import com.fabricmanagement.finance.common.app.OpenInvoiceAmountService.OpenAmountResult;
+import com.fabricmanagement.finance.common.dto.FinanceWarningDto;
 import com.fabricmanagement.finance.invoice.app.InvoiceSide;
-import com.fabricmanagement.finance.invoice.app.InvoiceSideResolver;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
@@ -64,8 +64,7 @@ public class ReceivablesInsightService {
   private final InvoiceRepository invoiceRepository;
   private final PaymentAllocationRepository paymentAllocationRepository;
   private final TenantReportingCurrencyPort reportingCurrencyPort;
-  private final ExchangeRateService exchangeRateService;
-  private final InvoiceSideResolver invoiceSideResolver;
+  private final OpenInvoiceAmountService openInvoiceAmountService;
   private final TradingPartnerResolver tradingPartnerResolver;
   private final Clock clock;
 
@@ -177,102 +176,24 @@ public class ReceivablesInsightService {
       String reportingCurrency,
       LocalDate asOfDate,
       List<ReceivablesWarningDto> warnings) {
-    BigDecimal documentAmount = invoice.getAmountDue().getAmount().abs();
-    String documentCurrency = invoice.getCurrency();
-    ConvertedAmount converted =
-        convertAmount(
-            tenantId,
-            invoice,
-            documentAmount,
-            documentCurrency,
-            reportingCurrency,
-            asOfDate,
-            warnings);
-    SignedOpenAmount signed =
-        signedOpenAmount(tenantId, invoice, documentAmount, converted.amount());
+
+    OpenAmountResult openAmount =
+        openInvoiceAmountService.signedOpenAmountForSide(
+            tenantId, invoice, InvoiceSide.ACCOUNTS_RECEIVABLE, reportingCurrency, asOfDate);
+
+    for (FinanceWarningDto w : openAmount.warnings()) {
+      warnings.add(new ReceivablesWarningDto(w.code(), w.invoiceId(), w.message()));
+    }
+
     return new ReceivableLine(
         invoice,
-        signed.documentAmount(),
-        signed.reportingAmount(),
-        documentCurrency,
+        openAmount.signedDocumentAmount(),
+        openAmount.signedReportingAmount(),
+        invoice.getCurrency(),
         isAgingEligible(invoice));
   }
 
-  private SignedOpenAmount signedOpenAmount(
-      UUID tenantId, Invoice invoice, BigDecimal documentAmount, BigDecimal reportingAmount) {
-    int sign = amountSign(tenantId, invoice);
-    return new SignedOpenAmount(
-        documentAmount
-            .multiply(BigDecimal.valueOf(sign))
-            .setScale(REPORTING_SCALE, RoundingMode.HALF_UP),
-        reportingAmount
-            .multiply(BigDecimal.valueOf(sign))
-            .setScale(REPORTING_SCALE, RoundingMode.HALF_UP));
-  }
-
-  private ConvertedAmount convertAmount(
-      UUID tenantId,
-      Invoice invoice,
-      BigDecimal documentAmount,
-      String documentCurrency,
-      String reportingCurrency,
-      LocalDate asOfDate,
-      List<ReceivablesWarningDto> warnings) {
-    if (documentCurrency.equalsIgnoreCase(reportingCurrency)) {
-      return new ConvertedAmount(documentAmount.setScale(REPORTING_SCALE, RoundingMode.HALF_UP));
-    }
-    try {
-      ConvertedMoney converted =
-          exchangeRateService.convert(
-              tenantId, documentAmount, documentCurrency, reportingCurrency, asOfDate);
-      if (converted.getRateDate() != null && converted.getRateDate().isBefore(asOfDate)) {
-        warnings.add(
-            new ReceivablesWarningDto(
-                "STALE_RATE",
-                invoice.getId(),
-                "Using %s->%s rate from %s for as-of %s"
-                    .formatted(
-                        documentCurrency, reportingCurrency, converted.getRateDate(), asOfDate)));
-      }
-      return new ConvertedAmount(
-          converted.getConvertedAmount().setScale(REPORTING_SCALE, RoundingMode.HALF_UP));
-    } catch (ExchangeRateRequiredException ex) {
-      if (invoice.getIssueExchangeRate() != null) {
-        warnings.add(
-            new ReceivablesWarningDto(
-                "ISSUE_RATE_FALLBACK",
-                invoice.getId(),
-                "Missing %s->%s rate for %s; using issue rate from %s"
-                    .formatted(
-                        documentCurrency,
-                        reportingCurrency,
-                        asOfDate,
-                        invoice.getIssueExchangeRateDate())));
-        return new ConvertedAmount(
-            documentAmount
-                .multiply(invoice.getIssueExchangeRate())
-                .setScale(REPORTING_SCALE, RoundingMode.HALF_UP));
-      }
-      warnings.add(
-          new ReceivablesWarningDto(
-              "MISSING_RATE",
-              invoice.getId(),
-              "Missing %s->%s rate for %s; using document amount as degraded reporting value"
-                  .formatted(documentCurrency, reportingCurrency, asOfDate)));
-      return new ConvertedAmount(documentAmount.setScale(REPORTING_SCALE, RoundingMode.HALF_UP));
-    }
-  }
-
-  private int amountSign(UUID tenantId, Invoice invoice) {
-    if (invoice.getInvoiceType().isReceivable()) {
-      return 1;
-    }
-    if (invoice.getInvoiceType() == InvoiceType.CREDIT_NOTE
-        && invoiceSideResolver.resolveSide(tenantId, invoice) == InvoiceSide.ACCOUNTS_RECEIVABLE) {
-      return -1;
-    }
-    return 1;
-  }
+  // Helper methods removed
 
   private boolean isAgingEligible(Invoice invoice) {
     return invoice.getInvoiceType().isReceivable();
@@ -393,16 +314,22 @@ public class ReceivablesInsightService {
                 tenantId, InvoiceType.SALES, EXCLUDED_OPEN_AR_STATUSES, fromDate, asOfDate)
             .stream()
             .map(
-                invoice ->
-                    convertAmount(
-                            tenantId,
-                            invoice,
-                            invoice.getTotalAmount().getAmount().abs(),
-                            invoice.getCurrency(),
-                            reportingCurrency,
-                            asOfDate,
-                            warnings)
-                        .amount())
+                invoice -> {
+                  List<FinanceWarningDto> localWarnings = new ArrayList<>();
+                  ConvertedAmount converted =
+                      openInvoiceAmountService.convertAmount(
+                          tenantId,
+                          invoice,
+                          invoice.getTotalAmount().getAmount().abs(),
+                          invoice.getCurrency(),
+                          reportingCurrency,
+                          asOfDate,
+                          localWarnings);
+                  for (FinanceWarningDto w : localWarnings) {
+                    warnings.add(new ReceivablesWarningDto(w.code(), w.invoiceId(), w.message()));
+                  }
+                  return converted.amount();
+                })
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(REPORTING_SCALE, RoundingMode.HALF_UP);
     if (creditSales.compareTo(BigDecimal.ZERO) == 0) {
@@ -553,10 +480,6 @@ public class ReceivablesInsightService {
     DAYS_61_90,
     DAYS_90_PLUS
   }
-
-  private record ConvertedAmount(BigDecimal amount) {}
-
-  private record SignedOpenAmount(BigDecimal documentAmount, BigDecimal reportingAmount) {}
 
   private record ReceivableLine(
       Invoice invoice,
