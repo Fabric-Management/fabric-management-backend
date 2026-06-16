@@ -3,6 +3,7 @@ package com.fabricmanagement.finance.fx.infra.repository;
 import com.fabricmanagement.finance.fx.domain.FxRealization;
 import com.fabricmanagement.finance.fx.domain.FxRealizationSourceType;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,4 +31,7 @@ public interface FxRealizationRepository extends JpaRepository<FxRealization, UU
       @Param("tenantId") UUID tenantId,
       @Param("sourceType") FxRealizationSourceType sourceType,
       @Param("sourceId") UUID sourceId);
+
+  List<FxRealization> findByTenantIdAndRealizedAtBetween(
+      UUID tenantId, Instant fromDate, Instant toDate);
 }

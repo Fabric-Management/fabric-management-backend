@@ -15717,6 +15717,69 @@ paths:
       summary: Generate cash flow forecast
       tags:
       - Finance - Cash Flow
+  /api/v1/finance/fx-exposure/summary:
+    get:
+      operationId: getSummary_2
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FxExposureSummaryDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - fx-exposure-controller
   /api/v1/finance/invoices:
     get:
       operationId: getAll_3
@@ -48548,6 +48611,16 @@ components:
         version:
           type: integer
           format: int64
+    FinanceWarningDto:
+      type: object
+      properties:
+        code:
+          type: string
+        invoiceId:
+          type: string
+          format: uuid
+        message:
+          type: string
     FinancialPeriodDto:
       type: object
       properties:
@@ -48639,6 +48712,52 @@ components:
             format: double
             description: Target fabric width in cm
             example: 155.0
+    FxExposureCurrencyDto:
+      type: object
+      properties:
+        currency:
+          type: string
+        grossAccountsPayable:
+          type: number
+        grossAccountsReceivable:
+          type: number
+        netDocumentCurrency:
+          type: number
+        netReportingCurrency:
+          type: number
+    FxExposureSummaryDto:
+      type: object
+      properties:
+        asOfDate:
+          type: string
+          format: date
+        latestRevaluationDate:
+          type: string
+          format: date
+        openExposure:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxExposureCurrencyDto"
+        realizedFx:
+          type: array
+          items:
+            $ref: "#/components/schemas/RealizedFxCurrencyDto"
+        reportingCurrency:
+          type: string
+        totalNetReportingExposure:
+          type: number
+        totalRealizedGainLoss:
+          type: number
+        totalUnrealizedGainLoss:
+          type: number
+        unrealizedFx:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnrealizedFxCurrencyDto"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinanceWarningDto"
     FxRevaluationDto:
       type: object
       properties:
@@ -51661,6 +51780,13 @@ components:
         validUntil:
           type: string
           format: date
+    RealizedFxCurrencyDto:
+      type: object
+      properties:
+        currency:
+          type: string
+        netRealizedGainLoss:
+          type: number
     ReasonRequest:
       type: object
       properties:
@@ -53953,6 +54079,13 @@ components:
           type: string
       required:
       - newLocationId
+    UnrealizedFxCurrencyDto:
+      type: object
+      properties:
+        currency:
+          type: string
+        netUnrealizedGainLoss:
+          type: number
     UnrealizedFxPositionDto:
       type: object
       properties:
