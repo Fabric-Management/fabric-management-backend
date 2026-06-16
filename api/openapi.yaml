@@ -36,6 +36,8 @@ tags:
   name: Costing
 - description: Inventory Balance operations
   name: Inventory Balance
+- description: Cash flow forecasting operations
+  name: Finance - Cash Flow
 - description: Approval Request operations
   name: Approval Request
 - description: Physical stock unit lifecycle management
@@ -15636,6 +15638,83 @@ paths:
           description: Internal Server Error
       tags:
       - Costing
+  /api/v1/finance/cash-flow/forecast:
+    get:
+      description: Generates a weekly cash flow forecast based on open AR and AP invoices.
+      operationId: getForecast
+      parameters:
+      - in: query
+        name: openingBalance
+        required: false
+        schema:
+          type: number
+      - in: query
+        name: horizonWeeks
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CashFlowForecastDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Generate cash flow forecast
+      tags:
+      - Finance - Cash Flow
   /api/v1/finance/invoices:
     get:
       operationId: getAll_3
@@ -44951,6 +45030,105 @@ components:
         wipLimitDefault:
           type: integer
           format: int32
+    CashFlowBucketDto:
+      type: object
+      description: A single week's cash-flow projection bucket
+      properties:
+        bucketKey:
+          type: string
+          description: Bucket key
+          example: WEEK_1
+        cashCrunch:
+          type: boolean
+          description: True if projected position is negative (cash crunch)
+        cumulativeNetMovement:
+          type: number
+          description: Cumulative net movement up to this bucket
+        endDate:
+          type: string
+          format: date
+          description: End date of the bucket (inclusive)
+        firstCrunch:
+          type: boolean
+          description: True if this is the first bucket where a cash crunch occurs
+        inflows:
+          type: number
+          description: Expected inflows (net open AR)
+        label:
+          type: string
+          description: Human readable label
+          example: Overdue / Now
+        netMovement:
+          type: number
+          description: Net movement (inflows - outflows)
+        outflows:
+          type: number
+          description: Expected outflows (net open AP)
+        projectedPosition:
+          type: number
+          description: Projected absolute position (only if opening balance was provided)
+        startDate:
+          type: string
+          format: date
+          description: Start date of the bucket (inclusive)
+    CashFlowForecastDto:
+      type: object
+      description: Cash-flow forecast projection
+      properties:
+        asOfDate:
+          type: string
+          format: date
+          description: As-of date the forecast was run
+        buckets:
+          type: array
+          description: "Forecast buckets (first is OVERDUE_NOW, followed by weekly\
+            \ buckets)"
+          items:
+            $ref: "#/components/schemas/CashFlowBucketDto"
+        firstCrunchBucketKey:
+          type: string
+          description: "Bucket key of the first cash crunch, if any"
+        hasCrunch:
+          type: boolean
+          description: True if a cash crunch occurs in the forecast
+        horizonEndDate:
+          type: string
+          format: date
+          description: End date of the horizon (inclusive)
+        horizonWeeks:
+          type: integer
+          format: int32
+          description: Number of weeks in the horizon
+        mode:
+          type: string
+          description: "Forecast mode: NET_MOVEMENT or PROJECTED_POSITION"
+          example: NET_MOVEMENT
+        openingBalance:
+          type: number
+          description: "Opening balance provided by the user, if any"
+        reportingCurrency:
+          type: string
+          description: Reporting currency used for consolidation
+        warnings:
+          type: array
+          description: Non-fatal warnings (e.g. missing FX rates)
+          items:
+            $ref: "#/components/schemas/CashFlowWarningDto"
+    CashFlowWarningDto:
+      type: object
+      description: Non-fatal warning produced while building cash-flow forecast
+      properties:
+        code:
+          type: string
+          description: Warning code
+          example: MISSING_RATE
+        invoiceId:
+          type: string
+          format: uuid
+          description: Invoice that caused the warning
+        message:
+          type: string
+          description: Warning details
     CertificationSummary:
       type: object
       properties:
