@@ -22,6 +22,7 @@ import com.fabricmanagement.finance.payment.dto.PaymentDto;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentAllocationRepository;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentRepository;
 import com.fabricmanagement.finance.payment.mapper.PaymentMapper;
+import com.fabricmanagement.finance.period.app.port.FinancialPeriodGuard;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -52,9 +53,13 @@ public class PaymentService {
   private final InvoicePaymentPort invoicePaymentPort;
   private final DomainEventPublisher eventPublisher;
   private final PaymentAllocationRepository paymentAllocationRepository;
+  private final FinancialPeriodGuard financialPeriodGuard;
 
   public PaymentDto createPayment(CreatePaymentRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
+    if (hasAllocations(request)) {
+      financialPeriodGuard.assertPostingAllowed(tenantId, request.paymentDate());
+    }
 
     String paymentNumber =
         documentNumberGenerator.nextNumber(tenantId, "PAY", request.paymentDate().getYear());
@@ -102,6 +107,8 @@ public class PaymentService {
 
   private PaymentAllocationDto doAllocate(
       UUID tenantId, Payment payment, CreateAllocationRequest request) {
+    financialPeriodGuard.assertPostingAllowed(tenantId, payment.getPaymentDate());
+
     InvoiceAllocationView invoiceView =
         invoicePaymentPort.getInvoiceForAllocation(tenantId, request.invoiceId());
 
@@ -220,6 +227,10 @@ public class PaymentService {
     return paymentRepository
         .findByTenantIdAndId(tenantId, paymentId)
         .orElseThrow(() -> new FinanceDomainException("Payment not found: " + paymentId));
+  }
+
+  private boolean hasAllocations(CreatePaymentRequest request) {
+    return request.allocations() != null && !request.allocations().isEmpty();
   }
 
   private PaymentDto withAllocations(

@@ -16,6 +16,7 @@ import com.fabricmanagement.finance.invoice.dto.CreateCreditNoteApplicationReque
 import com.fabricmanagement.finance.invoice.dto.CreditNoteApplicationDto;
 import com.fabricmanagement.finance.invoice.infra.repository.CreditNoteApplicationRepository;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.finance.period.app.port.FinancialPeriodGuard;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -39,6 +40,7 @@ public class CreditNoteApplicationService {
   private final Clock clock;
   private final InvoiceSideResolver sideResolver;
   private final RealizedFxService realizedFxService;
+  private final FinancialPeriodGuard financialPeriodGuard;
 
   public CreditNoteApplicationDto applyCreditNote(
       UUID creditNoteId, CreateCreditNoteApplicationRequest request) {
@@ -91,6 +93,7 @@ public class CreditNoteApplicationService {
     }
 
     LocalDate appliedDate = LocalDate.now(clock);
+    financialPeriodGuard.assertPostingAllowed(tenantId, appliedDate);
     targetInvoice.applyCredit(applicationAmount, appliedDate);
     invoiceRepository.save(targetInvoice);
 

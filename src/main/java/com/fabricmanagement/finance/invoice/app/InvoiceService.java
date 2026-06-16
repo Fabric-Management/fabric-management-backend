@@ -15,6 +15,7 @@ import com.fabricmanagement.finance.invoice.domain.event.*;
 import com.fabricmanagement.finance.invoice.dto.*;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
 import com.fabricmanagement.finance.invoice.mapper.InvoiceMapper;
+import com.fabricmanagement.finance.period.app.port.FinancialPeriodGuard;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -38,6 +39,7 @@ public class InvoiceService {
   private final TenantReportingCurrencyPort reportingCurrencyPort;
   private final FinanceDocumentNumberGenerator documentNumberGenerator;
   private final InvoiceReportingSnapshotService reportingSnapshotService;
+  private final FinancialPeriodGuard financialPeriodGuard;
 
   @Transactional(readOnly = true)
   public Page<InvoiceDto> getAllInvoices(Pageable pageable) {
@@ -192,6 +194,7 @@ public class InvoiceService {
   public InvoiceDto issueInvoice(UUID invoiceId) {
     UUID tenantId = TenantContext.requireTenantId();
     Invoice invoice = getInvoiceOrThrow(tenantId, invoiceId);
+    financialPeriodGuard.assertPostingAllowed(tenantId, invoice.getIssueDate());
     invoice.issue();
     reportingSnapshotService.captureAtIssue(tenantId, invoice);
     Invoice saved = invoiceRepository.save(invoice);

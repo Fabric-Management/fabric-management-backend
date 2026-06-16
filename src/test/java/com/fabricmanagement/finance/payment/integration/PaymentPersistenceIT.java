@@ -113,11 +113,11 @@ class PaymentPersistenceIT {
             .invoiceNumber("INV-OPT-1")
             .issueDate(LocalDate.now())
             .dueDate(LocalDate.now().plusDays(30))
-            .subtotal(Money.of(new java.math.BigDecimal("100.00"), "USD"))
-            .totalAmount(Money.of(new java.math.BigDecimal("100.00"), "USD"))
-            .amountDue(Money.of(new java.math.BigDecimal("100.00"), "USD"))
-            .amountPaid(Money.of(java.math.BigDecimal.ZERO, "USD"))
-            .amountCredited(Money.of(java.math.BigDecimal.ZERO, "USD"))
+            .subtotal(Money.of(new java.math.BigDecimal("100.00"), "GBP"))
+            .totalAmount(Money.of(new java.math.BigDecimal("100.00"), "GBP"))
+            .amountDue(Money.of(new java.math.BigDecimal("100.00"), "GBP"))
+            .amountPaid(Money.of(java.math.BigDecimal.ZERO, "GBP"))
+            .amountCredited(Money.of(java.math.BigDecimal.ZERO, "GBP"))
             .status(InvoiceStatus.SENT)
             .build();
     invoice.setTenantId(tenantId);
@@ -131,7 +131,7 @@ class PaymentPersistenceIT {
                 PaymentDirection.INBOUND.name(),
                 "BANK_TRANSFER",
                 new BigDecimal("100.00"),
-                "USD",
+                "GBP",
                 LocalDate.now(),
                 "REF-1",
                 "Notes",
@@ -144,7 +144,7 @@ class PaymentPersistenceIT {
                 PaymentDirection.INBOUND.name(),
                 "BANK_TRANSFER",
                 new BigDecimal("100.00"),
-                "USD",
+                "GBP",
                 LocalDate.now(),
                 "REF-2",
                 "Notes",
@@ -171,10 +171,10 @@ class PaymentPersistenceIT {
     Invoice tx1Invoice = invoiceRepository.findById(invoiceId).orElseThrow();
     Invoice tx2Invoice = invoiceRepository.findById(invoiceId).orElseThrow();
 
-    tx1Invoice.applyAllocation(Money.of(new java.math.BigDecimal("10.00"), "USD"), LocalDate.now());
+    tx1Invoice.applyAllocation(Money.of(new java.math.BigDecimal("10.00"), "GBP"), LocalDate.now());
     invoiceRepository.saveAndFlush(tx1Invoice); // version increments
 
-    tx2Invoice.applyAllocation(Money.of(new java.math.BigDecimal("10.00"), "USD"), LocalDate.now());
+    tx2Invoice.applyAllocation(Money.of(new java.math.BigDecimal("10.00"), "GBP"), LocalDate.now());
 
     assertThatThrownBy(() -> invoiceRepository.saveAndFlush(tx2Invoice))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
