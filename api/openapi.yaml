@@ -30,6 +30,8 @@ tags:
   name: Organization Contact
 - description: "B2B partner management - suppliers, customers, fason partners"
   name: Trading Partners
+- description: Read-only accounts payable intelligence
+  name: Payables Insights
 - description: Shipment management with TradingPartner integration
   name: Shipments
 - description: Costing operations
@@ -17283,6 +17285,148 @@ paths:
           description: Internal Server Error
       tags:
       - Invoice
+  /api/v1/finance/payables/summary:
+    get:
+      operationId: getSummary_1
+      parameters:
+      - in: query
+        name: topN
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 5
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePayablesSummaryDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get payables summary and risk metrics
+      tags:
+      - Payables Insights
+  /api/v1/finance/payables/suppliers:
+    get:
+      operationId: getSuppliers
+      parameters:
+      - in: query
+        name: pageable
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponsePayablesSupplierDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List per-supplier payables rollups
+      tags:
+      - Payables Insights
   /api/v1/finance/payments:
     get:
       operationId: getPayments
@@ -42972,6 +43116,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePagedResponsePayablesSupplierDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponsePayablesSupplierDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePagedResponseProductionRecordResponse:
       type: object
       properties:
@@ -43211,6 +43373,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PartnerUserDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePayablesSummaryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PayablesSummaryDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -47514,6 +47694,31 @@ components:
           type: string
       required:
       - deliveryMethod
+    DpoDto:
+      type: object
+      description: Days payable outstanding metric
+      properties:
+        daysPayableOutstanding:
+          type: number
+          description: "DPO value, or null when there is no purchases denominator"
+          example: 42.5
+        netAccountsPayable:
+          type: number
+          description: Net AP numerator in reporting currency
+          example: 100000.0
+        purchases:
+          type: number
+          description: Purchases denominator in reporting currency
+          example: 211765.0
+        status:
+          type: string
+          description: Reason when DPO cannot be computed
+          example: INSUFFICIENT_PURCHASE_WINDOW
+        windowDays:
+          type: integer
+          format: int32
+          description: Trailing window in days
+          example: 90
     DsoDto:
       type: object
       description: Days sales outstanding metric
@@ -49830,6 +50035,29 @@ components:
         totalPages:
           type: integer
           format: int32
+    PagedResponsePayablesSupplierDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PayablesSupplierDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PagedResponseProductionRecordResponse:
       type: object
       properties:
@@ -50228,6 +50456,176 @@ components:
       required:
       - password
       - token
+    PayablesAgingBucketDto:
+      type: object
+      description: Payables aging bucket amount in tenant reporting currency
+      properties:
+        amount:
+          type: number
+          description: Bucket amount in reporting currency
+          example: 12500.0
+        bucket:
+          type: string
+          description: Bucket code
+          example: DAYS_31_60
+    PayablesConcentrationDto:
+      type: object
+      description: Supplier concentration entry
+      properties:
+        outstanding:
+          type: number
+          description: Net outstanding amount in reporting currency
+          example: 45000.0
+        percentOfTotal:
+          type: number
+          description: Percentage of total net AP
+          example: 35.25
+        tradingPartnerId:
+          type: string
+          format: uuid
+          description: Trading partner ID
+        tradingPartnerName:
+          type: string
+          description: Trading partner display name
+          example: Acme Textiles
+    PayablesCurrencyBreakdownDto:
+      type: object
+      description: Payables amount by original document currency
+      properties:
+        currency:
+          type: string
+          description: ISO-4217 document currency
+          example: USD
+        documentAmount:
+          type: number
+          description: Signed open amount in document currency
+          example: 1000.0
+        reportingAmount:
+          type: number
+          description: Signed open amount converted to reporting currency
+          example: 790.0
+    PayablesRiskFlagDto:
+      type: object
+      description: Explainable payables risk flag
+      properties:
+        code:
+          type: string
+          description: Risk flag code
+          example: LARGE_UPCOMING_OUTFLOW
+        reason:
+          type: string
+          description: Human-readable reason
+          example: Supplier has an invoice due within 7 days whose reporting amount
+            is ≥ 25% of total net AP
+    PayablesSummaryDto:
+      type: object
+      description: Payables intelligence summary
+      properties:
+        agingBuckets:
+          type: array
+          description: "Aging buckets in reporting currency, excluding credit notes"
+          items:
+            $ref: "#/components/schemas/PayablesAgingBucketDto"
+        asOfDate:
+          type: string
+          format: date
+          description: As-of date used for aging and FX
+          example: 2026-06-16
+        concentration:
+          type: array
+          description: Top supplier concentration
+          items:
+            $ref: "#/components/schemas/PayablesConcentrationDto"
+        dpo:
+          $ref: "#/components/schemas/DpoDto"
+          description: Days payable outstanding
+        overdueExposure:
+          type: number
+          description: "Overdue exposure in reporting currency, excluding credit notes"
+        overdueExposurePercent:
+          type: number
+          description: Overdue exposure as percentage of total net AP
+          example: 18.75
+        perCurrencyBreakdown:
+          type: array
+          description: Original-currency breakdown with signed credit-note contra
+          items:
+            $ref: "#/components/schemas/PayablesCurrencyBreakdownDto"
+        reportingCurrency:
+          type: string
+          description: Tenant reporting currency
+          example: GBP
+        totalOutstanding:
+          type: number
+          description: Net AP in reporting currency after credit-note contra
+          example: 100000.0
+        warnings:
+          type: array
+          description: Non-fatal data quality or FX warnings
+          items:
+            $ref: "#/components/schemas/PayablesWarningDto"
+    PayablesSupplierDto:
+      type: object
+      description: Per-supplier payables rollup
+      properties:
+        agingBuckets:
+          type: array
+          description: "Aging buckets in reporting currency, excluding credit notes"
+          items:
+            $ref: "#/components/schemas/PayablesAgingBucketDto"
+        averageDaysLate:
+          type: number
+          description: "Average late days from historical payment allocations, early\
+            \ payments count as zero"
+        concentrationPercent:
+          type: number
+          description: Supplier share of total net AP
+          example: 20.5
+        hasDispute:
+          type: boolean
+          description: Whether any included payable document is disputed
+        outstanding:
+          type: number
+          description: Net outstanding in reporting currency after credit-note contra
+        overdueExposure:
+          type: number
+          description: "Overdue exposure in reporting currency, excluding credit notes"
+        perCurrencyBreakdown:
+          type: array
+          description: Original-currency breakdown with signed credit-note contra
+          items:
+            $ref: "#/components/schemas/PayablesCurrencyBreakdownDto"
+        riskFlags:
+          type: array
+          description: Explainable supplier risk flags
+          items:
+            $ref: "#/components/schemas/PayablesRiskFlagDto"
+        tradingPartnerId:
+          type: string
+          format: uuid
+          description: Trading partner ID
+        tradingPartnerName:
+          type: string
+          description: Trading partner display name
+          example: Acme Textiles
+        unappliedCredits:
+          type: number
+          description: Remaining unapplied credit-note balance in reporting currency
+    PayablesWarningDto:
+      type: object
+      description: Non-fatal warning produced while building payables insights
+      properties:
+        code:
+          type: string
+          description: Warning code
+          example: MISSING_RATE
+        invoiceId:
+          type: string
+          format: uuid
+          description: Invoice that caused the warning
+        message:
+          type: string
+          description: Warning details
     PaymentAllocationDto:
       type: object
       properties:
