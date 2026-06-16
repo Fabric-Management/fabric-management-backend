@@ -33,7 +33,7 @@ public class InvoiceController {
   private final CreditNoteApplicationService creditNoteApplicationService;
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getAll(
       @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -41,13 +41,13 @@ public class InvoiceController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<InvoiceDto>> getById(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.getInvoice(id)));
   }
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> create(
       @Valid @RequestBody CreateInvoiceRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -55,27 +55,27 @@ public class InvoiceController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> update(
       @PathVariable UUID id, @Valid @RequestBody UpdateInvoiceRequest request) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.updateInvoice(id, request)));
   }
 
   @PatchMapping("/{id}/issue")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> issue(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.issueInvoice(id)));
   }
 
   @PatchMapping("/{id}/send")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> send(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.sendInvoice(id)));
   }
 
   @Deprecated
   @PatchMapping("/{id}/payment")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> recordPayment(
       @PathVariable UUID id, @Valid @RequestBody RecordPaymentRequest request) {
 
@@ -97,38 +97,38 @@ public class InvoiceController {
   }
 
   @PatchMapping("/{id}/cancel")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> cancel(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.cancelInvoice(id)));
   }
 
   @PatchMapping("/{id}/void")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> voidInvoice(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.voidInvoice(id)));
   }
 
   @PatchMapping("/{id}/dispute")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> dispute(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.disputeInvoice(id)));
   }
 
   @PatchMapping("/{id}/resolve-dispute")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<InvoiceDto>> resolveDispute(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(invoiceService.resolveDispute(id)));
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<Void> delete(@PathVariable UUID id) {
     invoiceService.deleteInvoice(id);
     return ResponseEntity.noContent().build();
   }
 
   @GetMapping("/partner/{partnerId}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getByPartner(
       @PathVariable UUID partnerId, @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -136,7 +136,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/partner/{partnerId}/unpaid")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getUnpaidByPartner(
       @PathVariable UUID partnerId, @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -145,7 +145,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/status/{status}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getByStatus(
       @PathVariable InvoiceStatus status, @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -153,7 +153,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/overdue")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getOverdue(
       @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -161,7 +161,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/awaiting-payment")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getAwaitingPayment(
       @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -169,7 +169,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/ar")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getAccountsReceivable(
       @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -177,7 +177,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/ap")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> getAccountsPayable(
       @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
@@ -189,7 +189,7 @@ public class InvoiceController {
   // ═══════════════════════════════════════════════════════════════════════════
 
   @PostMapping("/{creditNoteId}/applications")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<CreditNoteApplicationDto>> applyCreditNote(
       @PathVariable UUID creditNoteId,
       @Valid @RequestBody CreateCreditNoteApplicationRequest request) {
@@ -200,7 +200,7 @@ public class InvoiceController {
   }
 
   @DeleteMapping("/{creditNoteId}/applications/{applicationId}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<Void> reverseCreditNoteApplication(
       @PathVariable UUID creditNoteId, @PathVariable UUID applicationId) {
     creditNoteApplicationService.reverseCreditNoteApplication(creditNoteId, applicationId);
@@ -208,7 +208,7 @@ public class InvoiceController {
   }
 
   @GetMapping("/{creditNoteId}/applications")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<List<CreditNoteApplicationDto>>> getCreditNoteApplications(
       @PathVariable UUID creditNoteId) {
     return ResponseEntity.ok(

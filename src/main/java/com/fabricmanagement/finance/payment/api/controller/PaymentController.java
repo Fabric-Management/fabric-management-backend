@@ -34,7 +34,7 @@ public class PaymentController {
   private final PaymentService paymentService;
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<PaymentDto>> createPayment(
       @Valid @RequestBody CreatePaymentRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -42,13 +42,13 @@ public class PaymentController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<PaymentDto>> getPayment(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(paymentService.getPayment(id)));
   }
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'read')")
   public ResponseEntity<ApiResponse<Page<PaymentDto>>> getPayments(
       @RequestParam(required = false) UUID tradingPartnerId, Pageable pageable) {
     Page<PaymentDto> payments =
@@ -59,7 +59,7 @@ public class PaymentController {
   }
 
   @PostMapping("/{id}/allocations")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<PaymentAllocationDto>> allocatePayment(
       @PathVariable UUID id, @Valid @RequestBody CreateAllocationRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -67,7 +67,7 @@ public class PaymentController {
   }
 
   @DeleteMapping("/{id}/allocations/{allocationId}")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<Void>> deallocatePayment(
       @PathVariable UUID id, @PathVariable UUID allocationId) {
     paymentService.deallocatePayment(id, allocationId);
@@ -75,7 +75,7 @@ public class PaymentController {
   }
 
   @PatchMapping("/{id}/void")
-  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'finance', 'write')")
   public ResponseEntity<ApiResponse<PaymentDto>> voidPayment(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(paymentService.voidPayment(id)));
   }

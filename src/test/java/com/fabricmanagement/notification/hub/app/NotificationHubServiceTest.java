@@ -58,7 +58,7 @@ class NotificationHubServiceTest {
     @Test
     @DisplayName("CRITICAL importance → tercih yok sayılır, kuyruklanır")
     void should_queue_critical_regardless_of_preference() {
-      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("TR");
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
       var template = mockTemplate(NotificationImportance.CRITICAL, NotificationChannel.IN_APP);
       when(templateRepo.findAllByEventType(EVENT_TYPE)).thenReturn(List.of(template));
       // Kullanıcı IN_APP kapattıysa bile CRITICAL gönderir
@@ -76,7 +76,7 @@ class NotificationHubServiceTest {
     @Test
     @DisplayName("NORMAL importance + kullanıcı IN_APP kapatmış → kuyruklanmaz")
     void should_not_queue_when_user_disabled_in_app() {
-      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("TR");
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
       var template = mockTemplate(NotificationImportance.NORMAL, NotificationChannel.IN_APP);
       when(templateRepo.findAllByEventType(EVENT_TYPE)).thenReturn(List.of(template));
 
@@ -94,7 +94,7 @@ class NotificationHubServiceTest {
     @Test
     @DisplayName("tercih yoksa varsayılan true → kuyruklanır")
     void should_queue_when_no_preference_exists() {
-      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("TR");
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
       var template = mockTemplate(NotificationImportance.NORMAL, NotificationChannel.EMAIL);
       when(templateRepo.findAllByEventType(EVENT_TYPE)).thenReturn(List.of(template));
       when(prefRepo.findByUserIdAndEventType(RECIPIENT_ID, EVENT_TYPE))
@@ -111,7 +111,7 @@ class NotificationHubServiceTest {
     @Test
     @DisplayName("birden fazla kanal şablonu → her biri ayrı kuyruklanır")
     void should_queue_for_each_channel_template() {
-      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("TR");
+      when(translationService.resolveLocaleForUser(any(), any())).thenReturn("EN");
       var inAppTemplate = mockTemplate(NotificationImportance.HIGH, NotificationChannel.IN_APP);
       var emailTemplate = mockTemplate(NotificationImportance.HIGH, NotificationChannel.EMAIL);
       when(templateRepo.findAllByEventType(EVENT_TYPE))
@@ -181,7 +181,7 @@ class NotificationHubServiceTest {
               NotificationImportance.NORMAL,
               NotificationDeliveryType.INSTANT,
               Map.of(),
-              "TR");
+              "EN");
 
       queue.markFailed("error 1"); // retry 1 → PENDING
       assertThat(queue.getStatus()).isEqualTo(NotificationQueueStatus.PENDING);

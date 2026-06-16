@@ -80,6 +80,7 @@
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <tomcat.version>10.1.55</tomcat.version>
         <spring-security.version>6.5.11</spring-security.version>
+        <opentelemetry-semconv.version>1.41.1</opentelemetry-semconv.version>
     </properties>
 
     <dependencies>
@@ -411,6 +412,12 @@
                 <groupId>commons-fileupload</groupId>
                 <artifactId>commons-fileupload</artifactId>
                 <version>${commons-fileupload.version}</version>
+            </dependency>
+            <!-- Override opentelemetry-semconv to fix CVE-2026-24051 -->
+            <dependency>
+                <groupId>io.opentelemetry.semconv</groupId>
+                <artifactId>opentelemetry-semconv</artifactId>
+                <version>${opentelemetry-semconv.version}</version>
             </dependency>
             <!-- Override swagger-ui to fix DOMPurify GHSA-39q2-94rc-95cp -->
             <dependency>

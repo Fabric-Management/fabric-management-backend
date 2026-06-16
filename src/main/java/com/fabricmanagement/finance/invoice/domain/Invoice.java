@@ -162,6 +162,18 @@ public class Invoice extends BaseEntity {
   @Setter(AccessLevel.NONE)
   private Money amountDue;
 
+  @Column(name = "reporting_currency", length = 3)
+  private String reportingCurrency;
+
+  @Column(name = "issue_exchange_rate", precision = 20, scale = 8)
+  private BigDecimal issueExchangeRate;
+
+  @Column(name = "issue_exchange_rate_date")
+  private LocalDate issueExchangeRateDate;
+
+  @Column(name = "reporting_total", precision = 19, scale = 4)
+  private BigDecimal reportingTotal;
+
   @Transient
   public String getCurrency() {
     if (subtotal == null || subtotal.getCurrency() == null) {
@@ -490,6 +502,17 @@ public class Invoice extends BaseEntity {
       throw new InvoiceStatusTransitionException(status, InvoiceStatus.SENT);
     }
     this.status = InvoiceStatus.SENT;
+  }
+
+  public void captureReportingSnapshot(
+      String reportingCurrency,
+      BigDecimal issueExchangeRate,
+      LocalDate issueExchangeRateDate,
+      BigDecimal reportingTotal) {
+    this.reportingCurrency = reportingCurrency;
+    this.issueExchangeRate = issueExchangeRate;
+    this.issueExchangeRateDate = issueExchangeRateDate;
+    this.reportingTotal = reportingTotal;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

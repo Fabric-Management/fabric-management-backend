@@ -1,8 +1,10 @@
 package com.fabricmanagement.finance.payment.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.finance.common.app.FinanceDocumentNumberGenerator;
+import com.fabricmanagement.finance.common.app.SettlementFxResult;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
 import com.fabricmanagement.finance.payment.app.port.InvoiceAllocationView;
 import com.fabricmanagement.finance.payment.app.port.InvoicePaymentPort;
@@ -17,13 +19,15 @@ import com.fabricmanagement.finance.payment.dto.CreateAllocationRequest;
 import com.fabricmanagement.finance.payment.dto.CreatePaymentRequest;
 import com.fabricmanagement.finance.payment.dto.PaymentAllocationDto;
 import com.fabricmanagement.finance.payment.dto.PaymentDto;
+import com.fabricmanagement.finance.payment.infra.repository.PaymentAllocationRepository;
 import com.fabricmanagement.finance.payment.infra.repository.PaymentRepository;
 import com.fabricmanagement.finance.payment.mapper.PaymentMapper;
+import com.fabricmanagement.finance.period.app.port.FinancialPeriodGuard;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -47,10 +51,15 @@ public class PaymentService {
   private final PaymentMapper paymentMapper;
   private final FinanceDocumentNumberGenerator documentNumberGenerator;
   private final InvoicePaymentPort invoicePaymentPort;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
+  private final PaymentAllocationRepository paymentAllocationRepository;
+  private final FinancialPeriodGuard financialPeriodGuard;
 
   public PaymentDto createPayment(CreatePaymentRequest request) {
     UUID tenantId = TenantContext.requireTenantId();
+    if (hasAllocations(request)) {
+      financialPeriodGuard.assertPostingAllowed(tenantId, request.paymentDate());
+    }
 
     String paymentNumber =
         documentNumberGenerator.nextNumber(tenantId, "PAY", request.paymentDate().getYear());
@@ -69,7 +78,7 @@ public class PaymentService {
 
     Payment saved = paymentRepository.save(payment);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new PaymentReceivedEvent(
             tenantId,
             saved.getId(),
@@ -79,13 +88,15 @@ public class PaymentService {
             saved.getAmount(),
             saved.getCurrency()));
 
+    List<PaymentAllocationDto> allocationDtos = new ArrayList<>();
     if (request.allocations() != null && !request.allocations().isEmpty()) {
       for (CreateAllocationRequest allocRequest : request.allocations()) {
-        doAllocate(tenantId, saved, allocRequest);
+        allocationDtos.add(doAllocate(tenantId, saved, allocRequest));
       }
     }
 
-    return paymentMapper.toDto(saved);
+    PaymentDto paymentDto = paymentMapper.toDto(saved);
+    return allocationDtos.isEmpty() ? paymentDto : withAllocations(paymentDto, allocationDtos);
   }
 
   public PaymentAllocationDto allocatePayment(UUID paymentId, CreateAllocationRequest request) {
@@ -96,6 +107,8 @@ public class PaymentService {
 
   private PaymentAllocationDto doAllocate(
       UUID tenantId, Payment payment, CreateAllocationRequest request) {
+    financialPeriodGuard.assertPostingAllowed(tenantId, payment.getPaymentDate());
+
     InvoiceAllocationView invoiceView =
         invoicePaymentPort.getInvoiceForAllocation(tenantId, request.invoiceId());
 
@@ -112,12 +125,21 @@ public class PaymentService {
             invoiceView.openBalance(),
             invoiceView.currency());
 
-    paymentRepository.save(payment);
+    paymentRepository.saveAndFlush(payment);
+    allocation = findPersistedAllocation(tenantId, payment.getId(), allocation.getInvoiceId());
 
     invoicePaymentPort.applyAllocation(
         tenantId, invoiceView.invoiceId(), allocation.getAmount(), payment.getPaymentDate());
 
-    eventPublisher.publishEvent(
+    SettlementFxResult fxResult =
+        invoicePaymentPort.recordAllocationFx(
+            tenantId,
+            invoiceView.invoiceId(),
+            allocation.getId(),
+            allocation.getAmount(),
+            payment.getPaymentDate());
+
+    eventPublisher.publish(
         new PaymentAllocatedEvent(
             tenantId, payment.getId(), invoiceView.invoiceId(), allocationAmount));
 
@@ -126,7 +148,17 @@ public class PaymentService {
         allocationAmount,
         payment.getId(),
         request.invoiceId());
-    return paymentMapper.toAllocationDto(allocation);
+    return paymentMapper.toAllocationDto(allocation, fxResult);
+  }
+
+  private PaymentAllocation findPersistedAllocation(UUID tenantId, UUID paymentId, UUID invoiceId) {
+    return paymentAllocationRepository
+        .findFirstByTenantIdAndPaymentIdAndInvoiceIdAndIsActiveTrueOrderByCreatedAtDesc(
+            tenantId, paymentId, invoiceId)
+        .orElseThrow(
+            () ->
+                new FinanceDomainException(
+                    "Persisted payment allocation could not be resolved for FX realization"));
   }
 
   public void deallocatePayment(UUID paymentId, UUID allocationId) {
@@ -137,6 +169,7 @@ public class PaymentService {
 
     invoicePaymentPort.reverseAllocation(
         tenantId, allocation.getInvoiceId(), allocation.getAmount());
+    invoicePaymentPort.reverseAllocationFx(tenantId, allocation.getId());
 
     paymentRepository.save(payment);
 
@@ -158,11 +191,12 @@ public class PaymentService {
     for (PaymentAllocation allocation : reversed) {
       invoicePaymentPort.reverseAllocation(
           tenantId, allocation.getInvoiceId(), allocation.getAmount());
+      invoicePaymentPort.reverseAllocationFx(tenantId, allocation.getId());
     }
 
     paymentRepository.save(payment);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new PaymentVoidedEvent(
             tenantId, payment.getId(), payment.getPaymentNumber(), affectedInvoiceIds));
 
@@ -193,5 +227,31 @@ public class PaymentService {
     return paymentRepository
         .findByTenantIdAndId(tenantId, paymentId)
         .orElseThrow(() -> new FinanceDomainException("Payment not found: " + paymentId));
+  }
+
+  private boolean hasAllocations(CreatePaymentRequest request) {
+    return request.allocations() != null && !request.allocations().isEmpty();
+  }
+
+  private PaymentDto withAllocations(
+      PaymentDto paymentDto, List<PaymentAllocationDto> allocations) {
+    return new PaymentDto(
+        paymentDto.id(),
+        paymentDto.tradingPartnerId(),
+        paymentDto.paymentNumber(),
+        paymentDto.direction(),
+        paymentDto.method(),
+        paymentDto.status(),
+        paymentDto.amount(),
+        paymentDto.currency(),
+        paymentDto.allocatedAmount(),
+        paymentDto.unallocatedAmount(),
+        paymentDto.paymentDate(),
+        paymentDto.bankReference(),
+        paymentDto.notes(),
+        paymentDto.metadata(),
+        allocations,
+        paymentDto.createdAt(),
+        paymentDto.updatedAt());
   }
 }

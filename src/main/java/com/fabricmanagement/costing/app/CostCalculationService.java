@@ -1,6 +1,7 @@
 package com.fabricmanagement.costing.app;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.app.port.TenantCostingSettingsPort;
@@ -28,7 +29,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,7 +53,7 @@ public class CostCalculationService {
   private final PriceListItemRepository priceListItemRepo;
   private final CostCalculationRepository costCalcRepo;
   private final TenantCostingSettingsPort tenantCostingSettingsPort;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
   private final Optional<WorkOrderPlanningUpdatePort> workOrderPlanningUpdatePort;
   private final ExchangeRateService exchangeRateService;
   private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
@@ -832,7 +832,7 @@ public class CostCalculationService {
                         .varianceRatio(ratioSigned) // signed: + overrun, - saving
                         .currency(current.getCurrency())
                         .build();
-                eventPublisher.publishEvent(event);
+                eventPublisher.publish(event);
                 log.warn(
                     "CostVarianceDetected: entityType={} entityId={} ratio={} ({} → {})",
                     entityType,

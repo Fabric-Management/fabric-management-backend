@@ -52,7 +52,7 @@ class NotificationItemProcessorTest {
             NotificationImportance.CRITICAL,
             NotificationDeliveryType.INSTANT,
             Map.of("batchCode", "B-001"),
-            "TR");
+            "EN");
     q.setId(UUID.randomUUID());
     return q;
   }
@@ -197,7 +197,7 @@ class NotificationItemProcessorTest {
               NotificationDeliveryType.INSTANT,
               Map.of(
                   "batchCode", "B-001", "referenceId", refId.toString(), "referenceType", "BATCH"),
-              "TR");
+              "EN");
 
       var template = mockTemplate();
       when(templateRepo.findByEventTypeAndChannel(EVENT_TYPE, NotificationChannel.IN_APP))

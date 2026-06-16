@@ -78,5 +78,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
   List<Invoice> findInvoicesEligibleForOverdue(
       @Param("tenantId") UUID tenantId, @Param("today") LocalDate today);
 
+  @Query(
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId "
+          + "AND i.status IN :statuses "
+          + "AND i.amountDue.amount > 0 "
+          + "AND i.amountDue.currency <> :reportingCurrency")
+  List<Invoice> findOpenForeignCurrencyForRevaluation(
+      @Param("tenantId") UUID tenantId,
+      @Param("reportingCurrency") String reportingCurrency,
+      @Param("statuses") List<InvoiceStatus> statuses);
+
   boolean existsByTenantIdAndInvoiceNumber(UUID tenantId, String invoiceNumber);
 }

@@ -19,11 +19,13 @@ import org.hibernate.annotations.Type;
 public class TenantLocaleConfig extends BaseEntity {
 
   @Column(name = "default_locale", nullable = false, length = 10)
-  private String defaultLocale = "TR";
+  private String defaultLocale =
+      com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_LOCALE;
 
   @Type(JsonBinaryType.class)
   @Column(name = "supported_locales", columnDefinition = "JSONB")
-  private List<String> supportedLocales = List.of("TR", "EN");
+  private List<String> supportedLocales =
+      com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_SUPPORTED_LOCALES;
 
   @Column(name = "date_format", nullable = false, length = 50)
   private String dateFormat = "dd.MM.yyyy";
@@ -32,7 +34,8 @@ public class TenantLocaleConfig extends BaseEntity {
   private String timeFormat = "HH:mm";
 
   @Column(nullable = false, length = 100)
-  private String timezone = "Europe/Istanbul";
+  private String timezone =
+      com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_TIMEZONE;
 
   @Column(nullable = false, length = 10)
   private String currency = CurrencyConstants.PLATFORM_DEFAULT_CURRENCY;

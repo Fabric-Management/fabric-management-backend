@@ -43,7 +43,7 @@ class TranslationServiceTest {
 
   private TranslationValue makeValue(String value) {
     // TranslationKey ve locale persist edilmese de getValue() çalışır
-    return TranslationValue.of(makeKey(KEY_CODE, value), "TR", value, false);
+    return TranslationValue.of(makeKey(KEY_CODE, value), "EN", value, false);
   }
 
   @Nested
@@ -54,10 +54,10 @@ class TranslationServiceTest {
     @DisplayName("tenant override varsa onu döndürür")
     void should_return_tenant_override_when_present() {
       var override = makeValue("Özel Başlık - Tenant Override");
-      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "TR", TENANT_ID))
+      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "EN", TENANT_ID))
           .thenReturn(Optional.of(override));
 
-      String result = translationService.translate(TENANT_ID, "TR", KEY_CODE);
+      String result = translationService.translate(TENANT_ID, "EN", KEY_CODE);
 
       assertThat(result).isEqualTo("Özel Başlık - Tenant Override");
       verify(translationValueRepo, never()).findSystemDefault(any(), any());
@@ -66,19 +66,19 @@ class TranslationServiceTest {
     @Test
     @DisplayName("tenant override yoksa sistem çevirisini döndürür")
     void should_return_system_translation_when_no_override() {
-      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "TR", TENANT_ID))
+      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "EN", TENANT_ID))
           .thenReturn(Optional.empty());
       var sysValue = makeValue("İş Emri Onay Bekliyor");
-      when(translationValueRepo.findSystemDefault(KEY_CODE, "TR"))
+      when(translationValueRepo.findSystemDefault(KEY_CODE, "EN"))
           .thenReturn(Optional.of(sysValue));
 
-      String result = translationService.translate(TENANT_ID, "TR", KEY_CODE);
+      String result = translationService.translate(TENANT_ID, "EN", KEY_CODE);
 
       assertThat(result).isEqualTo("İş Emri Onay Bekliyor");
     }
 
     @Test
-    @DisplayName("TR çevirisi yoksa EN fallback döner")
+    @DisplayName("Seçili locale yoksa EN fallback döner")
     void should_fallback_to_en_when_locale_missing() {
       when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "DE", TENANT_ID))
           .thenReturn(Optional.empty());
@@ -101,7 +101,7 @@ class TranslationServiceTest {
       var key = makeKey(KEY_CODE, "Default EN Title");
       when(translationKeyRepo.findByKeyCode(KEY_CODE)).thenReturn(Optional.of(key));
 
-      String result = translationService.translate(TENANT_ID, "TR", KEY_CODE);
+      String result = translationService.translate(TENANT_ID, "EN", KEY_CODE);
 
       assertThat(result).isEqualTo("Default EN Title");
     }
@@ -115,7 +115,7 @@ class TranslationServiceTest {
           .thenReturn(Optional.empty());
       when(translationKeyRepo.findByKeyCode(KEY_CODE)).thenReturn(Optional.empty());
 
-      String result = translationService.translate(TENANT_ID, "TR", KEY_CODE);
+      String result = translationService.translate(TENANT_ID, "EN", KEY_CODE);
 
       assertThat(result).isEqualTo(KEY_CODE);
     }
@@ -141,14 +141,14 @@ class TranslationServiceTest {
     @Test
     @DisplayName("parametreler doğru şekilde replace edilir")
     void should_replace_all_parameters() {
-      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "TR", TENANT_ID))
+      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "EN", TENANT_ID))
           .thenReturn(Optional.empty());
       var tv = makeValue("İş emri {workOrderNumber} onay bekliyor");
-      when(translationValueRepo.findSystemDefault(KEY_CODE, "TR")).thenReturn(Optional.of(tv));
+      when(translationValueRepo.findSystemDefault(KEY_CODE, "EN")).thenReturn(Optional.of(tv));
 
       String result =
           translationService.translateAndRender(
-              TENANT_ID, "TR", KEY_CODE, Map.of("workOrderNumber", "WO-001-2026"));
+              TENANT_ID, "EN", KEY_CODE, Map.of("workOrderNumber", "WO-001-2026"));
 
       assertThat(result).isEqualTo("İş emri WO-001-2026 onay bekliyor");
     }
@@ -156,12 +156,12 @@ class TranslationServiceTest {
     @Test
     @DisplayName("boş params map ile düz metin döner")
     void should_return_plain_text_when_no_params() {
-      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "TR", TENANT_ID))
+      when(translationValueRepo.findByKeyCodeAndLocaleAndTenant(KEY_CODE, "EN", TENANT_ID))
           .thenReturn(Optional.empty());
       var tv = makeValue("Onay Gerekiyor");
-      when(translationValueRepo.findSystemDefault(KEY_CODE, "TR")).thenReturn(Optional.of(tv));
+      when(translationValueRepo.findSystemDefault(KEY_CODE, "EN")).thenReturn(Optional.of(tv));
 
-      String result = translationService.translateAndRender(TENANT_ID, "TR", KEY_CODE, null);
+      String result = translationService.translateAndRender(TENANT_ID, "EN", KEY_CODE, null);
 
       assertThat(result).isEqualTo("Onay Gerekiyor");
     }

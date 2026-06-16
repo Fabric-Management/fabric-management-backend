@@ -3,9 +3,11 @@ package com.fabricmanagement.finance.invoice.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.util.Money;
@@ -18,7 +20,11 @@ import com.fabricmanagement.finance.invoice.dto.CreateInvoiceRequest;
 import com.fabricmanagement.finance.invoice.dto.UpdateInvoiceRequest;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
 import com.fabricmanagement.finance.invoice.mapper.InvoiceMapper;
+import com.fabricmanagement.finance.period.app.port.FinancialPeriodGuard;
+import com.fabricmanagement.finance.period.domain.exception.ClosedFinancialPeriodException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -31,7 +37,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,8 +44,10 @@ class InvoiceServiceAmountGuardTest {
 
   @Mock private InvoiceRepository invoiceRepository;
   @Mock private InvoiceMapper invoiceMapper;
-  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private DomainEventPublisher eventPublisher;
   @Mock private TenantReportingCurrencyPort reportingCurrencyPort;
+  @Mock private InvoiceReportingSnapshotService reportingSnapshotService;
+  @Mock private FinancialPeriodGuard financialPeriodGuard;
 
   @Mock
   private com.fabricmanagement.finance.common.app.FinanceDocumentNumberGenerator
@@ -105,6 +112,40 @@ class InvoiceServiceAmountGuardTest {
 
     // Assert
     verify(reportingCurrencyPort).getReportingCurrency(tenantId);
+  }
+
+  @org.junit.jupiter.api.Test
+  void issueInvoice_rejectsWhenIssueDateFallsInClosedPeriod() {
+    Invoice invoice =
+        Invoice.builder()
+            .tradingPartnerId(UUID.randomUUID())
+            .invoiceNumber("INV-1")
+            .invoiceType(InvoiceType.SALES)
+            .issueDate(LocalDate.of(2026, 5, 15))
+            .dueDate(LocalDate.of(2026, 6, 14))
+            .subtotal(Money.of(new BigDecimal("100.00"), "USD"))
+            .taxAmount(Money.zero("USD"))
+            .discountAmount(Money.zero("USD"))
+            .totalAmount(Money.of(new BigDecimal("100.00"), "USD"))
+            .build();
+    invoice.setId(invoiceId);
+    invoice.setTenantId(tenantId);
+
+    when(invoiceRepository.findByTenantIdAndId(tenantId, invoiceId))
+        .thenReturn(Optional.of(invoice));
+    org.mockito.Mockito.doThrow(
+            new ClosedFinancialPeriodException(LocalDate.of(2026, 5, 15), YearMonth.of(2026, 5)))
+        .when(financialPeriodGuard)
+        .assertPostingAllowed(tenantId, LocalDate.of(2026, 5, 15));
+
+    assertThatThrownBy(() -> invoiceService.issueInvoice(invoiceId))
+        .isInstanceOf(ClosedFinancialPeriodException.class);
+
+    assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.DRAFT);
+    verify(financialPeriodGuard).assertPostingAllowed(tenantId, LocalDate.of(2026, 5, 15));
+    verify(reportingSnapshotService, never()).captureAtIssue(any(), any());
+    verify(invoiceRepository, never()).save(any());
+    verify(eventPublisher, never()).publish(any());
   }
 
   @ParameterizedTest(name = "reject monetary field update: {0}")

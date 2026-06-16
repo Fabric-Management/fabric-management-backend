@@ -1,8 +1,12 @@
 package com.fabricmanagement.finance.invoice.app;
 
+import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.finance.common.app.SettlementFxResult;
 import com.fabricmanagement.finance.common.exception.FinanceDomainException;
+import com.fabricmanagement.finance.fx.app.RealizedFxService;
+import com.fabricmanagement.finance.fx.domain.FxRealizationSourceType;
 import com.fabricmanagement.finance.invoice.domain.CreditNoteApplication;
 import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
@@ -12,6 +16,7 @@ import com.fabricmanagement.finance.invoice.dto.CreateCreditNoteApplicationReque
 import com.fabricmanagement.finance.invoice.dto.CreditNoteApplicationDto;
 import com.fabricmanagement.finance.invoice.infra.repository.CreditNoteApplicationRepository;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.finance.period.app.port.FinancialPeriodGuard;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -20,7 +25,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +36,11 @@ public class CreditNoteApplicationService {
 
   private final InvoiceRepository invoiceRepository;
   private final CreditNoteApplicationRepository applicationRepository;
-  private final ApplicationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
   private final Clock clock;
+  private final InvoiceSideResolver sideResolver;
+  private final RealizedFxService realizedFxService;
+  private final FinancialPeriodGuard financialPeriodGuard;
 
   public CreditNoteApplicationDto applyCreditNote(
       UUID creditNoteId, CreateCreditNoteApplicationRequest request) {
@@ -65,19 +72,9 @@ public class CreditNoteApplicationService {
       throw new FinanceDomainException("Currency mismatch between credit note and target invoice");
     }
 
-    // Resolve CN side
-    Invoice originalInvoice =
-        invoiceRepository
-            .findByTenantIdAndId(tenantId, creditNote.getOriginalInvoiceId())
-            .orElseThrow(
-                () -> new FinanceDomainException("Original invoice not found for credit note"));
-
-    boolean isAr = originalInvoice.getInvoiceType().isReceivable();
-    boolean isAp = originalInvoice.getInvoiceType().isPayable();
-    boolean targetAr = targetInvoice.getInvoiceType().isReceivable();
-    boolean targetAp = targetInvoice.getInvoiceType().isPayable();
-
-    if ((isAr && !targetAr) || (isAp && !targetAp)) {
+    InvoiceSide creditNoteSide = sideResolver.resolveSide(tenantId, creditNote);
+    InvoiceSide targetSide = sideResolver.resolveSide(tenantId, targetInvoice);
+    if (creditNoteSide != targetSide) {
       throw new FinanceDomainException(
           "Cannot apply credit note to invoice on a different side (AR/AP mismatch)");
     }
@@ -95,10 +92,12 @@ public class CreditNoteApplicationService {
       throw new FinanceDomainException("Application amount exceeds target invoice open balance");
     }
 
-    targetInvoice.applyCredit(applicationAmount, LocalDate.now(clock));
+    LocalDate appliedDate = LocalDate.now(clock);
+    financialPeriodGuard.assertPostingAllowed(tenantId, appliedDate);
+    targetInvoice.applyCredit(applicationAmount, appliedDate);
     invoiceRepository.save(targetInvoice);
 
-    creditNote.applyCredit(applicationAmount, LocalDate.now(clock));
+    creditNote.applyCredit(applicationAmount, appliedDate);
     invoiceRepository.save(creditNote);
 
     CreditNoteApplication application =
@@ -111,7 +110,12 @@ public class CreditNoteApplicationService {
     application.setTenantId(tenantId);
     CreditNoteApplication saved = applicationRepository.save(application);
 
-    eventPublisher.publishEvent(
+    // FIN-6 records realized FX against the target invoice only; credit-note-side FX is deferred.
+    SettlementFxResult fxResult =
+        realizedFxService.recordCreditNoteApplication(
+            tenantId, targetInvoice, saved.getId(), applicationAmount, appliedDate);
+
+    eventPublisher.publish(
         new CreditNoteAppliedEvent(
             tenantId,
             creditNote.getId(),
@@ -125,7 +129,7 @@ public class CreditNoteApplicationService {
         targetInvoice.getInvoiceNumber(),
         applicationAmount);
 
-    return toDto(saved);
+    return toDto(saved, fxResult);
   }
 
   public void reverseCreditNoteApplication(UUID creditNoteId, UUID applicationId) {
@@ -150,13 +154,15 @@ public class CreditNoteApplicationService {
     application.delete();
     applicationRepository.save(application);
 
-    eventPublisher.publishEvent(
+    eventPublisher.publish(
         new CreditNoteReversedEvent(
             tenantId,
             creditNoteId,
             application.getTargetInvoiceId(),
             application.getAmount(),
             targetInvoice.getPaymentStatus().name()));
+
+    realizedFxService.reverseCreditNoteApplication(tenantId, applicationId);
 
     log.info("Reversed credit note application {}", applicationId);
   }
@@ -177,12 +183,25 @@ public class CreditNoteApplicationService {
   }
 
   private CreditNoteApplicationDto toDto(CreditNoteApplication entity) {
+    return realizedFxService
+        .findResultForSource(
+            entity.getTenantId(), FxRealizationSourceType.CREDIT_NOTE_APPLICATION, entity.getId())
+        .map(fxResult -> toDto(entity, fxResult))
+        .orElseGet(() -> toDto(entity, null));
+  }
+
+  private CreditNoteApplicationDto toDto(
+      CreditNoteApplication entity, SettlementFxResult fxResult) {
     return new CreditNoteApplicationDto(
         entity.getId(),
         entity.getCreditNoteId(),
         entity.getTargetInvoiceId(),
         entity.getAmount().getAmount(),
         entity.getAmount().getCurrency().getCurrencyCode(),
-        entity.getAppliedAt());
+        entity.getAppliedAt(),
+        fxResult != null ? fxResult.reportingCurrency() : null,
+        fxResult != null ? fxResult.realizedFxGainLoss() : null,
+        fxResult != null ? fxResult.settlementExchangeRate() : null,
+        fxResult != null ? fxResult.settlementExchangeRateDate() : null);
   }
 }

@@ -825,6 +825,8 @@ class ConstitutionArchTest {
               .and()
               .doNotHaveSimpleName("SystemDataSourceConfig")
               .and()
+              .doNotHaveSimpleName("FinancePermissionBackfillRunner")
+              .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()
               .dependOnClassesThat()

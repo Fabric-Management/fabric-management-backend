@@ -21,7 +21,8 @@ public class UserLocaleConfig extends BaseEntity {
   private UUID userId;
 
   @Column(nullable = false, length = 10)
-  private String locale = "TR";
+  private String locale =
+      com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_LOCALE;
 
   @Column(name = "date_format", length = 50)
   private String dateFormat;

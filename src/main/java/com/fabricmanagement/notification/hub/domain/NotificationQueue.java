@@ -57,7 +57,8 @@ public class NotificationQueue extends BaseEntity {
   private String lastError;
 
   @Column(nullable = false, length = 10)
-  private String locale = "TR";
+  private String locale =
+      com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_LOCALE;
 
   @Column(name = "processed_at")
   private Instant processedAt;
@@ -84,7 +85,10 @@ public class NotificationQueue extends BaseEntity {
     q.importance = importance;
     q.deliveryType = deliveryType;
     q.payload = payload != null ? payload : Map.of();
-    q.locale = locale != null ? locale : "TR";
+    q.locale =
+        locale != null
+            ? locale
+            : com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_LOCALE;
     q.status = NotificationQueueStatus.PENDING;
     return q;
   }

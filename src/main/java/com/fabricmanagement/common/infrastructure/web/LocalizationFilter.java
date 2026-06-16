@@ -38,9 +38,15 @@ public class LocalizationFilter extends OncePerRequestFilter {
 
   /** Locales the backend officially supports. Extend as new languages are added. */
   private static final List<Locale> SUPPORTED_LOCALES =
-      List.of(Locale.forLanguageTag("tr"), Locale.ENGLISH);
+      List.of(
+          Locale.forLanguageTag("tr"),
+          Locale.forLanguageTag(
+              com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_LOCALE
+                  .toLowerCase()));
 
-  private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
+  private static final Locale DEFAULT_LOCALE =
+      Locale.forLanguageTag(
+          com.fabricmanagement.common.domain.LocaleConstants.PLATFORM_DEFAULT_LOCALE.toLowerCase());
 
   @Override
   protected void doFilterInternal(
