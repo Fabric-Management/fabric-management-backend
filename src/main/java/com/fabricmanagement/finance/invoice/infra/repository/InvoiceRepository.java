@@ -61,6 +61,33 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
   @Query(
       "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId "
+          + "AND (i.invoiceType IN :arTypes "
+          + "  OR (i.invoiceType = :cnType AND i.originalInvoiceId IN "
+          + "      (SELECT o.id FROM Invoice o WHERE o.tenantId = :tenantId "
+          + "       AND o.invoiceType IN :arTypes))) "
+          + "AND i.status NOT IN :excludedStatuses "
+          + "AND i.paymentStatus <> 'PAID' "
+          + "AND i.amountDue.amount > 0")
+  List<Invoice> findOpenAccountsReceivable(
+      @Param("tenantId") UUID tenantId,
+      @Param("arTypes") List<InvoiceType> arTypes,
+      @Param("cnType") InvoiceType cnType,
+      @Param("excludedStatuses") List<InvoiceStatus> excludedStatuses);
+
+  @Query(
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId "
+          + "AND i.invoiceType = :invoiceType "
+          + "AND i.status NOT IN :excludedStatuses "
+          + "AND i.issueDate BETWEEN :fromDate AND :toDate")
+  List<Invoice> findIssuedInvoicesInWindow(
+      @Param("tenantId") UUID tenantId,
+      @Param("invoiceType") InvoiceType invoiceType,
+      @Param("excludedStatuses") List<InvoiceStatus> excludedStatuses,
+      @Param("fromDate") LocalDate fromDate,
+      @Param("toDate") LocalDate toDate);
+
+  @Query(
+      "SELECT i FROM Invoice i WHERE i.tenantId = :tenantId "
           + "AND (i.invoiceType = :apType "
           + "  OR (i.invoiceType = :cnType AND i.originalInvoiceId IN "
           + "      (SELECT o.id FROM Invoice o WHERE o.invoiceType = :apType))) "
