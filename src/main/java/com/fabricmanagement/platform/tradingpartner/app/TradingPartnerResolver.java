@@ -2,8 +2,11 @@ package com.fabricmanagement.platform.tradingpartner.app;
 
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -178,6 +181,19 @@ public class TradingPartnerResolver {
 
     // 2. Try legacy ID lookup
     return partnerRepository.findByTenantIdAndLegacyCompanyId(tenantId, partnerId);
+  }
+
+  public Map<UUID, String> resolveDisplayNames(UUID tenantId, List<UUID> partnerIds) {
+    if (partnerIds == null || partnerIds.isEmpty()) {
+      return Map.of();
+    }
+    return partnerRepository.findByTenantIdAndIdInWithRegistry(tenantId, partnerIds).stream()
+        .collect(Collectors.toMap(TradingPartner::getId, this::displayNameOrFallback));
+  }
+
+  private String displayNameOrFallback(TradingPartner partner) {
+    String displayName = partner.getDisplayName();
+    return displayName == null || displayName.isBlank() ? partner.getId().toString() : displayName;
   }
 
   /**

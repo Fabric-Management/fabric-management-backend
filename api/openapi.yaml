@@ -186,6 +186,8 @@ tags:
   name: User Address
 - description: User workload analysis
   name: FlowBoard — Workload
+- description: Read-only accounts receivable intelligence
+  name: Receivables Insights
 - description: Role operations
   name: Role
 - description: User operations
@@ -18126,6 +18128,148 @@ paths:
       summary: Get unrealized FX position for a financial period
       tags:
       - FinancialPeriod
+  /api/v1/finance/receivables/customers:
+    get:
+      operationId: getCustomers
+      parameters:
+      - in: query
+        name: pageable
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePagedResponseReceivablesCustomerDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List per-customer receivables rollups
+      tags:
+      - Receivables Insights
+  /api/v1/finance/receivables/summary:
+    get:
+      operationId: getSummary
+      parameters:
+      - in: query
+        name: topN
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 5
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseReceivablesSummaryDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get receivables summary and risk metrics
+      tags:
+      - Receivables Insights
   /api/v1/flowboard/automations:
     get:
       operationId: getAutomations
@@ -40252,6 +40396,18 @@ components:
         userId:
           type: string
           format: uuid
+    AgingBucketDto:
+      type: object
+      description: Receivables aging bucket amount in tenant reporting currency
+      properties:
+        amount:
+          type: number
+          description: Bucket amount in reporting currency
+          example: 12500.0
+        bucket:
+          type: string
+          description: Bucket code
+          example: DAYS_31_60
     ApiProblemDetail:
       properties:
         args:
@@ -42791,6 +42947,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponsePagedResponseReceivablesCustomerDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseReceivablesCustomerDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponsePagedResponseSalesOrderDto:
       type: object
       properties:
@@ -43264,6 +43438,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/QuoteResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseReceivablesSummaryDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ReceivablesSummaryDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -47144,6 +47336,31 @@ components:
           type: string
       required:
       - deliveryMethod
+    DsoDto:
+      type: object
+      description: Days sales outstanding metric
+      properties:
+        creditSales:
+          type: number
+          description: Credit sales denominator in reporting currency
+          example: 211765.0
+        daysSalesOutstanding:
+          type: number
+          description: "DSO value, or null when there is no sales denominator"
+          example: 42.5
+        netAccountsReceivable:
+          type: number
+          description: Net AR numerator in reporting currency
+          example: 100000.0
+        status:
+          type: string
+          description: Reason when DSO cannot be computed
+          example: INSUFFICIENT_SALES_WINDOW
+        windowDays:
+          type: integer
+          format: int32
+          description: Trailing window in days
+          example: 90
     DyePurchaseSpecs:
       allOf:
       - $ref: "#/components/schemas/PurchaseOrderSpecs"
@@ -49504,6 +49721,29 @@ components:
         totalPages:
           type: integer
           format: int32
+    PagedResponseReceivablesCustomerDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceivablesCustomerDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PagedResponseSalesOrderDto:
       type: object
       properties:
@@ -50854,6 +51094,163 @@ components:
           minLength: 0
       required:
       - reason
+    ReceivablesConcentrationDto:
+      type: object
+      description: Customer concentration entry
+      properties:
+        outstanding:
+          type: number
+          description: Net outstanding amount in reporting currency
+          example: 45000.0
+        percentOfTotal:
+          type: number
+          description: Percentage of total net AR
+          example: 35.25
+        tradingPartnerId:
+          type: string
+          format: uuid
+          description: Trading partner ID
+        tradingPartnerName:
+          type: string
+          description: Trading partner display name
+          example: Acme Textiles
+    ReceivablesCurrencyBreakdownDto:
+      type: object
+      description: Receivables amount by original document currency
+      properties:
+        currency:
+          type: string
+          description: ISO-4217 document currency
+          example: USD
+        documentAmount:
+          type: number
+          description: Signed open amount in document currency
+          example: 1000.0
+        reportingAmount:
+          type: number
+          description: Signed open amount converted to reporting currency
+          example: 790.0
+    ReceivablesCustomerDto:
+      type: object
+      description: Per-customer receivables rollup
+      properties:
+        agingBuckets:
+          type: array
+          description: "Aging buckets in reporting currency, excluding credit notes"
+          items:
+            $ref: "#/components/schemas/AgingBucketDto"
+        averageDaysLate:
+          type: number
+          description: "Average late days from historical payment allocations, early\
+            \ payments count as zero"
+        concentrationPercent:
+          type: number
+          description: Customer share of total net AR
+          example: 20.5
+        hasDispute:
+          type: boolean
+          description: Whether any included receivable document is disputed
+        outstanding:
+          type: number
+          description: Net outstanding in reporting currency after credit-note contra
+        overdueExposure:
+          type: number
+          description: "Overdue exposure in reporting currency, excluding credit notes"
+        perCurrencyBreakdown:
+          type: array
+          description: Original-currency breakdown with signed credit-note contra
+          items:
+            $ref: "#/components/schemas/ReceivablesCurrencyBreakdownDto"
+        riskFlags:
+          type: array
+          description: Explainable customer risk flags
+          items:
+            $ref: "#/components/schemas/ReceivablesRiskFlagDto"
+        tradingPartnerId:
+          type: string
+          format: uuid
+          description: Trading partner ID
+        tradingPartnerName:
+          type: string
+          description: Trading partner display name
+          example: Acme Textiles
+        unappliedCredits:
+          type: number
+          description: Remaining unapplied credit-note balance in reporting currency
+    ReceivablesRiskFlagDto:
+      type: object
+      description: Explainable receivables risk flag
+      properties:
+        code:
+          type: string
+          description: Risk flag code
+          example: SEVERE_OVERDUE
+        reason:
+          type: string
+          description: Human-readable reason
+          example: Customer has receivables 61+ days late
+    ReceivablesSummaryDto:
+      type: object
+      description: Receivables intelligence summary
+      properties:
+        agingBuckets:
+          type: array
+          description: "Aging buckets in reporting currency, excluding credit notes"
+          items:
+            $ref: "#/components/schemas/AgingBucketDto"
+        asOfDate:
+          type: string
+          format: date
+          description: As-of date used for aging and FX
+          example: 2026-06-16
+        concentration:
+          type: array
+          description: Top customer concentration
+          items:
+            $ref: "#/components/schemas/ReceivablesConcentrationDto"
+        dso:
+          $ref: "#/components/schemas/DsoDto"
+          description: Days sales outstanding
+        overdueExposure:
+          type: number
+          description: "Overdue exposure in reporting currency, excluding credit notes"
+        overdueExposurePercent:
+          type: number
+          description: Overdue exposure as percentage of total net AR
+          example: 18.75
+        perCurrencyBreakdown:
+          type: array
+          description: Original-currency breakdown with signed credit-note contra
+          items:
+            $ref: "#/components/schemas/ReceivablesCurrencyBreakdownDto"
+        reportingCurrency:
+          type: string
+          description: Tenant reporting currency
+          example: GBP
+        totalOutstanding:
+          type: number
+          description: Net AR in reporting currency after credit-note contra
+          example: 100000.0
+        warnings:
+          type: array
+          description: Non-fatal data quality or FX warnings
+          items:
+            $ref: "#/components/schemas/ReceivablesWarningDto"
+    ReceivablesWarningDto:
+      type: object
+      description: Non-fatal warning produced while building receivables insights
+      properties:
+        code:
+          type: string
+          description: Warning code
+          example: MISSING_RATE
+        invoiceId:
+          type: string
+          format: uuid
+          description: Invoice that caused the warning
+        message:
+          type: string
+          description: Warning details
     RecipeComponentDto:
       type: object
       properties:

@@ -49,6 +49,12 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
   Optional<TradingPartner> findByTenantIdAndLegacyCompanyId(
       @Param("tenantId") UUID tenantId, @Param("legacyCompanyId") UUID legacyCompanyId);
 
+  @Query(
+      "SELECT tp FROM TradingPartner tp LEFT JOIN FETCH tp.registry "
+          + "WHERE tp.tenantId = :tenantId AND tp.id IN :ids")
+  List<TradingPartner> findByTenantIdAndIdInWithRegistry(
+      @Param("tenantId") UUID tenantId, @Param("ids") List<UUID> ids);
+
   /** Find all active partners for tenant. */
   List<TradingPartner> findByTenantIdAndIsActiveTrue(@Param("tenantId") UUID tenantId);
 
