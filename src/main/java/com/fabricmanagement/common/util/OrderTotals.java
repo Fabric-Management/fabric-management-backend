@@ -96,9 +96,13 @@ public class OrderTotals {
         this.currency, this.totalAmountValue, this.taxAmountValue, discountAmount.getAmount());
   }
 
-  /** Recalculates the grand total: totalAmount + taxAmount - discountAmount. Null-safe. */
   public Money calculateGrandTotal() {
     return getTotalAmount().add(getTaxAmount()).subtract(getDiscountAmount());
+  }
+
+  /** Recalculates the net total: totalAmount - discountAmount. Null-safe. */
+  public Money calculateNetTotal() {
+    return getTotalAmount().subtract(getDiscountAmount());
   }
 
   private void requireCurrency(Money money) {

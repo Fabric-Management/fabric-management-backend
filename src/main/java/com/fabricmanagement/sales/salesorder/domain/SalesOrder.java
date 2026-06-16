@@ -424,4 +424,11 @@ public class SalesOrder extends BaseEntity {
     }
     return totals.calculateGrandTotal();
   }
+
+  public Money getNetTotal() {
+    if (totals == null) {
+      throw new IllegalStateException("SalesOrder totals cannot be null");
+    }
+    return totals.calculateNetTotal();
+  }
 }

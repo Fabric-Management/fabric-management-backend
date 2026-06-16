@@ -28,6 +28,8 @@ tags:
   name: FinancialPeriod
 - description: Organization Contact operations
   name: Organization Contact
+- description: Cross-context analytics APIs
+  name: Analytics
 - description: "B2B partner management - suppliers, customers, fason partners"
   name: Trading Partners
 - description: Read-only accounts payable intelligence
@@ -989,6 +991,70 @@ paths:
           description: Internal Server Error
       tags:
       - Platform Admin
+  /api/v1/analytics/margin/estimated:
+    get:
+      operationId: getEstimatedMargin
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseEstimatedMarginResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get estimated margins for active orders
+      tags:
+      - Analytics
   /api/v1/approval/policies:
     get:
       operationId: getAllPolicies_1
@@ -41198,6 +41264,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseEstimatedMarginResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/EstimatedMarginResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseExchangeRateResponse:
       type: object
       properties:
@@ -47646,6 +47730,31 @@ components:
           type: string
       required:
       - token
+    CustomerMarginDto:
+      type: object
+      properties:
+        costIncomplete:
+          type: boolean
+        estimatedMarginPercentage:
+          type: number
+        orderCount:
+          type: integer
+          format: int32
+        totalEstimatedCost:
+          $ref: "#/components/schemas/Money"
+        totalEstimatedMargin:
+          $ref: "#/components/schemas/Money"
+        totalRevenue:
+          $ref: "#/components/schemas/Money"
+        tradingPartnerId:
+          type: string
+          format: uuid
+        tradingPartnerName:
+          type: string
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarginWarningDto"
     DashboardConfigDto:
       type: object
       properties:
@@ -48057,6 +48166,19 @@ components:
         message:
           type: string
         rejectedValue: {}
+    EstimatedMarginResponse:
+      type: object
+      properties:
+        customers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerMarginDto"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderMarginDto"
+        reportingCurrency:
+          type: string
     ExchangeRateResponse:
       type: object
       properties:
@@ -49439,6 +49561,16 @@ components:
         productionDate:
           type: string
           format: date-time
+    MarginWarningDto:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        referenceId:
+          type: string
+          format: uuid
     MarkDeliveredRequest:
       type: object
       properties:
@@ -49590,6 +49722,34 @@ components:
           type: string
           description: Human-readable reason for the skip
           example: No price found in price list
+    Money:
+      type: object
+      properties:
+        amount:
+          type: number
+        currency:
+          type: object
+          properties:
+            currencyCode:
+              type: string
+            defaultFractionDigits:
+              type: integer
+              format: int32
+            displayName:
+              type: string
+            numericCode:
+              type: integer
+              format: int32
+            numericCodeAsString:
+              type: string
+            symbol:
+              type: string
+        negative:
+          type: boolean
+        positive:
+          type: boolean
+        zero:
+          type: boolean
     NavPreferencesRequest:
       type: object
       properties:
@@ -49769,6 +49929,37 @@ components:
           type: string
       required:
       - productType
+    OrderMarginDto:
+      type: object
+      properties:
+        costIncomplete:
+          type: boolean
+        estimatedCost:
+          $ref: "#/components/schemas/Money"
+        estimatedMargin:
+          $ref: "#/components/schemas/Money"
+        estimatedMarginPercentage:
+          type: number
+        orderDate:
+          type: string
+          format: date
+        orderId:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        quoteId:
+          type: string
+          format: uuid
+        revenue:
+          $ref: "#/components/schemas/Money"
+        tradingPartnerId:
+          type: string
+          format: uuid
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarginWarningDto"
     OrganizationAddressDto:
       type: object
       properties:
