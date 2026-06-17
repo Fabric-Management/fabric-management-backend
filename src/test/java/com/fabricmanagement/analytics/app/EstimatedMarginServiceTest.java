@@ -17,7 +17,6 @@ import com.fabricmanagement.costing.app.port.dto.AnalyticsCostEstimateDto;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.sales.salesorder.app.port.AnalyticsSalesOrderPort;
 import com.fabricmanagement.sales.salesorder.app.port.dto.AnalyticsSalesOrderDto;
-import com.fabricmanagement.sales.salesorder.domain.OrderStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -71,7 +70,7 @@ class EstimatedMarginServiceTest {
             .quoteId(quoteId)
             .orderDate(LocalDate.now())
             .netRevenue(Money.of(new BigDecimal("100.00"), "USD"))
-            .status(OrderStatus.CONFIRMED)
+            .status("CONFIRMED")
             .build();
 
     when(reportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn(tenantCurrency);
@@ -138,7 +137,7 @@ class EstimatedMarginServiceTest {
             .quoteId(quoteId)
             .orderDate(LocalDate.now())
             .netRevenue(Money.of(new BigDecimal("100.00"), "USD"))
-            .status(OrderStatus.CONFIRMED)
+            .status("CONFIRMED")
             .build();
 
     when(reportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn(tenantCurrency);
@@ -178,7 +177,7 @@ class EstimatedMarginServiceTest {
             .quoteId(quoteId)
             .orderDate(LocalDate.now())
             .netRevenue(Money.of(new BigDecimal("100.00"), "USD"))
-            .status(OrderStatus.CONFIRMED)
+            .status("CONFIRMED")
             .build();
 
     when(reportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn(tenantCurrency);

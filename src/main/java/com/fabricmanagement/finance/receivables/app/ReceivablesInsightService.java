@@ -58,8 +58,6 @@ public class ReceivablesInsightService {
   private static final BigDecimal SLOW_PAYER_DAYS = new BigDecimal("10.0000");
   private static final List<InvoiceType> AR_TYPES =
       List.of(InvoiceType.SALES, InvoiceType.DEBIT_NOTE);
-  private static final List<InvoiceStatus> EXCLUDED_OPEN_AR_STATUSES =
-      List.of(InvoiceStatus.CANCELLED, InvoiceStatus.VOIDED, InvoiceStatus.DRAFT);
 
   private final InvoiceRepository invoiceRepository;
   private final PaymentAllocationRepository paymentAllocationRepository;
@@ -120,7 +118,10 @@ public class ReceivablesInsightService {
     List<ReceivableLine> lines =
         invoiceRepository
             .findOpenAccountsReceivable(
-                tenantId, AR_TYPES, InvoiceType.CREDIT_NOTE, EXCLUDED_OPEN_AR_STATUSES)
+                tenantId,
+                AR_TYPES,
+                InvoiceType.CREDIT_NOTE,
+                InvoiceStatus.EXCLUDED_FROM_ISSUED_REVENUE)
             .stream()
             .map(invoice -> toLine(tenantId, invoice, reportingCurrency, asOfDate, warnings))
             .toList();
@@ -311,7 +312,11 @@ public class ReceivablesInsightService {
     BigDecimal creditSales =
         invoiceRepository
             .findIssuedInvoicesInWindow(
-                tenantId, InvoiceType.SALES, EXCLUDED_OPEN_AR_STATUSES, fromDate, asOfDate)
+                tenantId,
+                InvoiceType.SALES,
+                InvoiceStatus.EXCLUDED_FROM_ISSUED_REVENUE,
+                fromDate,
+                asOfDate)
             .stream()
             .map(
                 invoice -> {

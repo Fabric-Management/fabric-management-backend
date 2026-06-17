@@ -15,6 +15,13 @@ public enum InvoiceStatus {
   CANCELLED,
   VOIDED;
 
+  /**
+   * Invoice statuses that are excluded when calculating recognized/issued revenue. DRAFT represents
+   * uninvoiced work; CANCELLED and VOIDED represent nullified invoices.
+   */
+  public static final java.util.List<InvoiceStatus> EXCLUDED_FROM_ISSUED_REVENUE =
+      java.util.List.of(CANCELLED, VOIDED, DRAFT);
+
   public boolean isTerminal() {
     return this == CANCELLED || this == VOIDED;
   }
