@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.subscription.app;
 
+import com.fabricmanagement.platform.organization.domain.SystemDepartment;
 import java.util.List;
 
 public final class JobTitleSeedData {
@@ -15,27 +16,37 @@ public final class JobTitleSeedData {
               "Spinning Mill Manager",
               "Manages overall spinning mill operations",
               "MANAGER",
-              "YARN"),
+              SystemDepartment.YARN.code()),
           new Preset(
               "SPIN_SUPER",
               "Spinning Supervisor",
               "Manages shift and production line",
               "SUPERVISOR",
-              "YARN"),
+              SystemDepartment.YARN.code()),
           new Preset(
               "BLOW_OP",
               "Blow Room Operator",
               "Operates fiber blending and cleaning line",
               "WORKER",
-              "YARN"),
-          new Preset("CARD_OP", "Carding Operator", "Operates carding machines", "WORKER", "YARN"),
+              SystemDepartment.YARN.code()),
+          new Preset(
+              "CARD_OP",
+              "Carding Operator",
+              "Operates carding machines",
+              "WORKER",
+              SystemDepartment.YARN.code()),
           new Preset(
               "SPIN_OP",
               "Spinning Operator",
               "Operates Ring or Open-End spinning frames",
               "WORKER",
-              "YARN"),
-          new Preset("WIND_OP", "Winding Operator", "Operates winding machines", "WORKER", "YARN"),
+              SystemDepartment.YARN.code()),
+          new Preset(
+              "WIND_OP",
+              "Winding Operator",
+              "Operates winding machines",
+              "WORKER",
+              SystemDepartment.YARN.code()),
 
           // ── 2. Fabric Formation (Knitting & Weaving) ──
           new Preset(
@@ -43,43 +54,43 @@ public final class JobTitleSeedData {
               "Weaving Manager",
               "Manages weaving production department",
               "MANAGER",
-              "WEAVING"),
+              SystemDepartment.WEAVING.code()),
           new Preset(
               "KNIT_MGR",
               "Knitting Manager",
               "Manages knitting production department",
               "MANAGER",
-              "KNITTING"),
+              SystemDepartment.KNITTING.code()),
           new Preset(
               "WEAV_SUPER",
               "Weaving Supervisor",
               "Supervises weaving shifts and quality",
               "SUPERVISOR",
-              "WEAVING"),
+              SystemDepartment.WEAVING.code()),
           new Preset(
               "KNIT_SUPER",
               "Knitting Supervisor",
               "Supervises knitting shifts and quality",
               "SUPERVISOR",
-              "KNITTING"),
+              SystemDepartment.KNITTING.code()),
           new Preset(
               "WARP_OP",
               "Warping Operator",
               "Prepares warp beams for weaving",
               "WORKER",
-              "WEAVING"),
+              SystemDepartment.WEAVING.code()),
           new Preset(
               "WEAVER",
               "Loom Operator",
               "Operates and monitors weaving looms",
               "WORKER",
-              "WEAVING"),
+              SystemDepartment.WEAVING.code()),
           new Preset(
               "KNITTER",
               "Knitting Operator",
               "Operates and monitors knitting machines",
               "WORKER",
-              "KNITTING"),
+              SystemDepartment.KNITTING.code()),
 
           // ── 3. Dyeing & Finishing ──
           new Preset(
@@ -87,41 +98,49 @@ public final class JobTitleSeedData {
               "Dyehouse Manager",
               "Manages wet processing facility",
               "MANAGER",
-              "DYEING"),
+              SystemDepartment.DYEING.code()),
           new Preset(
               "FINISH_MGR",
               "Finishing Manager",
               "Manages dry finishing processes",
               "MANAGER",
-              "DYEING"),
+              SystemDepartment.DYEING.code()),
           new Preset(
-              "DYE_SUPER", "Dyeing Supervisor", "Supervises dyeing shifts", "SUPERVISOR", "DYEING"),
+              "DYE_SUPER",
+              "Dyeing Supervisor",
+              "Supervises dyeing shifts",
+              "SUPERVISOR",
+              SystemDepartment.DYEING.code()),
           new Preset(
               "CHEMIST",
               "Textile Chemist",
               "Optimizes chemical processes and formulas",
               "WORKER",
-              "DYEING"),
+              SystemDepartment.DYEING.code()),
           new Preset(
-              "DYE_MIXER", "Dye Mixer", "Prepares dye and chemical solutions", "WORKER", "DYEING"),
+              "DYE_MIXER",
+              "Dye Mixer",
+              "Prepares dye and chemical solutions",
+              "WORKER",
+              SystemDepartment.DYEING.code()),
           new Preset(
               "JET_OP",
               "Jet Dyeing Operator",
               "Operates HT fabric dyeing machines",
               "WORKER",
-              "DYEING"),
+              SystemDepartment.DYEING.code()),
           new Preset(
               "STENTER_OP",
               "Stenter Operator",
               "Operates drying and heat-setting machines",
               "WORKER",
-              "DYEING"),
+              SystemDepartment.DYEING.code()),
           new Preset(
               "PRINT_OP",
               "Printing Operator",
               "Operates rotary or digital printing machines",
               "WORKER",
-              "DYEING"),
+              SystemDepartment.DYEING.code()),
 
           // ── 4. Garment Manufacturing ──
           new Preset(
@@ -129,43 +148,43 @@ public final class JobTitleSeedData {
               "Garment Factory Manager",
               "Manages cutting, sewing, and packing",
               "MANAGER",
-              "GARMENT"),
+              SystemDepartment.GARMENT.code()),
           new Preset(
               "LINE_MGR",
               "Production Line Manager",
               "Supervises a specific sewing line",
               "SUPERVISOR",
-              "GARMENT"),
+              SystemDepartment.GARMENT.code()),
           new Preset(
               "PATTERN",
               "Pattern Maker",
               "Creates patterns and markers (CAD)",
               "WORKER",
-              "GARMENT"),
+              SystemDepartment.GARMENT.code()),
           new Preset(
               "CUT_SUPER",
               "Cutting Supervisor",
               "Supervises fabric spreading and cutting",
               "SUPERVISOR",
-              "GARMENT"),
+              SystemDepartment.GARMENT.code()),
           new Preset(
               "SEW_OP",
               "Sewing Machine Operator",
               "Operates industrial sewing machines",
               "WORKER",
-              "GARMENT"),
+              SystemDepartment.GARMENT.code()),
           new Preset(
               "IRON_OP",
               "Finishing Presser",
               "Handles final ironing and garment shaping",
               "WORKER",
-              "GARMENT"),
+              SystemDepartment.GARMENT.code()),
           new Preset(
               "PACK_OP",
               "Packing Operator",
               "Handles labeling, folding, and packing",
               "WORKER",
-              "GARMENT"),
+              SystemDepartment.GARMENT.code()),
 
           // ── 5. Quality Control & Laboratory ──
           new Preset(
@@ -173,37 +192,37 @@ public final class JobTitleSeedData {
               "QA Manager",
               "Manages quality standards and approvals",
               "MANAGER",
-              "QUALITY"),
+              SystemDepartment.QUALITY.code()),
           new Preset(
               "COLORIST",
               "Colorist",
               "Handles color matching and recipe approval",
               "WORKER",
-              "QUALITY"),
+              SystemDepartment.QUALITY.code()),
           new Preset(
               "LAB_TECH",
               "Lab Technician",
               "Performs physical testing (fastness, shrinkage)",
               "WORKER",
-              "QUALITY"),
+              SystemDepartment.QUALITY.code()),
           new Preset(
               "YARN_QC",
               "Yarn QC Inspector",
               "Checks yarn quality (Uster, strength)",
               "WORKER",
-              "QUALITY"),
+              SystemDepartment.QUALITY.code()),
           new Preset(
               "FABRIC_QC",
               "Fabric QC Inspector",
               "Performs 4-point fabric inspection",
               "WORKER",
-              "QUALITY"),
+              SystemDepartment.QUALITY.code()),
           new Preset(
               "GARM_QC",
               "Garment QC Inspector",
               "Checks sewing defects and measurements",
               "WORKER",
-              "QUALITY"),
+              SystemDepartment.QUALITY.code()),
 
           // ── 6. Logistics & Supply Chain ──
           new Preset(
@@ -211,43 +230,43 @@ public final class JobTitleSeedData {
               "Supply Chain Manager",
               "Manages end-to-end product flow",
               "MANAGER",
-              "WAREHOUSE"),
+              SystemDepartment.WAREHOUSE.code()),
           new Preset(
               "WH_MGR",
               "Warehouse Manager",
               "Manages warehouse operations and inventory",
               "MANAGER",
-              "WAREHOUSE"),
+              SystemDepartment.WAREHOUSE.code()),
           new Preset(
               "YARN_WH",
               "Yarn Warehouse Clerk",
               "Handles yarn receiving and dispatch",
               "WORKER",
-              "WAREHOUSE"),
+              SystemDepartment.WAREHOUSE.code()),
           new Preset(
               "FAB_WH",
               "Fabric Warehouse Clerk",
               "Handles greige and finished fabric inventory",
               "WORKER",
-              "WAREHOUSE"),
+              SystemDepartment.WAREHOUSE.code()),
           new Preset(
               "CHEM_WH",
               "Chemical Warehouse Clerk",
               "Handles dyes and hazardous chemicals",
               "WORKER",
-              "WAREHOUSE"),
+              SystemDepartment.WAREHOUSE.code()),
           new Preset(
               "LOG_COORD",
               "Logistics Coordinator",
               "Coordinates customs, freight, and export",
               "WORKER",
-              "SHIPPING"),
+              SystemDepartment.SHIPPING.code()),
           new Preset(
               "DISPATCHER",
               "Dispatcher",
               "Coordinates truck loading and packing lists",
               "WORKER",
-              "SHIPPING"),
+              SystemDepartment.SHIPPING.code()),
 
           // ── 7. Procurement & Sourcing ──
           new Preset(
@@ -255,49 +274,57 @@ public final class JobTitleSeedData {
               "Procurement Manager",
               "Manages strategic sourcing and purchasing",
               "MANAGER",
-              "PROCUREMENT"),
+              SystemDepartment.PROCUREMENT.code()),
           new Preset(
               "YARN_BUYER",
               "Yarn & Fiber Buyer",
               "Purchases raw products",
               "WORKER",
-              "PROCUREMENT"),
+              SystemDepartment.PROCUREMENT.code()),
           new Preset(
               "CHEM_BUYER",
               "Chemical Buyer",
               "Purchases dyes and auxiliary chemicals",
               "WORKER",
-              "PROCUREMENT"),
+              SystemDepartment.PROCUREMENT.code()),
           new Preset(
               "SOURCER",
               "Sourcing Specialist",
               "Manages outsourced production (subcontractors)",
               "WORKER",
-              "PROCUREMENT"),
+              SystemDepartment.PROCUREMENT.code()),
 
           // ── 8. Sales & Merchandising ──
           new Preset(
-              "SALES_DIR", "Sales Director", "Leads global sales strategy", "MANAGER", "SALES"),
+              "SALES_DIR",
+              "Sales Director",
+              "Leads global sales strategy",
+              "MANAGER",
+              SystemDepartment.SALES.code()),
           new Preset(
               "SALES_REP",
               "Sales Representative",
               "Handles customer orders and quotations",
               "WORKER",
-              "SALES"),
+              SystemDepartment.SALES.code()),
           new Preset(
               "SR_MERCH",
               "Senior Merchandiser",
               "Manages key accounts and order lifecycle",
               "SUPERVISOR",
-              "SALES"),
+              SystemDepartment.SALES.code()),
           new Preset(
-              "MERCH", "Merchandiser", "Tracks production and sampling orders", "WORKER", "SALES"),
+              "MERCH",
+              "Merchandiser",
+              "Tracks production and sampling orders",
+              "WORKER",
+              SystemDepartment.SALES.code()),
           new Preset(
               "SHOWROOM",
               "Showroom Coordinator",
               "Manages physical sample display and swatches",
               "WORKER",
-              "SALES"),
+              SystemDepartment.SALES.code()),
 
           // ── 9. Design, R&D & Planning ──
           new Preset(
@@ -305,32 +332,37 @@ public final class JobTitleSeedData {
               "Planning Manager",
               "Manages capacity and lead times",
               "MANAGER",
-              "PLANNING"),
+              SystemDepartment.PLANNING.code()),
           new Preset(
               "PLANNER",
               "Production Planner",
               "Schedules machines and work orders",
               "WORKER",
-              "PLANNING"),
-          new Preset("RD_MGR", "R&D Manager", "Manages new product development", "MANAGER", "RD"),
+              SystemDepartment.PLANNING.code()),
+          new Preset(
+              "RD_MGR",
+              "R&D Manager",
+              "Manages new product development",
+              "MANAGER",
+              SystemDepartment.RD.code()),
           new Preset(
               "FAB_DESIGN",
               "Fabric Designer",
               "Designs Dobby/Jacquard patterns (CAD)",
               "WORKER",
-              "RD"),
+              SystemDepartment.RD.code()),
           new Preset(
               "TECHNOLOG",
               "Fabric Technologist",
               "Defines fabric specifications and routes",
               "WORKER",
-              "RD"),
+              SystemDepartment.RD.code()),
           new Preset(
               "SAMPLE_MKR",
               "Sample Maker",
               "Produces physical samples for clients",
               "WORKER",
-              "RD"));
+              SystemDepartment.RD.code()));
 
   private JobTitleSeedData() {}
 }

@@ -2,10 +2,12 @@ package com.fabricmanagement.platform.subscription.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.organization.domain.Department;
+import com.fabricmanagement.platform.organization.domain.SystemDepartment;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.user.domain.JobTitlePreset;
 import com.fabricmanagement.platform.user.domain.port.JobTitlePresetRepository;
 import java.util.*;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,18 +38,12 @@ public class TenantSeedService {
       TenantContext.setCurrentTenantId(tenantId);
 
       // Create top-level group departments (replacing former DepartmentCategory)
-      Department production =
-          createGroupDepartment(organizationId, "Production", "Production-related departments", 1);
+      Department production = createGroupDepartment(organizationId, SystemDepartment.PRODUCTION);
       Department administration =
-          createGroupDepartment(
-              organizationId, "Administration", "Administrative and management departments", 2);
-      Department logistics =
-          createGroupDepartment(
-              organizationId, "Logistics", "Logistics and supply chain departments", 3);
-      Department utility =
-          createGroupDepartment(organizationId, "Utility", "Auxiliary service departments", 4);
-      Department support =
-          createGroupDepartment(organizationId, "Support", "Support and service departments", 5);
+          createGroupDepartment(organizationId, SystemDepartment.ADMINISTRATION);
+      Department logistics = createGroupDepartment(organizationId, SystemDepartment.LOGISTICS);
+      Department utility = createGroupDepartment(organizationId, SystemDepartment.UTILITY);
+      Department support = createGroupDepartment(organizationId, SystemDepartment.SUPPORT);
 
       seedProductionDepartments(organizationId, production);
       seedAdministrativeDepartments(organizationId, administration);
@@ -79,109 +75,93 @@ public class TenantSeedService {
   }
 
   /** Create a top-level group department (replaces the former DepartmentCategory concept). */
-  private Department createGroupDepartment(
-      UUID organizationId, String name, String description, int displayOrder) {
+  private Department createGroupDepartment(UUID organizationId, SystemDepartment systemDepartment) {
     if (departmentRepository.existsByTenantIdAndOrganizationIdAndDepartmentName(
-        TenantContext.requireTenantId(), organizationId, name)) {
+        TenantContext.requireTenantId(), organizationId, systemDepartment.displayName())) {
       return departmentRepository
           .findByTenantIdAndOrganizationIdAndDepartmentName(
-              TenantContext.requireTenantId(), organizationId, name)
+              TenantContext.requireTenantId(), organizationId, systemDepartment.displayName())
           .orElseThrow();
     }
 
-    String code = generateDepartmentCode(name);
-    Department dept = Department.create(organizationId, name, code, description);
-    dept.setDisplayOrder(displayOrder);
+    Department dept =
+        Department.create(
+            organizationId,
+            systemDepartment.displayName(),
+            systemDepartment.code(),
+            systemDepartment.description());
+    dept.setDisplayOrder(systemDepartment.displayOrder());
     dept.setIsSystemDepartment(true);
     return departmentRepository.save(dept);
   }
 
   private Department createDepartment(
-      UUID organizationId, String name, String description, Department parentDepartment) {
+      UUID organizationId, SystemDepartment systemDepartment, Department parentDepartment) {
     if (departmentRepository.existsByTenantIdAndOrganizationIdAndDepartmentName(
-        TenantContext.requireTenantId(), organizationId, name)) {
-      log.debug("Department already exists: {}", name);
+        TenantContext.requireTenantId(), organizationId, systemDepartment.displayName())) {
+      log.debug("Department already exists: {}", systemDepartment.displayName());
       return departmentRepository
           .findByTenantIdAndOrganizationIdAndDepartmentName(
-              TenantContext.requireTenantId(), organizationId, name)
+              TenantContext.requireTenantId(), organizationId, systemDepartment.displayName())
           .orElseThrow();
     }
 
-    String departmentCode = generateDepartmentCode(name);
-    Department department = Department.create(organizationId, name, departmentCode, description);
+    Department department =
+        Department.create(
+            organizationId,
+            systemDepartment.displayName(),
+            systemDepartment.code(),
+            systemDepartment.description());
     department.setParentDepartment(parentDepartment);
+    department.setDisplayOrder(systemDepartment.displayOrder());
+    department.setIsSystemDepartment(true);
     return departmentRepository.save(department);
   }
 
+  /** Custom department fallback only. System departments must use {@link SystemDepartment}. */
   private String generateDepartmentCode(String departmentName) {
-    String code = departmentName.toUpperCase().replaceAll("[^A-Z0-9]", "");
+    String code = departmentName.toUpperCase(Locale.ENGLISH).replaceAll("[^A-Z0-9]", "");
     return code.substring(0, Math.min(50, code.length()));
   }
 
   // ========== Seed Methods ==========
 
   private void seedProductionDepartments(UUID organizationId, Department parent) {
-    createDepartment(
-        organizationId,
-        "R&D / Product Development",
-        "Research, development and fiber formula design",
-        parent);
-    createDepartment(
-        organizationId,
-        "Production Planning",
-        "Production scheduling, capacity planning and work orders",
-        parent);
-    createDepartment(
-        organizationId,
-        "Fiber & Raw Product",
-        "Fiber procurement and raw product management",
-        parent);
-    createDepartment(organizationId, "Yarn Production", "Yarn manufacturing operations", parent);
-    createDepartment(
-        organizationId, "Weaving & Knitting", "Fabric weaving and knitting operations", parent);
-    createDepartment(
-        organizationId, "Dyeing & Finishing", "Fabric dyeing and finishing operations", parent);
-    createDepartment(
-        organizationId, "Quality Control", "Quality assurance and laboratory testing", parent);
+    createDepartment(organizationId, SystemDepartment.RD, parent);
+    createDepartment(organizationId, SystemDepartment.PLANNING, parent);
+    createDepartment(organizationId, SystemDepartment.FIBER, parent);
+    createDepartment(organizationId, SystemDepartment.YARN, parent);
+    createDepartment(organizationId, SystemDepartment.WEAVING, parent);
+    createDepartment(organizationId, SystemDepartment.KNITTING, parent);
+    createDepartment(organizationId, SystemDepartment.DYEING, parent);
+    createDepartment(organizationId, SystemDepartment.GARMENT, parent);
+    createDepartment(organizationId, SystemDepartment.QUALITY, parent);
   }
 
   private void seedAdministrativeDepartments(UUID organizationId, Department parent) {
-    createDepartment(organizationId, "Human Resources", "Human resources management", parent);
-    createDepartment(
-        organizationId, "Finance & Accounting", "Financial management and accounting", parent);
-    createDepartment(
-        organizationId,
-        "Administration Office",
-        "General administration and office management",
-        parent);
-    createDepartment(
-        organizationId,
-        "Management & Planning",
-        "Executive management and strategic planning",
-        parent);
+    createDepartment(organizationId, SystemDepartment.HR, parent);
+    createDepartment(organizationId, SystemDepartment.FINANCE, parent);
+    createDepartment(organizationId, SystemDepartment.SALES, parent);
+    createDepartment(organizationId, SystemDepartment.ADMINISTRATION_OFFICE, parent);
+    createDepartment(organizationId, SystemDepartment.MANAGEMENT_PLANNING, parent);
   }
 
   private void seedLogisticsDepartments(UUID organizationId, Department parent) {
-    createDepartment(organizationId, "Warehouse", "Warehouse management and storage", parent);
-    createDepartment(
-        organizationId, "Procurement & Supply", "Procurement and supply chain management", parent);
-    createDepartment(
-        organizationId, "Shipping & Transport", "Shipping and transportation management", parent);
+    createDepartment(organizationId, SystemDepartment.WAREHOUSE, parent);
+    createDepartment(organizationId, SystemDepartment.PROCUREMENT, parent);
+    createDepartment(organizationId, SystemDepartment.SHIPPING, parent);
   }
 
   private void seedUtilityDepartments(UUID organizationId, Department parent) {
-    createDepartment(organizationId, "Maintenance", "Equipment maintenance and repair", parent);
-    createDepartment(
-        organizationId, "Energy & Facilities", "Energy generation and facility operations", parent);
-    createDepartment(
-        organizationId, "Kitchen & Catering", "Kitchen and cafeteria services", parent);
+    createDepartment(organizationId, SystemDepartment.MAINTENANCE, parent);
+    createDepartment(organizationId, SystemDepartment.ENERGY_FACILITIES, parent);
+    createDepartment(organizationId, SystemDepartment.KITCHEN_CATERING, parent);
   }
 
   private void seedSupportDepartments(UUID organizationId, Department parent) {
-    createDepartment(organizationId, "IT Services", "IT support and system administration", parent);
-    createDepartment(organizationId, "Security", "Security and access control", parent);
-    createDepartment(
-        organizationId, "Cleaning Services", "Cleaning and janitorial services", parent);
+    createDepartment(organizationId, SystemDepartment.IT_SERVICES, parent);
+    createDepartment(organizationId, SystemDepartment.SECURITY, parent);
+    createDepartment(organizationId, SystemDepartment.CLEANING_SERVICES, parent);
   }
 
   private void seedJobTitles(UUID tenantId) {

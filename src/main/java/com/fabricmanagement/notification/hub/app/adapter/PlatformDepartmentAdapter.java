@@ -3,9 +3,11 @@ package com.fabricmanagement.notification.hub.app.adapter;
 import com.fabricmanagement.notification.hub.domain.port.DepartmentRecipientPort;
 import com.fabricmanagement.platform.organization.app.DepartmentService;
 import com.fabricmanagement.platform.organization.domain.Department;
+import com.fabricmanagement.platform.organization.domain.SystemDepartment;
 import com.fabricmanagement.platform.user.app.UserQueryService;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -67,9 +69,14 @@ public class PlatformDepartmentAdapter implements DepartmentRecipientPort {
     if (value == null) {
       return false;
     }
-    String upper = value.toUpperCase();
+    String upper = value.toUpperCase(Locale.ENGLISH);
     for (String target : targets) {
-      if (upper.contains(target.toUpperCase())) {
+      String canonicalCode =
+          SystemDepartment.fromCode(target).map(SystemDepartment::code).orElse(null);
+      if (canonicalCode != null && upper.equals(canonicalCode)) {
+        return true;
+      }
+      if (upper.contains(target.toUpperCase(Locale.ENGLISH))) {
         return true;
       }
     }
