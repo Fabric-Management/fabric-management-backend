@@ -1,6 +1,7 @@
 spring:
   main:
     allow-bean-definition-overriding: true
+    register-shutdown-hook: false
   datasource:
     hikari:
       maximum-pool-size: 10
@@ -15,6 +16,17 @@ application:
     enabled: true
     username: ${spring.datasource.username:test}
     password: ${spring.datasource.password:test}
+  email:
+    outbox:
+      worker-enabled: false
+      dead-letter-monitor-enabled: false
+
+org:
+  jobrunr:
+    background-job-server:
+      enabled: false
+    dashboard:
+      enabled: false
 
 logging:
   level:
