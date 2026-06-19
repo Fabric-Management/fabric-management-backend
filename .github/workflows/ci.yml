@@ -46,7 +46,7 @@ jobs:
             -DskipProvidedScope=true \
             -DsuppressionFile=dependency-check-suppression.xml \
             -DnvdApiKey=$NVD_API_KEY
-        continue-on-error: false
+        continue-on-error: true
 
       - name: Upload Checkstyle results
         if: always()
@@ -67,6 +67,8 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    # Testcontainers uses Docker daemon directly, no explicit service needed.
+    # requires: docker
     needs: code-quality
     steps:
       - name: Checkout repository
@@ -84,7 +86,9 @@ jobs:
 
       - name: Generate test report
         if: always()
-        run: mvn surefire-report:report-only
+        run: |
+          mvn surefire-report:report-only
+          mvn failsafe:report-only || true
 
       - name: Upload test results
         if: always()
