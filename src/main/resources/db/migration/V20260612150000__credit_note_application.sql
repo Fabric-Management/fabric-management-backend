@@ -21,6 +21,14 @@ CREATE INDEX IF NOT EXISTS idx_cna_tenant ON finance.finance_credit_note_applica
 CREATE INDEX IF NOT EXISTS idx_cna_credit_note ON finance.finance_credit_note_application(credit_note_id);
 CREATE INDEX IF NOT EXISTS idx_cna_target ON finance.finance_credit_note_application(target_invoice_id);
 
+ALTER TABLE finance.finance_credit_note_application ENABLE ROW LEVEL SECURITY;
+ALTER TABLE finance.finance_credit_note_application FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON finance.finance_credit_note_application;
+CREATE POLICY rls_tenant_isolation ON finance.finance_credit_note_application
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
 -- 2. Add amount_credited to finance_invoice
 ALTER TABLE finance.finance_invoice
     ADD COLUMN IF NOT EXISTS amount_credited NUMERIC(19,4) NOT NULL DEFAULT 0;

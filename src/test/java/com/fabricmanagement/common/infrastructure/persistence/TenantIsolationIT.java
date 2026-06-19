@@ -57,6 +57,8 @@ class TenantIsolationIT {
 
   private static final UUID TENANT_A = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
   private static final UUID TENANT_B = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+  private static final String STRICT_PARTNER_UID = "TEST-A-STRICT-TP";
+  private static final String STRICT_REGISTRY_UID = "TEST-A-STRICT-REG";
 
   @Container
   @SuppressWarnings("resource")
@@ -148,6 +150,31 @@ class TenantIsolationIT {
               + "WHERE NOT EXISTS (SELECT 1 FROM production.prod_fiber_category WHERE tenant_id = '"
               + TENANT_B
               + "' AND uid = 'TEST-B-CAT')");
+
+      stmt.execute(
+          "INSERT INTO common_company.trading_partner_registry "
+              + "(uid, official_name, country, verified_status, is_active, created_at, updated_at, version) "
+              + "VALUES ('"
+              + STRICT_REGISTRY_UID
+              + "', 'Strict Isolation Partner Registry', 'TUR', 'UNVERIFIED', true, now(), now(), 0) "
+              + "ON CONFLICT (uid) DO NOTHING");
+      stmt.execute(
+          "INSERT INTO common_company.common_trading_partner "
+              + "(tenant_id, uid, registry_id, custom_name, partner_type, status, relationship_meta, "
+              + "is_active, created_at, updated_at, version) "
+              + "SELECT '"
+              + TENANT_A
+              + "', '"
+              + STRICT_PARTNER_UID
+              + "', r.id, 'Strict Isolation Partner', 'CUSTOMER', 'ACTIVE', '{}'::jsonb, "
+              + "true, now(), now(), 0 "
+              + "FROM common_company.trading_partner_registry r "
+              + "WHERE r.uid = '"
+              + STRICT_REGISTRY_UID
+              + "' "
+              + "AND NOT EXISTS (SELECT 1 FROM common_company.common_trading_partner WHERE uid = '"
+              + STRICT_PARTNER_UID
+              + "')");
 
       stmt.close();
     }
@@ -244,9 +271,40 @@ class TenantIsolationIT {
   @Order(5)
   @DisplayName("T5-5: Empty context (no current_tenant set) → 0 rows (deny-by-default)")
   void emptyContext_returnsZeroRows() throws Exception {
+    Integer ownerCount =
+        ownerJdbc.queryForObject(
+            "SELECT count(*) FROM common_company.common_trading_partner WHERE uid = ?",
+            Integer.class,
+            STRICT_PARTNER_UID);
+    assertThat(ownerCount).isEqualTo(1);
+
+    try (Connection conn = getAppConnection(TENANT_A)) {
+      PreparedStatement ps =
+          conn.prepareStatement(
+              "SELECT count(*) FROM common_company.common_trading_partner WHERE uid = ?");
+      ps.setString(1, STRICT_PARTNER_UID);
+      ResultSet rs = ps.executeQuery();
+      rs.next();
+
+      assertThat(rs.getInt(1)).isOne();
+    }
+
+    try (Connection conn = getAppConnection(TENANT_B)) {
+      PreparedStatement ps =
+          conn.prepareStatement(
+              "SELECT count(*) FROM common_company.common_trading_partner WHERE uid = ?");
+      ps.setString(1, STRICT_PARTNER_UID);
+      ResultSet rs = ps.executeQuery();
+      rs.next();
+
+      assertThat(rs.getInt(1)).isZero();
+    }
+
     try (Connection conn = getAppConnection(null)) {
       PreparedStatement ps =
-          conn.prepareStatement("SELECT count(*) FROM production.prod_fiber_category");
+          conn.prepareStatement(
+              "SELECT count(*) FROM common_company.common_trading_partner WHERE uid = ?");
+      ps.setString(1, STRICT_PARTNER_UID);
       ResultSet rs = ps.executeQuery();
       rs.next();
 
