@@ -38,6 +38,10 @@ services:
       SERVER_PORT: ${SERVER_PORT:-8080}
       OTEL_SDK_DISABLED: "true"
       JWT_SECRET: ${JWT_SECRET:?error}
+      # Local docker dev runs over http://localhost → auth cookies must NOT be Secure,
+      # else the browser drops them and /users/me + /auth/refresh return 401.
+      # Override to "true" for any HTTPS/prod-like deployment.
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       POSTGRES_DB: ${POSTGRES_DB:?error}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:?error}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?error}
