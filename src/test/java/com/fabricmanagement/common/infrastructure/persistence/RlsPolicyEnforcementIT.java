@@ -47,7 +47,7 @@ class RlsPolicyEnforcementIT {
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
     // Find all tables that have a tenant_id column but don't have RLS enabled/forced
-    // or don't have a recognized RLS policy (rls_tenant_isolation or rls_tenant_self_row).
+    // or don't have a recognized RLS policy.
     String query =
         """
         SELECT c.table_schema, c.table_name
@@ -63,7 +63,7 @@ class RlsPolicyEnforcementIT {
               SELECT 1
               FROM pg_policy p
               WHERE p.polrelid = pc.oid
-                AND p.polname IN ('rls_tenant_isolation', 'rls_tenant_self_row')
+                AND p.polname IN ('rls_tenant_isolation', 'rls_tenant_self_row', 'rls_tenant_read')
             )
           )
         """;

@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.organization.domain.SystemDepartment;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.PermissionTemplate;
 import com.fabricmanagement.platform.user.infra.repository.PermissionTemplateRepository;
@@ -76,7 +77,7 @@ public class PermissionTemplateSeeder implements DataSeeder {
                 // 2. SALES
                 seedDepartment(
                     templatesToSave,
-                    "SALES",
+                    SystemDepartment.SALES.code(),
                     List.of(
                         new String[] {"WORKER", "sales", "read", "OWN"},
                         new String[] {"WORKER", "sales", "write", "OWN"},
@@ -129,14 +130,20 @@ public class PermissionTemplateSeeder implements DataSeeder {
                         new String[] {"MANAGER", "projects", "write", "DEPARTMENT"},
                         new String[] {"MANAGER", "projects", "manage", "DEPARTMENT"});
                 for (String deptCode :
-                    List.of("FIBER", "YARN", "WEAVING", "KNITTING", "DYEING", "GARMENT")) {
+                    List.of(
+                        SystemDepartment.FIBER.code(),
+                        SystemDepartment.YARN.code(),
+                        SystemDepartment.WEAVING.code(),
+                        SystemDepartment.KNITTING.code(),
+                        SystemDepartment.DYEING.code(),
+                        SystemDepartment.GARMENT.code())) {
                   seedDepartment(templatesToSave, deptCode, productionRules);
                 }
 
                 // 4. QUALITY
                 seedDepartment(
                     templatesToSave,
-                    "QUALITY",
+                    SystemDepartment.QUALITY.code(),
                     List.of(
                         new String[] {"WORKER", "fiber", "read", "OWN"},
                         new String[] {"WORKER", "products", "read", "OWN"},
@@ -151,7 +158,7 @@ public class PermissionTemplateSeeder implements DataSeeder {
                 // 5. WAREHOUSE
                 seedDepartment(
                     templatesToSave,
-                    "WAREHOUSE",
+                    SystemDepartment.WAREHOUSE.code(),
                     List.of(
                         new String[] {"WORKER", "products", "read", "OWN"},
                         new String[] {"WORKER", "products", "write", "OWN"},
@@ -179,7 +186,7 @@ public class PermissionTemplateSeeder implements DataSeeder {
                 // 6. FINANCE
                 seedDepartment(
                     templatesToSave,
-                    "FINANCE",
+                    SystemDepartment.FINANCE.code(),
                     List.of(
                         new String[] {"WORKER", "sales", "read", "ORGANIZATION"},
                         new String[] {"WORKER", "reports", "view", "OWN"},
@@ -205,7 +212,7 @@ public class PermissionTemplateSeeder implements DataSeeder {
                 // 7. HR
                 seedDepartment(
                     templatesToSave,
-                    "HR",
+                    SystemDepartment.HR.code(),
                     List.of(
                         new String[] {"WORKER", "settings", "view", "OWN"},
                         new String[] {"SUPERVISOR", "settings", "view", "DEPARTMENT"},
@@ -221,7 +228,7 @@ public class PermissionTemplateSeeder implements DataSeeder {
                 // 8. PROCUREMENT
                 seedDepartment(
                     templatesToSave,
-                    "PROCUREMENT",
+                    SystemDepartment.PROCUREMENT.code(),
                     List.of(
                         new String[] {"WORKER", "procurement", "read", "OWN"},
                         new String[] {"WORKER", "procurement", "write", "OWN"},

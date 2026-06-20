@@ -7,6 +7,14 @@ CREATE TABLE IF NOT EXISTS finance.document_number_counter (
     PRIMARY KEY (tenant_id, series, year)
 );
 
+ALTER TABLE finance.document_number_counter ENABLE ROW LEVEL SECURITY;
+ALTER TABLE finance.document_number_counter FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON finance.document_number_counter;
+CREATE POLICY rls_tenant_isolation ON finance.document_number_counter
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
 -- 2. Seed counters from existing document numbers (legacy format: SF-000123)
 INSERT INTO finance.document_number_counter (tenant_id, series, year, last_value)
 SELECT tenant_id,

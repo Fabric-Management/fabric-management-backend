@@ -34,6 +34,14 @@ CREATE INDEX IF NOT EXISTS idx_pay_trading_partner ON finance.finance_payment(tr
 CREATE INDEX IF NOT EXISTS idx_pay_payment_date ON finance.finance_payment(payment_date);
 CREATE INDEX IF NOT EXISTS idx_pay_direction ON finance.finance_payment(direction);
 
+ALTER TABLE finance.finance_payment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE finance.finance_payment FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON finance.finance_payment;
+CREATE POLICY rls_tenant_isolation ON finance.finance_payment
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
 -- 3. Create finance_payment_allocation table
 CREATE TABLE IF NOT EXISTS finance.finance_payment_allocation (
     id UUID PRIMARY KEY,
@@ -56,6 +64,14 @@ CREATE TABLE IF NOT EXISTS finance.finance_payment_allocation (
 CREATE INDEX IF NOT EXISTS idx_paya_tenant ON finance.finance_payment_allocation(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_paya_payment ON finance.finance_payment_allocation(payment_id);
 CREATE INDEX IF NOT EXISTS idx_paya_invoice ON finance.finance_payment_allocation(invoice_id);
+
+ALTER TABLE finance.finance_payment_allocation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE finance.finance_payment_allocation FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON finance.finance_payment_allocation;
+CREATE POLICY rls_tenant_isolation ON finance.finance_payment_allocation
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
 -- 4. Idempotent Backfill: Create Payments and Allocations for invoices with amount_paid > 0
 -- We use a derived UUID for the payment id to ensure idempotence.

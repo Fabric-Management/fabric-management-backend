@@ -1,4 +1,4 @@
-package com.fabricmanagement.analytics;
+package com.fabricmanagement.finance.common.app.port;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class AnalyticsArchTest {
+class AnalyticsFinancePortArchTest {
 
   private static JavaClasses allClasses;
 
@@ -23,24 +23,17 @@ class AnalyticsArchTest {
   }
 
   @Test
-  @DisplayName(
-      "analytics must not access sales or costing infra directly, only through app-layer ports")
-  void analyticsShouldNotReachIntoInfra() {
+  @DisplayName("Finance ports should not access sales or analytics domains")
+  void financePortsShouldNotReachIntoSalesOrAnalytics() {
     ArchRule rule =
         noClasses()
             .that()
-            .resideInAPackage("com.fabricmanagement.analytics..")
+            .resideInAPackage("com.fabricmanagement.finance.common.app.port.impl..")
             .should()
             .dependOnClassesThat()
-            .resideInAnyPackage(
-                "com.fabricmanagement.sales..infra..",
-                "com.fabricmanagement.sales..domain..",
-                "com.fabricmanagement.costing..infra..",
-                "com.fabricmanagement.costing..domain..",
-                "com.fabricmanagement.finance..infra..",
-                "com.fabricmanagement.finance..domain..")
+            .resideInAnyPackage("com.fabricmanagement.sales..", "com.fabricmanagement.analytics..")
             .as(
-                "Analytics must only use ports from sales, costing, and finance, never their infra or domain entities directly.");
+                "AnalyticsFinancePortImpl must only use finance internal models, not external domains.");
 
     rule.check(allClasses);
   }

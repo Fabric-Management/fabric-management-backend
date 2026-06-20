@@ -28,6 +28,14 @@ CREATE INDEX IF NOT EXISTS idx_itl_tenant ON finance.finance_invoice_tax_line(te
 CREATE INDEX IF NOT EXISTS idx_itl_rate_category 
     ON finance.finance_invoice_tax_line(tenant_id, tax_category, tax_rate);
 
+ALTER TABLE finance.finance_invoice_tax_line ENABLE ROW LEVEL SECURITY;
+ALTER TABLE finance.finance_invoice_tax_line FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_tenant_isolation ON finance.finance_invoice_tax_line;
+CREATE POLICY rls_tenant_isolation ON finance.finance_invoice_tax_line
+    FOR ALL
+    USING (tenant_id = current_setting('app.current_tenant', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant', true)::uuid);
+
 -- 3. Backfill: generate one STANDARD tax line per existing invoice from header values
 INSERT INTO finance.finance_invoice_tax_line 
     (id, tenant_id, invoice_id, tax_category, tax_rate, taxable_base, tax_amount)

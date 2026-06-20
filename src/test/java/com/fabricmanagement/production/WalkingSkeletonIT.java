@@ -272,9 +272,11 @@ class WalkingSkeletonIT {
     workOrderService.changeStatus(woReadyForProd.getId(), WorkOrderStatus.SENT);
 
     // Batches must reference real prod_fiber rows (fk_exec_batch_product → prod_fiber.id).
-    List<Fiber> seededFibers = fiberRepository.findByTenantIdAndIsActiveTrue(tenantId);
+    // R__001 seeds fibers into the Template Tenant (golden clone source), not the System Tenant.
+    List<Fiber> seededFibers =
+        fiberRepository.findByTenantIdAndIsActiveTrue(TenantContext.TEMPLATE_TENANT_ID);
     assertThat(seededFibers)
-        .as("R__001 fiber seeds for system tenant must be present")
+        .as("R__001 fiber seeds for template tenant must be present")
         .hasSizeGreaterThanOrEqualTo(2);
     UUID fiberId1 = seededFibers.get(0).getId();
     UUID fiberId2 = seededFibers.get(1).getId();

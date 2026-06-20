@@ -284,6 +284,34 @@ public class TenantClonerService {
                   },
                   templateTenantId);
 
+              // 3.3.5 Permission Template
+              // Source: golden-template (not nexus-fabrics) because TenantSeeder
+              // does not clone permission_template into nexus-fabrics.
+              // Manual loop required: uid has UNIQUE constraint, so
+              // cloneTableWithoutFKs (which copies uid verbatim) would violate it.
+              UUID goldenTemplateId = findTemplateTenantId();
+              if (goldenTemplateId != null) {
+                jdbc.query(
+                    "SELECT role_code, department_code, resource, action, data_scope "
+                        + "FROM common_user.permission_template "
+                        + "WHERE tenant_id = ? AND is_active = true",
+                    rs -> {
+                      jdbc.update(
+                          "INSERT INTO common_user.permission_template "
+                              + "(id, tenant_id, uid, role_code, department_code, resource, "
+                              + "action, data_scope, is_active, created_at, updated_at, version) "
+                              + "VALUES (gen_random_uuid(), ?, gen_random_uuid()::varchar, "
+                              + "?, ?, ?, ?, ?, true, now(), now(), 0)",
+                          newTenantId,
+                          rs.getString("role_code"),
+                          rs.getString("department_code"),
+                          rs.getString("resource"),
+                          rs.getString("action"),
+                          rs.getString("data_scope"));
+                    },
+                    goldenTemplateId);
+              }
+
               // 3.4 User
               Map<UUID, UUID> userMap = new HashMap<>();
               jdbc.query(

@@ -19,13 +19,11 @@ public class AnalyticsSalesOrderPortImpl implements AnalyticsSalesOrderPort {
   @Override
   @Transactional(readOnly = true)
   public List<AnalyticsSalesOrderDto> getOrdersForAnalytics(UUID tenantId) {
-    // findOpenOrders excludes DELIVERED, CANCELLED.
-    // Wait, the ticket says "open/won orders". DRAFT and CANCELLED should be excluded.
-    // DELIVERED should probably be included since they are won orders!
-    // So we can't use findOpenOrders if it excludes DELIVERED.
-    // We should write a query or use findAll and filter, or findByTenantId.
-    // Let's use findByTenantIdAndIsActiveTrue and filter, or a custom repository call if needed.
-    // For simplicity here, we'll fetch all active and filter out DRAFT and CANCELLED.
+    /**
+     * Returns all non-DRAFT, non-CANCELLED orders for analytics. DELIVERED orders are intentionally
+     * included — the analytics layer applies its own backlog filter (EXCLUDED_BACKLOG_STATUSES) to
+     * separate backlog from fulfilled orders.
+     */
     return salesOrderRepository
         .findByTenantIdAndIsActiveTrue(tenantId, org.springframework.data.domain.Pageable.unpaged())
         .stream()
@@ -39,7 +37,7 @@ public class AnalyticsSalesOrderPortImpl implements AnalyticsSalesOrderPort {
                     .quoteId(o.getQuoteId())
                     .orderDate(o.getOrderDate())
                     .netRevenue(o.getNetTotal())
-                    .status(o.getStatus())
+                    .status(o.getStatus() != null ? o.getStatus().name() : null)
                     .build())
         .toList();
   }
