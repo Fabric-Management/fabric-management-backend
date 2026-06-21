@@ -1131,6 +1131,80 @@ paths:
       summary: Get revenue and backlog trends by customer
       tags:
       - Analytics
+  /api/v1/analytics/working-capital:
+    get:
+      operationId: getWorkingCapital
+      parameters:
+      - description: As-of date (defaults to today)
+        example: 2026-06-19
+        in: query
+        name: asOfDate
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseWorkingCapitalResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get working capital (DSO + DPO + operating cash gap; DIO/full CCC pending
+        INS-7b)
+      tags:
+      - Analytics
   /api/v1/approval/policies:
     get:
       operationId: getAllPolicies_1
@@ -44670,6 +44744,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseWorkingCapitalResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/WorkingCapitalResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApprovalPolicyResponse:
       type: object
       properties:
@@ -56148,6 +56240,48 @@ components:
           type: string
         yieldPercentage:
           type: number
+    WorkingCapitalResponse:
+      type: object
+      description: Working capital view (DSO + DPO + operating cash gap). DIO and
+        full CCC pending (INS-7b).
+      properties:
+        cccComplete:
+          type: boolean
+          description: Full CCC (DSO + DIO − DPO) computed — always false until INS-7b
+          example: false
+        dioPending:
+          type: boolean
+          description: DIO not yet included — always true until INS-7b
+          example: true
+        dpo:
+          $ref: "#/components/schemas/DpoDto"
+          description: Days payable outstanding (trailing-90)
+        dso:
+          $ref: "#/components/schemas/DsoDto"
+          description: Days sales outstanding (trailing-90)
+        operatingCashGapDays:
+          type: number
+          description: Operating cash gap in days = DSO − DPO. EXCLUDES inventory
+            (DIO); not the full CCC. Null when DSO or DPO is unavailable.
+          example: 12.5
+        reportingCurrency:
+          type: string
+          description: Reporting currency
+          example: TRY
+        warnings:
+          type: array
+          description: Warnings (e.g. INSUFFICIENT_SALES_WINDOW / INSUFFICIENT_PURCHASE_WINDOW)
+          items:
+            $ref: "#/components/schemas/WorkingCapitalWarningDto"
+    WorkingCapitalWarningDto:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        referenceId:
+          type: string
     YarnAttributes:
       type: object
       description: Detailed specifications for YARN batches

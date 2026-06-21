@@ -16,6 +16,8 @@ import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.finance.payables.app.PayablesInsightService;
+import com.fabricmanagement.finance.receivables.app.ReceivablesInsightService;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -37,6 +39,8 @@ class AnalyticsFinancePortImplTest {
   @Mock private InvoiceRepository invoiceRepository;
   @Mock private OpenInvoiceAmountService openInvoiceAmountService;
   @Mock private InvoiceSideResolver invoiceSideResolver;
+  @Mock private ReceivablesInsightService receivablesInsightService;
+  @Mock private PayablesInsightService payablesInsightService;
 
   private Clock clock;
   private AnalyticsFinancePortImpl port;
@@ -46,7 +50,12 @@ class AnalyticsFinancePortImplTest {
     clock = Clock.fixed(Instant.parse("2024-06-15T10:00:00Z"), ZoneId.of("UTC"));
     port =
         new AnalyticsFinancePortImpl(
-            invoiceRepository, openInvoiceAmountService, invoiceSideResolver, clock);
+            invoiceRepository,
+            openInvoiceAmountService,
+            invoiceSideResolver,
+            receivablesInsightService,
+            payablesInsightService,
+            clock);
   }
 
   @Test

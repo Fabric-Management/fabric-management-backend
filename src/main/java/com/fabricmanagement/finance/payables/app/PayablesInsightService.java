@@ -111,6 +111,16 @@ public class PayablesInsightService {
     return new PageImpl<>(suppliers.subList(fromIndex, toIndex), pageable, suppliers.size());
   }
 
+  /**
+   * Computes standalone DPO for the given tenant/date/currency. Reuses the existing buildModel +
+   * buildDpo pipeline — no formula duplication.
+   */
+  public DpoDto computeDpo(UUID tenantId, LocalDate asOfDate, String reportingCurrency) {
+    PayablesModel model = buildModel(tenantId, asOfDate);
+    return buildDpo(
+        tenantId, asOfDate, reportingCurrency, model.totalOutstanding(), model.warnings());
+  }
+
   private PayablesModel buildModel(UUID tenantId, LocalDate asOfDate) {
     String reportingCurrency = reportingCurrencyPort.getReportingCurrency(tenantId);
     List<PayablesWarningDto> warnings = new ArrayList<>();

@@ -12,6 +12,10 @@ import com.fabricmanagement.finance.invoice.domain.Invoice;
 import com.fabricmanagement.finance.invoice.domain.InvoiceStatus;
 import com.fabricmanagement.finance.invoice.domain.InvoiceType;
 import com.fabricmanagement.finance.invoice.infra.repository.InvoiceRepository;
+import com.fabricmanagement.finance.payables.app.PayablesInsightService;
+import com.fabricmanagement.finance.payables.dto.DpoDto;
+import com.fabricmanagement.finance.receivables.app.ReceivablesInsightService;
+import com.fabricmanagement.finance.receivables.dto.DsoDto;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -32,6 +36,8 @@ public class AnalyticsFinancePortImpl implements AnalyticsFinancePort {
   private final InvoiceRepository invoiceRepository;
   private final OpenInvoiceAmountService openInvoiceAmountService;
   private final InvoiceSideResolver invoiceSideResolver;
+  private final ReceivablesInsightService receivablesInsightService;
+  private final PayablesInsightService payablesInsightService;
   private final Clock clock;
 
   @Override
@@ -75,6 +81,18 @@ public class AnalyticsFinancePortImpl implements AnalyticsFinancePort {
             .toList();
 
     return new AnalyticsRevenueResponse(records, warnings);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public DsoDto getDso(UUID tenantId, LocalDate asOfDate, String reportingCurrency) {
+    return receivablesInsightService.computeDso(tenantId, asOfDate, reportingCurrency);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public DpoDto getDpo(UUID tenantId, LocalDate asOfDate, String reportingCurrency) {
+    return payablesInsightService.computeDpo(tenantId, asOfDate, reportingCurrency);
   }
 
   private AnalyticsRevenueRecordDto processInvoice(
