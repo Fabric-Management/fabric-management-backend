@@ -73,6 +73,19 @@ class WorkingCapitalServiceTest {
   }
 
   @Test
+  void okStatusProducesNoWarning() {
+    when(analyticsFinancePort.getDso(eq(TENANT_ID), any(), eq(CURRENCY)))
+        .thenReturn(dso(BigDecimal.valueOf(83), "OK"));
+    when(analyticsFinancePort.getDpo(eq(TENANT_ID), any(), eq(CURRENCY)))
+        .thenReturn(dpo(BigDecimal.valueOf(61), "OK"));
+
+    WorkingCapitalResponse res = service.getWorkingCapital(null);
+
+    assertThat(res.operatingCashGapDays()).isEqualByComparingTo(BigDecimal.valueOf(22));
+    assertThat(res.warnings()).isEmpty();
+  }
+
+  @Test
   void gapNullAndWarningWhenDsoUnavailable() {
     when(analyticsFinancePort.getDso(eq(TENANT_ID), any(), eq(CURRENCY)))
         .thenReturn(dso(null, "INSUFFICIENT_SALES_WINDOW"));

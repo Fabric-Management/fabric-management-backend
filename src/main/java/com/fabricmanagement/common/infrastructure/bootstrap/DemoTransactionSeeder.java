@@ -42,8 +42,9 @@ public class DemoTransactionSeeder {
   private final SalesOrderService salesOrderService;
   private final WorkOrderService workOrderService;
   private final BatchService batchService;
+  private final FinanceDemoSeeder financeDemoSeeder;
 
-  @Value("${app.seed.demo-transactions.enabled:false}")
+  @Value("${application.seed.demo-transactions.enabled:false}")
   private boolean enabled;
 
   private static final String DEMO_CUSTOMER_NAME = "Global Fashion Wear Corp.";
@@ -90,75 +91,92 @@ public class DemoTransactionSeeder {
       partnerReq.setCountry("USA");
       TradingPartnerDto customer = tradingPartnerService.createPartner(partnerReq);
 
-      // 3. Find Shared Template Fibers (must use TEMPLATE tenant, not current tenant)
-      List<ProductDto> fibers =
-          productFacade.findByType(TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
+      // 2b. Finance dataset (DEMO-1): reporting currency (USD), FX rates, AR/AP invoices +
+      // payments.
+      // Independent of the fiber-dependent production demo below, so it still runs when no template
+      // fibers exist. Reuses the customer created above; same tenant context.
+      financeDemoSeeder.seedFor(tenantId);
 
-      if (fibers.isEmpty()) {
+      // 3. Production demo (best-effort, isolated): sales order → work order → batch.
+      // Pre-existing demo data. Wrapped in its own try/catch so a failure here can never roll back
+      // the finance demo (seeded above) or fail playground init.
+      try {
+        List<ProductDto> fibers =
+            productFacade.findByType(TenantContext.TEMPLATE_TENANT_ID, ProductType.FIBER);
+
+        if (fibers.isEmpty()) {
+          log.warn("No template fibers found. Skipping production demo for tenant: {}", tenantId);
+        } else {
+          ProductDto fiber1 = fibers.get(0);
+          ProductDto fiber2 = fibers.size() > 1 ? fibers.get(1) : fiber1;
+
+          CreateSalesOrderRequest orderReq = new CreateSalesOrderRequest();
+          orderReq.setPartnerId(customer.getId());
+          orderReq.setCustomerReference(DEMO_SO_REFERENCE);
+          orderReq.setOrderDate(LocalDate.now());
+          orderReq.setCurrency("USD");
+          orderReq.setNotes("Demo Sales Order for initial evaluation");
+
+          SalesOrderLineRequest line1 =
+              SalesOrderLineRequest.builder()
+                  .productId(fiber1.getId())
+                  .requestedQty(new BigDecimal("1500.00"))
+                  .unit("KG")
+                  .unitPrice(new BigDecimal("12.50"))
+                  .currency("USD")
+                  .build();
+
+          SalesOrderLineRequest line2 =
+              SalesOrderLineRequest.builder()
+                  .productId(fiber2.getId())
+                  .requestedQty(new BigDecimal("2000.00"))
+                  .unit("KG")
+                  .unitPrice(new BigDecimal("14.00"))
+                  .currency("USD")
+                  .build();
+
+          orderReq.setLines(List.of(line1, line2));
+          SalesOrderDto salesOrder = salesOrderService.createOrder(orderReq);
+
+          if (salesOrder.getLines() != null && !salesOrder.getLines().isEmpty()) {
+            UUID firstLineId = salesOrder.getLines().get(0).getId();
+
+            CreateWorkOrderRequest woReq =
+                CreateWorkOrderRequest.builder()
+                    .outputProductId(fiber1.getId())
+                    .moduleType(WorkOrderModuleType.SPINNING)
+                    .salesOrderLineId(firstLineId)
+                    .plannedQty(new BigDecimal("1550.00"))
+                    .unit("KG")
+                    .deadline(LocalDate.now().plusDays(15))
+                    .notes(DEMO_WO_NOTES)
+                    .build();
+            var workOrder = workOrderService.createWorkOrder(woReq);
+
+            CreateBatchRequest batchReq =
+                CreateBatchRequest.builder()
+                    .productId(fiber1.getId())
+                    .productType(ProductType.FIBER)
+                    .batchCode("B-DEMO-" + LocalDate.now().getYear() + "-001")
+                    .quantity(new BigDecimal("500.00"))
+                    .unit("KG")
+                    .sourceType(BatchSourceType.INTERNAL_PRODUCTION)
+                    .sourceId(workOrder.id())
+                    .remarks("Demo Initial Batch")
+                    .build();
+            batchService.create(batchReq);
+          } else {
+            log.warn(
+                "Demo sales order returned no lines; skipping work-order/batch for tenant: {}",
+                tenantId);
+          }
+        }
+      } catch (Exception prodEx) {
         log.warn(
-            "No template fibers found. Cannot seed demo transactions for tenant: {}", tenantId);
-        return;
+            "Production demo seeding failed for tenant {} — continuing; finance demo already seeded.",
+            tenantId,
+            prodEx);
       }
-
-      ProductDto fiber1 = fibers.get(0);
-      ProductDto fiber2 = fibers.size() > 1 ? fibers.get(1) : fiber1;
-
-      // 4. Create Sales Order
-      CreateSalesOrderRequest orderReq = new CreateSalesOrderRequest();
-      orderReq.setPartnerId(customer.getId());
-      orderReq.setCustomerReference(DEMO_SO_REFERENCE);
-      orderReq.setOrderDate(LocalDate.now());
-      orderReq.setCurrency("USD");
-      orderReq.setNotes("Demo Sales Order for initial evaluation");
-
-      SalesOrderLineRequest line1 =
-          SalesOrderLineRequest.builder()
-              .productId(fiber1.getId())
-              .requestedQty(new BigDecimal("1500.00"))
-              .unit("KG")
-              .unitPrice(new BigDecimal("12.50"))
-              .currency("USD")
-              .build();
-
-      SalesOrderLineRequest line2 =
-          SalesOrderLineRequest.builder()
-              .productId(fiber2.getId())
-              .requestedQty(new BigDecimal("2000.00"))
-              .unit("KG")
-              .unitPrice(new BigDecimal("14.00"))
-              .currency("USD")
-              .build();
-
-      orderReq.setLines(List.of(line1, line2));
-      SalesOrderDto salesOrder = salesOrderService.createOrder(orderReq);
-      UUID firstLineId = salesOrder.getLines().get(0).getId();
-
-      // 5. Create Work Order (Fulfilling Line 1)
-      CreateWorkOrderRequest woReq =
-          CreateWorkOrderRequest.builder()
-              .outputProductId(fiber1.getId())
-              .moduleType(WorkOrderModuleType.SPINNING)
-              .salesOrderLineId(firstLineId)
-              .plannedQty(new BigDecimal("1550.00"))
-              .unit("KG")
-              .deadline(LocalDate.now().plusDays(15))
-              .notes(DEMO_WO_NOTES)
-              .build();
-      var workOrder = workOrderService.createWorkOrder(woReq);
-
-      // 6. Create Production Batch (Linked to Work Order)
-      CreateBatchRequest batchReq =
-          CreateBatchRequest.builder()
-              .productId(fiber1.getId())
-              .productType(ProductType.FIBER)
-              .batchCode("B-DEMO-" + LocalDate.now().getYear() + "-001")
-              .quantity(new BigDecimal("500.00"))
-              .unit("KG")
-              .sourceType(BatchSourceType.INTERNAL_PRODUCTION)
-              .sourceId(workOrder.id())
-              .remarks("Demo Initial Batch")
-              .build();
-      batchService.create(batchReq);
 
       log.info("Successfully provisioned demo transactions for tenant: {}", tenantId);
 

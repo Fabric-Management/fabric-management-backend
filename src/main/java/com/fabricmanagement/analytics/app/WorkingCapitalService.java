@@ -42,13 +42,14 @@ public class WorkingCapitalService {
 
     BigDecimal operatingCashGapDays = computeOperatingCashGap(dso, dpo);
 
+    // Only surface a warning for a genuine problem status (e.g. INSUFFICIENT_*), never for "OK".
     List<WorkingCapitalWarningDto> warnings = new ArrayList<>();
-    if (dso != null && dso.status() != null) {
+    if (dso != null && isProblemStatus(dso.status())) {
       warnings.add(
           new WorkingCapitalWarningDto(
               dso.status(), "DSO", "Days sales outstanding could not be computed."));
     }
-    if (dpo != null && dpo.status() != null) {
+    if (dpo != null && isProblemStatus(dpo.status())) {
       warnings.add(
           new WorkingCapitalWarningDto(
               dpo.status(), "DPO", "Days payable outstanding could not be computed."));
@@ -70,5 +71,10 @@ public class WorkingCapitalService {
       return null;
     }
     return dsoValue.subtract(dpoValue);
+  }
+
+  /** A status is a problem only when present and not the success sentinel "OK". */
+  private boolean isProblemStatus(String status) {
+    return status != null && !"OK".equalsIgnoreCase(status);
   }
 }
