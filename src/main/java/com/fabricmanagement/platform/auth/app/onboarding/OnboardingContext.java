@@ -23,6 +23,7 @@ import lombok.Data;
  *   <li>Step 3 (CloneTemplateRolesStep): Clones platform roles from TEMPLATE tenant
  *   <li>Step 4 (SeedOrganizationStep): Seeds default departments
  *   <li>Step 5+ (CreateAdminUserStep, etc.): Use tenantId and organizationId
+ *   <li>Step 10 (CloneTemplatePermissionsStep): Clones permission templates
  * </ul>
  */
 @Data

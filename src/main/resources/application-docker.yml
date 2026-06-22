@@ -70,6 +70,12 @@ application:
   frontend:
     base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
+  # Playground/demo seed: clone-time finance + production demo data (DEMO-1).
+  # Docker is the playground runtime here, so default ON; override with the env var to disable.
+  seed:
+    demo-transactions:
+      enabled: ${APP_SEED_DEMO_TRANSACTIONS_ENABLED:true}
+
 logging:
   level:
     root: INFO

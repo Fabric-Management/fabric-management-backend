@@ -27,26 +27,56 @@ jobs:
           cache: maven
 
       - name: Format code
-        run: mvn fmt:format
+        run: mvn fmt:check
 
       - name: Run Checkstyle
         run: mvn checkstyle:check
-        continue-on-error: true
 
       - name: Run SpotBugs
         run: mvn spotbugs:check
-        continue-on-error: true
+
+      - name: Cache Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/dependency-check-data
+          key: ${{ runner.os }}-dependency-check-${{ hashFiles('pom.xml', 'dependency-check-suppression.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-dependency-check-
+
+      - name: Validate NVD API key
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "${NVD_API_KEY}" ]; then
+            echo "::error::NVD_API_KEY repository secret is required for the blocking Dependency-Check gate."
+            exit 1
+          fi
 
       - name: Run Security Scan (Dependency Check)
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        # Resilient to NVD API outages: nvdValidForHours=168 reuses cached NVD data for 7 days
+        # (so a warm cache never re-contacts NVD), nvdApiDelay throttles to avoid 429/503 rate
+        # limits, and the loop retries transient NVD 5xx failures before failing the gate.
         run: |
-          mvn org.owasp:dependency-check-maven:check \
-            -DfailBuildOnCVSS=7 \
-            -DskipProvidedScope=true \
-            -DsuppressionFile=dependency-check-suppression.xml \
-            -DnvdApiKey=$NVD_API_KEY
-        continue-on-error: true
+          set -e
+          for attempt in 1 2 3; do
+            if mvn org.owasp:dependency-check-maven:check \
+                -DfailBuildOnCVSS=7 \
+                -DdataDirectory="${HOME}/.m2/dependency-check-data" \
+                -DskipProvidedScope=true \
+                -DsuppressionFile=dependency-check-suppression.xml \
+                -DnvdApiKey="${NVD_API_KEY}" \
+                -DnvdValidForHours=168 \
+                -DnvdApiDelay=6000; then
+              echo "Dependency-Check passed on attempt ${attempt}."
+              exit 0
+            fi
+            echo "::warning::Dependency-Check attempt ${attempt} failed (likely NVD API 5xx). Retrying in 60s..."
+            sleep 60
+          done
+          echo "::error::Dependency-Check failed after 3 attempts — NVD API likely unavailable. Re-run once NVD recovers."
+          exit 1
 
       - name: Upload Checkstyle results
         if: always()

@@ -112,6 +112,16 @@ public class ReceivablesInsightService {
     return new PageImpl<>(customers.subList(fromIndex, toIndex), pageable, customers.size());
   }
 
+  /**
+   * Computes standalone DSO for the given tenant/date/currency. Reuses the existing buildModel +
+   * buildDso pipeline — no formula duplication.
+   */
+  public DsoDto computeDso(UUID tenantId, LocalDate asOfDate, String reportingCurrency) {
+    ReceivablesModel model = buildModel(tenantId, asOfDate);
+    return buildDso(
+        tenantId, asOfDate, reportingCurrency, model.totalOutstanding(), model.warnings());
+  }
+
   private ReceivablesModel buildModel(UUID tenantId, LocalDate asOfDate) {
     String reportingCurrency = reportingCurrencyPort.getReportingCurrency(tenantId);
     List<ReceivablesWarningDto> warnings = new ArrayList<>();

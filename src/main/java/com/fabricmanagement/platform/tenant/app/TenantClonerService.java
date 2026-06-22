@@ -29,14 +29,19 @@ public class TenantClonerService {
    * <p>Uses BYPASSRLS (SystemTransactionExecutor) — safe to call without tenant context.
    */
   public UUID findTemplateTenantId() {
-    return systemTransactionExecutor.executeInTransaction(
-        jdbc -> {
-          var results =
-              jdbc.queryForList(
-                  "SELECT id FROM common_tenant.common_tenant WHERE slug = 'golden-template' LIMIT 1",
-                  UUID.class);
-          return results.isEmpty() ? null : results.getFirst();
-        });
+    return systemTransactionExecutor.executeInTransaction(this::findTemplateTenantId);
+  }
+
+  /**
+   * Package-private overload for callers already inside a {@link SystemTransactionExecutor}
+   * transaction, avoiding a nested {@code executeInTransaction} call.
+   */
+  UUID findTemplateTenantId(org.springframework.jdbc.core.JdbcTemplate jdbc) {
+    var results =
+        jdbc.queryForList(
+            "SELECT id FROM common_tenant.common_tenant WHERE slug = 'golden-template' LIMIT 1",
+            UUID.class);
+    return results.isEmpty() ? null : results.getFirst();
   }
 
   /**
@@ -81,6 +86,72 @@ public class TenantClonerService {
               sourceTenantId);
           return count[0];
         });
+  }
+
+  /**
+   * Clone permission templates from a source tenant (typically golden-template) to a target tenant.
+   * Uses BYPASSRLS (SystemTransactionExecutor) — no JPA, no RLS constraints.
+   *
+   * <p>Manual loop required: uid has UNIQUE constraint, so a simple INSERT SELECT that copies uid
+   * verbatim would violate it.
+   *
+   * <p>Idempotent: skips cloning if the target tenant already has any permission_template rows.
+   *
+   * @param sourceTenantId the tenant to copy permission templates FROM
+   * @param targetTenantId the tenant to copy permission templates TO
+   * @return number of templates cloned
+   */
+  public int clonePermissionTemplatesToTenant(UUID sourceTenantId, UUID targetTenantId) {
+    if (sourceTenantId == null || targetTenantId == null) {
+      return 0;
+    }
+    return systemTransactionExecutor.executeInTransaction(
+        jdbc -> doClonePermissionTemplates(jdbc, sourceTenantId, targetTenantId));
+  }
+
+  /**
+   * Core logic for cloning permission templates. Package-private so that callers already inside a
+   * {@link SystemTransactionExecutor} transaction (e.g. {@link #cloneTemplateToPlayground()}) can
+   * invoke it directly without nesting another {@code executeInTransaction} call.
+   */
+  int doClonePermissionTemplates(
+      org.springframework.jdbc.core.JdbcTemplate jdbc, UUID sourceTenantId, UUID targetTenantId) {
+    // Idempotency guard: skip if target tenant already has permission templates
+    Integer existing =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM common_user.permission_template WHERE tenant_id = ?",
+            Integer.class,
+            targetTenantId);
+    if (existing != null && existing > 0) {
+      log.debug(
+          "Skipping permission template clone — target tenant {} already has {} templates.",
+          targetTenantId,
+          existing);
+      return 0;
+    }
+
+    int[] count = {0};
+    jdbc.query(
+        "SELECT role_code, department_code, resource, action, data_scope "
+            + "FROM common_user.permission_template "
+            + "WHERE tenant_id = ? AND is_active = true",
+        rs -> {
+          jdbc.update(
+              "INSERT INTO common_user.permission_template "
+                  + "(id, tenant_id, uid, role_code, department_code, resource, "
+                  + "action, data_scope, is_active, created_at, updated_at, version) "
+                  + "VALUES (gen_random_uuid(), ?, gen_random_uuid()::varchar, "
+                  + "?, ?, ?, ?, ?, true, now(), now(), 0)",
+              targetTenantId,
+              rs.getString("role_code"),
+              rs.getString("department_code"),
+              rs.getString("resource"),
+              rs.getString("action"),
+              rs.getString("data_scope"));
+          count[0]++;
+        },
+        sourceTenantId);
+    return count[0];
   }
 
   /**
@@ -287,29 +358,9 @@ public class TenantClonerService {
               // 3.3.5 Permission Template
               // Source: golden-template (not nexus-fabrics) because TenantSeeder
               // does not clone permission_template into nexus-fabrics.
-              // Manual loop required: uid has UNIQUE constraint, so
-              // cloneTableWithoutFKs (which copies uid verbatim) would violate it.
-              UUID goldenTemplateId = findTemplateTenantId();
+              UUID goldenTemplateId = findTemplateTenantId(jdbc);
               if (goldenTemplateId != null) {
-                jdbc.query(
-                    "SELECT role_code, department_code, resource, action, data_scope "
-                        + "FROM common_user.permission_template "
-                        + "WHERE tenant_id = ? AND is_active = true",
-                    rs -> {
-                      jdbc.update(
-                          "INSERT INTO common_user.permission_template "
-                              + "(id, tenant_id, uid, role_code, department_code, resource, "
-                              + "action, data_scope, is_active, created_at, updated_at, version) "
-                              + "VALUES (gen_random_uuid(), ?, gen_random_uuid()::varchar, "
-                              + "?, ?, ?, ?, ?, true, now(), now(), 0)",
-                          newTenantId,
-                          rs.getString("role_code"),
-                          rs.getString("department_code"),
-                          rs.getString("resource"),
-                          rs.getString("action"),
-                          rs.getString("data_scope"));
-                    },
-                    goldenTemplateId);
+                doClonePermissionTemplates(jdbc, goldenTemplateId, newTenantId);
               }
 
               // 3.4 User
