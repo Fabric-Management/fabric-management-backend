@@ -56,8 +56,9 @@ Proje üç seviyeli bir modül hiyerarşisine sahiptir. Her üst düzey paket, b
 | `human` | Employee, Leave, Payroll, Compliance, Localization |
 | `iwm` | Location, Reservation, StockCount, Transfer, RMA, Adjustment, Rules |
 | `costing` | CostCalculation, PriceList, ExchangeRate |
+| `analytics` | Cross-context read-only insights (ADR-0001; reads other contexts only via their app/ports) |
 | `notification` | Hub, i18n |
-| `finance` | Invoice |
+| `finance` | Invoice, Payment, Receivables, Payables, Period, FxExposure, CashFlow |
 | `logistics` | Shipment |
 | `approval` | ApprovalPolicy, ApprovalRequest, UserPromotion |
 | `offline` | Sync |
@@ -130,7 +131,7 @@ public class FiberBatch extends BaseEntity {
 - `ddl-auto` (validate hariç) → Flyway kullan
 - Tenant bypass eden query
 - `double`/`float` para/miktar için → `BigDecimal`
-- `@Transactional` Controller'da → Service'te kullan
+- `@Transactional` production/domain Controller'da → Service'te kullan (yalnızca `@Profile("local")` bakım controller'ları istisnadır; pattern olarak kopyalanmaz)
 - `catch (Exception e) {}` → Spesifik exception yakala, yutma
 - Schema değişikliği migration'sız
 - Cross-module'de doğrudan repository inject → QueryService/Facade/Event kullan
@@ -149,7 +150,7 @@ return ApiResponse.error(apiError);
 
 // Controller imzası
 @PostMapping
-@PreAuthorize("hasRole('PRODUCTION_MANAGER')")
+@PreAuthorize("@auth.can(authentication, 'production', 'manage')")
 public ResponseEntity<ApiResponse<BatchDto>> createBatch(
     @Valid @RequestBody CreateBatchRequest request) { ... }
 
@@ -163,13 +164,19 @@ public record CreateBatchRequest(
 
 - **MapStruct** ile entity↔DTO mapping; shared config `unmappedTargetPolicy = ERROR`
 - **GlobalExceptionHandler** → Tüm exception'lar standart `ApiError` formatında
-- **@PreAuthorize** → Her endpoint'te rol kontrolü zorunlu
+- **@PreAuthorize + @auth.can** → Her endpoint yetki kontrollü olmalı. **Resource/action domain
+  endpoint'lerinin VARSAYILANI** DB-driven RBAC: `@PreAuthorize("@auth.can(authentication, '<resource>',
+  '<action>')")` (SpELPermissionEvaluator). Bir domain endpoint'inde resource+action yerine
+  `hasRole(...)`/`hasAuthority('finance:read')` kullanmak YASAK. İstisna: erişim modeli gerçekten
+  rol/bootstrap/self-service olan endpoint'ler (platform-admin, approval-policy, offline sync, payroll
+  self-service) `hasAuthority(...)`/`isAuthenticated()` kullanabilir — bunları resource/action domain
+  endpoint'lerine KOPYALAMA.
 - **OpenAPI (SÖZLEŞME)** → Frontend'in tüm tip güvenliği bu belgelendirmeye bağlıdır! `@Tag`, `@Operation`, `@ApiResponse`, `@Schema(required = true)` gibi annotation'lar asla eksik bırakılamaz. Backend'deki bir drift, frontend'i otomatik patlatır.
 - **API versioning** → `/api/v1/`
 
 ### 5.1 Exception Hiyerarşisi
 
-Her üst düzey modülün kendi `DomainException` alt sınıfı olmalıdır. Exception mesajları i18n-ready veya constants altında tutulur.
+Modül-spesifik iş hataları, modülün mevcut base exception'ını extend eder; bir modül base'i yoksa tekrarlayan modül-spesifik exception eklemeden önce onu oluştur. Aşağıdaki ağaç illüstratiftir, exhaustive değildir. Exception mesajları i18n-ready veya constants altında tutulur.
 
 ```
 DomainException (abstract, common/infrastructure)
@@ -359,6 +366,7 @@ com.fabricmanagement/
 │   └── {board,task,generator,automation,dashboard}/
 │
 ├── costing/                        # MALİYETLENDİRME
+├── analytics/                      # CROSS-CONTEXT INSIGHTS (ADR-0001, read-only)
 ├── notification/                   # BİLDİRİM
 ├── finance/                        # FİNANS
 ├── logistics/                      # LOJİSTİK
@@ -388,422 +396,24 @@ Yukarıdaki kuralların büyük kısmı **ArchUnit testleriyle** otomatik olarak
 
 ---
 
-## 17. Platform ↔ Human Tenant Decoupling (Employee Projection Port)
+## 17. Cross-Module Decoupling (kalıcı kurallar)
 
-`platform/user` modülünün `human/core/employee` modülüne doğrudan binary bağımlılığını (service/entity seviyesinde) engellemek için **Port/Adapter Pattern** ve **Shared Kernel** kullanılır. 
+**Article 13 (ArchUnit):** hiçbir modül başka bir modülün `.infra..` paketine (entity/repository) erişemez — tek istisna `common/infrastructure`. Veriye **Port/Adapter** veya hedef modülün **QueryService/Facade** katmanı üzerinden ulaşılır. Infra bypass, hedefin business kurallarını + tenant/RLS interceptor'larını devre dışı bırakır.
 
-### 17.1 Shared Kernel (`common/infrastructure/identity/`) ✅
-Modüller arası veri değişiminde kullanılan ortak tipler burada tanımlanır:
-- `Gender`, `Title` (Enum)
-- `EmergencyContactData` (Record — immutable)
+**Mekanizma seçimi:**
+- Sınır geçen JPA `@ManyToOne` zaten var → **QueryService** (app-layer delegation; infra bypass'ı kapatır).
+- Aksi halde → **Port/Adapter** (UUID/primitive yetiyorsa minimal DTO; zengin veri gerekiyorsa Snapshot/zengin DTO).
+- **Port yeri:** 1:1 bağımlılık → *consumer* modülünde (consumer owns the contract — DIP). Cross-cutting (2+ consumer, ör. approval) → `common/infrastructure/`.
+- **ACL:** port consumer'ın dilini konuşur (sales "production order" der, "work order" değil). Platform sabitleri (`SystemUser.ID`, role kodları) adapter'da yaşar — servis platform import etmez.
+- Bir listener yalnızca tek bir ek alana ihtiyaç duyuyorsa **callback port yerine event enrichment** tercih et: alanı event'e ekle, DB round-trip'ini öldür.
 
-### 17.2 Port Pattern (Platform Domain) ✅
-Platform modülü, HR verisine ihtiyaç duyduğunda `human` modülüne sormaz; kendi domain'inde bir interface (Port) ve veri modeli (Snapshot) tanımlar.
-- `EmployeeProjectionPort`: Veri okuma (findByUserId, findByUserIds)
-- `EmployeeCreationPort`: Veri oluşturma / lifecycle
-- `EmployeeSnapshot`: Platform modülüne özel read-only veri modeli (Record)
+**ArchUnit-enforced, pazarlıksız iki standardizasyon:**
+- **Rule 8.1** — `domain/event/` altındaki her `*Event`, `DomainEvent`'i extend eder (eventId/tenantId/eventType/occurredAt verir). `record`/`@Value` abstract extend edemez → `@Getter class` + `@Builder`'ı constructor'a koy (producer `.builder()` zinciri kırılmaz). İş-semantiği taşıyan timestamp'ler (`consumedAt`, `transactionDate`) entity'de kalır, `occurredAt`'a katlanmaz.
+- **Rule 4.3** — her `@Entity`, `BaseEntity`/`BaseJunctionEntity`'den türer; ancak tenantId / UUID-`@Id` / soft-delete *gerçekten anlamsızsa* (root `Tenant`, composite-key junction, append-only audit log) istisna olur — her istisna `ConstitutionArchTest` içinde inline comment ile belgelidir.
 
-### 17.3 Adapter Implementation (Human App) ✅
-Human modülü, platform'un tanımladığı portları kendi `app/adapter/` klasörü altında implemente eder.
-- `EmployeeProjectionAdapter`: Entity → Snapshot dönüşümünü yapar.
-- `EmployeeCreationAdapter`: `EmployeeService` domain orchestration'ı ile platform taleplerini bağlar.
+**Yeni cross-BC bağımlılık eklerken:** port tanımla (servis/repo import'u YASAK) → yukarıdaki kurala göre doğru tarafa koy → adapter'ı sağlayıcı modülün `app/adapter/`'ında implemente et → ham coupling'i yasaklayan ArchUnit kuralını ekle.
 
-### 17.4 N+1 Önleme Kuralı ✅
-Kullanıcı listeleri (admin, user search vb.) dönerken employee verisi eklemek için **mutlaka batch-load** (`findByUserIds`) kullanılmalıdır. Stream içinde tek tek `findByUserId` çağrılması **KESİNLİKLE YASAKTIR.**
-
-## 18. Platform/AI ↔ Production Decoupling (AI Tool Registry Pattern)
-
-`platform/ai` modülünün production altyapısına (repository, entity) doğrudan bağımlılığını 
-engellemek için **AI Tool Registry Pattern** kullanılır.
-
-### 18.1 Shared Infrastructure (`common/infrastructure/ai/`) ✅
-- `AIToolProvider` — domain provider'ların implement ettiği interface (`getSupportedTools()`, `execute()`)
-- `AIQueryNormalizer` — Türkçe→İngilizce fiber terminoloji çevirisi (pamuk→cotton, vb.)
-
-### 18.2 Registry (`platform/ai/app/`) ✅
-- `AIToolRegistry` — Tüm `AIToolProvider` bean'lerini Spring injection ile toplar.
-  Sonuç cachelemesi (60 sn TTL) burada yönetilir. `create_*` araçları cache'lenmez.
-- `AIFunctionCaller` — Saf entry point; yalnızca `TenantContext`'ten tenantId okur ve 
-  `toolRegistry.execute()` 'e delege eder.
-
-### 18.3 Domain Providers (Adapter) ✅
-Her domain kendi AI araçlarını kendi `app/adapter/` altında implement eder:
-- `FiberAIToolProvider` → `search_fibers`, `get_fiber_info`, `list_fiber_categories`, `create_fiber`
-- `MaterialAIToolProvider` → `check_material_stock`, `create_material`, `search_materials`, `get_production_status`
-- `SmartSearchAIToolProvider` (`platform/ai/app/adapter/`) → `smart_search` (cross-domain orkestrasyon)
-
-### 18.4 Circular Dependency Çözümü ✅
-`SmartSearchAIToolProvider` `AIToolRegistry`'ye bağımlıdır — ancak `AIToolRegistry` 
-tüm provider'ları (SmartSearch dahil) toplar. Circular dependency `ObjectProvider<AIToolRegistry>` 
-ile çözülür: Spring lazy proxy ile initialization sırasında circular dep oluşmaz.
-
-### 18.5 ArchUnit Rule 11.4 ✅
-`platform/ai` modülü production altyapısına (`..production..infra..`) doğrudan erişemez.
-Facade (`api/facade/`) ve DTO kullanımı serbesttir.
-
-### 18.6 Kural: Yeni AI Aracı Eklemek
-1. İlgili domain modülünde `app/adapter/XxxAIToolProvider.java` oluştur (`AIToolProvider` implement et)
-2. `getSupportedTools()` içinde araç adını kaydet
-3. `execute()` içinde işlemi kendi facade'ı üzerinden gerçekleştir
-4. Unit test yaz (`XxxAIToolProviderTest`)
-5. `AIFunctionCaller`'a **kesinlikle dokunma** — araç otomatik olarak kayıt olur
-
----
-
-## 19. WorkOrder Cross-Module Decoupling (Port/Adapter + ACL Pattern)
-
-`production/execution/workorder` eksenindeki çapraz modül bağımlılıklarını izole etmek için
-**Port/Adapter + Anti-Corruption Layer** uygulandı. 3 fazda tamamlandı.
-
-### 19.1 Tespit Edilen Coupling Noktaları
-
-| ID | Kaynak | Hedef | Tür |
-|----|--------|-------|-----|
-| C1 | `sales/SalesOrderRuleEngine` | `production/WorkOrderService` | Doğrudan servis çağrısı |
-| C2 | `production/WorkOrderService` | `sales/SalesOrderConfirmedEvent.SalesOrderLineSnapshot` | Event tipi sızıntısı |
-| C3 | `production/WorkOrderService` | `approval/ApprovalGuardService` | Doğrudan servis çağrısı |
-| C4 | `approval/ApprovalGuardService` | `platform.user.infra/UserRepository` | Altyapı bypass |
-| C5 | `production/WorkOrderService` | `platform/TradingPartnerCertificationService` | Kasıtlı — **dokunulmadı** |
-
-C5 bilinçli olarak izole edilmedi: platform→domain yönü Rule 11.2 kapsamında kabul edilebilir.
-
-### 19.2 Phase 1 — Event İzolasyonu & Altyapı Bypass Düzeltmesi ✅
-
-**C2:** `production/execution/workorder/dto/IncomingSalesOrderLine` record tanımlandı.
-`WorkOrderSalesEventListener` çeviri sınırıdır: event alır, map'ler, servise local DTO iletir.
-`WorkOrderService` sıfır `sales.*` import'u ile çalışır.
-
-**C4:** `approval/domain/port/UserTrustLevelPort` arayüzü + `platform/user/app/adapter/UserTrustLevelAdapter`.
-`SystemUser.ID` kontrolü adapter içinde — `ApprovalGuardService` platform bilmez.
-
-**Phase X (ertelendi):** `User.java`, `approval.domain.UserTrustLevel` enum'unu import ediyor.
-Bu `platform/user → approval` pre-existing coupling ayrı bir refactoring konusudur.
-
-### 19.3 Phase 2 — Cross-BC Port/Adapter (Hibrit Karar) ✅
-
-**C1 — Bounded Port (1:1):**
-- `sales/salesorder/domain/port/ProductionOrderPort` — Sales kendi dilinde konuşur ("production order", "work order" değil)
-- `sales/salesorder/domain/port/DraftProductionOrderCommand` — Sales çıktı kontratı (record)
-- `production/execution/workorder/app/adapter/WorkOrderCreationAdapter` — portu implement eder, command→request map'leme burada
-
-**C3 — Universal Port (cross-cutting):**
-- `common/infrastructure/approval/ApprovalPort` — approval cross-cutting olduğu için `common`'da; `String entityType` kullanır
-- `approval/app/adapter/ApprovalGuardAdapter` — `String` → `ApprovalEntityType.valueOf()` dönüşümü burada
-- `WorkOrderService` sıfır `approval.*` import'u; `"WORK_ORDER"` String sabitini kullanır
-
-**Bağımlılık yönü kararı (DIP):**
-- 1:1 bağımlılık → port consumer modülünde (`ProductionOrderPort` → `sales`)
-- Cross-cutting → `common/infrastructure/` (`ApprovalPort` → `common`)
-
-### 19.4 Phase 3 — ArchUnit Guardrail'ları ✅
-
-`ConstitutionArchTest.java` — **Article 12 — WorkOrder Bounded Context Isolation:**
-
-- **Rule 12.1:** `sales..` → `production..app..` / `production..infra..` yasak
-- **Rule 12.2:** `production..` (EventListener hariç) → `approval.app..` yasak
-- **Rule 12.3:** `approval..` → `platform.user.infra..` yasak
-
-Rule 12.3 uygulanırken 3 gizli coupling daha yakalandı:
-
-| Sınıf | Sorun | Port |
-|-------|-------|------|
-| `UserPromotionService` | `UserRepository.save()` + `UserService` doğrudan | `approval/domain/port/UserTrustMutationPort` |
-| `ApproverRecipientResolver` | `UserRepository.findByTenantIdAndRole_RoleCodeIn()` | `approval/domain/port/ApproverRecipientPort` |
-
-### 19.5 Tüm Port/Adapter Envanteri
-
-**`approval/domain/port/`:**
-- `UserTrustLevelPort` — trust level okuma (ApprovalGuardService)
-- `UserTrustMutationPort` — trust level yazma + kullanıcı deaktivasyon (UserPromotionService)
-- `ApproverRecipientPort` — role kodu → kullanıcı ID listesi (ApproverRecipientResolver)
-
-**`platform/user/app/adapter/`:**
-- `UserTrustLevelAdapter` — SystemUser.ID bypass burada
-- `UserTrustMutationAdapter`
-- `ApproverRecipientAdapter`
-
-**`sales/salesorder/domain/port/`:**
-- `ProductionOrderPort` + `DraftProductionOrderCommand`
-
-**`production/execution/workorder/app/adapter/`:**
-- `WorkOrderCreationAdapter`
-
-**`common/infrastructure/approval/`:**
-- `ApprovalPort` — cross-cutting; String entityType (enum coupling yok)
-
-**`approval/app/adapter/`:**
-- `ApprovalGuardAdapter`
-
-### 19.6 Kurallar: Yeni Cross-BC Bağımlılık Eklendiğinde
-
-1. Doğrudan servis/repository import'u **YASAK** — port tanımla
-2. Port, ihtiyaç duyan modülde yaşar (consumer owns the contract — DIP)
-3. 1:1 bağımlılık → port consumer modülünde; cross-cutting → `common/infrastructure/`
-4. Adapter, sağlayıcı modülün `app/adapter/` içinde; infra'ya sadece adapter erişir
-5. ACL: Port consumer'ın kendi dilini kullanır ("production order", "work order" değil)
-6. Port/Adapter tamamlandıktan sonra `ConstitutionArchTest`'e ihlali engelleyen ArchUnit kuralı eklenir
-7. `SystemUser.ID`, `ApproverRole` gibi platform sabitleri adapter'a taşınır; servis katmanı platform bilmez
-
----
-
-## 20. Mimari Sağlık Raporu ve Konsolidasyon (Article 13)
-
-Cross-Module alanında en toksik bağımlılık türü "Infrastructure Bypass" durumudur. Bir modülün, başka bir modülün `infra` katmanına (Repository, Entity vb.) doğrudan erişmesi; o modülün business kurallarını (validasyonlar, event publishing) ve app katmanındaki interceptor'ları (tenant isolation, RLS) tamamen devre dışı bırakır.
-
-### Kural 13.1 - 13.4 (Cross-Module Infra Isolation)
-- **HİÇBİR MODÜL** kendi dışındaki bir modülün `.infra..` paketine erişemez. (common/infrastructure istisnadır)
-- İhtiyaç durumunda **Port/Adapter pattern** veya hedef modülün **QueryService/Facade** katmanları kullanılmalıdır.
-- **Article 13 TAMAMEN TEMİZ — 13 frozen → 0 ✅** (Tüm 4 rule: 0 frozen violation)
-- Frozen sınıflar `.and().doNotHaveSimpleName(...)` ile filtrelenir. ArchUnit testleri herhangi bir yeni infrastructure-bypass ihlaline izin vermez.
-- Çözüm geçmişi ve kullanılan pattern'ler Section 22'de belgelenmiştir.
-
----
-
-## 21. Notification Hub Cross-Module Decoupling (Port/Adapter + Event Enrichment)
-
-Notification Hub'daki 3 listener (InventoryNotificationListener, ProcurementNotificationListener, ProductionNotificationListener) doğrudan `platform.organization.infra.repository.DepartmentRepository` kullanıyordu. Ek olarak ProcurementNotificationListener, SupplierRFQRepository üzerinden callback yaparak `rfqCreatedByUserId` çekiyordu.
-
-### 21.1 Çözüm A — DepartmentRecipientPort (ACL Pattern)
-
-Port, **notification modülünde** yaşar (platform'da değil) — bağımlılık grafiği tek yönlü kalır.
-
-**Port:**
-- `notification/hub/domain/port/DepartmentRecipientPort` — department bazlı kullanıcı/yönetici çözümleme
-  - `findUsersByDepartmentKeyword(UUID tenantId, String... keywords)`
-  - `findManagersByDepartmentKeyword(UUID tenantId, String... keywords)`
-
-**Adapter:**
-- `notification/hub/app/adapter/PlatformDepartmentAdapter` — ACL; DepartmentService + UserQueryService çağırır
-  - Tüm `getDepartmentUsers()` / `getDepartmentManagers()` / `matchesAny()` helper logic'i burada konsolide
-
-### 21.2 Çözüm B — Event Enrichment (SupplierQuoteReceivedEvent)
-
-`ProcurementNotificationListener`, SupplierRFQRepository'den `rfqCreatedByUserId` çekiyordu (DB callback = N+1 risk). Çözüm: Event'e `rfqCreatedByUserId` alanı eklendi.
-
-- `procurement/quote/domain/event/SupplierQuoteReceivedEvent` → yeni alan: `UUID rfqCreatedByUserId`
-- Listener artık sıfır DB sorgusu yapar; tüm veri event'ten gelir
-
-### 21.3 Refactored Listeners
-
-3 listener'da yapılan değişiklikler:
-- `DepartmentRepository` import'u kaldırıldı → `DepartmentRecipientPort` inject edildi
-- `getDepartmentUsers()` / `getDepartmentManagers()` / `matchesAny()` helper method'ları silindi
-- `ProcurementNotificationListener`: SupplierRFQRepository import'u kaldırıldı → event field'dan okuma
-
-### 21.4 ArchUnit Etkisi
-
-- **Rule 13.4** artık tamamen temiz (0 frozen violation)
-- **Rule 13.1** frozen count: 7 → 4 (3 notification listener çözüldü)
-- Toplam frozen violation: 12 → 8
-
-### 21.5 Mimari Kararlar
-
-| Karar | Gerekçe |
-|-------|---------|
-| Port notification'da, platform'da değil | Unidirectional dependency graph; consumer owns the contract (DIP) |
-| Event Enrichment > Port/Adapter (RFQ case) | Hem coupling'i hem DB query'yi ortadan kaldırır; zero latency |
-| Tek port, iki method | `findUsers` + `findManagers` — aynı bounded context, aynı aggregate (Department→User) |
-
----
-
-## 22. Frozen Violation Envanteri ve Çözüm Geçmişi
-
-### 22.1 Çözülen Gruplar
-
-**Grup A — TenantRepository bypass ✅ (3 frozen → 0, Toplam: 8→5)**
-
-Port/Adapter pattern — domain model sınırı geçilmediğinden uygulandı.
-- Port: `common/infrastructure/tenant/TenantQueryPort` — `findAllActiveTenants()`, `findAllByIds()`, `findById()`
-- Adapter: `platform/tenant/app/adapter/TenantQueryAdapter`
-- DTO: `common/infrastructure/tenant/TenantReference` (id, uid, name)
-- Çözülen: BatchCertificationExpiryCheckJob, FiberRequestService, InvoiceOverdueJob
-
-**Grup B — Certification çapraz referans ✅ (3 frozen → 0, Toplam: 5→2)**
-
-QueryService pattern — JPA @ManyToOne ilişkiler domain sınırını zaten geçtiğinden Port/Adapter yerine app-layer delegation uygulandı.
-- `production/masterdata/fiber/app/FiberCertificationQueryService` — platform modüllerinin production infra bypass'ını önler
-- `platform/tradingpartner/app/TradingPartnerCertificationQueryService` — production modülünün platform infra bypass'ını önler
-- `platform/organization/app/OrganizationCertificationQueryService` — production modülünün platform infra bypass'ını önler
-- Çözülen: OrganizationCertificationService, TradingPartnerCertificationService, BatchCertificationService
-
-**Pattern Seçim Rehberi:**
-- Domain entity sınırı geçilmiyorsa → **Port/Adapter** (minimal DTO, ACL)
-- JPA @ManyToOne ilişki zaten sınır geçiyorsa → **QueryService** (app delegation, infra bypass'ı kapatır)
-
-### 22.2 Article 13 — TAMAMEN TEMİZ ✅
-
-**Grup C — Locale/i18n bypass ✅ (2 frozen → 0, Toplam: 2→0)**
-
-Port/Adapter pattern — JPA @ManyToOne yoktur (sadece primitive UUID); Grup A pattern'i geçerli.
-- `common/infrastructure/locale/LocaleResolutionPort` — 4 method: `findUserLocale()`, `findUserTimezone()`, `findTenantDefaultLocale()`, `findTenantTimezone()`
-- `notification/i18n/app/adapter/LocaleResolutionAdapter` — port'u implement eder
-- `platform/user/domain/port/UserLocaleConfigPort` — `findByUserId()`, `saveOrUpdate()`, `deleteByUserId()`
-- `platform/user/domain/port/UserLocalePreferences` — record DTO (userId, locale, timezone)
-- `notification/i18n/app/adapter/UserLocaleConfigAdapter` — entity create/update signature karmaşıklığını saklar; dateFormat korunur
-- Normalization (`extractLanguageCode`, "tr-TR" → "TR") UserLocaleService'de kalır — porta normalize data gider
-- Çözülen: LocalizationService, UserLocaleService
-
-**Tüm Frozen Violations: 13 → 0** — Rule 13.1, 13.2, 13.3, 13.4 hepsi temiz.
-
-### 22.3 Yeni Cross-Module Bağımlılık Oluştuğunda
-
-Aşağıdaki karar ağacını kullan:
-
-```
-Yeni cross-module bağımlılık gerekiyor
-         |
-         ▼
-Domain entity @ManyToOne var mı?
-    |               |
-   EVET            HAYIR
-    |               |
-    ▼               ▼
-QueryService    UUID/primitive yeterli mi?
-(app delegation)    |               |
-                   EVET            HAYIR (zengin veri)
-                    |               |
-                    ▼               ▼
-               Port/Adapter    Port/Adapter
-               (minimal DTO)  (zengin DTO)
-```
-
-Port yeri: 1:1 → consumer modülünde; cross-cutting (2+ consumer) → `common/infrastructure/`
-
----
-
-## 23. Domain Event Standardizasyonu (Rule 8.1)
-
-**Article 8 — Rule 8.1**: `domain/event/` paketindeki tüm `*Event` sınıfları `DomainEvent` base class'ını extend etmek zorundadır.
-
-### 23.1 Kural Amacı
-
-`DomainEvent` base class'ı (`common.infrastructure.events.DomainEvent`) 4 standart field sağlar:
-- `eventId` (UUID) — her event için benzersiz ID, otomatik üretilir
-- `tenantId` (UUID) — hangi tenant'ın eventi
-- `eventType` (String) — "BATCH_LINEAGE_DELETED" gibi sabit string
-- `occurredAt` (Instant) — event yayın zamanı, otomatik set edilir
-
-### 23.2 Çözülen İhlaller (7 frozen → 0) ✅
-
-| Event | Modül | Eski Yapı | Dönüşüm |
-|-------|-------|-----------|---------|
-| BatchLineageDeletedEvent | production/lineage | `@Value class` | `@Getter extends DomainEvent` |
-| BatchLineageCreatedEvent | production/lineage | `@Value class` | `@Getter extends DomainEvent`, `consumedAt` korundu |
-| CostVarianceDetectedEvent | costing | `@Builder record` | `@Getter class extends DomainEvent`, `detectedAt` → `occurredAt` |
-| InventoryTransactionCreatedEvent | production/inventory | `@Getter @Builder class` | `extends DomainEvent`, `tenantId` field kaldırıldı |
-| GoodsReceiptConfirmedEvent | production/goodsreceipt | `@Builder record` | `@Getter class extends DomainEvent` |
-| MinStockAlertEvent | iwm | `@Data @Builder class` | `@Getter extends DomainEvent` (production versiyonu zaten uyumluydu) |
-| ReturnRateExceededEvent | iwm | `@Data @Builder class` | `@Getter extends DomainEvent` (production versiyonu zaten uyumluydu) |
-
-### 23.3 Migration Pattern (Record / @Value → DomainEvent subclass)
-
-Java `record` ve `@Value` class'ları abstract class extend edemez. Dönüşüm adımları:
-
-```java
-// ESKİ: @Builder record veya @Value class
-@Builder
-public record XxxEvent(UUID tenantId, UUID entityId, String data) {}
-
-// YENİ: @Getter class + @Builder constructor üzerinde
-@Getter
-public class XxxEvent extends DomainEvent {
-
-    private final UUID entityId;
-    private final String data;
-    // tenantId kaldırıldı — DomainEvent'ten miras
-
-    @Builder  // ← constructor üzerinde; producer builder chain'i DEĞİŞMEZ
-    public XxxEvent(UUID tenantId, UUID entityId, String data) {
-        super(tenantId, "XXX_HAPPENED");
-        this.entityId = entityId;
-        this.data = data;
-    }
-}
-```
-
-**Neden `@Builder` constructor üzerinde?** — Producer kodlarındaki `.tenantId(x).entityId(y).build()` zinciri kırılmadan çalışmaya devam eder.
-
-**İş semantiği olan timestamp'ler korunur** — `consumedAt` (tüketim tarihi) veya `transactionDate` (işlem tarihi) `occurredAt` (event yayın anı) ile aynı kavram değildir; bu field'lar entity'de kalır.
-
-### 23.4 Consumer Uyum Notu
-
-`record` → `class` dönüşümünde record accessor'ları (`.fieldName()`) Java Bean getter'larına (`.getFieldName()`) dönüşür. Consumer sınıflarda bu değişiklik yapılmalıdır. Bu refactoring'de güncellenenler:
-- `ProductionNotificationListener` — 5 call site
-- `GoodsReceiptEventAdapter` — 3 call site
-
----
-
-## 24. Entity Standardizasyonu (Rule 4.3)
-
-**Article 4 — Rule 4.3**: `@Entity` sınıfları `BaseEntity` veya `BaseJunctionEntity`'den türemek zorundadır.
-
-### 24.1 Kural Amacı
-
-`BaseEntity` (`common.infrastructure.persistence.BaseEntity`) şu sözleşmeyi zorunlu kılar:
-- `id` (UUID, @Id) — primary key, otomatik üretilir
-- `tenantId` (UUID) — multi-tenant izolasyon
-- `uid` (String) — insan okunabilir benzersiz ID
-- `createdAt/By`, `updatedAt/By` — Spring Data Auditing
-- `isActive`, `deletedAt` — soft-delete
-- `version` (Long) — optimistic locking
-- Abstract `getModuleCode()` — UID üretimi için modül kodu
-
-### 24.2 Sonuç: 7 → 6 (1 false positive kaldırıldı)
-
-| Entity | Sonuç | Gerekçe |
-|--------|-------|---------|
-| **TaskDependency** | ✅ frozen'dan çıkarıldı | Zaten BaseEntity'yi extend ediyordu — false positive |
-| **Tenant** | 🔒 Kalıcı exception | Root entity; kendi tenantId'si olamaz |
-| **TradingPartnerRegistry** | 🔒 Kalıcı exception | Platform-wide singleton; tenant scope yok |
-| **EmployeeNumberSequence** | 🔒 Kalıcı exception | `tenantId` IS `@Id`; UUID @Id ile uyumsuz |
-| **BatchOverrideLog** | 🔒 Kalıcı exception | Append-only audit log; soft-delete/version anlamsız |
-| **UserDepartment** | 🔒 Kalıcı exception | Composite `@IdClass` key; BaseEntity @Id ile uyumsuz |
-| **TaskLabelAssignment** | 🔒 Kalıcı exception | NOTE [X1] — bilinçli karar; junction table, audit trail gereksiz |
-
-### 24.3 Karar Prensibi: Zorunlu Uyum vs. Tasarım İstisnası
-
-Rule 8.1 (domain event'ler) → saf Java davranışı, hiçbir entity bu kuraldan muaf olamaz.
-Rule 4.3 (entity'ler) → şema sözleşmesi; `tenantId`, UUID @Id, soft-delete **anlamsız** olduğunda enforce etmek mimariyi kirletir.
-
-Altı entity için CalıcıException kararını `ConstitutionArchTest`'teki inline comment'ler belgeler. Gelecekte yeni `@Entity` yazan herhangi biri ArchUnit'ten anında feedback alır.
-
----
-
-## 25. Katmanlı Mimari Temizliği (Rule 2.2 & Rule 6.2)
-
-**Rule 2.2** — Application layer sınıfları infra katmanına ait olmamalıdır.
-**Rule 6.2** — Application layer sınıfları `Service`, `Component`, `Facade`, vb. son eki taşımalıdır.
-
-### 25.1 Rule 2.2 — Çözülen İhlaller
-
-| Sınıf | Eski Konum | Yeni Konum | Gerekçe |
-|-------|-----------|-----------|---------|
-| `EmployeeComplianceContext` | `human/compliance/app/` | `human/compliance/domain/` | Domain verisi tutan `record`; app katmanında olmamalıydı |
-| `EmailNotificationSender` | `notification/hub/infra/email/` | `notification/hub/app/adapter/email/` | Email gönderimi bir adapter; infra değil app/adapter'a aittir |
-
-**Kalıcı exception:**
-- `WebSocketAuthInterceptor` → `notification/hub/infra/websocket/` — Spring `ChannelInterceptor`; `JwtService` gerektiren gerçek güvenlik altyapısı; app katmanına taşınamaz.
-
-ArchUnit muafiyet kapsamı `notification.hub.infra..` → `notification.hub.infra.websocket..` olarak daraltıldı.
-
-### 25.2 Rule 6.2 — Naming Convention Ek İstisna
-
-`EmailNotificationSender`, `app/adapter/` altına taşındıktan sonra isimlendirme kuralını tetikledi.
-`Sender` son eki, `Evaluator` ve `Dispatcher` gibi önceki istisnalar listesine eklendi.
-Gerekçe: Gönderici adaptörler iş odaklı isimler taşır; `Service` son eki semantik olarak yanlış olur.
-
-### 25.3 Rule 11.2 — Platform→Domain Exception Dokümantasyonu
-
-6 platform sub-modülü için bilinçli exception'lar `ConstitutionArchTest` inline comment'lerinde belgelendi:
-
-| Kod | Modül | Gerekçe |
-|-----|-------|---------|
-| [E1] | `platform.user` | Approval port adaptörleri + Human event listener'lar (cache invalidation) + Notification query impl |
-| [E2] | `platform.admin` | Platformu taraflı admin operasyonları; gelecekteki domain erişimi için korunan guard |
-| [E3] | `platform.ai` | AIToolRegistry tüm domain modüllerinden AIToolProvider toplar; cross-domain tool discovery çekirdeği |
-| [E4] | `platform.tradingpartner` | TradingPartner entity OfflineMetadata embed eder; certification servisleri FiberCertification referans eder |
-| [E5] | `platform.organization` | OrganizationCertification, fiber standart doğrulaması için production.masterdata.fiber'a bağlıdır |
-| [E6] | `platform.auth` | Tenant-scoped izin çözümlemesi için domain erişimi gerekebilir; ileriye dönük guard |
+> **Tarihçe notu.** Çözülmüş her coupling kaydı (hangi sınıf, hangi faz, frozen-violation sayıları) ve her per-class istisna `ConstitutionArchTest` / `ModernJavaArchTest` inline comment'lerinde yaşar — testler kaynağın ta kendisidir ve regresyonel ihlalde patlar; o tarihçe burada tekrarlanmaz.
 
 ---
 

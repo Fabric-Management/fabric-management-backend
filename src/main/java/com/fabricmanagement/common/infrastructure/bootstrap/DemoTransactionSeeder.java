@@ -43,6 +43,7 @@ public class DemoTransactionSeeder {
   private final WorkOrderService workOrderService;
   private final BatchService batchService;
   private final FinanceDemoSeeder financeDemoSeeder;
+  private final SalesDemoSeeder salesDemoSeeder;
 
   @Value("${application.seed.demo-transactions.enabled:false}")
   private boolean enabled;
@@ -96,6 +97,18 @@ public class DemoTransactionSeeder {
       // Independent of the fiber-dependent production demo below, so it still runs when no template
       // fibers exist. Reuses the customer created above; same tenant context.
       financeDemoSeeder.seedFor(tenantId);
+
+      // 2c. Sales demo orders (DEMO-2a): CONFIRMED orders so Margin + Backlog views show real data.
+      // Runs in its own transaction (REQUIRES_NEW) and is isolated here so a failure in the confirm
+      // rule-engine path can never roll back the finance demo above or fail playground init.
+      try {
+        salesDemoSeeder.seedFor(tenantId);
+      } catch (Exception salesEx) {
+        log.warn(
+            "Sales demo order seeding failed for tenant {} — continuing; finance demo unaffected.",
+            tenantId,
+            salesEx);
+      }
 
       // 3. Production demo (best-effort, isolated): sales order → work order → batch.
       // Pre-existing demo data. Wrapped in its own try/catch so a failure here can never roll back
