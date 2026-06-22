@@ -198,7 +198,7 @@ class ConstitutionArchTest {
     @Test
     @DisplayName("Rule 4.3: All JPA Entities must extend BaseEntity or BaseJunctionEntity")
     void allEntitiesShouldExtendBaseEntity() {
-      // Documented design exceptions (6) — these entities have legitimate
+      // Documented design exceptions - these entities have legitimate
       // reasons to deviate from BaseEntity:
       //
       //   - Tenant                  : Root entity; cannot have a tenantId by definition
@@ -206,9 +206,11 @@ class ConstitutionArchTest {
       //   - EmployeeNumberSequence  : tenantId IS the @Id (per-tenant singleton counter)
       //   - BatchOverrideLog        : Append-only audit log; soft-delete/version semantics N/A
       //   - UserDepartment          : Junction table with composite @IdClass key; incompatible with
-      // BaseEntity @Id
-      //   - TaskLabelAssignment     : Minimal junction table; NOTE [X1] — intentional, no audit
-      // trail needed
+      //                               BaseEntity @Id
+      //   - DocumentNumberCounter   : Counter singleton; BaseEntity tenant/id semantics N/A
+      //   - ProcessedEventEntry     : Durable event processing entry; BaseEntity semantics N/A
+      //   - TaskLabelAssignment     : Minimal junction table; NOTE [X1] - intentional, no audit
+      //                               trail needed
 
       ArchRule rule =
           classes()
@@ -238,7 +240,7 @@ class ConstitutionArchTest {
                   com.fabricmanagement.common.infrastructure.persistence.BaseJunctionEntity.class)
               .as(
                   "Rule 4.3: All @Entity classes must extend BaseEntity or BaseJunctionEntity. "
-                      + "(6 documented design exceptions — see inline comments)");
+                      + "(documented design exceptions - see inline comments)");
 
       rule.check(allClasses);
     }
@@ -508,39 +510,39 @@ class ConstitutionArchTest {
     @Test
     @DisplayName("Rule 11.2: Domain modules can depend on platform, not vice versa")
     void platformShouldNotDependOnDomainModules() {
-      // Documented design exceptions — 6 platform sub-modules with legitimate domain coupling:
+      // Documented design exceptions - 6 platform sub-modules with legitimate domain coupling:
       //
-      // [E1] platform.user — Implements approval module ports (UserTrustLevelPort,
+      // [E1] platform.user - Implements approval module ports (UserTrustLevelPort,
       //      ApproverRecipientPort, UserTrustMutationPort) and subscribes to human employee
       //      domain events (EmployeeTerminatedEvent, EmployeeUpdatedEvent) for cache
       //      invalidation. Also implements NotificationUserQueryService. All cross-domain
-      //      access is done via ports/adapters or event listeners — not direct service calls.
-      //      NOTE: UserTrustLevel enum moved to common.infrastructure.user — User entity
+      //      access is done via ports/adapters or event listeners - not direct service calls.
+      //      NOTE: UserTrustLevel enum moved to common.infrastructure.user - User entity
       //      no longer imports approval.domain directly; coupling is purely adapter-level.
       //
-      // [E2] platform.admin — Platform-wide administrative operations require cross-domain
+      // [E2] platform.admin - Platform-wide administrative operations require cross-domain
       //      visibility for tenant module management and health checks. Exception preserved
-      //      as architectural guardrail for any future admin→domain interactions.
+      //      as architectural guardrail for any future admin-to-domain interactions.
       //
-      // [E3] platform.ai — AIToolRegistry aggregates AIToolProvider implementations
+      // [E3] platform.ai - AIToolRegistry aggregates AIToolProvider implementations
       //      contributed by each domain module. Cross-domain tool discovery is the core
       //      responsibility of this module; without it the AI cannot operate on domain data.
-      //      See Section 18 of AGENTS.md for the AIToolProvider plugin pattern.
+      //      See AGENTS.md Section 17 for the cross-module decoupling pattern.
       //
-      // [E4] platform.tradingpartner — TradingPartner entity embeds OfflineMetadata (offline
+      // [E4] platform.tradingpartner - TradingPartner entity embeds OfflineMetadata (offline
       //      sync capability). Certification services reference FiberCertification from
-      //      production masterdata via FiberCertificationQueryService (QueryService pattern —
+      //      production masterdata via FiberCertificationQueryService (QueryService pattern -
       //      @ManyToOne already crosses module boundary at JPA level).
       //
-      // [E5] platform.organization — OrganizationCertification references FiberCertification
+      // [E5] platform.organization - OrganizationCertification references FiberCertification
       //      from production masterdata for fiber standard validation (same @ManyToOne
       //      coupling as tradingpartner; QueryService pattern applied in Grup B refactoring).
       //
-      // [E6] platform.auth — Authentication context resolution may require domain-level
+      // [E6] platform.auth - Authentication context resolution may require domain-level
       //      permission lookup and tenant-scoped resource access checks. Exception reserved
-      //      as architectural boundary for auth→domain interactions.
+      //      as architectural boundary for auth-to-domain interactions.
       //
-      // See AGENTS.md Sections 17, 18, and 22 for design patterns governing these exceptions.
+      // See AGENTS.md Section 17 for design patterns governing these exceptions.
 
       ArchRule rule =
           noClasses()
