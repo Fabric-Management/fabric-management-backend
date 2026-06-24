@@ -5,8 +5,10 @@ import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatu
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface SubcontractOrderRepository extends JpaRepository<SubcontractOrder, UUID> {
+public interface SubcontractOrderRepository
+    extends JpaRepository<SubcontractOrder, UUID>, JpaSpecificationExecutor<SubcontractOrder> {
 
   java.util.Optional<SubcontractOrder> findByIdAndTenantIdAndIsActiveTrue(UUID id, UUID tenantId);
 

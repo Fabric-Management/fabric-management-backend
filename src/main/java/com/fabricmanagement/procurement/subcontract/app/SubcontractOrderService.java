@@ -2,6 +2,7 @@ package com.fabricmanagement.procurement.subcontract.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrder;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatus;
@@ -16,6 +17,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +35,28 @@ public class SubcontractOrderService {
 
   public SubcontractOrderResponse getSubcontractOrder(UUID id) {
     return mapToResponse(findEntityById(id));
+  }
+
+  public PagedResponse<SubcontractOrderResponse> listSubcontractOrders(
+      SubcontractOrderStatus status, Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+
+    Specification<SubcontractOrder> spec =
+        (root, query, cb) -> {
+          var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+          predicates.add(cb.equal(root.get("tenantId"), tenantId));
+          predicates.add(cb.isTrue(root.get("isActive")));
+
+          if (status != null) {
+            predicates.add(cb.equal(root.get("status"), status));
+          }
+
+          return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+    Page<SubcontractOrder> scPage = scRepository.findAll(spec, pageable);
+
+    return PagedResponse.from(scPage, SubcontractOrderResponse::from);
   }
 
   @Transactional
@@ -175,27 +201,6 @@ public class SubcontractOrderService {
   }
 
   private SubcontractOrderResponse mapToResponse(SubcontractOrder sc) {
-    return SubcontractOrderResponse.builder()
-        .id(sc.getId())
-        .uid(sc.getUid())
-        .scNumber(sc.getScNumber())
-        .workOrderId(sc.getWorkOrderId())
-        .tradingPartnerId(sc.getTradingPartnerId())
-        .status(sc.getStatus())
-        .inputProductId(sc.getInputProductId())
-        .inputProductType(sc.getInputProductType())
-        .outputProductId(sc.getOutputProductId())
-        .outputProductType(sc.getOutputProductType())
-        .productSentQty(sc.getProductSentQty())
-        .unit(sc.getUnit())
-        .expectedOutputQty(sc.getExpectedOutputQty())
-        .outputUnit(sc.getOutputUnit())
-        .actualReturnedQty(sc.getActualReturnedQty())
-        .wasteQty(sc.getWasteQty())
-        .agreedUnitPrice(sc.getAgreedUnitPrice())
-        .currency(sc.getCurrency())
-        .expectedReturnDate(sc.getExpectedReturnDate())
-        .notes(sc.getNotes())
-        .build();
+    return SubcontractOrderResponse.from(sc);
   }
 }

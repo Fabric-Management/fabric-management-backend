@@ -1,16 +1,21 @@
 package com.fabricmanagement.procurement.subcontract.api.controller;
 
+import com.fabricmanagement.common.infrastructure.web.ApiResponse;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.procurement.subcontract.app.SubcontractOrderService;
 import com.fabricmanagement.procurement.subcontract.domain.SubcontractOrderStatus;
 import com.fabricmanagement.procurement.subcontract.dto.CreateSubcontractOrderRequest;
 import com.fabricmanagement.procurement.subcontract.dto.SubcontractOrderResponse;
 import com.fabricmanagement.procurement.subcontract.dto.UpdateSubcontractOrderRequest;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -29,6 +34,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class SubcontractOrderController {
 
   private final SubcontractOrderService subcontractOrderService;
+
+  @GetMapping
+  @PreAuthorize("@auth.can(authentication, 'procurement', 'read')")
+  @Operation(summary = "List Subcontract Orders")
+  public ResponseEntity<ApiResponse<PagedResponse<SubcontractOrderResponse>>> listSubcontractOrders(
+      @RequestParam(required = false) SubcontractOrderStatus status, Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(subcontractOrderService.listSubcontractOrders(status, pageable)));
+  }
 
   @GetMapping("/{id}")
   @PreAuthorize("@auth.can(authentication, 'procurement', 'read')")
