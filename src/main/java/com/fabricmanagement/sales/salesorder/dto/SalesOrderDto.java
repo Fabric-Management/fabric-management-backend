@@ -22,6 +22,7 @@ import lombok.Data;
 public class SalesOrderDto {
   private UUID id;
   private String uid;
+  private Long version;
   private UUID tradingPartnerId;
   private TradingPartnerDto tradingPartner;
   private String orderNumber;
@@ -76,6 +77,7 @@ public class SalesOrderDto {
     return SalesOrderDto.builder()
         .id(order.getId())
         .uid(order.getUid())
+        .version(order.getVersion())
         .tradingPartnerId(order.getTradingPartnerId())
         .tradingPartner(partner)
         .orderNumber(order.getOrderNumber())
