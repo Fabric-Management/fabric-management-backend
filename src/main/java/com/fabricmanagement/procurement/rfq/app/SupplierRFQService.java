@@ -2,16 +2,20 @@ package com.fabricmanagement.procurement.rfq.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.rfq.domain.RfqRecipientStatus;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQLine;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQModuleType;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQRecipient;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQStatus;
 import com.fabricmanagement.procurement.rfq.domain.event.RfqSentEvent;
 import com.fabricmanagement.procurement.rfq.dto.AddRecipientRequest;
 import com.fabricmanagement.procurement.rfq.dto.AddRfqLineRequest;
 import com.fabricmanagement.procurement.rfq.dto.CreateSupplierRFQRequest;
+import com.fabricmanagement.procurement.rfq.dto.SupplierRFQResponse;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,6 +24,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +38,38 @@ public class SupplierRFQService {
 
   private final SupplierRFQRepository rfqRepository;
   private final DomainEventPublisher eventPublisher;
+
+  public SupplierRFQResponse getRfq(UUID id) {
+    return rfqRepository
+        .findById(id)
+        .map(SupplierRFQResponse::from)
+        .orElseThrow(() -> new NotFoundException("SupplierRFQ not found with id: " + id));
+  }
+
+  public PagedResponse<SupplierRFQResponse> listRfqs(
+      SupplierRFQStatus status, SupplierRFQModuleType moduleType, Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+
+    Specification<SupplierRFQ> spec =
+        (root, query, cb) -> {
+          var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+          predicates.add(cb.equal(root.get("tenantId"), tenantId));
+          predicates.add(cb.isTrue(root.get("isActive")));
+
+          if (status != null) {
+            predicates.add(cb.equal(root.get("status"), status));
+          }
+          if (moduleType != null) {
+            predicates.add(cb.equal(root.get("moduleType"), moduleType));
+          }
+
+          return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+    Page<SupplierRFQ> rfqPage = rfqRepository.findAll(spec, pageable);
+
+    return PagedResponse.from(rfqPage, SupplierRFQResponse::from);
+  }
 
   @Transactional
   public SupplierRFQ createRfq(CreateSupplierRFQRequest req) {

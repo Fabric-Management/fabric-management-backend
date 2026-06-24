@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.rfq.domain.RfqRecipientStatus;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
@@ -19,10 +21,17 @@ import com.fabricmanagement.procurement.rfq.domain.SupplierRFQType;
 import com.fabricmanagement.procurement.rfq.dto.AddRecipientRequest;
 import com.fabricmanagement.procurement.rfq.dto.AddRfqLineRequest;
 import com.fabricmanagement.procurement.rfq.dto.CreateSupplierRFQRequest;
+import com.fabricmanagement.procurement.rfq.dto.SupplierRFQResponse;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -30,9 +39,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class SupplierRFQServiceTest {
@@ -57,11 +71,91 @@ class SupplierRFQServiceTest {
     mockRfq.setTenantId(tenantId);
     mockRfq.setRfqNumber("RFQ-2026-TEST");
     mockRfq.setStatus(SupplierRFQStatus.DRAFT);
+    mockRfq.setModuleType(SupplierRFQModuleType.FIBER);
+    mockRfq.setRfqType(SupplierRFQType.PURCHASE);
+    mockRfq.setDeadline(Instant.now().plus(7, ChronoUnit.DAYS));
   }
 
   @AfterEach
   void tearDown() {
     TenantContext.clear();
+  }
+
+  @Test
+  @DisplayName("Should get RFQ by id")
+  void shouldGetRfqById() {
+    when(rfqRepository.findById(rfqId)).thenReturn(Optional.of(mockRfq));
+
+    SupplierRFQResponse response = rfqService.getRfq(rfqId);
+
+    assertEquals(rfqId, response.getId());
+    assertEquals("RFQ-2026-TEST", response.getRfqNumber());
+    verify(rfqRepository).findById(rfqId);
+  }
+
+  @Test
+  @DisplayName("Should throw when RFQ is not found")
+  void shouldThrowWhenRfqNotFound() {
+    when(rfqRepository.findById(rfqId)).thenReturn(Optional.empty());
+
+    NotFoundException ex = assertThrows(NotFoundException.class, () -> rfqService.getRfq(rfqId));
+
+    assertEquals("SupplierRFQ not found with id: " + rfqId, ex.getMessage());
+  }
+
+  @Test
+  @DisplayName("Should list RFQs as a paged response")
+  void shouldListRfqs() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(rfqRepository.findAll(any(Specification.class), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(mockRfq), pageable, 1));
+
+    PagedResponse<SupplierRFQResponse> response =
+        rfqService.listRfqs(null, SupplierRFQModuleType.FIBER, pageable);
+
+    assertEquals(1, response.getContent().size());
+    assertEquals(SupplierRFQModuleType.FIBER, response.getContent().get(0).getModuleType());
+    assertEquals(0, response.getPage());
+    assertEquals(20, response.getSize());
+  }
+
+  @Test
+  @DisplayName("Should build status filter when listing RFQs")
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  void shouldBuildStatusFilterWhenListingRfqs() {
+    Pageable pageable = PageRequest.of(0, 20);
+    when(rfqRepository.findAll(any(Specification.class), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(mockRfq), pageable, 1));
+
+    rfqService.listRfqs(SupplierRFQStatus.SENT, null, pageable);
+
+    ArgumentCaptor<Specification<SupplierRFQ>> specCaptor =
+        ArgumentCaptor.forClass(Specification.class);
+    verify(rfqRepository).findAll(specCaptor.capture(), any(Pageable.class));
+
+    Root root = org.mockito.Mockito.mock(Root.class);
+    CriteriaQuery query = org.mockito.Mockito.mock(CriteriaQuery.class);
+    CriteriaBuilder cb = org.mockito.Mockito.mock(CriteriaBuilder.class);
+    Path tenantPath = org.mockito.Mockito.mock(Path.class);
+    Path activePath = org.mockito.Mockito.mock(Path.class);
+    Path statusPath = org.mockito.Mockito.mock(Path.class);
+    Predicate tenantPredicate = org.mockito.Mockito.mock(Predicate.class);
+    Predicate activePredicate = org.mockito.Mockito.mock(Predicate.class);
+    Predicate statusPredicate = org.mockito.Mockito.mock(Predicate.class);
+    Predicate combinedPredicate = org.mockito.Mockito.mock(Predicate.class);
+
+    when(root.get("tenantId")).thenReturn(tenantPath);
+    when(root.get("isActive")).thenReturn(activePath);
+    when(root.get("status")).thenReturn(statusPath);
+    when(cb.equal(tenantPath, tenantId)).thenReturn(tenantPredicate);
+    when(cb.isTrue(activePath)).thenReturn(activePredicate);
+    when(cb.equal(statusPath, SupplierRFQStatus.SENT)).thenReturn(statusPredicate);
+    when(cb.and(any(Predicate[].class))).thenReturn(combinedPredicate);
+
+    Predicate predicate = specCaptor.getValue().toPredicate(root, query, cb);
+
+    assertEquals(combinedPredicate, predicate);
+    verify(cb).equal(statusPath, SupplierRFQStatus.SENT);
   }
 
   @Test
