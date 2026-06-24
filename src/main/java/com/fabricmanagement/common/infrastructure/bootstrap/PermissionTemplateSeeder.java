@@ -233,14 +233,19 @@ public class PermissionTemplateSeeder implements DataSeeder {
                         new String[] {"WORKER", "procurement", "read", "OWN"},
                         new String[] {"WORKER", "procurement", "write", "OWN"},
                         new String[] {"WORKER", "partners", "read", "DEPARTMENT"},
+                        new String[] {"WORKER", "products", "read", "OWN"},
                         new String[] {"SUPERVISOR", "procurement", "read", "DEPARTMENT"},
                         new String[] {"SUPERVISOR", "procurement", "write", "DEPARTMENT"},
                         new String[] {"SUPERVISOR", "partners", "read", "DEPARTMENT"},
                         new String[] {"SUPERVISOR", "partners", "write", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "products", "read", "DEPARTMENT"},
+                        new String[] {"SUPERVISOR", "products", "write", "DEPARTMENT"},
                         new String[] {"MANAGER", "procurement", "read", "ORGANIZATION"},
                         new String[] {"MANAGER", "procurement", "write", "DEPARTMENT"},
                         new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
-                        new String[] {"MANAGER", "partners", "write", "DEPARTMENT"}));
+                        new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
+                        new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+                        new String[] {"MANAGER", "products", "write", "DEPARTMENT"}));
 
                 // 9. PARTNER roles — visible only in partner invitation UIs
                 // Partners do not have departments, so wildcard (null) is used here.
