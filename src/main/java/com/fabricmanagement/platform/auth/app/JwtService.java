@@ -58,18 +58,25 @@ public class JwtService {
   private final OrganizationRepository organizationRepository;
   private final SecretKey secretKey;
   private final long accessTokenExpiration;
+  private final long playgroundTokenExpiration;
 
   public JwtService(
       TenantQueryPort tenantQueryPort,
       OrganizationRepository organizationRepository,
       @Value("${application.jwt.secret}") String secret,
-      @Value("${application.jwt.expiration:900000}") long accessTokenExpiration) {
+      @Value("${application.jwt.expiration:900000}") long accessTokenExpiration,
+      @Value("${application.jwt.playground-expiration:7776000000}")
+          long playgroundTokenExpiration) {
     this.tenantQueryPort = tenantQueryPort;
     this.organizationRepository = organizationRepository;
     this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     this.accessTokenExpiration = accessTokenExpiration;
+    this.playgroundTokenExpiration = playgroundTokenExpiration;
 
-    log.info("JwtService initialized - accessTokenExpiration: {}ms", accessTokenExpiration);
+    log.info(
+        "JwtService initialized - accessTokenExpiration: {}ms, playgroundTokenExpiration: {}ms",
+        accessTokenExpiration,
+        playgroundTokenExpiration);
   }
 
   public String generateAccessToken(User user) {
@@ -108,7 +115,7 @@ public class JwtService {
     claims.put("is_playground", true);
     claims.put("guest_id", guestId);
 
-    return buildToken(contactValue, claims, accessTokenExpiration);
+    return buildToken(contactValue, claims, playgroundTokenExpiration);
   }
 
   private String getVerifiedContactOrThrow(User user) {

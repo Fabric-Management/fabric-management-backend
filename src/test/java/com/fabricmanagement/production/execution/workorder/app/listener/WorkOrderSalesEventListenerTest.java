@@ -1,18 +1,25 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderService;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrder;
 import com.fabricmanagement.production.execution.workorder.domain.WorkOrderStatus;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderCancelledEvent;
+import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +61,46 @@ class WorkOrderSalesEventListenerTest {
     tenantId = UUID.randomUUID();
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
+    TenantContext.clear();
+  }
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
+  }
+
+  @Test
+  void onSalesOrderConfirmed_setsTenantContextBeforeCreatingWorkOrders() {
+    SalesOrderConfirmedEvent event =
+        new SalesOrderConfirmedEvent(
+            tenantId,
+            orderId,
+            "SO-123",
+            UUID.randomUUID(),
+            "Acme Textile",
+            new BigDecimal("250.000"),
+            "KG",
+            LocalDate.now().plusDays(14),
+            List.of(
+                new SalesOrderConfirmedEvent.SalesOrderLineSnapshot(
+                    lineId,
+                    UUID.randomUUID(),
+                    "FAB-DENIM-001",
+                    new BigDecimal("250.000"),
+                    "KG",
+                    LocalDate.now().plusDays(14))));
+
+    doAnswer(
+            invocation -> {
+              assertThat(TenantContext.requireTenantId()).isEqualTo(tenantId);
+              return null;
+            })
+        .when(workOrderService)
+        .createFromSalesOrderLine(any(), any(), any());
+
+    listener.onSalesOrderConfirmed(event);
+
+    verify(workOrderService).createFromSalesOrderLine(any(), any(), any());
   }
 
   @Test
@@ -67,6 +114,13 @@ class WorkOrderSalesEventListenerTest {
     when(workOrderRepository.findByTenantIdAndSalesOrderLineIdAndIsActiveTrueOrderByCreatedAtAsc(
             tenantId, lineId))
         .thenReturn(List.of(wo1, wo2));
+    doAnswer(
+            invocation -> {
+              assertThat(TenantContext.requireTenantId()).isEqualTo(tenantId);
+              return null;
+            })
+        .when(workOrderService)
+        .changeStatus(any(), any());
 
     listener.onSalesOrderCancelled(event);
 

@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderPlannedCostTriggerService;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
 import lombok.RequiredArgsConstructor;
@@ -35,17 +36,30 @@ public class WorkOrderPlannedCostListener {
 
   @ApplicationModuleListener
   public void handleWorkOrderApprovedEvent(WorkOrderApprovedEvent event) {
-    idempotentHandler.executeOnce(
-        event.getEventId(),
-        this.getClass(),
-        "handleWorkOrderApprovedEvent",
-        () -> {
-          log.info(
-              "WorkOrderApprovedEvent: initiating planned cost calculation for WorkOrder {} ({})",
-              event.getWorkOrderId(),
-              event.getWorkOrderNumber());
+    TenantContext.executeInTenantContext(
+        event.getTenantId(),
+        () ->
+            idempotentHandler.executeOnce(
+                event.getEventId(),
+                this.getClass(),
+                "handleWorkOrderApprovedEvent",
+                () -> {
+                  log.info(
+                      "WorkOrderApprovedEvent: initiating planned cost calculation for WorkOrder {} ({})",
+                      event.getWorkOrderId(),
+                      event.getWorkOrderNumber());
 
-          plannedCostTriggerService.triggerPlannedCost(event.getWorkOrderId());
-        });
+                  try {
+                    plannedCostTriggerService.triggerPlannedCost(event.getWorkOrderId());
+                  } catch (Exception e) {
+                    log.error(
+                        "Automatic planned cost calculation failed for WorkOrder {}. "
+                            + "Use POST /api/production/work-orders/{}/recalculate-planned after fixing configuration.",
+                        event.getWorkOrderId(),
+                        event.getWorkOrderId(),
+                        e);
+                    // Intentional: cost failure must not fail WorkOrder approval.
+                  }
+                }));
   }
 }

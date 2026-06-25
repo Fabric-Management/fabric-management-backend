@@ -83,6 +83,7 @@ application:
   jwt:
     secret: local-dev-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm
     expiration: 3600000 # 1 hour for local development
+    playground-expiration: 7776000000 # 90 days for playground demo sessions
     refresh-expiration: 2592000000 # 30 days for local development
 
   # Auth cookies: Secure=false so cookies work over http://localhost
@@ -138,4 +139,3 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
-

@@ -137,6 +137,7 @@ application:
   jwt:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:900000} # 15 minutes
+    playground-expiration: ${JWT_PLAYGROUND_EXPIRATION:7776000000} # 90 days
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
 
   # Auth cookies (HttpOnly). Set secure=false for local HTTP (e.g. http://localhost).

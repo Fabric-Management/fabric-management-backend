@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.workorder.app.WorkOrderCostRecalculationService;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderCompletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -25,26 +26,29 @@ public class WorkOrderCostBridgeListener {
 
   @ApplicationModuleListener
   public void handleWorkOrderCompletedEvent(WorkOrderCompletedEvent event) {
-    idempotentHandler.executeOnce(
-        event.getEventId(),
-        this.getClass(),
-        "handleWorkOrderCompletedEvent",
-        () -> {
-          log.info(
-              "WorkOrderCompletedEvent: initiating cost calculation for WorkOrder {}",
-              event.getWorkOrderId());
+    TenantContext.executeInTenantContext(
+        event.getTenantId(),
+        () ->
+            idempotentHandler.executeOnce(
+                event.getEventId(),
+                this.getClass(),
+                "handleWorkOrderCompletedEvent",
+                () -> {
+                  log.info(
+                      "WorkOrderCompletedEvent: initiating cost calculation for WorkOrder {}",
+                      event.getWorkOrderId());
 
-          try {
-            costRecalculationService.recalculateActualCost(event.getWorkOrderId());
-          } catch (Exception e) {
-            log.error(
-                "Automatic cost calculation failed for WorkOrder {}. "
-                    + "Use POST /api/production/work-orders/{}/recalculate-cost after fixing configuration.",
-                event.getWorkOrderId(),
-                event.getWorkOrderId(),
-                e);
-            // Intentional: cost failure must not roll back the COMPLETED status.
-          }
-        });
+                  try {
+                    costRecalculationService.recalculateActualCost(event.getWorkOrderId());
+                  } catch (Exception e) {
+                    log.error(
+                        "Automatic cost calculation failed for WorkOrder {}. "
+                            + "Use POST /api/production/work-orders/{}/recalculate-cost after fixing configuration.",
+                        event.getWorkOrderId(),
+                        event.getWorkOrderId(),
+                        e);
+                    // Intentional: cost failure must not roll back the COMPLETED status.
+                  }
+                }));
   }
 }
