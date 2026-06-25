@@ -169,13 +169,14 @@ class SupplierRFQServiceTest {
 
     when(rfqRepository.save(any(SupplierRFQ.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    SupplierRFQ created = rfqService.createRfq(req);
+    SupplierRFQResponse created = rfqService.createRfq(req);
 
     assertNotNull(created);
-    assertEquals(tenantId, created.getTenantId());
     assertNotNull(created.getRfqNumber());
     assertEquals(SupplierRFQModuleType.FIBER, created.getModuleType());
     assertEquals(SupplierRFQStatus.DRAFT, created.getStatus());
+    assertEquals(0, created.getLines().size());
+    assertEquals(0, created.getRecipients().size());
   }
 
   @Test
@@ -188,7 +189,7 @@ class SupplierRFQServiceTest {
     // Fix #2 — DTO ile gönderilir artık
     AddRfqLineRequest req = new AddRfqLineRequest(null, null, new BigDecimal("1000"), "KG", null);
 
-    SupplierRFQ updated = rfqService.addLine(rfqId, req);
+    SupplierRFQResponse updated = rfqService.addLine(rfqId, req);
 
     assertEquals(1, updated.getLines().size());
     assertEquals(new BigDecimal("1000"), updated.getLines().get(0).getRequestedQty());
@@ -224,7 +225,7 @@ class SupplierRFQServiceTest {
     AddRecipientRequest req = new AddRecipientRequest();
     req.setTradingPartnerId(partnerId);
 
-    SupplierRFQ updated = rfqService.addRecipient(rfqId, req);
+    SupplierRFQResponse updated = rfqService.addRecipient(rfqId, req);
 
     assertEquals(1, updated.getRecipients().size());
     assertEquals(partnerId, updated.getRecipients().get(0).getTradingPartnerId());
@@ -258,13 +259,58 @@ class SupplierRFQServiceTest {
         .thenReturn(Optional.of(mockRfq));
     when(rfqRepository.save(any(SupplierRFQ.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    SupplierRFQ updated = rfqService.sendRfq(rfqId);
+    SupplierRFQResponse updated = rfqService.sendRfq(rfqId);
 
     assertEquals(SupplierRFQStatus.SENT, updated.getStatus());
     // Fix #8 — sentAt set edilmeli
     assertNotNull(updated.getRecipients().get(0).getSentAt());
     // Fix #9 — SENT yapılmış olmalı
     assertEquals(RfqRecipientStatus.SENT, updated.getRecipients().get(0).getStatus());
+  }
+
+  @Test
+  @DisplayName("Should return populated DTOs through RFQ write flow")
+  void shouldReturnPopulatedDtosThroughWriteFlow() {
+    UUID partnerId = UUID.randomUUID();
+    CreateSupplierRFQRequest createReq = new CreateSupplierRFQRequest();
+    createReq.setWorkOrderId(UUID.randomUUID());
+    createReq.setModuleType(SupplierRFQModuleType.FIBER);
+    createReq.setRfqType(SupplierRFQType.PURCHASE);
+    createReq.setDeadline(Instant.now().plus(7, ChronoUnit.DAYS));
+
+    when(rfqRepository.save(any(SupplierRFQ.class)))
+        .thenAnswer(
+            inv -> {
+              SupplierRFQ rfq = inv.getArgument(0);
+              if (rfq.getId() == null) {
+                rfq.setId(rfqId);
+              }
+              return rfq;
+            });
+
+    SupplierRFQResponse created = rfqService.createRfq(createReq);
+    when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
+        .thenReturn(Optional.of(mockRfq));
+
+    SupplierRFQResponse withLine =
+        rfqService.addLine(
+            created.getId(),
+            new AddRfqLineRequest(
+                UUID.randomUUID(), "BCI cotton", new BigDecimal("1000"), "KG", null));
+
+    AddRecipientRequest recipientReq = new AddRecipientRequest();
+    recipientReq.setTradingPartnerId(partnerId);
+    SupplierRFQResponse withRecipient = rfqService.addRecipient(created.getId(), recipientReq);
+    SupplierRFQResponse sent = rfqService.sendRfq(created.getId());
+
+    assertEquals(rfqId, created.getId());
+    assertEquals(1, withLine.getLines().size());
+    assertEquals(1, withRecipient.getLines().size());
+    assertEquals(1, withRecipient.getRecipients().size());
+    assertEquals(SupplierRFQStatus.SENT, sent.getStatus());
+    assertEquals(1, sent.getLines().size());
+    assertEquals(1, sent.getRecipients().size());
+    assertEquals(RfqRecipientStatus.SENT, sent.getRecipients().get(0).getStatus());
   }
 
   @Test

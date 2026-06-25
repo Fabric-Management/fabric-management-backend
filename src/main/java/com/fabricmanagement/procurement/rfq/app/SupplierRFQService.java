@@ -72,7 +72,7 @@ public class SupplierRFQService {
   }
 
   @Transactional
-  public SupplierRFQ createRfq(CreateSupplierRFQRequest req) {
+  public SupplierRFQResponse createRfq(CreateSupplierRFQRequest req) {
     SupplierRFQ rfq = new SupplierRFQ();
     rfq.setTenantId(TenantContext.requireTenantId());
 
@@ -94,11 +94,11 @@ public class SupplierRFQService {
         saved.getRfqNumber(),
         req.getRfqType(),
         req.getWorkOrderId());
-    return saved;
+    return SupplierRFQResponse.from(saved);
   }
 
   @Transactional
-  public SupplierRFQ addLine(UUID rfqId, AddRfqLineRequest req) {
+  public SupplierRFQResponse addLine(UUID rfqId, AddRfqLineRequest req) {
     SupplierRFQ rfq = getActiveDraftRfq(rfqId);
 
     // Fix #2 — DTO'dan entity oluşturuyoruz (client entity göndermez)
@@ -113,11 +113,11 @@ public class SupplierRFQService {
     }
 
     rfq.addLine(line);
-    return rfqRepository.save(rfq);
+    return SupplierRFQResponse.from(rfqRepository.save(rfq));
   }
 
   @Transactional
-  public SupplierRFQ addRecipient(UUID rfqId, AddRecipientRequest req) {
+  public SupplierRFQResponse addRecipient(UUID rfqId, AddRecipientRequest req) {
     SupplierRFQ rfq = getActiveDraftRfq(rfqId);
 
     // Fix #10 — DTO kullanılıyor, ayrıca Fix #9 — PENDING ile başlatılıyor
@@ -128,11 +128,11 @@ public class SupplierRFQService {
     recipient.setStatus(RfqRecipientStatus.PENDING);
 
     rfq.addRecipient(recipient);
-    return rfqRepository.save(rfq);
+    return SupplierRFQResponse.from(rfqRepository.save(rfq));
   }
 
   @Transactional
-  public SupplierRFQ sendRfq(UUID rfqId) {
+  public SupplierRFQResponse sendRfq(UUID rfqId) {
     // Fix #6 — Sadece DRAFT RFQ gönderilebilir
     SupplierRFQ rfq = getActiveDraftRfq(rfqId);
 
@@ -165,7 +165,7 @@ public class SupplierRFQService {
         "SupplierRFQ sent: {} to {} recipients",
         saved.getRfqNumber(),
         saved.getRecipients().size());
-    return saved;
+    return SupplierRFQResponse.from(saved);
   }
 
   // ── Private Helpers ────────────────────────────────────────────────────────

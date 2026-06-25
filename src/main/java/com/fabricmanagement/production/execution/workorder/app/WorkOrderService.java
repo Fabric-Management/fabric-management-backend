@@ -138,6 +138,7 @@ public class WorkOrderService {
         WorkOrder.builder()
             .workOrderNumber(generateWorkOrderNumber())
             .recipeId(request.recipeId())
+            .outputProductId(request.outputProductId())
             .tradingPartnerId(request.tradingPartnerId())
             .salesOrderLineId(request.salesOrderLineId())
             .fulfillmentType(request.fulfillmentType())
@@ -153,8 +154,11 @@ public class WorkOrderService {
                 request.attachments() == null ? java.util.List.of() : request.attachments())
             .status(WorkOrderStatus.DRAFT)
             .moduleType(
-                com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
-                    .GENERIC)
+                request.moduleType() != null
+                    ? request.moduleType()
+                    : com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
+                        .GENERIC)
+            .productionSpecs(request.productionSpecs())
             .build();
 
     applySupplierSnapshot(workOrder);
@@ -186,6 +190,7 @@ public class WorkOrderService {
         WorkOrder.builder()
             .workOrderNumber(generateWorkOrderNumber())
             .recipeId(request.recipeId())
+            .outputProductId(request.outputProductId())
             .tradingPartnerId(request.tradingPartnerId())
             .salesOrderLineId(request.salesOrderLineId())
             .fulfillmentType(fulfillmentType)
@@ -201,8 +206,11 @@ public class WorkOrderService {
                 request.attachments() == null ? java.util.List.of() : request.attachments())
             .status(WorkOrderStatus.DRAFT)
             .moduleType(
-                com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
-                    .GENERIC)
+                request.moduleType() != null
+                    ? request.moduleType()
+                    : com.fabricmanagement.production.execution.workorder.domain.WorkOrderModuleType
+                        .GENERIC)
+            .productionSpecs(request.productionSpecs())
             .build();
 
     applySupplierSnapshot(workOrder);
