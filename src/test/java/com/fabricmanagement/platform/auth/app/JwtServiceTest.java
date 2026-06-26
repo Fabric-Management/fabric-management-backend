@@ -14,6 +14,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 import javax.crypto.SecretKey;
@@ -68,6 +70,63 @@ class JwtServiceTest {
     assertTokenTtl(claims, PLAYGROUND_TOKEN_EXPIRATION);
     assertThat(claims.get("is_playground", Boolean.class)).isTrue();
     assertThat(claims.get("guest_id", String.class)).isEqualTo("guest-123");
+  }
+
+  @Test
+  @DisplayName("secondsUntilExpiry returns remaining regular access token lifetime")
+  void secondsUntilExpiry_returnsRegularAccessTokenLifetime() {
+    User user = buildUser();
+    when(tenantQueryPort.findById(user.getTenantId()))
+        .thenReturn(
+            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
+    when(organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId()))
+        .thenReturn(Optional.empty());
+
+    long secondsUntilExpiry = jwtService.secondsUntilExpiry(jwtService.generateAccessToken(user));
+
+    assertThat(secondsUntilExpiry).isBetween(895L, 900L);
+  }
+
+  @Test
+  @DisplayName("secondsUntilExpiry returns remaining playground access token lifetime")
+  void secondsUntilExpiry_returnsPlaygroundAccessTokenLifetime() {
+    User user = buildUser();
+    when(tenantQueryPort.findById(user.getTenantId()))
+        .thenReturn(
+            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
+
+    long secondsUntilExpiry =
+        jwtService.secondsUntilExpiry(
+            jwtService.generatePlaygroundAccessToken(user, "guest-123", "guest@example.com"));
+
+    assertThat(secondsUntilExpiry).isBetween(7_775_995L, 7_776_000L);
+  }
+
+  @Test
+  @DisplayName("secondsUntilExpiry returns zero for expired token")
+  void secondsUntilExpiry_returnsZeroForExpiredToken() {
+    String expiredToken =
+        Jwts.builder()
+            .subject("guest@example.com")
+            .issuedAt(Date.from(Instant.now().minusSeconds(120)))
+            .expiration(Date.from(Instant.now().minusSeconds(60)))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
+
+    assertThat(jwtService.secondsUntilExpiry(expiredToken)).isZero();
+  }
+
+  @Test
+  @DisplayName("secondsUntilExpiry returns zero for token without exp")
+  void secondsUntilExpiry_returnsZeroForTokenWithoutExpiration() {
+    String tokenWithoutExpiration =
+        Jwts.builder()
+            .subject("guest@example.com")
+            .issuedAt(Date.from(Instant.now()))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
+
+    assertThat(jwtService.secondsUntilExpiry(tokenWithoutExpiration)).isZero();
   }
 
   private static void assertTokenTtl(Claims claims, long expectedMillis) {
