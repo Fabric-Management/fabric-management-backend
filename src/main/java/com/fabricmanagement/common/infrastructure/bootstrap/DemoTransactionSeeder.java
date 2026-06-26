@@ -44,6 +44,7 @@ public class DemoTransactionSeeder {
   private final BatchService batchService;
   private final FinanceDemoSeeder financeDemoSeeder;
   private final SalesDemoSeeder salesDemoSeeder;
+  private final ProcurementDemoSeeder procurementDemoSeeder;
 
   @Value("${application.seed.demo-transactions.enabled:false}")
   private boolean enabled;
@@ -78,6 +79,7 @@ public class DemoTransactionSeeder {
           tradingPartnerService.searchByName(tenantId, DEMO_CUSTOMER_NAME);
       if (!existing.isEmpty()) {
         log.info("Demo transactions already exist for tenant: {}. Skipping.", tenantId);
+        seedProcurementDemo(tenantId);
         return;
       }
 
@@ -109,6 +111,8 @@ public class DemoTransactionSeeder {
             tenantId,
             salesEx);
       }
+
+      seedProcurementDemo(tenantId);
 
       // 3. Production demo (best-effort, isolated): sales order → work order → batch.
       // Pre-existing demo data. Wrapped in its own try/catch so a failure here can never roll back
@@ -202,6 +206,17 @@ public class DemoTransactionSeeder {
       } else {
         TenantContext.clear();
       }
+    }
+  }
+
+  private void seedProcurementDemo(UUID tenantId) {
+    try {
+      procurementDemoSeeder.seedFor(tenantId);
+    } catch (Exception procurementEx) {
+      log.warn(
+          "Procurement demo seeding failed for tenant {} - continuing; other demos unaffected.",
+          tenantId,
+          procurementEx);
     }
   }
 }

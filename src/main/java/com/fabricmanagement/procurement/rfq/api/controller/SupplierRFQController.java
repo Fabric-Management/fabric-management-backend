@@ -62,7 +62,7 @@ public class SupplierRFQController {
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@auth.can(authentication, 'procurement', 'write')")
   public SupplierRFQResponse createRfq(@Valid @RequestBody CreateSupplierRFQRequest req) {
-    return SupplierRFQResponse.from(rfqService.createRfq(req));
+    return rfqService.createRfq(req);
   }
 
   @PostMapping("/{rfqId}/lines")
@@ -70,7 +70,7 @@ public class SupplierRFQController {
   @PreAuthorize("@auth.can(authentication, 'procurement', 'write')")
   public SupplierRFQResponse addLine(
       @PathVariable UUID rfqId, @Valid @RequestBody AddRfqLineRequest req) {
-    return SupplierRFQResponse.from(rfqService.addLine(rfqId, req));
+    return rfqService.addLine(rfqId, req);
   }
 
   @PostMapping("/{rfqId}/recipients")
@@ -78,12 +78,12 @@ public class SupplierRFQController {
   @PreAuthorize("@auth.can(authentication, 'procurement', 'write')")
   public SupplierRFQResponse addRecipient(
       @PathVariable UUID rfqId, @Valid @RequestBody AddRecipientRequest req) {
-    return SupplierRFQResponse.from(rfqService.addRecipient(rfqId, req));
+    return rfqService.addRecipient(rfqId, req);
   }
 
   @PostMapping("/{rfqId}/send")
   @PreAuthorize("@auth.can(authentication, 'procurement', 'write')")
   public SupplierRFQResponse sendRfq(@PathVariable UUID rfqId) {
-    return SupplierRFQResponse.from(rfqService.sendRfq(rfqId));
+    return rfqService.sendRfq(rfqId);
   }
 }

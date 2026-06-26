@@ -70,6 +70,9 @@ application:
   frontend:
     base-url: ${FRONTEND_URL:${APP_BASE_URL:http://localhost:3000}}
 
+  jwt:
+    playground-expiration: ${JWT_PLAYGROUND_EXPIRATION:7776000000} # 90 days
+
   # Playground/demo seed: clone-time finance + production demo data (DEMO-1).
   # Docker is the playground runtime here, so default ON; override with the env var to disable.
   seed:

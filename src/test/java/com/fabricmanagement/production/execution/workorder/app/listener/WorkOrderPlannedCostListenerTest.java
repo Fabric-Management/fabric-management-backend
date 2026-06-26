@@ -1,6 +1,9 @@
 package com.fabricmanagement.production.execution.workorder.app.listener;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
@@ -47,7 +50,7 @@ class WorkOrderPlannedCostListenerTest {
           .when(idempotentHandler)
           .executeOnce(any(), any(), any(), any());
     }
-    TenantContext.setCurrentTenantId(TENANT_ID);
+    TenantContext.clear();
   }
 
   @AfterEach
@@ -76,45 +79,48 @@ class WorkOrderPlannedCostListenerTest {
     void delegatesToTriggerService() {
       WorkOrderApprovedEvent event = buildEvent();
 
-      listener.handleWorkOrderApprovedEvent(event);
+      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
 
       verify(plannedCostTriggerService).triggerPlannedCost(WORK_ORDER_ID);
     }
 
     @Test
-    @DisplayName("sets TenantContext from event before delegation")
-    void setsTenantContextFromEvent() {
-      // Start with a different tenant to prove the listener overrides it
-      TenantContext.setCurrentTenantId(UUID.randomUUID());
+    @DisplayName("sets TenantContext from event before delegation on async thread")
+    void setsTenantContextFromEventBeforeDelegation() {
+      TenantContext.clear();
+      doAnswer(
+              invocation -> {
+                assertThat(TenantContext.requireTenantId()).isEqualTo(TENANT_ID);
+                return null;
+              })
+          .when(plannedCostTriggerService)
+          .triggerPlannedCost(WORK_ORDER_ID);
 
       WorkOrderApprovedEvent event = buildEvent();
 
-      listener.handleWorkOrderApprovedEvent(event);
+      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
 
-      // The listener should have set TenantContext to the event's tenantId.
-      // Since triggerService is mocked, TenantContext should still be event's tenant
-      // after the call.
       verify(plannedCostTriggerService).triggerPlannedCost(WORK_ORDER_ID);
+      assertThat(TenantContext.getCurrentTenantIdOrNull()).isNull();
     }
 
     @Test
-    @DisplayName("propagates RuntimeException to trigger event resubmission")
-    void propagatesRuntimeException() {
+    @DisplayName("swallows RuntimeException so approval flow is not failed by costing")
+    void swallowsRuntimeException() {
       doThrow(new RuntimeException("Price list not found"))
           .when(plannedCostTriggerService)
           .triggerPlannedCost(any());
 
       WorkOrderApprovedEvent event = buildEvent();
 
-      org.assertj.core.api.Assertions.assertThatThrownBy(
-              () -> listener.handleWorkOrderApprovedEvent(event))
-          .isInstanceOf(RuntimeException.class)
-          .hasMessage("Price list not found");
+      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
+
+      verify(plannedCostTriggerService).triggerPlannedCost(WORK_ORDER_ID);
     }
 
     @Test
-    @DisplayName("propagates WorkOrderDomainException to trigger event resubmission")
-    void propagatesDomainException() {
+    @DisplayName("swallows WorkOrderDomainException so approval flow is not failed by costing")
+    void swallowsDomainException() {
       doThrow(
               new com.fabricmanagement.production.execution.workorder.domain.exception
                   .WorkOrderDomainException("missing outputProductId"))
@@ -123,27 +129,23 @@ class WorkOrderPlannedCostListenerTest {
 
       WorkOrderApprovedEvent event = buildEvent();
 
-      org.assertj.core.api.Assertions.assertThatThrownBy(
-              () -> listener.handleWorkOrderApprovedEvent(event))
-          .isInstanceOf(
-              com.fabricmanagement.production.execution.workorder.domain.exception
-                  .WorkOrderDomainException.class)
-          .hasMessage("missing outputProductId");
+      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
+
+      verify(plannedCostTriggerService).triggerPlannedCost(WORK_ORDER_ID);
     }
 
     @Test
-    @DisplayName("propagates NullPointerException to trigger event resubmission")
-    void propagatesUnexpectedNPE() {
+    @DisplayName("swallows unexpected exception so approval flow is not failed by costing")
+    void swallowsUnexpectedNPE() {
       doThrow(new NullPointerException("unexpected"))
           .when(plannedCostTriggerService)
           .triggerPlannedCost(any());
 
       WorkOrderApprovedEvent event = buildEvent();
 
-      org.assertj.core.api.Assertions.assertThatThrownBy(
-              () -> listener.handleWorkOrderApprovedEvent(event))
-          .isInstanceOf(NullPointerException.class)
-          .hasMessage("unexpected");
+      assertThatCode(() -> listener.handleWorkOrderApprovedEvent(event)).doesNotThrowAnyException();
+
+      verify(plannedCostTriggerService).triggerPlannedCost(WORK_ORDER_ID);
     }
   }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.organization.domain.SystemDepartment;
+import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.PermissionTemplate;
 import com.fabricmanagement.platform.user.infra.repository.PermissionTemplateRepository;
 import java.lang.reflect.Proxy;
@@ -56,6 +57,24 @@ class PermissionTemplateSeederSystemDepartmentTest {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet()))
         .containsExactlyInAnyOrderElementsOf(SystemDepartment.permissionBackedCodes());
+    assertThat(savedTemplates)
+        .filteredOn(
+            template -> SystemDepartment.PROCUREMENT.code().equals(template.getDepartmentCode()))
+        .extracting(
+            PermissionTemplate::getRoleCode,
+            PermissionTemplate::getResource,
+            PermissionTemplate::getAction,
+            PermissionTemplate::getDataScope)
+        .contains(
+            org.assertj.core.groups.Tuple.tuple("WORKER", "products", "read", DataScope.OWN),
+            org.assertj.core.groups.Tuple.tuple(
+                "SUPERVISOR", "products", "read", DataScope.DEPARTMENT),
+            org.assertj.core.groups.Tuple.tuple(
+                "SUPERVISOR", "products", "write", DataScope.DEPARTMENT),
+            org.assertj.core.groups.Tuple.tuple(
+                "MANAGER", "products", "read", DataScope.ORGANIZATION),
+            org.assertj.core.groups.Tuple.tuple(
+                "MANAGER", "products", "write", DataScope.DEPARTMENT));
   }
 
   @SuppressWarnings("unchecked")
