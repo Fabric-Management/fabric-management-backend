@@ -8,6 +8,7 @@ import com.fabricmanagement.platform.organization.infra.repository.OrganizationR
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -332,6 +333,23 @@ public class JwtService {
     } catch (Exception e) {
       log.trace("Invalid JWT token: {}", e.getMessage());
       return false;
+    }
+  }
+
+  /** Seconds from now until this token's exp claim; 0 if expired, invalid, or no exp. */
+  public long secondsUntilExpiry(String token) {
+    try {
+      Claims claims = extractClaims(token);
+      Date expiration = claims.getExpiration();
+      if (expiration == null) {
+        return 0;
+      }
+      long secondsRemaining =
+          expiration.toInstant().getEpochSecond() - Instant.now().getEpochSecond();
+      return Math.max(0, secondsRemaining);
+    } catch (JwtException | IllegalArgumentException e) {
+      log.trace("Could not read JWT expiry: {}", e.getMessage());
+      return 0;
     }
   }
 

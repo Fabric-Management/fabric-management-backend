@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.security;
 
+import com.fabricmanagement.platform.auth.app.JwtService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,7 +19,7 @@ public class AuthCookieSupport {
   /** Cookie name for refresh token (sent only to /api/auth). */
   public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
 
-  /** Access token cookie Max-Age in seconds (15 minutes). */
+  /** Access token cookie Max-Age fallback in seconds (15 minutes). */
   private static final int ACCESS_TOKEN_MAX_AGE_SECONDS = 900;
 
   /** Refresh token cookie Max-Age in seconds (7 days). */
@@ -26,6 +27,12 @@ public class AuthCookieSupport {
 
   @Value("${application.auth.cookie.secure:true}")
   private boolean secureCookie;
+
+  private final JwtService jwtService;
+
+  public AuthCookieSupport(JwtService jwtService) {
+    this.jwtService = jwtService;
+  }
 
   /**
    * Add access_token and refresh_token cookies to the response. Skips any token that is null or
@@ -38,7 +45,7 @@ public class AuthCookieSupport {
       accessCookie.setHttpOnly(true);
       accessCookie.setSecure(secureCookie);
       accessCookie.setPath("/api/v1");
-      accessCookie.setMaxAge(ACCESS_TOKEN_MAX_AGE_SECONDS);
+      accessCookie.setMaxAge(resolveAccessTokenMaxAge(accessToken));
       accessCookie.setAttribute("SameSite", "Strict");
       response.addCookie(accessCookie);
     }
@@ -73,5 +80,13 @@ public class AuthCookieSupport {
     refreshCookie.setMaxAge(0);
     refreshCookie.setAttribute("SameSite", "Strict");
     response.addCookie(refreshCookie);
+  }
+
+  private int resolveAccessTokenMaxAge(String accessToken) {
+    long secondsUntilExpiry = jwtService.secondsUntilExpiry(accessToken);
+    if (secondsUntilExpiry <= 0) {
+      return ACCESS_TOKEN_MAX_AGE_SECONDS;
+    }
+    return (int) Math.min(Integer.MAX_VALUE, secondsUntilExpiry);
   }
 }
