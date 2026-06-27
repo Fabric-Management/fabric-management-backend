@@ -90,7 +90,7 @@ public class TenantSystemService {
     TenantType type = request.getType() != null ? request.getType() : TenantType.REGULAR;
     TenantStatus status = request.getTrialDays() > 0 ? TenantStatus.TRIAL : TenantStatus.ACTIVE;
     Instant trialEndsAt =
-        request.getTrialDays() > 0
+        request.getTrialDays() > 0 && !request.isDeferTrialActivation()
             ? Instant.now().plus(java.time.Duration.ofDays(request.getTrialDays()))
             : null;
     String settingsJson = serializeSettings(settings);

@@ -3,9 +3,11 @@ package com.fabricmanagement.common.infrastructure.web;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.JwtTokenExtractor;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
+import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +60,7 @@ public class JwtContextInterceptor implements HandlerInterceptor {
 
   private final JwtService jwtService;
   private final TenantQueryPort tenantQueryPort;
+  private final Optional<TrialLifecyclePort> trialLifecyclePort;
 
   /** Extract JWT token and set TenantContext before handler execution. */
   @Override
@@ -74,12 +77,20 @@ public class JwtContextInterceptor implements HandlerInterceptor {
 
     if (token != null && jwtService.validateToken(token)) {
       try {
-        UUID userId = jwtService.getUserIdFromToken(token);
-        UUID tenantId = jwtService.getTenantIdFromToken(token);
+        JwtService.AuthTokenClaims authContext = jwtService.extractAuthContext(token);
+        UUID userId = authContext.userId();
+        UUID tenantId = authContext.tenantId();
+        if (userId == null || tenantId == null) {
+          throw new IllegalArgumentException("JWT token missing user_id or tenant_id");
+        }
 
         // Set TenantContext for this request thread
         TenantContext.setCurrentTenantId(tenantId);
         TenantContext.setCurrentUserId(userId);
+
+        if (shouldTouchTrialActivity(authContext)) {
+          trialLifecyclePort.ifPresent(port -> port.touchTenantActivity(tenantId));
+        }
 
         // Load tenant UID from JWT token (no DB query needed)
         // ⚠️ Performance: JWT already contains tenant_uid claim, no need for DB query
@@ -171,5 +182,18 @@ public class JwtContextInterceptor implements HandlerInterceptor {
       }
     }
     return false;
+  }
+
+  private boolean shouldTouchTrialActivity(JwtService.AuthTokenClaims authContext) {
+    if (authContext == null || authContext.tenantId() == null || authContext.userId() == null) {
+      return false;
+    }
+    if (authContext.isPlayground()) {
+      return false;
+    }
+    if (authContext.partnerId() != null) {
+      return false;
+    }
+    return authContext.userType() == null || !"PARTNER".equalsIgnoreCase(authContext.userType());
   }
 }

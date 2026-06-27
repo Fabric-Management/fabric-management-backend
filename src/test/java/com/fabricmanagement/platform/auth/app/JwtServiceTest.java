@@ -27,7 +27,7 @@ class JwtServiceTest {
 
   private static final String SECRET = "test-secret-key-must-be-at-least-256-bits-long-for-hs256";
   private static final long ACCESS_TOKEN_EXPIRATION = 900_000L;
-  private static final long PLAYGROUND_TOKEN_EXPIRATION = 7_776_000_000L;
+  private static final long PLAYGROUND_TOKEN_EXPIRATION = 1_209_600_000L;
 
   private final TenantQueryPort tenantQueryPort = org.mockito.Mockito.mock(TenantQueryPort.class);
   private final OrganizationRepository organizationRepository =
@@ -99,7 +99,7 @@ class JwtServiceTest {
         jwtService.secondsUntilExpiry(
             jwtService.generatePlaygroundAccessToken(user, "guest-123", "guest@example.com"));
 
-    assertThat(secondsUntilExpiry).isBetween(7_775_995L, 7_776_000L);
+    assertThat(secondsUntilExpiry).isBetween(1_209_595L, 1_209_600L);
   }
 
   @Test

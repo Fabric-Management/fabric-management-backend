@@ -45849,6 +45849,9 @@ components:
           format: uuid
         isActive:
           type: boolean
+        lastActivityAt:
+          type: string
+          format: date-time
         name:
           type: string
         wipLimitDefault:
@@ -54510,11 +54513,15 @@ components:
           enum:
           - TRIAL
           - ACTIVE
+          - EXPIRED
           - SUSPENDED
           - CANCELLED
         subscriptionPlan:
           type: string
         trialEndsAt:
+          type: string
+          format: date-time
+        trialStartedAt:
           type: string
           format: date-time
         type:

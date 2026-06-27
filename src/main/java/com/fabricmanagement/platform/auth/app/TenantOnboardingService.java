@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TenantOnboardingService {
 
   /** Default trial days for self-service signups. */
-  private static final int DEFAULT_SELF_SERVICE_TRIAL_DAYS = 14;
+  private static final int DEFAULT_SELF_SERVICE_TRIAL_DAYS = 90;
 
   /** Default trial days for sales-led onboarding when not specified. */
   private static final int DEFAULT_SALES_LED_TRIAL_DAYS = 90;

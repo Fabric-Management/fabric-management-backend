@@ -31,6 +31,18 @@ public class TenantRowMapper implements RowMapper<TenantDto> {
         .type(
             TenantType.valueOf(Objects.requireNonNull(rs.getString("type"), "type column is NULL")))
         .billingEmail(rs.getString("billing_email"))
+        .trialStartedAt(
+            rs.getTimestamp("trial_started_at") != null
+                ? rs.getTimestamp("trial_started_at").toInstant()
+                : null)
+        .lastActivityAt(
+            rs.getTimestamp("last_activity_at") != null
+                ? rs.getTimestamp("last_activity_at").toInstant()
+                : null)
+        .trialEndsAt(
+            rs.getTimestamp("trial_ends_at") != null
+                ? rs.getTimestamp("trial_ends_at").toInstant()
+                : null)
         .isActive(rs.getBoolean("is_active"))
         .build();
   }
