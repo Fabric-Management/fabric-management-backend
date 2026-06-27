@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Auth module configuration (lockout, verification, JWT, password).
+ * Auth module configuration (lockout, verification, password).
  *
  * <p>Bind with prefix "auth". Example: auth.lockout.max-attempts=5
  */
@@ -21,8 +21,6 @@ public class AuthProperties {
   @Valid private LockoutProperties lockout = new LockoutProperties();
 
   @Valid private VerificationProperties verification = new VerificationProperties();
-
-  @Valid private JwtProperties jwt = new JwtProperties();
 
   @Valid private PasswordProperties password = new PasswordProperties();
 
@@ -51,12 +49,6 @@ public class AuthProperties {
     @Min(1)
     @Max(5)
     private int maxAttempts = 3;
-  }
-
-  @Data
-  public static class JwtProperties {
-    private Duration accessTokenExpiry = Duration.ofMinutes(15);
-    private Duration refreshTokenExpiry = Duration.ofDays(7);
   }
 
   @Data

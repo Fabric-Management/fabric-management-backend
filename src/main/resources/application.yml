@@ -108,7 +108,7 @@ logging:
     # Reduce log noise from background jobs
     com.fabricmanagement.platform.communication.app.EmailOutboxService: INFO
 
-# Auth module configuration (lockout, verification, JWT)
+# Auth module configuration (lockout, verification, password)
 auth:
   lockout:
     max-attempts: ${AUTH_LOCKOUT_MAX_ATTEMPTS:5}
@@ -117,9 +117,6 @@ auth:
     code-length: ${AUTH_VERIFICATION_CODE_LENGTH:6}
     code-expiry: ${AUTH_VERIFICATION_CODE_EXPIRY:10m}
     max-attempts: ${AUTH_VERIFICATION_MAX_ATTEMPTS:3}
-  jwt:
-    access-token-expiry: ${AUTH_JWT_ACCESS_EXPIRY:15m}
-    refresh-token-expiry: ${AUTH_JWT_REFRESH_EXPIRY:7d}
   password:
     bcrypt-strength: ${AUTH_BCRYPT_STRENGTH:10}
   mfa:
