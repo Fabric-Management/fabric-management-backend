@@ -121,7 +121,11 @@ public class PlaygroundService {
    *
    * <p>Instead, we let the clone run in its own transaction, then set TenantContext and open a NEW
    * read-only transaction via TransactionTemplate so the connection is bound to the correct tenant.
+   *
+   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
+   *     anonymous init is retired pending FE migration.
    */
+  @Deprecated
   public PlaygroundInitResponse initPlayground(String guestId) {
     // 1. Clone the template (runs in its own BYPASSRLS transaction)
     Tenant playgroundTenant = tenantClonerService.cloneTemplateToPlayground();

@@ -361,7 +361,9 @@ public class TenantSystemService {
    * @param plan Subscription plan name
    * @return Updated tenant
    */
-  @CacheEvict(value = "tenant-writable", key = "#tenantId.toString()")
+  @CacheEvict(
+      value = {"tenant-writable", "tenant-demomode"},
+      key = "#tenantId.toString()")
   public TenantDto activate(UUID tenantId, String plan) {
     return updateStatusSystem(tenantId, TenantStatus.ACTIVE, "Subscription activated: " + plan);
   }
@@ -373,7 +375,9 @@ public class TenantSystemService {
    * @param reason Suspension reason
    * @return Updated tenant
    */
-  @CacheEvict(value = "tenant-writable", key = "#tenantId.toString()")
+  @CacheEvict(
+      value = {"tenant-writable", "tenant-demomode"},
+      key = "#tenantId.toString()")
   public TenantDto suspend(UUID tenantId, String reason) {
     return updateStatusSystem(tenantId, TenantStatus.SUSPENDED, reason);
   }
@@ -385,7 +389,9 @@ public class TenantSystemService {
    * @param reason Cancellation reason
    * @return Updated tenant
    */
-  @CacheEvict(value = "tenant-writable", key = "#tenantId.toString()")
+  @CacheEvict(
+      value = {"tenant-writable", "tenant-demomode"},
+      key = "#tenantId.toString()")
   public TenantDto cancel(UUID tenantId, String reason) {
     return updateStatusSystem(tenantId, TenantStatus.CANCELLED, reason);
   }

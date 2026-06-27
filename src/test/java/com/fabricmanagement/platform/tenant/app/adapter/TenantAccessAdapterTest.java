@@ -38,6 +38,36 @@ class TenantAccessAdapterTest {
   }
 
   @Test
+  @DisplayName("isDemoMode follows tenant demoMode flag")
+  void shouldReturnDemoModeDecisionFromTenant() {
+    UUID demoTenantId = UUID.randomUUID();
+    when(tenantSystemService.findById(demoTenantId))
+        .thenReturn(Optional.of(TenantDto.builder().id(demoTenantId).demoMode(true).build()));
+
+    UUID realTenantId = UUID.randomUUID();
+    when(tenantSystemService.findById(realTenantId))
+        .thenReturn(Optional.of(TenantDto.builder().id(realTenantId).demoMode(false).build()));
+
+    assertThat(adapter.isDemoMode(demoTenantId)).isTrue();
+    assertThat(adapter.isDemoMode(realTenantId)).isFalse();
+  }
+
+  @Test
+  @DisplayName("unknown tenant fails closed for demoMode")
+  void shouldFailClosedForUnknownDemoModeTenant() {
+    UUID tenantId = UUID.randomUUID();
+    when(tenantSystemService.findById(tenantId)).thenReturn(Optional.empty());
+
+    assertThat(adapter.isDemoMode(tenantId)).isFalse();
+  }
+
+  @Test
+  @DisplayName("null tenant fails closed for demoMode")
+  void shouldFailClosedForNullDemoModeTenant() {
+    assertThat(adapter.isDemoMode(null)).isFalse();
+  }
+
+  @Test
   @DisplayName("isWritable is cacheable")
   void shouldBeCacheable() throws NoSuchMethodException {
     Method method = TenantAccessAdapter.class.getMethod("isWritable", UUID.class);
@@ -45,6 +75,18 @@ class TenantAccessAdapterTest {
 
     assertThat(cacheable).isNotNull();
     assertThat(cacheable.value()).containsExactly("tenant-writable");
+  }
+
+  @Test
+  @DisplayName("isDemoMode is cacheable")
+  void shouldCacheDemoModeDecision() throws NoSuchMethodException {
+    Method method = TenantAccessAdapter.class.getMethod("isDemoMode", UUID.class);
+    Cacheable cacheable = method.getAnnotation(Cacheable.class);
+
+    assertThat(cacheable).isNotNull();
+    assertThat(cacheable.value()).containsExactly("tenant-demomode");
+    assertThat(cacheable.key()).isEqualTo("#tenantId.toString()");
+    assertThat(cacheable.condition()).isEqualTo("#tenantId != null");
   }
 
   private void assertWritable(TenantStatus status, boolean expected) {

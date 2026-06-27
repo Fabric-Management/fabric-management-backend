@@ -19,6 +19,7 @@ import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import com.fabricmanagement.platform.user.app.RoleService;
 import com.fabricmanagement.platform.user.app.UserCreationService;
 import com.fabricmanagement.platform.user.domain.Role;
+import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
@@ -28,6 +29,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionCallback;
@@ -80,6 +82,15 @@ class UserSeederTest {
         .thenAnswer(invocation -> Optional.of(department(organizationId)));
     when(userCreationService.createInternalUser(any(CreateInternalUserRequest.class)))
         .thenAnswer(invocation -> UserDto.builder().id(UUID.randomUUID()).build());
+    when(userRepository.findByTenantIdAndId(Mockito.eq(tenantId), ArgumentMatchers.any(UUID.class)))
+        .thenAnswer(
+            invocation -> {
+              UUID userId = invocation.getArgument(1);
+              User user = User.create("Seed", "Persona", organizationId);
+              user.setId(userId);
+              user.setTenantId(tenantId);
+              return Optional.of(user);
+            });
     when(passwordEncoder.encode(anyString())).thenReturn("encoded");
     when(contactRepository.findByTenantIdAndContactValue(Mockito.eq(tenantId), anyString()))
         .thenReturn(Optional.empty());
@@ -91,6 +102,8 @@ class UserSeederTest {
         ArgumentCaptor.forClass(CreateInternalUserRequest.class);
     verify(userCreationService, Mockito.times(15)).createInternalUser(requestCaptor.capture());
     verify(authUserRepository, Mockito.times(15)).save(any());
+    ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository, Mockito.times(15)).save(userCaptor.capture());
     List<String> contactValues =
         requestCaptor.getAllValues().stream()
             .map(CreateInternalUserRequest::getContactValue)
@@ -105,6 +118,9 @@ class UserSeederTest {
               assertThat(email).doesNotContain("nexusfabrics.com");
             })
         .contains("owner+spin-mgr@acmetextiles.com", "owner+sales-rep@acmetextiles.com");
+    assertThat(userCaptor.getAllValues())
+        .hasSize(15)
+        .allSatisfy(user -> assertThat(user.isDemoSeed()).isTrue());
   }
 
   @Test

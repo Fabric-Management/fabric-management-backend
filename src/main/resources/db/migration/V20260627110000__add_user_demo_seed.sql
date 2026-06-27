@@ -1,0 +1,2 @@
+ALTER TABLE common_user.common_user
+    ADD COLUMN IF NOT EXISTS demo_seed BOOLEAN NOT NULL DEFAULT FALSE;

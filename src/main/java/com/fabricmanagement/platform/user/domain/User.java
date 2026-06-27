@@ -105,6 +105,10 @@ public class User extends BaseEntity {
   @Column(name = "onboarding_completed_at")
   private Instant onboardingCompletedAt;
 
+  @Column(name = "demo_seed", nullable = false)
+  @Builder.Default
+  private boolean demoSeed = false;
+
   /**
    * User's preferred locale tag (e.g. "tr-TR", "en-US").
    *

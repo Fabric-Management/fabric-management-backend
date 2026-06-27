@@ -1,13 +1,16 @@
 package com.fabricmanagement.common.infrastructure.web;
 
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
@@ -24,6 +27,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
 
   private static final int MAX_MUTATIONS_PER_PLAYGROUND = 5_000;
@@ -32,6 +36,8 @@ public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
   // In a multi-node environment with Redis, this should be replaced with a Redis counter.
   private final Cache<UUID, AtomicInteger> quotaCache =
       Caffeine.newBuilder().expireAfterWrite(14, TimeUnit.DAYS).maximumSize(10_000).build();
+
+  private final Optional<TenantAccessPort> tenantAccessPort;
 
   @Override
   public boolean preHandle(
@@ -52,17 +58,18 @@ public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
     // 2. Check if the user is in a PLAYGROUND session
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth != null && auth.getPrincipal() instanceof AuthenticatedUserContext ctx) {
-      if (ctx.isPlayground() && ctx.tenantId() != null) {
+      UUID tenantId = ctx.tenantId();
+      if (tenantId != null && shouldApplyPlaygroundQuota(ctx, tenantId)) {
 
         // 3. Increment first, then check (atomic — prevents TOCTOU race)
-        AtomicInteger counter = quotaCache.get(ctx.tenantId(), k -> new AtomicInteger(0));
+        AtomicInteger counter = quotaCache.get(tenantId, k -> new AtomicInteger(0));
         int currentCount = counter.incrementAndGet();
 
         if (currentCount > MAX_MUTATIONS_PER_PLAYGROUND) {
           log.warn(
-              "Playground quota exceeded for tenantId: {} (Guest: {})",
-              ctx.tenantId(),
-              ctx.guestId());
+              "Playground quota exceeded for tenantId: {}, guestId: {}",
+              tenantId,
+              Optional.ofNullable(ctx.guestId()).orElse("<none>"));
           response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
           response.setContentType("application/json");
           response.setIntHeader("X-Playground-Quota-Remaining", 0);
@@ -80,5 +87,12 @@ public class PlaygroundQuotaInterceptor implements HandlerInterceptor {
     }
 
     return true;
+  }
+
+  private boolean shouldApplyPlaygroundQuota(AuthenticatedUserContext ctx, UUID tenantId) {
+    if (ctx.isPlayground()) {
+      return true;
+    }
+    return tenantAccessPort.map(port -> port.isDemoMode(tenantId)).orElse(false);
   }
 }
