@@ -187,7 +187,8 @@ public class UserProfileService {
     userContactAssignmentService.assignContact(userId, contact.getId(), false);
   }
 
-  private void updatePersonalContact(UUID userId, String contactValue, ContactType contactType) {
+  @Transactional
+  public void updatePersonalContact(UUID userId, String contactValue, ContactType contactType) {
     Contact contact =
         contactService
             .findByValueAndType(contactValue, contactType)

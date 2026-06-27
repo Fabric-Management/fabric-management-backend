@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.communication.domain.Contact;
+import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.event.UserProfileUpdatedEvent;
 import com.fabricmanagement.platform.user.domain.port.EmployeeMutationPort;
@@ -201,6 +204,49 @@ class UserProfileServiceTest {
       verify(userContactAssignmentService)
           .assignContact(eq(USER_ID), eq(contact.getId()), eq(false));
       assertThat(result.getId()).isEqualTo(USER_ID);
+    }
+  }
+
+  @Nested
+  @DisplayName("updatePersonalContact")
+  class UpdatePersonalContact {
+
+    @Test
+    void createsAndAssignsPersonalMobileWhenMissing() {
+      Contact contact =
+          Contact.builder().contactValue("+905551234567").contactType(ContactType.MOBILE).build();
+      contact.setId(UUID.randomUUID());
+      contact.setTenantId(TENANT_ID);
+      when(contactService.findByValueAndType("+905551234567", ContactType.MOBILE))
+          .thenReturn(Optional.empty());
+      when(contactService.createContact(
+              "+905551234567", ContactType.MOBILE, "Personal mobile", true, null))
+          .thenReturn(contact);
+      when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
+          .thenReturn(false);
+
+      service.updatePersonalContact(USER_ID, "+905551234567", ContactType.MOBILE);
+
+      verify(contactService)
+          .createContact("+905551234567", ContactType.MOBILE, "Personal mobile", true, null);
+      verify(userContactAssignmentService).assignContact(USER_ID, contact.getId(), false);
+    }
+
+    @Test
+    void doesNotDuplicateExistingPersonalMobileAssignment() {
+      Contact contact =
+          Contact.builder().contactValue("+905551234567").contactType(ContactType.MOBILE).build();
+      contact.setId(UUID.randomUUID());
+      contact.setTenantId(TENANT_ID);
+      when(contactService.findByValueAndType("+905551234567", ContactType.MOBILE))
+          .thenReturn(Optional.of(contact));
+      when(userContactAssignmentService.existsUserContact(USER_ID, contact.getId()))
+          .thenReturn(true);
+
+      service.updatePersonalContact(USER_ID, "+905551234567", ContactType.MOBILE);
+
+      verify(contactService, never()).createContact(any(), any(), any(), any(), any());
+      verify(userContactAssignmentService, never()).assignContact(any(), any(), any());
     }
   }
 }

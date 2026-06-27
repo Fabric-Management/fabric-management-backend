@@ -51,6 +51,7 @@ public class UserOnboardingService {
   private final ContactService contactService;
   private final OrganizationAddressAssignmentService addressAssignmentService;
   private final OrganizationContactAssignmentService contactAssignmentService;
+  private final UserProfileService userProfileService;
 
   @Transactional(readOnly = true)
   public OnboardingStatusResponse getStatus(UUID userId) {
@@ -91,13 +92,13 @@ public class UserOnboardingService {
     if (user.getOnboardingCompletedAt() != null) {
       log.debug("User already completed onboarding: userId={}", userId);
       if (request != null) {
-        applyEnrichment(tenantId, request);
+        applyEnrichment(tenantId, userId, request);
       }
       return UserDto.from(user, employeeProjectionPort.findByUserId(tenantId, userId).orElse(null));
     }
 
     if (request != null) {
-      applyEnrichment(tenantId, request);
+      applyEnrichment(tenantId, userId, request);
     }
 
     user.completeOnboarding();
@@ -132,10 +133,11 @@ public class UserOnboardingService {
    *   <li>Company contacts (email and/or phone)
    * </ol>
    */
-  private void applyEnrichment(UUID tenantId, CompleteOnboardingRequest request) {
+  private void applyEnrichment(UUID tenantId, UUID userId, CompleteOnboardingRequest request) {
     log.debug("Applying onboarding enrichment: tenantId={}", tenantId);
 
     organizationService.enrichRootOrganization(tenantId, request);
+    saveUserMobile(userId, request);
 
     OrganizationDto rootOrg = organizationService.getRootOrganization().orElse(null);
     if (rootOrg == null) {
@@ -146,6 +148,15 @@ public class UserOnboardingService {
 
     saveHqAddress(orgId, request);
     saveContacts(orgId, request);
+  }
+
+  private void saveUserMobile(UUID userId, CompleteOnboardingRequest request) {
+    if (request.getMobilePhone() == null || request.getMobilePhone().isBlank()) {
+      return;
+    }
+    userProfileService.updatePersonalContact(
+        userId, request.getMobilePhone().trim(), ContactType.MOBILE);
+    log.debug("saveUserMobile: personal mobile assigned, userId={}", userId);
   }
 
   private void saveHqAddress(UUID orgId, CompleteOnboardingRequest req) {

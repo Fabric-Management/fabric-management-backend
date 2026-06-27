@@ -51,8 +51,9 @@ public class UserOnboardingController {
    * Complete onboarding for current user.
    *
    * <p>Accepts an optional {@link CompleteOnboardingRequest} body with company enrichment data
-   * (legalName, industry, address, etc.). If the body is absent or null, onboarding is still marked
-   * complete and no enrichment is performed — existing callers remain unaffected.
+   * (legalName, industry, address, etc.) and the current user's personal mobile. If the body is
+   * absent or null, onboarding is still marked complete and no enrichment is performed — existing
+   * callers remain unaffected.
    */
   @PostMapping("/onboarding/complete")
   public ResponseEntity<ApiResponse<UserDto>> completeOnboarding(

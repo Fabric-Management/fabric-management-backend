@@ -118,6 +118,11 @@ public class CompleteOnboardingRequest {
   @Size(max = 20, message = "Phone must not exceed 20 characters")
   private String companyPhone;
 
+  /** Registering user's own mobile phone number (E.164 recommended). */
+  @Size(max = 20, message = "Mobile phone must not exceed 20 characters")
+  @Pattern(regexp = "^\\+[1-9]\\d{1,14}$|^$", message = "Invalid mobile phone format")
+  private String mobilePhone;
+
   // ── Platform modules ─────────────────────────────────────────────────────────
 
   /** Selected OS module codes (e.g. ["FabricOS", "LogiOS"]). */

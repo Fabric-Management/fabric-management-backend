@@ -46103,6 +46103,11 @@ components:
           type: string
           maxLength: 20
           minLength: 0
+        mobilePhone:
+          type: string
+          maxLength: 20
+          minLength: 0
+          pattern: "^\\+[1-9]\\d{1,14}$|^$"
         country:
           type: string
           maxLength: 100
