@@ -117,8 +117,8 @@ jobs:
       - name: Generate test report
         if: always()
         run: |
-          mvn surefire-report:report-only
-          mvn failsafe:report-only || true
+          mvn surefire-report:report-only || true
+          mvn surefire-report:failsafe-report-only || true
 
       - name: Upload test results
         if: always()
