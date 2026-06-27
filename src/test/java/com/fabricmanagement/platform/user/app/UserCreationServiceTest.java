@@ -12,10 +12,13 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
+import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.dto.CreateAdminUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -162,6 +166,50 @@ class UserCreationServiceTest {
           .copyOrganizationPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
       assertThat(result.getId()).isEqualTo(USER_ID);
       assertThat(result.getOrganizationId()).isEqualTo(COMPANY_ID);
+    }
+  }
+
+  @Nested
+  @DisplayName("createAdminUser")
+  class CreateAdminUser {
+
+    @Test
+    void createsOwnerWithDemoSeedFalse() {
+      CreateAdminUserRequest request =
+          CreateAdminUserRequest.builder()
+              .tenantId(TENANT_ID)
+              .organizationId(COMPANY_ID)
+              .firstName("Owner")
+              .lastName("Admin")
+              .contactValue(CONTACT_VALUE)
+              .build();
+      when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
+          .thenReturn(false);
+      Role adminRole = Role.create("Admin", "ADMIN", "Tenant admin");
+      adminRole.setId(UUID.randomUUID());
+      when(roleService.findTenantAdminRoleOrThrow(TENANT_ID)).thenReturn(adminRole);
+      User savedUser = User.create("Owner", "Admin", COMPANY_ID);
+      savedUser.setId(USER_ID);
+      savedUser.setTenantId(TENANT_ID);
+      savedUser.setRole(adminRole);
+      when(userRepository.save(any(User.class))).thenReturn(savedUser);
+      Contact contact = new Contact();
+      contact.setId(CONTACT_ID);
+      contact.setContactValue(CONTACT_VALUE);
+      contact.setContactType(ContactType.EMAIL);
+      when(contactService.createContact(
+              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+          .thenReturn(contact);
+      when(departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentName(
+              eq(TENANT_ID), eq(COMPANY_ID), eq("Administration Office")))
+          .thenReturn(Optional.empty());
+
+      UserDto result = service.createAdminUser(request);
+
+      ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+      verify(userRepository).save(userCaptor.capture());
+      assertThat(userCaptor.getValue().isDemoSeed()).isFalse();
+      assertThat(result.getId()).isEqualTo(USER_ID);
     }
   }
 

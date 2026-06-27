@@ -14,6 +14,7 @@ import com.fabricmanagement.platform.user.app.RoleService;
 import com.fabricmanagement.platform.user.app.UserCreationService;
 import com.fabricmanagement.platform.user.domain.ContactType;
 import com.fabricmanagement.platform.user.domain.Role;
+import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
@@ -459,6 +460,7 @@ public class UserSeeder implements DataSeeder {
             .build();
 
     UserDto user = userCreationService.createInternalUser(req);
+    stampDemoSeed(user.getId(), tenantId);
 
     // 3. Setup Password System ByPass
     setupAuthUser(user.getId(), tenantId);
@@ -479,6 +481,16 @@ public class UserSeeder implements DataSeeder {
         profile.email(),
         profile.roleCode());
     return true;
+  }
+
+  private void stampDemoSeed(UUID userId, UUID tenantId) {
+    User seededUser =
+        userRepository
+            .findByTenantIdAndId(tenantId, userId)
+            .orElseThrow(
+                () -> new IllegalStateException("Seeded user not found after creation: " + userId));
+    seededUser.setDemoSeed(true);
+    userRepository.save(seededUser);
   }
 
   private void setupAuthUser(UUID userId, UUID tenantId) {
