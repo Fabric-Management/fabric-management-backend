@@ -1,9 +1,13 @@
 package com.fabricmanagement.common.infrastructure.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,10 +23,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class PlaygroundQuotaInterceptorTest {
 
   private PlaygroundQuotaInterceptor interceptor;
+  private TenantAccessPort tenantAccessPort;
 
   @BeforeEach
   void setUp() {
-    interceptor = new PlaygroundQuotaInterceptor();
+    tenantAccessPort = mock(TenantAccessPort.class);
+    interceptor = new PlaygroundQuotaInterceptor(Optional.of(tenantAccessPort));
   }
 
   @AfterEach
@@ -77,8 +83,72 @@ class PlaygroundQuotaInterceptorTest {
     }
 
     @Test
-    @DisplayName("Should ignore regular (non-playground) sessions")
-    void shouldIgnoreRegularSessions() throws Exception {
+    @DisplayName("Should count demoMode regular sessions")
+    void shouldCountDemoModeRegularSessions() throws Exception {
+      UUID tenantId = UUID.randomUUID();
+      setRegularContext(tenantId);
+      when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(true);
+
+      MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/orders");
+      MockHttpServletResponse response = new MockHttpServletResponse();
+
+      boolean allowed = interceptor.preHandle(request, response, new Object());
+
+      assertThat(allowed).isTrue();
+      assertThat(response.getHeader("X-Playground-Quota-Remaining")).isEqualTo("4999");
+    }
+
+    @Test
+    @DisplayName("Should still count legacy is_playground sessions")
+    void shouldStillCountLegacyPlaygroundSessions() throws Exception {
+      UUID tenantId = UUID.randomUUID();
+      setPlaygroundContext(tenantId, "guest-legacy");
+
+      MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/orders");
+      MockHttpServletResponse response = new MockHttpServletResponse();
+
+      boolean allowed = interceptor.preHandle(request, response, new Object());
+
+      assertThat(allowed).isTrue();
+      assertThat(response.getHeader("X-Playground-Quota-Remaining")).isEqualTo("4999");
+    }
+
+    @Test
+    @DisplayName("Should ignore real-mode regular sessions")
+    void shouldIgnoreRealModeRegularSessions() throws Exception {
+      UUID tenantId = UUID.randomUUID();
+      setRegularContext(tenantId);
+      when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(false);
+
+      MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/orders");
+      MockHttpServletResponse response = new MockHttpServletResponse();
+
+      boolean allowed = interceptor.preHandle(request, response, new Object());
+
+      assertThat(allowed).isTrue();
+      assertThat(response.getHeader("X-Playground-Quota-Remaining")).isNull();
+    }
+
+    @Test
+    @DisplayName("Should count demoMode session with null guestId")
+    void shouldCountDemoModeSessionWithNullGuestId() throws Exception {
+      UUID tenantId = UUID.randomUUID();
+      setRegularContext(tenantId);
+      when(tenantAccessPort.isDemoMode(tenantId)).thenReturn(true);
+
+      MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/orders");
+      MockHttpServletResponse response = new MockHttpServletResponse();
+
+      boolean allowed = interceptor.preHandle(request, response, new Object());
+
+      assertThat(allowed).isTrue();
+      assertThat(response.getHeader("X-Playground-Quota-Remaining")).isEqualTo("4999");
+    }
+
+    @Test
+    @DisplayName("Should no-op when tenant access port is unavailable")
+    void shouldNoOpWhenTenantAccessPortUnavailable() throws Exception {
+      interceptor = new PlaygroundQuotaInterceptor(Optional.empty());
       UUID tenantId = UUID.randomUUID();
       setRegularContext(tenantId);
 
@@ -88,7 +158,6 @@ class PlaygroundQuotaInterceptorTest {
       boolean allowed = interceptor.preHandle(request, response, new Object());
 
       assertThat(allowed).isTrue();
-      // Header should not be set for regular sessions
       assertThat(response.getHeader("X-Playground-Quota-Remaining")).isNull();
     }
   }

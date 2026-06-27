@@ -50,9 +50,15 @@ public class PlaygroundAuthController {
   private Cache<String, Instant> rateLimitCache =
       Caffeine.newBuilder().expireAfterWrite(10, TimeUnit.SECONDS).maximumSize(10_000).build();
 
+  /**
+   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
+   *     anonymous init is retired pending FE migration.
+   */
+  @Deprecated
   @PostMapping("/init")
   @Operation(
       summary = "Initialize a new playground session",
+      deprecated = true,
       description =
           "Clones the TEMPLATE tenant into an ephemeral PLAYGROUND tenant, "
               + "assigns the first PLATFORM_ADMIN user as the default persona, "

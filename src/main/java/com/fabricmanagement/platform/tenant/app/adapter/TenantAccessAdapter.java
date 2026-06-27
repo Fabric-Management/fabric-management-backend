@@ -33,4 +33,26 @@ public class TenantAccessAdapter implements TenantAccessPort {
               return true;
             });
   }
+
+  @Override
+  @Cacheable(
+      value = "tenant-demomode",
+      key = "#tenantId.toString()",
+      condition = "#tenantId != null")
+  public boolean isDemoMode(UUID tenantId) {
+    if (tenantId == null) {
+      log.warn("Tenant demo-mode decision requested with null tenantId; failing closed");
+      return false;
+    }
+    return tenantSystemService
+        .findById(tenantId)
+        .map(tenant -> tenant.isDemoMode())
+        .orElseGet(
+            () -> {
+              log.warn(
+                  "Tenant {} could not be resolved for demo-mode decision; failing closed",
+                  tenantId);
+              return false;
+            });
+  }
 }

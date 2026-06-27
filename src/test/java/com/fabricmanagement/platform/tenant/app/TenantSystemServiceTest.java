@@ -15,6 +15,7 @@ import com.fabricmanagement.platform.tenant.domain.TenantStatus;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -98,6 +100,13 @@ class TenantSystemServiceTest {
         .executeInTransaction(ArgumentMatchers.<Function<JdbcTemplate, UUID>>any());
   }
 
+  @Test
+  void shouldEvictWritableAndDemoModeCachesOnTenantLifecycleChanges() throws Exception {
+    assertTenantLifecycleEvictsTenantAccessCaches("activate", String.class);
+    assertTenantLifecycleEvictsTenantAccessCaches("suspend", String.class);
+    assertTenantLifecycleEvictsTenantAccessCaches("cancel", String.class);
+  }
+
   private void stubIdentityExistenceChecks() {
     AtomicInteger acme001Checks = new AtomicInteger();
     AtomicInteger baseSlugChecks = new AtomicInteger();
@@ -113,5 +122,15 @@ class TenantSystemServiceTest {
                 default -> 0;
               };
             });
+  }
+
+  private void assertTenantLifecycleEvictsTenantAccessCaches(
+      String methodName, Class<?> secondArgumentType) throws NoSuchMethodException {
+    Method method = TenantSystemService.class.getMethod(methodName, UUID.class, secondArgumentType);
+    CacheEvict cacheEvict = method.getAnnotation(CacheEvict.class);
+
+    assertThat(cacheEvict).isNotNull();
+    assertThat(cacheEvict.value()).containsExactlyInAnyOrder("tenant-writable", "tenant-demomode");
+    assertThat(cacheEvict.key()).isEqualTo("#tenantId.toString()");
   }
 }

@@ -97,7 +97,11 @@ public class JwtService {
   /**
    * Generates a JWT token for a playground guest session. Includes is_playground and guest_id
    * claims.
+   *
+   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
+   *     anonymous init is retired pending FE migration.
    */
+  @Deprecated
   public String generatePlaygroundAccessToken(User user, String guestId) {
     String contactValue = getVerifiedContactOrThrow(user);
     return generatePlaygroundAccessToken(user, guestId, contactValue);
@@ -107,7 +111,11 @@ public class JwtService {
    * Overload that accepts a pre-resolved contactValue. Use this when the caller has already fetched
    * the contact (e.g. via a direct query) to avoid LazyInitializationException on
    * User.userContacts.
+   *
+   * @deprecated Register-first playground tenants with {@code demoMode} are the supported entry;
+   *     anonymous init is retired pending FE migration.
    */
+  @Deprecated
   public String generatePlaygroundAccessToken(User user, String guestId, String contactValue) {
     log.debug(
         "Generating playground access token for user: {}, guestId: {}", contactValue, guestId);

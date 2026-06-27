@@ -24023,6 +24023,7 @@ paths:
       - Playground Auth
   /api/v1/playground/init:
     post:
+      deprecated: true
       description: "Clones the TEMPLATE tenant into an ephemeral PLAYGROUND tenant,\
         \ assigns the first PLATFORM_ADMIN user as the default persona, and returns\
         \ a JWT token scoped to the playground context. Rate limited to 1 request\
