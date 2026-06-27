@@ -20,6 +20,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class TenantSystemService {
+
+  private static final int TENANT_IDENTITY_INSERT_MAX_ATTEMPTS = 5;
 
   private final DomainEventPublisher eventPublisher;
   private final SystemTransactionExecutor systemExecutor;
@@ -75,17 +78,11 @@ public class TenantSystemService {
   public TenantDto createTenant(CreateTenantRequest request) {
     log.debug("Creating tenant: name={}", request.getName());
 
-    // Generate UID (uses system executor for cross-tenant collision check)
-    String uid = generateUid(request.getName());
-
     // Prepare settings
     TenantSettings settings = request.getSettings();
     if (settings == null) {
       settings = TenantSettings.defaults();
     }
-
-    // Generate collision-safe slug (uses system executor)
-    String slug = generateUniqueSlug(request.getName());
 
     // Create tenant via system executor (BYPASSRLS) — tenant table has self-row RLS
     TenantType type = request.getType() != null ? request.getType() : TenantType.REGULAR;
@@ -96,26 +93,10 @@ public class TenantSystemService {
             : null;
     String settingsJson = serializeSettings(settings);
 
-    UUID tenantId =
-        systemExecutor.executeInTransaction(
-            jdbc -> {
-              UUID id = UUID.randomUUID();
-              jdbc.update(
-                  "INSERT INTO common_tenant.common_tenant "
-                      + "(id, uid, slug, name, type, status, settings, billing_email, "
-                      + "trial_ends_at, is_active, created_at, updated_at, version) "
-                      + "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, true, now(), now(), 0)",
-                  id,
-                  uid,
-                  slug,
-                  request.getName(),
-                  type.name(),
-                  status.name(),
-                  settingsJson,
-                  request.getBillingEmail(),
-                  trialEndsAt != null ? java.sql.Timestamp.from(trialEndsAt) : null);
-              return id;
-            });
+    TenantIdentityInsert insert =
+        insertTenantWithIdentityRetry(request, type, status, settingsJson, trialEndsAt);
+    UUID tenantId = insert.tenantId();
+    String uid = insert.uid();
 
     // CR-1: Set TenantContext BEFORE event publish so that:
     // 1. TenantRestoringEventListenerAspect can propagate the correct tenantId
@@ -143,6 +124,77 @@ public class TenantSystemService {
         TenantContext.clear();
       }
     }
+  }
+
+  private record TenantIdentityInsert(UUID tenantId, String uid) {}
+
+  private TenantIdentityInsert insertTenantWithIdentityRetry(
+      CreateTenantRequest request,
+      TenantType type,
+      TenantStatus status,
+      String settingsJson,
+      Instant trialEndsAt) {
+    for (int attempt = 1; attempt <= TENANT_IDENTITY_INSERT_MAX_ATTEMPTS; attempt++) {
+      String uid = generateUid(request.getName());
+      String slug = generateUniqueSlug(request.getName());
+      try {
+        UUID tenantId = insertTenant(request, type, status, settingsJson, trialEndsAt, uid, slug);
+        return new TenantIdentityInsert(tenantId, uid);
+      } catch (DataIntegrityViolationException e) {
+        if (!isTenantIdentityCollision(e) || attempt == TENANT_IDENTITY_INSERT_MAX_ATTEMPTS) {
+          throw e;
+        }
+        log.warn(
+            "Tenant identity collision while creating tenant '{}', retrying ({}/{})",
+            request.getName(),
+            attempt,
+            TENANT_IDENTITY_INSERT_MAX_ATTEMPTS);
+      }
+    }
+    throw new IllegalStateException("Tenant identity retry loop exhausted unexpectedly");
+  }
+
+  private UUID insertTenant(
+      CreateTenantRequest request,
+      TenantType type,
+      TenantStatus status,
+      String settingsJson,
+      Instant trialEndsAt,
+      String uid,
+      String slug) {
+    return systemExecutor.executeInTransaction(
+        jdbc -> {
+          UUID id = UUID.randomUUID();
+          jdbc.update(
+              "INSERT INTO common_tenant.common_tenant "
+                  + "(id, uid, slug, name, type, status, settings, billing_email, "
+                  + "trial_ends_at, demo_mode, is_active, created_at, updated_at, version) "
+                  + "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, true, now(), now(), 0)",
+              id,
+              uid,
+              slug,
+              request.getName(),
+              type.name(),
+              status.name(),
+              settingsJson,
+              request.getBillingEmail(),
+              trialEndsAt != null ? java.sql.Timestamp.from(trialEndsAt) : null,
+              request.isDemoMode());
+          return id;
+        });
+  }
+
+  private boolean isTenantIdentityCollision(DataIntegrityViolationException exception) {
+    Throwable current = exception;
+    while (current != null) {
+      String message = current.getMessage();
+      if (message != null
+          && (message.contains("uk_tenant_uid") || message.contains("uk_tenant_slug"))) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
   }
 
   // ========================================

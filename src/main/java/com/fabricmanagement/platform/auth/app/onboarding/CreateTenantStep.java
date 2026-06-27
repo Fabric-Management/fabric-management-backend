@@ -41,6 +41,7 @@ public class CreateTenantStep implements OnboardingStep {
             .country(context.getCountry())
             .trialDays(context.getTrialDays())
             .deferTrialActivation(!context.isSalesLed())
+            .demoMode(context.isDemoMode())
             .build();
 
     TenantDto tenant = tenantFacade.createTenant(request);

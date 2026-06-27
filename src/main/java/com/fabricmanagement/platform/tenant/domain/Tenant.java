@@ -153,6 +153,11 @@ public class Tenant implements Serializable {
   @Column(name = "last_activity_at")
   private Instant lastActivityAt;
 
+  /** Whether this registered tenant is in demo/learn mode. */
+  @Column(name = "demo_mode", nullable = false)
+  @Builder.Default
+  private boolean demoMode = false;
+
   /** Subscription plan identifier (e.g., "professional", "enterprise") */
   @Column(name = "subscription_plan", length = 50)
   private String subscriptionPlan;

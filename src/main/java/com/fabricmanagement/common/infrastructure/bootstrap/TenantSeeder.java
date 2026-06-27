@@ -75,7 +75,7 @@ public class TenantSeeder implements DataSeeder {
     // Seed demo transactions if enabled
     if (tenantId != null) {
       try {
-        demoTransactionSeeder.seedFor(tenantId);
+        demoTransactionSeeder.seedIfEnabledFor(tenantId);
       } catch (Exception e) {
         log.error("Startup demo seeding failed, but continuing tenant bootstrap.", e);
       }

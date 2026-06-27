@@ -17,6 +17,7 @@ class TenantTest {
     assertThat(tenant.getTrialStartedAt()).isNull();
     assertThat(tenant.getLastActivityAt()).isNull();
     assertThat(tenant.getTrialEndsAt()).isNull();
+    assertThat(tenant.isDemoMode()).isFalse();
   }
 
   @Test

@@ -49,6 +49,7 @@ public class OnboardingContext {
   private List<String> selectedOS;
   private int trialDays;
   private boolean salesLed;
+  private boolean demoMode;
 
   // ========================================
   // OUTPUTS - Tenant (Step 1)

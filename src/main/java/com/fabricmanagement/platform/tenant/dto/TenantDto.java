@@ -32,6 +32,7 @@ public class TenantDto {
   private Instant trialEndsAt;
   private Instant trialStartedAt;
   private Instant lastActivityAt;
+  private boolean demoMode;
   private String subscriptionPlan;
   private TenantSettings settings;
   private Instant createdAt;
@@ -58,6 +59,7 @@ public class TenantDto {
         .trialEndsAt(tenant.getTrialEndsAt())
         .trialStartedAt(tenant.getTrialStartedAt())
         .lastActivityAt(tenant.getLastActivityAt())
+        .demoMode(tenant.isDemoMode())
         .subscriptionPlan(tenant.getSubscriptionPlan())
         .settings(tenant.getSettings())
         .createdAt(tenant.getCreatedAt())

@@ -39,6 +39,7 @@ public class TenantRowMapper implements RowMapper<TenantDto> {
             rs.getTimestamp("last_activity_at") != null
                 ? rs.getTimestamp("last_activity_at").toInstant()
                 : null)
+        .demoMode(rs.getBoolean("demo_mode"))
         .trialEndsAt(
             rs.getTimestamp("trial_ends_at") != null
                 ? rs.getTimestamp("trial_ends_at").toInstant()

@@ -39,6 +39,9 @@ public class CreateTenantRequest {
   /** Whether trial dates should stay null until password setup activation. */
   @Builder.Default private boolean deferTrialActivation = false;
 
+  /** Whether the tenant should start in demo/learn mode. */
+  @Builder.Default private boolean demoMode = false;
+
   /** Country code for locale defaults (ISO 3166-1 alpha-2) */
   private String country;
 

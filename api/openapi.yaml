@@ -45849,9 +45849,6 @@ components:
           format: uuid
         isActive:
           type: boolean
-        lastActivityAt:
-          type: string
-          format: date-time
         name:
           type: string
         wipLimitDefault:
@@ -46106,11 +46103,6 @@ components:
           type: string
           maxLength: 20
           minLength: 0
-        mobilePhone:
-          type: string
-          maxLength: 20
-          minLength: 0
-          pattern: "^\\+[1-9]\\d{1,14}$|^$"
         country:
           type: string
           maxLength: 100
@@ -46131,6 +46123,11 @@ components:
           type: string
           maxLength: 200
           minLength: 0
+        mobilePhone:
+          type: string
+          maxLength: 20
+          minLength: 0
+          pattern: "^\\+[1-9]\\d{1,14}$|^$"
         organizationName:
           type: string
           maxLength: 255
@@ -54497,11 +54494,16 @@ components:
         createdAt:
           type: string
           format: date-time
+        demoMode:
+          type: boolean
         id:
           type: string
           format: uuid
         isActive:
           type: boolean
+        lastActivityAt:
+          type: string
+          format: date-time
         name:
           type: string
         settings:
