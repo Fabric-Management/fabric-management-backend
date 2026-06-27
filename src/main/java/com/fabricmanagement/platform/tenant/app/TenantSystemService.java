@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -308,6 +309,7 @@ public class TenantSystemService {
    * @param plan Subscription plan name
    * @return Updated tenant
    */
+  @CacheEvict(value = "tenant-writable", key = "#tenantId.toString()")
   public TenantDto activate(UUID tenantId, String plan) {
     return updateStatusSystem(tenantId, TenantStatus.ACTIVE, "Subscription activated: " + plan);
   }
@@ -319,6 +321,7 @@ public class TenantSystemService {
    * @param reason Suspension reason
    * @return Updated tenant
    */
+  @CacheEvict(value = "tenant-writable", key = "#tenantId.toString()")
   public TenantDto suspend(UUID tenantId, String reason) {
     return updateStatusSystem(tenantId, TenantStatus.SUSPENDED, reason);
   }
@@ -330,6 +333,7 @@ public class TenantSystemService {
    * @param reason Cancellation reason
    * @return Updated tenant
    */
+  @CacheEvict(value = "tenant-writable", key = "#tenantId.toString()")
   public TenantDto cancel(UUID tenantId, String reason) {
     return updateStatusSystem(tenantId, TenantStatus.CANCELLED, reason);
   }

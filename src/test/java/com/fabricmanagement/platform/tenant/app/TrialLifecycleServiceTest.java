@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.CacheManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -31,12 +32,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 class TrialLifecycleServiceTest {
 
   @Mock private SystemTransactionExecutor systemExecutor;
+  @Mock private CacheManager cacheManager;
 
   private TrialLifecycleService service;
 
   @BeforeEach
   void setUp() {
-    service = new TrialLifecycleService(systemExecutor);
+    service = new TrialLifecycleService(systemExecutor, cacheManager);
     ReflectionTestUtils.setField(service, "baseDays", 90);
     ReflectionTestUtils.setField(service, "dormancyWindowDays", 90);
     ReflectionTestUtils.setField(service, "hardCapMonths", 18);

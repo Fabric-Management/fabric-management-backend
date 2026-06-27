@@ -12,6 +12,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,10 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class TrialLifecycleService implements TrialLifecyclePort {
 
+  private static final String TENANT_WRITABLE_CACHE = "tenant-writable";
+
   private final SystemTransactionExecutor systemExecutor;
+  private final CacheManager cacheManager;
 
   @Value("${application.trial.base-days:90}")
   private int baseDays;
@@ -133,6 +137,9 @@ public class TrialLifecycleService implements TrialLifecyclePort {
                         decision.status().name(),
                         Timestamp.from(decision.effectiveExpiry()),
                         row.tenantId());
+                if (decision.status() == TenantStatus.EXPIRED) {
+                  evictWritableCache(row.tenantId());
+                }
               }
               return count;
             });
@@ -148,6 +155,13 @@ public class TrialLifecycleService implements TrialLifecyclePort {
     Instant effectiveExpiry = dormancyExpiry.isBefore(hardCapAt) ? dormancyExpiry : hardCapAt;
     TenantStatus status = now.isAfter(effectiveExpiry) ? TenantStatus.EXPIRED : TenantStatus.TRIAL;
     return new TrialDecision(status, effectiveExpiry);
+  }
+
+  private void evictWritableCache(UUID tenantId) {
+    var cache = cacheManager.getCache(TENANT_WRITABLE_CACHE);
+    if (cache != null) {
+      cache.evict(tenantId.toString());
+    }
   }
 
   record TrialWindow(UUID tenantId, Instant trialStartedAt, Instant lastActivityAt) {}

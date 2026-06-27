@@ -141,6 +141,12 @@ application:
     base-days: ${TRIAL_BASE_DAYS:90}
     dormancy-window-days: ${TRIAL_DORMANCY_WINDOW_DAYS:90}
     hard-cap-months: ${TRIAL_HARD_CAP_MONTHS:18}
+    read-only:
+      allow-paths:
+        - /api/v1/auth/**
+        - /api/v1/public/**
+        - /api/v1/subscriptions/*/activate
+        - /api/v1/subscriptions/**/activate
 
   # Auth cookies (HttpOnly). Set secure=false for local HTTP (e.g. http://localhost).
   auth:
