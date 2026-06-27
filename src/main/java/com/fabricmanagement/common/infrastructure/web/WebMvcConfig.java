@@ -19,6 +19,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
   private final JwtContextInterceptor jwtContextInterceptor;
+  private final TenantWriteGuardInterceptor tenantWriteGuardInterceptor;
   private final PlaygroundQuotaInterceptor playgroundQuotaInterceptor;
 
   /**
@@ -45,6 +46,24 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/actuator/**");
 
     log.info("✅ JwtContextInterceptor registered globally (with public endpoint exclusions)");
+
+    registry
+        .addInterceptor(tenantWriteGuardInterceptor)
+        .addPathPatterns("/api/v1/**")
+        .excludePathPatterns(
+            // Public endpoints - no JWT required
+            "/api/v1/health",
+            "/api/v1/info",
+            "/api/v1/public/**",
+            "/api/v1/auth/**",
+            // Swagger/OpenAPI docs
+            "/api-docs/**",
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            // Actuator (monitoring)
+            "/actuator/**");
+
+    log.info("✅ TenantWriteGuardInterceptor registered globally");
 
     registry
         .addInterceptor(playgroundQuotaInterceptor)

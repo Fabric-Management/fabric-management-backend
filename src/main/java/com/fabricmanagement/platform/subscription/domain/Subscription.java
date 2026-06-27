@@ -36,7 +36,7 @@ import org.hibernate.annotations.Type;
  *     .osName("Yarn Production OS")
  *     .status(SubscriptionStatus.TRIAL)
  *     .startDate(Instant.now())
- *     .trialEndsAt(Instant.now().plus(14, ChronoUnit.DAYS))
+ *     .trialEndsAt(Instant.now().plus(90, ChronoUnit.DAYS))
  *     .pricingTier("Professional")
  *     .build();
  * }</pre>

@@ -30,6 +30,9 @@ public class TenantDto {
   private TenantType type;
   private TenantStatus status;
   private Instant trialEndsAt;
+  private Instant trialStartedAt;
+  private Instant lastActivityAt;
+  private boolean demoMode;
   private String subscriptionPlan;
   private TenantSettings settings;
   private Instant createdAt;
@@ -54,6 +57,9 @@ public class TenantDto {
         .type(tenant.getType())
         .status(tenant.getStatus())
         .trialEndsAt(tenant.getTrialEndsAt())
+        .trialStartedAt(tenant.getTrialStartedAt())
+        .lastActivityAt(tenant.getLastActivityAt())
+        .demoMode(tenant.isDemoMode())
         .subscriptionPlan(tenant.getSubscriptionPlan())
         .settings(tenant.getSettings())
         .createdAt(tenant.getCreatedAt())

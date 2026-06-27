@@ -33,8 +33,14 @@ public class CreateTenantRequest {
   /** Custom settings (optional - uses defaults if not provided) */
   private TenantSettings settings;
 
-  /** Trial period in days (default: 14) */
-  @Builder.Default private int trialDays = 14;
+  /** Trial period in days (default: 90) */
+  @Builder.Default private int trialDays = 90;
+
+  /** Whether trial dates should stay null until password setup activation. */
+  @Builder.Default private boolean deferTrialActivation = false;
+
+  /** Whether the tenant should start in demo/learn mode. */
+  @Builder.Default private boolean demoMode = false;
 
   /** Country code for locale defaults (ISO 3166-1 alpha-2) */
   private String country;

@@ -145,6 +145,19 @@ public class Tenant implements Serializable {
   @Column(name = "trial_ends_at")
   private Instant trialEndsAt;
 
+  /** Trial activation timestamp. Null until a self-service trial is activated. */
+  @Column(name = "trial_started_at")
+  private Instant trialStartedAt;
+
+  /** Last meaningful authenticated tenant activity. */
+  @Column(name = "last_activity_at")
+  private Instant lastActivityAt;
+
+  /** Whether this registered tenant is in demo/learn mode. */
+  @Column(name = "demo_mode", nullable = false)
+  @Builder.Default
+  private boolean demoMode = false;
+
   /** Subscription plan identifier (e.g., "professional", "enterprise") */
   @Column(name = "subscription_plan", length = 50)
   private String subscriptionPlan;
@@ -297,6 +310,23 @@ public class Tenant implements Serializable {
   public void startTrial(int trialDays) {
     this.status = TenantStatus.TRIAL;
     this.trialEndsAt = Instant.now().plusSeconds(trialDays * 24L * 60 * 60);
+  }
+
+  /** Start the activation-based trial clock now. */
+  public void startTrialNow(int baseDays) {
+    Instant now = Instant.now();
+    this.status = TenantStatus.TRIAL;
+    this.trialStartedAt = now;
+    this.lastActivityAt = now;
+    this.trialEndsAt = now.plusSeconds(baseDays * 24L * 60 * 60);
+  }
+
+  /** Mark the trial retained read-only after expiry. */
+  public void expireTrial() {
+    if (this.status != TenantStatus.TRIAL) {
+      throw new IllegalStateException("Only trial tenants can expire");
+    }
+    this.status = TenantStatus.EXPIRED;
   }
 
   /**

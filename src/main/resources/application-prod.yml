@@ -92,7 +92,7 @@ application:
   jwt:
     secret: ${JWT_SECRET}
     expiration: 900000 # 15 minutes
-    playground-expiration: 7776000000 # 90 days for playground demo sessions
+    playground-expiration: 1209600000 # 14 days for playground demo sessions
     refresh-expiration: 604800000 # 7 days
 
   mail:

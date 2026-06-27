@@ -89,17 +89,17 @@ class TradingPartnerDeduplicationIntegrationTest {
   }
 
   private UUID createTestTenant(String name) {
-    long timestamp = System.currentTimeMillis();
-    String uid = "TEST-" + timestamp % 100000;
+    String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    String uid = "TEST-" + suffix.toUpperCase();
 
-    Tenant tenant = Tenant.create(name + " " + timestamp, uid);
+    Tenant tenant = Tenant.create(name + " " + suffix, uid);
     tenant.activate("test");
     tenant = tenantRepository.save(tenant);
 
     // Create root organization for tenant
     TenantContext.setCurrentTenantId(tenant.getId());
     Organization org =
-        Organization.create(name + " Org", "TAX" + timestamp % 100000, OrganizationType.SPINNER);
+        Organization.create(name + " Org", "TAX" + suffix.toUpperCase(), OrganizationType.SPINNER);
     org = organizationRepository.save(org);
     TenantContext.clear();
 

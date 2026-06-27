@@ -8,11 +8,13 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import java.util.function.Function;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -54,6 +56,30 @@ class PlaygroundTTLReaperServiceTest {
       reaper.reapExpiredPlaygrounds();
 
       verify(mockJdbc).update(anyString(), any(java.sql.Timestamp.class));
+    }
+
+    @Test
+    @DisplayName("Should target only playground tenants")
+    @SuppressWarnings("unchecked")
+    void shouldNeverReapRegisteredTenants() {
+      JdbcTemplate mockJdbc = mock(JdbcTemplate.class);
+      when(mockJdbc.update(anyString(), any(java.sql.Timestamp.class))).thenReturn(3);
+
+      when(systemExecutor.executeInTransaction(any(Function.class)))
+          .thenAnswer(
+              invocation -> {
+                Function<JdbcTemplate, Integer> callback = invocation.getArgument(0);
+                return callback.apply(mockJdbc);
+              });
+
+      reaper.reapExpiredPlaygrounds();
+
+      ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+      verify(mockJdbc).update(sqlCaptor.capture(), any(java.sql.Timestamp.class));
+      Assertions.assertThat(sqlCaptor.getValue()).contains("WHERE type = 'PLAYGROUND'");
+      Assertions.assertThat(sqlCaptor.getValue()).doesNotContain("status = 'TRIAL'");
+      Assertions.assertThat(sqlCaptor.getValue()).doesNotContain("status = 'EXPIRED'");
+      Assertions.assertThat(sqlCaptor.getValue()).doesNotContain("status = 'ACTIVE'");
     }
 
     @Test

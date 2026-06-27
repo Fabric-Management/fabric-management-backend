@@ -29,7 +29,7 @@ public class CreateSubscriptionsStep implements OnboardingStep {
       return;
     }
     List<String> selectedOS = context.getSelectedOS();
-    int trialDays = context.isSalesLed() ? context.getTrialDays() : 14;
+    int trialDays = context.getTrialDays();
     if (selectedOS == null || selectedOS.isEmpty()) {
       selectedOS = List.of("FabricOS");
     }

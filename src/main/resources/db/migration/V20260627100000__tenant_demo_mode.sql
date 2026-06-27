@@ -1,0 +1,2 @@
+ALTER TABLE common_tenant.common_tenant
+  ADD COLUMN IF NOT EXISTS demo_mode BOOLEAN NOT NULL DEFAULT FALSE;

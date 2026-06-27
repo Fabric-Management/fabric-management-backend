@@ -59,11 +59,18 @@ public class DemoTransactionSeeder {
    * @param tenantId The UUID of the tenant to seed
    */
   public void seedFor(UUID tenantId) {
+    seedForInternal(tenantId);
+  }
+
+  public void seedIfEnabledFor(UUID tenantId) {
     if (!enabled) {
       log.info("Demo transactions seeding is disabled via properties.");
       return;
     }
+    seedForInternal(tenantId);
+  }
 
+  private void seedForInternal(UUID tenantId) {
     // Capture previous context to restore safely if called in middle of another process
     UUID previousTenantId = null;
     try {

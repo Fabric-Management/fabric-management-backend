@@ -806,6 +806,8 @@ class ConstitutionArchTest {
       //   - TenantClonerService          : Onboarding: TEMPLATE→Yeni tenant klon
       //   - PlaygroundTTLReaperService   : Scheduled job: süresi dolan playground tenant'ları
       // temizle
+      //   - TrialLifecycleService        : Scheduled job: registered trial expiry/activity
+      // maintenance
       //   - TenantQueryAdapter           : Port/Adapter: tenant lookup (auth, event yolu)
       //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
@@ -821,6 +823,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("TenantClonerService")
               .and()
               .doNotHaveSimpleName("PlaygroundTTLReaperService")
+              .and()
+              .doNotHaveSimpleName("TrialLifecycleService")
               .and()
               .doNotHaveSimpleName("TenantQueryAdapter")
               .and()

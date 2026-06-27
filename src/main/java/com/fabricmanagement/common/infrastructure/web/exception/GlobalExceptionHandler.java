@@ -66,6 +66,18 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(status).body(pd);
   }
 
+  @ExceptionHandler(TenantReadOnlyException.class)
+  @ResponseStatus(HttpStatus.FORBIDDEN)
+  public ApiProblemDetail handleTenantReadOnly(TenantReadOnlyException ex, HttpServletRequest req) {
+    log.info("Read-only tenant write rejected: {}", req.getRequestURI());
+    return buildProblemDetail(
+        HttpStatus.FORBIDDEN,
+        "Forbidden",
+        TenantReadOnlyException.CODE,
+        ex.getMessage(),
+        req.getRequestURI());
+  }
+
   @ExceptionHandler(TaxIdAlreadyExistsException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ApiProblemDetail handleTaxIdAlreadyExists(

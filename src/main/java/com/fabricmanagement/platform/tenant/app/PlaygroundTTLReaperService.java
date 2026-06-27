@@ -24,6 +24,11 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class PlaygroundTTLReaperService {
 
+  static final String REAP_EXPIRED_PLAYGROUNDS_SQL =
+      "UPDATE common_tenant.common_tenant "
+          + "SET is_active = false, updated_at = now(), version = version + 1 "
+          + "WHERE type = 'PLAYGROUND' AND is_active = true AND created_at < ?";
+
   private final SystemTransactionExecutor systemExecutor;
 
   @Value("${playground.ttl.days:14}")
@@ -46,12 +51,7 @@ public class PlaygroundTTLReaperService {
 
     int affected =
         systemExecutor.executeInTransaction(
-            jdbc ->
-                jdbc.update(
-                    "UPDATE common_tenant.common_tenant "
-                        + "SET is_active = false, updated_at = now(), version = version + 1 "
-                        + "WHERE type = 'PLAYGROUND' AND is_active = true AND created_at < ?",
-                    java.sql.Timestamp.from(threshold)));
+            jdbc -> jdbc.update(REAP_EXPIRED_PLAYGROUNDS_SQL, java.sql.Timestamp.from(threshold)));
 
     if (affected == 0) {
       log.info("No expired playgrounds found.");

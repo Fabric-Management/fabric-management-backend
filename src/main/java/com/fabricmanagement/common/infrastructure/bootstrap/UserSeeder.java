@@ -18,7 +18,9 @@ import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +53,10 @@ public class UserSeeder implements DataSeeder {
 
   private static final String DEFAULT_PASSWORD = "password123";
 
+  public enum PersonaSubset {
+    REPRESENTATIVE
+  }
+
   /**
    * Seed user profile definition. Each entry maps to exactly one user in the playground tenant.
    *
@@ -67,7 +73,20 @@ public class UserSeeder implements DataSeeder {
       String email,
       String roleCode,
       String departmentCode,
-      String jobTitleCode) {}
+      String jobTitleCode) {
+    SeedUserProfile withEmail(String newEmail) {
+      return new SeedUserProfile(
+          firstName, lastName, newEmail, roleCode, departmentCode, jobTitleCode);
+    }
+
+    String aliasSlug() {
+      String localPart = email.substring(0, email.indexOf('@'));
+      return localPart
+          .toLowerCase(Locale.ROOT)
+          .replaceAll("[^a-z0-9]+", "-")
+          .replaceAll("^-|-$", "");
+    }
+  }
 
   // ─── Thematic Persona Definitions ───
 
@@ -280,6 +299,24 @@ public class UserSeeder implements DataSeeder {
    */
   private static final String LAST_SEEDED_EMAIL = "budget@nexusfabrics.com";
 
+  private static final Set<String> REPRESENTATIVE_PROFILE_EMAILS =
+      Set.of(
+          "spin.mgr@nexusfabrics.com",
+          "blow.op@nexusfabrics.com",
+          "weav.mgr@nexusfabrics.com",
+          "weaver@nexusfabrics.com",
+          "knit.mgr@nexusfabrics.com",
+          "knitter@nexusfabrics.com",
+          "dye.mgr@nexusfabrics.com",
+          "jet.op@nexusfabrics.com",
+          "qa.mgr@nexusfabrics.com",
+          "wh.mgr@nexusfabrics.com",
+          "yarn.wh@nexusfabrics.com",
+          "proc.mgr@nexusfabrics.com",
+          "yarn.buyer@nexusfabrics.com",
+          "sales.dir@nexusfabrics.com",
+          "sales.rep@nexusfabrics.com");
+
   @Override
   public boolean isSeeded() {
     Optional<TenantDto> tenantOpt = tenantService.findBySlug(TenantSeeder.TENANT_SLUG);
@@ -326,6 +363,59 @@ public class UserSeeder implements DataSeeder {
                     tenant.getId());
               });
         });
+  }
+
+  public int seedFor(UUID tenantId, String ownerEmail, PersonaSubset subset) {
+    return TenantContext.executeInTenantContext(
+        tenantId,
+        () -> {
+          Integer seeded =
+              transactionTemplate.execute(
+                  status -> {
+                    OrganizationDto rootOrg =
+                        organizationService
+                            .getRootOrganization()
+                            .orElseThrow(
+                                () -> new IllegalStateException("Root organization missing"));
+
+                    List<SeedUserProfile> profiles = profilesFor(subset);
+                    int seededCount = 0;
+                    for (SeedUserProfile profile : profiles) {
+                      SeedUserProfile tenantProfile =
+                          profile.withEmail(ownerAliasEmail(ownerEmail, profile));
+                      if (seedUser(tenantProfile, tenantId, rootOrg.getId())) {
+                        seededCount++;
+                      }
+                    }
+                    log.info(
+                        "Seeded {}/{} registered demo persona users for tenant: {}",
+                        seededCount,
+                        profiles.size(),
+                        tenantId);
+                    return seededCount;
+                  });
+          return seeded != null ? seeded : 0;
+        });
+  }
+
+  private List<SeedUserProfile> profilesFor(PersonaSubset subset) {
+    if (subset == PersonaSubset.REPRESENTATIVE) {
+      return ALL_PROFILES.stream()
+          .filter(profile -> REPRESENTATIVE_PROFILE_EMAILS.contains(profile.email()))
+          .toList();
+    }
+    throw new IllegalArgumentException("Unsupported persona subset: " + subset);
+  }
+
+  private String ownerAliasEmail(String ownerEmail, SeedUserProfile profile) {
+    String normalizedOwnerEmail = ownerEmail.trim().toLowerCase(Locale.ROOT);
+    int atIndex = normalizedOwnerEmail.indexOf('@');
+    if (atIndex <= 0 || atIndex == normalizedOwnerEmail.length() - 1) {
+      throw new IllegalArgumentException("Owner email is required for demo persona aliases");
+    }
+    String localPart = normalizedOwnerEmail.substring(0, atIndex);
+    String domain = normalizedOwnerEmail.substring(atIndex + 1);
+    return localPart + "+" + profile.aliasSlug() + "@" + domain;
   }
 
   /** Returns true if a new user was actually created, false if skipped (already existed). */

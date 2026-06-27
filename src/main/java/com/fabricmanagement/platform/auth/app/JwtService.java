@@ -66,7 +66,7 @@ public class JwtService {
       OrganizationRepository organizationRepository,
       @Value("${application.jwt.secret}") String secret,
       @Value("${application.jwt.expiration:900000}") long accessTokenExpiration,
-      @Value("${application.jwt.playground-expiration:7776000000}")
+      @Value("${application.jwt.playground-expiration:1209600000}")
           long playgroundTokenExpiration) {
     this.tenantQueryPort = tenantQueryPort;
     this.organizationRepository = organizationRepository;

@@ -4,10 +4,12 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
+import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.platform.auth.domain.RegistrationToken;
+import com.fabricmanagement.platform.auth.domain.RegistrationTokenType;
 import com.fabricmanagement.platform.auth.domain.event.UserLoginEvent;
 import com.fabricmanagement.platform.auth.domain.event.UserRegisteredEvent;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
@@ -76,6 +78,7 @@ public class PasswordSetupService {
   private final OrganizationAddressRepository organizationAddressRepository;
   private final TenantQueryPort tenantQueryPort;
   private final EmployeeProjectionPort employeeProjectionPort;
+  private final TrialLifecyclePort trialLifecyclePort;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
@@ -134,6 +137,9 @@ public class PasswordSetupService {
                 () ->
                     new IllegalStateException(
                         "Tenant not found or not active. Password setup is not allowed."));
+    if (tenantRef != null && token.getTokenType() == RegistrationTokenType.SELF_SERVICE) {
+      trialLifecyclePort.startSelfServiceTrialIfNeeded(user.getTenantId());
+    }
 
     // Reload User entity with contacts/departments for JWT generation
     com.fabricmanagement.platform.user.domain.User userEntity =
