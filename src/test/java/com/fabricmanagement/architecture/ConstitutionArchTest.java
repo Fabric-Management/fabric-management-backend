@@ -808,6 +808,7 @@ class ConstitutionArchTest {
       // temizle
       //   - TrialLifecycleService        : Scheduled job: registered trial expiry/activity
       // maintenance
+      //   - TenantTransactionalPurgeService : Go-real purge, atomic tenant-scoped seed/data wipe
       //   - TenantQueryAdapter           : Port/Adapter: tenant lookup (auth, event yolu)
       //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
@@ -825,6 +826,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("PlaygroundTTLReaperService")
               .and()
               .doNotHaveSimpleName("TrialLifecycleService")
+              .and()
+              .doNotHaveSimpleName("TenantTransactionalPurgeService")
               .and()
               .doNotHaveSimpleName("TenantQueryAdapter")
               .and()

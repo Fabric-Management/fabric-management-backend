@@ -61,6 +61,7 @@ public class TrialLifecycleService implements TrialLifecyclePort {
           AND type = 'REGULAR'
           AND status = 'TRIAL'
           AND trial_started_at IS NULL
+          AND demo_mode = false
           AND is_active = true
         """,
         Timestamp.from(now),
