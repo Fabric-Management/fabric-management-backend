@@ -39,7 +39,7 @@ public class TrialLifecycleService implements TrialLifecyclePort {
   @Value("${application.trial.dormancy-window-days:90}")
   private int dormancyWindowDays;
 
-  @Value("${application.trial.hard-cap-months:18}")
+  @Value("${application.trial.hard-cap-months:4}")
   private int hardCapMonths;
 
   @Override
