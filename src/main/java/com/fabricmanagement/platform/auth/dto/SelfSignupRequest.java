@@ -42,5 +42,11 @@ public class SelfSignupRequest {
 
   private List<String> selectedOS;
 
+  @Builder.Default private SignupIntent intent = SignupIntent.PLAYGROUND;
+
   @Builder.Default private Boolean acceptedTerms = false;
+
+  public SignupIntent getIntent() {
+    return intent != null ? intent : SignupIntent.PLAYGROUND;
+  }
 }
