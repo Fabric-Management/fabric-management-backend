@@ -67,6 +67,16 @@ class TenantWriteGuardInterceptorTest {
   }
 
   @Test
+  @DisplayName("EXPIRED tenant go-real POST passes through read-only guard")
+  void shouldAllowGoRealForExpiredTenantWriteGuard() {
+    UUID tenantId = UUID.randomUUID();
+    TenantContext.setCurrentTenantId(tenantId);
+
+    assertThat(preHandle("POST", "/api/v1/tenant/go-real")).isTrue();
+    verify(tenantAccessPort, never()).isWritable(tenantId);
+  }
+
+  @Test
   @DisplayName("TRIAL or ACTIVE tenant write passes through")
   void shouldAllowWritableTenantWrite() {
     UUID tenantId = UUID.randomUUID();

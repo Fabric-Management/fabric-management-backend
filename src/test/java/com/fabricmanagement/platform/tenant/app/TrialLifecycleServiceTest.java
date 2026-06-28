@@ -59,6 +59,7 @@ class TrialLifecycleServiceTest {
     assertThat(sqlCaptor.getValue()).contains("type = 'REGULAR'");
     assertThat(sqlCaptor.getValue()).contains("status = 'TRIAL'");
     assertThat(sqlCaptor.getValue()).contains("trial_started_at IS NULL");
+    assertThat(sqlCaptor.getValue()).contains("demo_mode = false");
   }
 
   @Test

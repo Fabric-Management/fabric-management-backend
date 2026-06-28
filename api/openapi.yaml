@@ -10,26 +10,12 @@ servers:
 - description: Current host
   url: /
 tags:
-- description: FX Exposure summary operations
-  name: Finance - FX Exposure
 - description: Mobile Offline Synchronization API
   name: Offline Sync
-- description: Stock Reservation and Lot Engine API
-  name: IWM Stock Reservation
-- description: Dashboard widget metrikleri
-  name: FlowBoard — Dashboard
-- description: Work Order operations
-  name: Work Order
 - description: Payment operations
   name: Payment
 - description: Manage certifications for trading partners
   name: Partner Certifications
-- description: Notification management and preferences
-  name: Notifications
-- description: Financial period close and FX revaluation
-  name: FinancialPeriod
-- description: Organization Contact operations
-  name: Organization Contact
 - description: Cross-context analytics APIs
   name: Analytics
 - description: "B2B partner management - suppliers, customers, fason partners"
@@ -44,38 +30,20 @@ tags:
   name: Inventory Balance
 - description: Cash flow forecasting operations
   name: Finance - Cash Flow
-- description: Approval Request operations
-  name: Approval Request
-- description: Physical stock unit lifecycle management
-  name: StockUnit
-- description: Procurement Purchase Order API
-  name: Purchase Order
-- description: Partner portal user management
-  name: Partner Users
-- description: Payroll Self Service operations
-  name: Payroll Self Service
 - description: IWM Warehouse Location Management API
   name: IWM Location
 - description: Recurring task templates
   name: FlowBoard — Recurring Tasks
-- description: Employee Profile operations
-  name: Employee Profile
-- description: Goods Receipt operations
-  name: Goods Receipt
 - description: Tenant Settings operations
   name: Tenant Settings
 - description: Organization operations
   name: Organization
-- description: Automation rules management
-  name: FlowBoard — Otomasyon
 - description: Inventory Transaction operations
   name: Inventory Transaction
 - description: Fiber operations
   name: Fiber
 - description: Policy operations
   name: Policy
-- description: Board management and kanban view
-  name: FlowBoard — Board
 - description: Quote management with pricing engine integration
   name: Quotes
 - description: Fiber Request Platform operations
@@ -88,6 +56,84 @@ tags:
   name: Address Validation
 - description: Batch Lineage operations
   name: Batch Lineage
+- description: Address operations
+  name: Address
+- description: Permission Management operations
+  name: Permission Management
+- description: Invoice operations
+  name: Invoice
+- description: Fiber Request operations
+  name: Fiber Request
+- description: Contact operations
+  name: Contact
+- description: Platform Notification operations
+  name: Platform Notification
+- description: Task management and status updates
+  name: FlowBoard — Task
+- description: Audit operations
+  name: Audit
+- description: WhatsApp Business API webhook endpoints
+  name: WhatsApp Webhooks
+- description: User performance leaderboard
+  name: FlowBoard — Performance
+- description: Tenant go-real transition operations
+  name: Tenant Go Real
+- description: Subcontract Order operations
+  name: Subcontract Order
+- description: Fiber Test Result operations
+  name: Fiber Test Result
+- description: User Contact operations
+  name: User Contact
+- description: User Promotion operations
+  name: User Promotion
+- description: Tenant Seed operations
+  name: Tenant Seed
+- description: "Self-service tenant registration. No authentication required. Creates\
+    \ tenant, company, admin user, FabricOS trial, and sends setup link by email.\
+    \ Email link click = email verified."
+  name: Public Signup
+- description: Manage certifications for organizations
+  name: Organization Certifications
+- description: Department operations
+  name: Department
+- description: Role operations
+  name: Role
+- description: User operations
+  name: User
+- description: Supplier Quote Management API
+  name: Supplier Quote
+- description: FX Exposure summary operations
+  name: Finance - FX Exposure
+- description: Stock Reservation and Lot Engine API
+  name: IWM Stock Reservation
+- description: Dashboard widget metrikleri
+  name: FlowBoard — Dashboard
+- description: Work Order operations
+  name: Work Order
+- description: Notification management and preferences
+  name: Notifications
+- description: Financial period close and FX revaluation
+  name: FinancialPeriod
+- description: Organization Contact operations
+  name: Organization Contact
+- description: Approval Request operations
+  name: Approval Request
+- description: Physical stock unit lifecycle management
+  name: StockUnit
+- description: Procurement Purchase Order API
+  name: Purchase Order
+- description: Partner portal user management
+  name: Partner Users
+- description: Payroll Self Service operations
+  name: Payroll Self Service
+- description: Employee Profile operations
+  name: Employee Profile
+- description: Goods Receipt operations
+  name: Goods Receipt
+- description: Automation rules management
+  name: FlowBoard — Otomasyon
+- description: Board management and kanban view
+  name: FlowBoard — Board
 - description: Fiber Quality Standard operations
   name: Fiber Quality Standard
 - description: Company Type operations
@@ -98,8 +144,6 @@ tags:
     \ user, subscriptions, and sends welcome email with setup link. Requires platform\
     \ admin in production."
   name: Tenant Onboarding (Admin)
-- description: Address operations
-  name: Address
 - description: Task Template operations
   name: Task Template
 - description: Tenant management operations (PLATFORM_ADMIN only)
@@ -114,10 +158,6 @@ tags:
   name: Health
 - description: Subscription operations
   name: Subscription
-- description: Permission Management operations
-  name: Permission Management
-- description: Invoice operations
-  name: Invoice
 - description: Fabric A I operations
   name: Fabric A I
 - description: Recipe operations
@@ -126,32 +166,18 @@ tags:
   name: Registration
 - description: Multilingual and localization management
   name: i18n
-- description: Fiber Request operations
-  name: Fiber Request
-- description: Contact operations
-  name: Contact
 - description: Product Batch Inventory & Lifecycle Management API
   name: Batch
 - description: Hr Policy Pack operations
   name: Hr Policy Pack
 - description: Whisper operations
   name: Whisper
-- description: Platform Notification operations
-  name: Platform Notification
-- description: Task management and status updates
-  name: FlowBoard — Task
-- description: Audit operations
-  name: Audit
 - description: Endpoints for PLG Simulation Playground
   name: Playground Auth
 - description: Sample request and delivery management
   name: Sample Management
-- description: WhatsApp Business API webhook endpoints
-  name: WhatsApp Webhooks
 - description: Production Output operations
   name: Production Output
-- description: User performance leaderboard
-  name: FlowBoard — Performance
 - description: Kullanici dashboard yapilandirmasi ve widget yonetimi
   name: FlowBoard — Dashboard
 - description: Tenant-specific quality grading system management
@@ -162,50 +188,26 @@ tags:
   name: User Work Location
 - description: User Nav Preferences operations
   name: User Nav Preferences
-- description: Subcontract Order operations
-  name: Subcontract Order
 - description: Notification operations
   name: Notification
-- description: Fiber Test Result operations
-  name: Fiber Test Result
-- description: User Contact operations
-  name: User Contact
 - description: Sales order management with TradingPartner integration
   name: Sales Orders
 - description: Sales Product operations
   name: Sales Product
-- description: User Promotion operations
-  name: User Promotion
 - description: User Onboarding operations
   name: User Onboarding
 - description: Platform Admin operations
   name: Platform Admin
-- description: Tenant Seed operations
-  name: Tenant Seed
-- description: "Self-service tenant registration. No authentication required. Creates\
-    \ tenant, company, admin user, FabricOS trial, and sends setup link by email.\
-    \ Email link click = email verified."
-  name: Public Signup
-- description: Manage certifications for organizations
-  name: Organization Certifications
-- description: Department operations
-  name: Department
 - description: User Address operations
   name: User Address
 - description: User workload analysis
   name: FlowBoard — Workload
 - description: Read-only accounts receivable intelligence
   name: Receivables Insights
-- description: Role operations
-  name: Role
-- description: User operations
-  name: User
 - description: Exchange Rate operations
   name: Exchange Rate
 - description: Password operations
   name: Password
-- description: Supplier Quote Management API
-  name: Supplier Quote
 paths:
   /api/v1/admin/onboarding/tenant:
     post:
@@ -39802,6 +39804,74 @@ paths:
       summary: Push offline data to backend
       tags:
       - Offline Sync
+  /api/v1/tenant/go-real:
+    post:
+      operationId: goReal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteOnboardingRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseGoRealResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      tags:
+      - Tenant Go Real
   /api/v1/webhooks/whatsapp:
     get:
       description: Meta webhook verification endpoint (GET)
@@ -41790,6 +41860,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/FinancialPeriodDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseGoRealResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/GoRealResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -49468,6 +49556,25 @@ components:
             type: string
             description: Additional processing or requirement notes
       description: Generic RFQ specs for undefined or basic modules
+    GoRealResponse:
+      type: object
+      properties:
+        deletedRows:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+        demoMode:
+          type: boolean
+        tenantId:
+          type: string
+          format: uuid
+        trialEndsAt:
+          type: string
+          format: date-time
+        trialStartedAt:
+          type: string
+          format: date-time
     GoodsReceiptItemRequest:
       type: object
       properties:
