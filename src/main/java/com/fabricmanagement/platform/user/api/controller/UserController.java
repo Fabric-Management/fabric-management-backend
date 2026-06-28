@@ -11,12 +11,14 @@ import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactSuggestionService;
 import com.fabricmanagement.platform.communication.dto.ContactSuggestionsDto;
 import com.fabricmanagement.platform.subscription.app.UserCreationOptionsService;
+import com.fabricmanagement.platform.tenant.app.TenantService;
 import com.fabricmanagement.platform.user.app.UserLocaleService;
 import com.fabricmanagement.platform.user.app.UserService;
 import com.fabricmanagement.platform.user.domain.DataScope;
 import com.fabricmanagement.platform.user.domain.port.EmployeeCreationPort;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
+import com.fabricmanagement.platform.user.dto.CurrentUserResponse;
 import com.fabricmanagement.platform.user.dto.UpdateLocalePreferencesRequest;
 import com.fabricmanagement.platform.user.dto.UpdateUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
@@ -47,6 +49,7 @@ public class UserController {
   private final UserDepartmentRepository userDepartmentRepository;
   private final UserLocaleService userLocaleService;
   private final PermissionEvaluator permissionEvaluator;
+  private final TenantService tenantService;
 
   private PermissionResult getPermissions(UUID requesterId) {
     UUID tenantId = TenantContext.requireTenantId();
@@ -260,7 +263,7 @@ public class UserController {
    * <p>Uses TenantContext.getCurrentUserId() to get the authenticated user.
    */
   @GetMapping("/me")
-  public ResponseEntity<ApiResponse<UserDto>> getCurrentUser() {
+  public ResponseEntity<ApiResponse<CurrentUserResponse>> getCurrentUser() {
     UUID userId = TenantContext.getCurrentUserId();
     UUID tenantId = TenantContext.requireTenantId();
 
@@ -282,7 +285,8 @@ public class UserController {
     user.setPermissions(permResult.permissions());
     user.setSuperAdmin(permResult.isSuperAdmin());
 
-    return ResponseEntity.ok(ApiResponse.success(user));
+    return ResponseEntity.ok(
+        ApiResponse.success(CurrentUserResponse.from(user, tenantService.getMyTenant())));
   }
 
   /**

@@ -12264,7 +12264,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ApiResponseUserDto"
+                $ref: "#/components/schemas/ApiResponseCurrentUserResponse"
           description: OK
         "400":
           content:
@@ -41657,6 +41657,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseCurrentUserResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/CurrentUserResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseDashboardConfigDto:
       type: object
       properties:
@@ -48309,6 +48327,120 @@ components:
         targetInvoiceId:
           type: string
           format: uuid
+    CurrentTenantContextDto:
+      type: object
+      properties:
+        demoMode:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - TRIAL
+          - ACTIVE
+          - EXPIRED
+          - SUSPENDED
+          - CANCELLED
+        trialEndsAt:
+          type: string
+          format: date-time
+    CurrentUserResponse:
+      type: object
+      properties:
+        birthDate:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+        departmentCodes:
+          type: array
+          items:
+            type: string
+        departmentId:
+          type: string
+          format: uuid
+        departmentName:
+          type: string
+        displayName:
+          type: string
+        emergencyContact:
+          $ref: "#/components/schemas/EmergencyContactDto"
+        employeeNumber:
+          type: string
+        firstName:
+          type: string
+        gender:
+          type: string
+        hasCompletedOnboarding:
+          type: boolean
+        hireDate:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
+        isActive:
+          type: boolean
+        isEmployee:
+          type: boolean
+        lastActiveAt:
+          type: string
+          format: date-time
+        lastName:
+          type: string
+        nationality:
+          type: string
+        onboardingCompletedAt:
+          type: string
+          format: date-time
+        organizationId:
+          type: string
+          format: uuid
+        permissions:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+              enum:
+              - OWN
+              - DEPARTMENT
+              - ORGANIZATION
+              - GLOBAL
+        preferredLocale:
+          type: string
+        preferredTimezone:
+          type: string
+        primaryDepartmentCode:
+          type: string
+        role:
+          type: string
+        roleCode:
+          type: string
+        roleId:
+          type: string
+          format: uuid
+        superAdmin:
+          type: boolean
+        tenant:
+          $ref: "#/components/schemas/CurrentTenantContextDto"
+        tenantId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        uid:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        userType:
+          type: string
+        wipLimit:
+          type: integer
+          format: int32
+        workLocationLabel:
+          type: string
     CustomerApprovalRequest:
       type: object
       properties:
