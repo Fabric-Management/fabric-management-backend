@@ -146,6 +146,10 @@ public class TenantTransactionalPurgeService {
           "common_user.profile_update_request",
           "common_infrastructure.document_sequence");
 
+  static List<String> tenantScopedDeleteTables() {
+    return TRANSACTIONAL_TABLES;
+  }
+
   private final SystemTransactionExecutor systemExecutor;
   private final CacheManager cacheManager;
   private final Clock clock;
