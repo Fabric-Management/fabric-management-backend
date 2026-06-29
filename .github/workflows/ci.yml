@@ -114,6 +114,28 @@ jobs:
       - name: Run tests
         run: mvn clean verify
 
+      - name: Print test failures
+        if: always()
+        run: |
+          echo "=== Surefire/Failsafe failure summary ==="
+          grep -R -n -E "<failure|<error" target/surefire-reports target/failsafe-reports 2>/dev/null || true
+
+          echo "=== Failing text reports ==="
+          for reports_dir in target/surefire-reports target/failsafe-reports; do
+            if [ ! -d "${reports_dir}" ]; then
+              echo "No ${reports_dir} directory."
+              continue
+            fi
+
+            for report in "${reports_dir}"/*.txt; do
+              [ -e "${report}" ] || continue
+              if grep -q -E "<<< FAILURE!|<<< ERROR!" "${report}"; then
+                echo "---- ${report} ----"
+                sed -n '1,300p' "${report}" || true
+              fi
+            done
+          done
+
       - name: Generate test report
         if: always()
         run: |
