@@ -12,6 +12,8 @@ servers:
 tags:
 - description: Mobile Offline Synchronization API
   name: Offline Sync
+- description: Demo tenant reset operations
+  name: Tenant Demo Reset
 - description: Payment operations
   name: Payment
 - description: Manage certifications for trading partners
@@ -39872,6 +39874,70 @@ paths:
           description: Internal Server Error
       tags:
       - Tenant Go Real
+  /api/v1/tenant/reset-demo:
+    post:
+      description: Requires a demo-mode tenant owner. Purges sandbox demo data and
+        restores fresh sample personas and business data while keeping the tenant
+        in demo mode.
+      operationId: resetDemo
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResetDemoResponse"
+          description: Demo reset with fresh sample data
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content: {}
+          description: DEMO_MODE_REQUIRED or RESET_REQUIRES_OWNER
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reset demo data
+      tags:
+      - Tenant Demo Reset
   /api/v1/webhooks/whatsapp:
     get:
       description: Meta webhook verification endpoint (GET)
@@ -53197,6 +53263,32 @@ components:
       required:
       - quantity
       - referenceType
+    ResetDemoResponse:
+      type: object
+      description: Summary returned after resetting a demo tenant with fresh sample
+        data
+      properties:
+        demoMode:
+          type: boolean
+          description: Whether the tenant remains in demo mode
+          example: true
+        purgedRows:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Rows purged by table or purge category
+        seededPersonaUsers:
+          type: integer
+          format: int32
+          description: Number of persona users seeded after the reset
+          example: 15
+        tenantId:
+          type: string
+          format: uuid
+          description: Tenant ID
+      required:
+      - tenantId
     RetireHrPolicyPackRequest:
       type: object
       properties:

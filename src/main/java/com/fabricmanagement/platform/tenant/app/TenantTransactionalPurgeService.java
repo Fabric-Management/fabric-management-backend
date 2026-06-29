@@ -108,7 +108,6 @@ public class TenantTransactionalPurgeService {
           "production.production_quality_fiber_test_result",
           "production.production_execution_batch_attribute",
           "production.production_execution_batch_certification",
-          "production.production_execution_batch_override_log",
           "production.production_execution_batch_reservation",
           "production.production_execution_inventory_transaction",
           "production.production_execution_inventory_balance",
@@ -127,7 +126,6 @@ public class TenantTransactionalPurgeService {
           "procurement.subcontract_order",
           "procurement.purchase_order_line",
           "procurement.purchase_order",
-          "sales_ord.sales_order_line_processed_shipments",
           "sales_ord.sales_order_line",
           "sales_ord.sales_order",
           "sales.sample_delivery",
@@ -166,11 +164,7 @@ public class TenantTransactionalPurgeService {
         systemExecutor.executeInTransaction(
             jdbc -> {
               ensureTenantIsDemoMode(jdbc, tenantId);
-              Map<String, Integer> rows = new LinkedHashMap<>();
-              deleteTransactionalRows(jdbc, tenantId, rows);
-              deleteSeedUsers(jdbc, tenantId, rows);
-              deleteTradingPartnerRows(jdbc, tenantId, rows);
-              deleteProductReferenceRows(jdbc, tenantId, rows);
+              Map<String, Integer> rows = purgeDemoData(jdbc, tenantId);
               flipDemoModeAndStartClock(jdbc, tenantId, now, trialEndsAt);
               return rows;
             });
@@ -182,6 +176,32 @@ public class TenantTransactionalPurgeService {
         trialEndsAt,
         deletedRows);
     return new PurgeResult(tenantId, deletedRows, now, trialEndsAt);
+  }
+
+  public PurgeDemoDataResult purgeDemoData(UUID tenantId) {
+    if (tenantId == null) {
+      throw new PlatformDomainException("Tenant not found", "TENANT_NOT_FOUND", 404);
+    }
+
+    Map<String, Integer> deletedRows =
+        systemExecutor.executeInTransaction(
+            jdbc -> {
+              ensureTenantIsDemoMode(jdbc, tenantId);
+              return purgeDemoData(jdbc, tenantId);
+            });
+
+    log.info(
+        "Tenant demo data purge completed: tenantId={}, deletedRows={}", tenantId, deletedRows);
+    return new PurgeDemoDataResult(tenantId, deletedRows);
+  }
+
+  private Map<String, Integer> purgeDemoData(JdbcTemplate jdbc, UUID tenantId) {
+    Map<String, Integer> rows = new LinkedHashMap<>();
+    deleteTransactionalRows(jdbc, tenantId, rows);
+    deleteSeedUsers(jdbc, tenantId, rows);
+    deleteTradingPartnerRows(jdbc, tenantId, rows);
+    deleteProductReferenceRows(jdbc, tenantId, rows);
+    return rows;
   }
 
   private void ensureTenantIsDemoMode(JdbcTemplate jdbc, UUID tenantId) {
@@ -207,9 +227,36 @@ public class TenantTransactionalPurgeService {
 
   private void deleteTransactionalRows(
       JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
+    deleteChildRowsWithoutTenantId(jdbc, tenantId, rows);
     for (String table : TRANSACTIONAL_TABLES) {
       delete(jdbc, rows, table, "DELETE FROM " + table + " WHERE tenant_id = ?", tenantId);
     }
+  }
+
+  private void deleteChildRowsWithoutTenantId(
+      JdbcTemplate jdbc, UUID tenantId, Map<String, Integer> rows) {
+    delete(
+        jdbc,
+        rows,
+        "production.production_execution_batch_override_log",
+        """
+        DELETE FROM production.production_execution_batch_override_log log
+        USING production.production_execution_batch batch
+        WHERE log.batch_id = batch.id
+          AND batch.tenant_id = ?
+        """,
+        tenantId);
+    delete(
+        jdbc,
+        rows,
+        "sales_ord.sales_order_line_processed_shipments",
+        """
+        DELETE FROM sales_ord.sales_order_line_processed_shipments processed
+        USING sales_ord.sales_order_line line
+        WHERE processed.sales_order_line_id = line.id
+          AND line.tenant_id = ?
+        """,
+        tenantId);
   }
 
   private void deleteTradingPartnerRows(
@@ -560,4 +607,6 @@ public class TenantTransactionalPurgeService {
       Map<String, Integer> deletedRows,
       Instant trialStartedAt,
       Instant trialEndsAt) {}
+
+  public record PurgeDemoDataResult(UUID tenantId, Map<String, Integer> deletedRows) {}
 }
