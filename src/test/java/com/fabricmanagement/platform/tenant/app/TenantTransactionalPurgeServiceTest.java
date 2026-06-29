@@ -86,6 +86,8 @@ class TenantTransactionalPurgeServiceTest {
             "flowboard.task",
             "common_approval.approval_request",
             "notification.notification_queue",
+            "production.production_execution_batch_override_log",
+            "sales_ord.sales_order_line_processed_shipments",
             "common_company.common_organization(external-partners)",
             "common_company.common_trading_partner+unreferenced_registry",
             "human.human_employee_number_sequence",
@@ -96,6 +98,14 @@ class TenantTransactionalPurgeServiceTest {
             contains("DELETE FROM procurement.purchase_order WHERE tenant_id = ?"), eq(TENANT_ID));
     verify(jdbc)
         .update(contains("DELETE FROM production.prod_product WHERE tenant_id = ?"), eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM production.production_execution_batch_override_log log"),
+            eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM sales_ord.sales_order_line_processed_shipments processed"),
+            eq(TENANT_ID));
     verify(jdbc)
         .update(
             contains(
@@ -156,8 +166,18 @@ class TenantTransactionalPurgeServiceTest {
             "sales.quote",
             "procurement.purchase_order",
             "production.prod_product",
+            "production.production_execution_batch_override_log",
+            "sales_ord.sales_order_line_processed_shipments",
             "common_user.common_user(seed-demo-users)");
     verify(jdbc).update(contains("DELETE FROM sales.quote WHERE tenant_id = ?"), eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM production.production_execution_batch_override_log log"),
+            eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM sales_ord.sales_order_line_processed_shipments processed"),
+            eq(TENANT_ID));
     verify(jdbc, never())
         .update(
             contains("UPDATE common_tenant.common_tenant"),
