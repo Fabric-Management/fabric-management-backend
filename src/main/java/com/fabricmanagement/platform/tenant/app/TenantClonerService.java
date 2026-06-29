@@ -278,8 +278,8 @@ public class TenantClonerService {
               String name = "Playground " + playgroundSuffix;
 
               jdbc.update(
-                  "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, status, settings, is_active, created_at, updated_at, version) "
-                      + "VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb, true, now(), now(), 0)",
+                  "INSERT INTO common_tenant.common_tenant (id, uid, slug, name, type, status, settings, demo_mode, is_active, created_at, updated_at, version) "
+                      + "VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb, true, true, now(), now(), 0)",
                   newTenantId,
                   uid,
                   slug,

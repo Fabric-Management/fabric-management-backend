@@ -1,9 +1,11 @@
 package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
 import com.fabricmanagement.platform.auth.dto.PlaygroundImpersonateResponse;
 import com.fabricmanagement.platform.auth.dto.PlaygroundInitResponse;
 import com.fabricmanagement.platform.auth.dto.PlaygroundPersonaDto;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
@@ -32,6 +34,7 @@ public class PlaygroundService {
   private final UserRepository userRepository;
   private final OrganizationRepository organizationRepository;
   private final TransactionTemplate transactionTemplate;
+  private final TenantAccessPort tenantAccessPort;
 
   private static final Map<String, String> PLAYGROUND_JOB_TITLES =
       Map.ofEntries(
@@ -193,6 +196,14 @@ public class PlaygroundService {
 
   @Transactional
   public PlaygroundImpersonateResponse impersonate(UUID tenantId, UUID userId, String guestId) {
+    return impersonate(tenantId, userId, guestId, false);
+  }
+
+  @Transactional
+  public PlaygroundImpersonateResponse impersonate(
+      UUID tenantId, UUID userId, String guestId, boolean preserveRealSession) {
+    requireDemoMode(tenantId);
+
     return TenantContext.executeInTenantContext(
         tenantId,
         () -> {
@@ -203,7 +214,10 @@ public class PlaygroundService {
 
           String contactValue = resolvePlaygroundContact(targetUser);
           String newToken =
-              jwtService.generatePlaygroundAccessToken(targetUser, guestId, contactValue);
+              preserveRealSession
+                  ? jwtService.generateDemoImpersonationAccessToken(
+                      targetUser, guestId, contactValue)
+                  : jwtService.generatePlaygroundAccessToken(targetUser, guestId, contactValue);
 
           String roleName =
               targetUser.getRole() != null ? targetUser.getRole().getRoleName() : "No Role";
@@ -215,6 +229,8 @@ public class PlaygroundService {
 
   @Transactional(readOnly = true)
   public List<PlaygroundPersonaDto> listPersonas(UUID tenantId) {
+    requireDemoMode(tenantId);
+
     return TenantContext.executeInTenantContext(
         tenantId,
         () -> {
@@ -253,6 +269,21 @@ public class PlaygroundService {
                   })
               .toList();
         });
+  }
+
+  private void requireDemoMode(UUID tenantId) {
+    boolean demoMode;
+    try {
+      demoMode = tenantAccessPort.isDemoMode(tenantId);
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Could not resolve demo mode for tenant {}; refusing playground capability", tenantId);
+      demoMode = false;
+    }
+    if (!demoMode) {
+      throw new PlatformDomainException(
+          "Demo mode is required to use playground impersonation", "DEMO_MODE_REQUIRED", 403);
+    }
   }
 
   private String resolvePlaygroundContact(User user) {
