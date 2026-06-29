@@ -53697,6 +53697,11 @@ components:
         firstName:
           type: string
           minLength: 1
+        intent:
+          type: string
+          enum:
+          - PLAYGROUND
+          - TRIAL
         lastName:
           type: string
           minLength: 1

@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.exception.TaxIdAlreadyExis
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingContext;
 import com.fabricmanagement.platform.auth.app.onboarding.TenantOnboardingOrchestrator;
 import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
+import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingRequest;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
@@ -107,7 +108,7 @@ public class TenantOnboardingService {
             : List.of("FabricOS"));
     context.setTrialDays(DEFAULT_SELF_SERVICE_TRIAL_DAYS);
     context.setSalesLed(false);
-    context.setDemoMode(true);
+    context.setDemoMode(request.getIntent() != SignupIntent.TRIAL);
 
     return orchestrator.onboard(context);
   }

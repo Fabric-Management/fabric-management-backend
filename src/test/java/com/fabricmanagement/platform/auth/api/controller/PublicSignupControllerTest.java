@@ -1,6 +1,8 @@
 package com.fabricmanagement.platform.auth.api.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.auth.app.TenantOnboardingService;
 import com.fabricmanagement.platform.auth.dto.SelfSignupRequest;
+import com.fabricmanagement.platform.auth.dto.SignupIntent;
 import com.fabricmanagement.platform.auth.dto.TenantOnboardingResponse;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import java.time.Instant;
@@ -17,6 +20,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -95,5 +99,52 @@ class PublicSignupControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data").value("Welcome! Check your email to complete registration."));
+  }
+
+  @Test
+  @DisplayName("POST /api/public/signup defaults unknown intent to playground")
+  void signup_defaultsUnknownIntentToPlayground() throws Exception {
+    TenantOnboardingResponse response =
+        TenantOnboardingResponse.builder()
+            .organizationId(UUID.randomUUID())
+            .tenantId(UUID.randomUUID())
+            .organizationUid("SIGNUP-002")
+            .organizationName("Signup Co")
+            .adminUserId(UUID.randomUUID())
+            .adminContactValue("user@example.com")
+            .registrationToken("token-789")
+            .subscriptions(List.of("FabricOS"))
+            .trialEndsAt(Instant.now().plusSeconds(86400))
+            .setupUrl("https://app.example.com/setup?token=token-789")
+            .build();
+    when(onboardingService.createSelfServiceTenant(any(SelfSignupRequest.class)))
+        .thenReturn(response);
+
+    String body =
+        """
+        {
+          "organizationName": "Signup Co",
+          "taxId": "9876543210",
+          "organizationType": "WEAVER",
+          "firstName": "John",
+          "lastName": "Doe",
+          "email": "user@example.com",
+          "acceptedTerms": true,
+          "intent": "something-else"
+        }
+        """;
+
+    mockMvc
+        .perform(
+            post("/api/v1/public/signup")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<SelfSignupRequest> requestCaptor =
+        ArgumentCaptor.forClass(SelfSignupRequest.class);
+    verify(onboardingService).createSelfServiceTenant(requestCaptor.capture());
+    assertThat(requestCaptor.getValue().getIntent()).isEqualTo(SignupIntent.PLAYGROUND);
   }
 }

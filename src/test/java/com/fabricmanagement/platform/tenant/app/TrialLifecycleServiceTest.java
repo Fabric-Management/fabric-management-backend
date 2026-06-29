@@ -41,7 +41,7 @@ class TrialLifecycleServiceTest {
     service = new TrialLifecycleService(systemExecutor, cacheManager);
     ReflectionTestUtils.setField(service, "baseDays", 90);
     ReflectionTestUtils.setField(service, "dormancyWindowDays", 90);
-    ReflectionTestUtils.setField(service, "hardCapMonths", 18);
+    ReflectionTestUtils.setField(service, "hardCapMonths", 4);
   }
 
   @Test
@@ -105,7 +105,7 @@ class TrialLifecycleServiceTest {
 
     assertThat(decision.status()).isEqualTo(TenantStatus.EXPIRED);
     assertThat(decision.effectiveExpiry())
-        .isEqualTo(started.atOffset(java.time.ZoneOffset.UTC).plusMonths(18).toInstant());
+        .isEqualTo(started.atOffset(java.time.ZoneOffset.UTC).plusMonths(4).toInstant());
   }
 
   @Test
