@@ -24,6 +24,7 @@ public class TenantWriteGuardInterceptor implements HandlerInterceptor {
       List.of(
           "/api/v1/auth/**",
           "/api/v1/public/**",
+          "/api/v1/playground/impersonate/**",
           "/api/v1/tenant/go-real",
           "/api/v1/subscriptions/*/activate",
           "/api/v1/subscriptions/**/activate");

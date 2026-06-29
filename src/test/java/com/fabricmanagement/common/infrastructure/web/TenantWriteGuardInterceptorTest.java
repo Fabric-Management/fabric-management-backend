@@ -77,6 +77,16 @@ class TenantWriteGuardInterceptorTest {
   }
 
   @Test
+  @DisplayName("EXPIRED tenant playground impersonation passes through read-only guard")
+  void shouldAllowPlaygroundImpersonationForExpiredTenantWriteGuard() {
+    UUID tenantId = UUID.randomUUID();
+    TenantContext.setCurrentTenantId(tenantId);
+
+    assertThat(preHandle("POST", "/api/v1/playground/impersonate/" + UUID.randomUUID())).isTrue();
+    verify(tenantAccessPort, never()).isWritable(tenantId);
+  }
+
+  @Test
   @DisplayName("TRIAL or ACTIVE tenant write passes through")
   void shouldAllowWritableTenantWrite() {
     UUID tenantId = UUID.randomUUID();

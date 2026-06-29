@@ -7,9 +7,12 @@ import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
+import com.fabricmanagement.platform.organization.domain.Department;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
+import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.domain.UserContact;
+import com.fabricmanagement.platform.user.domain.UserDepartment;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -70,6 +73,54 @@ class JwtServiceTest {
     assertTokenTtl(claims, PLAYGROUND_TOKEN_EXPIRATION);
     assertThat(claims.get("is_playground", Boolean.class)).isTrue();
     assertThat(claims.get("guest_id", String.class)).isEqualTo("guest-123");
+  }
+
+  @Test
+  @DisplayName("demo impersonation access token preserves normal session lifetime")
+  void generateDemoImpersonationAccessToken_usesRegularAccessTokenExpiration() {
+    User user = buildUser();
+    when(tenantQueryPort.findById(user.getTenantId()))
+        .thenReturn(
+            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
+    when(organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId()))
+        .thenReturn(Optional.empty());
+
+    Claims claims =
+        parse(
+            jwtService.generateDemoImpersonationAccessToken(
+                user, "guest-123", "guest@example.com"));
+
+    assertTokenTtl(claims, ACCESS_TOKEN_EXPIRATION);
+    assertThat(claims.get("is_playground", Boolean.class)).isNull();
+    assertThat(claims.get("demo_impersonation", Boolean.class)).isTrue();
+    assertThat(claims.get("guest_id", String.class)).isEqualTo("guest-123");
+  }
+
+  @Test
+  @DisplayName("demo impersonation context matches real login context for data-scope inputs")
+  void generateDemoImpersonationAccessToken_matchesRealLoginSecurityContextClaims() {
+    User user = buildWorkerUser();
+    when(tenantQueryPort.findById(user.getTenantId()))
+        .thenReturn(
+            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
+    when(organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId()))
+        .thenReturn(Optional.empty());
+
+    JwtService.AuthTokenClaims realLoginClaims =
+        jwtService.extractAuthContext(jwtService.generateAccessToken(user));
+    JwtService.AuthTokenClaims impersonationClaims =
+        jwtService.extractAuthContext(
+            jwtService.generateDemoImpersonationAccessToken(
+                user, "guest-123", "worker@example.com"));
+
+    assertThat(impersonationClaims.userId()).isEqualTo(realLoginClaims.userId());
+    assertThat(impersonationClaims.tenantId()).isEqualTo(realLoginClaims.tenantId());
+    assertThat(impersonationClaims.roleCode()).isEqualTo("WORKER");
+    assertThat(impersonationClaims.roleCode()).isEqualTo(realLoginClaims.roleCode());
+    assertThat(impersonationClaims.departmentCodes())
+        .containsExactlyElementsOf(realLoginClaims.departmentCodes());
+    assertThat(impersonationClaims.primaryDepartment())
+        .isEqualTo(realLoginClaims.primaryDepartment());
   }
 
   @Test
@@ -156,6 +207,32 @@ class JwtServiceTest {
     user.setTenantId(tenantId);
     user.setUid("TEST-001-USER-00001");
     user.getUserContacts().add(UserContact.builder().contact(contact).isDefault(true).build());
+    return user;
+  }
+
+  private static User buildWorkerUser() {
+    User user = buildUser();
+
+    Role role = Role.create("Worker", "WORKER", "Worker");
+    role.setId(UUID.randomUUID());
+    role.setTenantId(user.getTenantId());
+    user.setRole(role);
+
+    Department department =
+        Department.create(user.getOrganizationId(), "Production", "PRODUCTION", "Production");
+    department.setId(UUID.randomUUID());
+    department.setTenantId(user.getTenantId());
+
+    user.getUserDepartments()
+        .add(
+            UserDepartment.builder()
+                .user(user)
+                .userId(user.getId())
+                .department(department)
+                .departmentId(department.getId())
+                .tenantId(user.getTenantId())
+                .isPrimary(true)
+                .build());
     return user;
   }
 }

@@ -84,14 +84,7 @@ public class JwtService {
     String contactValue = getVerifiedContactOrThrow(user);
     log.debug("Generating access token for user: {}", contactValue);
 
-    Map<String, Object> claims = buildCommonClaims(user);
-
-    // Load organization for organization_type (category equivalent)
-    Optional<Organization> orgOpt =
-        organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
-    orgOpt.ifPresent(o -> claims.put("organization_type", o.getOrganizationType().name()));
-
-    return buildToken(contactValue, claims, accessTokenExpiration);
+    return buildToken(contactValue, buildAccessTokenClaims(user), accessTokenExpiration);
   }
 
   /**
@@ -127,6 +120,29 @@ public class JwtService {
     return buildToken(contactValue, claims, playgroundTokenExpiration);
   }
 
+  /**
+   * Generates a normal-session access token for demo impersonation.
+   *
+   * <p>This keeps the real-login session model: regular access-token lifetime and no {@code
+   * is_playground} claim. Demo authorization is decided from the tenant's demoMode flag, while this
+   * token keeps an explicit impersonation marker for downstream diagnostics and compatibility.
+   */
+  public String generateDemoImpersonationAccessToken(
+      User user, String guestId, String contactValue) {
+    log.debug(
+        "Generating demo impersonation access token for user: {}, guestId: {}",
+        contactValue,
+        guestId);
+
+    Map<String, Object> claims = buildAccessTokenClaims(user);
+    claims.put("demo_impersonation", true);
+    if (guestId != null && !guestId.isBlank()) {
+      claims.put("guest_id", guestId);
+    }
+
+    return buildToken(contactValue, claims, accessTokenExpiration);
+  }
+
   private String getVerifiedContactOrThrow(User user) {
     return user.getAnyVerifiedContact()
         .map(contact -> contact.getContactValue())
@@ -134,6 +150,16 @@ public class JwtService {
             () ->
                 new PlatformDomainException(
                     "User has no verified contact", "AUTH_NO_VERIFIED_CONTACT", 400));
+  }
+
+  private Map<String, Object> buildAccessTokenClaims(User user) {
+    Map<String, Object> claims = buildCommonClaims(user);
+
+    // Load organization for organization_type (category equivalent)
+    Optional<Organization> orgOpt =
+        organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId());
+    orgOpt.ifPresent(o -> claims.put("organization_type", o.getOrganizationType().name()));
+    return claims;
   }
 
   private Map<String, Object> buildCommonClaims(User user) {

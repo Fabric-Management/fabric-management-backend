@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -110,12 +111,12 @@ public class PlaygroundAuthController {
   @Operation(
       summary = "Switch persona in the current playground session",
       description =
-          "Validates the target user belongs to the current playground tenant and generates a new JWT token for that persona.")
+          "Validates the current tenant is in demo mode, verifies the target user belongs to that tenant, and generates a new JWT token for that persona.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Persona switched successfully"),
     @ApiResponse(
         responseCode = "403",
-        description = "Not a valid playground session or user outside playground",
+        description = "Demo mode is required or user is outside the current tenant",
         content = @Content)
   })
   @PreAuthorize("isAuthenticated()")
@@ -125,10 +126,11 @@ public class PlaygroundAuthController {
               example = "550e8400-e29b-41d4-a716-446655440000")
           @PathVariable
           UUID userId,
+      HttpServletRequest request,
       HttpServletResponse response) {
     AuthenticatedUserContext ctx = getAuthenticatedContextOrNull();
-    if (ctx == null || !ctx.isPlayground()) {
-      throw new AccessDeniedException("Not a valid playground session");
+    if (ctx == null) {
+      throw new AccessDeniedException("Authenticated user context is required");
     }
 
     log.info(
@@ -137,11 +139,13 @@ public class PlaygroundAuthController {
         userId,
         ctx.tenantId());
 
+    String refreshToken = resolveRefreshTokenCookie(request);
+    boolean realSession = !ctx.isPlayground();
     PlaygroundImpersonateResponse impersonateResponse =
-        playgroundService.impersonate(ctx.tenantId(), userId, ctx.guestId());
+        playgroundService.impersonate(ctx.tenantId(), userId, ctx.guestId(), realSession);
 
     // Set JWT as HttpOnly cookie — frontend uses cookie-based auth exclusively
-    authCookieSupport.addAuthCookies(response, impersonateResponse.token(), null);
+    authCookieSupport.addAuthCookies(response, impersonateResponse.token(), refreshToken);
 
     return ResponseEntity.ok(impersonateResponse);
   }
@@ -153,16 +157,13 @@ public class PlaygroundAuthController {
           "Returns a list of all active users in the cloned playground tenant that can be impersonated.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "List of personas retrieved successfully"),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Not a valid playground session",
-        content = @Content)
+    @ApiResponse(responseCode = "403", description = "Demo mode is required", content = @Content)
   })
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<List<PlaygroundPersonaDto>> listPersonas() {
     AuthenticatedUserContext ctx = getAuthenticatedContextOrNull();
-    if (ctx == null || !ctx.isPlayground()) {
-      throw new AccessDeniedException("Not a valid playground session");
+    if (ctx == null) {
+      throw new AccessDeniedException("Authenticated user context is required");
     }
 
     List<PlaygroundPersonaDto> personas = playgroundService.listPersonas(ctx.tenantId());
@@ -173,6 +174,18 @@ public class PlaygroundAuthController {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth != null && auth.getPrincipal() instanceof AuthenticatedUserContext ctx) {
       return ctx;
+    }
+    return null;
+  }
+
+  private String resolveRefreshTokenCookie(HttpServletRequest request) {
+    if (request.getCookies() == null) {
+      return null;
+    }
+    for (Cookie cookie : request.getCookies()) {
+      if (AuthCookieSupport.REFRESH_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
+        return cookie.getValue();
+      }
     }
     return null;
   }
