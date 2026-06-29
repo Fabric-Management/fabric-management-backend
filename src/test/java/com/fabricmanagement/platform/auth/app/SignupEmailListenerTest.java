@@ -39,10 +39,15 @@ class SignupEmailListenerTest {
             UUID.randomUUID(),
             "owner@example.com",
             "Owner",
+            "Admin",
             "Acme Textiles",
+            "ACME-123",
+            "SPINNER",
             "https://app.example.com/setup?token=abc",
             false,
             List.of("FabricOS"),
+            "PLAYGROUND",
+            UUID.randomUUID(),
             "en");
     LocalizationContext.setLocale("tr");
     when(localizationService.getMessage(
@@ -84,10 +89,15 @@ class SignupEmailListenerTest {
             UUID.randomUUID(),
             "admin@example.com",
             "Admin",
+            "Owner",
             "Enterprise Textiles",
+            "ENT-123",
+            "VERTICAL_MILL",
             "https://app.example.com/setup?token=sales",
             true,
             List.of("FabricOS", "WarehouseOS"),
+            "SALES_LED",
+            UUID.randomUUID(),
             "tr");
     when(localizationService.getMessage("email.welcome.subject", null, Locale.forLanguageTag("tr")))
         .thenReturn("Welcome");

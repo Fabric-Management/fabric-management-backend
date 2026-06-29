@@ -31,10 +31,15 @@ class SignupEmailAfterCommitIntegrationTest extends AbstractIntegrationTest {
             UUID.randomUUID(),
             "rollback@example.com",
             "Rollback",
+            "Owner",
             "Rollback Textiles",
+            "ROLL-123",
+            "SPINNER",
             "https://app.example.com/setup?token=rollback",
             false,
             List.of("FabricOS"),
+            "PLAYGROUND",
+            UUID.randomUUID(),
             "en");
 
     transactionTemplate.executeWithoutResult(

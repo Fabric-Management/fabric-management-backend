@@ -50,6 +50,9 @@ class RlsAllowlistArchTest {
           "common_tenant",
           "trading_partner_registry",
 
+          // Permanent marketing lead; tenant-independent with nullable trial_tenant_id link
+          "common_lead",
+
           // Audit Logs without tenantId (joined via parent entity)
           "production_execution_batch_override_log",
 

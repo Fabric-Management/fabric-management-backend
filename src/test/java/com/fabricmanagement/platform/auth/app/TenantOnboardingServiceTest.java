@@ -39,6 +39,7 @@ class TenantOnboardingServiceTest {
     verify(orchestrator).onboard(contextCaptor.capture());
     assertThat(contextCaptor.getValue().isSalesLed()).isFalse();
     assertThat(contextCaptor.getValue().isDemoMode()).isTrue();
+    assertThat(contextCaptor.getValue().getSignupIntent()).isEqualTo("PLAYGROUND");
   }
 
   @Test
@@ -55,6 +56,7 @@ class TenantOnboardingServiceTest {
     verify(orchestrator).onboard(contextCaptor.capture());
     assertThat(contextCaptor.getValue().isSalesLed()).isFalse();
     assertThat(contextCaptor.getValue().isDemoMode()).isTrue();
+    assertThat(contextCaptor.getValue().getSignupIntent()).isEqualTo("PLAYGROUND");
   }
 
   @Test
@@ -70,6 +72,7 @@ class TenantOnboardingServiceTest {
     verify(orchestrator).onboard(contextCaptor.capture());
     assertThat(contextCaptor.getValue().isSalesLed()).isFalse();
     assertThat(contextCaptor.getValue().isDemoMode()).isFalse();
+    assertThat(contextCaptor.getValue().getSignupIntent()).isEqualTo("TRIAL");
   }
 
   @Test
@@ -94,6 +97,7 @@ class TenantOnboardingServiceTest {
     verify(orchestrator).onboard(contextCaptor.capture());
     assertThat(contextCaptor.getValue().isSalesLed()).isTrue();
     assertThat(contextCaptor.getValue().isDemoMode()).isFalse();
+    assertThat(contextCaptor.getValue().getSignupIntent()).isEqualTo("SALES_LED");
   }
 
   private SelfSignupRequest selfSignupRequest(SignupIntent intent) {

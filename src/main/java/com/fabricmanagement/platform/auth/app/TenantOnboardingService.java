@@ -69,6 +69,7 @@ public class TenantOnboardingService {
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()
             : List.of("FabricOS"));
+    context.setSignupIntent("SALES_LED");
     context.setTrialDays(
         request.getTrialDays() != null ? request.getTrialDays() : DEFAULT_SALES_LED_TRIAL_DAYS);
     context.setSalesLed(true);
@@ -106,6 +107,7 @@ public class TenantOnboardingService {
         request.getSelectedOS() != null && !request.getSelectedOS().isEmpty()
             ? request.getSelectedOS()
             : List.of("FabricOS"));
+    context.setSignupIntent(request.getIntent().name());
     context.setTrialDays(DEFAULT_SELF_SERVICE_TRIAL_DAYS);
     context.setSalesLed(false);
     context.setDemoMode(request.getIntent() != SignupIntent.TRIAL);

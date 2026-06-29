@@ -10,6 +10,7 @@ import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.web.LocalizationContext;
 import com.fabricmanagement.platform.auth.domain.event.SelfSignupCompletedEvent;
+import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -43,8 +44,12 @@ class PublishSelfSignupCompletedStepTest {
     context.setRegistrationToken("setup-token");
     context.setAdminContact("owner@example.com");
     context.setAdminFirstName("Owner");
+    context.setAdminLastName("Admin");
     context.setOrganizationName("Acme Textiles");
+    context.setTaxId("ACME-123");
+    context.setOrganizationType(OrganizationType.SPINNER);
     context.setSalesLed(true);
+    context.setSignupIntent("PLAYGROUND");
     context.setSubscriptionOsCodes(List.of("FabricOS", "WarehouseOS"));
     LocalizationContext.setLocale("tr");
     when(frontendUrlProvider.buildUrl("/setup?token=setup-token"))
@@ -62,10 +67,15 @@ class PublishSelfSignupCompletedStepTest {
     assertThat(event.getTenantId()).isEqualTo(tenantId);
     assertThat(event.getRecipientEmail()).isEqualTo("owner@example.com");
     assertThat(event.getFirstName()).isEqualTo("Owner");
+    assertThat(event.getLastName()).isEqualTo("Admin");
     assertThat(event.getOrganizationName()).isEqualTo("Acme Textiles");
+    assertThat(event.getTaxId()).isEqualTo("ACME-123");
+    assertThat(event.getOrganizationType()).isEqualTo("SPINNER");
     assertThat(event.getSetupUrl()).isEqualTo("https://app.example.com/setup?token=setup-token");
     assertThat(event.isSalesLed()).isTrue();
     assertThat(event.getSubscriptionOsCodes()).containsExactly("FabricOS", "WarehouseOS");
+    assertThat(event.getSignupIntent()).isEqualTo("PLAYGROUND");
+    assertThat(event.getTrialTenantId()).isEqualTo(tenantId);
     assertThat(event.getLocaleLanguageTag()).isEqualTo("tr");
   }
 

@@ -47,6 +47,7 @@ public class OnboardingContext {
   private String adminLastName;
   private String adminContact;
   private List<String> selectedOS;
+  private String signupIntent;
   private int trialDays;
   private boolean salesLed;
   private boolean demoMode;

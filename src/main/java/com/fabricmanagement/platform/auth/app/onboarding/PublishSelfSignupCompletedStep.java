@@ -41,10 +41,15 @@ public class PublishSelfSignupCompletedStep implements OnboardingStep {
             context.getTenantId(),
             email,
             context.getAdminFirstName() != null ? context.getAdminFirstName() : "",
+            context.getAdminLastName() != null ? context.getAdminLastName() : "",
             context.getOrganizationName() != null ? context.getOrganizationName() : "",
+            context.getTaxId(),
+            context.getOrganizationType() != null ? context.getOrganizationType().name() : null,
             setupUrl,
             context.isSalesLed(),
             context.getSubscriptionOsCodes(),
+            context.getSignupIntent(),
+            context.getTenantId(),
             LocalizationContext.getLocale());
 
     eventPublisher.publish(event);
