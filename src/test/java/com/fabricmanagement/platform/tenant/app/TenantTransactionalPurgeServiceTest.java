@@ -144,6 +144,31 @@ class TenantTransactionalPurgeServiceTest {
   }
 
   @Test
+  void purgeDemoDataShouldDeleteRowsWithoutFlippingDemoModeOrStartingTrialClock() {
+    stubSystemTransaction();
+    when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(TENANT_ID))).thenReturn(true);
+
+    TenantTransactionalPurgeService.PurgeDemoDataResult result = service.purgeDemoData(TENANT_ID);
+
+    assertThat(result.tenantId()).isEqualTo(TENANT_ID);
+    assertThat(result.deletedRows())
+        .containsKeys(
+            "sales.quote",
+            "procurement.purchase_order",
+            "production.prod_product",
+            "common_user.common_user(seed-demo-users)");
+    verify(jdbc).update(contains("DELETE FROM sales.quote WHERE tenant_id = ?"), eq(TENANT_ID));
+    verify(jdbc, never())
+        .update(
+            contains("UPDATE common_tenant.common_tenant"),
+            any(Timestamp.class),
+            any(Timestamp.class),
+            any(Timestamp.class),
+            eq(TENANT_ID));
+    verify(cacheManager, never()).getCache("tenant-demomode");
+  }
+
+  @Test
   void shouldNotDeleteIdentityConfigurationTablesWholesale() {
     stubSystemTransaction();
     when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(TENANT_ID))).thenReturn(true);

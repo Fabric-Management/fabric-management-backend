@@ -166,11 +166,7 @@ public class TenantTransactionalPurgeService {
         systemExecutor.executeInTransaction(
             jdbc -> {
               ensureTenantIsDemoMode(jdbc, tenantId);
-              Map<String, Integer> rows = new LinkedHashMap<>();
-              deleteTransactionalRows(jdbc, tenantId, rows);
-              deleteSeedUsers(jdbc, tenantId, rows);
-              deleteTradingPartnerRows(jdbc, tenantId, rows);
-              deleteProductReferenceRows(jdbc, tenantId, rows);
+              Map<String, Integer> rows = purgeDemoData(jdbc, tenantId);
               flipDemoModeAndStartClock(jdbc, tenantId, now, trialEndsAt);
               return rows;
             });
@@ -182,6 +178,32 @@ public class TenantTransactionalPurgeService {
         trialEndsAt,
         deletedRows);
     return new PurgeResult(tenantId, deletedRows, now, trialEndsAt);
+  }
+
+  public PurgeDemoDataResult purgeDemoData(UUID tenantId) {
+    if (tenantId == null) {
+      throw new PlatformDomainException("Tenant not found", "TENANT_NOT_FOUND", 404);
+    }
+
+    Map<String, Integer> deletedRows =
+        systemExecutor.executeInTransaction(
+            jdbc -> {
+              ensureTenantIsDemoMode(jdbc, tenantId);
+              return purgeDemoData(jdbc, tenantId);
+            });
+
+    log.info(
+        "Tenant demo data purge completed: tenantId={}, deletedRows={}", tenantId, deletedRows);
+    return new PurgeDemoDataResult(tenantId, deletedRows);
+  }
+
+  private Map<String, Integer> purgeDemoData(JdbcTemplate jdbc, UUID tenantId) {
+    Map<String, Integer> rows = new LinkedHashMap<>();
+    deleteTransactionalRows(jdbc, tenantId, rows);
+    deleteSeedUsers(jdbc, tenantId, rows);
+    deleteTradingPartnerRows(jdbc, tenantId, rows);
+    deleteProductReferenceRows(jdbc, tenantId, rows);
+    return rows;
   }
 
   private void ensureTenantIsDemoMode(JdbcTemplate jdbc, UUID tenantId) {
@@ -560,4 +582,6 @@ public class TenantTransactionalPurgeService {
       Map<String, Integer> deletedRows,
       Instant trialStartedAt,
       Instant trialEndsAt) {}
+
+  public record PurgeDemoDataResult(UUID tenantId, Map<String, Integer> deletedRows) {}
 }
