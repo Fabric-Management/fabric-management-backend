@@ -23953,8 +23953,8 @@ paths:
       - Platform Notification
   /api/v1/playground/impersonate/{userId}:
     post:
-      description: Validates the target user belongs to the current playground tenant
-        and generates a new JWT token for that persona.
+      description: "Validates the current tenant is in demo mode, verifies the target\
+        \ user belongs to that tenant, and generates a new JWT token for that persona."
       operationId: impersonate
       parameters:
       - description: Target user ID to impersonate
@@ -23989,7 +23989,7 @@ paths:
           description: Unauthorized
         "403":
           content: {}
-          description: Not a valid playground session or user outside playground
+          description: Demo mode is required or user is outside the current tenant
         "404":
           content:
             application/problem+json:
@@ -24128,7 +24128,7 @@ paths:
           description: Unauthorized
         "403":
           content: {}
-          description: Not a valid playground session
+          description: Demo mode is required
         "404":
           content:
             application/problem+json:
