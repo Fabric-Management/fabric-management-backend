@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <pre>
  * 1. POST /api/public/signup
  *    → Creates tenant + company + admin user
- *    → Sends email with setup link (via SendWelcomeEmailStep in orchestrator)
+ *    → Sends email with setup link after the onboarding transaction commits
  *
  * 2. User clicks email link
  *    → Redirects to /setup?token=xyz
@@ -71,7 +71,7 @@ public class PublicSignupController {
         request.getOrganizationName(),
         PiiMaskingUtil.maskEmail(request.getEmail()));
 
-    // Orchestrator handles everything: tenant, org, user, subscriptions, token, and email
+    // Orchestrator handles data setup and publishes the post-commit signup email event.
     TenantOnboardingResponse response = onboardingService.createSelfServiceTenant(request);
 
     log.info(

@@ -25,7 +25,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p><b>Excluded scenarios:</b>
  *
  * <ul>
- *   <li>Admin users created during onboarding (handled by SendWelcomeEmailStep)
+ *   <li>Admin users created during onboarding (handled by SignupEmailListener)
  *   <li>Users who already have an AuthUser (already registered)
  * </ul>
  */
