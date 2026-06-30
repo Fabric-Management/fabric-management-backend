@@ -2,16 +2,15 @@ package com.fabricmanagement.common.infrastructure.security;
 
 import com.fabricmanagement.common.infrastructure.security.dto.PermissionResult;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 @Component("auth")
 @RequiredArgsConstructor
-@Slf4j
 public class SpELPermissionEvaluator {
 
   private final PermissionEvaluator permissionEvaluator;
+  private final AuthenticatedUserContextResolver contextResolver;
 
   /** Used in SpEL expressions: @PreAuthorize("@auth.can(authentication, 'SALES', 'WRITE')") */
   public boolean can(Authentication authentication, String resource, String action) {
@@ -19,7 +18,7 @@ public class SpELPermissionEvaluator {
       return false;
     }
 
-    AuthenticatedUserContext ctx = extractContext(authentication);
+    AuthenticatedUserContext ctx = contextResolver.resolve(authentication).orElse(null);
     if (ctx == null) {
       return false;
     }
@@ -41,7 +40,7 @@ public class SpELPermissionEvaluator {
       return false;
     }
 
-    AuthenticatedUserContext ctx = extractContext(authentication);
+    AuthenticatedUserContext ctx = contextResolver.resolve(authentication).orElse(null);
     if (ctx == null) {
       return false;
     }
@@ -60,14 +59,5 @@ public class SpELPermissionEvaluator {
         com.fabricmanagement.platform.user.domain.DataScope.valueOf(requiredScope.toUpperCase());
 
     return userScope.compareTo(reqScope) >= 0;
-  }
-
-  private AuthenticatedUserContext extractContext(Authentication authentication) {
-    if (authentication.getPrincipal() instanceof AuthenticatedUserContext customDetails) {
-      return customDetails;
-    }
-
-    log.warn("Principal is not an instance of AuthenticatedUserContext");
-    return null;
   }
 }

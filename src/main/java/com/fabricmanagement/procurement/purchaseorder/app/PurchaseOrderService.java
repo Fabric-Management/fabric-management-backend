@@ -3,6 +3,7 @@ package com.fabricmanagement.procurement.purchaseorder.app;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.security.DataScopeGuard;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.platform.user.domain.SystemUser;
@@ -44,9 +45,11 @@ public class PurchaseOrderService {
   private final PurchaseOrderValidationEngine validationEngine;
   private final ApprovalPort approvalPort;
   private final DocumentNumberGenerator documentNumberGenerator;
+  private final DataScopeGuard scopeGuard;
 
   public PurchaseOrderResponse getPurchaseOrder(UUID id) {
     PurchaseOrder po = findEntityById(id);
+    scopeGuard.assertCanAccess("procurement", "read", po);
     List<PurchaseOrderLine> lines =
         lineRepository.findByPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(id);
     return mapToResponse(po, lines);
@@ -73,7 +76,9 @@ public class PurchaseOrderService {
           return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
 
-    Page<PurchaseOrder> poPage = poRepository.findAll(spec, pageable);
+    Page<PurchaseOrder> poPage =
+        poRepository.findAll(
+            spec.and(scopeGuard.<PurchaseOrder>scopeFilter("procurement", "read")), pageable);
 
     return PagedResponse.from(poPage, this::mapToSummaryResponse);
   }
@@ -154,6 +159,7 @@ public class PurchaseOrderService {
   @Transactional
   public PurchaseOrderResponse changeStatus(UUID id, PurchaseOrderStatus newStatus) {
     PurchaseOrder po = findEntityById(id);
+    scopeGuard.assertCanAccess("procurement", "write", po);
 
     if (!po.getStatus().canTransitionTo(newStatus)) {
       throw new ProcurementDomainException(

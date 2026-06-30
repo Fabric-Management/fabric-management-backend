@@ -13,6 +13,8 @@ import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
+import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
@@ -53,6 +55,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +78,7 @@ class ProcurementDemoSeederTest {
   @Mock private PurchaseOrderService purchaseOrderService;
   @Mock private SubcontractOrderService subcontractOrderService;
   @Mock private GoodsReceiptService goodsReceiptService;
+  @Mock private UserRepository userRepository;
 
   private final List<TradingPartnerDto> partners = new ArrayList<>();
   private final Map<UUID, SupplierRFQ> rfqs = new HashMap<>();
@@ -94,6 +98,7 @@ class ProcurementDemoSeederTest {
             purchaseOrderService,
             subcontractOrderService,
             goodsReceiptService,
+            userRepository,
             clock);
   }
 
@@ -108,6 +113,9 @@ class ProcurementDemoSeederTest {
     ProductDto blend = product("Combed Cotton Blend");
     when(productFacade.findByType(eq(TenantContext.TEMPLATE_TENANT_ID), eq(ProductType.FIBER)))
         .thenReturn(List.of(cotton, blend));
+    when(userRepository.findFirstByTenantIdAndFirstNameAndLastNameAndIsActiveTrue(
+            TENANT_ID, "Yolanda", "Bidwell"))
+        .thenReturn(Optional.of(user(UUID.randomUUID())));
 
     when(tradingPartnerService.searchByName(TENANT_ID, ProcurementDemoSeeder.SUPPLIER_ANATOLIA))
         .thenAnswer(
@@ -315,5 +323,11 @@ class ProcurementDemoSeederTest {
         .productType(ProductType.FIBER)
         .unit("KG")
         .build();
+  }
+
+  private User user(UUID id) {
+    User user = User.builder().firstName("Yolanda").lastName("Bidwell").build();
+    user.setId(id);
+    return user;
   }
 }

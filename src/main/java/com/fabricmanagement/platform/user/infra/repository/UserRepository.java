@@ -4,6 +4,7 @@ import com.fabricmanagement.platform.user.domain.User;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -165,6 +166,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   boolean existsByTenantIdAndContactValue(
       @Param("tenantId") UUID tenantId, @Param("contactValue") String contactValue);
 
+  Optional<User> findFirstByTenantIdAndFirstNameAndLastNameAndIsActiveTrue(
+      UUID tenantId, String firstName, String lastName);
+
   /**
    * Search users by name.
    *
@@ -198,6 +202,24 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           + "AND ud.departmentId IN :departmentIds")
   List<User> findByTenantIdAndDepartmentIds(
       @Param("tenantId") UUID tenantId, @Param("departmentIds") java.util.Set<UUID> departmentIds);
+
+  /**
+   * Get active user IDs belonging to active department assignments by canonical department code.
+   */
+  @Query(
+      """
+      SELECT DISTINCT u.id FROM User u
+      JOIN u.userDepartments ud
+      JOIN ud.department d
+      WHERE u.tenantId = :tenantId
+        AND u.isActive = true
+        AND ud.tenantId = :tenantId
+        AND ud.isActive = true
+        AND UPPER(d.departmentCode) IN :departmentCodes
+      """)
+  Set<UUID> findActiveUserIdsByDepartmentCodes(
+      @Param("tenantId") UUID tenantId,
+      @Param("departmentCodes") Collection<String> departmentCodes);
 
   /** Count active users in tenant. */
   long countByTenantIdAndIsActiveTrue(UUID tenantId);
