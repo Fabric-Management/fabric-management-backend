@@ -24,6 +24,15 @@
     </suppress>
 
     <suppress until="2026-09-01Z">
+        <notes>CVE is currently matched against Kotlin stdlib artifacts by broad JetBrains CPE.
+        This Java service only receives Kotlin transitively through OkHttp/OpenTelemetry; stdlib is
+        pinned to the current managed version and should be rechecked when JetBrains publishes a
+        narrower advisory or fixed coordinate.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib.*$</packageUrl>
+        <cve>CVE-2026-53914</cve>
+    </suppress>
+
+    <suppress until="2026-09-01Z">
         <notes>DOMPurify 3.3.2 bundled inside swagger-ui (via springdoc 2.8.17).
         No upstream swagger-ui release with DOMPurify >= 3.4.0 yet.
         Mitigated: swagger-ui disabled outside dev profile. Re-check at Q3 review.</notes>
