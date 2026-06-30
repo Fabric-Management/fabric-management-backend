@@ -13,7 +13,9 @@ import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.DataScopeGuard;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.procurement.purchaseorder.app.validation.PurchaseOrderValidationEngine;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrder;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
@@ -49,6 +51,8 @@ class PurchaseOrderServiceDataScopeTest {
   @Mock private ApprovalPort approvalPort;
   @Mock private DocumentNumberGenerator documentNumberGenerator;
   @Mock private DataScopeGuard scopeGuard;
+  @Mock private ExchangeRateService exchangeRateService;
+  @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   @AfterEach
   void clearTenantContext() {
@@ -156,6 +160,7 @@ class PurchaseOrderServiceDataScopeTest {
     when(lineRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
     when(scopeGuard.canAccess(eq("procurement"), eq("write"), any(PurchaseOrder.class)))
         .thenReturn(true);
+    when(tenantReportingCurrencyPort.getReportingCurrency(TENANT_ID)).thenReturn("USD");
 
     PurchaseOrderResponse response = service.createPurchaseOrder(createRequest());
 
@@ -171,7 +176,9 @@ class PurchaseOrderServiceDataScopeTest {
         validationEngine,
         approvalPort,
         documentNumberGenerator,
-        scopeGuard);
+        scopeGuard,
+        exchangeRateService,
+        tenantReportingCurrencyPort);
   }
 
   private PurchaseOrder purchaseOrder(PurchaseOrderStatus status) {

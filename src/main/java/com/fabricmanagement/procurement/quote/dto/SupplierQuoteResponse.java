@@ -1,5 +1,6 @@
 package com.fabricmanagement.procurement.quote.dto;
 
+import com.fabricmanagement.common.dto.ConvertedMoneyDto;
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteModuleType;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteStatus;
@@ -64,6 +65,9 @@ public class SupplierQuoteResponse {
 
   @Schema(description = "Total Amount of the Quote")
   BigDecimal totalAmount;
+
+  @Schema(description = "Total amount converted to the tenant reporting currency")
+  ConvertedMoneyDto reportingTotal;
 
   @Schema(description = "Quote Lines")
   List<QuoteLineResponse> lines;

@@ -1,8 +1,12 @@
 package com.fabricmanagement.procurement.quote.app;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
+import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
+import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
@@ -18,7 +22,10 @@ import com.fabricmanagement.procurement.quote.infra.repository.SupplierQuoteRepo
 import com.fabricmanagement.procurement.quote.mapper.SupplierQuoteMapper;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -42,6 +49,8 @@ public class SupplierQuoteService {
   private final TradingPartnerResolver partnerResolver;
   private final SupplierQuoteMapper quoteMapper;
   private final DomainEventPublisher eventPublisher;
+  private final ExchangeRateService exchangeRateService;
+  private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   public SupplierQuoteResponse getQuoteById(UUID quoteId) {
     return quoteMapper.toResponse(getActiveQuote(quoteId));
@@ -144,6 +153,7 @@ public class SupplierQuoteService {
     line.setNotes(req.notes());
 
     quote.addLine(line);
+    recomputeTotals(quote);
     return quoteMapper.toResponse(quoteRepository.save(quote));
   }
 
@@ -235,5 +245,63 @@ public class SupplierQuoteService {
     } catch (Exception e) {
       log.warn("Failed to publish SupplierQuoteReceivedEvent for quote {}", quote.getId(), e);
     }
+  }
+
+  private void recomputeTotals(SupplierQuote quote) {
+    LocalDate documentDate = docDate(quote);
+    String headerCurrency = quote.getCurrency();
+    BigDecimal nativeTotal =
+        quote.getLines().stream()
+            .map(
+                line ->
+                    convertLineTotalToHeader(
+                        quote.getTenantId(), line, headerCurrency, documentDate))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    String reportingCurrency =
+        tenantReportingCurrencyPort.getReportingCurrency(quote.getTenantId());
+    quote.setReportingTotal(
+        convertMoney(
+            quote.getTenantId(), nativeTotal, headerCurrency, reportingCurrency, documentDate));
+  }
+
+  private BigDecimal convertLineTotalToHeader(
+      UUID tenantId, SupplierQuoteLine line, String headerCurrency, LocalDate documentDate) {
+    BigDecimal lineAmount = line.lineTotal();
+    String lineCurrency = line.getCurrency();
+    if (lineCurrency.equalsIgnoreCase(headerCurrency)) {
+      return lineAmount;
+    }
+
+    return convertMoney(tenantId, lineAmount, lineCurrency, headerCurrency, documentDate)
+        .getConvertedAmount();
+  }
+
+  private ConvertedMoney convertMoney(
+      UUID tenantId,
+      BigDecimal amount,
+      String fromCurrency,
+      String toCurrency,
+      LocalDate documentDate) {
+    if (fromCurrency.equalsIgnoreCase(toCurrency)) {
+      return ConvertedMoney.of(
+          amount, fromCurrency, amount, toCurrency, BigDecimal.ONE, documentDate);
+    }
+
+    try {
+      return exchangeRateService.convert(tenantId, amount, fromCurrency, toCurrency, documentDate);
+    } catch (ExchangeRateRequiredException ex) {
+      throw new ProcurementDomainException(
+          String.format(
+              "No exchange rate for %s->%s on %s; seed a rate before creating this document",
+              fromCurrency, toCurrency, documentDate),
+          ex);
+    }
+  }
+
+  private LocalDate docDate(SupplierQuote quote) {
+    Instant dateSource =
+        quote.getSubmittedAt() != null ? quote.getSubmittedAt() : quote.getCreatedAt();
+    return dateSource != null ? dateSource.atZone(ZoneOffset.UTC).toLocalDate() : LocalDate.now();
   }
 }

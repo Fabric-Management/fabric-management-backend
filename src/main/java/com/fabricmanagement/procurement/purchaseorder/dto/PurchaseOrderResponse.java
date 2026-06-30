@@ -1,5 +1,6 @@
 package com.fabricmanagement.procurement.purchaseorder.dto;
 
+import com.fabricmanagement.common.dto.ConvertedMoneyDto;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
 import com.fabricmanagement.procurement.purchaseorder.domain.specs.PurchaseOrderSpecs;
@@ -25,6 +26,7 @@ public class PurchaseOrderResponse {
   String paymentTerms;
   LocalDate expectedDelivery;
   BigDecimal totalAmount;
+  ConvertedMoneyDto reportingTotal;
   Integer revisionNumber;
   String notes;
   PurchaseOrderModuleType moduleType;

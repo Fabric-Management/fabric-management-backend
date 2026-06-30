@@ -1,5 +1,6 @@
 package com.fabricmanagement.procurement.purchaseorder.domain;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.web.exception.CurrencyMismatchException;
 import com.fabricmanagement.common.util.Money;
@@ -78,6 +79,27 @@ public class PurchaseOrder extends BaseEntity {
   })
   @Setter(AccessLevel.NONE)
   private Money totalAmount;
+
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(
+        name = "originalAmount",
+        column = @Column(name = "reporting_total_original", precision = 18, scale = 4)),
+    @AttributeOverride(
+        name = "originalCurrency",
+        column = @Column(name = "reporting_total_orig_currency", length = 3)),
+    @AttributeOverride(
+        name = "convertedAmount",
+        column = @Column(name = "reporting_total_converted", precision = 18, scale = 4)),
+    @AttributeOverride(
+        name = "convertedCurrency",
+        column = @Column(name = "reporting_currency", length = 3)),
+    @AttributeOverride(
+        name = "exchangeRate",
+        column = @Column(name = "reporting_exchange_rate", precision = 20, scale = 8)),
+    @AttributeOverride(name = "rateDate", column = @Column(name = "reporting_rate_date"))
+  })
+  private ConvertedMoney reportingTotal;
 
   public void updateTotalAmount(Money amount) {
     if (amount == null) {
