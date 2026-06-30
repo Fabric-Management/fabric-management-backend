@@ -1,9 +1,13 @@
 package com.fabricmanagement.procurement.quote.domain;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -51,6 +55,27 @@ public class SupplierQuote extends BaseEntity {
 
   @Column(name = "currency", nullable = false, length = 10)
   private String currency;
+
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(
+        name = "originalAmount",
+        column = @Column(name = "reporting_total_original", precision = 18, scale = 4)),
+    @AttributeOverride(
+        name = "originalCurrency",
+        column = @Column(name = "reporting_total_orig_currency", length = 3)),
+    @AttributeOverride(
+        name = "convertedAmount",
+        column = @Column(name = "reporting_total_converted", precision = 18, scale = 4)),
+    @AttributeOverride(
+        name = "convertedCurrency",
+        column = @Column(name = "reporting_currency", length = 3)),
+    @AttributeOverride(
+        name = "exchangeRate",
+        column = @Column(name = "reporting_exchange_rate", precision = 20, scale = 8)),
+    @AttributeOverride(name = "rateDate", column = @Column(name = "reporting_rate_date"))
+  })
+  private ConvertedMoney reportingTotal;
 
   @Column(name = "payment_terms", length = 50)
   private String paymentTerms;
@@ -113,6 +138,9 @@ public class SupplierQuote extends BaseEntity {
   }
 
   public BigDecimal computeTotalAmount() {
+    if (this.reportingTotal != null) {
+      return this.reportingTotal.getOriginalAmount();
+    }
     return this.lines.stream()
         .map(SupplierQuoteLine::lineTotal)
         .reduce(BigDecimal.ZERO, BigDecimal::add);

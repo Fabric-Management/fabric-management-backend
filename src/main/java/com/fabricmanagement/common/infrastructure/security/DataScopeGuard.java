@@ -52,33 +52,36 @@ public class DataScopeGuard {
   }
 
   public void assertCanAccess(String resource, String action, BaseEntity entity) {
-    if (isSystemContext(currentContext().orElse(null))) {
-      return;
+    if (!canAccess(resource, action, entity)) {
+      throw forbidden(resource, scopeLabel(resource, action));
+    }
+  }
+
+  public boolean canAccess(String resource, String action, BaseEntity entity) {
+    Optional<AuthenticatedUserContext> context = currentContext();
+    if (isSystemContext(context.orElse(null))) {
+      return true;
     }
     if (entity == null) {
-      throw forbidden(resource, "UNKNOWN");
+      return false;
     }
 
-    DataScope scope = currentScope(resource, action);
-    UUID currentUserId = currentUserId();
+    DataScope scope = scopeOf(context, resource, action).orElse(null);
+    UUID currentUserId =
+        context.map(AuthenticatedUserContext::userId).orElse(TenantContext.getCurrentUserId());
     if (scope == null || currentUserId == null) {
-      throw forbidden(resource, String.valueOf(scope));
+      return false;
     }
-
     if (scope == DataScope.GLOBAL || scope == DataScope.ORGANIZATION) {
-      return;
+      return true;
     }
 
     UUID createdBy = entity.getCreatedBy();
     if (scope == DataScope.OWN && currentUserId.equals(createdBy)) {
-      return;
+      return true;
     }
 
-    if (scope == DataScope.DEPARTMENT && departmentMemberIds().contains(createdBy)) {
-      return;
-    }
-
-    throw forbidden(resource, scope.name());
+    return scope == DataScope.DEPARTMENT && departmentMemberIds().contains(createdBy);
   }
 
   public <T> Specification<T> scopeFilter(String resource, String action) {
@@ -116,6 +119,28 @@ public class DataScopeGuard {
     return currentContext()
         .map(AuthenticatedUserContext::userId)
         .orElse(TenantContext.getCurrentUserId());
+  }
+
+  private Optional<DataScope> scopeOf(
+      Optional<AuthenticatedUserContext> context, String resource, String action) {
+    return context.map(
+        authenticated -> {
+          PermissionResult result =
+              permissionEvaluator.evaluate(
+                  authenticated.tenantId(),
+                  authenticated.roleCode(),
+                  authenticated.departmentCodes(),
+                  authenticated.userId());
+          return result.scopeOf(resource, action);
+        });
+  }
+
+  private String scopeLabel(String resource, String action) {
+    Optional<AuthenticatedUserContext> context = currentContext();
+    if (isSystemContext(context.orElse(null))) {
+      return DataScope.GLOBAL.name();
+    }
+    return scopeOf(context, resource, action).map(Enum::name).orElse("UNKNOWN");
   }
 
   private boolean isSystemContext(AuthenticatedUserContext context) {

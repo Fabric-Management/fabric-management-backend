@@ -33,13 +33,22 @@
     </suppress>
 
     <suppress until="2026-09-01Z">
-        <notes>DOMPurify 3.3.2 bundled inside swagger-ui (via springdoc 2.8.17).
-        No upstream swagger-ui release with DOMPurify >= 3.4.0 yet.
-        Mitigated: swagger-ui disabled outside dev profile. Re-check at Q3 review.</notes>
-        <packageUrl regex="true">^pkg:javascript/DOMPurify@3\.3\.2$</packageUrl>
-        <cve>CVE-2026-41238</cve>
-        <cve>CVE-2026-41239</cve>
-        <cve>CVE-2026-41240</cve>
+        <notes>DOMPurify 3.4.0 bundled inside swagger-ui (via springdoc). Supersedes the prior 3.3.2
+        rule: swagger-ui was bumped and now ships DOMPurify 3.4.0, which closed the old CVEs
+        (41238/41239/41240) but carries new IN_PLACE-mode XSS findings — CVE-2026-49458 (Moderate),
+        CVE-2026-49459, CVE-2026-49978 (Low) plus aliased GHSAs — all below the CVSS 7 gate. DOMPurify's
+        version is controlled by swagger-ui, not pinned here, and no swagger-ui/springdoc release ships a
+        patched DOMPurify yet. Mitigated: swagger-ui disabled outside dev profile, so no production attack
+        surface. Re-check at Q3 review / on next springdoc upgrade.</notes>
+        <packageUrl regex="true">^pkg:javascript/DOMPurify@3\.4\.0$</packageUrl>
+        <cve>CVE-2026-49458</cve>
+        <cve>CVE-2026-49459</cve>
+        <cve>CVE-2026-49978</cve>
+        <vulnerabilityName>GHSA-76mc-f452-cxcm</vulnerabilityName>
+        <vulnerabilityName>GHSA-cmwh-pvxp-8882</vulnerabilityName>
+        <vulnerabilityName>GHSA-gvmj-g25r-r7wr</vulnerabilityName>
+        <vulnerabilityName>GHSA-vxr8-fq34-vvx9</vulnerabilityName>
+        <vulnerabilityName>GHSA-x4vx-rjvf-j5p4</vulnerabilityName>
     </suppress>
 
 </suppressions>

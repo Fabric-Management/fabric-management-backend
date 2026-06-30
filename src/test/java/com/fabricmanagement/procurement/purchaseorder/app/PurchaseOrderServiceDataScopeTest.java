@@ -1,24 +1,27 @@
 package com.fabricmanagement.procurement.purchaseorder.app;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.DataScopeGuard;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.procurement.purchaseorder.app.validation.PurchaseOrderValidationEngine;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrder;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
+import com.fabricmanagement.procurement.purchaseorder.dto.PurchaseOrderResponse;
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderLineRepository;
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
 import java.math.BigDecimal;
@@ -48,6 +51,8 @@ class PurchaseOrderServiceDataScopeTest {
   @Mock private ApprovalPort approvalPort;
   @Mock private DocumentNumberGenerator documentNumberGenerator;
   @Mock private DataScopeGuard scopeGuard;
+  @Mock private ExchangeRateService exchangeRateService;
+  @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   @AfterEach
   void clearTenantContext() {
@@ -71,17 +76,55 @@ class PurchaseOrderServiceDataScopeTest {
   }
 
   @Test
-  void getPurchaseOrderAppliesReadScopeBeforeReturningLines() {
+  void managerReadOrgWriteDepartmentListMapsCanEditFromWriteScopeDecision() {
+    TenantContext.setCurrentTenantId(TENANT_ID);
+    PurchaseOrderService service = service();
+    PageRequest pageable = PageRequest.of(0, 20);
+    Specification<PurchaseOrder> scopeSpec = (root, query, cb) -> cb.conjunction();
+    PurchaseOrder editablePo = purchaseOrder(PurchaseOrderStatus.DRAFT);
+    PurchaseOrder readOnlyPo = purchaseOrder(PurchaseOrderStatus.DRAFT);
+    readOnlyPo.setId(UUID.fromString("30000000-0000-0000-0000-000000000002"));
+    when(scopeGuard.<PurchaseOrder>scopeFilter("procurement", "read")).thenReturn(scopeSpec);
+    when(scopeGuard.canAccess("procurement", "write", editablePo)).thenReturn(true);
+    when(scopeGuard.canAccess("procurement", "write", readOnlyPo)).thenReturn(false);
+    when(poRepository.findAll(any(Specification.class), eq(pageable)))
+        .thenReturn(new PageImpl<>(List.of(editablePo, readOnlyPo), pageable, 2));
+
+    List<PurchaseOrderResponse> content =
+        service.listPurchaseOrders(null, null, pageable).getContent();
+
+    assertThat(content).extracting(PurchaseOrderResponse::isCanEdit).containsExactly(true, false);
+  }
+
+  @Test
+  void managerReadOrgWriteDepartmentDetailMapsCanEditFalseForReadOnlyRecord() {
     PurchaseOrder po = purchaseOrder(PurchaseOrderStatus.DRAFT);
     PurchaseOrderService service = service();
     when(poRepository.findById(PO_ID)).thenReturn(Optional.of(po));
+    when(scopeGuard.canAccess("procurement", "write", po)).thenReturn(false);
     when(lineRepository.findByPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(PO_ID))
         .thenReturn(List.of());
 
-    service.getPurchaseOrder(PO_ID);
+    PurchaseOrderResponse response = service.getPurchaseOrder(PO_ID);
 
     verify(scopeGuard).assertCanAccess("procurement", "read", po);
     verify(lineRepository).findByPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(PO_ID);
+    assertThat(response.isCanEdit()).isFalse();
+  }
+
+  @Test
+  void managerReadOrgWriteDepartmentDetailMapsCanEditTrueForEditableRecord() {
+    PurchaseOrder po = purchaseOrder(PurchaseOrderStatus.DRAFT);
+    PurchaseOrderService service = service();
+    when(poRepository.findById(PO_ID)).thenReturn(Optional.of(po));
+    when(scopeGuard.canAccess("procurement", "write", po)).thenReturn(true);
+    when(lineRepository.findByPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(PO_ID))
+        .thenReturn(List.of());
+
+    PurchaseOrderResponse response = service.getPurchaseOrder(PO_ID);
+
+    verify(scopeGuard).assertCanAccess("procurement", "read", po);
+    assertThat(response.isCanEdit()).isTrue();
   }
 
   @Test
@@ -101,7 +144,7 @@ class PurchaseOrderServiceDataScopeTest {
   }
 
   @Test
-  void createPurchaseOrderDoesNotApplyRowScopeGuard() {
+  void createPurchaseOrderDoesNotApplyRowScopeGuardButReturnsCanEdit() {
     TenantContext.setCurrentTenantId(TENANT_ID);
     PurchaseOrderService service = service();
     when(documentNumberGenerator.generate(
@@ -115,10 +158,15 @@ class PurchaseOrderServiceDataScopeTest {
               return po;
             });
     when(lineRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(scopeGuard.canAccess(eq("procurement"), eq("write"), any(PurchaseOrder.class)))
+        .thenReturn(true);
+    when(tenantReportingCurrencyPort.getReportingCurrency(TENANT_ID)).thenReturn("USD");
 
-    service.createPurchaseOrder(createRequest());
+    PurchaseOrderResponse response = service.createPurchaseOrder(createRequest());
 
-    verifyNoInteractions(scopeGuard);
+    assertThat(response.isCanEdit()).isTrue();
+    verify(scopeGuard, never()).assertCanAccess(eq("procurement"), eq("write"), any());
+    verify(scopeGuard, never()).scopeFilter(eq("procurement"), eq("read"));
   }
 
   private PurchaseOrderService service() {
@@ -128,7 +176,9 @@ class PurchaseOrderServiceDataScopeTest {
         validationEngine,
         approvalPort,
         documentNumberGenerator,
-        scopeGuard);
+        scopeGuard,
+        exchangeRateService,
+        tenantReportingCurrencyPort);
   }
 
   private PurchaseOrder purchaseOrder(PurchaseOrderStatus status) {

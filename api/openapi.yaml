@@ -46529,6 +46529,29 @@ components:
           type: string
         origin:
           $ref: "#/components/schemas/Origin"
+    ConvertedMoneyDto:
+      type: object
+      description: Money converted from an original currency into a reporting currency
+      properties:
+        convertedAmount:
+          type: number
+          description: Converted amount
+        convertedCurrency:
+          type: string
+          description: Converted currency code
+        exchangeRate:
+          type: number
+          description: Exchange rate used for the conversion
+        originalAmount:
+          type: number
+          description: Original amount before conversion
+        originalCurrency:
+          type: string
+          description: Original currency code
+        rateDate:
+          type: string
+          format: date
+          description: Rate date used for the conversion
     CostCalculationResponse:
       type: object
       properties:
@@ -52555,6 +52578,8 @@ components:
     PurchaseOrderResponse:
       type: object
       properties:
+        canEdit:
+          type: boolean
         currency:
           type: string
         expectedDelivery:
@@ -52583,6 +52608,8 @@ components:
           type: string
         poNumber:
           type: string
+        reportingTotal:
+          $ref: "#/components/schemas/ConvertedMoneyDto"
         revisionNumber:
           type: integer
           format: int32
@@ -54450,6 +54477,9 @@ components:
         quoteNumber:
           type: string
           description: Quote Number
+        reportingTotal:
+          $ref: "#/components/schemas/ConvertedMoneyDto"
+          description: Total amount converted to the tenant reporting currency
         rfqId:
           type: string
           format: uuid

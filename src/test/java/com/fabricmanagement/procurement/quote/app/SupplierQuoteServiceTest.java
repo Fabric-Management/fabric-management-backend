@@ -4,14 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
+import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
+import com.fabricmanagement.procurement.quote.domain.SupplierQuoteLine;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteStatus;
 import com.fabricmanagement.procurement.quote.dto.AddQuoteLineRequest;
 import com.fabricmanagement.procurement.quote.dto.CreateSupplierQuoteRequest;
@@ -21,6 +26,7 @@ import com.fabricmanagement.procurement.quote.mapper.SupplierQuoteMapper;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +49,8 @@ class SupplierQuoteServiceTest {
   @Mock private TradingPartnerResolver partnerResolver;
   @Mock private SupplierQuoteMapper quoteMapper;
   @Mock private DomainEventPublisher eventPublisher;
+  @Mock private ExchangeRateService exchangeRateService;
+  @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   @InjectMocks private SupplierQuoteService quoteService;
 
@@ -64,6 +72,7 @@ class SupplierQuoteServiceTest {
     mockQuote.setTradingPartnerId(partnerId);
     mockQuote.setQuoteNumber("SQ-2026-TEST");
     mockQuote.setStatus(SupplierQuoteStatus.RECEIVED);
+    mockQuote.setCurrency("USD");
 
     mockResponse =
         SupplierQuoteResponse.builder().id(quoteId).status(SupplierQuoteStatus.RECEIVED).build();
@@ -112,6 +121,7 @@ class SupplierQuoteServiceTest {
         .thenReturn(Optional.of(mockQuote));
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
     when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("USD");
 
     AddQuoteLineRequest req =
         new AddQuoteLineRequest(
@@ -129,6 +139,79 @@ class SupplierQuoteServiceTest {
     assertNotNull(updated);
     assertEquals(1, mockQuote.getLines().size());
     assertEquals(new BigDecimal("12.50"), mockQuote.getLines().get(0).getUnitPrice());
+    assertNotNull(mockQuote.getReportingTotal());
+    assertEquals("USD", mockQuote.getReportingTotal().getConvertedCurrency());
+    verify(quoteRepository).save(mockQuote);
+  }
+
+  @Test
+  @DisplayName("Should compute Supplier Quote native and reporting totals with FX")
+  void shouldComputeSupplierQuoteTotalsWithFx() {
+    LocalDate docDate = LocalDate.of(2026, 6, 30);
+    mockQuote.setCurrency("TRY");
+    mockQuote.setSubmittedAt(Instant.parse("2026-06-30T09:00:00Z"));
+    mockQuote.addLine(quoteLine("USD", "100.00", "1.000"));
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+    when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    when(exchangeRateService.convert(
+            eq(tenantId), any(BigDecimal.class), eq("USD"), eq("TRY"), eq(docDate)))
+        .thenReturn(
+            ConvertedMoney.of(
+                new BigDecimal("100.00000"),
+                "USD",
+                new BigDecimal("3000.0000"),
+                "TRY",
+                new BigDecimal("30.00000000"),
+                docDate));
+    when(exchangeRateService.convert(
+            eq(tenantId), any(BigDecimal.class), eq("EUR"), eq("TRY"), eq(docDate)))
+        .thenReturn(
+            ConvertedMoney.of(
+                new BigDecimal("50.00000"),
+                "EUR",
+                new BigDecimal("1750.0000"),
+                "TRY",
+                new BigDecimal("35.00000000"),
+                docDate));
+    when(exchangeRateService.convert(
+            eq(tenantId), any(BigDecimal.class), eq("TRY"), eq("GBP"), eq(docDate)))
+        .thenReturn(
+            ConvertedMoney.of(
+                new BigDecimal("4750.0000"),
+                "TRY",
+                new BigDecimal("95.0000"),
+                "GBP",
+                new BigDecimal("0.02000000"),
+                docDate));
+
+    SupplierQuoteResponse updated =
+        quoteService.addLine(
+            quoteId,
+            new AddQuoteLineRequest(
+                UUID.randomUUID(),
+                new BigDecimal("50.00"),
+                "EUR",
+                new BigDecimal("1.000"),
+                "KG",
+                null,
+                null,
+                null));
+
+    assertNotNull(updated);
+    assertNotNull(mockQuote.getReportingTotal());
+    assertEquals(0, mockQuote.computeTotalAmount().compareTo(new BigDecimal("4750.0000")));
+    assertEquals("TRY", mockQuote.getReportingTotal().getOriginalCurrency());
+    assertEquals(
+        0,
+        mockQuote.getReportingTotal().getOriginalAmount().compareTo(new BigDecimal("4750.0000")));
+    assertEquals("GBP", mockQuote.getReportingTotal().getConvertedCurrency());
+    assertEquals(
+        0, mockQuote.getReportingTotal().getConvertedAmount().compareTo(new BigDecimal("95.0000")));
+    assertEquals(docDate, mockQuote.getReportingTotal().getRateDate());
     verify(quoteRepository).save(mockQuote);
   }
 
@@ -234,5 +317,16 @@ class SupplierQuoteServiceTest {
         assertThrows(IllegalStateException.class, () -> quoteService.markAsRejected(quoteId));
 
     assertEquals("Cannot transition quote from ACCEPTED to REJECTED", ex.getMessage());
+  }
+
+  private SupplierQuoteLine quoteLine(String currency, String unitPrice, String qty) {
+    SupplierQuoteLine line = new SupplierQuoteLine();
+    line.setTenantId(tenantId);
+    line.setRfqLineId(UUID.randomUUID());
+    line.setUnitPrice(new BigDecimal(unitPrice));
+    line.setCurrency(currency);
+    line.setQty(new BigDecimal(qty));
+    line.setUnit("KG");
+    return line;
   }
 }

@@ -1,11 +1,16 @@
 package com.fabricmanagement.procurement.purchaseorder.app;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
+import com.fabricmanagement.common.dto.ConvertedMoneyDto;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.persistence.DocumentNumberGenerator;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.security.DataScopeGuard;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
+import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.purchaseorder.app.validation.PurchaseOrderValidationEngine;
@@ -21,8 +26,8 @@ import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseO
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +51,8 @@ public class PurchaseOrderService {
   private final ApprovalPort approvalPort;
   private final DocumentNumberGenerator documentNumberGenerator;
   private final DataScopeGuard scopeGuard;
+  private final ExchangeRateService exchangeRateService;
+  private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   public PurchaseOrderResponse getPurchaseOrder(UUID id) {
     PurchaseOrder po = findEntityById(id);
@@ -130,13 +137,11 @@ public class PurchaseOrderService {
             .toList();
     List<PurchaseOrderLine> savedLines = lineRepository.saveAll(lines);
 
-    // 3. Compute header total from saved lines' Money-rounded totalPrice values
-    BigDecimal total =
-        savedLines.stream()
-            .map(PurchaseOrderLine::getTotalPrice)
-            .filter(Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-    saved.updateTotalAmount(Money.of(total, saved.getCurrency()));
+    FxTotals totals =
+        computeTotals(
+            TenantContext.requireTenantId(), saved.getCurrency(), savedLines, docDate(saved));
+    saved.updateTotalAmount(totals.nativeTotal());
+    saved.setReportingTotal(totals.reportingTotal());
     PurchaseOrder finalSaved = poRepository.save(saved);
 
     log.info(
@@ -274,11 +279,13 @@ public class PurchaseOrderService {
         .paymentTerms(po.getPaymentTerms())
         .expectedDelivery(po.getExpectedDelivery())
         .totalAmount(extractAmount(po.getTotalAmount()))
+        .reportingTotal(toDto(po.getReportingTotal()))
         .revisionNumber(po.getRevisionNumber())
         .notes(po.getNotes())
         .moduleType(po.getModuleType())
         .moduleSpecs(po.getModuleSpecs())
         .lines(lineResps)
+        .canEdit(scopeGuard.canAccess("procurement", "write", po))
         .build();
   }
 
@@ -295,11 +302,13 @@ public class PurchaseOrderService {
         .paymentTerms(po.getPaymentTerms())
         .expectedDelivery(po.getExpectedDelivery())
         .totalAmount(extractAmount(po.getTotalAmount()))
+        .reportingTotal(toDto(po.getReportingTotal()))
         .revisionNumber(po.getRevisionNumber())
         .notes(po.getNotes())
         .moduleType(po.getModuleType())
         .moduleSpecs(po.getModuleSpecs())
         .lines(null) // Summary — lines loaded lazily via separate query
+        .canEdit(scopeGuard.canAccess("procurement", "write", po))
         .build();
   }
 
@@ -310,4 +319,82 @@ public class PurchaseOrderService {
   private static String extractCurrencyCode(Money money) {
     return money != null ? money.getCurrency().getCurrencyCode() : null;
   }
+
+  private FxTotals computeTotals(
+      UUID tenantId, String headerCurrency, List<PurchaseOrderLine> lines, LocalDate documentDate) {
+    // Future PO line mutation endpoints must call this before saving the header.
+    BigDecimal nativeTotal =
+        lines.stream()
+            .map(line -> convertLineTotalToHeader(tenantId, line, headerCurrency, documentDate))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    ConvertedMoney reportingTotal =
+        convertToReportingTotal(tenantId, nativeTotal, headerCurrency, documentDate);
+    return new FxTotals(Money.of(nativeTotal, headerCurrency), reportingTotal);
+  }
+
+  private BigDecimal convertLineTotalToHeader(
+      UUID tenantId, PurchaseOrderLine line, String headerCurrency, LocalDate documentDate) {
+    if (line.getTotalPrice() == null || line.getUnitPrice() == null) {
+      return BigDecimal.ZERO;
+    }
+
+    String lineCurrency = line.getUnitPrice().getCurrency().getCurrencyCode();
+    BigDecimal lineAmount = line.getTotalPrice();
+    if (lineCurrency.equalsIgnoreCase(headerCurrency)) {
+      return lineAmount;
+    }
+
+    return convertMoney(tenantId, lineAmount, lineCurrency, headerCurrency, documentDate)
+        .getConvertedAmount();
+  }
+
+  private ConvertedMoney convertToReportingTotal(
+      UUID tenantId, BigDecimal nativeTotal, String headerCurrency, LocalDate documentDate) {
+    String reportingCurrency = tenantReportingCurrencyPort.getReportingCurrency(tenantId);
+    return convertMoney(tenantId, nativeTotal, headerCurrency, reportingCurrency, documentDate);
+  }
+
+  private ConvertedMoney convertMoney(
+      UUID tenantId,
+      BigDecimal amount,
+      String fromCurrency,
+      String toCurrency,
+      LocalDate documentDate) {
+    if (fromCurrency.equalsIgnoreCase(toCurrency)) {
+      return ConvertedMoney.of(
+          amount, fromCurrency, amount, toCurrency, BigDecimal.ONE, documentDate);
+    }
+
+    try {
+      return exchangeRateService.convert(tenantId, amount, fromCurrency, toCurrency, documentDate);
+    } catch (ExchangeRateRequiredException ex) {
+      throw new ProcurementDomainException(
+          String.format(
+              "No exchange rate for %s->%s on %s; seed a rate before creating this document",
+              fromCurrency, toCurrency, documentDate),
+          ex);
+    }
+  }
+
+  private LocalDate docDate(PurchaseOrder po) {
+    return po.getCreatedAt() != null
+        ? po.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate()
+        : LocalDate.now();
+  }
+
+  private static ConvertedMoneyDto toDto(ConvertedMoney money) {
+    if (money == null) {
+      return null;
+    }
+    return ConvertedMoneyDto.builder()
+        .originalAmount(money.getOriginalAmount())
+        .originalCurrency(money.getOriginalCurrency())
+        .convertedAmount(money.getConvertedAmount())
+        .convertedCurrency(money.getConvertedCurrency())
+        .exchangeRate(money.getExchangeRate())
+        .rateDate(money.getRateDate())
+        .build();
+  }
+
+  private record FxTotals(Money nativeTotal, ConvertedMoney reportingTotal) {}
 }
