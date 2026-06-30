@@ -612,6 +612,10 @@
                 <version>${spotbugs-maven-plugin.version}</version>
                 <configuration>
                     <effort>Max</effort>
+                    <!-- Analysis runs in a forked JVM; the 512MB default OOMs at effort=Max
+                         as the codebase grows. Give it room (GitHub runners have ~7GB). -->
+                    <fork>true</fork>
+                    <maxHeap>3072</maxHeap>
                     <threshold>High</threshold>
                     <failOnError>false</failOnError>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
