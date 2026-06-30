@@ -30,6 +30,7 @@ public class PurchaseOrderResponse {
   PurchaseOrderModuleType moduleType;
   PurchaseOrderSpecs moduleSpecs;
   List<PurchaseOrderLineResponse> lines;
+  boolean canEdit;
 
   @Value
   @Builder

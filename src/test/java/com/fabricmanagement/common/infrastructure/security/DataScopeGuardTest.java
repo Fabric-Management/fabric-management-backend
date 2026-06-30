@@ -64,6 +64,8 @@ class DataScopeGuardTest {
 
     assertThatCode(() -> guard.assertCanAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID)))
         .doesNotThrowAnyException();
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID))).isTrue();
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(OTHER_USER_ID))).isFalse();
     assertThatThrownBy(
             () -> guard.assertCanAccess("procurement", "read", poCreatedBy(OTHER_USER_ID)))
         .isInstanceOf(AccessDeniedException.class);
@@ -100,6 +102,8 @@ class DataScopeGuardTest {
     assertThatCode(
             () -> guard.assertCanAccess("procurement", "write", poCreatedBy(DEPARTMENT_MEMBER_ID)))
         .doesNotThrowAnyException();
+    assertThat(guard.canAccess("procurement", "write", poCreatedBy(DEPARTMENT_MEMBER_ID))).isTrue();
+    assertThat(guard.canAccess("procurement", "write", poCreatedBy(OTHER_USER_ID))).isFalse();
     assertThatThrownBy(
             () -> guard.assertCanAccess("procurement", "write", poCreatedBy(OTHER_USER_ID)))
         .isInstanceOf(AccessDeniedException.class);
@@ -132,6 +136,35 @@ class DataScopeGuardTest {
 
     assertThat(organizationPredicate).isSameAs(organizationCriteria.expectedPredicate);
     assertThat(globalPredicate).isSameAs(globalCriteria.expectedPredicate);
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(OTHER_USER_ID))).isTrue();
+  }
+
+  @Test
+  void managerReadOrganizationWriteDepartmentCanSeeAllButEditOnlyDepartmentRecords() {
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    authenticate(CURRENT_USER_ID, List.of("PROCUREMENT"));
+    PermissionResult managerPermissions =
+        new PermissionResult(
+            Map.of(
+                "procurement",
+                Map.of("read", DataScope.ORGANIZATION, "write", DataScope.DEPARTMENT)),
+            false);
+    when(permissionEvaluator.evaluate(TENANT_ID, "WORKER", List.of("PROCUREMENT"), CURRENT_USER_ID))
+        .thenReturn(managerPermissions);
+    when(userRepository.findActiveUserIdsByDepartmentCodes(TENANT_ID, Set.of("PROCUREMENT")))
+        .thenReturn(Set.of(DEPARTMENT_MEMBER_ID));
+    CriteriaMocks criteria = criteriaMocks();
+    when(criteria.criteriaBuilder.conjunction()).thenReturn(criteria.expectedPredicate);
+
+    Predicate readPredicate =
+        guard
+            .scopeFilter("procurement", "read")
+            .toPredicate(criteria.root, criteria.query, criteria.criteriaBuilder);
+
+    assertThat(readPredicate).isSameAs(criteria.expectedPredicate);
+    assertThat(guard.canAccess("procurement", "write", poCreatedBy(DEPARTMENT_MEMBER_ID))).isTrue();
+    assertThat(guard.canAccess("procurement", "write", poCreatedBy(OTHER_USER_ID))).isFalse();
   }
 
   @Test
@@ -145,6 +178,7 @@ class DataScopeGuardTest {
     assertThatThrownBy(
             () -> guard.assertCanAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID)))
         .isInstanceOf(AccessDeniedException.class);
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID))).isFalse();
     Predicate predicate =
         guard
             .scopeFilter("procurement", "read")
@@ -155,6 +189,7 @@ class DataScopeGuardTest {
 
   @Test
   void missingAuthenticationFailsClosedButExplicitSystemContextBypasses() {
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID))).isFalse();
     assertThatThrownBy(
             () -> guard.assertCanAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID)))
         .isInstanceOf(AccessDeniedException.class);
@@ -164,6 +199,16 @@ class DataScopeGuardTest {
 
     assertThatCode(() -> guard.assertCanAccess("procurement", "read", poCreatedBy(OTHER_USER_ID)))
         .doesNotThrowAnyException();
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(OTHER_USER_ID))).isTrue();
+    verify(permissionEvaluator, never()).evaluate(any(), any(), any(), any());
+  }
+
+  @Test
+  void anonymousPrincipalMakesCanAccessReturnFalseWithoutThrowing() {
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken("anonymous", "n/a", List.of()));
+
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(CURRENT_USER_ID))).isFalse();
     verify(permissionEvaluator, never()).evaluate(any(), any(), any(), any());
   }
 
@@ -173,6 +218,7 @@ class DataScopeGuardTest {
 
     assertThatCode(() -> guard.assertCanAccess("procurement", "read", poCreatedBy(OTHER_USER_ID)))
         .doesNotThrowAnyException();
+    assertThat(guard.canAccess("procurement", "read", poCreatedBy(OTHER_USER_ID))).isTrue();
     verify(permissionEvaluator, never()).evaluate(any(), any(), any(), any());
   }
 

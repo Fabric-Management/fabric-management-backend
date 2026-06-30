@@ -279,6 +279,7 @@ public class PurchaseOrderService {
         .moduleType(po.getModuleType())
         .moduleSpecs(po.getModuleSpecs())
         .lines(lineResps)
+        .canEdit(scopeGuard.canAccess("procurement", "write", po))
         .build();
   }
 
@@ -300,6 +301,7 @@ public class PurchaseOrderService {
         .moduleType(po.getModuleType())
         .moduleSpecs(po.getModuleSpecs())
         .lines(null) // Summary — lines loaded lazily via separate query
+        .canEdit(scopeGuard.canAccess("procurement", "write", po))
         .build();
   }
 

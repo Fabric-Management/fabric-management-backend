@@ -52555,6 +52555,8 @@ components:
     PurchaseOrderResponse:
       type: object
       properties:
+        canEdit:
+          type: boolean
         currency:
           type: string
         expectedDelivery:
