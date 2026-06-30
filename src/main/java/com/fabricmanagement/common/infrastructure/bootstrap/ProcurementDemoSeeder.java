@@ -6,6 +6,7 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.user.domain.SystemUser;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
@@ -50,6 +51,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -76,6 +78,7 @@ public class ProcurementDemoSeeder {
   private final PurchaseOrderService purchaseOrderService;
   private final SubcontractOrderService subcontractOrderService;
   private final GoodsReceiptService goodsReceiptService;
+  private final UserRepository userRepository;
   private final Clock clock;
 
   public void seedFor(UUID tenantId) {
@@ -99,6 +102,7 @@ public class ProcurementDemoSeeder {
       ProductDto cotton = fibers.get(0);
       ProductDto blend = fibers.size() > 1 ? fibers.get(1) : cotton;
       LocalDate today = LocalDate.now(clock);
+      UUID procurementPersonaUserId = resolveProcurementPersonaUserId(tenantId);
 
       TradingPartnerDto anatolia =
           createPartner(
@@ -212,7 +216,11 @@ public class ProcurementDemoSeeder {
 
       PurchaseOrderResponse po =
           createConfirmedPurchaseOrder(
-              chainPurchaseWo.id(), anatolia.getId(), acceptedQuote.getId(), rfqLines);
+              chainPurchaseWo.id(),
+              anatolia.getId(),
+              acceptedQuote.getId(),
+              rfqLines,
+              procurementPersonaUserId);
       createConfirmedGoodsReceipt(po.getId());
 
       createInProgressSubcontract(chainSubcontractWo.id(), marmara.getId(), cotton, blend, today);
@@ -377,41 +385,66 @@ public class ProcurementDemoSeeder {
       UUID workOrderId,
       UUID supplierId,
       UUID quoteId,
-      List<SupplierRFQResponse.RfqLineResponse> rfqLines) {
+      List<SupplierRFQResponse.RfqLineResponse> rfqLines,
+      UUID ownerUserId) {
     PurchaseOrderResponse po =
-        purchaseOrderService.createPurchaseOrder(
-            CreatePurchaseOrderRequest.builder()
-                .workOrderId(workOrderId)
-                .tradingPartnerId(supplierId)
-                .supplierQuoteId(quoteId)
-                .currency("USD")
-                .paymentTerms("NET30")
-                .expectedDelivery(LocalDate.now(clock).plusDays(16))
-                .notes("Demo PO generated from accepted supplier quote")
-                .moduleType(PurchaseOrderModuleType.FIBER)
-                .moduleSpecs(fiberPurchaseSpecs())
-                .lines(
-                    rfqLines.stream()
-                        .map(
-                            line ->
-                                CreatePurchaseOrderRequest.PurchaseOrderLineRequest.builder()
-                                    .rfqLineId(line.getId())
-                                    .productId(line.getProductId())
-                                    .productDesc(line.getProductDesc())
-                                    .qty(line.getRequestedQty())
-                                    .unit(line.getUnit())
-                                    .unitPrice(new BigDecimal("3.78"))
-                                    .currency("USD")
-                                    .moduleSpecs(fiberPurchaseSpecs())
-                                    .build())
-                        .toList())
-                .build());
+        executeAsUser(
+            ownerUserId,
+            () ->
+                purchaseOrderService.createPurchaseOrder(
+                    CreatePurchaseOrderRequest.builder()
+                        .workOrderId(workOrderId)
+                        .tradingPartnerId(supplierId)
+                        .supplierQuoteId(quoteId)
+                        .currency("USD")
+                        .paymentTerms("NET30")
+                        .expectedDelivery(LocalDate.now(clock).plusDays(16))
+                        .notes("Demo PO generated from accepted supplier quote")
+                        .moduleType(PurchaseOrderModuleType.FIBER)
+                        .moduleSpecs(fiberPurchaseSpecs())
+                        .lines(
+                            rfqLines.stream()
+                                .map(
+                                    line ->
+                                        CreatePurchaseOrderRequest.PurchaseOrderLineRequest
+                                            .builder()
+                                            .rfqLineId(line.getId())
+                                            .productId(line.getProductId())
+                                            .productDesc(line.getProductDesc())
+                                            .qty(line.getRequestedQty())
+                                            .unit(line.getUnit())
+                                            .unitPrice(new BigDecimal("3.78"))
+                                            .currency("USD")
+                                            .moduleSpecs(fiberPurchaseSpecs())
+                                            .build())
+                                .toList())
+                        .build()));
 
     po = purchaseOrderService.changeStatus(po.getId(), PurchaseOrderStatus.SENT);
     if (po.getStatus() == PurchaseOrderStatus.PENDING_APPROVAL) {
       po = purchaseOrderService.changeStatusAsSystem(po.getId(), PurchaseOrderStatus.SENT);
     }
     return purchaseOrderService.changeStatus(po.getId(), PurchaseOrderStatus.CONFIRMED);
+  }
+
+  private UUID resolveProcurementPersonaUserId(UUID tenantId) {
+    return userRepository
+        .findFirstByTenantIdAndFirstNameAndLastNameAndIsActiveTrue(tenantId, "Yolanda", "Bidwell")
+        .map(com.fabricmanagement.platform.user.domain.User::getId)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "Procurement demo persona Yolanda Bidwell is required before seeding POs"));
+  }
+
+  private <T> T executeAsUser(UUID userId, Supplier<T> supplier) {
+    TenantContext.TenantSnapshot previous = TenantContext.capture();
+    try {
+      TenantContext.setCurrentUserId(userId);
+      return supplier.get();
+    } finally {
+      TenantContext.restore(previous);
+    }
   }
 
   private void createConfirmedGoodsReceipt(UUID poId) {
