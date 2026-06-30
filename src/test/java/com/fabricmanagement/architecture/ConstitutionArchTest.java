@@ -205,6 +205,8 @@ class ConstitutionArchTest {
       //   - TradingPartnerRegistry  : Platform-wide registry; no tenant scope by design
       //   - EmployeeNumberSequence  : tenantId IS the @Id (per-tenant singleton counter)
       //   - BatchOverrideLog        : Append-only audit log; soft-delete/version semantics N/A
+      //   - Lead                    : Tenant-independent marketing record; linked via nullable
+      //                               trialTenantId and must survive tenant lifecycle events
       //   - UserDepartment          : Junction table with composite @IdClass key; incompatible with
       //                               BaseEntity @Id
       //   - DocumentNumberCounter   : Counter singleton; BaseEntity tenant/id semantics N/A
@@ -230,6 +232,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("EmployeeNumberSequence")
               .and()
               .doNotHaveSimpleName("BatchOverrideLog")
+              .and()
+              .doNotHaveSimpleName("Lead")
               .and()
               .doNotHaveSimpleName("ProcessedEventEntry")
               .should()

@@ -80,6 +80,8 @@
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <tomcat.version>10.1.55</tomcat.version>
         <spring-security.version>6.5.11</spring-security.version>
+        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <kotlin.version>2.2.21</kotlin.version>
         <opentelemetry-semconv.version>1.41.1</opentelemetry-semconv.version>
     </properties>
 

@@ -17,10 +17,10 @@ import org.springframework.stereotype.Component;
  * <p>Idempotent: skips cloning if the target tenant already has permission_template rows.
  *
  * <p><b>Why order 10:</b> Permission templates refer to roles and departments by string codes, so
- * there are no hard foreign key dependencies other than the tenant itself. Placed at the end of the
- * onboarding pipeline as a trailing step to avoid renumbering existing core steps.
+ * there are no hard foreign key dependencies other than the tenant itself. Runs before demo seed
+ * and post-commit signup email publication so the tenant is ready before any setup link is sent.
  */
-@Order(10) // Appended after SendWelcomeEmailStep (9)
+@Order(10)
 @Component
 @RequiredArgsConstructor
 @Slf4j
