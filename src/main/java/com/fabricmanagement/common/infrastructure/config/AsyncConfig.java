@@ -12,7 +12,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * uncaught-exception logging. (Spring allows only one {@code AsyncConfigurer} bean.)
  */
 @Configuration
-@EnableAsync
+@EnableAsync(proxyTargetClass = true)
 public class AsyncConfig implements AsyncConfigurer {
 
   @Override
