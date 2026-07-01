@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.platform.tenant.api.facade.TenantFacade;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
@@ -17,7 +18,9 @@ import org.mockito.ArgumentCaptor;
 class CreateTenantStepTest {
 
   private final TenantFacade tenantFacade = org.mockito.Mockito.mock(TenantFacade.class);
-  private final CreateTenantStep step = new CreateTenantStep(tenantFacade);
+  private final TenantSessionBinder tenantSessionBinder =
+      org.mockito.Mockito.mock(TenantSessionBinder.class);
+  private final CreateTenantStep step = new CreateTenantStep(tenantFacade, tenantSessionBinder);
 
   @AfterEach
   void tearDown() {
@@ -47,6 +50,9 @@ class CreateTenantStepTest {
     assertThat(requestCaptor.getValue().isDeferTrialActivation()).isTrue();
     assertThat(requestCaptor.getValue().isDemoMode()).isTrue();
     assertThat(context.getTenantId()).isEqualTo(tenantId);
+    // The DB session must be re-bound to the new tenant so subsequent steps' tenant-scoped inserts
+    // pass RLS (the connection opened bound to SYSTEM_TENANT_ID during anonymous signup).
+    verify(tenantSessionBinder).bindToCurrentSession(tenantId);
   }
 
   @Test
