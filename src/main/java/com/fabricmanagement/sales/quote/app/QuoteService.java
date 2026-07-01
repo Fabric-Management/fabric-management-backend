@@ -1,6 +1,11 @@
 package com.fabricmanagement.sales.quote.app;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
+import com.fabricmanagement.common.util.Money;
+import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
+import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
@@ -15,6 +20,9 @@ import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
 import com.fabricmanagement.sales.salesproduct.app.SalesProductService;
 import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +39,8 @@ public class QuoteService {
   private final PricingEngineService pricingEngineService;
   private final SalesProductService catalogService;
   private final DiscountPolicyService policyService;
+  private final ExchangeRateService exchangeRateService;
+  private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
@@ -79,11 +89,14 @@ public class QuoteService {
     line.setUnit(unit);
     line.setListPrice(catalogItem.getListPrice());
     line.setOfferedPrice(offeredPrice);
+    line.setCurrency(catalogItem.getCurrency());
     line.setDiscountRate(pricing.getDiscountRate());
     line.setProfitMargin(pricing.getProfitMargin());
     line.setPriceZone(pricing.getPriceZone());
 
     quote.addLine(line);
+    // Any future line-mutating path must recompute totals before saving.
+    recomputeTotals(quote);
     return quoteRepository.save(quote);
   }
 
@@ -150,6 +163,7 @@ public class QuoteService {
     newQuote.setAssignedToId(oldQuote.getAssignedToId());
     newQuote.setModuleType(oldQuote.getModuleType());
     newQuote.setEstimatedUnitCost(oldQuote.getEstimatedUnitCost());
+    newQuote.setCurrency(oldQuote.getCurrency());
     newQuote.setValidUntil(oldQuote.getValidUntil());
     newQuote.setPaymentTerms(oldQuote.getPaymentTerms());
     newQuote.setLeadTimeDays(oldQuote.getLeadTimeDays());
@@ -168,6 +182,7 @@ public class QuoteService {
       newLine.setUnit(oldLine.getUnit());
       newLine.setListPrice(oldLine.getListPrice());
       newLine.setOfferedPrice(oldLine.getOfferedPrice());
+      newLine.setCurrency(oldLine.getCurrency());
       newLine.setDiscountRate(oldLine.getDiscountRate());
       newLine.setProfitMargin(oldLine.getProfitMargin());
       newLine.setPriceZone(oldLine.getPriceZone());
@@ -175,6 +190,7 @@ public class QuoteService {
       newQuote.addLine(newLine);
     }
 
+    recomputeTotals(newQuote);
     return quoteRepository.save(newQuote);
   }
 
@@ -183,5 +199,71 @@ public class QuoteService {
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+  }
+
+  private void recomputeTotals(Quote quote) {
+    LocalDate documentDate = docDate(quote);
+    String reportingCurrency =
+        tenantReportingCurrencyPort.getReportingCurrency(quote.getTenantId());
+    String rawHeaderCurrency = quote.getCurrency();
+    final String headerCurrency =
+        (rawHeaderCurrency == null || rawHeaderCurrency.isBlank())
+            ? reportingCurrency
+            : rawHeaderCurrency;
+
+    BigDecimal nativeTotal =
+        quote.getLines().stream()
+            .map(
+                line ->
+                    convertLineTotalToHeader(
+                        quote.getTenantId(), line, headerCurrency, documentDate))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    quote.setTotalAmount(Money.of(nativeTotal, headerCurrency));
+    quote.setReportingTotal(
+        convertMoney(
+            quote.getTenantId(), nativeTotal, headerCurrency, reportingCurrency, documentDate));
+  }
+
+  private BigDecimal convertLineTotalToHeader(
+      UUID tenantId, QuoteLine line, String headerCurrency, LocalDate documentDate) {
+    BigDecimal lineAmount = line.lineTotal();
+    String lineCurrency = line.getCurrency();
+    if (lineCurrency == null || lineCurrency.isBlank()) {
+      lineCurrency = headerCurrency;
+    }
+    if (lineCurrency.equalsIgnoreCase(headerCurrency)) {
+      return lineAmount;
+    }
+
+    return convertMoney(tenantId, lineAmount, lineCurrency, headerCurrency, documentDate)
+        .getConvertedAmount();
+  }
+
+  private ConvertedMoney convertMoney(
+      UUID tenantId,
+      BigDecimal amount,
+      String fromCurrency,
+      String toCurrency,
+      LocalDate documentDate) {
+    if (fromCurrency.equalsIgnoreCase(toCurrency)) {
+      return ConvertedMoney.of(
+          amount, fromCurrency, amount, toCurrency, BigDecimal.ONE, documentDate);
+    }
+
+    try {
+      return exchangeRateService.convert(tenantId, amount, fromCurrency, toCurrency, documentDate);
+    } catch (ExchangeRateRequiredException ex) {
+      throw SalesDomainException.exchangeRateRequired(
+          String.format(
+              "No exchange rate for %s->%s on %s; seed a rate before saving this quote",
+              fromCurrency, toCurrency, documentDate),
+          ex);
+    }
+  }
+
+  private LocalDate docDate(Quote quote) {
+    Instant dateSource = quote.getCreatedAt();
+    return dateSource != null ? dateSource.atZone(ZoneOffset.UTC).toLocalDate() : LocalDate.now();
   }
 }

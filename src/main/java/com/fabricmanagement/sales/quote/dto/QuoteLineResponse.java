@@ -16,6 +16,7 @@ public class QuoteLineResponse {
   private final String unit;
   private final BigDecimal listPrice;
   private final BigDecimal offeredPrice;
+  private final String currency;
   private final BigDecimal discountRate;
   private final BigDecimal profitMargin;
   private final QuotePriceZone priceZone;
@@ -29,6 +30,7 @@ public class QuoteLineResponse {
     this.unit = line.getUnit();
     this.listPrice = line.getListPrice();
     this.offeredPrice = line.getOfferedPrice();
+    this.currency = line.getCurrency();
     this.discountRate = line.getDiscountRate();
     this.profitMargin = line.getProfitMargin();
     this.priceZone = line.getPriceZone();

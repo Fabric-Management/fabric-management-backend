@@ -42,6 +42,10 @@ public class QuoteCreateRequest {
    */
   private BigDecimal estimatedUnitCost;
 
+  @NotBlank(message = "Currency is required")
+  @Pattern(regexp = "^[A-Z]{3}$", message = "Currency must be a 3-letter ISO code")
+  private String currency;
+
   @NotNull(message = "Valid-until date is required")
   @FutureOrPresent(message = "Valid-until date must be today or in the future")
   private LocalDate validUntil;
@@ -85,6 +89,7 @@ public class QuoteCreateRequest {
     q.setModuleType(moduleType);
     q.setQuoteNumber(quoteNumber);
     q.setEstimatedUnitCost(estimatedUnitCost);
+    q.setCurrency(currency);
     q.setValidUntil(validUntil);
     q.setPaymentTerms(paymentTerms);
     q.setLeadTimeDays(leadTimeDays);

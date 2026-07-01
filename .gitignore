@@ -166,3 +166,6 @@ hash.java
 test-sessions.sh
 t2_changes.diff
 tests_run.txt
+
+# Commit message scratch files (delivered by Claude, used via git commit -F)
+COMMIT_MSG*.txt

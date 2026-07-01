@@ -14,6 +14,11 @@ public class SalesDomainException extends DomainException {
     super(message, errorCode, httpStatus.value(), args);
   }
 
+  public SalesDomainException(
+      String message, String errorCode, HttpStatus httpStatus, Throwable cause) {
+    super(message, errorCode, httpStatus.value(), cause);
+  }
+
   public static SalesDomainException invalidPriceZone(String message) {
     return new SalesDomainException(message, "SALES_001_INVALID_PRICE_ZONE", HttpStatus.FORBIDDEN);
   }
@@ -30,5 +35,10 @@ public class SalesDomainException extends DomainException {
 
   public static SalesDomainException tokenExpiredOrUsed(String message) {
     return new SalesDomainException(message, "SALES_004_TOKEN_INVALID", HttpStatus.BAD_REQUEST);
+  }
+
+  public static SalesDomainException exchangeRateRequired(String message, Throwable cause) {
+    return new SalesDomainException(
+        message, "SALES_005_EXCHANGE_RATE_REQUIRED", HttpStatus.BAD_REQUEST, cause);
   }
 }

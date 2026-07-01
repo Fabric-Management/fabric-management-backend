@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.auth.app.onboarding;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.platform.tenant.api.facade.TenantFacade;
 import com.fabricmanagement.platform.tenant.dto.CreateTenantRequest;
 import com.fabricmanagement.platform.tenant.dto.TenantDto;
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Component;
 public class CreateTenantStep implements OnboardingStep {
 
   private final TenantFacade tenantFacade;
+  private final TenantSessionBinder tenantSessionBinder;
 
   @Override
   public void execute(OnboardingContext context) {
@@ -51,6 +53,13 @@ public class CreateTenantStep implements OnboardingStep {
     context.setTenantUid(tenant.getUid());
     TenantContext.setCurrentTenantId(tenant.getId());
     TenantContext.setCurrentTenantUid(tenant.getUid());
+
+    // The onboarding transaction opened bound to SYSTEM_TENANT_ID (anonymous signup). The MTCP
+    // binds
+    // app.current_tenant only at connection acquisition, so switching TenantContext above is not
+    // enough — re-bind the DB session on the same connection or the next tenant-scoped insert
+    // (common_organization, step 2) fails the RLS WITH CHECK. See TenantSessionBinder.
+    tenantSessionBinder.bindToCurrentSession(tenant.getId());
 
     log.debug("CreateTenantStep: tenantId={}, tenantUid={}", tenant.getId(), tenant.getUid());
   }
