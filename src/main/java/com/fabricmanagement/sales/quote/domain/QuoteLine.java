@@ -41,6 +41,9 @@ public class QuoteLine extends BaseEntity {
   @Column(name = "offered_price", nullable = false, precision = 18, scale = 4)
   private BigDecimal offeredPrice;
 
+  @Column(name = "currency", length = 3)
+  private String currency;
+
   @Column(name = "discount_rate", nullable = false, precision = 5, scale = 4)
   private BigDecimal discountRate;
 
@@ -57,6 +60,13 @@ public class QuoteLine extends BaseEntity {
 
   @Column(name = "is_active", nullable = false)
   private boolean isActive = true;
+
+  public BigDecimal lineTotal() {
+    if (offeredPrice == null || requestedQty == null) {
+      return BigDecimal.ZERO;
+    }
+    return offeredPrice.multiply(requestedQty);
+  }
 
   public void markAsDeleted() {
     this.isActive = false;

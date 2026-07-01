@@ -1,8 +1,12 @@
 package com.fabricmanagement.sales.quote.domain;
 
+import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
+import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.offline.domain.OfflineMetadata;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -47,6 +51,39 @@ public class Quote extends BaseEntity {
 
   @Column(name = "estimated_unit_cost", precision = 18, scale = 4)
   private BigDecimal estimatedUnitCost;
+
+  @Column(name = "currency", length = 3)
+  private String currency;
+
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(
+        name = "amount",
+        column = @Column(name = "total_amount", precision = 18, scale = 4)),
+    @AttributeOverride(name = "currency", column = @Column(name = "total_currency", length = 3))
+  })
+  private Money totalAmount;
+
+  @Embedded
+  @AttributeOverrides({
+    @AttributeOverride(
+        name = "originalAmount",
+        column = @Column(name = "reporting_total_original", precision = 18, scale = 4)),
+    @AttributeOverride(
+        name = "originalCurrency",
+        column = @Column(name = "reporting_total_orig_currency", length = 3)),
+    @AttributeOverride(
+        name = "convertedAmount",
+        column = @Column(name = "reporting_total_converted", precision = 18, scale = 4)),
+    @AttributeOverride(
+        name = "convertedCurrency",
+        column = @Column(name = "reporting_currency", length = 3)),
+    @AttributeOverride(
+        name = "exchangeRate",
+        column = @Column(name = "reporting_exchange_rate", precision = 20, scale = 8)),
+    @AttributeOverride(name = "rateDate", column = @Column(name = "reporting_rate_date"))
+  })
+  private ConvertedMoney reportingTotal;
 
   @Column(name = "valid_until", nullable = false)
   private LocalDate validUntil;

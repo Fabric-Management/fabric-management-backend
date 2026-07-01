@@ -50581,6 +50581,16 @@ components:
           type: boolean
         zero:
           type: boolean
+    MoneyDto:
+      type: object
+      description: Money amount with currency
+      properties:
+        amount:
+          type: number
+          description: Amount
+        currency:
+          type: string
+          description: Currency code
     NavPreferencesRequest:
       type: object
       properties:
@@ -52731,6 +52741,10 @@ components:
         assignedToId:
           type: string
           format: uuid
+        currency:
+          type: string
+          minLength: 1
+          pattern: "^[A-Z]{3}$"
         customerId:
           type: string
           format: uuid
@@ -52765,6 +52779,7 @@ components:
           format: date
       required:
       - assignedToId
+      - currency
       - customerId
       - moduleType
       - quoteNumber
@@ -52772,6 +52787,8 @@ components:
     QuoteLineResponse:
       type: object
       properties:
+        currency:
+          type: string
         discountRate:
           type: number
         id:
@@ -52809,6 +52826,8 @@ components:
         createdAt:
           type: string
           format: date-time
+        currency:
+          type: string
         customerId:
           type: string
           format: uuid
@@ -52835,6 +52854,8 @@ components:
           type: string
         quoteNumber:
           type: string
+        reportingTotal:
+          $ref: "#/components/schemas/ConvertedMoneyDto"
         revisionNumber:
           type: integer
           format: int32
@@ -52849,6 +52870,8 @@ components:
           - CONVERTED
           - EXPIRED
           - SUPERSEDED
+        totalAmount:
+          $ref: "#/components/schemas/MoneyDto"
         validUntil:
           type: string
           format: date
