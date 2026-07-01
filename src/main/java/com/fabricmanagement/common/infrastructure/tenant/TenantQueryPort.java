@@ -19,4 +19,11 @@ public interface TenantQueryPort {
 
   /** Tek tenant lookup (tekil DTO enrichment / bildirim). */
   Optional<TenantReference> findById(UUID tenantId);
+
+  /**
+   * Pre-auth tenant resolution from a registration token. Used by password setup, which is
+   * anonymous (no tenant context yet) so the tenant-scoped registration-token table is invisible to
+   * RLS-bound reads. Runs via the BYPASSRLS system executor in the adapter.
+   */
+  Optional<UUID> findTenantIdByRegistrationToken(String token);
 }
