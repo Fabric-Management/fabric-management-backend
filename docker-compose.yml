@@ -90,7 +90,7 @@ services:
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?error}
       POSTGRES_SYSTEM_PASSWORD: ${POSTGRES_SYSTEM_PASSWORD:?error}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/db/docker-init-roles.sh:/docker-entrypoint-initdb.d/01-init-roles.sh
