@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
+import com.fabricmanagement.platform.auth.app.IdentityProvisioningService;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
@@ -91,6 +92,7 @@ class JwtRoundTripIntegrationTest {
   @Autowired private OrganizationRepository organizationRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private AuthUserRepository authUserRepository;
+  @Autowired private IdentityProvisioningService identityProvisioningService;
   @Autowired private PasswordEncoder passwordEncoder;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private SystemTransactionExecutor systemExecutor;
@@ -159,9 +161,19 @@ class JwtRoundTripIntegrationTest {
         signupTenantId);
     try {
       // Create AuthUser with password (user-based auth: one AuthUser per User)
-      AuthUser authUser = AuthUser.create(signupUserId, passwordEncoder.encode(password));
+      String passwordHash = passwordEncoder.encode(password);
+      AuthUser authUser = AuthUser.create(signupUserId, passwordHash);
       authUser.verify();
       authUserRepository.save(authUser);
+      identityProvisioningService.provisionCredential(
+          email,
+          passwordHash,
+          Boolean.TRUE.equals(authUser.getIsMfaEnabled()),
+          authUser.getPrimaryMfaType(),
+          authUser.getMfaSecret(),
+          true,
+          signupTenantId,
+          signupUserId);
 
       // Verify the contact directly in the DB
       systemExecutor.executeUpdate(
@@ -286,9 +298,19 @@ class JwtRoundTripIntegrationTest {
     com.fabricmanagement.common.infrastructure.persistence.TenantContext.setCurrentTenantId(
         signupTenantId);
     try {
-      AuthUser authUser = AuthUser.create(signupUserId, passwordEncoder.encode(password));
+      String passwordHash = passwordEncoder.encode(password);
+      AuthUser authUser = AuthUser.create(signupUserId, passwordHash);
       authUser.verify();
       authUserRepository.save(authUser);
+      identityProvisioningService.provisionCredential(
+          email,
+          passwordHash,
+          Boolean.TRUE.equals(authUser.getIsMfaEnabled()),
+          authUser.getPrimaryMfaType(),
+          authUser.getMfaSecret(),
+          true,
+          signupTenantId,
+          signupUserId);
 
       // Verify the contact directly in the DB
       systemExecutor.executeUpdate(

@@ -62,6 +62,7 @@ class PasswordSetupServiceTest {
   @Mock private EmployeeProjectionPort employeeProjectionPort;
   @Mock private TrialLifecyclePort trialLifecyclePort;
   @Mock private TenantSessionBinder tenantSessionBinder;
+  @Mock private IdentityProvisioningService identityProvisioningService;
 
   private PasswordSetupService service;
 
@@ -85,7 +86,8 @@ class PasswordSetupServiceTest {
             tenantQueryPort,
             employeeProjectionPort,
             trialLifecyclePort,
-            tenantSessionBinder);
+            tenantSessionBinder,
+            identityProvisioningService);
     ReflectionTestUtils.setField(service, "refreshTokenExpiration", 604_800_000L);
     ReflectionTestUtils.setField(service, "accessTokenExpiration", 900_000L);
   }
@@ -113,6 +115,25 @@ class PasswordSetupServiceTest {
     service.setupPassword(fixture.request(), "127.0.0.1");
 
     verify(trialLifecyclePort, never()).startSelfServiceTrialIfNeeded(any());
+  }
+
+  @Test
+  @DisplayName("password setup provisions platform identity and membership")
+  void shouldProvisionIdentityAndMembershipOnPasswordSetup() {
+    PasswordSetupFixture fixture = arrangePasswordSetup(RegistrationTokenType.SALES_LED);
+
+    service.setupPassword(fixture.request(), "127.0.0.1");
+
+    verify(identityProvisioningService)
+        .provisionCredential(
+            "admin@example.com",
+            "hash",
+            false,
+            com.fabricmanagement.platform.auth.domain.MfaType.NONE,
+            null,
+            true,
+            fixture.tenantId(),
+            fixture.userId());
   }
 
   private PasswordSetupFixture arrangePasswordSetup(RegistrationTokenType tokenType) {
@@ -146,7 +167,7 @@ class PasswordSetupServiceTest {
     when(jwtService.generateRefreshToken(user)).thenReturn("refresh-token");
     when(employeeProjectionPort.findByUserId(tenantId, userId)).thenReturn(Optional.empty());
 
-    return new PasswordSetupFixture(request, tenantId);
+    return new PasswordSetupFixture(request, tenantId, userId);
   }
 
   private static User buildVerifiedUser(
@@ -166,5 +187,5 @@ class PasswordSetupServiceTest {
     return user;
   }
 
-  private record PasswordSetupFixture(PasswordSetupRequest request, UUID tenantId) {}
+  private record PasswordSetupFixture(PasswordSetupRequest request, UUID tenantId, UUID userId) {}
 }

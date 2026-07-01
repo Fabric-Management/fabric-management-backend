@@ -87,4 +87,27 @@ public class LoginIdentity {
       email = email.trim().toLowerCase(java.util.Locale.ROOT);
     }
   }
+
+  public boolean isLocked() {
+    return lockedUntil != null && lockedUntil.isAfter(Instant.now());
+  }
+
+  public void recordFailedLogin(int maxAttempts, int lockDurationSeconds) {
+    this.failedLoginAttempts =
+        (this.failedLoginAttempts != null ? this.failedLoginAttempts : 0) + 1;
+    if (this.failedLoginAttempts >= maxAttempts) {
+      this.lockedUntil = Instant.now().plusSeconds(lockDurationSeconds);
+    }
+  }
+
+  public void recordSuccessfulLogin() {
+    this.failedLoginAttempts = 0;
+    this.lockedUntil = null;
+  }
+
+  public void changePassword(String newPasswordHash) {
+    this.passwordHash = newPasswordHash;
+    this.requiresPasswordReset = false;
+    recordSuccessfulLogin();
+  }
 }

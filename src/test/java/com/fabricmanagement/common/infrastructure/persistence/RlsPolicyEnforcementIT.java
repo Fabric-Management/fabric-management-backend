@@ -56,6 +56,10 @@ class RlsPolicyEnforcementIT {
         JOIN pg_namespace pn ON pn.oid = pc.relnamespace AND pn.nspname = c.table_schema
         WHERE c.column_name = 'tenant_id'
           AND c.table_schema NOT IN ('information_schema', 'pg_catalog')
+          -- IDENTITY-1/2: common_auth.membership.tenant_id is a plain membership FK used
+          -- during pre-auth organization selection. The table is deliberately RLS-free so login
+          -- can resolve active memberships before TenantContext exists.
+          AND NOT (c.table_schema = 'common_auth' AND c.table_name = 'membership')
           AND (
             pc.relrowsecurity = false
             OR pc.relforcerowsecurity = false

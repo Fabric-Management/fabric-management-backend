@@ -31,6 +31,7 @@ public class MfaSetupService {
   private final TotpMfaService totpMfaService;
   private final UserRepository userRepository;
   private final LocalizationService localizationService;
+  private final IdentityProvisioningService identityProvisioningService;
 
   /**
    * Initiate MFA setup for user.
@@ -93,6 +94,8 @@ public class MfaSetupService {
     authUser.setIsMfaEnabled(false);
 
     authUserRepository.save(authUser);
+    identityProvisioningService.updateMfaForUser(
+        authUser.getUserId(), false, authUser.getPrimaryMfaType(), authUser.getMfaSecret());
 
     log.info("TOTP MFA setup initiated for user: {}", authUser.getUserId());
 
@@ -117,6 +120,8 @@ public class MfaSetupService {
     authUser.setMfaSecret(null);
 
     authUserRepository.save(authUser);
+    identityProvisioningService.updateMfaForUser(
+        authUser.getUserId(), false, authUser.getPrimaryMfaType(), authUser.getMfaSecret());
 
     log.info("{} MFA setup initiated for user: {}", mfaType, authUser.getUserId());
 
@@ -167,6 +172,8 @@ public class MfaSetupService {
 
     authUser.setIsMfaEnabled(true);
     authUserRepository.save(authUser);
+    identityProvisioningService.updateMfaForUser(
+        authUser.getUserId(), true, authUser.getPrimaryMfaType(), authUser.getMfaSecret());
 
     log.info("✅ MFA enabled for user: {}, type={}", userId, authUser.getPrimaryMfaType());
   }
@@ -192,6 +199,8 @@ public class MfaSetupService {
     authUser.setMfaSecret(null);
 
     authUserRepository.save(authUser);
+    identityProvisioningService.updateMfaForUser(
+        authUser.getUserId(), false, authUser.getPrimaryMfaType(), authUser.getMfaSecret());
 
     trustedDeviceRepository.deleteByUserId(userId);
 

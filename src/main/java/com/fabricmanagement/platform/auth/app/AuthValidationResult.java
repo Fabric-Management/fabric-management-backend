@@ -39,4 +39,8 @@ public class AuthValidationResult {
   public static AuthValidationResult inactive() {
     return new AuthValidationResult(false, "Account is deactivated", null);
   }
+
+  public static AuthValidationResult passwordResetRequired() {
+    return new AuthValidationResult(false, "Password reset required", null);
+  }
 }

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import com.fabricmanagement.platform.auth.app.IdentityProvisioningService;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.communication.domain.Contact;
@@ -47,6 +48,7 @@ class PartnerUserSeederTest {
   @Mock private PasswordEncoder passwordEncoder;
   @Mock private TransactionTemplate transactionTemplate;
   @Mock private ContactRepository contactRepository;
+  @Mock private IdentityProvisioningService identityProvisioningService;
 
   @InjectMocks private PartnerUserSeeder partnerUserSeeder;
 

@@ -77,6 +77,7 @@ public class PasswordResetService {
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final DomainEventPublisher eventPublisher;
+  private final IdentityProvisioningService identityProvisioningService;
 
   @Value("${application.jwt.expiration:900000}")
   private long accessTokenExpiration;
@@ -316,6 +317,7 @@ public class PasswordResetService {
     authUser.unlock();
 
     authUserRepository.save(authUser);
+    identityProvisioningService.updatePasswordForUser(userId, newPasswordHash);
 
     // ✅ Get User DTO (user-based authentication)
     UserDto user =
