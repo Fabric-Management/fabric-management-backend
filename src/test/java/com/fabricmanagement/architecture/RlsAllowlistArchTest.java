@@ -50,6 +50,10 @@ class RlsAllowlistArchTest {
           "common_tenant",
           "trading_partner_registry",
 
+          // Platform identity tables (IDENTITY-1): pre-auth/cross-tenant, deliberately no RLS
+          "login_identity",
+          "membership",
+
           // Permanent marketing lead; tenant-independent with nullable trial_tenant_id link
           "common_lead",
 

@@ -213,6 +213,9 @@ class ConstitutionArchTest {
       //   - ProcessedEventEntry     : Durable event processing entry; BaseEntity semantics N/A
       //   - TaskLabelAssignment     : Minimal junction table; NOTE [X1] - intentional, no audit
       //                               trail needed
+      //   - LoginIdentity           : Platform-level pre-auth principal; no tenant_id by design
+      //   - Membership              : Platform-level identity→tenant link; tenant_id is a plain FK,
+      //                               not BaseEntity's RLS isolation column
 
       ArchRule rule =
           classes()
@@ -236,6 +239,10 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("Lead")
               .and()
               .doNotHaveSimpleName("ProcessedEventEntry")
+              .and()
+              .doNotHaveSimpleName("LoginIdentity")
+              .and()
+              .doNotHaveSimpleName("Membership")
               .should()
               .beAssignableTo(
                   com.fabricmanagement.common.infrastructure.persistence.BaseEntity.class)
@@ -815,6 +822,7 @@ class ConstitutionArchTest {
       //   - TenantTransactionalPurgeService : Go-real purge, atomic tenant-scoped seed/data wipe
       //   - TenantQueryAdapter           : Port/Adapter: tenant lookup (auth, event yolu)
       //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
+      //   - LoginIdentityBackfillRunner  : IDENTITY-1 startup backfill from RLS source tables
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -840,6 +848,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("SystemDataSourceConfig")
               .and()
               .doNotHaveSimpleName("FinancePermissionBackfillRunner")
+              .and()
+              .doNotHaveSimpleName("LoginIdentityBackfillRunner")
               .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()
