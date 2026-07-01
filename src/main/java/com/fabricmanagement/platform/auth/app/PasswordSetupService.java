@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
@@ -79,6 +80,7 @@ public class PasswordSetupService {
   private final TenantQueryPort tenantQueryPort;
   private final EmployeeProjectionPort employeeProjectionPort;
   private final TrialLifecyclePort trialLifecyclePort;
+  private final TenantSessionBinder tenantSessionBinder;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
@@ -100,6 +102,18 @@ public class PasswordSetupService {
         "Password setup initiated: token={}..., tokenType={}",
         request.getToken().substring(0, Math.min(8, request.getToken().length())),
         "checking...");
+
+    // RLS: common_registration_token is tenant-scoped, but password setup is anonymous (no tenant
+    // context yet), so the RLS-bound reads below can't see the token. Resolve the token's tenant
+    // via
+    // the BYPASSRLS query port and bind the DB session, so the token/user/contact reads that follow
+    // run under the correct tenant. See TenantQueryPort / TenantSessionBinder.
+    UUID tokenTenantId =
+        tenantQueryPort
+            .findTenantIdByRegistrationToken(request.getToken())
+            .orElseThrow(() -> new IllegalArgumentException("Invalid registration token"));
+    TenantContext.setCurrentTenantId(tokenTenantId);
+    tenantSessionBinder.bindToCurrentSession(tokenTenantId);
 
     RegistrationToken token =
         tokenRepository

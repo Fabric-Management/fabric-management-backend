@@ -6,6 +6,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
 import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
@@ -30,6 +32,7 @@ import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,7 @@ class PasswordSetupServiceTest {
   @Mock private TenantQueryPort tenantQueryPort;
   @Mock private EmployeeProjectionPort employeeProjectionPort;
   @Mock private TrialLifecyclePort trialLifecyclePort;
+  @Mock private TenantSessionBinder tenantSessionBinder;
 
   private PasswordSetupService service;
 
@@ -80,9 +84,15 @@ class PasswordSetupServiceTest {
             organizationAddressRepository,
             tenantQueryPort,
             employeeProjectionPort,
-            trialLifecyclePort);
+            trialLifecyclePort,
+            tenantSessionBinder);
     ReflectionTestUtils.setField(service, "refreshTokenExpiration", 604_800_000L);
     ReflectionTestUtils.setField(service, "accessTokenExpiration", 900_000L);
+  }
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
   }
 
   @Test
@@ -122,6 +132,8 @@ class PasswordSetupServiceTest {
             .build();
     User user = buildVerifiedUser(tenantId, userId, organizationId, contactValue);
 
+    when(tenantQueryPort.findTenantIdByRegistrationToken(token.getToken()))
+        .thenReturn(Optional.of(tenantId));
     when(tokenRepository.findByToken(token.getToken())).thenReturn(Optional.of(token));
     when(userFacade.findByContactValue(contactValue)).thenReturn(Optional.of(userDto));
     when(authUserRepository.existsByUserId(userId)).thenReturn(false);

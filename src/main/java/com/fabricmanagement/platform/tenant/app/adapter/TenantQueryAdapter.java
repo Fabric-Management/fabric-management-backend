@@ -36,6 +36,9 @@ public class TenantQueryAdapter implements TenantQueryPort {
   private static final String SELECT_BY_IDS =
       "SELECT id, uid, name, type FROM common_tenant.common_tenant WHERE id = ANY(?) AND is_active = true";
 
+  private static final String SELECT_TENANT_ID_BY_REG_TOKEN =
+      "SELECT tenant_id FROM common_auth.common_registration_token WHERE token = ?";
+
   @Override
   public List<TenantReference> findAllActiveTenants() {
     return systemExecutor.executeQuery(
@@ -78,5 +81,13 @@ public class TenantQueryAdapter implements TenantQueryPort {
                     rs.getString("type")),
             tenantId);
     return Optional.ofNullable(result);
+  }
+
+  @Override
+  public Optional<UUID> findTenantIdByRegistrationToken(String token) {
+    UUID tenantId =
+        systemExecutor.executeQueryForObject(
+            SELECT_TENANT_ID_BY_REG_TOKEN, (rs, i) -> rs.getObject("tenant_id", UUID.class), token);
+    return Optional.ofNullable(tenantId);
   }
 }
