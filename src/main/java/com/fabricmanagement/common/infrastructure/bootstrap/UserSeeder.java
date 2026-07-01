@@ -1,7 +1,9 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.auth.app.IdentityProvisioningService;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
+import com.fabricmanagement.platform.auth.domain.MfaType;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.app.OrganizationService;
@@ -51,6 +53,7 @@ public class UserSeeder implements DataSeeder {
   private final PasswordEncoder passwordEncoder;
   private final TransactionTemplate transactionTemplate;
   private final ContactRepository contactRepository;
+  private final IdentityProvisioningService identityProvisioningService;
 
   private static final String DEFAULT_PASSWORD = "password123";
 
@@ -462,10 +465,7 @@ public class UserSeeder implements DataSeeder {
     UserDto user = userCreationService.createInternalUser(req);
     stampDemoSeed(user.getId(), tenantId);
 
-    // 3. Setup Password System ByPass
-    setupAuthUser(user.getId(), tenantId);
-
-    // 4. Mark all auto-assigned contacts as verified to allow login
+    // 3. Mark all auto-assigned contacts as verified to allow login
     contactRepository
         .findByTenantIdAndContactValue(tenantId, profile.email())
         .ifPresent(
@@ -473,6 +473,9 @@ public class UserSeeder implements DataSeeder {
               contact.verify();
               contactRepository.save(contact);
             });
+
+    // 4. Setup Password System ByPass + platform identity dual-write
+    setupAuthUser(user.getId(), tenantId, profile.email());
 
     log.debug(
         "Created user: {} {} — {} ({})",
@@ -493,12 +496,15 @@ public class UserSeeder implements DataSeeder {
     userRepository.save(seededUser);
   }
 
-  private void setupAuthUser(UUID userId, UUID tenantId) {
+  private void setupAuthUser(UUID userId, UUID tenantId, String email) {
     if (!authUserRepository.existsByUserId(userId)) {
-      AuthUser authUser = AuthUser.create(userId, passwordEncoder.encode(DEFAULT_PASSWORD));
+      String passwordHash = passwordEncoder.encode(DEFAULT_PASSWORD);
+      AuthUser authUser = AuthUser.create(userId, passwordHash);
       authUser.setTenantId(tenantId);
       authUser.verify();
       authUserRepository.save(authUser);
+      identityProvisioningService.provisionCredential(
+          email, passwordHash, false, MfaType.NONE, null, true, tenantId, userId);
     }
   }
 

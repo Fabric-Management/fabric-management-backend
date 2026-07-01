@@ -74,6 +74,7 @@ public class RegistrationService {
   private final TenantQueryPort tenantQueryPort;
   private final VerificationCodeManager verificationCodeManager;
   private final OrganizationRepository organizationRepository;
+  private final IdentityProvisioningService identityProvisioningService;
 
   // VerificationService no longer injected - VerificationCodeManager.issueCode sends via dispatcher
 
@@ -162,6 +163,15 @@ public class RegistrationService {
     authUser.setTenantId(user.getTenantId());
     authUser.verify();
     authUserRepository.save(authUser);
+    identityProvisioningService.provisionCredential(
+        contact.getContactValue(),
+        passwordHash,
+        Boolean.TRUE.equals(authUser.getIsMfaEnabled()),
+        authUser.getPrimaryMfaType(),
+        authUser.getMfaSecret(),
+        true,
+        user.getTenantId(),
+        user.getId());
 
     com.fabricmanagement.platform.user.domain.User userEntity =
         userRepository

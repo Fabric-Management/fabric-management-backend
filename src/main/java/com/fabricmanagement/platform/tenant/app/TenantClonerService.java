@@ -439,6 +439,11 @@ public class TenantClonerService {
                   },
                   templateTenantId);
 
+              // Do not clone common_auth_user/login_identity/membership here. Playground access
+              // currently uses impersonation, and provisioning cloned users with the same emails
+              // would intentionally merge into the global LoginIdentity rows until org-picker and
+              // identity lifecycle rules are implemented.
+
               // 4. Clone Reference Data Tables (No internal hierarchical dependencies)
 
               // 5. PRODUCTION MASTERDATA

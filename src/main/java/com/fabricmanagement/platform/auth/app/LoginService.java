@@ -2,9 +2,12 @@ package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.util.DeviceInfoUtil;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
-import com.fabricmanagement.platform.auth.domain.AuthUser;
+import com.fabricmanagement.platform.auth.domain.LoginIdentity;
+import com.fabricmanagement.platform.auth.domain.Membership;
+import com.fabricmanagement.platform.auth.domain.MembershipStatus;
 import com.fabricmanagement.platform.auth.domain.MfaType;
 import com.fabricmanagement.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.platform.auth.domain.VerificationType;
@@ -12,7 +15,8 @@ import com.fabricmanagement.platform.auth.domain.event.UserLoginEvent;
 import com.fabricmanagement.platform.auth.dto.LoginRequest;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.dto.VerifyMfaRequest;
-import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
+import com.fabricmanagement.platform.auth.infra.repository.LoginIdentityRepository;
+import com.fabricmanagement.platform.auth.infra.repository.MembershipRepository;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.communication.app.ContactService;
@@ -22,11 +26,15 @@ import com.fabricmanagement.platform.user.api.facade.UserFacade;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,8 +56,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class LoginService {
 
-  private final AuthUserRepository authUserRepository;
   private final AuthUserResolutionService resolutionService;
+  private final LoginIdentityRepository loginIdentityRepository;
+  private final MembershipRepository membershipRepository;
   private final RefreshTokenRepository refreshTokenRepository;
   private final UserFacade userFacade;
   private final UserRepository userRepository;
@@ -63,6 +72,7 @@ public class LoginService {
   private final TrustedDeviceService trustedDeviceService;
   private final MfaRateLimitService mfaRateLimitService;
   private final MfaEventService mfaEventService;
+  private final TenantSessionBinder tenantSessionBinder;
 
   @Value("${application.jwt.expiration:900000}")
   private long accessTokenExpiration;
@@ -79,167 +89,150 @@ public class LoginService {
       log.debug("Login attempt (unmasked): contactValue={}", request.getContactValue());
     }
 
-    // ✅ Find AuthUser by contact value (user-based authentication)
-    Optional<AuthUser> authUserOpt = resolutionService.resolveByContact(request.getContactValue());
+    String normalizedEmail = normalizeEmail(request.getContactValue());
+    Optional<LoginIdentity> identityOpt = loginIdentityRepository.findByEmail(normalizedEmail);
 
-    // ✅ If AuthUser doesn't exist, check if contact belongs to user with password
-    if (authUserOpt.isEmpty()) {
-      log.debug(
-          "AuthUser not found for contactValue={}, checking if user exists",
-          PiiMaskingUtil.maskEmail(request.getContactValue()));
-
-      Optional<UserDto> userOpt = userFacade.findByContactValue(request.getContactValue());
-      if (userOpt.isPresent()) {
-        UserDto user = userOpt.get();
-        log.debug(
-            "User found: userId={}, tenantId={}, checking for password",
-            user.getId(),
-            user.getTenantId());
-
-        // ✅ Check if user has AuthUser (password exists) - simple user-based check
-        boolean userHasPassword = resolutionService.existsByUserId(user.getId());
-
-        log.debug("User has password: {}", userHasPassword);
-
-        if (userHasPassword) {
-          // User has password but this contact is not verified
-          TenantContext.executeInTenantContext(
-              user.getTenantId(), () -> checkUnverifiedContact(request.getContactValue()));
-        }
-      }
-
-      // Contact doesn't exist or user doesn't have password
+    if (identityOpt.isEmpty()) {
       log.warn(
-          "Login failed: User not found or has no password. contactValue={}",
+          "Login failed: LoginIdentity not found. contactValue={}",
           PiiMaskingUtil.maskEmail(request.getContactValue()));
       throw createContextAwareNotFoundException(request.getContactValue());
     }
 
-    AuthUser authUser = authUserOpt.get();
+    LoginIdentity identity = identityOpt.get();
 
-    AuthValidationResult validation = resolutionService.validate(authUser);
+    AuthValidationResult validation = resolutionService.validate(identity);
     if (!validation.isValid()) {
       log.warn(
           "Auth validation failed: contactValue={}, reason={}",
           PiiMaskingUtil.maskEmail(request.getContactValue()),
           validation.getReason());
+      if (Boolean.TRUE.equals(identity.getRequiresPasswordReset())) {
+        throw new PlatformDomainException(
+            "Password reset required", "AUTH_PASSWORD_RESET_REQUIRED", 409);
+      }
       throw new PlatformDomainException(
           validation.getReason(), "AUTH_LOGIN_VALIDATION_FAILED", 400);
     }
 
-    if (!passwordEncoder.matches(request.getPassword(), authUser.getPasswordHash())) {
-      resolutionService.recordFailedAttempt(authUser);
+    if (!passwordEncoder.matches(request.getPassword(), identity.getPasswordHash())) {
+      resolutionService.recordFailedAttempt(identity);
       log.warn(
           "Invalid password: contactValue={}, attempts={}",
           PiiMaskingUtil.maskEmail(request.getContactValue()),
-          authUser.getFailedLoginAttempts());
+          identity.getFailedLoginAttempts());
       throw new PlatformDomainException("Invalid credentials", "AUTH_INVALID_CREDENTIALS", 401);
     }
 
-    resolutionService.resetFailedAttempts(authUser);
+    resolutionService.resetFailedAttempts(identity);
 
-    // ✅ Get User from AuthUser (user-based authentication)
-    // AuthUser.user is already loaded via LEFT JOIN FETCH in repository query
-    UUID userId = authUser.getUserId();
-    UserDto user =
-        userFacade
-            .findById(authUser.getTenantId(), userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    Membership membership = selectLoginMembership(identity);
+    UUID tenantId = membership.getTenantId();
+    UUID userId = membership.getUserId();
 
-    if (!user.getIsActive()) {
-      throw new PlatformDomainException(
-          "User account is deactivated", "AUTH_USER_DEACTIVATED", 403);
-    }
+    TenantContext.setCurrentTenantId(tenantId);
+    tenantSessionBinder.bindToCurrentSession(tenantId);
 
-    // Get User entity with contacts/departments loaded for JWT generation
-    com.fabricmanagement.platform.user.domain.User userEntity =
-        userRepository
-            .findByTenantIdAndId(user.getTenantId(), user.getId())
-            .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
+    try {
+      UserDto user = userFacade.findById(tenantId, userId).orElseThrow();
 
-    // Check if MFA is enabled and handle it
-    boolean bypassMfa = false;
-
-    // Check trusted device token with full context binding (IP + User-Agent)
-    if (request.getTrustedDeviceToken() != null && !request.getTrustedDeviceToken().isBlank()) {
-      bypassMfa =
-          trustedDeviceService.validateDevice(
-              request.getTrustedDeviceToken(), user.getId(), ipAddress, userAgent);
-      if (bypassMfa) {
-        log.info(
-            "MFA bypassed due to valid trusted device token for user: {}",
-            PiiMaskingUtil.maskEmail(request.getContactValue()));
-      } else {
-        log.warn(
-            "Invalid or expired trusted device token for user: {}",
-            PiiMaskingUtil.maskEmail(request.getContactValue()));
+      if (!user.getIsActive()) {
+        throw new PlatformDomainException(
+            "User account is deactivated", "AUTH_USER_DEACTIVATED", 403);
       }
-    }
 
-    if (!bypassMfa && Boolean.TRUE.equals(authUser.getIsMfaEnabled())) {
-      MfaType mfaType =
-          authUser.getPrimaryMfaType() != null ? authUser.getPrimaryMfaType() : MfaType.NONE;
+      // Get User entity with contacts/departments loaded for JWT generation
+      com.fabricmanagement.platform.user.domain.User userEntity =
+          userRepository
+              .findByTenantIdAndId(tenantId, userId)
+              .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
 
-      if (mfaType != MfaType.NONE) {
-        String preAuthToken = jwtService.generatePreAuthToken(userEntity);
+      // Check if MFA is enabled and handle it
+      boolean bypassMfa = false;
 
-        String maskedContact = null;
-        if (mfaType == MfaType.EMAIL || mfaType == MfaType.SMS || mfaType == MfaType.WHATSAPP) {
-          VerificationCodeManager.MfaCodeIssuanceResult mfaResult =
-              verificationCodeManager.issueMfaCode(user.getId(), user.getTenantId(), mfaType);
-          maskedContact = mfaResult.maskedContact();
+      // Check trusted device token with full context binding (IP + User-Agent)
+      if (request.getTrustedDeviceToken() != null && !request.getTrustedDeviceToken().isBlank()) {
+        bypassMfa =
+            trustedDeviceService.validateDevice(
+                request.getTrustedDeviceToken(), user.getId(), ipAddress, userAgent);
+        if (bypassMfa) {
+          log.info(
+              "MFA bypassed due to valid trusted device token for user: {}",
+              PiiMaskingUtil.maskEmail(request.getContactValue()));
+        } else {
+          log.warn(
+              "Invalid or expired trusted device token for user: {}",
+              PiiMaskingUtil.maskEmail(request.getContactValue()));
         }
-
-        log.info(
-            "MFA required for user: {}, mfaType={}",
-            PiiMaskingUtil.maskEmail(request.getContactValue()),
-            mfaType);
-        return LoginResponse.builder()
-            .mfaRequired(true)
-            .mfaToken(preAuthToken)
-            .mfaType(mfaType)
-            .maskedContact(maskedContact)
-            .build();
       }
+
+      if (!bypassMfa && Boolean.TRUE.equals(identity.getIsMfaEnabled())) {
+        MfaType mfaType =
+            identity.getPrimaryMfaType() != null ? identity.getPrimaryMfaType() : MfaType.NONE;
+
+        if (mfaType != MfaType.NONE) {
+          String preAuthToken = jwtService.generatePreAuthToken(userEntity);
+
+          String maskedContact = null;
+          if (mfaType == MfaType.EMAIL || mfaType == MfaType.SMS || mfaType == MfaType.WHATSAPP) {
+            VerificationCodeManager.MfaCodeIssuanceResult mfaResult =
+                verificationCodeManager.issueMfaCode(user.getId(), user.getTenantId(), mfaType);
+            maskedContact = mfaResult.maskedContact();
+          }
+
+          log.info(
+              "MFA required for user: {}, mfaType={}",
+              PiiMaskingUtil.maskEmail(request.getContactValue()),
+              mfaType);
+          return LoginResponse.builder()
+              .mfaRequired(true)
+              .mfaToken(preAuthToken)
+              .mfaType(mfaType)
+              .maskedContact(maskedContact)
+              .build();
+        }
+      }
+
+      String accessToken = jwtService.generateAccessToken(userEntity);
+      String refreshToken = jwtService.generateRefreshToken(userEntity);
+
+      RefreshToken refreshTokenEntity =
+          RefreshToken.create(
+              user.getId(),
+              refreshToken,
+              Instant.now().plusMillis(refreshTokenExpiration),
+              ipAddress,
+              userAgent,
+              DeviceInfoUtil.extractDeviceName(userAgent));
+      TenantContext.executeInTenantContext(
+          user.getTenantId(), () -> refreshTokenRepository.save(refreshTokenEntity));
+
+      // Get contact value from Contact entity
+      String contactValue =
+          userEntity
+              .getAnyVerifiedContact()
+              .map(contact -> contact.getContactValue())
+              .orElse(request.getContactValue());
+
+      eventPublisher.publish(
+          new UserLoginEvent(user.getTenantId(), user.getId(), contactValue, ipAddress));
+
+      log.info(
+          "Login successful: contactValue={}, userId={}, uid={}",
+          PiiMaskingUtil.maskEmail(request.getContactValue()),
+          user.getId(),
+          user.getUid());
+
+      return LoginResponse.builder()
+          .accessToken(accessToken)
+          .refreshToken(refreshToken)
+          .expiresIn(accessTokenExpiration / 1000)
+          .user(user)
+          .needsOnboarding(!Boolean.TRUE.equals(user.getHasCompletedOnboarding()))
+          .build();
+    } finally {
+      TenantContext.clear();
     }
-
-    String accessToken = jwtService.generateAccessToken(userEntity);
-    String refreshToken = jwtService.generateRefreshToken(userEntity);
-
-    RefreshToken refreshTokenEntity =
-        RefreshToken.create(
-            user.getId(),
-            refreshToken,
-            Instant.now().plusMillis(refreshTokenExpiration),
-            ipAddress,
-            userAgent,
-            DeviceInfoUtil.extractDeviceName(userAgent));
-    TenantContext.executeInTenantContext(
-        user.getTenantId(), () -> refreshTokenRepository.save(refreshTokenEntity));
-
-    // Get contact value from Contact entity
-    String contactValue =
-        userEntity
-            .getAnyVerifiedContact()
-            .map(contact -> contact.getContactValue())
-            .orElse(request.getContactValue());
-
-    eventPublisher.publish(
-        new UserLoginEvent(user.getTenantId(), user.getId(), contactValue, ipAddress));
-
-    log.info(
-        "Login successful: contactValue={}, userId={}, uid={}",
-        PiiMaskingUtil.maskEmail(request.getContactValue()),
-        user.getId(),
-        user.getUid());
-
-    return LoginResponse.builder()
-        .accessToken(accessToken)
-        .refreshToken(refreshToken)
-        .expiresIn(accessTokenExpiration / 1000)
-        .user(user)
-        .needsOnboarding(!Boolean.TRUE.equals(user.getHasCompletedOnboarding()))
-        .build();
   }
 
   @Transactional
@@ -260,76 +253,125 @@ public class LoginService {
     // Brute-force protection: reject if user exceeded max failed MFA attempts
     mfaRateLimitService.checkRateLimit(userId);
 
-    AuthUser authUser =
-        authUserRepository
-            .findByTenantIdAndUserId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    Membership membership =
+        membershipRepository
+            .findByUserId(userId)
+            .filter(
+                m -> m.getTenantId().equals(tenantId) && m.getStatus() == MembershipStatus.ACTIVE)
+            .orElseThrow(() -> new IllegalArgumentException("Login membership not found"));
+    LoginIdentity identity =
+        loginIdentityRepository
+            .findById(membership.getLoginIdentityId())
+            .orElseThrow(() -> new IllegalArgumentException("Login identity not found"));
 
-    com.fabricmanagement.platform.user.domain.User userEntity =
-        userRepository
-            .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
-
-    MfaType mfaType = authUser.getPrimaryMfaType();
+    TenantContext.setCurrentTenantId(tenantId);
+    tenantSessionBinder.bindToCurrentSession(tenantId);
 
     try {
-      if (mfaType == MfaType.TOTP) {
-        boolean isValid = totpMfaService.verifyCode(authUser.getMfaSecret(), request.getCode());
-        if (!isValid) {
-          throw new PlatformDomainException("Invalid TOTP code", "AUTH_MFA_INVALID_CODE", 400);
+      com.fabricmanagement.platform.user.domain.User userEntity =
+          userRepository
+              .findByTenantIdAndId(tenantId, userId)
+              .orElseThrow(() -> new IllegalArgumentException("User entity not found"));
+
+      MfaType mfaType = identity.getPrimaryMfaType();
+
+      try {
+        if (mfaType == MfaType.TOTP) {
+          boolean isValid = totpMfaService.verifyCode(identity.getMfaSecret(), request.getCode());
+          if (!isValid) {
+            throw new PlatformDomainException("Invalid TOTP code", "AUTH_MFA_INVALID_CODE", 400);
+          }
+        } else if (mfaType == MfaType.EMAIL
+            || mfaType == MfaType.SMS
+            || mfaType == MfaType.WHATSAPP) {
+          verificationCodeManager.validateMfaCode(userId, tenantId, mfaType, request.getCode());
+        } else {
+          throw new PlatformDomainException(
+              "MFA is not enabled or type is invalid", "AUTH_MFA_NOT_ENABLED", 400);
         }
-      } else if (mfaType == MfaType.EMAIL
-          || mfaType == MfaType.SMS
-          || mfaType == MfaType.WHATSAPP) {
-        verificationCodeManager.validateMfaCode(userId, tenantId, mfaType, request.getCode());
-      } else {
-        throw new PlatformDomainException(
-            "MFA is not enabled or type is invalid", "AUTH_MFA_NOT_ENABLED", 400);
+      } catch (IllegalArgumentException e) {
+        mfaRateLimitService.recordFailedAttempt(userId);
+        throw e;
       }
-    } catch (IllegalArgumentException e) {
-      mfaRateLimitService.recordFailedAttempt(userId);
-      throw e;
+
+      mfaRateLimitService.clearAttempts(userId);
+      mfaEventService.pushCompletionEvent(userId);
+
+      // Success! Generate actual tokens
+      String accessToken = jwtService.generateAccessToken(userEntity);
+      String refreshToken = jwtService.generateRefreshToken(userEntity);
+
+      RefreshToken refreshTokenEntity =
+          RefreshToken.create(
+              userId,
+              refreshToken,
+              Instant.now().plusMillis(refreshTokenExpiration),
+              ipAddress,
+              userAgent,
+              DeviceInfoUtil.extractDeviceName(userAgent));
+      TenantContext.executeInTenantContext(
+          tenantId, () -> refreshTokenRepository.save(refreshTokenEntity));
+
+      String newTrustedDeviceToken = null;
+      if (Boolean.TRUE.equals(request.getRememberDevice())) {
+        newTrustedDeviceToken =
+            trustedDeviceService.createTrustedDevice(userId, ipAddress, userAgent);
+      }
+
+      UserDto userDto = userFacade.findById(tenantId, userId).orElseThrow();
+
+      String contactValue = jwtService.getContactValueFromToken(request.getMfaToken());
+
+      eventPublisher.publish(new UserLoginEvent(tenantId, userId, contactValue, ipAddress));
+
+      return LoginResponse.builder()
+          .accessToken(accessToken)
+          .refreshToken(refreshToken)
+          .expiresIn(accessTokenExpiration / 1000)
+          .user(userDto)
+          .mfaRequired(false)
+          .trustedDeviceToken(newTrustedDeviceToken)
+          .needsOnboarding(!Boolean.TRUE.equals(userDto.getHasCompletedOnboarding()))
+          .build();
+    } finally {
+      TenantContext.clear();
+    }
+  }
+
+  private Membership selectLoginMembership(LoginIdentity identity) {
+    List<Membership> activeMemberships =
+        membershipRepository.findByLoginIdentityIdAndStatus(
+            identity.getId(), MembershipStatus.ACTIVE);
+
+    if (activeMemberships.isEmpty()) {
+      throw new PlatformDomainException(
+          "No active organization membership found", "AUTH_NO_ACTIVE_MEMBERSHIP", 403);
     }
 
-    mfaRateLimitService.clearAttempts(userId);
-    mfaEventService.pushCompletionEvent(userId);
-
-    // Success! Generate actual tokens
-    String accessToken = jwtService.generateAccessToken(userEntity);
-    String refreshToken = jwtService.generateRefreshToken(userEntity);
-
-    RefreshToken refreshTokenEntity =
-        RefreshToken.create(
-            userId,
-            refreshToken,
-            Instant.now().plusMillis(refreshTokenExpiration),
-            ipAddress,
-            userAgent,
-            DeviceInfoUtil.extractDeviceName(userAgent));
-    TenantContext.executeInTenantContext(
-        tenantId, () -> refreshTokenRepository.save(refreshTokenEntity));
-
-    String newTrustedDeviceToken = null;
-    if (Boolean.TRUE.equals(request.getRememberDevice())) {
-      newTrustedDeviceToken =
-          trustedDeviceService.createTrustedDevice(userId, ipAddress, userAgent);
+    if (activeMemberships.size() == 1) {
+      return activeMemberships.getFirst();
     }
 
-    UserDto userDto = userFacade.findById(tenantId, userId).orElseThrow();
+    return activeMemberships.stream()
+        .filter(membership -> Boolean.TRUE.equals(membership.getIsDefault()))
+        .min(
+            Comparator.comparing(
+                Membership::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+        .orElseGet(
+            () -> {
+              log.warn(
+                  "LoginIdentity {} has {} active memberships but no default; using first membership.",
+                  identity.getId(),
+                  activeMemberships.size());
+              return activeMemberships.getFirst();
+            });
+  }
 
-    String contactValue = jwtService.getContactValueFromToken(request.getMfaToken());
-
-    eventPublisher.publish(new UserLoginEvent(tenantId, userId, contactValue, ipAddress));
-
-    return LoginResponse.builder()
-        .accessToken(accessToken)
-        .refreshToken(refreshToken)
-        .expiresIn(accessTokenExpiration / 1000)
-        .user(userDto)
-        .mfaRequired(false)
-        .trustedDeviceToken(newTrustedDeviceToken)
-        .needsOnboarding(!Boolean.TRUE.equals(userDto.getHasCompletedOnboarding()))
-        .build();
+  private String normalizeEmail(String contactValue) {
+    if (contactValue == null || contactValue.isBlank()) {
+      throw new PlatformDomainException("Invalid credentials", "AUTH_INVALID_CREDENTIALS", 401);
+    }
+    return contactValue.trim().toLowerCase(Locale.ROOT);
   }
 
   /**
@@ -424,7 +466,14 @@ public class LoginService {
     String normalizedDomain = domain.trim().toLowerCase();
     log.trace("Finding any user with domain: {}", normalizedDomain);
 
-    return userRepository.findAnyByEmailDomain(normalizedDomain).map(UserDto::from);
+    try {
+      return userRepository.findAnyByEmailDomain(normalizedDomain).map(UserDto::from);
+    } catch (IncorrectResultSizeDataAccessException ex) {
+      log.warn(
+          "Multiple users found for email domain {}; skipping context-aware login guidance.",
+          normalizedDomain);
+      return Optional.empty();
+    }
   }
 
   /**

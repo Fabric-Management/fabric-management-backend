@@ -1,7 +1,9 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.auth.app.IdentityProvisioningService;
 import com.fabricmanagement.platform.auth.domain.AuthUser;
+import com.fabricmanagement.platform.auth.domain.MfaType;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.domain.Organization;
@@ -45,6 +47,7 @@ public class PartnerUserSeeder implements DataSeeder {
   private final PasswordEncoder passwordEncoder;
   private final TransactionTemplate transactionTemplate;
   private final ContactRepository contactRepository;
+  private final IdentityProvisioningService identityProvisioningService;
 
   private static final String DEFAULT_PASSWORD = "password123";
 
@@ -205,8 +208,6 @@ public class PartnerUserSeeder implements DataSeeder {
     entity.setRole(role);
     userRepository.save(entity);
 
-    setupAuthUser(user.getId(), tenantId);
-
     // Mark contact as verified
     contactRepository
         .findByTenantIdAndContactValue(tenantId, profile.email())
@@ -215,6 +216,8 @@ public class PartnerUserSeeder implements DataSeeder {
               contact.verify();
               contactRepository.save(contact);
             });
+
+    setupAuthUser(user.getId(), tenantId, profile.email());
 
     log.debug(
         "Created external user: {} {} — {} ({}) linked to {}",
@@ -226,12 +229,15 @@ public class PartnerUserSeeder implements DataSeeder {
     return true;
   }
 
-  private void setupAuthUser(UUID userId, UUID tenantId) {
+  private void setupAuthUser(UUID userId, UUID tenantId, String email) {
     if (!authUserRepository.existsByUserId(userId)) {
-      AuthUser authUser = AuthUser.create(userId, passwordEncoder.encode(DEFAULT_PASSWORD));
+      String passwordHash = passwordEncoder.encode(DEFAULT_PASSWORD);
+      AuthUser authUser = AuthUser.create(userId, passwordHash);
       authUser.setTenantId(tenantId);
       authUser.verify();
       authUserRepository.save(authUser);
+      identityProvisioningService.provisionCredential(
+          email, passwordHash, false, MfaType.NONE, null, true, tenantId, userId);
     }
   }
 

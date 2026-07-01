@@ -81,6 +81,7 @@ public class PasswordSetupService {
   private final EmployeeProjectionPort employeeProjectionPort;
   private final TrialLifecyclePort trialLifecyclePort;
   private final TenantSessionBinder tenantSessionBinder;
+  private final IdentityProvisioningService identityProvisioningService;
 
   @Value("${application.jwt.refresh-expiration:604800000}")
   private long refreshTokenExpiration;
@@ -196,6 +197,16 @@ public class PasswordSetupService {
 
     authUserRepository.save(authUser);
     log.info("✅ Password setup: Created AuthUser for user: userId={}", user.getId());
+
+    identityProvisioningService.provisionCredential(
+        token.getContactValue(),
+        passwordHash,
+        Boolean.TRUE.equals(authUser.getIsMfaEnabled()),
+        authUser.getPrimaryMfaType(),
+        authUser.getMfaSecret(),
+        true,
+        user.getTenantId(),
+        user.getId());
 
     token.markAsUsed();
     tokenRepository.save(token);

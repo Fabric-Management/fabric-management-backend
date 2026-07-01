@@ -134,6 +134,11 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
         "common_auth.common_registration_token",
         "Registration/setup tokens are retained for account lifecycle.");
     tables.put(
+        "common_auth.membership",
+        "Platform identity membership rows are RLS-free auth data; tenant_id is a plain FK used "
+            + "before TenantContext exists. Demo purge retains them; tenant hard-delete removes "
+            + "them via fk_membership_tenant ON DELETE CASCADE.");
+    tables.put(
         "common_auth.common_trusted_device",
         "Seed-user trusted devices are deleted by demo_seed CTE.");
     tables.put(

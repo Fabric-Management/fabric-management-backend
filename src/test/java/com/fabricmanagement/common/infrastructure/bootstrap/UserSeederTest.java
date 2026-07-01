@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.bootstrap.UserSeeder.PersonaSubset;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.platform.auth.app.IdentityProvisioningService;
 import com.fabricmanagement.platform.auth.infra.repository.AuthUserRepository;
 import com.fabricmanagement.platform.communication.infra.repository.ContactRepository;
 import com.fabricmanagement.platform.organization.app.OrganizationService;
@@ -48,6 +49,8 @@ class UserSeederTest {
   private final PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
   private final TransactionTemplate transactionTemplate = Mockito.mock(TransactionTemplate.class);
   private final ContactRepository contactRepository = Mockito.mock(ContactRepository.class);
+  private final IdentityProvisioningService identityProvisioningService =
+      Mockito.mock(IdentityProvisioningService.class);
 
   private final UserSeeder userSeeder =
       new UserSeeder(
@@ -60,7 +63,8 @@ class UserSeederTest {
           authUserRepository,
           passwordEncoder,
           transactionTemplate,
-          contactRepository);
+          contactRepository,
+          identityProvisioningService);
 
   @AfterEach
   void tearDown() {
