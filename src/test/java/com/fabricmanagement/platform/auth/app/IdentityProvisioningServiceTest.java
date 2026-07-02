@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.auth.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,7 @@ import com.fabricmanagement.platform.auth.domain.MembershipStatus;
 import com.fabricmanagement.platform.auth.domain.MfaType;
 import com.fabricmanagement.platform.auth.infra.repository.LoginIdentityRepository;
 import com.fabricmanagement.platform.auth.infra.repository.MembershipRepository;
+import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -124,6 +126,144 @@ class IdentityProvisioningServiceTest {
     assertThat(membershipCaptor.getValue().getTenantId()).isEqualTo(tenantId);
     assertThat(membershipCaptor.getValue().getUserId()).isEqualTo(userId);
     assertThat(membershipCaptor.getValue().getIsDefault()).isFalse();
+  }
+
+  @Test
+  void shouldProvisionMembershipForExistingIdentityWithoutTouchingPasswordState() {
+    UUID identityId = UUID.randomUUID();
+    UUID tenantId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    LoginIdentity identity = identity(identityId, "admin@example.com", "old-hash");
+    identity.setRequiresPasswordReset(true);
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(membershipRepository.findByUserId(userId)).thenReturn(Optional.empty());
+    when(membershipRepository.findByLoginIdentityIdAndTenantId(identityId, tenantId))
+        .thenReturn(Optional.empty());
+    when(membershipRepository.countByLoginIdentityId(identityId)).thenReturn(1L);
+
+    LoginIdentity result =
+        service.provisionMembershipForExistingIdentity(" Admin@Example.COM ", tenantId, userId);
+
+    assertThat(result).isSameAs(identity);
+    assertThat(identity.getPasswordHash()).isEqualTo("old-hash");
+    assertThat(identity.getRequiresPasswordReset()).isTrue();
+    verify(loginIdentityRepository, never()).save(any(LoginIdentity.class));
+
+    ArgumentCaptor<Membership> membershipCaptor = ArgumentCaptor.forClass(Membership.class);
+    verify(membershipRepository).save(membershipCaptor.capture());
+    assertThat(membershipCaptor.getValue().getLoginIdentityId()).isEqualTo(identityId);
+    assertThat(membershipCaptor.getValue().getTenantId()).isEqualTo(tenantId);
+    assertThat(membershipCaptor.getValue().getUserId()).isEqualTo(userId);
+    assertThat(membershipCaptor.getValue().getStatus()).isEqualTo(MembershipStatus.ACTIVE);
+    assertThat(membershipCaptor.getValue().getIsDefault()).isFalse();
+  }
+
+  @Test
+  void shouldBeIdempotentWhenExistingIdentityMembershipAlreadyMatchesUser() {
+    UUID identityId = UUID.randomUUID();
+    UUID tenantId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    LoginIdentity identity = identity(identityId, "admin@example.com", "old-hash");
+    Membership membership =
+        Membership.builder()
+            .loginIdentityId(identityId)
+            .tenantId(tenantId)
+            .userId(userId)
+            .status(MembershipStatus.ACTIVE)
+            .isDefault(false)
+            .build();
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(membershipRepository.findByUserId(userId)).thenReturn(Optional.of(membership));
+
+    LoginIdentity result =
+        service.provisionMembershipForExistingIdentity("admin@example.com", tenantId, userId);
+
+    assertThat(result).isSameAs(identity);
+    assertThat(identity.getPasswordHash()).isEqualTo("old-hash");
+    verify(loginIdentityRepository, never()).save(any(LoginIdentity.class));
+    verify(membershipRepository, never()).save(any(Membership.class));
+  }
+
+  @Test
+  void shouldRejectExistingIdentityMembershipWhenUserBelongsToDifferentIdentity() {
+    UUID identityId = UUID.randomUUID();
+    UUID tenantId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    LoginIdentity identity = identity(identityId, "admin@example.com", "old-hash");
+    Membership membership =
+        Membership.builder()
+            .loginIdentityId(UUID.randomUUID())
+            .tenantId(tenantId)
+            .userId(userId)
+            .status(MembershipStatus.ACTIVE)
+            .isDefault(false)
+            .build();
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(membershipRepository.findByUserId(userId)).thenReturn(Optional.of(membership));
+
+    assertThatThrownBy(
+            () ->
+                service.provisionMembershipForExistingIdentity(
+                    "admin@example.com", tenantId, userId))
+        .isInstanceOfSatisfying(
+            PlatformDomainException.class,
+            error -> {
+              assertThat(error.getErrorCode()).isEqualTo("AUTH_IDENTITY_MEMBERSHIP_CONFLICT");
+              assertThat(error.getHttpStatus()).isEqualTo(409);
+            });
+
+    verify(loginIdentityRepository, never()).save(any(LoginIdentity.class));
+    verify(membershipRepository, never()).save(any(Membership.class));
+  }
+
+  @Test
+  void shouldRejectExistingIdentityMembershipWhenTenantBelongsToDifferentUser() {
+    UUID identityId = UUID.randomUUID();
+    UUID tenantId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    LoginIdentity identity = identity(identityId, "admin@example.com", "old-hash");
+    Membership membership =
+        Membership.builder()
+            .loginIdentityId(identityId)
+            .tenantId(tenantId)
+            .userId(UUID.randomUUID())
+            .status(MembershipStatus.ACTIVE)
+            .isDefault(false)
+            .build();
+    IdentityProvisioningService service =
+        new IdentityProvisioningService(loginIdentityRepository, membershipRepository);
+
+    when(loginIdentityRepository.findByEmail("admin@example.com"))
+        .thenReturn(Optional.of(identity));
+    when(membershipRepository.findByUserId(userId)).thenReturn(Optional.empty());
+    when(membershipRepository.findByLoginIdentityIdAndTenantId(identityId, tenantId))
+        .thenReturn(Optional.of(membership));
+
+    assertThatThrownBy(
+            () ->
+                service.provisionMembershipForExistingIdentity(
+                    "admin@example.com", tenantId, userId))
+        .isInstanceOfSatisfying(
+            PlatformDomainException.class,
+            error -> {
+              assertThat(error.getErrorCode()).isEqualTo("AUTH_IDENTITY_MEMBERSHIP_CONFLICT");
+              assertThat(error.getHttpStatus()).isEqualTo(409);
+            });
+
+    verify(loginIdentityRepository, never()).save(any(LoginIdentity.class));
+    verify(membershipRepository, never()).save(any(Membership.class));
   }
 
   private LoginIdentity identity(UUID identityId, String email, String passwordHash) {
