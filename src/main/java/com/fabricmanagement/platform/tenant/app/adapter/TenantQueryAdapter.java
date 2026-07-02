@@ -39,6 +39,9 @@ public class TenantQueryAdapter implements TenantQueryPort {
   private static final String SELECT_TENANT_ID_BY_REG_TOKEN =
       "SELECT tenant_id FROM common_auth.common_registration_token WHERE token = ?";
 
+  private static final String SELECT_TENANT_ID_BY_REFRESH_TOKEN =
+      "SELECT tenant_id FROM common_auth.common_refresh_token WHERE token = ?";
+
   @Override
   public List<TenantReference> findAllActiveTenants() {
     return systemExecutor.executeQuery(
@@ -88,6 +91,16 @@ public class TenantQueryAdapter implements TenantQueryPort {
     UUID tenantId =
         systemExecutor.executeQueryForObject(
             SELECT_TENANT_ID_BY_REG_TOKEN, (rs, i) -> rs.getObject("tenant_id", UUID.class), token);
+    return Optional.ofNullable(tenantId);
+  }
+
+  @Override
+  public Optional<UUID> findTenantIdByRefreshToken(String token) {
+    UUID tenantId =
+        systemExecutor.executeQueryForObject(
+            SELECT_TENANT_ID_BY_REFRESH_TOKEN,
+            (rs, i) -> rs.getObject("tenant_id", UUID.class),
+            token);
     return Optional.ofNullable(tenantId);
   }
 }

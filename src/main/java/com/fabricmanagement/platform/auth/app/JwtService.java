@@ -2,6 +2,8 @@ package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
+import com.fabricmanagement.platform.auth.domain.Membership;
+import com.fabricmanagement.platform.auth.infra.repository.MembershipRepository;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
 import com.fabricmanagement.platform.organization.domain.Organization;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
@@ -57,6 +59,7 @@ public class JwtService {
 
   private final TenantQueryPort tenantQueryPort;
   private final OrganizationRepository organizationRepository;
+  private final MembershipRepository membershipRepository;
   private final SecretKey secretKey;
   private final long accessTokenExpiration;
   private final long playgroundTokenExpiration;
@@ -64,12 +67,14 @@ public class JwtService {
   public JwtService(
       TenantQueryPort tenantQueryPort,
       OrganizationRepository organizationRepository,
+      MembershipRepository membershipRepository,
       @Value("${application.jwt.secret}") String secret,
       @Value("${application.jwt.expiration:900000}") long accessTokenExpiration,
       @Value("${application.jwt.playground-expiration:1209600000}")
           long playgroundTokenExpiration) {
     this.tenantQueryPort = tenantQueryPort;
     this.organizationRepository = organizationRepository;
+    this.membershipRepository = membershipRepository;
     this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     this.accessTokenExpiration = accessTokenExpiration;
     this.playgroundTokenExpiration = playgroundTokenExpiration;
@@ -176,6 +181,14 @@ public class JwtService {
     claims.put("organization_id", user.getOrganizationId().toString());
     claims.put("firstName", user.getFirstName());
     claims.put("lastName", user.getLastName());
+    try {
+      membershipRepository
+          .findByUserId(user.getId())
+          .map(Membership::getLoginIdentityId)
+          .ifPresent(identityId -> claims.put("identity_id", identityId.toString()));
+    } catch (RuntimeException ex) {
+      log.debug("Skipping identity_id claim: {}", ex.getMessage());
+    }
 
     List<String> departmentCodes = new ArrayList<>();
     String primaryDepartmentCode = null;

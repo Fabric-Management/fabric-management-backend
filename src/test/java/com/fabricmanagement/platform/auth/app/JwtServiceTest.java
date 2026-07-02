@@ -1,10 +1,14 @@
 package com.fabricmanagement.platform.auth.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReference;
+import com.fabricmanagement.platform.auth.domain.Membership;
+import com.fabricmanagement.platform.auth.infra.repository.MembershipRepository;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.organization.domain.Department;
@@ -22,6 +26,7 @@ import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 import javax.crypto.SecretKey;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -35,13 +40,21 @@ class JwtServiceTest {
   private final TenantQueryPort tenantQueryPort = org.mockito.Mockito.mock(TenantQueryPort.class);
   private final OrganizationRepository organizationRepository =
       org.mockito.Mockito.mock(OrganizationRepository.class);
+  private final MembershipRepository membershipRepository =
+      org.mockito.Mockito.mock(MembershipRepository.class);
   private final JwtService jwtService =
       new JwtService(
           tenantQueryPort,
           organizationRepository,
+          membershipRepository,
           SECRET,
           ACCESS_TOKEN_EXPIRATION,
           PLAYGROUND_TOKEN_EXPIRATION);
+
+  @BeforeEach
+  void setUp() {
+    lenient().when(membershipRepository.findByUserId(any(UUID.class))).thenReturn(Optional.empty());
+  }
 
   @Test
   @DisplayName("regular access token uses application.jwt.expiration")
@@ -151,6 +164,46 @@ class JwtServiceTest {
             jwtService.generatePlaygroundAccessToken(user, "guest-123", "guest@example.com"));
 
     assertThat(secondsUntilExpiry).isBetween(1_209_595L, 1_209_600L);
+  }
+
+  @Test
+  @DisplayName("access token includes identity_id when membership exists")
+  void generateAccessToken_includesIdentityIdWhenMembershipExists() {
+    User user = buildUser();
+    UUID identityId = UUID.randomUUID();
+    when(tenantQueryPort.findById(user.getTenantId()))
+        .thenReturn(
+            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
+    when(organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId()))
+        .thenReturn(Optional.empty());
+    when(membershipRepository.findByUserId(user.getId()))
+        .thenReturn(
+            Optional.of(
+                Membership.builder()
+                    .loginIdentityId(identityId)
+                    .tenantId(user.getTenantId())
+                    .userId(user.getId())
+                    .build()));
+
+    Claims claims = parse(jwtService.generateAccessToken(user));
+
+    assertThat(claims.get("identity_id", String.class)).isEqualTo(identityId.toString());
+  }
+
+  @Test
+  @DisplayName("access token omits identity_id when membership is absent")
+  void generateAccessToken_omitsIdentityIdWhenMembershipAbsent() {
+    User user = buildUser();
+    when(tenantQueryPort.findById(user.getTenantId()))
+        .thenReturn(
+            Optional.of(new TenantReference(user.getTenantId(), "TEST-001", "Test", "TENANT")));
+    when(organizationRepository.findByTenantIdAndId(user.getTenantId(), user.getOrganizationId()))
+        .thenReturn(Optional.empty());
+    when(membershipRepository.findByUserId(user.getId())).thenReturn(Optional.empty());
+
+    Claims claims = parse(jwtService.generateAccessToken(user));
+
+    assertThat(claims.get("identity_id", String.class)).isNull();
   }
 
   @Test
