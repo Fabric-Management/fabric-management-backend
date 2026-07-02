@@ -2,6 +2,8 @@ package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.platform.auth.domain.event.UserLogoutEvent;
 import com.fabricmanagement.platform.auth.dto.ActiveSessionDto;
@@ -26,6 +28,8 @@ public class LogoutService {
 
   private final RefreshTokenRepository refreshTokenRepository;
   private final DomainEventPublisher eventPublisher;
+  private final TenantQueryPort tenantQueryPort;
+  private final TenantSessionBinder tenantSessionBinder;
 
   /**
    * Logout user by revoking refresh token (requires authenticated context for userId).
@@ -78,26 +82,40 @@ public class LogoutService {
   @Transactional
   public void logoutByRefreshToken(String refreshToken) {
     log.info("Logout by refresh token (cookie)");
-    refreshTokenRepository
-        .findByToken(refreshToken)
+    tenantQueryPort
+        .findTenantIdByRefreshToken(refreshToken)
         .ifPresentOrElse(
-            token -> {
-              UUID tenantId = token.getTenantId();
-              UUID userId = token.getUserId();
-              token.revoke();
-              refreshTokenRepository.save(token);
-              eventPublisher.publish(new UserLogoutEvent(tenantId, userId));
-              log.info(
-                  "✅ Refresh token revoked (cookie logout): tokenId={}, userId={}",
-                  token.getId(),
-                  userId);
+            tenantId -> {
+              TenantContext.setCurrentTenantId(tenantId);
+              tenantSessionBinder.bindToCurrentSession(tenantId);
+              try {
+                refreshTokenRepository
+                    .findByToken(refreshToken)
+                    .ifPresentOrElse(
+                        token -> {
+                          UUID userId = token.getUserId();
+                          token.revoke();
+                          refreshTokenRepository.save(token);
+                          eventPublisher.publish(new UserLogoutEvent(tenantId, userId));
+                          log.info(
+                              "✅ Refresh token revoked (cookie logout): tokenId={}, userId={}",
+                              token.getId(),
+                              userId);
+                        },
+                        () -> logRefreshTokenNotFound(refreshToken));
+              } finally {
+                TenantContext.clear();
+              }
             },
-            () ->
-                log.warn(
-                    "Refresh token not found on logout: token={}***",
-                    refreshToken != null && !refreshToken.isEmpty()
-                        ? refreshToken.substring(0, Math.min(8, refreshToken.length()))
-                        : ""));
+            () -> logRefreshTokenNotFound(refreshToken));
+  }
+
+  private void logRefreshTokenNotFound(String refreshToken) {
+    log.warn(
+        "Refresh token not found on logout: token={}***",
+        refreshToken != null && !refreshToken.isEmpty()
+            ? refreshToken.substring(0, Math.min(8, refreshToken.length()))
+            : "");
   }
 
   /**

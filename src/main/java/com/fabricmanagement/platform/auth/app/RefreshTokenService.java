@@ -1,6 +1,8 @@
 package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
+import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.platform.auth.domain.RefreshToken;
 import com.fabricmanagement.platform.auth.dto.LoginResponse;
 import com.fabricmanagement.platform.auth.infra.repository.RefreshTokenRepository;
@@ -36,6 +38,8 @@ public class RefreshTokenService {
   private final UserRepository userRepository;
   private final UserFacade userFacade;
   private final JwtService jwtService;
+  private final TenantQueryPort tenantQueryPort;
+  private final TenantSessionBinder tenantSessionBinder;
 
   @Value("${application.jwt.expiration:900000}")
   private long accessTokenExpiration;
@@ -53,72 +57,86 @@ public class RefreshTokenService {
   public LoginResponse refreshAccessToken(String refreshToken) {
     log.info("Refresh token request");
 
-    // Find refresh token
-    RefreshToken token =
-        refreshTokenRepository
-            .findByToken(refreshToken)
+    UUID tenantId =
+        tenantQueryPort
+            .findTenantIdByRefreshToken(refreshToken)
             .orElseThrow(
                 () -> {
                   log.warn("Invalid refresh token");
                   return new IllegalArgumentException("Invalid refresh token");
                 });
+    TenantContext.setCurrentTenantId(tenantId);
+    tenantSessionBinder.bindToCurrentSession(tenantId);
 
-    // Validate token
-    if (!token.isValid()) {
-      log.warn("Refresh token expired or revoked: tokenId={}", token.getId());
-      throw new PlatformDomainException(
-          "Refresh token expired or revoked", "AUTH_REFRESH_TOKEN_INVALID", 401);
+    try {
+      // Find refresh token
+      RefreshToken token =
+          refreshTokenRepository
+              .findByToken(refreshToken)
+              .orElseThrow(
+                  () -> {
+                    log.warn("Invalid refresh token");
+                    return new IllegalArgumentException("Invalid refresh token");
+                  });
+
+      // Validate token
+      if (!token.isValid()) {
+        log.warn("Refresh token expired or revoked: tokenId={}", token.getId());
+        throw new PlatformDomainException(
+            "Refresh token expired or revoked", "AUTH_REFRESH_TOKEN_INVALID", 401);
+      }
+
+      UUID userId = token.getUserId();
+
+      // Get user
+      com.fabricmanagement.platform.user.domain.User user =
+          userRepository
+              .findByTenantIdAndId(tenantId, userId)
+              .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+      // Check user status
+      if (!user.getIsActive()) {
+        throw new PlatformDomainException(
+            "User account is deactivated", "AUTH_USER_DEACTIVATED", 403);
+      }
+
+      // Revoke old refresh token (token rotation)
+      token.revoke();
+      refreshTokenRepository.save(token);
+      log.debug("Old refresh token revoked: tokenId={}", token.getId());
+
+      // Generate new tokens
+      String newAccessToken = jwtService.generateAccessToken(user);
+      String newRefreshToken = jwtService.generateRefreshToken(user);
+
+      // Carry over device info from old token (same session, same device)
+      RefreshToken newRefreshTokenEntity =
+          RefreshToken.create(
+              user.getId(),
+              newRefreshToken,
+              Instant.now().plusMillis(refreshTokenExpiration),
+              token.getIpAddress(),
+              token.getUserAgent(),
+              token.getDeviceName());
+      refreshTokenRepository.save(newRefreshTokenEntity);
+
+      // Get UserDto for response
+      UserDto userDto =
+          userFacade
+              .findById(tenantId, userId)
+              .orElseThrow(() -> new IllegalArgumentException("User DTO not found"));
+
+      log.info("✅ Access token refreshed: userId={}, uid={}", userId, userDto.getUid());
+
+      return LoginResponse.builder()
+          .accessToken(newAccessToken)
+          .refreshToken(newRefreshToken)
+          .expiresIn(accessTokenExpiration / 1000)
+          .user(userDto)
+          .needsOnboarding(!user.hasCompletedOnboarding())
+          .build();
+    } finally {
+      TenantContext.clear();
     }
-
-    UUID tenantId = TenantContext.requireTenantId();
-    UUID userId = token.getUserId();
-
-    // Get user
-    com.fabricmanagement.platform.user.domain.User user =
-        userRepository
-            .findByTenantIdAndId(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-    // Check user status
-    if (!user.getIsActive()) {
-      throw new PlatformDomainException(
-          "User account is deactivated", "AUTH_USER_DEACTIVATED", 403);
-    }
-
-    // Revoke old refresh token (token rotation)
-    token.revoke();
-    refreshTokenRepository.save(token);
-    log.debug("Old refresh token revoked: tokenId={}", token.getId());
-
-    // Generate new tokens
-    String newAccessToken = jwtService.generateAccessToken(user);
-    String newRefreshToken = jwtService.generateRefreshToken(user);
-
-    // Carry over device info from old token (same session, same device)
-    RefreshToken newRefreshTokenEntity =
-        RefreshToken.create(
-            user.getId(),
-            newRefreshToken,
-            Instant.now().plusMillis(refreshTokenExpiration),
-            token.getIpAddress(),
-            token.getUserAgent(),
-            token.getDeviceName());
-    refreshTokenRepository.save(newRefreshTokenEntity);
-
-    // Get UserDto for response
-    UserDto userDto =
-        userFacade
-            .findById(tenantId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("User DTO not found"));
-
-    log.info("✅ Access token refreshed: userId={}, uid={}", userId, userDto.getUid());
-
-    return LoginResponse.builder()
-        .accessToken(newAccessToken)
-        .refreshToken(newRefreshToken)
-        .expiresIn(accessTokenExpiration / 1000)
-        .user(userDto)
-        .needsOnboarding(!user.hasCompletedOnboarding())
-        .build();
   }
 }

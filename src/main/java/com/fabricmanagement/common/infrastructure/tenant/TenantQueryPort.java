@@ -26,4 +26,11 @@ public interface TenantQueryPort {
    * RLS-bound reads. Runs via the BYPASSRLS system executor in the adapter.
    */
   Optional<UUID> findTenantIdByRegistrationToken(String token);
+
+  /**
+   * Pre-auth tenant resolution from a refresh token. Refresh is anonymous (no tenant context yet)
+   * so the tenant-scoped refresh-token table is invisible to RLS-bound reads. Runs via the
+   * BYPASSRLS system executor in the adapter.
+   */
+  Optional<UUID> findTenantIdByRefreshToken(String token);
 }
