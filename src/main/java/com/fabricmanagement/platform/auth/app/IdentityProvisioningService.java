@@ -62,15 +62,7 @@ public class IdentityProvisioningService {
       membershipCount = 0;
     }
 
-    var existingMembershipForUser = membershipRepository.findByUserId(userId);
-    if (existingMembershipForUser.isPresent()) {
-      Membership membership = existingMembershipForUser.get();
-      if (!membership.getLoginIdentityId().equals(identity.getId())) {
-        throw new PlatformDomainException(
-            "User is already linked to a different login identity",
-            "AUTH_IDENTITY_MEMBERSHIP_CONFLICT",
-            409);
-      }
+    if (isUserAlreadyLinkedToIdentity(identity, userId)) {
       return identity;
     }
 
@@ -98,6 +90,48 @@ public class IdentityProvisioningService {
     }
 
     boolean firstMembership = membershipCount == 0;
+    membershipRepository.save(
+        Membership.builder()
+            .loginIdentityId(identity.getId())
+            .tenantId(tenantId)
+            .userId(userId)
+            .status(MembershipStatus.ACTIVE)
+            .isDefault(firstMembership)
+            .build());
+
+    return identity;
+  }
+
+  @Transactional
+  public LoginIdentity provisionMembershipForExistingIdentity(
+      String email, UUID tenantId, UUID userId) {
+    String normalizedEmail = normalizeEmailOrThrow(email);
+    LoginIdentity identity =
+        loginIdentityRepository
+            .findByEmail(normalizedEmail)
+            .orElseThrow(
+                () ->
+                    new PlatformDomainException(
+                        "Login identity not found", "AUTH_IDENTITY_NOT_FOUND", 404));
+
+    if (isUserAlreadyLinkedToIdentity(identity, userId)) {
+      return identity;
+    }
+
+    var existingMembershipForTenant =
+        membershipRepository.findByLoginIdentityIdAndTenantId(identity.getId(), tenantId);
+    if (existingMembershipForTenant.isPresent()) {
+      Membership membership = existingMembershipForTenant.get();
+      if (!membership.getUserId().equals(userId)) {
+        throw new PlatformDomainException(
+            "Tenant membership is already linked to a different user",
+            "AUTH_IDENTITY_MEMBERSHIP_CONFLICT",
+            409);
+      }
+      return identity;
+    }
+
+    boolean firstMembership = membershipRepository.countByLoginIdentityId(identity.getId()) == 0;
     membershipRepository.save(
         Membership.builder()
             .loginIdentityId(identity.getId())
@@ -172,6 +206,22 @@ public class IdentityProvisioningService {
     identity.setPrimaryMfaType(mfaType != null ? mfaType : MfaType.NONE);
     identity.setMfaSecret(mfaSecret);
     loginIdentityRepository.save(identity);
+  }
+
+  private boolean isUserAlreadyLinkedToIdentity(LoginIdentity identity, UUID userId) {
+    var existingMembershipForUser = membershipRepository.findByUserId(userId);
+    if (existingMembershipForUser.isEmpty()) {
+      return false;
+    }
+
+    Membership membership = existingMembershipForUser.get();
+    if (!membership.getLoginIdentityId().equals(identity.getId())) {
+      throw new PlatformDomainException(
+          "User is already linked to a different login identity",
+          "AUTH_IDENTITY_MEMBERSHIP_CONFLICT",
+          409);
+    }
+    return true;
   }
 
   private String normalizeEmailOrThrow(String email) {

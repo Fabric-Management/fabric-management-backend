@@ -70,6 +70,16 @@ public class EmailTemplateRenderer {
     return render("partner-invitation.html", vars);
   }
 
+  /** Render added-to-organization email for existing login identities. */
+  public String renderAddedToOrganization(String firstName, String orgName, String email) {
+    Map<String, String> vars =
+        Map.of(
+            "firstName", firstName != null && !firstName.isBlank() ? firstName : "there",
+            "orgName", orgName != null && !orgName.isBlank() ? orgName : "your organization",
+            "email", email != null ? email : "");
+    return render("added-to-organization.html", vars);
+  }
+
   /** Render password reset email. */
   public String renderPasswordReset(
       String firstName, String resetUrl, String expiresIn, String verificationCode) {
