@@ -11,6 +11,7 @@ import com.fabricmanagement.platform.auth.app.LogoutService;
 import com.fabricmanagement.platform.auth.app.MfaEventService;
 import com.fabricmanagement.platform.auth.app.MfaSetupService;
 import com.fabricmanagement.platform.auth.app.RefreshTokenService;
+import com.fabricmanagement.platform.auth.app.SwitchOrganizationService;
 import com.fabricmanagement.platform.auth.dto.*;
 import com.fabricmanagement.platform.auth.dto.ActiveSessionDto;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
@@ -50,6 +51,7 @@ public class AuthController {
   private final LoginService loginService;
   private final LogoutService logoutService;
   private final RefreshTokenService refreshTokenService;
+  private final SwitchOrganizationService switchOrganizationService;
   private final JwtService jwtService;
   private final MfaSetupService mfaSetupService;
   private final MfaEventService mfaEventService;
@@ -137,6 +139,34 @@ public class AuthController {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .body(ApiResponse.error("UNAUTHORIZED", "Invalid or expired refresh token"));
     }
+  }
+
+  @GetMapping("/memberships")
+  public ResponseEntity<ApiResponse<List<OrganizationMembershipDto>>> getMemberships() {
+    UUID userId = getCurrentUserId();
+    UUID tenantId = getCurrentTenantId();
+    List<OrganizationMembershipDto> memberships =
+        switchOrganizationService.getMemberships(userId, tenantId);
+    return ResponseEntity.ok(ApiResponse.success(memberships, "Memberships retrieved"));
+  }
+
+  @PostMapping("/switch-org/{tenantId}")
+  public ResponseEntity<ApiResponse<LoginResponse>> switchOrganization(
+      @PathVariable UUID tenantId,
+      HttpServletRequest httpRequest,
+      HttpServletResponse httpResponse) {
+    UUID userId = getCurrentUserId();
+    String ipAddress = WebRequestUtils.getClientIpAddress(httpRequest);
+    String userAgent = httpRequest.getHeader("User-Agent");
+    LoginResponse response =
+        switchOrganizationService.switchOrganization(userId, tenantId, ipAddress, userAgent);
+
+    authCookieSupport.addAuthCookies(
+        httpResponse, response.getAccessToken(), response.getRefreshToken());
+    response.setAccessToken(null);
+    response.setRefreshToken(null);
+
+    return ResponseEntity.ok(ApiResponse.success(response, "Organization switched successfully"));
   }
 
   /** Read refresh_token from request cookies (BE-04). */
