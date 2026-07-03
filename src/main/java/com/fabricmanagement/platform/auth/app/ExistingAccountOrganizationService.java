@@ -1,7 +1,6 @@
 package com.fabricmanagement.platform.auth.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
 import com.fabricmanagement.common.infrastructure.web.exception.TaxIdAlreadyExistsException;
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingContext;
@@ -26,7 +25,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /** Creates a new trial tenant for an already authenticated login identity. */
@@ -44,12 +42,18 @@ public class ExistingAccountOrganizationService {
   private final UserRepository userRepository;
   private final TrialLifecyclePort trialLifecyclePort;
   private final SwitchOrganizationService switchOrganizationService;
-  private final TenantSessionBinder tenantSessionBinder;
 
   @Value("${application.identity.max-organizations:5}")
   private int maxOrganizations;
 
-  @Transactional
+  // Deliberately NOT @Transactional at this level. One long transaction breaks the flow twice:
+  // (1) /api/v1/auth/* skips the tenant-context interceptor, so the connection would be acquired
+  // unbound and the RLS-scoped user pre-read sees nothing; (2) the final token issuance reloads the
+  // new admin User inside the SAME persistence context that created it, and its contact links
+  // (written via separate link entities) are not visible on the cached instance
+  // (AUTH_NO_VERIFIED_CONTACT). Instead each part runs its own transaction: the orchestrator is
+  // @Transactional (atomic pipeline), and SwitchOrganizationService opens a fresh session that
+  // reads the committed user + verified contact from the database.
   public LoginResponse createOrganization(
       UUID currentUserId,
       CreateExistingAccountOrganizationRequest request,
@@ -85,16 +89,29 @@ public class ExistingAccountOrganizationService {
       throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
 
-    // /api/v1/auth/* is excluded from the tenant-context interceptor (pre-auth endpoints), so no
-    // tenant is bound here and the RLS-scoped User read below would see nothing. Bind the caller's
-    // own tenant first — the same bind-before-read pattern SwitchOrganizationService uses. The
-    // onboarding pipeline (CreateTenantStep) re-binds to the NEW tenant afterwards.
+    // Set the caller's tenant on the thread BEFORE the RLS-scoped read: with no surrounding
+    // transaction, the read acquires a fresh connection and TenantConnectionProvider binds
+    // app.current_tenant from TenantContext at acquisition time.
     TenantContext.setCurrentTenantId(currentMembership.getTenantId());
-    tenantSessionBinder.bindToCurrentSession(currentMembership.getTenantId());
+    try {
+      return doCreateOrganization(currentUserId, request, ipAddress, userAgent, identity, taxId);
+    } finally {
+      TenantContext.clear();
+    }
+  }
+
+  private LoginResponse doCreateOrganization(
+      UUID currentUserId,
+      CreateExistingAccountOrganizationRequest request,
+      String ipAddress,
+      String userAgent,
+      LoginIdentity identity,
+      String taxId) {
+    UUID callerTenantId = TenantContext.requireTenantId();
 
     User currentUser =
         userRepository
-            .findByTenantIdAndId(currentMembership.getTenantId(), currentUserId)
+            .findByTenantIdAndId(callerTenantId, currentUserId)
             .orElseThrow(
                 () ->
                     new PlatformDomainException(
