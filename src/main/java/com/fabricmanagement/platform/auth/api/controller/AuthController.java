@@ -331,7 +331,15 @@ public class AuthController {
    */
   private UUID getCurrentUserId() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null || !auth.isAuthenticated()) {
+    // /api/v1/auth/** is permitAll, so an expired/absent token still reaches the controller as
+    // Spring's ANONYMOUS authentication (isAuthenticated()=true, principal="anonymousUser").
+    // Without this check that principal fell through to UUID.fromString and produced a 400 —
+    // which the frontend refresh interceptor ignores (it only reacts to 401), breaking silent
+    // re-auth on the authenticated auth endpoints (memberships, switch-org, organizations).
+    if (auth == null
+        || !auth.isAuthenticated()
+        || auth
+            instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
       throw new PlatformDomainException("Not authenticated", "AUTH_NOT_AUTHENTICATED", 401);
     }
     Object principal = auth.getPrincipal();
