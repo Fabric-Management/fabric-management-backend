@@ -22,6 +22,8 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -63,7 +65,10 @@ public class PartnerUserInvitationEventListener {
         .ifPresent(identity -> provisionExistingIdentityInvite(event, identity));
   }
 
+  // REQUIRES_NEW: see UserInvitationEventListener.onUserCreated — AFTER_COMMIT writes
+  // (registration token, email outbox row) are lost without a fresh transaction.
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void onPartnerUserCreated(PartnerUserCreatedEvent event) {
     try {
       String normalizedEmail = normalizeEmail(event.getContactValue());
