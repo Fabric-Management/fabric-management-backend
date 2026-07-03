@@ -1,5 +1,7 @@
 package com.fabricmanagement.platform.auth.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.tenant.TrialLifecyclePort;
 import com.fabricmanagement.common.infrastructure.web.exception.TaxIdAlreadyExistsException;
 import com.fabricmanagement.platform.auth.app.onboarding.OnboardingContext;
@@ -42,6 +44,7 @@ public class ExistingAccountOrganizationService {
   private final UserRepository userRepository;
   private final TrialLifecyclePort trialLifecyclePort;
   private final SwitchOrganizationService switchOrganizationService;
+  private final TenantSessionBinder tenantSessionBinder;
 
   @Value("${application.identity.max-organizations:5}")
   private int maxOrganizations;
@@ -81,6 +84,13 @@ public class ExistingAccountOrganizationService {
     if (taxId != null && organizationFacade.existsByTaxId(taxId)) {
       throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
+
+    // /api/v1/auth/* is excluded from the tenant-context interceptor (pre-auth endpoints), so no
+    // tenant is bound here and the RLS-scoped User read below would see nothing. Bind the caller's
+    // own tenant first — the same bind-before-read pattern SwitchOrganizationService uses. The
+    // onboarding pipeline (CreateTenantStep) re-binds to the NEW tenant afterwards.
+    TenantContext.setCurrentTenantId(currentMembership.getTenantId());
+    tenantSessionBinder.bindToCurrentSession(currentMembership.getTenantId());
 
     User currentUser =
         userRepository

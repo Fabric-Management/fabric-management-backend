@@ -43,6 +43,10 @@ class ExistingAccountOrganizationServiceTest {
   private final TrialLifecyclePort trialLifecyclePort = Mockito.mock(TrialLifecyclePort.class);
   private final SwitchOrganizationService switchOrganizationService =
       Mockito.mock(SwitchOrganizationService.class);
+  private final com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder
+      tenantSessionBinder =
+          Mockito.mock(
+              com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder.class);
 
   private ExistingAccountOrganizationService service;
 
@@ -56,7 +60,8 @@ class ExistingAccountOrganizationServiceTest {
             loginIdentityRepository,
             userRepository,
             trialLifecyclePort,
-            switchOrganizationService);
+            switchOrganizationService,
+            tenantSessionBinder);
     ReflectionTestUtils.setField(service, "maxOrganizations", 5);
   }
 
