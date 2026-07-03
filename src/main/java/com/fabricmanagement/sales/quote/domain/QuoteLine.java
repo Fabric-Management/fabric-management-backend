@@ -68,6 +68,19 @@ public class QuoteLine extends BaseEntity {
     return offeredPrice.multiply(requestedQty);
   }
 
+  public void updateEditableFields(BigDecimal requestedQty, String unit, BigDecimal offeredPrice) {
+    this.requestedQty = requestedQty;
+    this.unit = unit;
+    this.offeredPrice = offeredPrice;
+  }
+
+  public void applyPricing(
+      BigDecimal discountRate, BigDecimal profitMargin, QuotePriceZone priceZone) {
+    this.discountRate = discountRate;
+    this.profitMargin = profitMargin;
+    this.priceZone = priceZone;
+  }
+
   public void markAsDeleted() {
     this.isActive = false;
     super.delete();

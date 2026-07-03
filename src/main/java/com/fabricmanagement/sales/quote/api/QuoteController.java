@@ -9,6 +9,8 @@ import com.fabricmanagement.sales.quote.dto.CustomerApprovalRequest;
 import com.fabricmanagement.sales.quote.dto.GenerateQuoteTokenRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteApprovalTokenDto;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
+import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
+import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.mapper.QuoteMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,7 +24,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -93,6 +97,36 @@ public class QuoteController {
                         req.getRequestedQty(),
                         req.getUnit(),
                         req.getOfferedPrice()))));
+  }
+
+  @PatchMapping("/{quoteId}")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(summary = "Update editable quote header fields")
+  public ResponseEntity<ApiResponse<QuoteResponse>> updateQuote(
+      @PathVariable UUID quoteId, @Valid @RequestBody UpdateQuoteRequest req) {
+    return ResponseEntity.ok(
+        ApiResponse.success(QuoteResponse.from(quoteService.updateQuoteHeader(quoteId, req))));
+  }
+
+  @PatchMapping("/{quoteId}/lines/{lineId}")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(summary = "Update a quote line and re-evaluate pricing")
+  public ResponseEntity<ApiResponse<QuoteResponse>> updateLine(
+      @PathVariable UUID quoteId,
+      @PathVariable UUID lineId,
+      @Valid @RequestBody UpdateQuoteLineRequest req) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            QuoteResponse.from(quoteService.updateQuoteLine(quoteId, lineId, req))));
+  }
+
+  @DeleteMapping("/{quoteId}/lines/{lineId}")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(summary = "Remove a line item from a quote")
+  public ResponseEntity<ApiResponse<QuoteResponse>> removeLine(
+      @PathVariable UUID quoteId, @PathVariable UUID lineId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(QuoteResponse.from(quoteService.removeQuoteLine(quoteId, lineId))));
   }
 
   @PostMapping("/{quoteId}/submit")

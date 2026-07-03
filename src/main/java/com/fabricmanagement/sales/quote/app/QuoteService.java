@@ -16,6 +16,8 @@ import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
+import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
 import com.fabricmanagement.sales.salesproduct.app.SalesProductService;
 import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
@@ -68,10 +70,7 @@ public class QuoteService {
       UUID quoteId, UUID productId, BigDecimal requestedQty, String unit, BigDecimal offeredPrice) {
     Quote quote = getActiveQuote(quoteId);
 
-    if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.EVALUATION) {
-      throw SalesDomainException.invalidQuoteStatus(
-          "Cannot add lines to a quote in " + quote.getStatus() + " status");
-    }
+    assertEditable(quote, "add lines to");
 
     SalesProductDto catalogItem = catalogService.getActiveByProductId(productId);
     DiscountPolicy policy = policyService.getActivePolicy(quote.getModuleType());
@@ -96,6 +95,42 @@ public class QuoteService {
 
     quote.addLine(line);
     // Any future line-mutating path must recompute totals before saving.
+    recomputeTotals(quote);
+    return quoteRepository.save(quote);
+  }
+
+  @Transactional
+  public Quote updateQuoteHeader(UUID quoteId, UpdateQuoteRequest req) {
+    Quote quote = getActiveQuote(quoteId);
+    assertEditable(quote, "edit");
+
+    quote.updateHeader(
+        req.getValidUntil(), req.getPaymentTerms(), req.getLeadTimeDays(), req.getNotes());
+    recomputeTotals(quote);
+    return quoteRepository.save(quote);
+  }
+
+  @Transactional
+  public Quote updateQuoteLine(UUID quoteId, UUID lineId, UpdateQuoteLineRequest req) {
+    Quote quote = getActiveQuote(quoteId);
+    assertEditable(quote, "edit lines on");
+
+    QuoteLine line = getQuoteLine(quote, lineId);
+    PricingResult pricing = evaluateLinePrice(quote, line, req.getOfferedPrice());
+
+    line.updateEditableFields(req.getRequestedQty(), req.getUnit(), req.getOfferedPrice());
+    line.applyPricing(pricing.getDiscountRate(), pricing.getProfitMargin(), pricing.getPriceZone());
+    recomputeTotals(quote);
+    return quoteRepository.save(quote);
+  }
+
+  @Transactional
+  public Quote removeQuoteLine(UUID quoteId, UUID lineId) {
+    Quote quote = getActiveQuote(quoteId);
+    assertEditable(quote, "remove lines from");
+
+    getQuoteLine(quote, lineId);
+    quote.removeLine(lineId);
     recomputeTotals(quote);
     return quoteRepository.save(quote);
   }
@@ -199,6 +234,25 @@ public class QuoteService {
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+  }
+
+  private void assertEditable(Quote quote, String action) {
+    if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.EVALUATION) {
+      throw SalesDomainException.invalidQuoteStatus(
+          "Cannot " + action + " a quote in " + quote.getStatus() + " status");
+    }
+  }
+
+  private QuoteLine getQuoteLine(Quote quote, UUID lineId) {
+    return quote
+        .findLine(lineId)
+        .orElseThrow(() -> SalesDomainException.quoteNotFound("line " + lineId));
+  }
+
+  private PricingResult evaluateLinePrice(Quote quote, QuoteLine line, BigDecimal offeredPrice) {
+    DiscountPolicy policy = policyService.getActivePolicy(quote.getModuleType());
+    return pricingEngineService.evaluatePrice(
+        line.getListPrice(), offeredPrice, quote.getEstimatedUnitCost(), policy);
   }
 
   private void recomputeTotals(Quote quote) {
