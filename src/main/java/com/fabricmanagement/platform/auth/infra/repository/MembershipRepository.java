@@ -20,4 +20,6 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
   Optional<Membership> findByLoginIdentityIdAndTenantId(UUID loginIdentityId, UUID tenantId);
 
   long countByLoginIdentityId(UUID loginIdentityId);
+
+  long countByLoginIdentityIdAndStatus(UUID loginIdentityId, MembershipStatus status);
 }

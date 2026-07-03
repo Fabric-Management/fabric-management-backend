@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.security.AuthenticatedUserCont
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.common.util.WebRequestUtils;
+import com.fabricmanagement.platform.auth.app.ExistingAccountOrganizationService;
 import com.fabricmanagement.platform.auth.app.JwtService;
 import com.fabricmanagement.platform.auth.app.LoginService;
 import com.fabricmanagement.platform.auth.app.LogoutService;
@@ -15,6 +16,9 @@ import com.fabricmanagement.platform.auth.app.SwitchOrganizationService;
 import com.fabricmanagement.platform.auth.dto.*;
 import com.fabricmanagement.platform.auth.dto.ActiveSessionDto;
 import com.fabricmanagement.platform.common.exception.PlatformDomainException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,6 +56,7 @@ public class AuthController {
   private final LogoutService logoutService;
   private final RefreshTokenService refreshTokenService;
   private final SwitchOrganizationService switchOrganizationService;
+  private final ExistingAccountOrganizationService existingAccountOrganizationService;
   private final JwtService jwtService;
   private final MfaSetupService mfaSetupService;
   private final MfaEventService mfaEventService;
@@ -167,6 +172,46 @@ public class AuthController {
     response.setRefreshToken(null);
 
     return ResponseEntity.ok(ApiResponse.success(response, "Organization switched successfully"));
+  }
+
+  @Operation(
+      summary = "Create organization for current account",
+      description =
+          "Creates a clean trial tenant and root organization for the authenticated login identity, "
+              + "then switches the session into the new organization.",
+      responses = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Organization created and session switched",
+            content =
+                @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = LoginResponse.class))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "Authentication required"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "400",
+            description = "Organization limit reached or invalid request")
+      })
+  @PostMapping("/organizations")
+  public ResponseEntity<ApiResponse<LoginResponse>> createOrganization(
+      @Valid @RequestBody CreateExistingAccountOrganizationRequest request,
+      HttpServletRequest httpRequest,
+      HttpServletResponse httpResponse) {
+    UUID userId = getCurrentUserId();
+    String ipAddress = WebRequestUtils.getClientIpAddress(httpRequest);
+    String userAgent = httpRequest.getHeader("User-Agent");
+    LoginResponse response =
+        existingAccountOrganizationService.createOrganization(
+            userId, request, ipAddress, userAgent);
+
+    authCookieSupport.addAuthCookies(
+        httpResponse, response.getAccessToken(), response.getRefreshToken());
+    response.setAccessToken(null);
+    response.setRefreshToken(null);
+
+    return ResponseEntity.ok(ApiResponse.success(response, "Organization created successfully"));
   }
 
   /** Read refresh_token from request cookies (BE-04). */

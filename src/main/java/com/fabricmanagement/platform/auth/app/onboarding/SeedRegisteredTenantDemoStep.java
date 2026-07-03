@@ -20,10 +20,11 @@ public class SeedRegisteredTenantDemoStep implements OnboardingStep {
 
   @Override
   public void execute(OnboardingContext context) {
-    if (context.isSalesLed() || !context.isDemoMode()) {
+    if (context.isExistingIdentity() || context.isSalesLed() || !context.isDemoMode()) {
       log.debug(
-          "SeedRegisteredTenantDemoStep: skipping tenantId={}, salesLed={}, demoMode={}",
+          "SeedRegisteredTenantDemoStep: skipping tenantId={}, existingIdentity={}, salesLed={}, demoMode={}",
           context.getTenantId(),
+          context.isExistingIdentity(),
           context.isSalesLed(),
           context.isDemoMode());
       return;

@@ -22,6 +22,8 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -57,6 +59,9 @@ public class UserInvitationEventListener {
 
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void provisionExistingIdentityMembership(UserCreatedEvent event) {
+    if (event.isInvitationEmailSuppressed()) {
+      return;
+    }
     if (shouldSkipInviteHandling(event)) {
       return;
     }
@@ -72,9 +77,18 @@ public class UserInvitationEventListener {
    *
    * <p>Runs after the transaction commits to ensure user data is persisted before sending email.
    */
+  // REQUIRES_NEW is essential: an AFTER_COMMIT listener still runs inside the COMPLETED
+  // transaction's context, so any DB write joining it (registration token, email outbox row)
+  // is silently never committed. A fresh transaction makes those writes real.
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void onUserCreated(UserCreatedEvent event) {
     try {
+      if (event.isInvitationEmailSuppressed()) {
+        log.debug("Skipping invitation handling for userId={}", event.getUserId());
+        return;
+      }
+
       String normalizedEmail = normalizeEmail(event.getContactValue());
       if (loginIdentityRepository.findByEmail(normalizedEmail).isPresent()) {
         sendAddedToOrganizationEmail(event);
