@@ -20,6 +20,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -118,6 +120,30 @@ public class Quote extends BaseEntity {
 
   public void addLine(QuoteLine line) {
     this.lines.add(line);
+  }
+
+  public Optional<QuoteLine> findLine(UUID lineId) {
+    return this.lines.stream().filter(line -> Objects.equals(line.getId(), lineId)).findFirst();
+  }
+
+  public void updateHeader(
+      LocalDate validUntil, String paymentTerms, Integer leadTimeDays, String notes) {
+    if (validUntil != null) {
+      this.validUntil = validUntil;
+    }
+    if (paymentTerms != null) {
+      this.paymentTerms = paymentTerms;
+    }
+    if (leadTimeDays != null) {
+      this.leadTimeDays = leadTimeDays;
+    }
+    if (notes != null) {
+      this.notes = notes;
+    }
+  }
+
+  public boolean removeLine(UUID lineId) {
+    return this.lines.removeIf(line -> Objects.equals(line.getId(), lineId));
   }
 
   public void markAsDeleted() {

@@ -6,12 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
+import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
@@ -24,6 +26,8 @@ import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
+import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
 import com.fabricmanagement.sales.salesproduct.app.SalesProductService;
 import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
@@ -279,7 +283,7 @@ class QuoteServiceTest {
     Quote revised = quoteService.reviseQuote(quoteId);
 
     ArgumentCaptor<Quote> quoteCaptor = ArgumentCaptor.forClass(Quote.class);
-    verify(quoteRepository, org.mockito.Mockito.times(2)).save(quoteCaptor.capture());
+    verify(quoteRepository, times(2)).save(quoteCaptor.capture());
     List<Quote> savedQuotes = quoteCaptor.getAllValues();
     Quote savedRevision = savedQuotes.get(1);
 
@@ -288,6 +292,239 @@ class QuoteServiceTest {
     assertEquals("USD", savedRevision.getLines().get(0).getCurrency());
     assertNotNull(savedRevision.getTotalAmount());
     assertNotNull(savedRevision.getReportingTotal());
+  }
+
+  @Test
+  @DisplayName("Should update draft quote header fields without changing totals")
+  void shouldUpdateDraftQuoteHeaderFieldsWithoutChangingTotals() {
+    LocalDate validUntil = LocalDate.now().plusDays(30);
+    QuoteLine line = quoteLine("GBP", "10.00", "2.000");
+    line.setId(UUID.randomUUID());
+    quote.addLine(line);
+    quote.setTotalAmount(Money.of(new BigDecimal("20.00"), "GBP"));
+    quote.setReportingTotal(
+        ConvertedMoney.of(
+            new BigDecimal("20.00"),
+            "GBP",
+            new BigDecimal("20.00"),
+            "GBP",
+            BigDecimal.ONE,
+            LocalDate.now()));
+
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setValidUntil(validUntil);
+    req.setPaymentTerms("Net 45");
+    req.setLeadTimeDays(12);
+    req.setNotes("Updated planner note");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    Quote updated = quoteService.updateQuoteHeader(quoteId, req);
+
+    assertEquals(validUntil, updated.getValidUntil());
+    assertEquals("Net 45", updated.getPaymentTerms());
+    assertEquals(12, updated.getLeadTimeDays());
+    assertEquals("Updated planner note", updated.getNotes());
+    assertEquals(0, updated.getTotalAmount().getAmount().compareTo(new BigDecimal("20.00")));
+    assertEquals(
+        0, updated.getReportingTotal().getConvertedAmount().compareTo(new BigDecimal("20.00")));
+  }
+
+  @Test
+  @DisplayName("Should update line quantity and price, re-evaluate zone, and recompute totals")
+  void shouldUpdateLineQuantityAndPriceReevaluateZoneAndRecomputeTotals() {
+    UUID lineId = UUID.randomUUID();
+    QuoteLine line = quoteLine("GBP", "100.00", "2.000");
+    line.setId(lineId);
+    quote.addLine(line);
+
+    UpdateQuoteLineRequest req = new UpdateQuoteLineRequest();
+    req.setRequestedQty(new BigDecimal("3.000"));
+    req.setUnit("M");
+    req.setOfferedPrice(new BigDecimal("80.00"));
+
+    PricingResult managerApproval =
+        PricingResult.builder()
+            .discountRate(new BigDecimal("0.2000"))
+            .profitMargin(new BigDecimal("0.9375"))
+            .priceZone(QuotePriceZone.MANAGER_APPROVAL)
+            .build();
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(pricingEngineService.evaluatePrice(
+            eq(new BigDecimal("100.00")),
+            eq(new BigDecimal("80.00")),
+            eq(new BigDecimal("5.00")),
+            any(DiscountPolicy.class)))
+        .thenReturn(managerApproval);
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote updated = quoteService.updateQuoteLine(quoteId, lineId, req);
+
+    QuoteLine updatedLine = updated.getLines().get(0);
+    assertEquals(0, updatedLine.getRequestedQty().compareTo(new BigDecimal("3.000")));
+    assertEquals("M", updatedLine.getUnit());
+    assertEquals(0, updatedLine.getOfferedPrice().compareTo(new BigDecimal("80.00")));
+    assertEquals(QuotePriceZone.MANAGER_APPROVAL, updatedLine.getPriceZone());
+    assertEquals(0, updatedLine.getDiscountRate().compareTo(new BigDecimal("0.2000")));
+    assertEquals(0, updated.getTotalAmount().getAmount().compareTo(new BigDecimal("240.00")));
+    assertEquals(
+        0, updated.getReportingTotal().getConvertedAmount().compareTo(new BigDecimal("240.00")));
+  }
+
+  @Test
+  @DisplayName("Should delete a line and recompute quote totals")
+  void shouldDeleteLineAndRecomputeTotals() {
+    UUID removedLineId = UUID.randomUUID();
+    QuoteLine removedLine = quoteLine("GBP", "10.00", "2.000");
+    removedLine.setId(removedLineId);
+    QuoteLine remainingLine = quoteLine("GBP", "5.00", "3.000");
+    remainingLine.setId(UUID.randomUUID());
+    quote.addLine(removedLine);
+    quote.addLine(remainingLine);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote updated = quoteService.removeQuoteLine(quoteId, removedLineId);
+
+    assertEquals(1, updated.getLines().size());
+    assertEquals(remainingLine.getId(), updated.getLines().get(0).getId());
+    assertEquals(0, updated.getTotalAmount().getAmount().compareTo(new BigDecimal("15.00")));
+    assertEquals(
+        0, updated.getReportingTotal().getConvertedAmount().compareTo(new BigDecimal("15.00")));
+  }
+
+  @Test
+  @DisplayName("Should delete the last line and leave totals at zero")
+  void shouldDeleteLastLineAndLeaveTotalsAtZero() {
+    UUID lineId = UUID.randomUUID();
+    QuoteLine line = quoteLine("GBP", "10.00", "2.000");
+    line.setId(lineId);
+    quote.addLine(line);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote updated = quoteService.removeQuoteLine(quoteId, lineId);
+
+    assertEquals(0, updated.getLines().size());
+    assertEquals(0, updated.getTotalAmount().getAmount().compareTo(BigDecimal.ZERO));
+    assertEquals(0, updated.getReportingTotal().getConvertedAmount().compareTo(BigDecimal.ZERO));
+  }
+
+  @Test
+  @DisplayName("Should reject header updates for non-editable quote statuses")
+  void shouldRejectHeaderUpdatesForNonEditableQuoteStatuses() {
+    for (QuoteStatus status :
+        List.of(QuoteStatus.APPROVED, QuoteStatus.PENDING_APPROVAL, QuoteStatus.SUPERSEDED)) {
+      Quote lockedQuote = quote("GBP");
+      lockedQuote.setStatus(status);
+      lockedQuote.setPaymentTerms("Net 30");
+
+      UpdateQuoteRequest req = new UpdateQuoteRequest();
+      req.setPaymentTerms("Net 60");
+
+      when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+          .thenReturn(Optional.of(lockedQuote));
+
+      assertThrows(SalesDomainException.class, () -> quoteService.updateQuoteHeader(quoteId, req));
+
+      assertEquals("Net 30", lockedQuote.getPaymentTerms());
+    }
+
+    verify(quoteRepository, never()).save(any(Quote.class));
+  }
+
+  @Test
+  @DisplayName("Should reject line updates for non-editable quote statuses")
+  void shouldRejectLineUpdatesForNonEditableQuoteStatuses() {
+    UUID lineId = UUID.randomUUID();
+    UpdateQuoteLineRequest req = new UpdateQuoteLineRequest();
+    req.setRequestedQty(new BigDecimal("4.000"));
+    req.setUnit("KG");
+    req.setOfferedPrice(new BigDecimal("8.00"));
+
+    for (QuoteStatus status :
+        List.of(QuoteStatus.APPROVED, QuoteStatus.PENDING_APPROVAL, QuoteStatus.SUPERSEDED)) {
+      Quote lockedQuote = quote("GBP");
+      lockedQuote.setStatus(status);
+      QuoteLine line = quoteLine("GBP", "10.00", "2.000");
+      line.setId(lineId);
+      lockedQuote.addLine(line);
+
+      when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+          .thenReturn(Optional.of(lockedQuote));
+
+      assertThrows(
+          SalesDomainException.class, () -> quoteService.updateQuoteLine(quoteId, lineId, req));
+
+      assertEquals(0, line.getRequestedQty().compareTo(new BigDecimal("2.000")));
+      assertEquals(0, line.getOfferedPrice().compareTo(new BigDecimal("10.00")));
+      assertEquals(QuotePriceZone.FREE, line.getPriceZone());
+    }
+
+    verify(policyService, never()).getActivePolicy(any());
+    verify(pricingEngineService, never()).evaluatePrice(any(), any(), any(), any());
+    verify(quoteRepository, never()).save(any(Quote.class));
+  }
+
+  @Test
+  @DisplayName("Should reject line deletes for non-editable quote statuses")
+  void shouldRejectLineDeletesForNonEditableQuoteStatuses() {
+    UUID lineId = UUID.randomUUID();
+
+    for (QuoteStatus status :
+        List.of(QuoteStatus.APPROVED, QuoteStatus.PENDING_APPROVAL, QuoteStatus.SUPERSEDED)) {
+      Quote lockedQuote = quote("GBP");
+      lockedQuote.setStatus(status);
+      QuoteLine line = quoteLine("GBP", "10.00", "2.000");
+      line.setId(lineId);
+      lockedQuote.addLine(line);
+
+      when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+          .thenReturn(Optional.of(lockedQuote));
+
+      assertThrows(SalesDomainException.class, () -> quoteService.removeQuoteLine(quoteId, lineId));
+
+      assertEquals(1, lockedQuote.getLines().size());
+    }
+
+    verify(quoteRepository, never()).save(any(Quote.class));
+  }
+
+  @Test
+  @DisplayName("Should preserve tenant isolation for quote mutators")
+  void shouldPreserveTenantIsolationForQuoteMutators() {
+    UUID lineId = UUID.randomUUID();
+    UpdateQuoteRequest headerReq = new UpdateQuoteRequest();
+    headerReq.setNotes("Cross-tenant update");
+    UpdateQuoteLineRequest lineReq = new UpdateQuoteLineRequest();
+    lineReq.setRequestedQty(new BigDecimal("2.000"));
+    lineReq.setUnit("KG");
+    lineReq.setOfferedPrice(new BigDecimal("12.00"));
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.empty());
+
+    assertThrows(
+        SalesDomainException.class, () -> quoteService.updateQuoteHeader(quoteId, headerReq));
+    assertThrows(
+        SalesDomainException.class, () -> quoteService.updateQuoteLine(quoteId, lineId, lineReq));
+    assertThrows(SalesDomainException.class, () -> quoteService.removeQuoteLine(quoteId, lineId));
+
+    verify(quoteRepository, times(3)).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+    verify(quoteRepository, never()).save(any(Quote.class));
   }
 
   private Quote quote(String currency) {
