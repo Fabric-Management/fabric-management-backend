@@ -142,11 +142,8 @@ public class Quote extends BaseEntity {
     }
   }
 
-  public void removeLine(UUID lineId) {
-    QuoteLine line =
-        findLine(lineId)
-            .orElseThrow(() -> new IllegalArgumentException("Quote line not found: " + lineId));
-    this.lines.remove(line);
+  public boolean removeLine(UUID lineId) {
+    return this.lines.removeIf(line -> Objects.equals(line.getId(), lineId));
   }
 
   public void markAsDeleted() {

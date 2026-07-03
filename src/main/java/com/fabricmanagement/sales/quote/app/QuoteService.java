@@ -129,8 +129,9 @@ public class QuoteService {
     Quote quote = getActiveQuote(quoteId);
     assertEditable(quote, "remove lines from");
 
-    getQuoteLine(quote, lineId);
-    quote.removeLine(lineId);
+    if (!quote.removeLine(lineId)) {
+      throw SalesDomainException.quoteNotFound("line " + lineId);
+    }
     recomputeTotals(quote);
     return quoteRepository.save(quote);
   }
