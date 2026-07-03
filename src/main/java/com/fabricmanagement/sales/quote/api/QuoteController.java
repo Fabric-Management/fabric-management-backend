@@ -9,6 +9,7 @@ import com.fabricmanagement.sales.quote.dto.CustomerApprovalRequest;
 import com.fabricmanagement.sales.quote.dto.GenerateQuoteTokenRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteApprovalTokenDto;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
+import com.fabricmanagement.sales.quote.dto.SendQuoteRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.mapper.QuoteMapper;
@@ -135,6 +136,17 @@ public class QuoteController {
   public ResponseEntity<ApiResponse<QuoteResponse>> submitQuote(@PathVariable UUID quoteId) {
     return ResponseEntity.ok(
         ApiResponse.success(QuoteResponse.from(quoteService.submitQuote(quoteId))));
+  }
+
+  @PostMapping("/{quoteId}/send")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(summary = "Send a quote approval email to the customer")
+  public ResponseEntity<ApiResponse<QuoteApprovalTokenDto>> sendQuote(
+      @PathVariable UUID quoteId, @Valid @RequestBody SendQuoteRequest req) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            ApiResponse.success(
+                mapper.toDto(quoteService.sendQuote(quoteId, req.getCustomerEmail()))));
   }
 
   @PostMapping("/{quoteId}/revise")

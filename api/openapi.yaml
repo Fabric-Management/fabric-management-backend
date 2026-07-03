@@ -37945,6 +37945,83 @@ paths:
       summary: Create a new revision of a quote
       tags:
       - Quotes
+  /api/v1/sales/quotes/{quoteId}/send:
+    post:
+      operationId: sendQuote
+      parameters:
+      - in: path
+        name: quoteId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendQuoteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseQuoteApprovalTokenDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Send a quote approval email to the customer
+      tags:
+      - Quotes
   /api/v1/sales/quotes/{quoteId}/submit:
     post:
       operationId: submitQuote
@@ -54379,6 +54456,15 @@ components:
       - organizationName
       - organizationType
       - taxId
+    SendQuoteRequest:
+      type: object
+      properties:
+        customerEmail:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - customerEmail
     ShipmentDto:
       type: object
       properties:

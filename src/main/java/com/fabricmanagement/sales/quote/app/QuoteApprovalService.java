@@ -1,12 +1,14 @@
 package com.fabricmanagement.sales.quote.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.web.LocalizationContext;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalStatus;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import com.fabricmanagement.sales.quote.domain.event.QuoteApprovalTokenGeneratedEvent;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteApprovalTokenRepository;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
 import java.security.SecureRandom;
@@ -15,6 +17,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,7 @@ public class QuoteApprovalService {
 
   private final QuoteApprovalTokenRepository tokenRepository;
   private final QuoteRepository quoteRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public QuoteApprovalToken generateTokenForQuote(
@@ -61,10 +65,21 @@ public class QuoteApprovalService {
     token.setExpiresAt(Instant.now().plus(7, ChronoUnit.DAYS));
     token.setStatus(QuoteApprovalStatus.PENDING);
 
-    // Note: Emitting a QuoteApprovalTokenGeneratedEvent here would trigger the
-    // Notification Hub (Phase 7) to actually dispatch the email/SMS/WhatsApp.
+    QuoteApprovalToken savedToken = tokenRepository.save(token);
 
-    return tokenRepository.save(token);
+    if (channel == QuoteApprovalChannel.EMAIL) {
+      eventPublisher.publishEvent(
+          new QuoteApprovalTokenGeneratedEvent(
+              quote.getTenantId(),
+              quote.getId(),
+              quote.getQuoteNumber(),
+              savedToken.getToken(),
+              sentTo,
+              channel,
+              LocalizationContext.getLocale()));
+    }
+
+    return savedToken;
   }
 
   @Transactional

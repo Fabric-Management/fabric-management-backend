@@ -70,6 +70,19 @@ public class EmailTemplateRenderer {
     return render("partner-invitation.html", vars);
   }
 
+  /** Render quote customer approval email. */
+  public String renderQuoteApproval(
+      String heading, String body, String cta, String expires, String approvalUrl) {
+    Map<String, String> vars =
+        Map.of(
+            "heading", heading != null ? heading : "",
+            "body", body != null ? body : "",
+            "cta", cta != null ? cta : "",
+            "expires", expires != null ? expires : "",
+            "approvalUrl", approvalUrl != null ? approvalUrl : "");
+    return render("quote-approval.html", vars);
+  }
+
   /** Render added-to-organization email for existing login identities. */
   public String renderAddedToOrganization(String firstName, String orgName, String email) {
     Map<String, String> vars =

@@ -23,6 +23,9 @@ import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult
 import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
 import com.fabricmanagement.sales.quote.api.QuoteCreateRequest;
 import com.fabricmanagement.sales.quote.domain.Quote;
+import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
+import com.fabricmanagement.sales.quote.domain.QuoteApprovalStatus;
+import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
@@ -56,6 +59,7 @@ class QuoteServiceTest {
   @Mock private DiscountPolicyService policyService;
   @Mock private ExchangeRateService exchangeRateService;
   @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
+  @Mock private QuoteApprovalService quoteApprovalService;
 
   @InjectMocks private QuoteService quoteService;
 
@@ -522,9 +526,76 @@ class QuoteServiceTest {
     assertThrows(
         SalesDomainException.class, () -> quoteService.updateQuoteLine(quoteId, lineId, lineReq));
     assertThrows(SalesDomainException.class, () -> quoteService.removeQuoteLine(quoteId, lineId));
+    assertThrows(
+        SalesDomainException.class, () -> quoteService.sendQuote(quoteId, "buyer@example.com"));
 
-    verify(quoteRepository, times(3)).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+    verify(quoteRepository, times(4)).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
     verify(quoteRepository, never()).save(any(Quote.class));
+    verify(quoteApprovalService, never())
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any());
+  }
+
+  @Test
+  @DisplayName("Should submit clean draft quote and mint email token when sending")
+  void shouldSubmitCleanDraftQuoteAndMintEmailTokenWhenSending() {
+    quote.addLine(quoteLine("GBP", "10.00", "2.000"));
+    QuoteApprovalToken approvalToken = quoteApprovalToken("buyer@example.com");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteApprovalService.generateTokenForQuote(
+            quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com"))
+        .thenReturn(approvalToken);
+
+    QuoteApprovalToken result = quoteService.sendQuote(quoteId, "buyer@example.com");
+
+    assertEquals(approvalToken, result);
+    assertEquals(QuoteStatus.APPROVED, quote.getStatus());
+    verify(quoteApprovalService)
+        .generateTokenForQuote(quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com");
+  }
+
+  @Test
+  @DisplayName("Should move manager approval quote to pending approval and not mint token")
+  void shouldMoveManagerApprovalQuoteToPendingApprovalAndNotMintToken() {
+    QuoteLine line = quoteLine("GBP", "10.00", "2.000");
+    line.setPriceZone(QuotePriceZone.MANAGER_APPROVAL);
+    quote.addLine(line);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    SalesDomainException ex =
+        assertThrows(
+            SalesDomainException.class, () -> quoteService.sendQuote(quoteId, "buyer@example.com"));
+
+    assertEquals("SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", ex.getErrorCode());
+    assertEquals(QuoteStatus.PENDING_APPROVAL, quote.getStatus());
+    verify(quoteApprovalService, never())
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any());
+  }
+
+  @Test
+  @DisplayName("Should return needs approval for blocked quote and not mint token")
+  void shouldReturnNeedsApprovalForBlockedQuoteAndNotMintToken() {
+    QuoteLine line = quoteLine("GBP", "10.00", "2.000");
+    line.setPriceZone(QuotePriceZone.BLOCKED);
+    quote.addLine(line);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+
+    SalesDomainException ex =
+        assertThrows(
+            SalesDomainException.class, () -> quoteService.sendQuote(quoteId, "buyer@example.com"));
+
+    assertEquals("SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", ex.getErrorCode());
+    assertEquals(QuoteStatus.DRAFT, quote.getStatus());
+    verify(quoteRepository, never()).save(any(Quote.class));
+    verify(quoteApprovalService, never())
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any());
   }
 
   private Quote quote(String currency) {
@@ -580,5 +651,17 @@ class QuoteServiceTest {
         .profitMargin(BigDecimal.ONE)
         .priceZone(QuotePriceZone.FREE)
         .build();
+  }
+
+  private QuoteApprovalToken quoteApprovalToken(String sentTo) {
+    QuoteApprovalToken token = new QuoteApprovalToken();
+    token.setTenantId(tenantId);
+    token.setQuoteId(quoteId);
+    token.setToken("approval-token");
+    token.setChannel(QuoteApprovalChannel.EMAIL);
+    token.setSentTo(sentTo);
+    token.setExpiresAt(Instant.now().plusSeconds(3600));
+    token.setStatus(QuoteApprovalStatus.PENDING);
+    return token;
   }
 }
