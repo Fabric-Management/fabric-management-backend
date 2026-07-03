@@ -16,13 +16,25 @@ public class UserCreatedEvent extends DomainEvent {
   private final String displayName;
   private final String contactValue;
   private final UUID organizationId;
+  private final boolean invitationEmailSuppressed;
 
   public UserCreatedEvent(
       UUID tenantId, UUID userId, String displayName, String contactValue, UUID organizationId) {
+    this(tenantId, userId, displayName, contactValue, organizationId, false);
+  }
+
+  public UserCreatedEvent(
+      UUID tenantId,
+      UUID userId,
+      String displayName,
+      String contactValue,
+      UUID organizationId,
+      boolean invitationEmailSuppressed) {
     super(tenantId, "USER_CREATED");
     this.userId = userId;
     this.displayName = displayName;
     this.contactValue = contactValue;
     this.organizationId = organizationId;
+    this.invitationEmailSuppressed = invitationEmailSuppressed;
   }
 }

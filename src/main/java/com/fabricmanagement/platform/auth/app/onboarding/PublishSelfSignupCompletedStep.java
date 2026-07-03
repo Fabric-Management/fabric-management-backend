@@ -20,6 +20,13 @@ public class PublishSelfSignupCompletedStep implements OnboardingStep {
 
   @Override
   public void execute(OnboardingContext context) {
+    if (context.isExistingIdentity()) {
+      log.debug(
+          "PublishSelfSignupCompletedStep: skipping existing identity tenantId={}",
+          context.getTenantId());
+      return;
+    }
+
     String token = context.getRegistrationToken();
     String email = context.getAdminContact();
     if (token == null || email == null) {

@@ -66,7 +66,7 @@ public class Organization extends BaseEntity {
   private String name;
 
   /** Tax identification number - unique within tenant */
-  @Column(name = "tax_id", nullable = false, length = 50)
+  @Column(name = "tax_id", length = 50)
   private String taxId;
 
   /** Organization type - determines suggested OS subscriptions */

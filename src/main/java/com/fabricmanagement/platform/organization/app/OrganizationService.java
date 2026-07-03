@@ -53,7 +53,8 @@ public class OrganizationService {
     }
 
     // Validate tax ID uniqueness within tenant
-    if (organizationRepository.existsByTenantIdAndTaxId(tenantId, request.getTaxId())) {
+    if (request.getTaxId() != null
+        && organizationRepository.existsByTenantIdAndTaxId(tenantId, request.getTaxId())) {
       throw new TaxIdAlreadyExistsException(
           "Organization with this tax ID already exists in your tenant");
     }
@@ -103,7 +104,7 @@ public class OrganizationService {
     log.debug("Creating root organization for tenant: {}", tenantId);
 
     // Validate tax ID global uniqueness for root organizations
-    if (organizationRepository.existsByTaxId(taxId)) {
+    if (taxId != null && organizationRepository.existsByTaxId(taxId)) {
       throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
 

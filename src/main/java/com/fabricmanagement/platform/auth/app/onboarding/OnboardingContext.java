@@ -51,6 +51,7 @@ public class OnboardingContext {
   private int trialDays;
   private boolean salesLed;
   private boolean demoMode;
+  private boolean existingIdentity;
 
   // ========================================
   // OUTPUTS - Tenant (Step 1)
@@ -95,6 +96,7 @@ public class OnboardingContext {
         .firstName(adminFirstName)
         .lastName(adminLastName)
         .contactValue(adminContact)
+        .suppressInvitationEmail(existingIdentity)
         .build();
   }
 

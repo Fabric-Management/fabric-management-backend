@@ -68,4 +68,21 @@ class SeedRegisteredTenantDemoStepTest {
         .seedFor(Mockito.any(), Mockito.anyString(), Mockito.any(PersonaSubset.class));
     verify(demoTransactionSeeder, never()).seedFor(Mockito.any());
   }
+
+  @Test
+  void shouldSkipExistingIdentityTenantEvenWhenDemoModeIsSet() {
+    UUID tenantId = UUID.randomUUID();
+    OnboardingContext context = new OnboardingContext();
+    context.setTenantId(tenantId);
+    context.setExistingIdentity(true);
+    context.setSalesLed(false);
+    context.setDemoMode(true);
+    context.setAdminContact("owner@example.com");
+
+    step.execute(context);
+
+    verify(userSeeder, never())
+        .seedFor(Mockito.any(), Mockito.anyString(), Mockito.any(PersonaSubset.class));
+    verify(demoTransactionSeeder, never()).seedFor(Mockito.any());
+  }
 }

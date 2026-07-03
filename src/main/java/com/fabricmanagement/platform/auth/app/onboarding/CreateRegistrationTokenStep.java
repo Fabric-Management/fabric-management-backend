@@ -19,6 +19,13 @@ public class CreateRegistrationTokenStep implements OnboardingStep {
 
   @Override
   public void execute(OnboardingContext context) {
+    if (context.isExistingIdentity()) {
+      log.debug(
+          "CreateRegistrationTokenStep: skipping existing identity tenantId={}",
+          context.getTenantId());
+      return;
+    }
+
     UUID userId = context.getUserId();
     UUID organizationId = context.getOrganizationId();
     String contactValue = context.getAdminContact();

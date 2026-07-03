@@ -93,4 +93,20 @@ class PublishSelfSignupCompletedStepTest {
     verify(eventPublisher, never()).publish(org.mockito.ArgumentMatchers.any());
     assertThat(output).contains("missing token or recipient email, skipping signup email event");
   }
+
+  @Test
+  void existingIdentityDoesNotPublishSignupCompletedEvent() {
+    PublishSelfSignupCompletedStep step =
+        new PublishSelfSignupCompletedStep(frontendUrlProvider, eventPublisher);
+    OnboardingContext context = new OnboardingContext();
+    context.setExistingIdentity(true);
+    context.setRegistrationToken("setup-token");
+    context.setAdminContact("owner@example.com");
+
+    step.execute(context);
+
+    verify(frontendUrlProvider, never()).buildUrl(org.mockito.ArgumentMatchers.anyString());
+    verify(eventPublisher, never()).publish(org.mockito.ArgumentMatchers.any());
+    assertThat(context.getSetupUrl()).isNull();
+  }
 }

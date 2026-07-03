@@ -272,7 +272,8 @@ public class UserCreationService {
                   saved.getId(),
                   saved.getDisplayName(),
                   contact.getContactValue(),
-                  saved.getOrganizationId()));
+                  saved.getOrganizationId(),
+                  request.isSuppressInvitationEmail()));
 
           log.info("Admin user created: id={}, uid={}", saved.getId(), saved.getUid());
           return UserDto.from(saved);
