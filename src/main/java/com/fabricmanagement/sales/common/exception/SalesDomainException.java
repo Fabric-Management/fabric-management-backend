@@ -41,4 +41,9 @@ public class SalesDomainException extends DomainException {
     return new SalesDomainException(
         message, "SALES_005_EXCHANGE_RATE_REQUIRED", HttpStatus.BAD_REQUEST, cause);
   }
+
+  public static SalesDomainException needsInternalApproval(String message) {
+    return new SalesDomainException(
+        message, "SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", HttpStatus.CONFLICT);
+  }
 }

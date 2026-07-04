@@ -13,6 +13,8 @@ import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult
 import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
 import com.fabricmanagement.sales.quote.api.QuoteCreateRequest;
 import com.fabricmanagement.sales.quote.domain.Quote;
+import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
+import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
@@ -43,6 +45,7 @@ public class QuoteService {
   private final DiscountPolicyService policyService;
   private final ExchangeRateService exchangeRateService;
   private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
+  private final QuoteApprovalService quoteApprovalService;
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
@@ -168,6 +171,29 @@ public class QuoteService {
   }
 
   @Transactional
+  public QuoteApprovalToken sendQuote(UUID quoteId, String customerEmail) {
+    Quote quote = getActiveQuote(quoteId);
+
+    if (quote.getStatus() == QuoteStatus.DRAFT || quote.getStatus() == QuoteStatus.EVALUATION) {
+      rejectBlockedQuoteForCustomerSend(quote);
+      quote = submitQuote(quoteId);
+    }
+
+    if (quote.getStatus() == QuoteStatus.APPROVED) {
+      return quoteApprovalService.generateTokenForQuote(
+          quoteId, QuoteApprovalChannel.EMAIL, customerEmail);
+    }
+
+    if (quote.getStatus() == QuoteStatus.PENDING_APPROVAL) {
+      throw SalesDomainException.needsInternalApproval(
+          "Quote needs internal approval before it can be sent to the customer.");
+    }
+
+    throw SalesDomainException.invalidQuoteStatus(
+        "Cannot send a quote in " + quote.getStatus() + " status");
+  }
+
+  @Transactional
   public Quote reviseQuote(UUID quoteId) {
     Quote oldQuote = getActiveQuote(quoteId);
 
@@ -241,6 +267,15 @@ public class QuoteService {
     if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.EVALUATION) {
       throw SalesDomainException.invalidQuoteStatus(
           "Cannot " + action + " a quote in " + quote.getStatus() + " status");
+    }
+  }
+
+  private void rejectBlockedQuoteForCustomerSend(Quote quote) {
+    boolean hasBlockedLine =
+        quote.getLines().stream().anyMatch(line -> line.getPriceZone() == QuotePriceZone.BLOCKED);
+    if (hasBlockedLine) {
+      throw SalesDomainException.needsInternalApproval(
+          "Quote needs internal approval before it can be sent to the customer.");
     }
   }
 
