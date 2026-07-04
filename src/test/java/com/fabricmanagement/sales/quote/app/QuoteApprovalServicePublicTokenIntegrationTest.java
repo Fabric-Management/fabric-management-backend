@@ -14,19 +14,68 @@ import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.dto.PublicQuoteResponse;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteApprovalTokenRepository;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
-import com.fabricmanagement.testsupport.AbstractIntegrationTest;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@ActiveProfiles("test")
+@Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("Quote Approval Public Token Integration Test")
-class QuoteApprovalServicePublicTokenIntegrationTest extends AbstractIntegrationTest {
+class QuoteApprovalServicePublicTokenIntegrationTest {
+
+  @Container
+  @SuppressWarnings("resource")
+  static PostgreSQLContainer<?> postgres =
+      new PostgreSQLContainer<>(DockerImageName.parse("postgres:15-alpine"))
+          .withDatabaseName("fabric_test")
+          .withUsername("fabric_owner")
+          .withPassword("fabric123");
+
+  @DynamicPropertySource
+  static void configureDatasource(DynamicPropertyRegistry registry) {
+    try (Connection conn =
+        DriverManager.getConnection(
+            postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+      Statement stmt = conn.createStatement();
+      stmt.execute(
+          "CREATE ROLE fabric_app LOGIN NOSUPERUSER NOCREATEDB NOBYPASSRLS PASSWORD 'app_test'");
+      stmt.execute(
+          "CREATE ROLE fabric_system LOGIN NOSUPERUSER NOCREATEDB BYPASSRLS PASSWORD 'system_test'");
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create test database roles", e);
+    }
+
+    registry.add("spring.datasource.url", postgres::getJdbcUrl);
+    registry.add("spring.datasource.username", () -> "fabric_app");
+    registry.add("spring.datasource.password", () -> "app_test");
+    registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+    registry.add("spring.flyway.url", postgres::getJdbcUrl);
+    registry.add("spring.flyway.user", postgres::getUsername);
+    registry.add("spring.flyway.password", postgres::getPassword);
+    registry.add("application.system-datasource.username", () -> "fabric_system");
+    registry.add("application.system-datasource.password", () -> "system_test");
+  }
 
   @Autowired private QuoteApprovalService quoteApprovalService;
   @Autowired private QuoteRepository quoteRepository;
@@ -56,6 +105,9 @@ class QuoteApprovalServicePublicTokenIntegrationTest extends AbstractIntegration
 
     TenantContext.clear();
     assertThat(TenantContext.getCurrentTenantIdOrNull()).isNull();
+    Optional<QuoteApprovalToken> rlsFilteredToken =
+        transactionTemplate.execute(status -> tokenRepository.findByTokenAndIsActiveTrue(token));
+    assertThat(rlsFilteredToken).isEmpty();
 
     PublicQuoteResponse response = quoteApprovalService.getPublicQuoteByToken(token);
 

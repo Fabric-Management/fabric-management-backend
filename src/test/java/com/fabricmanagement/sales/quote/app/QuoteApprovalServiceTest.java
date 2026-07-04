@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +46,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class QuoteApprovalServiceTest {
@@ -53,6 +56,7 @@ class QuoteApprovalServiceTest {
   @Mock private QuoteRepository quoteRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private SystemTransactionExecutor systemTransactionExecutor;
+  @Mock private TransactionTemplate transactionTemplate;
 
   @InjectMocks private QuoteApprovalService quoteApprovalService;
 
@@ -65,6 +69,13 @@ class QuoteApprovalServiceTest {
     TenantContext.setCurrentTenantId(tenantId);
     LocalizationContext.setLocale("tr");
     quote = approvedQuote();
+    lenient()
+        .when(transactionTemplate.execute(any()))
+        .thenAnswer(
+            invocation -> {
+              TransactionCallback<?> callback = invocation.getArgument(0);
+              return callback.doInTransaction(null);
+            });
   }
 
   @AfterEach
