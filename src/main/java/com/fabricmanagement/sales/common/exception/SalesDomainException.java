@@ -37,6 +37,16 @@ public class SalesDomainException extends DomainException {
     return new SalesDomainException(message, "SALES_004_TOKEN_INVALID", HttpStatus.BAD_REQUEST);
   }
 
+  public static SalesDomainException approvalTokenNotFound(String message) {
+    return new SalesDomainException(
+        message, "SALES_007_APPROVAL_TOKEN_NOT_FOUND", HttpStatus.NOT_FOUND);
+  }
+
+  public static SalesDomainException approvalTokenNoLongerValid(String message) {
+    return new SalesDomainException(
+        message, "SALES_008_APPROVAL_TOKEN_NO_LONGER_VALID", HttpStatus.GONE);
+  }
+
   public static SalesDomainException exchangeRateRequired(String message, Throwable cause) {
     return new SalesDomainException(
         message, "SALES_005_EXCHANGE_RATE_REQUIRED", HttpStatus.BAD_REQUEST, cause);

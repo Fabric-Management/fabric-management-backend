@@ -5,7 +5,6 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.sales.quote.app.QuoteApprovalService;
 import com.fabricmanagement.sales.quote.app.QuoteService;
 import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
-import com.fabricmanagement.sales.quote.dto.CustomerApprovalRequest;
 import com.fabricmanagement.sales.quote.dto.GenerateQuoteTokenRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteApprovalTokenDto;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
@@ -172,17 +171,5 @@ public class QuoteController {
                 mapper.toDto(
                     quoteApprovalService.generateTokenForQuote(
                         quoteId, req.getChannel(), req.getSentTo()))));
-  }
-
-  /** Public endpoint intended for the customer-facing frontend. */
-  @PostMapping("/public/approve")
-  @Operation(summary = "Customer approves a quote via token (public endpoint)")
-  public ResponseEntity<ApiResponse<QuoteResponse>> customerApprove(
-      @Valid @RequestBody CustomerApprovalRequest req) {
-    return ResponseEntity.ok(
-        ApiResponse.success(
-            QuoteResponse.from(
-                quoteApprovalService.processCustomerApproval(
-                    req.getToken(), req.getIpAddress(), req.getUserAgent()))));
   }
 }

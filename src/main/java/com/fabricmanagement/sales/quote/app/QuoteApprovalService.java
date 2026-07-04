@@ -9,6 +9,7 @@ import com.fabricmanagement.sales.quote.domain.QuoteApprovalStatus;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.domain.event.QuoteApprovalTokenGeneratedEvent;
+import com.fabricmanagement.sales.quote.dto.PublicQuoteResponse;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteApprovalTokenRepository;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
 import java.security.SecureRandom;
@@ -83,38 +84,67 @@ public class QuoteApprovalService {
   }
 
   @Transactional
-  public Quote processCustomerApproval(String tokenStr, String ipAddress, String userAgent) {
-    QuoteApprovalToken token =
-        tokenRepository
-            .findByTokenAndIsActiveTrue(tokenStr)
-            .orElseThrow(
-                () -> SalesDomainException.tokenExpiredOrUsed("Invalid or non-existent token"));
+  public PublicQuoteResponse getPublicQuoteByToken(String tokenStr) {
+    QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
+    Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
+    return PublicQuoteResponse.from(quote);
+  }
 
-    if (token.getStatus() != QuoteApprovalStatus.PENDING) {
-      throw SalesDomainException.tokenExpiredOrUsed("Token has already been used or expired");
-    }
-
-    if (Instant.now().isAfter(token.getExpiresAt())) {
-      token.setStatus(QuoteApprovalStatus.EXPIRED);
-      tokenRepository.save(token);
-      throw SalesDomainException.tokenExpiredOrUsed("This quote approval link has expired");
-    }
+  @Transactional
+  public Quote processCustomerApproval(
+      String tokenStr, String ipAddress, String userAgent, String customerNote) {
+    QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
 
     // Mark token as USED with full audit trail
     token.setStatus(QuoteApprovalStatus.USED);
     token.setUsedAt(Instant.now());
     token.setIpAddress(ipAddress);
     token.setUserAgent(userAgent);
+    token.setCustomerNote(normalizeCustomerNote(customerNote));
     tokenRepository.save(token);
 
     // Transition quote to CONVERTED — accepted by customer, ready to become a Sales Order
-    Quote quote = getActiveQuote(token.getQuoteId());
+    Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
     quote.setStatus(QuoteStatus.CONVERTED);
     return quoteRepository.save(quote);
   }
 
+  private QuoteApprovalToken requireUsablePublicToken(String tokenStr) {
+    QuoteApprovalToken token =
+        tokenRepository
+            .findByTokenAndIsActiveTrue(tokenStr)
+            .orElseThrow(
+                () ->
+                    SalesDomainException.approvalTokenNotFound(
+                        "Invalid or non-existent quote approval token"));
+
+    if (token.getStatus() != QuoteApprovalStatus.PENDING) {
+      throw SalesDomainException.approvalTokenNoLongerValid(
+          "Quote approval token has already been used or expired");
+    }
+
+    if (Instant.now().isAfter(token.getExpiresAt())) {
+      token.setStatus(QuoteApprovalStatus.EXPIRED);
+      tokenRepository.save(token);
+      throw SalesDomainException.approvalTokenNoLongerValid("This quote approval link has expired");
+    }
+
+    return token;
+  }
+
+  private String normalizeCustomerNote(String customerNote) {
+    if (customerNote == null || customerNote.isBlank()) {
+      return null;
+    }
+    return customerNote.strip();
+  }
+
   private Quote getActiveQuote(UUID quoteId) {
     UUID tenantId = TenantContext.requireTenantId();
+    return getActiveQuote(tenantId, quoteId);
+  }
+
+  private Quote getActiveQuote(UUID tenantId, UUID quoteId) {
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
