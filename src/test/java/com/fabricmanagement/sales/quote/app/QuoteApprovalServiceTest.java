@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
+import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.LocalizationContext;
 import com.fabricmanagement.common.util.Money;
@@ -50,6 +52,7 @@ class QuoteApprovalServiceTest {
   @Mock private QuoteApprovalTokenRepository tokenRepository;
   @Mock private QuoteRepository quoteRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private SystemTransactionExecutor systemTransactionExecutor;
 
   @InjectMocks private QuoteApprovalService quoteApprovalService;
 
@@ -159,6 +162,7 @@ class QuoteApprovalServiceTest {
     Quote publicQuote = quoteWithCustomerFacingTotals();
     QuoteApprovalToken token = pendingToken(tenantId, quoteId);
 
+    givenPublicTokenTenant("public-token", tenantId);
     when(tokenRepository.findByTokenAndIsActiveTrue("public-token")).thenReturn(Optional.of(token));
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(publicQuote));
@@ -183,13 +187,12 @@ class QuoteApprovalServiceTest {
 
   @Test
   void getPublicQuoteByTokenRejectsInvalidTokenAsNotFound() {
-    when(tokenRepository.findByTokenAndIsActiveTrue("missing")).thenReturn(Optional.empty());
-
     assertThatThrownBy(() -> quoteApprovalService.getPublicQuoteByToken("missing"))
         .isInstanceOf(SalesDomainException.class)
         .extracting("httpStatus")
         .isEqualTo(404);
 
+    verify(tokenRepository, never()).findByTokenAndIsActiveTrue(any());
     verify(quoteRepository, never()).findByTenantIdAndIdAndIsActiveTrue(any(), any());
   }
 
@@ -198,6 +201,7 @@ class QuoteApprovalServiceTest {
     QuoteApprovalToken token = pendingToken(tenantId, quoteId);
     token.setExpiresAt(Instant.now().minusSeconds(60));
 
+    givenPublicTokenTenant("expired", tenantId);
     when(tokenRepository.findByTokenAndIsActiveTrue("expired")).thenReturn(Optional.of(token));
 
     assertThatThrownBy(() -> quoteApprovalService.getPublicQuoteByToken("expired"))
@@ -215,6 +219,7 @@ class QuoteApprovalServiceTest {
     QuoteApprovalToken token = pendingToken(tenantId, quoteId);
     token.setStatus(QuoteApprovalStatus.USED);
 
+    givenPublicTokenTenant("used", tenantId);
     when(tokenRepository.findByTokenAndIsActiveTrue("used")).thenReturn(Optional.of(token));
 
     assertThatThrownBy(() -> quoteApprovalService.getPublicQuoteByToken("used"))
@@ -233,6 +238,7 @@ class QuoteApprovalServiceTest {
     publicQuote.setTenantId(tokenTenantId);
     QuoteApprovalToken token = pendingToken(tokenTenantId, quoteId);
 
+    givenPublicTokenTenant("approve-token", tokenTenantId);
     when(tokenRepository.findByTokenAndIsActiveTrue("approve-token"))
         .thenReturn(Optional.of(token));
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tokenTenantId, quoteId))
@@ -258,6 +264,7 @@ class QuoteApprovalServiceTest {
     QuoteApprovalToken token = pendingToken(tenantId, quoteId);
     token.setStatus(QuoteApprovalStatus.USED);
 
+    givenPublicTokenTenant("used", tenantId);
     when(tokenRepository.findByTokenAndIsActiveTrue("used")).thenReturn(Optional.of(token));
 
     assertThatThrownBy(
@@ -328,6 +335,11 @@ class QuoteApprovalServiceTest {
     token.setStatus(QuoteApprovalStatus.PENDING);
     token.setExpiresAt(Instant.now().plusSeconds(3600));
     return token;
+  }
+
+  private void givenPublicTokenTenant(String token, UUID resolvedTenantId) {
+    when(systemTransactionExecutor.executeQueryForObject(any(), any(), eq(token)))
+        .thenReturn(resolvedTenantId);
   }
 
   private List<String> fieldNames(Class<?> type) {

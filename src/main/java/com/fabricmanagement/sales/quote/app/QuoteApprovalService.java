@@ -1,5 +1,6 @@
 package com.fabricmanagement.sales.quote.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.LocalizationContext;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
@@ -31,6 +32,7 @@ public class QuoteApprovalService {
   private final QuoteApprovalTokenRepository tokenRepository;
   private final QuoteRepository quoteRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final SystemTransactionExecutor systemTransactionExecutor;
 
   @Transactional
   public QuoteApprovalToken generateTokenForQuote(
@@ -85,28 +87,51 @@ public class QuoteApprovalService {
 
   @Transactional
   public PublicQuoteResponse getPublicQuoteByToken(String tokenStr) {
-    QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
-    Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
-    return PublicQuoteResponse.from(quote);
+    UUID tenantId = resolvePublicTokenTenant(tokenStr);
+    return TenantContext.executeInTenantContext(
+        tenantId,
+        () -> {
+          QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
+          Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
+          return PublicQuoteResponse.from(quote);
+        });
   }
 
   @Transactional
   public Quote processCustomerApproval(
       String tokenStr, String ipAddress, String userAgent, String customerNote) {
-    QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
+    UUID tenantId = resolvePublicTokenTenant(tokenStr);
+    return TenantContext.executeInTenantContext(
+        tenantId,
+        () -> {
+          QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
 
-    // Mark token as USED with full audit trail
-    token.setStatus(QuoteApprovalStatus.USED);
-    token.setUsedAt(Instant.now());
-    token.setIpAddress(ipAddress);
-    token.setUserAgent(userAgent);
-    token.setCustomerNote(normalizeCustomerNote(customerNote));
-    tokenRepository.save(token);
+          // Mark token as USED with full audit trail
+          token.setStatus(QuoteApprovalStatus.USED);
+          token.setUsedAt(Instant.now());
+          token.setIpAddress(ipAddress);
+          token.setUserAgent(userAgent);
+          token.setCustomerNote(normalizeCustomerNote(customerNote));
+          tokenRepository.save(token);
 
-    // Transition quote to CONVERTED — accepted by customer, ready to become a Sales Order
-    Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
-    quote.setStatus(QuoteStatus.CONVERTED);
-    return quoteRepository.save(quote);
+          // Transition quote to CONVERTED — accepted by customer, ready to become a Sales Order
+          Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
+          quote.setStatus(QuoteStatus.CONVERTED);
+          return quoteRepository.save(quote);
+        });
+  }
+
+  private UUID resolvePublicTokenTenant(String tokenStr) {
+    UUID tenantId =
+        systemTransactionExecutor.executeQueryForObject(
+            "SELECT tenant_id FROM sales.quote_approval_token WHERE token = ? AND is_active = true",
+            (rs, rowNum) -> UUID.fromString(rs.getString("tenant_id")),
+            tokenStr);
+    if (tenantId == null) {
+      throw SalesDomainException.approvalTokenNotFound(
+          "Invalid or non-existent quote approval token");
+    }
+    return tenantId;
   }
 
   private QuoteApprovalToken requireUsablePublicToken(String tokenStr) {
