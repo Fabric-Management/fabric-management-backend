@@ -50,6 +50,9 @@ public class QuoteApprovalToken extends BaseEntity {
   @Column(name = "user_agent", columnDefinition = "TEXT")
   private String userAgent;
 
+  @Column(name = "customer_note", columnDefinition = "TEXT")
+  private String customerNote;
+
   @Type(JsonType.class)
   @Column(columnDefinition = "jsonb")
   private String location;
