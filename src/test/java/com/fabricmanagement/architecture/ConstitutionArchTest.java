@@ -823,6 +823,7 @@ class ConstitutionArchTest {
       //   - TenantQueryAdapter           : Port/Adapter: tenant lookup (auth, event yolu)
       //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
       //   - LoginIdentityBackfillRunner  : IDENTITY-1 startup backfill from RLS source tables
+      //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -850,6 +851,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("FinancePermissionBackfillRunner")
               .and()
               .doNotHaveSimpleName("LoginIdentityBackfillRunner")
+              .and()
+              .doNotHaveSimpleName("QuoteApprovalService")
               .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()
