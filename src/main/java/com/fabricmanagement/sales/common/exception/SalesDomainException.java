@@ -52,6 +52,11 @@ public class SalesDomainException extends DomainException {
         message, "SALES_009_INVALID_QUOTE_TOKEN_RECIPIENT", HttpStatus.UNPROCESSABLE_ENTITY);
   }
 
+  public static SalesDomainException invalidQuoteRecipientContact(String message) {
+    return new SalesDomainException(
+        message, "SALES_010_INVALID_QUOTE_RECIPIENT_CONTACT", HttpStatus.BAD_REQUEST);
+  }
+
   public static SalesDomainException exchangeRateRequired(String message, Throwable cause) {
     return new SalesDomainException(
         message, "SALES_005_EXCHANGE_RATE_REQUIRED", HttpStatus.BAD_REQUEST, cause);

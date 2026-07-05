@@ -98,6 +98,17 @@ class QuoteRequestValidationTest {
   }
 
   @Test
+  void sendQuoteRequestRequiresContactId() {
+    SendQuoteRequest request = new SendQuoteRequest();
+
+    assertThat(violatedFields(request)).containsExactly("contactId");
+
+    request.setContactId(UUID.randomUUID());
+
+    assertThat(violatedFields(request)).isEmpty();
+  }
+
+  @Test
   void boundaryValuesPassValidation() {
     QuoteCreateRequest createRequest = validCreateRequest();
     createRequest.setPaymentTerms("x".repeat(50));

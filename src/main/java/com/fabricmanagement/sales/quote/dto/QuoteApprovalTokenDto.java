@@ -13,6 +13,7 @@ public class QuoteApprovalTokenDto {
   String token;
   QuoteApprovalChannel channel;
   String sentTo;
+  UUID contactId;
   Instant expiresAt;
   QuoteApprovalStatus status;
   Instant usedAt;

@@ -142,8 +142,7 @@ public class QuoteController {
       @PathVariable UUID quoteId, @Valid @RequestBody SendQuoteRequest req) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            ApiResponse.success(
-                mapper.toDto(quoteService.sendQuote(quoteId, req.getCustomerEmail()))));
+            ApiResponse.success(mapper.toDto(quoteService.sendQuote(quoteId, req.getContactId()))));
   }
 
   @PostMapping("/{quoteId}/revise")

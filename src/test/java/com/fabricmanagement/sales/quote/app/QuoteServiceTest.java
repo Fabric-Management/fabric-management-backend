@@ -17,7 +17,13 @@ import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrency
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
+import com.fabricmanagement.platform.tradingpartner.app.PartnerContactService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.platform.tradingpartner.domain.PartnerContact;
+import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
+import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
+import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
+import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
@@ -68,12 +74,14 @@ class QuoteServiceTest {
   @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
   @Mock private QuoteApprovalService quoteApprovalService;
   @Mock private TradingPartnerResolver tradingPartnerResolver;
+  @Mock private PartnerContactService partnerContactService;
 
   @InjectMocks private QuoteService quoteService;
 
   private final UUID tenantId = UUID.randomUUID();
   private final UUID quoteId = UUID.randomUUID();
   private final UUID customerId = UUID.randomUUID();
+  private final UUID contactId = UUID.randomUUID();
   private final UUID productId = UUID.randomUUID();
   private Quote quote;
 
@@ -564,13 +572,12 @@ class QuoteServiceTest {
     assertThrows(
         SalesDomainException.class, () -> quoteService.updateQuoteLine(quoteId, lineId, lineReq));
     assertThrows(SalesDomainException.class, () -> quoteService.removeQuoteLine(quoteId, lineId));
-    assertThrows(
-        SalesDomainException.class, () -> quoteService.sendQuote(quoteId, "buyer@example.com"));
+    assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
 
     verify(quoteRepository, times(4)).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
     verify(quoteRepository, never()).save(any(Quote.class));
     verify(quoteApprovalService, never())
-        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any());
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any(), any());
   }
 
   @Test
@@ -581,17 +588,38 @@ class QuoteServiceTest {
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(quote));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, customerId, "buyer@example.com"));
     when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
     when(quoteApprovalService.generateTokenForQuote(
-            quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com"))
+            quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId))
         .thenReturn(approvalToken);
 
-    QuoteApprovalToken result = quoteService.sendQuote(quoteId, "buyer@example.com");
+    QuoteApprovalToken result = quoteService.sendQuote(quoteId, contactId);
 
     assertEquals(approvalToken, result);
     assertEquals(QuoteStatus.APPROVED, quote.getStatus());
     verify(quoteApprovalService)
-        .generateTokenForQuote(quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com");
+        .generateTokenForQuote(quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId);
+  }
+
+  @Test
+  @DisplayName("Should reject quote send when contact belongs to another customer")
+  void shouldRejectQuoteSendWhenContactBelongsToAnotherCustomer() {
+    UUID otherCustomerId = UUID.randomUUID();
+    quote.setStatus(QuoteStatus.APPROVED);
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, otherCustomerId, "buyer@example.com"));
+
+    SalesDomainException ex =
+        assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
+
+    assertEquals("SALES_010_INVALID_QUOTE_RECIPIENT_CONTACT", ex.getErrorCode());
+    assertEquals(400, ex.getHttpStatus());
+    verify(quoteApprovalService, never())
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any(), any());
   }
 
   @Test
@@ -606,13 +634,12 @@ class QuoteServiceTest {
     when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
 
     SalesDomainException ex =
-        assertThrows(
-            SalesDomainException.class, () -> quoteService.sendQuote(quoteId, "buyer@example.com"));
+        assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
 
     assertEquals("SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", ex.getErrorCode());
     assertEquals(QuoteStatus.PENDING_APPROVAL, quote.getStatus());
     verify(quoteApprovalService, never())
-        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any());
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any(), any());
   }
 
   @Test
@@ -626,14 +653,13 @@ class QuoteServiceTest {
         .thenReturn(Optional.of(quote));
 
     SalesDomainException ex =
-        assertThrows(
-            SalesDomainException.class, () -> quoteService.sendQuote(quoteId, "buyer@example.com"));
+        assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
 
     assertEquals("SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", ex.getErrorCode());
     assertEquals(QuoteStatus.DRAFT, quote.getStatus());
     verify(quoteRepository, never()).save(any(Quote.class));
     verify(quoteApprovalService, never())
-        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any());
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any(), any());
   }
 
   private Quote quote(String currency) {
@@ -701,5 +727,30 @@ class QuoteServiceTest {
     token.setExpiresAt(Instant.now().plusSeconds(3600));
     token.setStatus(QuoteApprovalStatus.PENDING);
     return token;
+  }
+
+  private PartnerContact partnerContact(UUID contactId, UUID partnerId, String email) {
+    TradingPartnerRegistry registry =
+        TradingPartnerRegistry.builder().id(UUID.randomUUID()).officialName("Acme").build();
+    TradingPartner partner =
+        TradingPartner.builder()
+            .registry(registry)
+            .partnerType(PartnerType.CUSTOMER)
+            .customName("Acme")
+            .build();
+    partner.setId(partnerId);
+    partner.setTenantId(tenantId);
+
+    PartnerContact contact =
+        PartnerContact.builder()
+            .partner(partner)
+            .name("Buyer")
+            .email(email)
+            .role(PartnerContactRole.BUYER)
+            .primaryContact(true)
+            .build();
+    contact.setId(contactId);
+    contact.setTenantId(tenantId);
+    return contact;
   }
 }

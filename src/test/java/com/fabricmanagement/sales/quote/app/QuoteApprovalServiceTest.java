@@ -86,6 +86,7 @@ class QuoteApprovalServiceTest {
 
   @Test
   void generatesEmailTokenAndPublishesEvent() {
+    UUID contactId = UUID.randomUUID();
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(quote));
     when(tokenRepository.findPendingByQuoteId(quoteId)).thenReturn(Optional.empty());
@@ -93,12 +94,13 @@ class QuoteApprovalServiceTest {
 
     QuoteApprovalToken token =
         quoteApprovalService.generateTokenForQuote(
-            quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com");
+            quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId);
 
     assertNotNull(token.getToken());
     assertEquals(64, token.getToken().length());
     assertEquals(QuoteApprovalChannel.EMAIL, token.getChannel());
     assertEquals("buyer@example.com", token.getSentTo());
+    assertEquals(contactId, token.getContactId());
     assertEquals(QuoteApprovalStatus.PENDING, token.getStatus());
 
     ArgumentCaptor<QuoteApprovalTokenGeneratedEvent> eventCaptor =

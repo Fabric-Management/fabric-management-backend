@@ -44,6 +44,12 @@ public class QuoteApprovalService {
   @Transactional
   public QuoteApprovalToken generateTokenForQuote(
       UUID quoteId, QuoteApprovalChannel channel, String sentTo) {
+    return generateTokenForQuote(quoteId, channel, sentTo, null);
+  }
+
+  @Transactional
+  public QuoteApprovalToken generateTokenForQuote(
+      UUID quoteId, QuoteApprovalChannel channel, String sentTo, UUID contactId) {
     Quote quote = getActiveQuote(quoteId);
     validateSentTo(channel, sentTo);
 
@@ -73,6 +79,7 @@ public class QuoteApprovalService {
     token.setToken(secureToken);
     token.setChannel(channel);
     token.setSentTo(sentTo);
+    token.setContactId(contactId);
     token.setExpiresAt(Instant.now().plus(7, ChronoUnit.DAYS));
     token.setStatus(QuoteApprovalStatus.PENDING);
 

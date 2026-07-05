@@ -11,12 +11,15 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
+import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerStatus;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
 import com.fabricmanagement.platform.tradingpartner.domain.event.TradingPartnerCreatedEvent;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
+import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerContactRequest;
+import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
 import java.util.List;
@@ -45,6 +48,7 @@ class TradingPartnerServiceTest {
   @Mock private TradingPartnerRegistryService registryService;
   @Mock private DomainEventPublisher eventPublisher;
   @Mock private OrganizationFacade organizationFacade;
+  @Mock private PartnerContactService partnerContactService;
 
   @InjectMocks private TradingPartnerService service;
 
@@ -206,6 +210,91 @@ class TradingPartnerServiceTest {
       assertThat(result.getPartnerType()).isEqualTo(PartnerType.SUPPLIER);
       verify(partnerRepository, never()).save(any());
       verify(eventPublisher, never()).publish(any(TradingPartnerCreatedEvent.class));
+    }
+  }
+
+  @Nested
+  @DisplayName("quickCreateCustomer")
+  class QuickCreateCustomer {
+
+    @Test
+    void createsCustomerWithPendingAccountingReviewAndPrimaryBuyerContact() {
+      QuickCreateCustomerContactRequest buyer = new QuickCreateCustomerContactRequest();
+      buyer.setName("Jane Buyer");
+      buyer.setEmail("buyer@example.com");
+
+      QuickCreateCustomerContactRequest finance = new QuickCreateCustomerContactRequest();
+      finance.setName("Fin User");
+      finance.setEmail("finance@example.com");
+      finance.setRole(PartnerContactRole.FINANCE);
+
+      QuickCreateCustomerRequest request = new QuickCreateCustomerRequest();
+      request.setCompanyName("Quick Customer Ltd");
+      request.setTaxNumber("TAX-42");
+      request.setPhone("+44 20 0000 0000");
+      request.setAddress("1 High Street");
+      request.setContacts(List.of(buyer, finance));
+
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .uid("REG-QUICK")
+              .taxId("TAX-42")
+              .officialName("Quick Customer Ltd")
+              .country("TUR")
+              .build();
+
+      when(registryService.findOrCreate("TAX-42", "Quick Customer Ltd", "TUR"))
+          .thenReturn(registry);
+      when(partnerRepository.findByTenantIdAndRegistryId(TENANT_ID, REGISTRY_ID))
+          .thenReturn(Optional.empty());
+      when(partnerRepository.save(any(TradingPartner.class)))
+          .thenAnswer(
+              inv -> {
+                TradingPartner tp = inv.getArgument(0);
+                tp.setId(PARTNER_ID);
+                tp.setUid("TP-QUICK");
+                tp.setTenantId(TENANT_ID);
+                return tp;
+              });
+      when(organizationFacade.createPartnerOrganization(any(), any(), any()))
+          .thenReturn(OrganizationDto.builder().id(UUID.randomUUID()).build());
+      when(organizationFacade.findById(any(), any())).thenReturn(Optional.empty());
+
+      TradingPartnerDto result = service.quickCreateCustomer(request);
+
+      assertThat(result.getPartnerType()).isEqualTo(PartnerType.CUSTOMER);
+      assertThat(result.isPendingAccountingReview()).isTrue();
+
+      ArgumentCaptor<TradingPartner> partnerCaptor = ArgumentCaptor.forClass(TradingPartner.class);
+      verify(partnerRepository, org.mockito.Mockito.times(2)).save(partnerCaptor.capture());
+      TradingPartner saved = partnerCaptor.getValue();
+      assertThat(saved.isPendingAccountingReview()).isTrue();
+      assertThat(saved.getRelationshipMeta())
+          .containsEntry("quick_create_phone", "+44 20 0000 0000")
+          .containsEntry("quick_create_address", "1 High Street")
+          .containsEntry("quick_created", true);
+
+      verify(partnerContactService)
+          .createContact(
+              TENANT_ID,
+              saved,
+              "Jane Buyer",
+              "buyer@example.com",
+              null,
+              PartnerContactRole.BUYER,
+              false,
+              true);
+      verify(partnerContactService)
+          .createContact(
+              TENANT_ID,
+              saved,
+              "Fin User",
+              "finance@example.com",
+              null,
+              PartnerContactRole.FINANCE,
+              false,
+              false);
     }
   }
 
