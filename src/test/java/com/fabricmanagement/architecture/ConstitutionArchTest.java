@@ -824,6 +824,7 @@ class ConstitutionArchTest {
       //   - CloneTemplateRolesStep       : Onboarding: TEMPLATE rollerini yeni tenant'a kopyala
       //   - LoginIdentityBackfillRunner  : IDENTITY-1 startup backfill from RLS source tables
       //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
+      //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -853,6 +854,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("LoginIdentityBackfillRunner")
               .and()
               .doNotHaveSimpleName("QuoteApprovalService")
+              .and()
+              .doNotHaveSimpleName("QuoteRetentionPurgeJob")
               .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()
