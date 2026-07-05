@@ -87,10 +87,12 @@ public class OrganizationController {
       @PathVariable UUID id,
       @RequestParam String name,
       @RequestParam(required = false) String taxId,
-      @RequestParam(required = false) String legalName) {
+      @RequestParam(required = false) String legalName,
+      @RequestParam(required = false) String preferredCurrency) {
     log.info("Updating organization: id={}", id);
 
-    OrganizationDto updated = organizationService.updateOrganization(id, name, taxId, legalName);
+    OrganizationDto updated =
+        organizationService.updateOrganization(id, name, taxId, legalName, preferredCurrency);
 
     return ResponseEntity.ok(ApiResponse.success(updated, "Organization updated successfully"));
   }

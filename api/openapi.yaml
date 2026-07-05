@@ -5967,6 +5967,11 @@ paths:
         required: false
         schema:
           type: string
+      - in: query
+        name: preferredCurrency
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -41593,6 +41598,7 @@ components:
           minimum: 0.001
         unit:
           type: string
+          maxLength: 20
           minLength: 1
       required:
       - offeredPrice
@@ -48102,6 +48108,9 @@ components:
         parentOrganizationId:
           type: string
           format: uuid
+        preferredCurrency:
+          type: string
+          pattern: "^[A-Za-z]{3}$"
         taxId:
           type: string
           maxLength: 50
@@ -49196,11 +49205,13 @@ components:
           minLength: 0
         ipAddress:
           type: string
+          maxLength: 45
         token:
           type: string
           minLength: 1
         userAgent:
           type: string
+          maxLength: 512
       required:
       - token
     CustomerMarginDto:
@@ -50410,6 +50421,7 @@ components:
           - IN_PERSON
         sentTo:
           type: string
+          maxLength: 254
       required:
       - channel
     GenericProductionSpecs:
@@ -51560,6 +51572,8 @@ components:
         parentOrganizationId:
           type: string
           format: uuid
+        preferredCurrency:
+          type: string
         taxId:
           type: string
         tenantId:
@@ -53232,6 +53246,8 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          maximum: 3650
+          minimum: 0
         lines:
           type: array
           items:
@@ -53507,6 +53523,7 @@ components:
           minLength: 1
         notes:
           type: string
+          maxLength: 2000
         offlineCreatedAt:
           type: string
           format: date-time
@@ -53515,6 +53532,7 @@ components:
           format: uuid
         paymentTerms:
           type: string
+          maxLength: 50
         quoteNumber:
           type: string
           minLength: 1
@@ -55992,6 +56010,8 @@ components:
         organizationId:
           type: string
           format: uuid
+        preferredCurrency:
+          type: string
         partnerType:
           type: string
           enum:
@@ -56436,6 +56456,7 @@ components:
           minimum: 0.001
         unit:
           type: string
+          maxLength: 20
           minLength: 1
       required:
       - offeredPrice
@@ -56447,10 +56468,14 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          maximum: 3650
+          minimum: 0
         notes:
           type: string
+          maxLength: 2000
         paymentTerms:
           type: string
+          maxLength: 50
         validUntil:
           type: string
           format: date

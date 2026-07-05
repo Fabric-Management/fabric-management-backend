@@ -103,6 +103,10 @@ public class Organization extends BaseEntity {
   @Column(name = "reporting_currency", length = 3)
   private String reportingCurrency;
 
+  /** Preferred business currency for this organization (ISO-4217, optional) */
+  @Column(name = "preferred_currency", length = 3)
+  private String preferredCurrency;
+
   /** Associated contacts (junction table) */
   @OneToMany(mappedBy = "organization", fetch = FetchType.LAZY)
   @Builder.Default

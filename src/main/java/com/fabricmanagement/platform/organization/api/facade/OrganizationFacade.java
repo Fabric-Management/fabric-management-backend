@@ -110,6 +110,21 @@ public class OrganizationFacade {
   }
 
   /**
+   * Update organization including preferred currency.
+   *
+   * @param id Organization UUID
+   * @param name New name
+   * @param taxId New tax ID
+   * @param legalName Legal registered name (optional)
+   * @param preferredCurrency Preferred organization currency (blank clears, null leaves unchanged)
+   * @return Updated organization
+   */
+  public OrganizationDto updateOrganization(
+      UUID id, String name, String taxId, String legalName, String preferredCurrency) {
+    return organizationService.updateOrganization(id, name, taxId, legalName, preferredCurrency);
+  }
+
+  /**
    * Deactivate organization.
    *
    * @param id Organization UUID

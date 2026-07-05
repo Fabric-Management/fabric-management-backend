@@ -19,6 +19,7 @@ import com.fabricmanagement.platform.tradingpartner.domain.event.TradingPartnerC
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -267,6 +268,45 @@ class TradingPartnerServiceTest {
 
       assertThat(result).isPresent();
       assertThat(result.get().getLegacyCompanyId()).isEqualTo(legacyCompanyId);
+    }
+  }
+
+  @Nested
+  @DisplayName("findCustomers")
+  class FindCustomers {
+
+    @Test
+    void returnsPreferredCurrencyFromLinkedOrganization() {
+      UUID organizationId = UUID.randomUUID();
+      TradingPartnerRegistry registry =
+          TradingPartnerRegistry.builder()
+              .id(REGISTRY_ID)
+              .officialName("Acme Textiles")
+              .taxId("1234567890")
+              .country("GBR")
+              .build();
+      TradingPartner partner =
+          TradingPartner.builder()
+              .registry(registry)
+              .partnerType(PartnerType.CUSTOMER)
+              .status(PartnerStatus.ACTIVE)
+              .build();
+      partner.setId(PARTNER_ID);
+      partner.setUid("TP-CUSTOMER");
+      partner.setTenantId(TENANT_ID);
+      partner.setOrganizationId(organizationId);
+
+      when(partnerRepository.findCustomers(TENANT_ID)).thenReturn(List.of(partner));
+      when(organizationFacade.findById(TENANT_ID, organizationId))
+          .thenReturn(
+              Optional.of(
+                  OrganizationDto.builder().id(organizationId).preferredCurrency("EUR").build()));
+
+      List<TradingPartnerDto> result = service.findCustomers(TENANT_ID);
+
+      assertThat(result).hasSize(1);
+      assertThat(result.get(0).getDisplayName()).isEqualTo("Acme Textiles");
+      assertThat(result.get(0).getPreferredCurrency()).isEqualTo("EUR");
     }
   }
 

@@ -47,6 +47,7 @@ public class TradingPartnerDto {
 
   // Partner Organization
   private UUID organizationId;
+  private String preferredCurrency;
 
   // Audit
   private Instant createdAt;

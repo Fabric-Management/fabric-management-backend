@@ -24,6 +24,7 @@ public class OrganizationDto {
   private String taxId;
   private OrganizationType organizationType;
   private UUID parentOrganizationId;
+  private String preferredCurrency;
   private Instant createdAt;
   private Boolean isActive;
 
@@ -46,6 +47,7 @@ public class OrganizationDto {
         .taxId(organization.getTaxId())
         .organizationType(organization.getOrganizationType())
         .parentOrganizationId(organization.getParentOrganizationId())
+        .preferredCurrency(organization.getPreferredCurrency())
         .createdAt(organization.getCreatedAt())
         .isActive(organization.getIsActive())
         .build();

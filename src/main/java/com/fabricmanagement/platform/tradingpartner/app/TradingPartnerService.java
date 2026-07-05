@@ -243,7 +243,9 @@ public class TradingPartnerService {
    */
   @Transactional(readOnly = true)
   public List<TradingPartnerDto> findCustomers(UUID tenantId) {
-    return partnerRepository.findCustomers(tenantId).stream().map(TradingPartnerDto::from).toList();
+    return partnerRepository.findCustomers(tenantId).stream()
+        .map(partner -> toCustomerDto(tenantId, partner))
+        .toList();
   }
 
   /**
@@ -257,6 +259,18 @@ public class TradingPartnerService {
     return partnerRepository.findFasonPartners(tenantId).stream()
         .map(TradingPartnerDto::from)
         .toList();
+  }
+
+  private TradingPartnerDto toCustomerDto(UUID tenantId, TradingPartner partner) {
+    TradingPartnerDto dto = TradingPartnerDto.from(partner);
+    if (partner.getOrganizationId() == null) {
+      return dto;
+    }
+    organizationFacade
+        .findById(tenantId, partner.getOrganizationId())
+        .map(OrganizationDto::getPreferredCurrency)
+        .ifPresent(dto::setPreferredCurrency);
+    return dto;
   }
 
   /**
