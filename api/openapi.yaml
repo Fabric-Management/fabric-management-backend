@@ -53576,9 +53576,10 @@ components:
           type: string
           format: uuid
         customerName:
-          type: string
+          type:
+          - string
+          - "null"
           description: Customer display name resolved from trading partner data
-          nullable: true
         estimatedUnitCost:
           type: number
         id:
