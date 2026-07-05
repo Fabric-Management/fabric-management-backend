@@ -5,6 +5,7 @@ import com.fabricmanagement.common.dto.ConvertedMoneyDto;
 import com.fabricmanagement.common.dto.MoneyDto;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,6 +19,10 @@ public class QuoteResponse {
   private final UUID id;
   private final String quoteNumber;
   private final UUID customerId;
+
+  @Schema(description = "Customer display name resolved from trading partner data", nullable = true)
+  private final String customerName;
+
   private final UUID assignedToId;
   private final String moduleType;
   private final QuoteStatus status;
@@ -35,9 +40,14 @@ public class QuoteResponse {
   private final List<QuoteLineResponse> lines;
 
   private QuoteResponse(Quote quote) {
+    this(quote, null);
+  }
+
+  private QuoteResponse(Quote quote, String customerName) {
     this.id = quote.getId();
     this.quoteNumber = quote.getQuoteNumber();
     this.customerId = quote.getCustomerId();
+    this.customerName = customerName;
     this.assignedToId = quote.getAssignedToId();
     this.moduleType = quote.getModuleType();
     this.status = quote.getStatus();
@@ -57,6 +67,10 @@ public class QuoteResponse {
 
   public static QuoteResponse from(Quote quote) {
     return new QuoteResponse(quote);
+  }
+
+  public static QuoteResponse from(Quote quote, String customerName) {
+    return new QuoteResponse(quote, customerName);
   }
 
   private static ConvertedMoneyDto toDto(ConvertedMoney money) {

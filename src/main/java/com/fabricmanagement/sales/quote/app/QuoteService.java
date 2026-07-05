@@ -6,6 +6,7 @@ import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrency
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
@@ -18,6 +19,7 @@ import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
@@ -27,6 +29,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +51,7 @@ public class QuoteService {
   private final ExchangeRateService exchangeRateService;
   private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
   private final QuoteApprovalService quoteApprovalService;
+  private final TradingPartnerResolver tradingPartnerResolver;
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
@@ -54,9 +60,33 @@ public class QuoteService {
   }
 
   @Transactional(readOnly = true)
+  public Page<QuoteResponse> findAllResponses(Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+    Page<Quote> page = quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
+    Map<UUID, String> customerNames =
+        tradingPartnerResolver.resolveDisplayNames(
+            tenantId,
+            page.getContent().stream()
+                .map(Quote::getCustomerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
+    Map<UUID, String> safeCustomerNames = customerNames != null ? customerNames : Map.of();
+    return page.map(quote -> toResponse(quote, safeCustomerNames));
+  }
+
+  @Transactional(readOnly = true)
   public Optional<Quote> findById(UUID quoteId) {
     UUID tenantId = TenantContext.requireTenantId();
     return quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<QuoteResponse> findResponseById(UUID quoteId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    return quoteRepository
+        .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
+        .map(quote -> toResponse(quote, resolveCustomerName(tenantId, quote.getCustomerId())));
   }
 
   @Transactional
@@ -66,6 +96,11 @@ public class QuoteService {
     quote.setStatus(QuoteStatus.DRAFT);
     quote.setRevisionNumber(1);
     return quoteRepository.save(quote);
+  }
+
+  @Transactional(readOnly = true)
+  public QuoteResponse toResponse(Quote quote) {
+    return toResponse(quote, resolveCustomerName(quote.getTenantId(), quote.getCustomerId()));
   }
 
   @Transactional
@@ -261,6 +296,23 @@ public class QuoteService {
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+  }
+
+  private QuoteResponse toResponse(Quote quote, Map<UUID, String> customerNames) {
+    return QuoteResponse.from(quote, customerNames.get(quote.getCustomerId()));
+  }
+
+  private QuoteResponse toResponse(Quote quote, String customerName) {
+    return QuoteResponse.from(quote, customerName);
+  }
+
+  private String resolveCustomerName(UUID tenantId, UUID customerId) {
+    if (tenantId == null || customerId == null) {
+      return null;
+    }
+    Map<UUID, String> customerNames =
+        tradingPartnerResolver.resolveDisplayNames(tenantId, List.of(customerId));
+    return customerNames != null ? customerNames.get(customerId) : null;
   }
 
   private void assertEditable(Quote quote, String action) {
