@@ -243,6 +243,7 @@ public class QuoteService {
 
     // 1. Mark old as SUPERSEDED
     oldQuote.setStatus(QuoteStatus.SUPERSEDED);
+    quoteApprovalService.expirePendingTokensForQuote(oldQuote.getTenantId(), oldQuote.getId());
     quoteRepository.save(oldQuote);
 
     // 2. Clone to new Quote

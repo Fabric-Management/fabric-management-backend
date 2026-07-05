@@ -3,6 +3,7 @@ package com.fabricmanagement.sales.quote.dto;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.Data;
@@ -18,6 +19,7 @@ public class AddQuoteLineRequest {
   private BigDecimal requestedQty;
 
   @NotBlank(message = "Unit is required")
+  @Size(max = 20, message = "Unit must be 20 characters or less")
   private String unit;
 
   @NotNull(message = "Offered price is required")

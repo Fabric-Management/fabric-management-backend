@@ -128,6 +128,28 @@ class QuoteApprovalServiceTest {
   }
 
   @Test
+  void rejectsInvalidEmailRecipientForEmailTokenAsValidationFailure() {
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+
+    assertThatThrownBy(
+            () ->
+                quoteApprovalService.generateTokenForQuote(
+                    quoteId, QuoteApprovalChannel.EMAIL, "not-an-email"))
+        .isInstanceOf(SalesDomainException.class)
+        .satisfies(
+            ex -> {
+              SalesDomainException salesEx = (SalesDomainException) ex;
+              assertThat(salesEx.getHttpStatus()).isEqualTo(422);
+              assertThat(salesEx.getErrorCode())
+                  .isEqualTo("SALES_009_INVALID_QUOTE_TOKEN_RECIPIENT");
+            });
+
+    verify(tokenRepository, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
   void resendInvalidatesPriorPendingTokenBeforeCreatingNewToken() {
     QuoteApprovalToken existingToken = new QuoteApprovalToken();
     existingToken.setTenantId(tenantId);
@@ -150,6 +172,22 @@ class QuoteApprovalServiceTest {
     assertEquals(QuoteApprovalStatus.PENDING, newToken.getStatus());
     verify(tokenRepository).save(existingToken);
     verify(eventPublisher).publishEvent(any(QuoteApprovalTokenGeneratedEvent.class));
+  }
+
+  @Test
+  void expirePendingTokensForQuoteExpiresAllTenantScopedPendingTokens() {
+    QuoteApprovalToken firstToken = pendingToken(tenantId, quoteId);
+    firstToken.setToken("first");
+    QuoteApprovalToken secondToken = pendingToken(tenantId, quoteId);
+    secondToken.setToken("second");
+    when(tokenRepository.findPendingByTenantIdAndQuoteId(tenantId, quoteId))
+        .thenReturn(List.of(firstToken, secondToken));
+
+    quoteApprovalService.expirePendingTokensForQuote(tenantId, quoteId);
+
+    assertThat(firstToken.getStatus()).isEqualTo(QuoteApprovalStatus.EXPIRED);
+    assertThat(secondToken.getStatus()).isEqualTo(QuoteApprovalStatus.EXPIRED);
+    verify(tokenRepository).saveAll(List.of(firstToken, secondToken));
   }
 
   @Test
@@ -242,6 +280,28 @@ class QuoteApprovalServiceTest {
   }
 
   @Test
+  void getPublicQuoteByTokenRejectsNoLongerApprovableQuoteAsGone() {
+    Quote supersededQuote = approvedQuote();
+    supersededQuote.setStatus(QuoteStatus.SUPERSEDED);
+    QuoteApprovalToken token = pendingToken(tenantId, quoteId);
+
+    givenPublicTokenTenant("stale", tenantId);
+    when(tokenRepository.findByTokenAndIsActiveTrue("stale")).thenReturn(Optional.of(token));
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(supersededQuote));
+
+    assertThatThrownBy(() -> quoteApprovalService.getPublicQuoteByToken("stale"))
+        .isInstanceOf(SalesDomainException.class)
+        .satisfies(
+            ex -> {
+              SalesDomainException salesEx = (SalesDomainException) ex;
+              assertThat(salesEx.getHttpStatus()).isEqualTo(410);
+              assertThat(salesEx.getErrorCode())
+                  .isEqualTo("SALES_008_APPROVAL_TOKEN_NO_LONGER_VALID");
+            });
+  }
+
+  @Test
   void processCustomerApprovalPersistsNoteUsesTokenTenantAndConvertsQuote() {
     UUID tokenTenantId = UUID.randomUUID();
     TenantContext.clear();
@@ -268,6 +328,62 @@ class QuoteApprovalServiceTest {
     verify(quoteRepository).findByTenantIdAndIdAndIsActiveTrue(tokenTenantId, quoteId);
     verify(tokenRepository).save(token);
     verify(quoteRepository).save(publicQuote);
+  }
+
+  @Test
+  void processCustomerApprovalRejectsSupersededQuoteAndLeavesTokenPending() {
+    Quote supersededQuote = approvedQuote();
+    supersededQuote.setStatus(QuoteStatus.SUPERSEDED);
+    QuoteApprovalToken token = pendingToken(tenantId, quoteId);
+
+    givenPublicTokenTenant("stale-token", tenantId);
+    when(tokenRepository.findByTokenAndIsActiveTrue("stale-token")).thenReturn(Optional.of(token));
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(supersededQuote));
+
+    assertThatThrownBy(
+            () ->
+                quoteApprovalService.processCustomerApproval(
+                    "stale-token", "127.0.0.1", "Mozilla", "ignored"))
+        .isInstanceOf(SalesDomainException.class)
+        .satisfies(
+            ex -> {
+              SalesDomainException salesEx = (SalesDomainException) ex;
+              assertThat(salesEx.getHttpStatus()).isEqualTo(410);
+              assertThat(salesEx.getErrorCode())
+                  .isEqualTo("SALES_008_APPROVAL_TOKEN_NO_LONGER_VALID");
+            });
+
+    assertThat(token.getStatus()).isEqualTo(QuoteApprovalStatus.PENDING);
+    assertThat(supersededQuote.getStatus()).isEqualTo(QuoteStatus.SUPERSEDED);
+    verify(tokenRepository, never()).save(token);
+    verify(quoteRepository, never()).save(any());
+  }
+
+  @Test
+  void processCustomerApprovalRejectsAlreadyConvertedQuoteAndLeavesTokenPending() {
+    Quote convertedQuote = approvedQuote();
+    convertedQuote.setStatus(QuoteStatus.CONVERTED);
+    QuoteApprovalToken token = pendingToken(tenantId, quoteId);
+
+    givenPublicTokenTenant("converted-token", tenantId);
+    when(tokenRepository.findByTokenAndIsActiveTrue("converted-token"))
+        .thenReturn(Optional.of(token));
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(convertedQuote));
+
+    assertThatThrownBy(
+            () ->
+                quoteApprovalService.processCustomerApproval(
+                    "converted-token", "127.0.0.1", "Mozilla", "ignored"))
+        .isInstanceOf(SalesDomainException.class)
+        .extracting("httpStatus")
+        .isEqualTo(410);
+
+    assertThat(token.getStatus()).isEqualTo(QuoteApprovalStatus.PENDING);
+    assertThat(convertedQuote.getStatus()).isEqualTo(QuoteStatus.CONVERTED);
+    verify(tokenRepository, never()).save(token);
+    verify(quoteRepository, never()).save(any());
   }
 
   @Test

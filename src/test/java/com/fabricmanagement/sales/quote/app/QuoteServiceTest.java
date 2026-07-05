@@ -328,6 +328,7 @@ class QuoteServiceTest {
     List<Quote> savedQuotes = quoteCaptor.getAllValues();
     Quote savedRevision = savedQuotes.get(1);
 
+    verify(quoteApprovalService).expirePendingTokensForQuote(tenantId, quoteId);
     assertEquals(revised, savedRevision);
     assertEquals("USD", savedRevision.getCurrency());
     assertEquals("USD", savedRevision.getLines().get(0).getCurrency());
