@@ -18,7 +18,6 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -52,8 +51,8 @@ public class QuoteController {
   @Operation(summary = "List all quotes (paginated)")
   public ResponseEntity<ApiResponse<PagedResponse<QuoteResponse>>> listQuotes(
       @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
-    Page<QuoteResponse> page = quoteService.findAll(pageable).map(QuoteResponse::from);
-    return ResponseEntity.ok(ApiResponse.success(PagedResponse.from(page)));
+    return ResponseEntity.ok(
+        ApiResponse.success(PagedResponse.from(quoteService.findAllResponses(pageable))));
   }
 
   @GetMapping("/{quoteId}")
@@ -62,11 +61,9 @@ public class QuoteController {
   public ResponseEntity<ApiResponse<QuoteResponse>> getQuote(@PathVariable UUID quoteId) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            QuoteResponse.from(
-                quoteService
-                    .findById(quoteId)
-                    .orElseThrow(
-                        () -> new EntityNotFoundException("Quote not found: " + quoteId)))));
+            quoteService
+                .findResponseById(quoteId)
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -79,7 +76,7 @@ public class QuoteController {
   public ResponseEntity<ApiResponse<QuoteResponse>> createQuote(
       @Valid @RequestBody QuoteCreateRequest req) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.success(QuoteResponse.from(quoteService.createQuote(req))));
+        .body(ApiResponse.success(quoteService.toResponse(quoteService.createQuote(req))));
   }
 
   @PostMapping("/{quoteId}/lines")
@@ -90,7 +87,7 @@ public class QuoteController {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
             ApiResponse.success(
-                QuoteResponse.from(
+                quoteService.toResponse(
                     quoteService.addQuoteLine(
                         quoteId,
                         req.getProductId(),
@@ -105,7 +102,7 @@ public class QuoteController {
   public ResponseEntity<ApiResponse<QuoteResponse>> updateQuote(
       @PathVariable UUID quoteId, @Valid @RequestBody UpdateQuoteRequest req) {
     return ResponseEntity.ok(
-        ApiResponse.success(QuoteResponse.from(quoteService.updateQuoteHeader(quoteId, req))));
+        ApiResponse.success(quoteService.toResponse(quoteService.updateQuoteHeader(quoteId, req))));
   }
 
   @PatchMapping("/{quoteId}/lines/{lineId}")
@@ -117,7 +114,7 @@ public class QuoteController {
       @Valid @RequestBody UpdateQuoteLineRequest req) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            QuoteResponse.from(quoteService.updateQuoteLine(quoteId, lineId, req))));
+            quoteService.toResponse(quoteService.updateQuoteLine(quoteId, lineId, req))));
   }
 
   @DeleteMapping("/{quoteId}/lines/{lineId}")
@@ -126,7 +123,8 @@ public class QuoteController {
   public ResponseEntity<ApiResponse<QuoteResponse>> removeLine(
       @PathVariable UUID quoteId, @PathVariable UUID lineId) {
     return ResponseEntity.ok(
-        ApiResponse.success(QuoteResponse.from(quoteService.removeQuoteLine(quoteId, lineId))));
+        ApiResponse.success(
+            quoteService.toResponse(quoteService.removeQuoteLine(quoteId, lineId))));
   }
 
   @PostMapping("/{quoteId}/submit")
@@ -134,7 +132,7 @@ public class QuoteController {
   @Operation(summary = "Submit a quote for approval")
   public ResponseEntity<ApiResponse<QuoteResponse>> submitQuote(@PathVariable UUID quoteId) {
     return ResponseEntity.ok(
-        ApiResponse.success(QuoteResponse.from(quoteService.submitQuote(quoteId))));
+        ApiResponse.success(quoteService.toResponse(quoteService.submitQuote(quoteId))));
   }
 
   @PostMapping("/{quoteId}/send")
@@ -153,7 +151,7 @@ public class QuoteController {
   @Operation(summary = "Create a new revision of a quote")
   public ResponseEntity<ApiResponse<QuoteResponse>> reviseQuote(@PathVariable UUID quoteId) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.success(QuoteResponse.from(quoteService.reviseQuote(quoteId))));
+        .body(ApiResponse.success(quoteService.toResponse(quoteService.reviseQuote(quoteId))));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

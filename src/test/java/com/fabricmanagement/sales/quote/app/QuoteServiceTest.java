@@ -2,6 +2,7 @@ package com.fabricmanagement.sales.quote.app;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,6 +17,7 @@ import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrency
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
+import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
@@ -29,6 +31,7 @@ import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
@@ -38,6 +41,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -49,6 +53,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class QuoteServiceTest {
@@ -60,11 +67,13 @@ class QuoteServiceTest {
   @Mock private ExchangeRateService exchangeRateService;
   @Mock private TenantReportingCurrencyPort tenantReportingCurrencyPort;
   @Mock private QuoteApprovalService quoteApprovalService;
+  @Mock private TradingPartnerResolver tradingPartnerResolver;
 
   @InjectMocks private QuoteService quoteService;
 
   private final UUID tenantId = UUID.randomUUID();
   private final UUID quoteId = UUID.randomUUID();
+  private final UUID customerId = UUID.randomUUID();
   private final UUID productId = UUID.randomUUID();
   private Quote quote;
 
@@ -96,6 +105,34 @@ class QuoteServiceTest {
 
     assertEquals("GBP", created.getCurrency());
     assertEquals(QuoteStatus.DRAFT, created.getStatus());
+  }
+
+  @Test
+  @DisplayName("Should populate customer name on quote list response")
+  void shouldPopulateCustomerNameOnQuoteListResponse() {
+    PageRequest pageable = PageRequest.of(0, 20);
+    when(quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable))
+        .thenReturn(new PageImpl<>(List.of(quote), pageable, 1));
+    when(tradingPartnerResolver.resolveDisplayNames(tenantId, List.of(customerId)))
+        .thenReturn(Map.of(customerId, "Acme Textiles"));
+
+    Page<QuoteResponse> page = quoteService.findAllResponses(pageable);
+
+    assertEquals("Acme Textiles", page.getContent().get(0).getCustomerName());
+  }
+
+  @Test
+  @DisplayName("Should keep customer name null when quote customer is missing")
+  void shouldKeepCustomerNameNullWhenCustomerMissing() {
+    PageRequest pageable = PageRequest.of(0, 20);
+    when(quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable))
+        .thenReturn(new PageImpl<>(List.of(quote), pageable, 1));
+    when(tradingPartnerResolver.resolveDisplayNames(tenantId, List.of(customerId)))
+        .thenReturn(Map.of());
+
+    Page<QuoteResponse> page = quoteService.findAllResponses(pageable);
+
+    assertNull(page.getContent().get(0).getCustomerName());
   }
 
   @Test
@@ -603,7 +640,7 @@ class QuoteServiceTest {
     q.setId(quoteId);
     q.setTenantId(tenantId);
     q.setQuoteNumber("Q-2026-001");
-    q.setCustomerId(UUID.randomUUID());
+    q.setCustomerId(customerId);
     q.setAssignedToId(UUID.randomUUID());
     q.setModuleType("FABRIC");
     q.setCurrency(currency);
