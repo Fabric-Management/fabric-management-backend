@@ -78,6 +78,7 @@ class TenantTransactionalPurgeServiceTest {
     assertThat(result.trialEndsAt()).isEqualTo(Instant.parse("2026-09-25T12:00:00Z"));
     assertThat(result.deletedRows())
         .containsKeys(
+            "sales.quote_send_request",
             "sales.quote",
             "procurement.purchase_order",
             "production.prod_product",
@@ -93,6 +94,9 @@ class TenantTransactionalPurgeServiceTest {
             "human.human_employee_number_sequence",
             "common_user.common_user(seed-demo-users)");
     verify(jdbc).update(contains("DELETE FROM sales.quote WHERE tenant_id = ?"), eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM sales.quote_send_request WHERE tenant_id = ?"), eq(TENANT_ID));
     verify(jdbc)
         .update(
             contains("DELETE FROM procurement.purchase_order WHERE tenant_id = ?"), eq(TENANT_ID));
@@ -163,6 +167,7 @@ class TenantTransactionalPurgeServiceTest {
     assertThat(result.tenantId()).isEqualTo(TENANT_ID);
     assertThat(result.deletedRows())
         .containsKeys(
+            "sales.quote_send_request",
             "sales.quote",
             "procurement.purchase_order",
             "production.prod_product",
@@ -170,6 +175,9 @@ class TenantTransactionalPurgeServiceTest {
             "sales_ord.sales_order_line_processed_shipments",
             "common_user.common_user(seed-demo-users)");
     verify(jdbc).update(contains("DELETE FROM sales.quote WHERE tenant_id = ?"), eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM sales.quote_send_request WHERE tenant_id = ?"), eq(TENANT_ID));
     verify(jdbc)
         .update(
             contains("DELETE FROM production.production_execution_batch_override_log log"),

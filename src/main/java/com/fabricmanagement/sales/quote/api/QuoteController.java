@@ -1,14 +1,19 @@
 package com.fabricmanagement.sales.quote.api;
 
+import com.fabricmanagement.common.infrastructure.security.SpELPermissionEvaluator;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.sales.quote.app.QuoteApprovalService;
 import com.fabricmanagement.sales.quote.app.QuoteService;
+import com.fabricmanagement.sales.quote.app.SendQuoteResult;
 import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.GenerateQuoteTokenRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteApprovalTokenDto;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
+import com.fabricmanagement.sales.quote.dto.QuoteSendRequestDto;
+import com.fabricmanagement.sales.quote.dto.RejectQuoteSendRequest;
 import com.fabricmanagement.sales.quote.dto.SendQuoteRequest;
+import com.fabricmanagement.sales.quote.dto.SendQuoteResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.mapper.QuoteMapper;
@@ -23,6 +28,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -41,6 +47,7 @@ public class QuoteController {
   private final QuoteService quoteService;
   private final QuoteApprovalService quoteApprovalService;
   private final QuoteMapper mapper;
+  private final SpELPermissionEvaluator auth;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // READ
@@ -137,12 +144,40 @@ public class QuoteController {
 
   @PostMapping("/{quoteId}/send")
   @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
-  @Operation(summary = "Send a quote approval email to the customer")
-  public ResponseEntity<ApiResponse<QuoteApprovalTokenDto>> sendQuote(
-      @PathVariable UUID quoteId, @Valid @RequestBody SendQuoteRequest req) {
+  @Operation(summary = "Send a quote to a customer or request internal send approval")
+  public ResponseEntity<ApiResponse<SendQuoteResponse>> sendQuote(
+      @PathVariable UUID quoteId,
+      @Valid @RequestBody SendQuoteRequest req,
+      Authentication authentication) {
+    boolean callerCanApprove = auth.can(authentication, "sales", "approve");
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            ApiResponse.success(mapper.toDto(quoteService.sendQuote(quoteId, req.getContactId()))));
+            ApiResponse.success(
+                toSendQuoteResponse(
+                    quoteService.sendQuote(quoteId, req.getContactId(), callerCanApprove))));
+  }
+
+  @PostMapping("/{quoteId}/send-requests/{requestId}/approve")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'approve')")
+  @Operation(summary = "Approve a quote send request and send the quote to the customer")
+  public ResponseEntity<ApiResponse<SendQuoteResponse>> approveSendRequest(
+      @PathVariable UUID quoteId, @PathVariable UUID requestId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            toSendQuoteResponse(quoteService.approveSendRequest(quoteId, requestId))));
+  }
+
+  @PostMapping("/{quoteId}/send-requests/{requestId}/reject")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'approve')")
+  @Operation(summary = "Reject a quote send request")
+  public ResponseEntity<ApiResponse<QuoteSendRequestDto>> rejectSendRequest(
+      @PathVariable UUID quoteId,
+      @PathVariable UUID requestId,
+      @Valid @RequestBody RejectQuoteSendRequest req) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            QuoteSendRequestDto.from(
+                quoteService.rejectSendRequest(quoteId, requestId, req.decisionNote()))));
   }
 
   @PostMapping("/{quoteId}/revise")
@@ -168,5 +203,16 @@ public class QuoteController {
                 mapper.toDto(
                     quoteApprovalService.generateTokenForQuote(
                         quoteId, req.getChannel(), req.getSentTo()))));
+  }
+
+  private SendQuoteResponse toSendQuoteResponse(SendQuoteResult result) {
+    QuoteApprovalTokenDto token =
+        result.approvalToken() != null ? mapper.toDto(result.approvalToken()) : null;
+    QuoteSendRequestDto request =
+        result.sendRequest() != null ? QuoteSendRequestDto.from(result.sendRequest()) : null;
+    if (result.awaitingApproval()) {
+      return SendQuoteResponse.awaitingApproval(request);
+    }
+    return request != null ? SendQuoteResponse.sent(token, request) : SendQuoteResponse.sent(token);
   }
 }

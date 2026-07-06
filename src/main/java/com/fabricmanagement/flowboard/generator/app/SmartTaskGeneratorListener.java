@@ -4,6 +4,7 @@ import com.fabricmanagement.common.domain.event.production.WorkOrderRecipeAssign
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.production.execution.goodsreceipt.domain.event.GoodsReceiptConfirmedEvent;
 import com.fabricmanagement.production.execution.workorder.domain.event.WorkOrderApprovedEvent;
+import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
 import com.fabricmanagement.sales.salesorder.domain.event.SalesOrderConfirmedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +66,17 @@ public class SmartTaskGeneratorListener {
         event.getEventId(),
         this.getClass(),
         "onRecipeAssignmentNeeded",
+        () -> {
+          eventRouterService.route(event);
+        });
+  }
+
+  @ApplicationModuleListener
+  public void onQuoteSendRequested(QuoteSendRequestedEvent event) {
+    idempotentHandler.executeOnce(
+        event.getEventId(),
+        this.getClass(),
+        "onQuoteSendRequested",
         () -> {
           eventRouterService.route(event);
         });
