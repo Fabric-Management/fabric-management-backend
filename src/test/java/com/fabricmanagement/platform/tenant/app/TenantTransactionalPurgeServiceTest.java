@@ -280,6 +280,10 @@ class TenantTransactionalPurgeServiceTest {
                 "DELETE FROM common_company.common_organization\n"
                     + "WHERE tenant_id = ? AND organization_type = 'EXTERNAL_PARTNER'"),
             eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM common_company.partner_contact WHERE tenant_id = ?"),
+            eq(TENANT_ID));
 
     ArgumentCaptor<String> twoTenantSqlCaptor = ArgumentCaptor.forClass(String.class);
     verify(jdbc, org.mockito.Mockito.atLeastOnce())
