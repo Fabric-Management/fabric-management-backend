@@ -47,6 +47,8 @@ public class TradingPartnerDto {
 
   // Partner Organization
   private UUID organizationId;
+  private String preferredCurrency;
+  private boolean pendingAccountingReview;
 
   // Audit
   private Instant createdAt;
@@ -80,6 +82,7 @@ public class TradingPartnerDto {
         .linkedTenantId(tp.getLinkedTenantId())
         .verifiedStatus(registry != null ? registry.getVerifiedStatus().name() : null)
         .organizationId(tp.getOrganizationId())
+        .pendingAccountingReview(tp.isPendingAccountingReview())
         .createdAt(tp.getCreatedAt())
         .isActive(tp.getIsActive())
         .legacyCompanyId(tp.getLegacyCompanyId())

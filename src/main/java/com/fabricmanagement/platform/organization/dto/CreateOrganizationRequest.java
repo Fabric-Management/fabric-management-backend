@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.organization.dto;
 import com.fabricmanagement.platform.organization.domain.OrganizationType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -31,4 +32,7 @@ public class CreateOrganizationRequest {
 
   /** Parent organization for hierarchy (optional) */
   private UUID parentOrganizationId;
+
+  @Pattern(regexp = "^[A-Za-z]{3}$", message = "Preferred currency must be a 3-letter ISO code")
+  private String preferredCurrency;
 }

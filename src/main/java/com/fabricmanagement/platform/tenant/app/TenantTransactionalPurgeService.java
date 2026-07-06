@@ -135,6 +135,7 @@ public class TenantTransactionalPurgeService {
           "sales.quote",
           "sales.sales_product",
           "sales.discount_policy",
+          "common_company.partner_contact",
           "human.human_pay_run_audit_log",
           "human.human_pay_run_payout",
           "human.human_pay_run_entry",

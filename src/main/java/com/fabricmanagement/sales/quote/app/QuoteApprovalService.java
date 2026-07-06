@@ -17,7 +17,9 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class QuoteApprovalService {
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final Pattern BASIC_EMAIL_PATTERN =
+      Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
   private final QuoteApprovalTokenRepository tokenRepository;
   private final QuoteRepository quoteRepository;
@@ -40,7 +44,14 @@ public class QuoteApprovalService {
   @Transactional
   public QuoteApprovalToken generateTokenForQuote(
       UUID quoteId, QuoteApprovalChannel channel, String sentTo) {
+    return generateTokenForQuote(quoteId, channel, sentTo, null);
+  }
+
+  @Transactional
+  public QuoteApprovalToken generateTokenForQuote(
+      UUID quoteId, QuoteApprovalChannel channel, String sentTo, UUID contactId) {
     Quote quote = getActiveQuote(quoteId);
+    validateSentTo(channel, sentTo);
 
     // Only APPROVED quotes (internally approved) can be sent to the customer
     if (quote.getStatus() != QuoteStatus.APPROVED) {
@@ -68,6 +79,7 @@ public class QuoteApprovalService {
     token.setToken(secureToken);
     token.setChannel(channel);
     token.setSentTo(sentTo);
+    token.setContactId(contactId);
     token.setExpiresAt(Instant.now().plus(7, ChronoUnit.DAYS));
     token.setStatus(QuoteApprovalStatus.PENDING);
 
@@ -88,6 +100,17 @@ public class QuoteApprovalService {
     return savedToken;
   }
 
+  @Transactional
+  public void expirePendingTokensForQuote(UUID tenantId, UUID quoteId) {
+    List<QuoteApprovalToken> pendingTokens =
+        tokenRepository.findPendingByTenantIdAndQuoteId(tenantId, quoteId);
+    if (pendingTokens.isEmpty()) {
+      return;
+    }
+    pendingTokens.forEach(token -> token.setStatus(QuoteApprovalStatus.EXPIRED));
+    tokenRepository.saveAll(pendingTokens);
+  }
+
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public PublicQuoteResponse getPublicQuoteByToken(String tokenStr) {
     UUID tenantId = resolvePublicTokenTenant(tokenStr);
@@ -98,6 +121,7 @@ public class QuoteApprovalService {
                 status -> {
                   QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
                   Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
+                  requireApprovableQuote(quote);
                   return PublicQuoteResponse.from(quote);
                 }));
   }
@@ -112,6 +136,8 @@ public class QuoteApprovalService {
             transactionTemplate.execute(
                 status -> {
                   QuoteApprovalToken token = requireUsablePublicToken(tokenStr);
+                  Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
+                  requireApprovableQuote(quote);
 
                   // Mark token as USED with full audit trail
                   token.setStatus(QuoteApprovalStatus.USED);
@@ -123,7 +149,6 @@ public class QuoteApprovalService {
 
                   // Transition quote to CONVERTED — accepted by customer, ready to become a Sales
                   // Order
-                  Quote quote = getActiveQuote(token.getTenantId(), token.getQuoteId());
                   quote.setStatus(QuoteStatus.CONVERTED);
                   return quoteRepository.save(quote);
                 }));
@@ -163,6 +188,22 @@ public class QuoteApprovalService {
     }
 
     return token;
+  }
+
+  private void requireApprovableQuote(Quote quote) {
+    if (quote.getStatus() != QuoteStatus.APPROVED) {
+      throw SalesDomainException.approvalTokenNoLongerValid("This quote is no longer valid");
+    }
+  }
+
+  private void validateSentTo(QuoteApprovalChannel channel, String sentTo) {
+    if (channel != QuoteApprovalChannel.EMAIL) {
+      return;
+    }
+    if (sentTo == null || sentTo.isBlank() || !BASIC_EMAIL_PATTERN.matcher(sentTo).matches()) {
+      throw SalesDomainException.invalidQuoteTokenRecipient(
+          "sentTo must be a valid email address when channel is EMAIL");
+    }
   }
 
   private String normalizeCustomerNote(String customerNote) {

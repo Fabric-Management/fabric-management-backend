@@ -6,7 +6,9 @@ import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrency
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
+import com.fabricmanagement.platform.tradingpartner.app.PartnerContactService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.platform.tradingpartner.domain.PartnerContact;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
@@ -52,6 +54,7 @@ public class QuoteService {
   private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
   private final QuoteApprovalService quoteApprovalService;
   private final TradingPartnerResolver tradingPartnerResolver;
+  private final PartnerContactService partnerContactService;
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
@@ -140,8 +143,10 @@ public class QuoteService {
   @Transactional
   public Quote updateQuoteHeader(UUID quoteId, UpdateQuoteRequest req) {
     Quote quote = getActiveQuote(quoteId);
+    assertDraftIdentityEditable(quote, req);
     assertEditable(quote, "edit");
 
+    quote.updateDraftIdentity(req.getCustomerId(), req.getCurrency());
     quote.updateHeader(
         req.getValidUntil(), req.getPaymentTerms(), req.getLeadTimeDays(), req.getNotes());
     recomputeTotals(quote);
@@ -206,7 +211,7 @@ public class QuoteService {
   }
 
   @Transactional
-  public QuoteApprovalToken sendQuote(UUID quoteId, String customerEmail) {
+  public QuoteApprovalToken sendQuote(UUID quoteId, UUID contactId) {
     Quote quote = getActiveQuote(quoteId);
 
     if (quote.getStatus() == QuoteStatus.DRAFT || quote.getStatus() == QuoteStatus.EVALUATION) {
@@ -215,8 +220,9 @@ public class QuoteService {
     }
 
     if (quote.getStatus() == QuoteStatus.APPROVED) {
+      PartnerContact contact = requireQuoteCustomerContact(quote, contactId);
       return quoteApprovalService.generateTokenForQuote(
-          quoteId, QuoteApprovalChannel.EMAIL, customerEmail);
+          quoteId, QuoteApprovalChannel.EMAIL, contact.getEmail(), contact.getId());
     }
 
     if (quote.getStatus() == QuoteStatus.PENDING_APPROVAL) {
@@ -243,6 +249,7 @@ public class QuoteService {
 
     // 1. Mark old as SUPERSEDED
     oldQuote.setStatus(QuoteStatus.SUPERSEDED);
+    quoteApprovalService.expirePendingTokensForQuote(oldQuote.getTenantId(), oldQuote.getId());
     quoteRepository.save(oldQuote);
 
     // 2. Clone to new Quote
@@ -306,6 +313,20 @@ public class QuoteService {
     return QuoteResponse.from(quote, customerName);
   }
 
+  private PartnerContact requireQuoteCustomerContact(Quote quote, UUID contactId) {
+    PartnerContact contact =
+        partnerContactService.requireActiveContact(quote.getTenantId(), contactId);
+    if (!quote.getCustomerId().equals(contact.getPartner().getId())) {
+      throw SalesDomainException.invalidQuoteRecipientContact(
+          "Quote recipient contact must belong to the quote customer");
+    }
+    if (contact.getEmail() == null || contact.getEmail().isBlank()) {
+      throw SalesDomainException.invalidQuoteRecipientContact(
+          "Quote recipient contact must have an email address");
+    }
+    return contact;
+  }
+
   private String resolveCustomerName(UUID tenantId, UUID customerId) {
     if (tenantId == null || customerId == null) {
       return null;
@@ -319,6 +340,20 @@ public class QuoteService {
     if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.EVALUATION) {
       throw SalesDomainException.invalidQuoteStatus(
           "Cannot " + action + " a quote in " + quote.getStatus() + " status");
+    }
+  }
+
+  private void assertDraftIdentityEditable(Quote quote, UpdateQuoteRequest req) {
+    if (req.getCustomerId() == null && req.getCurrency() == null) {
+      return;
+    }
+    if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.EVALUATION) {
+      throw SalesDomainException.quoteDraftIdentityLocked(
+          "Quote customer and currency can only be changed on draft or evaluation quotes.");
+    }
+    if (!quote.getLines().isEmpty()) {
+      throw SalesDomainException.quoteDraftIdentityLocked(
+          "Quote customer and currency are locked after the first line is added.");
     }
   }
 
@@ -391,6 +426,10 @@ public class QuoteService {
     if (fromCurrency.equalsIgnoreCase(toCurrency)) {
       return ConvertedMoney.of(
           amount, fromCurrency, amount, toCurrency, BigDecimal.ONE, documentDate);
+    }
+    if (amount.compareTo(BigDecimal.ZERO) == 0) {
+      return ConvertedMoney.of(
+          BigDecimal.ZERO, fromCurrency, BigDecimal.ZERO, toCurrency, BigDecimal.ONE, documentDate);
     }
 
     try {

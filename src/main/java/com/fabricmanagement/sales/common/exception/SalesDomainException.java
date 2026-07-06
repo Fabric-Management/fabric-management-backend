@@ -33,6 +33,11 @@ public class SalesDomainException extends DomainException {
         message, "SALES_003_INVALID_QUOTE_STATUS", HttpStatus.BAD_REQUEST);
   }
 
+  public static SalesDomainException quoteDraftIdentityLocked(String message) {
+    return new SalesDomainException(
+        message, "SALES_011_QUOTE_DRAFT_IDENTITY_LOCKED", HttpStatus.CONFLICT);
+  }
+
   public static SalesDomainException tokenExpiredOrUsed(String message) {
     return new SalesDomainException(message, "SALES_004_TOKEN_INVALID", HttpStatus.BAD_REQUEST);
   }
@@ -45,6 +50,16 @@ public class SalesDomainException extends DomainException {
   public static SalesDomainException approvalTokenNoLongerValid(String message) {
     return new SalesDomainException(
         message, "SALES_008_APPROVAL_TOKEN_NO_LONGER_VALID", HttpStatus.GONE);
+  }
+
+  public static SalesDomainException invalidQuoteTokenRecipient(String message) {
+    return new SalesDomainException(
+        message, "SALES_009_INVALID_QUOTE_TOKEN_RECIPIENT", HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+
+  public static SalesDomainException invalidQuoteRecipientContact(String message) {
+    return new SalesDomainException(
+        message, "SALES_010_INVALID_QUOTE_RECIPIENT_CONTACT", HttpStatus.BAD_REQUEST);
   }
 
   public static SalesDomainException exchangeRateRequired(String message, Throwable cause) {

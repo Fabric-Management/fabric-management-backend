@@ -34,6 +34,9 @@ public class QuoteApprovalToken extends BaseEntity {
   @Column(name = "sent_to", length = 255)
   private String sentTo;
 
+  @Column(name = "contact_id")
+  private UUID contactId;
+
   @Column(name = "expires_at", nullable = false)
   private Instant expiresAt;
 

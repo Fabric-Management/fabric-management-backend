@@ -90,6 +90,8 @@ tags:
   name: User Contact
 - description: User Promotion operations
   name: User Promotion
+- description: Lightweight contacts for trading partners
+  name: Partner Contacts
 - description: Tenant Seed operations
   name: Tenant Seed
 - description: "Self-service tenant registration. No authentication required. Creates\
@@ -4591,7 +4593,7 @@ paths:
       - Company Type
   /api/v1/common/contacts:
     post:
-      operationId: createContact
+      operationId: createContact_1
       requestBody:
         content:
           application/json:
@@ -5964,6 +5966,11 @@ paths:
           type: string
       - in: query
         name: legalName
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: preferredCurrency
         required: false
         schema:
           type: string
@@ -10335,6 +10342,76 @@ paths:
       summary: List customers
       tags:
       - Trading Partners
+  /api/v1/common/trading-partners/customers/quick:
+    post:
+      operationId: quickCreateCustomer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuickCreateCustomerRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseTradingPartnerDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Quick-create a customer for sales
+      tags:
+      - Trading Partners
   /api/v1/common/trading-partners/fason:
     get:
       description: Lists subcontractor (fason) partners
@@ -11455,6 +11532,167 @@ paths:
       summary: Update certification
       tags:
       - Partner Certifications
+  /api/v1/common/trading-partners/{partnerId}/contacts:
+    get:
+      operationId: listContacts
+      parameters:
+      - description: Partner ID
+        in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: Optional contact role filter
+        in: query
+        name: role
+        required: false
+        schema:
+          type: string
+          enum:
+          - BUYER
+          - FINANCE
+          - LOGISTICS
+          - QUALITY
+          - OTHER
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListPartnerContactDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List trading partner contacts
+      tags:
+      - Partner Contacts
+    post:
+      operationId: createContact
+      parameters:
+      - description: Partner ID
+        in: path
+        name: partnerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePartnerContactRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponsePartnerContactDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Create a trading partner contact
+      tags:
+      - Partner Contacts
   /api/v1/common/trading-partners/{partnerId}/users:
     get:
       description: Returns all portal users for a trading partner
@@ -41593,7 +41831,8 @@ components:
           minimum: 0.001
         unit:
           type: string
-          minLength: 1
+          maxLength: 20
+          minLength: 0
       required:
       - offeredPrice
       - productId
@@ -43325,6 +43564,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListPartnerContactDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartnerContactDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListPartnerUserDto:
       type: object
       properties:
@@ -44707,6 +44966,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseWorkOrderResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePartnerContactDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PartnerContactDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -48102,6 +48379,9 @@ components:
         parentOrganizationId:
           type: string
           format: uuid
+        preferredCurrency:
+          type: string
+          pattern: "^[A-Za-z]{3}$"
         taxId:
           type: string
           maxLength: 50
@@ -48110,6 +48390,37 @@ components:
       - name
       - organizationType
       - taxId
+    CreatePartnerContactRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          minLength: 0
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+        phone:
+          type: string
+          maxLength: 30
+          minLength: 0
+        primary:
+          type: boolean
+        role:
+          type: string
+          enum:
+          - BUYER
+          - FINANCE
+          - LOGISTICS
+          - QUALITY
+          - OTHER
+        whatsappEnabled:
+          type: boolean
+      required:
+      - name
+      - role
     CreatePaymentRequest:
       type: object
       properties:
@@ -49196,11 +49507,15 @@ components:
           minLength: 0
         ipAddress:
           type: string
+          maxLength: 45
+          minLength: 0
         token:
           type: string
           minLength: 1
         userAgent:
           type: string
+          maxLength: 512
+          minLength: 0
       required:
       - token
     CustomerMarginDto:
@@ -50410,6 +50725,8 @@ components:
           - IN_PERSON
         sentTo:
           type: string
+          maxLength: 254
+          minLength: 0
       required:
       - channel
     GenericProductionSpecs:
@@ -51560,6 +51877,8 @@ components:
         parentOrganizationId:
           type: string
           format: uuid
+        preferredCurrency:
+          type: string
         taxId:
           type: string
         tenantId:
@@ -52255,6 +52574,38 @@ components:
       required:
       - acceptedQuantity
       - reason
+    PartnerContactDto:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        id:
+          type: string
+          format: uuid
+        isActive:
+          type: boolean
+        name:
+          type: string
+        partnerId:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        primary:
+          type: boolean
+        role:
+          type: string
+          enum:
+          - BUYER
+          - FINANCE
+          - LOGISTICS
+          - QUALITY
+          - OTHER
+        whatsappEnabled:
+          type: boolean
     PartnerUserDto:
       type: object
       properties:
@@ -53440,6 +53791,62 @@ components:
           type: boolean
         saleable:
           type: boolean
+    QuickCreateCustomerContactRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          minLength: 0
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+        phone:
+          type: string
+          maxLength: 30
+          minLength: 0
+        role:
+          type: string
+          enum:
+          - BUYER
+          - FINANCE
+          - LOGISTICS
+          - QUALITY
+          - OTHER
+        whatsappEnabled:
+          type: boolean
+      required:
+      - email
+      - name
+    QuickCreateCustomerRequest:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 500
+          minLength: 0
+        companyName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuickCreateCustomerContactRequest"
+          minItems: 1
+        phone:
+          type: string
+          maxLength: 30
+          minLength: 0
+        taxNumber:
+          type: string
+          maxLength: 50
+          minLength: 0
+      required:
+      - companyName
+      - contacts
     QuoteApprovalTokenDto:
       type: object
       properties:
@@ -53451,6 +53858,9 @@ components:
           - EMAIL
           - WHATSAPP
           - IN_PERSON
+        contactId:
+          type: string
+          format: uuid
         expiresAt:
           type: string
           format: date-time
@@ -53502,11 +53912,15 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          maximum: 3650
+          minimum: 0
         moduleType:
           type: string
           minLength: 1
         notes:
           type: string
+          maxLength: 2000
+          minLength: 0
         offlineCreatedAt:
           type: string
           format: date-time
@@ -53515,6 +53929,8 @@ components:
           format: uuid
         paymentTerms:
           type: string
+          maxLength: 50
+          minLength: 0
         quoteNumber:
           type: string
           minLength: 1
@@ -54626,12 +55042,11 @@ components:
     SendQuoteRequest:
       type: object
       properties:
-        customerEmail:
+        contactId:
           type: string
-          format: email
-          minLength: 1
+          format: uuid
       required:
-      - customerEmail
+      - contactId
     ShipmentDto:
       type: object
       properties:
@@ -56003,6 +56418,10 @@ components:
           - SISTER_COMPANY
           - SUBSIDIARY
           - PARENT_COMPANY
+        pendingAccountingReview:
+          type: boolean
+        preferredCurrency:
+          type: string
         registryId:
           type: string
           format: uuid
@@ -56436,7 +56855,8 @@ components:
           minimum: 0.001
         unit:
           type: string
-          minLength: 1
+          maxLength: 20
+          minLength: 0
       required:
       - offeredPrice
       - requestedQty
@@ -56444,13 +56864,25 @@ components:
     UpdateQuoteRequest:
       type: object
       properties:
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        customerId:
+          type: string
+          format: uuid
         leadTimeDays:
           type: integer
           format: int32
+          maximum: 3650
+          minimum: 0
         notes:
           type: string
+          maxLength: 2000
+          minLength: 0
         paymentTerms:
           type: string
+          maxLength: 50
+          minLength: 0
         validUntil:
           type: string
           format: date

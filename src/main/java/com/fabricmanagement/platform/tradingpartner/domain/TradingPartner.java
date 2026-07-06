@@ -148,6 +148,10 @@ public class TradingPartner extends BaseEntity {
   @Column(name = "legacy_company_id")
   private UUID legacyCompanyId;
 
+  @Column(name = "pending_accounting_review", nullable = false)
+  @Builder.Default
+  private boolean pendingAccountingReview = false;
+
   @Embedded private OfflineMetadata offlineMetadata;
 
   @Override

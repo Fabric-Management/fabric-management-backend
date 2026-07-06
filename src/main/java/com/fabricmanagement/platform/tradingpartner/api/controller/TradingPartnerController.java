@@ -5,6 +5,7 @@ import com.fabricmanagement.common.infrastructure.web.ApiResponse;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
+import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.tradingpartner.dto.UpdateTradingPartnerRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -80,6 +81,16 @@ public class TradingPartnerController {
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success(created, "Trading partner created successfully"));
+  }
+
+  @PostMapping("/customers/quick")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
+  @Operation(summary = "Quick-create a customer for sales")
+  public ResponseEntity<ApiResponse<TradingPartnerDto>> quickCreateCustomer(
+      @Valid @RequestBody QuickCreateCustomerRequest request) {
+    TradingPartnerDto created = tradingPartnerService.quickCreateCustomer(request);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(created, "Customer created successfully"));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

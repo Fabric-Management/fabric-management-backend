@@ -142,6 +142,15 @@ public class Quote extends BaseEntity {
     }
   }
 
+  public void updateDraftIdentity(UUID customerId, String currency) {
+    if (customerId != null) {
+      this.customerId = customerId;
+    }
+    if (currency != null) {
+      this.currency = currency;
+    }
+  }
+
   public boolean removeLine(UUID lineId) {
     return this.lines.removeIf(line -> Objects.equals(line.getId(), lineId));
   }

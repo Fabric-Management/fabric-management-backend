@@ -11,7 +11,10 @@ import com.fabricmanagement.platform.organization.dto.CreateOrganizationRequest;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.OrganizationRepository;
 import com.fabricmanagement.platform.user.dto.CompleteOnboardingRequest;
+import java.util.Currency;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +74,7 @@ public class OrganizationService {
     Organization organization =
         Organization.create(request.getName(), request.getTaxId(), request.getOrganizationType());
     organization.setParent(request.getParentOrganizationId());
+    organization.setPreferredCurrency(normalizePreferredCurrency(request.getPreferredCurrency()));
 
     Organization saved = organizationRepository.save(organization);
 
@@ -282,6 +286,22 @@ public class OrganizationService {
    */
   @Transactional
   public OrganizationDto updateOrganization(UUID id, String name, String taxId, String legalName) {
+    return updateOrganization(id, name, taxId, legalName, null);
+  }
+
+  /**
+   * Update organization basic info.
+   *
+   * @param id Organization UUID
+   * @param name New name
+   * @param taxId New tax ID
+   * @param legalName Legal registered name (optional)
+   * @param preferredCurrency Preferred organization currency (blank clears, null leaves unchanged)
+   * @return Updated organization
+   */
+  @Transactional
+  public OrganizationDto updateOrganization(
+      UUID id, String name, String taxId, String legalName, String preferredCurrency) {
     UUID tenantId = TenantContext.requireTenantId();
     Organization organization =
         organizationRepository
@@ -292,7 +312,8 @@ public class OrganizationService {
                         "Organization not found", "ORG_NOT_FOUND", 404, new Object[] {id}));
 
     // Validate tax ID uniqueness if changed
-    if (!organization.getTaxId().equals(taxId)
+    if (taxId != null
+        && !Objects.equals(organization.getTaxId(), taxId)
         && organizationRepository.existsByTenantIdAndTaxId(tenantId, taxId)) {
       throw new TaxIdAlreadyExistsException("Organization with this tax ID already exists");
     }
@@ -301,6 +322,9 @@ public class OrganizationService {
     organization.update(name, effectiveTaxId);
     if (legalName != null) {
       organization.setLegalName(legalName.trim().isEmpty() ? null : legalName.trim());
+    }
+    if (preferredCurrency != null) {
+      organization.setPreferredCurrency(normalizePreferredCurrency(preferredCurrency));
     }
     Organization saved = organizationRepository.save(organization);
 
@@ -428,5 +452,24 @@ public class OrganizationService {
    */
   public boolean existsByTaxId(String taxId) {
     return organizationRepository.existsByTaxId(taxId);
+  }
+
+  private String normalizePreferredCurrency(String preferredCurrency) {
+    if (preferredCurrency == null) {
+      return null;
+    }
+    if (preferredCurrency.isBlank()) {
+      return null;
+    }
+    String normalized = preferredCurrency.trim().toUpperCase(Locale.ROOT);
+    try {
+      Currency.getInstance(normalized);
+      return normalized;
+    } catch (IllegalArgumentException ex) {
+      throw new PlatformDomainException(
+          "Preferred currency must be a known ISO-4217 currency code",
+          "ORG_INVALID_PREFERRED_CURRENCY",
+          422);
+    }
   }
 }

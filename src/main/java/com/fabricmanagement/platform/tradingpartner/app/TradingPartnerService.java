@@ -4,16 +4,21 @@ import com.fabricmanagement.common.infrastructure.events.DomainEventPublisher;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.organization.dto.OrganizationDto;
+import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
 import com.fabricmanagement.platform.tradingpartner.domain.event.TradingPartnerCreatedEvent;
 import com.fabricmanagement.platform.tradingpartner.domain.event.TradingPartnerStatusChangedEvent;
 import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequest;
+import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerContactRequest;
+import com.fabricmanagement.platform.tradingpartner.dto.QuickCreateCustomerRequest;
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.tradingpartner.dto.UpdateTradingPartnerRequest;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +58,7 @@ public class TradingPartnerService {
   private final TradingPartnerRegistryService registryService;
   private final OrganizationFacade organizationFacade;
   private final DomainEventPublisher eventPublisher;
+  private final PartnerContactService partnerContactService;
 
   private static final String DEFAULT_COUNTRY = "TUR";
 
@@ -136,6 +142,55 @@ public class TradingPartnerService {
         partnerOrg.getId());
 
     return TradingPartnerDto.from(saved);
+  }
+
+  @Transactional
+  public TradingPartnerDto quickCreateCustomer(QuickCreateCustomerRequest request) {
+    UUID tenantId = TenantContext.requireTenantId();
+    TradingPartnerRegistry registry =
+        registryService.findOrCreate(
+            request.getTaxNumber(), request.getCompanyName(), DEFAULT_COUNTRY);
+
+    Optional<TradingPartner> existing =
+        partnerRepository.findByTenantIdAndRegistryId(tenantId, registry.getId());
+    TradingPartner partner;
+    boolean created = false;
+
+    if (existing.isPresent()) {
+      partner = existing.get();
+      partner.upgradeToMultiType(PartnerType.CUSTOMER);
+    } else {
+      partner = TradingPartner.create(registry, PartnerType.CUSTOMER, request.getCompanyName());
+      created = true;
+    }
+
+    partner.setPendingAccountingReview(true);
+    partner.setRelationshipMeta(
+        quickCustomerRelationshipMeta(request, partner.getRelationshipMeta()));
+    TradingPartner saved = partnerRepository.save(partner);
+
+    if (saved.getOrganizationId() == null) {
+      OrganizationDto partnerOrg =
+          organizationFacade.createPartnerOrganization(
+              saved.getDisplayName(), registry.getTaxId(), saved.getUid());
+      saved.setOrganizationId(partnerOrg.getId());
+      saved = partnerRepository.save(saved);
+    }
+
+    createQuickCustomerContacts(tenantId, saved, request.getContacts());
+
+    if (created) {
+      eventPublisher.publish(
+          new TradingPartnerCreatedEvent(
+              tenantId,
+              saved.getId(),
+              registry.getId(),
+              saved.getPartnerType().name(),
+              saved.getDisplayName(),
+              null));
+    }
+
+    return toCustomerDto(tenantId, saved);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -243,7 +298,9 @@ public class TradingPartnerService {
    */
   @Transactional(readOnly = true)
   public List<TradingPartnerDto> findCustomers(UUID tenantId) {
-    return partnerRepository.findCustomers(tenantId).stream().map(TradingPartnerDto::from).toList();
+    return partnerRepository.findCustomers(tenantId).stream()
+        .map(partner -> toCustomerDto(tenantId, partner))
+        .toList();
   }
 
   /**
@@ -257,6 +314,58 @@ public class TradingPartnerService {
     return partnerRepository.findFasonPartners(tenantId).stream()
         .map(TradingPartnerDto::from)
         .toList();
+  }
+
+  private TradingPartnerDto toCustomerDto(UUID tenantId, TradingPartner partner) {
+    TradingPartnerDto dto = TradingPartnerDto.from(partner);
+    if (partner.getOrganizationId() == null) {
+      return dto;
+    }
+    organizationFacade
+        .findById(tenantId, partner.getOrganizationId())
+        .map(OrganizationDto::getPreferredCurrency)
+        .ifPresent(dto::setPreferredCurrency);
+    return dto;
+  }
+
+  private Map<String, Object> quickCustomerRelationshipMeta(
+      QuickCreateCustomerRequest request, Map<String, Object> existingMeta) {
+    Map<String, Object> meta = new HashMap<>();
+    if (existingMeta != null) {
+      meta.putAll(existingMeta);
+    }
+    putIfPresent(meta, "quick_create_address", request.getAddress());
+    putIfPresent(meta, "quick_create_phone", request.getPhone());
+    meta.put("quick_created", true);
+    return meta;
+  }
+
+  private void createQuickCustomerContacts(
+      UUID tenantId, TradingPartner partner, List<QuickCreateCustomerContactRequest> requests) {
+    boolean buyerPrimaryAssigned = false;
+    for (QuickCreateCustomerContactRequest request : requests) {
+      PartnerContactRole role =
+          request.getRole() == null ? PartnerContactRole.BUYER : request.getRole();
+      boolean primary = role == PartnerContactRole.BUYER && !buyerPrimaryAssigned;
+      partnerContactService.createContact(
+          tenantId,
+          partner,
+          request.getName(),
+          request.getEmail(),
+          request.getPhone(),
+          role,
+          Boolean.TRUE.equals(request.getWhatsappEnabled()),
+          primary);
+      if (primary) {
+        buyerPrimaryAssigned = true;
+      }
+    }
+  }
+
+  private void putIfPresent(Map<String, Object> meta, String key, String value) {
+    if (value != null && !value.isBlank()) {
+      meta.put(key, value.strip());
+    }
   }
 
   /**

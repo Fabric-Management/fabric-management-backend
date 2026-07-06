@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.quote.infra.repository;
 
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,4 +23,15 @@ public interface QuoteApprovalTokenRepository extends JpaRepository<QuoteApprova
         AND t.isActive = true
       """)
   Optional<QuoteApprovalToken> findPendingByQuoteId(@Param("quoteId") UUID quoteId);
+
+  @Query(
+      """
+      SELECT t FROM QuoteApprovalToken t
+      WHERE t.tenantId = :tenantId
+        AND t.quoteId = :quoteId
+        AND t.status = 'PENDING'
+        AND t.isActive = true
+      """)
+  List<QuoteApprovalToken> findPendingByTenantIdAndQuoteId(
+      @Param("tenantId") UUID tenantId, @Param("quoteId") UUID quoteId);
 }
