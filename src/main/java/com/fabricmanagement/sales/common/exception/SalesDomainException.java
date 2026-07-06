@@ -71,4 +71,21 @@ public class SalesDomainException extends DomainException {
     return new SalesDomainException(
         message, "SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", HttpStatus.CONFLICT);
   }
+
+  public static SalesDomainException quoteSendRequestAlreadyPending(String message) {
+    return new SalesDomainException(
+        message, "SALES_012_QUOTE_SEND_REQUEST_ALREADY_PENDING", HttpStatus.CONFLICT);
+  }
+
+  public static SalesDomainException quoteSendRequestNotFound(String requestId) {
+    return new SalesDomainException(
+        "Quote send request not found: " + requestId,
+        "SALES_013_QUOTE_SEND_REQUEST_NOT_FOUND",
+        HttpStatus.NOT_FOUND);
+  }
+
+  public static SalesDomainException invalidQuoteSendRequestDecision(String message) {
+    return new SalesDomainException(
+        message, "SALES_014_INVALID_QUOTE_SEND_REQUEST_DECISION", HttpStatus.BAD_REQUEST);
+  }
 }

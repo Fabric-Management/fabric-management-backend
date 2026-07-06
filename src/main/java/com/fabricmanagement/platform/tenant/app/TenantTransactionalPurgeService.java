@@ -130,6 +130,7 @@ public class TenantTransactionalPurgeService {
           "sales_ord.sales_order",
           "sales.sample_delivery",
           "sales.sample_request",
+          "sales.quote_send_request",
           "sales.quote_approval_token",
           "sales.quote_line",
           "sales.quote",

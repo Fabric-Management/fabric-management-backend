@@ -36,11 +36,16 @@ import com.fabricmanagement.sales.quote.domain.QuoteApprovalStatus;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
+import com.fabricmanagement.sales.quote.domain.QuoteSendRequest;
+import com.fabricmanagement.sales.quote.domain.QuoteSendRequestStatus;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestRejectedEvent;
+import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
+import com.fabricmanagement.sales.quote.infra.repository.QuoteSendRequestRepository;
 import com.fabricmanagement.sales.salesproduct.app.SalesProductService;
 import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
 import java.math.BigDecimal;
@@ -59,6 +64,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -75,6 +81,8 @@ class QuoteServiceTest {
   @Mock private QuoteApprovalService quoteApprovalService;
   @Mock private TradingPartnerResolver tradingPartnerResolver;
   @Mock private PartnerContactService partnerContactService;
+  @Mock private QuoteSendRequestRepository quoteSendRequestRepository;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private QuoteService quoteService;
 
@@ -83,11 +91,13 @@ class QuoteServiceTest {
   private final UUID customerId = UUID.randomUUID();
   private final UUID contactId = UUID.randomUUID();
   private final UUID productId = UUID.randomUUID();
+  private final UUID userId = UUID.randomUUID();
   private Quote quote;
 
   @BeforeEach
   void setUp() {
     TenantContext.setCurrentTenantId(tenantId);
+    TenantContext.setCurrentUserId(userId);
     quote = quote("GBP");
   }
 
@@ -691,7 +701,8 @@ class QuoteServiceTest {
     assertThrows(
         SalesDomainException.class, () -> quoteService.updateQuoteLine(quoteId, lineId, lineReq));
     assertThrows(SalesDomainException.class, () -> quoteService.removeQuoteLine(quoteId, lineId));
-    assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
+    assertThrows(
+        SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId, false));
 
     verify(quoteRepository, times(4)).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
     verify(quoteRepository, never()).save(any(Quote.class));
@@ -700,8 +711,8 @@ class QuoteServiceTest {
   }
 
   @Test
-  @DisplayName("Should submit clean draft quote and mint email token when sending")
-  void shouldSubmitCleanDraftQuoteAndMintEmailTokenWhenSending() {
+  @DisplayName("Approver send should submit clean draft quote and mint email token")
+  void approverSendShouldSubmitCleanDraftQuoteAndMintEmailToken() {
     quote.addLine(quoteLine("GBP", "10.00", "2.000"));
     QuoteApprovalToken approvalToken = quoteApprovalToken("buyer@example.com");
 
@@ -714,12 +725,41 @@ class QuoteServiceTest {
             quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId))
         .thenReturn(approvalToken);
 
-    QuoteApprovalToken result = quoteService.sendQuote(quoteId, contactId);
+    SendQuoteResult result = quoteService.sendQuote(quoteId, contactId, true);
 
-    assertEquals(approvalToken, result);
+    assertEquals(approvalToken, result.approvalToken());
+    assertNull(result.sendRequest());
     assertEquals(QuoteStatus.APPROVED, quote.getStatus());
     verify(quoteApprovalService)
         .generateTokenForQuote(quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId);
+  }
+
+  @Test
+  @DisplayName("Non-approver send should create pending send request and not mint token")
+  void nonApproverSendShouldCreatePendingSendRequestAndNotMintToken() {
+    quote.addLine(quoteLine("GBP", "10.00", "2.000"));
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, customerId, "buyer@example.com"));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteSendRequestRepository.findPendingByTenantIdAndQuoteId(tenantId, quoteId))
+        .thenReturn(Optional.empty());
+    when(quoteSendRequestRepository.save(any(QuoteSendRequest.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    SendQuoteResult result = quoteService.sendQuote(quoteId, contactId, false);
+
+    assertNull(result.approvalToken());
+    assertNotNull(result.sendRequest());
+    assertEquals(QuoteSendRequestStatus.PENDING, result.sendRequest().getStatus());
+    assertEquals(contactId, result.sendRequest().getContactId());
+    assertEquals(userId, result.sendRequest().getRequestedBy());
+    assertEquals(QuoteStatus.APPROVED, quote.getStatus());
+    verify(quoteApprovalService, never())
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any(), any());
+    verify(eventPublisher).publishEvent(any(QuoteSendRequestedEvent.class));
   }
 
   @Test
@@ -733,7 +773,8 @@ class QuoteServiceTest {
         .thenReturn(partnerContact(contactId, otherCustomerId, "buyer@example.com"));
 
     SalesDomainException ex =
-        assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
+        assertThrows(
+            SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId, true));
 
     assertEquals("SALES_010_INVALID_QUOTE_RECIPIENT_CONTACT", ex.getErrorCode());
     assertEquals(400, ex.getHttpStatus());
@@ -742,23 +783,128 @@ class QuoteServiceTest {
   }
 
   @Test
-  @DisplayName("Should move manager approval quote to pending approval and not mint token")
-  void shouldMoveManagerApprovalQuoteToPendingApprovalAndNotMintToken() {
+  @DisplayName("Non-approver manager approval quote should create pending send request")
+  void nonApproverManagerApprovalQuoteShouldCreatePendingSendRequest() {
     QuoteLine line = quoteLine("GBP", "10.00", "2.000");
     line.setPriceZone(QuotePriceZone.MANAGER_APPROVAL);
     quote.addLine(line);
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(quote));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, customerId, "buyer@example.com"));
     when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteSendRequestRepository.findPendingByTenantIdAndQuoteId(tenantId, quoteId))
+        .thenReturn(Optional.empty());
+    when(quoteSendRequestRepository.save(any(QuoteSendRequest.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
 
-    SalesDomainException ex =
-        assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
+    SendQuoteResult result = quoteService.sendQuote(quoteId, contactId, false);
 
-    assertEquals("SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", ex.getErrorCode());
+    assertNull(result.approvalToken());
+    assertNotNull(result.sendRequest());
     assertEquals(QuoteStatus.PENDING_APPROVAL, quote.getStatus());
     verify(quoteApprovalService, never())
         .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any(), any());
+  }
+
+  @Test
+  @DisplayName("Approver send should approve manager-zone quote and mint email token")
+  void approverSendShouldApproveManagerZoneQuoteAndMintToken() {
+    QuoteLine line = quoteLine("GBP", "10.00", "2.000");
+    line.setPriceZone(QuotePriceZone.MANAGER_APPROVAL);
+    quote.addLine(line);
+    QuoteApprovalToken approvalToken = quoteApprovalToken("buyer@example.com");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, customerId, "buyer@example.com"));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteApprovalService.generateTokenForQuote(
+            quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId))
+        .thenReturn(approvalToken);
+
+    SendQuoteResult result = quoteService.sendQuote(quoteId, contactId, true);
+
+    assertEquals(approvalToken, result.approvalToken());
+    assertEquals(QuoteStatus.APPROVED, quote.getStatus());
+    verify(quoteApprovalService)
+        .generateTokenForQuote(quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId);
+  }
+
+  @Test
+  @DisplayName("Second open send request should return conflict")
+  void secondOpenSendRequestShouldReturnConflict() {
+    quote.setStatus(QuoteStatus.APPROVED);
+    QuoteSendRequest existing = quoteSendRequest();
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, customerId, "buyer@example.com"));
+    when(quoteSendRequestRepository.findPendingByTenantIdAndQuoteId(tenantId, quoteId))
+        .thenReturn(Optional.of(existing));
+
+    SalesDomainException ex =
+        assertThrows(
+            SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId, false));
+
+    assertEquals("SALES_012_QUOTE_SEND_REQUEST_ALREADY_PENDING", ex.getErrorCode());
+    verify(quoteApprovalService, never())
+        .generateTokenForQuote(any(), any(QuoteApprovalChannel.class), any(), any());
+    verify(quoteSendRequestRepository, never()).save(any(QuoteSendRequest.class));
+  }
+
+  @Test
+  @DisplayName("Approve send request should approve pending quote and mint email token")
+  void approveSendRequestShouldApprovePendingQuoteAndMintEmailToken() {
+    quote.setStatus(QuoteStatus.PENDING_APPROVAL);
+    QuoteSendRequest request = quoteSendRequest();
+    QuoteApprovalToken approvalToken = quoteApprovalToken("buyer@example.com");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteSendRequestRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, request.getId()))
+        .thenReturn(Optional.of(request));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, customerId, "buyer@example.com"));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteSendRequestRepository.save(any(QuoteSendRequest.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(quoteApprovalService.generateTokenForQuote(
+            quoteId, QuoteApprovalChannel.EMAIL, "buyer@example.com", contactId))
+        .thenReturn(approvalToken);
+
+    SendQuoteResult result = quoteService.approveSendRequest(quoteId, request.getId());
+
+    assertEquals(approvalToken, result.approvalToken());
+    assertEquals(QuoteSendRequestStatus.APPROVED, result.sendRequest().getStatus());
+    assertEquals(userId, result.sendRequest().getDecidedBy());
+    assertEquals(QuoteStatus.APPROVED, quote.getStatus());
+  }
+
+  @Test
+  @DisplayName("Reject send request should return quote to evaluation and notify requester")
+  void rejectSendRequestShouldReturnQuoteToEvaluationAndNotifyRequester() {
+    quote.setStatus(QuoteStatus.PENDING_APPROVAL);
+    QuoteSendRequest request = quoteSendRequest();
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteSendRequestRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, request.getId()))
+        .thenReturn(Optional.of(request));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteSendRequestRepository.save(any(QuoteSendRequest.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    QuoteSendRequest rejected =
+        quoteService.rejectSendRequest(quoteId, request.getId(), "Margin too low");
+
+    assertEquals(QuoteStatus.EVALUATION, quote.getStatus());
+    assertEquals(QuoteSendRequestStatus.REJECTED, rejected.getStatus());
+    assertEquals("Margin too low", rejected.getDecisionNote());
+    verify(eventPublisher).publishEvent(any(QuoteSendRequestRejectedEvent.class));
   }
 
   @Test
@@ -770,9 +916,12 @@ class QuoteServiceTest {
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(quote));
+    when(partnerContactService.requireActiveContact(tenantId, contactId))
+        .thenReturn(partnerContact(contactId, customerId, "buyer@example.com"));
 
     SalesDomainException ex =
-        assertThrows(SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId));
+        assertThrows(
+            SalesDomainException.class, () -> quoteService.sendQuote(quoteId, contactId, false));
 
     assertEquals("SALES_006_QUOTE_NEEDS_INTERNAL_APPROVAL", ex.getErrorCode());
     assertEquals(QuoteStatus.DRAFT, quote.getStatus());
@@ -846,6 +995,14 @@ class QuoteServiceTest {
     token.setExpiresAt(Instant.now().plusSeconds(3600));
     token.setStatus(QuoteApprovalStatus.PENDING);
     return token;
+  }
+
+  private QuoteSendRequest quoteSendRequest() {
+    QuoteSendRequest request =
+        QuoteSendRequest.create(
+            tenantId, quoteId, contactId, QuoteApprovalChannel.EMAIL, userId, Instant.now());
+    request.setId(UUID.randomUUID());
+    return request;
   }
 
   private PartnerContact partnerContact(UUID contactId, UUID partnerId, String email) {

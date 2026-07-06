@@ -20,11 +20,15 @@ import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalToken;
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
+import com.fabricmanagement.sales.quote.domain.QuoteSendRequest;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
+import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestRejectedEvent;
+import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
+import com.fabricmanagement.sales.quote.infra.repository.QuoteSendRequestRepository;
 import com.fabricmanagement.sales.salesproduct.app.SalesProductService;
 import com.fabricmanagement.sales.salesproduct.dto.SalesProductDto;
 import java.math.BigDecimal;
@@ -37,6 +41,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -55,6 +61,8 @@ public class QuoteService {
   private final QuoteApprovalService quoteApprovalService;
   private final TradingPartnerResolver tradingPartnerResolver;
   private final PartnerContactService partnerContactService;
+  private final QuoteSendRequestRepository quoteSendRequestRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
@@ -211,27 +219,80 @@ public class QuoteService {
   }
 
   @Transactional
-  public QuoteApprovalToken sendQuote(UUID quoteId, UUID contactId) {
+  public SendQuoteResult sendQuote(UUID quoteId, UUID contactId, boolean callerCanApprove) {
     Quote quote = getActiveQuote(quoteId);
+    PartnerContact contact = requireQuoteCustomerContact(quote, contactId);
 
     if (quote.getStatus() == QuoteStatus.DRAFT || quote.getStatus() == QuoteStatus.EVALUATION) {
       rejectBlockedQuoteForCustomerSend(quote);
       quote = submitQuote(quoteId);
     }
 
+    if (callerCanApprove && quote.getStatus() == QuoteStatus.PENDING_APPROVAL) {
+      quote.setStatus(QuoteStatus.APPROVED);
+      quote = quoteRepository.save(quote);
+    }
+
     if (quote.getStatus() == QuoteStatus.APPROVED) {
-      PartnerContact contact = requireQuoteCustomerContact(quote, contactId);
-      return quoteApprovalService.generateTokenForQuote(
-          quoteId, QuoteApprovalChannel.EMAIL, contact.getEmail(), contact.getId());
+      if (callerCanApprove) {
+        return SendQuoteResult.sent(
+            quoteApprovalService.generateTokenForQuote(
+                quoteId, QuoteApprovalChannel.EMAIL, contact.getEmail(), contact.getId()));
+      }
+      return SendQuoteResult.awaitingApproval(createPendingSendRequest(quote, contact));
     }
 
     if (quote.getStatus() == QuoteStatus.PENDING_APPROVAL) {
-      throw SalesDomainException.needsInternalApproval(
-          "Quote needs internal approval before it can be sent to the customer.");
+      return SendQuoteResult.awaitingApproval(createPendingSendRequest(quote, contact));
     }
 
     throw SalesDomainException.invalidQuoteStatus(
         "Cannot send a quote in " + quote.getStatus() + " status");
+  }
+
+  @Transactional
+  public SendQuoteResult approveSendRequest(UUID quoteId, UUID requestId) {
+    Quote quote = getActiveQuote(quoteId);
+    QuoteSendRequest request = getActiveSendRequest(quoteId, requestId);
+
+    if (quote.getStatus() == QuoteStatus.PENDING_APPROVAL) {
+      quote.setStatus(QuoteStatus.APPROVED);
+      quote = quoteRepository.save(quote);
+    }
+    if (quote.getStatus() != QuoteStatus.APPROVED) {
+      throw SalesDomainException.invalidQuoteStatus(
+          "Cannot approve a send request for a quote in " + quote.getStatus() + " status");
+    }
+
+    PartnerContact contact = requireQuoteCustomerContact(quote, request.getContactId());
+    request.approve(requireCurrentUserId(), Instant.now());
+    QuoteSendRequest savedRequest = quoteSendRequestRepository.save(request);
+
+    QuoteApprovalToken token =
+        quoteApprovalService.generateTokenForQuote(
+            quoteId, request.getChannel(), contact.getEmail(), contact.getId());
+    return SendQuoteResult.sent(token, savedRequest);
+  }
+
+  @Transactional
+  public QuoteSendRequest rejectSendRequest(UUID quoteId, UUID requestId, String decisionNote) {
+    Quote quote = getActiveQuote(quoteId);
+    QuoteSendRequest request = getActiveSendRequest(quoteId, requestId);
+
+    request.reject(requireCurrentUserId(), Instant.now(), decisionNote);
+    quote.setStatus(QuoteStatus.EVALUATION);
+
+    Quote savedQuote = quoteRepository.save(quote);
+    QuoteSendRequest savedRequest = quoteSendRequestRepository.save(request);
+    eventPublisher.publishEvent(
+        new QuoteSendRequestRejectedEvent(
+            savedRequest.getTenantId(),
+            savedRequest.getId(),
+            savedQuote.getId(),
+            savedQuote.getQuoteNumber(),
+            savedRequest.getRequestedBy(),
+            savedRequest.getDecisionNote()));
+    return savedRequest;
   }
 
   @Transactional
@@ -305,6 +366,52 @@ public class QuoteService {
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
   }
 
+  private QuoteSendRequest getActiveSendRequest(UUID quoteId, UUID requestId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    QuoteSendRequest request =
+        quoteSendRequestRepository
+            .findByTenantIdAndIdAndIsActiveTrue(tenantId, requestId)
+            .orElseThrow(() -> SalesDomainException.quoteSendRequestNotFound(requestId.toString()));
+    if (!quoteId.equals(request.getQuoteId())) {
+      throw SalesDomainException.quoteSendRequestNotFound(requestId.toString());
+    }
+    return request;
+  }
+
+  private QuoteSendRequest createPendingSendRequest(Quote quote, PartnerContact contact) {
+    UUID tenantId = quote.getTenantId();
+    quoteSendRequestRepository
+        .findPendingByTenantIdAndQuoteId(tenantId, quote.getId())
+        .ifPresent(
+            existing -> {
+              throw SalesDomainException.quoteSendRequestAlreadyPending(
+                  "Quote already has a pending send request.");
+            });
+
+    QuoteSendRequest request =
+        QuoteSendRequest.create(
+            tenantId,
+            quote.getId(),
+            contact.getId(),
+            QuoteApprovalChannel.EMAIL,
+            requireCurrentUserId(),
+            Instant.now());
+    try {
+      QuoteSendRequest saved = quoteSendRequestRepository.save(request);
+      eventPublisher.publishEvent(
+          new QuoteSendRequestedEvent(
+              saved.getTenantId(),
+              saved.getId(),
+              quote.getId(),
+              quote.getQuoteNumber(),
+              saved.getRequestedBy()));
+      return saved;
+    } catch (DataIntegrityViolationException ex) {
+      throw SalesDomainException.quoteSendRequestAlreadyPending(
+          "Quote already has a pending send request.");
+    }
+  }
+
   private QuoteResponse toResponse(Quote quote, Map<UUID, String> customerNames) {
     return QuoteResponse.from(quote, customerNames.get(quote.getCustomerId()));
   }
@@ -364,6 +471,15 @@ public class QuoteService {
       throw SalesDomainException.needsInternalApproval(
           "Quote needs internal approval before it can be sent to the customer.");
     }
+  }
+
+  private UUID requireCurrentUserId() {
+    UUID userId = TenantContext.getCurrentUserId();
+    if (userId == null) {
+      throw SalesDomainException.invalidQuoteSendRequestDecision(
+          "Authenticated user context is required for quote send approval workflow.");
+    }
+    return userId;
   }
 
   private QuoteLine getQuoteLine(Quote quote, UUID lineId) {

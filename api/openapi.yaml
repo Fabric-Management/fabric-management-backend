@@ -38276,7 +38276,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ApiResponseQuoteApprovalTokenDto"
+                $ref: "#/components/schemas/ApiResponseSendQuoteResponse"
           description: OK
         "400":
           content:
@@ -38329,7 +38329,167 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Send a quote approval email to the customer
+      summary: Send a quote to a customer or request internal send approval
+      tags:
+      - Quotes
+  /api/v1/sales/quotes/{quoteId}/send-requests/{requestId}/approve:
+    post:
+      operationId: approveSendRequest
+      parameters:
+      - in: path
+        name: quoteId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: requestId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseSendQuoteResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Approve a quote send request and send the quote to the customer
+      tags:
+      - Quotes
+  /api/v1/sales/quotes/{quoteId}/send-requests/{requestId}/reject:
+    post:
+      operationId: rejectSendRequest
+      parameters:
+      - in: path
+        name: quoteId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: requestId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectQuoteSendRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseQuoteSendRequestDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reject a quote send request
       tags:
       - Quotes
   /api/v1/sales/quotes/{quoteId}/submit:
@@ -45357,6 +45517,24 @@ components:
           type: array
           items:
             type: string
+    ApiResponseQuoteSendRequestDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/QuoteSendRequestDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseReceivablesSummaryDto:
       type: object
       properties:
@@ -45488,6 +45666,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/SampleRequestDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseSendQuoteResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/SendQuoteResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -54040,6 +54236,53 @@ components:
         validUntil:
           type: string
           format: date
+    QuoteSendRequestDto:
+      type: object
+      description: Internal approval request for sending a quote to a customer contact
+      properties:
+        channel:
+          type: string
+          enum:
+          - EMAIL
+          - WHATSAPP
+          - IN_PERSON
+        contactId:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        decidedBy:
+          type: string
+          format: uuid
+        decisionNote:
+          type: string
+        id:
+          type: string
+          format: uuid
+        quoteId:
+          type: string
+          format: uuid
+        requestedAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - APPROVED
+          - REJECTED
+      required:
+      - channel
+      - contactId
+      - id
+      - quoteId
+      - requestedAt
+      - requestedBy
+      - status
     RealizedFxCurrencyDto:
       type: object
       properties:
@@ -54436,6 +54679,16 @@ components:
           minLength: 10
       required:
       - reviewNote
+    RejectQuoteSendRequest:
+      type: object
+      description: Decision note for rejecting a quote send request
+      properties:
+        decisionNote:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - decisionNote
     RejectRequestDto:
       type: object
       properties:
@@ -55047,6 +55300,21 @@ components:
           format: uuid
       required:
       - contactId
+    SendQuoteResponse:
+      type: object
+      description: Result of a quote send attempt
+      properties:
+        approvalToken:
+          $ref: "#/components/schemas/QuoteApprovalTokenDto"
+        result:
+          type: string
+          enum:
+          - SENT
+          - AWAITING_APPROVAL
+        sendRequest:
+          $ref: "#/components/schemas/QuoteSendRequestDto"
+      required:
+      - result
     ShipmentDto:
       type: object
       properties:
