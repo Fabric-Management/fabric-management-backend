@@ -50,13 +50,17 @@ class QuoteRequestValidationTest {
   void updateQuoteRequestRejectsHeaderFieldLimitViolations() {
     UpdateQuoteRequest request = new UpdateQuoteRequest();
     request.setValidUntil(LocalDate.now().plusDays(1));
+    request.setCustomerId(UUID.randomUUID());
+    request.setCurrency("usd");
     request.setPaymentTerms("x".repeat(51));
     request.setLeadTimeDays(-1);
     request.setNotes("x".repeat(2001));
 
-    assertThat(violatedFields(request)).contains("paymentTerms", "leadTimeDays", "notes");
+    assertThat(violatedFields(request))
+        .contains("currency", "paymentTerms", "leadTimeDays", "notes");
 
     request.setLeadTimeDays(3651);
+    request.setCurrency("USD");
 
     assertThat(violatedFields(request)).contains("leadTimeDays");
   }
@@ -116,6 +120,8 @@ class QuoteRequestValidationTest {
     createRequest.setNotes("x".repeat(2000));
 
     UpdateQuoteRequest updateRequest = new UpdateQuoteRequest();
+    updateRequest.setCustomerId(UUID.randomUUID());
+    updateRequest.setCurrency("GBP");
     updateRequest.setPaymentTerms("x".repeat(50));
     updateRequest.setLeadTimeDays(3650);
     updateRequest.setNotes("x".repeat(2000));

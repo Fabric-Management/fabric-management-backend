@@ -143,8 +143,10 @@ public class QuoteService {
   @Transactional
   public Quote updateQuoteHeader(UUID quoteId, UpdateQuoteRequest req) {
     Quote quote = getActiveQuote(quoteId);
+    assertDraftIdentityEditable(quote, req);
     assertEditable(quote, "edit");
 
+    quote.updateDraftIdentity(req.getCustomerId(), req.getCurrency());
     quote.updateHeader(
         req.getValidUntil(), req.getPaymentTerms(), req.getLeadTimeDays(), req.getNotes());
     recomputeTotals(quote);
@@ -341,6 +343,20 @@ public class QuoteService {
     }
   }
 
+  private void assertDraftIdentityEditable(Quote quote, UpdateQuoteRequest req) {
+    if (req.getCustomerId() == null && req.getCurrency() == null) {
+      return;
+    }
+    if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.EVALUATION) {
+      throw SalesDomainException.quoteDraftIdentityLocked(
+          "Quote customer and currency can only be changed on draft or evaluation quotes.");
+    }
+    if (!quote.getLines().isEmpty()) {
+      throw SalesDomainException.quoteDraftIdentityLocked(
+          "Quote customer and currency are locked after the first line is added.");
+    }
+  }
+
   private void rejectBlockedQuoteForCustomerSend(Quote quote) {
     boolean hasBlockedLine =
         quote.getLines().stream().anyMatch(line -> line.getPriceZone() == QuotePriceZone.BLOCKED);
@@ -410,6 +426,10 @@ public class QuoteService {
     if (fromCurrency.equalsIgnoreCase(toCurrency)) {
       return ConvertedMoney.of(
           amount, fromCurrency, amount, toCurrency, BigDecimal.ONE, documentDate);
+    }
+    if (amount.compareTo(BigDecimal.ZERO) == 0) {
+      return ConvertedMoney.of(
+          BigDecimal.ZERO, fromCurrency, BigDecimal.ZERO, toCurrency, BigDecimal.ONE, documentDate);
     }
 
     try {

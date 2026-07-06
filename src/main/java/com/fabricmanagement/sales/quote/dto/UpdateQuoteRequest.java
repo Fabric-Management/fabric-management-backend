@@ -3,12 +3,19 @@ package com.fabricmanagement.sales.quote.dto;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.UUID;
 import lombok.Data;
 
 @Data
 public class UpdateQuoteRequest {
+
+  private UUID customerId;
+
+  @Pattern(regexp = "^[A-Z]{3}$", message = "Currency must be a 3-letter ISO code")
+  private String currency;
 
   @FutureOrPresent(message = "Valid-until date must be today or in the future")
   private LocalDate validUntil;

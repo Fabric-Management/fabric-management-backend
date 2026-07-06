@@ -384,6 +384,125 @@ class QuoteServiceTest {
   }
 
   @Test
+  @DisplayName("Should update customer and currency before quote has lines")
+  void shouldUpdateCustomerAndCurrencyBeforeQuoteHasLines() {
+    UUID newCustomerId = UUID.randomUUID();
+    LocalDate docDate = LocalDate.of(2026, 7, 1);
+    quote.setCreatedAt(Instant.parse("2026-07-01T09:00:00Z"));
+
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setCustomerId(newCustomerId);
+    req.setCurrency("USD");
+    req.setPaymentTerms("Net 15");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(tradingPartnerResolver.resolveDisplayNames(tenantId, List.of(newCustomerId)))
+        .thenReturn(Map.of(newCustomerId, "New Customer Ltd"));
+
+    Quote updated = quoteService.updateQuoteHeader(quoteId, req);
+    QuoteResponse response = quoteService.toResponse(updated);
+
+    assertEquals(newCustomerId, updated.getCustomerId());
+    assertEquals("USD", updated.getCurrency());
+    assertEquals("Net 15", updated.getPaymentTerms());
+    assertEquals(0, updated.getLines().size());
+    assertEquals(0, updated.getTotalAmount().getAmount().compareTo(BigDecimal.ZERO));
+    assertEquals("USD", updated.getTotalAmount().getCurrency().getCurrencyCode());
+    assertEquals(BigDecimal.ZERO, updated.getReportingTotal().getOriginalAmount());
+    assertEquals("USD", updated.getReportingTotal().getOriginalCurrency());
+    assertEquals(BigDecimal.ZERO, updated.getReportingTotal().getConvertedAmount());
+    assertEquals("GBP", updated.getReportingTotal().getConvertedCurrency());
+    assertEquals(BigDecimal.ONE, updated.getReportingTotal().getExchangeRate());
+    assertEquals(docDate, updated.getReportingTotal().getRateDate());
+    assertEquals("New Customer Ltd", response.getCustomerName());
+    verify(exchangeRateService, never()).convert(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("Should update customer and currency on line-less evaluation quotes")
+  void shouldUpdateCustomerAndCurrencyOnLineLessEvaluationQuotes() {
+    UUID newCustomerId = UUID.randomUUID();
+    quote.setStatus(QuoteStatus.EVALUATION);
+
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setCustomerId(newCustomerId);
+    req.setCurrency("EUR");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("EUR");
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote updated = quoteService.updateQuoteHeader(quoteId, req);
+
+    assertEquals(newCustomerId, updated.getCustomerId());
+    assertEquals("EUR", updated.getCurrency());
+    assertEquals(QuoteStatus.EVALUATION, updated.getStatus());
+    assertEquals(0, updated.getTotalAmount().getAmount().compareTo(BigDecimal.ZERO));
+  }
+
+  @Test
+  @DisplayName("Should reject customer and currency changes after quote has lines")
+  void shouldRejectCustomerAndCurrencyChangesAfterQuoteHasLines() {
+    UUID originalCustomerId = quote.getCustomerId();
+    quote.addLine(quoteLine("GBP", "10.00", "2.000"));
+
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setCustomerId(UUID.randomUUID());
+    req.setCurrency("USD");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+
+    SalesDomainException ex =
+        assertThrows(
+            SalesDomainException.class, () -> quoteService.updateQuoteHeader(quoteId, req));
+
+    assertEquals("SALES_011_QUOTE_DRAFT_IDENTITY_LOCKED", ex.getErrorCode());
+    assertEquals(409, ex.getHttpStatus());
+    assertEquals(originalCustomerId, quote.getCustomerId());
+    assertEquals("GBP", quote.getCurrency());
+    verify(quoteRepository, never()).save(any(Quote.class));
+  }
+
+  @Test
+  @DisplayName("Should reject customer and currency changes for locked quote statuses")
+  void shouldRejectCustomerAndCurrencyChangesForLockedQuoteStatuses() {
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setCustomerId(UUID.randomUUID());
+    req.setCurrency("USD");
+
+    for (QuoteStatus status :
+        List.of(
+            QuoteStatus.PENDING_APPROVAL,
+            QuoteStatus.APPROVED,
+            QuoteStatus.REJECTED,
+            QuoteStatus.CONVERTED,
+            QuoteStatus.EXPIRED,
+            QuoteStatus.SUPERSEDED)) {
+      Quote lockedQuote = quote("GBP");
+      lockedQuote.setStatus(status);
+
+      when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+          .thenReturn(Optional.of(lockedQuote));
+
+      SalesDomainException ex =
+          assertThrows(
+              SalesDomainException.class, () -> quoteService.updateQuoteHeader(quoteId, req));
+
+      assertEquals("SALES_011_QUOTE_DRAFT_IDENTITY_LOCKED", ex.getErrorCode());
+      assertEquals(409, ex.getHttpStatus());
+      assertEquals(customerId, lockedQuote.getCustomerId());
+      assertEquals("GBP", lockedQuote.getCurrency());
+    }
+
+    verify(quoteRepository, never()).save(any(Quote.class));
+  }
+
+  @Test
   @DisplayName("Should update line quantity and price, re-evaluate zone, and recompute totals")
   void shouldUpdateLineQuantityAndPriceReevaluateZoneAndRecomputeTotals() {
     UUID lineId = UUID.randomUUID();

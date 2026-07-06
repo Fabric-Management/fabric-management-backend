@@ -33,6 +33,11 @@ public class SalesDomainException extends DomainException {
         message, "SALES_003_INVALID_QUOTE_STATUS", HttpStatus.BAD_REQUEST);
   }
 
+  public static SalesDomainException quoteDraftIdentityLocked(String message) {
+    return new SalesDomainException(
+        message, "SALES_011_QUOTE_DRAFT_IDENTITY_LOCKED", HttpStatus.CONFLICT);
+  }
+
   public static SalesDomainException tokenExpiredOrUsed(String message) {
     return new SalesDomainException(message, "SALES_004_TOKEN_INVALID", HttpStatus.BAD_REQUEST);
   }
