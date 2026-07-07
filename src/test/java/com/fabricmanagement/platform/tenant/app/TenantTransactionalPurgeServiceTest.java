@@ -82,6 +82,7 @@ class TenantTransactionalPurgeServiceTest {
             "sales.quote",
             "procurement.purchase_order",
             "production.prod_product",
+            "production.stock_unit_soft_hold",
             "iwm.warehouse_location",
             "finance.finance_invoice",
             "flowboard.task",
@@ -102,6 +103,10 @@ class TenantTransactionalPurgeServiceTest {
             contains("DELETE FROM procurement.purchase_order WHERE tenant_id = ?"), eq(TENANT_ID));
     verify(jdbc)
         .update(contains("DELETE FROM production.prod_product WHERE tenant_id = ?"), eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains("DELETE FROM production.stock_unit_soft_hold WHERE tenant_id = ?"),
+            eq(TENANT_ID));
     verify(jdbc)
         .update(
             contains("DELETE FROM production.production_execution_batch_override_log log"),
@@ -171,6 +176,7 @@ class TenantTransactionalPurgeServiceTest {
             "sales.quote",
             "procurement.purchase_order",
             "production.prod_product",
+            "production.color",
             "production.production_execution_batch_override_log",
             "sales_ord.sales_order_line_processed_shipments",
             "common_user.common_user(seed-demo-users)");
@@ -253,6 +259,8 @@ class TenantTransactionalPurgeServiceTest {
     assertThat(indexOf(sql, "DELETE FROM production.prod_product_attribute WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.quality_grade WHERE tenant_id = ?"))
+        .isLessThan(indexOf(sql, "DELETE FROM production.prod_product WHERE tenant_id = ?"));
+    assertThat(indexOf(sql, "DELETE FROM production.color WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_product WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.prod_fiber_certification WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"));

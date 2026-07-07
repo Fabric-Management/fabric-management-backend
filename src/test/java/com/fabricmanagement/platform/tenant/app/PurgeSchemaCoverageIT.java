@@ -212,6 +212,9 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
         "notification.user_notification_preference",
         "Seed-user notification preferences are deleted by demo_seed CTE.");
     tables.put(
+        "production.color",
+        "Product reference data is deleted by dedicated product-reference cleanup.");
+    tables.put(
         "production.inheritance_rule_schema",
         "Product reference data is deleted by dedicated product-reference cleanup.");
     tables.put(
