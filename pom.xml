@@ -78,7 +78,7 @@
         <commons-fileupload.version>1.6.0</commons-fileupload.version>
         <angus-mail.version>2.0.4</angus-mail.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
-        <tomcat.version>10.1.55</tomcat.version>
+        <tomcat.version>10.1.56</tomcat.version>
         <spring-security.version>6.5.11</spring-security.version>
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <kotlin.version>2.2.21</kotlin.version>
