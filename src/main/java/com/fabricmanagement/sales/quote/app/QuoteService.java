@@ -9,11 +9,17 @@ import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredExcepti
 import com.fabricmanagement.platform.tradingpartner.app.PartnerContactService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerContact;
+import com.fabricmanagement.production.execution.stockunit.api.StockUnitSoftHoldPort;
+import com.fabricmanagement.sales.color.app.SalesColorService;
+import com.fabricmanagement.sales.color.app.SalesColorSnapshot;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
+import com.fabricmanagement.sales.lot.app.SalesLotService;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
 import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
+import com.fabricmanagement.sales.qualitygrade.app.SalesQualityGradeService;
+import com.fabricmanagement.sales.qualitygrade.app.SalesQualityGradeSnapshot;
 import com.fabricmanagement.sales.quote.api.QuoteCreateRequest;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
@@ -24,6 +30,9 @@ import com.fabricmanagement.sales.quote.domain.QuoteSendRequest;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestRejectedEvent;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
+import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
+import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshot;
+import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshotCodec;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
@@ -63,6 +72,10 @@ public class QuoteService {
   private final PartnerContactService partnerContactService;
   private final QuoteSendRequestRepository quoteSendRequestRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final SalesQualityGradeService salesQualityGradeService;
+  private final SalesColorService salesColorService;
+  private final SalesLotService salesLotService;
+  private final StockUnitSoftHoldPort stockUnitSoftHoldPort;
 
   @Transactional(readOnly = true)
   public Page<Quote> findAll(Pageable pageable) {
@@ -117,27 +130,50 @@ public class QuoteService {
   @Transactional
   public Quote addQuoteLine(
       UUID quoteId, UUID productId, BigDecimal requestedQty, String unit, BigDecimal offeredPrice) {
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(requestedQty);
+    req.setUnit(unit);
+    req.setOfferedPrice(offeredPrice);
+    return addQuoteLine(quoteId, req);
+  }
+
+  @Transactional
+  public Quote addQuoteLine(UUID quoteId, AddQuoteLineRequest req) {
     Quote quote = getActiveQuote(quoteId);
 
     assertEditable(quote, "add lines to");
 
+    UUID productId = req.getProductId();
     SalesProductDto catalogItem = catalogService.getActiveByProductId(productId);
     DiscountPolicy policy = policyService.getActivePolicy(quote.getModuleType());
+    SalesQualityGradeSnapshot qualitySnapshot =
+        salesQualityGradeService.resolveSnapshot(req.getQualityGradeId());
+    SalesColorSnapshot colorSnapshot =
+        salesColorService.resolveNewSelectionSnapshot(req.getColorId());
+    List<QuoteLineLotSnapshot> lotSnapshots =
+        salesLotService.resolveNewSelectionSnapshots(req.getSelectedLots());
 
     // Evaluate Pricing Zone
     PricingResult pricing =
         pricingEngineService.evaluatePrice(
-            catalogItem.getListPrice(), offeredPrice, quote.getEstimatedUnitCost(), policy);
+            catalogItem.getListPrice(),
+            req.getOfferedPrice(),
+            quote.getEstimatedUnitCost(),
+            policy);
 
     // Create Line
     QuoteLine line = new QuoteLine();
     line.setTenantId(quote.getTenantId());
     line.setProductId(productId);
-    line.setRequestedQty(requestedQty);
-    line.setUnit(unit);
+    line.setRequestedQty(req.getRequestedQty());
+    line.setUnit(req.getUnit());
     line.setListPrice(catalogItem.getListPrice());
-    line.setOfferedPrice(offeredPrice);
+    line.setOfferedPrice(req.getOfferedPrice());
     line.setCurrency(catalogItem.getCurrency());
+    applyQualitySnapshot(line, qualitySnapshot);
+    applyColorSnapshot(line, colorSnapshot);
+    applyLotSnapshots(line, lotSnapshots);
     line.setDiscountRate(pricing.getDiscountRate());
     line.setProfitMargin(pricing.getProfitMargin());
     line.setPriceZone(pricing.getPriceZone());
@@ -145,7 +181,9 @@ public class QuoteService {
     quote.addLine(line);
     // Any future line-mutating path must recompute totals before saving.
     recomputeTotals(quote);
-    return quoteRepository.save(quote);
+    Quote saved = quoteRepository.save(quote);
+    replaceSoftHolds(line, lotSnapshots);
+    return saved;
   }
 
   @Transactional
@@ -168,11 +206,23 @@ public class QuoteService {
 
     QuoteLine line = getQuoteLine(quote, lineId);
     PricingResult pricing = evaluateLinePrice(quote, line, req.getOfferedPrice());
+    SalesQualityGradeSnapshot qualitySnapshot =
+        salesQualityGradeService.resolveSnapshot(req.getQualityGradeId());
+    SalesColorSnapshot colorSnapshot =
+        salesColorService.resolveUpdateSnapshot(req.getColorId(), line);
+    List<QuoteLineLotSnapshot> lotSnapshots =
+        salesLotService.resolveUpdateSelectionSnapshots(
+            req.getSelectedLots(), line.getLotSnapshot());
 
     line.updateEditableFields(req.getRequestedQty(), req.getUnit(), req.getOfferedPrice());
+    applyQualitySnapshot(line, qualitySnapshot);
+    applyColorSnapshot(line, colorSnapshot);
+    applyLotSnapshots(line, lotSnapshots);
     line.applyPricing(pricing.getDiscountRate(), pricing.getProfitMargin(), pricing.getPriceZone());
     recomputeTotals(quote);
-    return quoteRepository.save(quote);
+    Quote saved = quoteRepository.save(quote);
+    replaceSoftHolds(line, lotSnapshots);
+    return saved;
   }
 
   @Transactional
@@ -180,9 +230,9 @@ public class QuoteService {
     Quote quote = getActiveQuote(quoteId);
     assertEditable(quote, "remove lines from");
 
-    if (!quote.removeLine(lineId)) {
-      throw SalesDomainException.quoteNotFound("line " + lineId);
-    }
+    QuoteLine line = getQuoteLine(quote, lineId);
+    stockUnitSoftHoldPort.releaseHolds(line.getId());
+    quote.removeLine(lineId);
     recomputeTotals(quote);
     return quoteRepository.save(quote);
   }
@@ -348,6 +398,17 @@ public class QuoteService {
       newLine.setListPrice(oldLine.getListPrice());
       newLine.setOfferedPrice(oldLine.getOfferedPrice());
       newLine.setCurrency(oldLine.getCurrency());
+      newLine.applyQualityGrade(
+          oldLine.getQualityGradeId(),
+          oldLine.getQualityGradeCode(),
+          oldLine.getQualityGradeName(),
+          oldLine.getQualityPriceFactor());
+      newLine.applyColor(
+          oldLine.getColorId(),
+          oldLine.getColorCode(),
+          oldLine.getColorName(),
+          oldLine.getColorHex());
+      newLine.applyLotSnapshot(oldLine.getLotSnapshot());
       newLine.setDiscountRate(oldLine.getDiscountRate());
       newLine.setProfitMargin(oldLine.getProfitMargin());
       newLine.setPriceZone(oldLine.getPriceZone());
@@ -364,6 +425,31 @@ public class QuoteService {
     return quoteRepository
         .findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId)
         .orElseThrow(() -> SalesDomainException.quoteNotFound(quoteId.toString()));
+  }
+
+  private void applyQualitySnapshot(QuoteLine line, SalesQualityGradeSnapshot qualitySnapshot) {
+    if (qualitySnapshot == null) {
+      line.clearQualityGrade();
+      return;
+    }
+    line.applyQualityGrade(
+        qualitySnapshot.id(),
+        qualitySnapshot.code(),
+        qualitySnapshot.name(),
+        qualitySnapshot.priceFactor());
+  }
+
+  private void applyColorSnapshot(QuoteLine line, SalesColorSnapshot colorSnapshot) {
+    if (colorSnapshot == null) {
+      line.clearColor();
+      return;
+    }
+    line.applyColor(
+        colorSnapshot.id(), colorSnapshot.code(), colorSnapshot.name(), colorSnapshot.colorHex());
+  }
+
+  private void applyLotSnapshots(QuoteLine line, List<QuoteLineLotSnapshot> lotSnapshots) {
+    line.applyLotSnapshot(QuoteLineLotSnapshotCodec.toJson(lotSnapshots));
   }
 
   private QuoteSendRequest getActiveSendRequest(UUID quoteId, UUID requestId) {
@@ -516,6 +602,21 @@ public class QuoteService {
     quote.setReportingTotal(
         convertMoney(
             quote.getTenantId(), nativeTotal, headerCurrency, reportingCurrency, documentDate));
+  }
+
+  private void replaceSoftHolds(QuoteLine line, List<QuoteLineLotSnapshot> lotSnapshots) {
+    if (line.getId() == null) {
+      return;
+    }
+    List<UUID> stockUnitIds =
+        (lotSnapshots == null ? List.<QuoteLineLotSnapshot>of() : lotSnapshots)
+            .stream()
+                .flatMap(lot -> lot.pieces().stream())
+                .map(piece -> piece.stockUnitId())
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    stockUnitSoftHoldPort.replaceHolds(line.getId(), stockUnitIds);
   }
 
   private BigDecimal convertLineTotalToHeader(

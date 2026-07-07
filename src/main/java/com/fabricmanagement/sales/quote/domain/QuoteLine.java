@@ -29,6 +29,34 @@ public class QuoteLine extends BaseEntity {
   @Column(name = "product_desc", columnDefinition = "TEXT")
   private String productDesc;
 
+  @Column(name = "quality_grade_id")
+  private UUID qualityGradeId;
+
+  @Column(name = "quality_grade_code", length = 10)
+  private String qualityGradeCode;
+
+  @Column(name = "quality_grade_name", length = 255)
+  private String qualityGradeName;
+
+  @Column(name = "quality_price_factor", precision = 4, scale = 3)
+  private BigDecimal qualityPriceFactor;
+
+  @Column(name = "color_id")
+  private UUID colorId;
+
+  @Column(name = "color_code", length = 50)
+  private String colorCode;
+
+  @Column(name = "color_name", length = 255)
+  private String colorName;
+
+  @Column(name = "color_hex", length = 7)
+  private String colorHex;
+
+  @Type(JsonType.class)
+  @Column(name = "lot_snapshot", columnDefinition = "jsonb", nullable = false)
+  private String lotSnapshot = "[]";
+
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
 
@@ -72,6 +100,36 @@ public class QuoteLine extends BaseEntity {
     this.requestedQty = requestedQty;
     this.unit = unit;
     this.offeredPrice = offeredPrice;
+  }
+
+  public void applyQualityGrade(
+      UUID qualityGradeId,
+      String qualityGradeCode,
+      String qualityGradeName,
+      BigDecimal qualityPriceFactor) {
+    this.qualityGradeId = qualityGradeId;
+    this.qualityGradeCode = qualityGradeCode;
+    this.qualityGradeName = qualityGradeName;
+    this.qualityPriceFactor = qualityPriceFactor;
+  }
+
+  public void clearQualityGrade() {
+    applyQualityGrade(null, null, null, null);
+  }
+
+  public void applyColor(UUID colorId, String colorCode, String colorName, String colorHex) {
+    this.colorId = colorId;
+    this.colorCode = colorCode;
+    this.colorName = colorName;
+    this.colorHex = colorHex;
+  }
+
+  public void clearColor() {
+    applyColor(null, null, null, null);
+  }
+
+  public void applyLotSnapshot(String lotSnapshot) {
+    this.lotSnapshot = lotSnapshot == null || lotSnapshot.isBlank() ? "[]" : lotSnapshot;
   }
 
   public void applyPricing(

@@ -12,6 +12,8 @@ servers:
 tags:
 - description: Mobile Offline Synchronization API
   name: Offline Sync
+- description: Tenant color-card master data
+  name: Color
 - description: Demo tenant reset operations
   name: Tenant Demo Reset
 - description: Payment operations
@@ -68,6 +70,8 @@ tags:
   name: Invoice
 - description: Fiber Request operations
   name: Fiber Request
+- description: Sales-readable lot and piece projection
+  name: Sales Lot
 - description: Contact operations
   name: Contact
 - description: Platform Notification operations
@@ -100,6 +104,8 @@ tags:
   name: Public Signup
 - description: Manage certifications for organizations
   name: Organization Certifications
+- description: Sales-readable color-card projection
+  name: Sales Color
 - description: Department operations
   name: Department
 - description: Role operations
@@ -122,6 +128,8 @@ tags:
   name: FinancialPeriod
 - description: Organization Contact operations
   name: Organization Contact
+- description: Sales-readable quality grade projection
+  name: Sales Quality Grade
 - description: Approval Request operations
   name: Approval Request
 - description: Physical stock unit lifecycle management
@@ -29189,6 +29197,359 @@ paths:
       summary: Record Batch Waste
       tags:
       - Batch
+  /api/v1/production/colors:
+    get:
+      operationId: listColors
+      parameters:
+      - in: query
+        name: includeInactive
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List color cards
+      tags:
+      - Color
+    post:
+      operationId: createColor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateColorRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Create a color card
+      tags:
+      - Color
+  /api/v1/production/colors/{id}:
+    delete:
+      operationId: deactivateColor
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Deactivate a color card
+      tags:
+      - Color
+    get:
+      operationId: findColorById
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Get a color card by ID
+      tags:
+      - Color
+    patch:
+      operationId: updateColor
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateColorRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Update a color card
+      tags:
+      - Color
   /api/v1/production/fiber-quality-standards:
     get:
       operationId: getAll
@@ -36099,6 +36460,141 @@ paths:
       summary: Self-service signup
       tags:
       - Public Signup
+  /api/v1/sales/colors:
+    get:
+      operationId: listSalesColors
+      parameters:
+      - in: query
+        name: includeInactive
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListSalesColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List sales-readable color cards
+      tags:
+      - Sales Color
+  /api/v1/sales/lots:
+    get:
+      operationId: listSalesLots
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListSalesLotDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List sales-readable lots and pieces
+      tags:
+      - Sales Lot
   /api/v1/sales/orders:
     get:
       operationId: getAllOrders
@@ -37662,6 +38158,88 @@ paths:
           description: Internal Server Error
       tags:
       - Sales Product
+  /api/v1/sales/quality-grades:
+    get:
+      operationId: listSalesGrades
+      parameters:
+      - in: query
+        name: productType
+        required: true
+        schema:
+          type: string
+          enum:
+          - FIBER
+          - YARN
+          - FABRIC
+          - CHEMICAL
+          - CONSUMABLE
+      - in: query
+        name: includeNonSaleable
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListSalesQualityGradeDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List sales-readable quality grades
+      tags:
+      - Sales Quality Grade
   /api/v1/sales/quotes:
     get:
       operationId: listQuotes
@@ -41980,15 +42558,25 @@ components:
     AddQuoteLineRequest:
       type: object
       properties:
+        colorId:
+          type: string
+          format: uuid
         offeredPrice:
           type: number
           minimum: 0.0001
         productId:
           type: string
           format: uuid
+        qualityGradeId:
+          type: string
+          format: uuid
         requestedQty:
           type: number
           minimum: 0.001
+        selectedLots:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteLineLotSelectionRequest"
         unit:
           type: string
           maxLength: 20
@@ -42619,6 +43207,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/CloseFinancialPeriodResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseColorDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ColorDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -43272,6 +43878,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BoardResponse"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListColorDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColorDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -44024,6 +44650,46 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListSalesColorDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesColorDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListSalesLotDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesLotDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListSalesOrderDto:
       type: object
       properties:
@@ -44051,6 +44717,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SalesProductDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseListSalesQualityGradeDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesQualityGradeDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -47324,6 +48010,20 @@ components:
         reversedEntryCount:
           type: integer
           format: int32
+    ColorDto:
+      type: object
+      properties:
+        active:
+          type: boolean
+        code:
+          type: string
+        colorHex:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
     CompanyTypeOptionDto:
       type: object
       properties:
@@ -48026,6 +48726,23 @@ components:
           format: int32
       required:
       - boardType
+      - name
+    CreateColorRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 50
+          minLength: 0
+        colorHex:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - code
       - name
     CreateContactRequest:
       type: object
@@ -49051,6 +49768,12 @@ components:
         productId:
           type: string
           format: uuid
+        productName:
+          type: string
+          description: Snapshot of the production product name shown in sales catalog
+            pickers
+          maxLength: 255
+          minLength: 0
         specs:
           type: string
       required:
@@ -49158,6 +49881,12 @@ components:
           type: number
         initialWeight:
           type: number
+        length:
+          type: number
+        lengthUnit:
+          type: string
+          maxLength: 10
+          minLength: 0
         locationId:
           type: string
           format: uuid
@@ -53748,6 +54477,15 @@ components:
       type: object
       description: Customer-facing quote line without internal pricing fields
       properties:
+        colorCode:
+          type: string
+        colorHex:
+          type: string
+        colorId:
+          type: string
+          format: uuid
+        colorName:
+          type: string
         currency:
           type: string
         discountRate:
@@ -53765,6 +54503,10 @@ components:
           type: string
         requestedQty:
           type: number
+        selectedLots:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteLineLotSnapshot"
         unit:
           type: string
     PublicQuoteResponse:
@@ -54140,9 +54882,65 @@ components:
       - moduleType
       - quoteNumber
       - validUntil
+    QuoteLineLotPieceSnapshot:
+      type: object
+      properties:
+        measure:
+          type: number
+        pieceNo:
+          type: string
+        stockUnitId:
+          type: string
+          format: uuid
+        unit:
+          type: string
+    QuoteLineLotSelectionRequest:
+      type: object
+      properties:
+        lotId:
+          type: string
+          format: uuid
+        stockUnitIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - lotId
+    QuoteLineLotSnapshot:
+      type: object
+      properties:
+        colour:
+          $ref: "#/components/schemas/SalesLotColourDto"
+        derivedQuantity:
+          type: number
+        lotId:
+          type: string
+          format: uuid
+        lotNo:
+          type: string
+        pieces:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteLineLotPieceSnapshot"
+        primaryMeasure:
+          type: string
+        quality:
+          $ref: "#/components/schemas/SalesLotQualityDto"
+        unit:
+          type: string
     QuoteLineResponse:
       type: object
       properties:
+        colorCode:
+          type: string
+        colorHex:
+          type: string
+        colorId:
+          type: string
+          format: uuid
+        colorName:
+          type: string
         currency:
           type: string
         discountRate:
@@ -54169,8 +54967,21 @@ components:
           format: uuid
         profitMargin:
           type: number
+        qualityGradeCode:
+          type: string
+        qualityGradeId:
+          type: string
+          format: uuid
+        qualityGradeName:
+          type: string
+        qualityPriceFactor:
+          type: number
         requestedQty:
           type: number
+        selectedLots:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteLineLotSnapshot"
         unit:
           type: string
     QuoteResponse:
@@ -54935,6 +55746,91 @@ components:
           format: date-time
         status:
           type: string
+    SalesColorDto:
+      type: object
+      properties:
+        active:
+          type: boolean
+        code:
+          type: string
+        colorHex:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    SalesLotColourDto:
+      type: object
+      properties:
+        colourCode:
+          type: string
+        colourHex:
+          type: string
+        colourId:
+          type: string
+          format: uuid
+        colourLabel:
+          type: string
+        colourName:
+          type: string
+    SalesLotDto:
+      type: object
+      properties:
+        availableQuantity:
+          type: number
+        colour:
+          $ref: "#/components/schemas/SalesLotColourDto"
+        id:
+          type: string
+          format: uuid
+        lotNo:
+          type: string
+        pieces:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesLotPieceDto"
+        primaryMeasure:
+          type: string
+        quality:
+          $ref: "#/components/schemas/SalesLotQualityDto"
+        status:
+          type: string
+        unit:
+          type: string
+    SalesLotPieceDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        length:
+          type: number
+        lengthUnit:
+          type: string
+        packageType:
+          type: string
+        pieceNo:
+          type: string
+        softReservedCount:
+          type: integer
+          format: int64
+        status:
+          type: string
+        weight:
+          type: number
+        weightUnit:
+          type: string
+    SalesLotQualityDto:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
     SalesOrderDto:
       type: object
       properties:
@@ -55163,11 +56059,27 @@ components:
         productId:
           type: string
           format: uuid
+        productName:
+          type: string
         specs:
           type: string
         tenantId:
           type: string
           format: uuid
+    SalesQualityGradeDto:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        priceFactor:
+          type: number
+        saleable:
+          type: boolean
     SampleDeliveryDto:
       type: object
       properties:
@@ -55677,6 +56589,10 @@ components:
           format: uuid
         initialWeight:
           type: number
+        length:
+          type: number
+        lengthUnit:
+          type: string
         locationId:
           type: string
           format: uuid
@@ -56825,6 +57741,23 @@ components:
           format: date
       required:
       - changeReason
+    UpdateColorRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 50
+          minLength: 0
+        colorHex:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - code
+      - name
     UpdateContactAssignmentRequest:
       type: object
       properties:
@@ -57115,12 +58048,22 @@ components:
     UpdateQuoteLineRequest:
       type: object
       properties:
+        colorId:
+          type: string
+          format: uuid
         offeredPrice:
           type: number
           minimum: 0.0001
+        qualityGradeId:
+          type: string
+          format: uuid
         requestedQty:
           type: number
           minimum: 0.001
+        selectedLots:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteLineLotSelectionRequest"
         unit:
           type: string
           maxLength: 20

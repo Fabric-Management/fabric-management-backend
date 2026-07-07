@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
+import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredException;
@@ -24,11 +25,17 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
+import com.fabricmanagement.production.execution.stockunit.api.StockUnitSoftHoldPort;
+import com.fabricmanagement.sales.color.app.SalesColorService;
+import com.fabricmanagement.sales.color.app.SalesColorSnapshot;
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
+import com.fabricmanagement.sales.lot.app.SalesLotService;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService;
 import com.fabricmanagement.sales.pricing.app.PricingEngineService.PricingResult;
 import com.fabricmanagement.sales.pricing.domain.DiscountPolicy;
+import com.fabricmanagement.sales.qualitygrade.app.SalesQualityGradeService;
+import com.fabricmanagement.sales.qualitygrade.app.SalesQualityGradeSnapshot;
 import com.fabricmanagement.sales.quote.api.QuoteCreateRequest;
 import com.fabricmanagement.sales.quote.domain.Quote;
 import com.fabricmanagement.sales.quote.domain.QuoteApprovalChannel;
@@ -41,6 +48,11 @@ import com.fabricmanagement.sales.quote.domain.QuoteSendRequestStatus;
 import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestRejectedEvent;
 import com.fabricmanagement.sales.quote.domain.event.QuoteSendRequestedEvent;
+import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
+import com.fabricmanagement.sales.quote.dto.QuoteLineLotPieceSnapshot;
+import com.fabricmanagement.sales.quote.dto.QuoteLineLotSelectionRequest;
+import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshot;
+import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshotCodec;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
@@ -83,6 +95,10 @@ class QuoteServiceTest {
   @Mock private PartnerContactService partnerContactService;
   @Mock private QuoteSendRequestRepository quoteSendRequestRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private SalesQualityGradeService salesQualityGradeService;
+  @Mock private SalesColorService salesColorService;
+  @Mock private SalesLotService salesLotService;
+  @Mock private StockUnitSoftHoldPort stockUnitSoftHoldPort;
 
   @InjectMocks private QuoteService quoteService;
 
@@ -328,11 +344,214 @@ class QuoteServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "Should snapshot selected quality grade on quote line without mutating offered price")
+  void shouldSnapshotSelectedQualityGradeOnQuoteLine() {
+    UUID qualityGradeId = UUID.randomUUID();
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(new BigDecimal("2.000"));
+    req.setUnit("KG");
+    req.setOfferedPrice(new BigDecimal("12.00"));
+    req.setQualityGradeId(qualityGradeId);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(catalogService.getActiveByProductId(productId)).thenReturn(product("GBP", "15.00"));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
+        .thenReturn(pricingResult());
+    when(salesQualityGradeService.resolveSnapshot(qualityGradeId))
+        .thenReturn(
+            new SalesQualityGradeSnapshot(qualityGradeId, "A", "Grade A", new BigDecimal("1.125")));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    Quote updated = quoteService.addQuoteLine(quoteId, req);
+
+    QuoteLine line = updated.getLines().get(0);
+    assertEquals(qualityGradeId, line.getQualityGradeId());
+    assertEquals("A", line.getQualityGradeCode());
+    assertEquals("Grade A", line.getQualityGradeName());
+    assertEquals(0, line.getQualityPriceFactor().compareTo(new BigDecimal("1.125")));
+    assertEquals(0, line.getOfferedPrice().compareTo(new BigDecimal("12.00")));
+  }
+
+  @Test
+  @DisplayName("Should reject unknown quality grade without saving quote line")
+  void shouldRejectUnknownQualityGradeWithoutSavingQuoteLine() {
+    UUID qualityGradeId = UUID.randomUUID();
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(new BigDecimal("2.000"));
+    req.setUnit("KG");
+    req.setOfferedPrice(new BigDecimal("12.00"));
+    req.setQualityGradeId(qualityGradeId);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(catalogService.getActiveByProductId(productId)).thenReturn(product("GBP", "15.00"));
+    when(salesQualityGradeService.resolveSnapshot(qualityGradeId))
+        .thenThrow(new NotFoundException("Quality grade not found: " + qualityGradeId));
+
+    assertThrows(NotFoundException.class, () -> quoteService.addQuoteLine(quoteId, req));
+
+    verify(quoteRepository, never()).save(any(Quote.class));
+  }
+
+  @Test
+  @DisplayName("Should snapshot selected color on quote line")
+  void shouldSnapshotSelectedColorOnQuoteLine() {
+    UUID colorId = UUID.randomUUID();
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(new BigDecimal("2.000"));
+    req.setUnit("KG");
+    req.setOfferedPrice(new BigDecimal("12.00"));
+    req.setColorId(colorId);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(catalogService.getActiveByProductId(productId)).thenReturn(product("GBP", "15.00"));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
+        .thenReturn(pricingResult());
+    when(salesColorService.resolveNewSelectionSnapshot(colorId))
+        .thenReturn(new SalesColorSnapshot(colorId, "NAVY-01", "Navy", "#001F3F"));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    Quote updated = quoteService.addQuoteLine(quoteId, req);
+
+    QuoteLine line = updated.getLines().get(0);
+    assertEquals(colorId, line.getColorId());
+    assertEquals("NAVY-01", line.getColorCode());
+    assertEquals("Navy", line.getColorName());
+    assertEquals("#001F3F", line.getColorHex());
+  }
+
+  @Test
+  @DisplayName("Should snapshot selected lots and place soft holds after quote line save")
+  void shouldSnapshotSelectedLotsAndPlaceSoftHoldsAfterQuoteLineSave() {
+    UUID lineId = UUID.randomUUID();
+    UUID lotId = UUID.randomUUID();
+    UUID stockUnitId = UUID.randomUUID();
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(new BigDecimal("120.000"));
+    req.setUnit("M");
+    req.setOfferedPrice(new BigDecimal("12.00"));
+    req.setSelectedLots(List.of(new QuoteLineLotSelectionRequest(lotId, List.of(stockUnitId))));
+    List<QuoteLineLotSnapshot> snapshots =
+        List.of(
+            new QuoteLineLotSnapshot(
+                lotId,
+                "LOT-001",
+                null,
+                null,
+                "LENGTH",
+                "M",
+                List.of(
+                    new QuoteLineLotPieceSnapshot(
+                        stockUnitId, "ROLL-001", new BigDecimal("120.000"), "M")),
+                new BigDecimal("120.000")));
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class)))
+        .thenAnswer(
+            inv -> {
+              Quote saved = inv.getArgument(0);
+              saved.getLines().get(0).setId(lineId);
+              return saved;
+            });
+    when(catalogService.getActiveByProductId(productId)).thenReturn(product("GBP", "15.00"));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
+        .thenReturn(pricingResult());
+    when(salesLotService.resolveNewSelectionSnapshots(req.getSelectedLots())).thenReturn(snapshots);
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    Quote updated = quoteService.addQuoteLine(quoteId, req);
+
+    QuoteLine line = updated.getLines().get(0);
+    assertEquals(snapshots, QuoteLineLotSnapshotCodec.fromJson(line.getLotSnapshot()));
+    assertEquals(0, line.getRequestedQty().compareTo(new BigDecimal("120.000")));
+    verify(stockUnitSoftHoldPort).replaceHolds(lineId, List.of(stockUnitId));
+  }
+
+  @Test
+  @DisplayName("Should update lot snapshot and keep offered spec unchanged")
+  void shouldUpdateLotSnapshotAndKeepOfferedSpecUnchanged() {
+    UUID lineId = UUID.randomUUID();
+    UUID qualityGradeId = UUID.randomUUID();
+    UUID colorId = UUID.randomUUID();
+    UUID lotId = UUID.randomUUID();
+    UUID stockUnitId = UUID.randomUUID();
+    QuoteLine line = quoteLine("GBP", "100.00", "2.000");
+    line.setId(lineId);
+    line.applyQualityGrade(qualityGradeId, "A", "Grade A", new BigDecimal("1.125"));
+    line.applyColor(colorId, "NAVY-01", "Navy", "#001F3F");
+    quote.addLine(line);
+
+    UpdateQuoteLineRequest req = new UpdateQuoteLineRequest();
+    req.setQualityGradeId(qualityGradeId);
+    req.setColorId(colorId);
+    req.setRequestedQty(new BigDecimal("250.000"));
+    req.setUnit("M");
+    req.setOfferedPrice(new BigDecimal("80.00"));
+    req.setSelectedLots(List.of(new QuoteLineLotSelectionRequest(lotId, List.of(stockUnitId))));
+    List<QuoteLineLotSnapshot> snapshots =
+        List.of(
+            new QuoteLineLotSnapshot(
+                lotId,
+                "LOT-002",
+                null,
+                null,
+                "LENGTH",
+                "M",
+                List.of(
+                    new QuoteLineLotPieceSnapshot(
+                        stockUnitId, "ROLL-002", new BigDecimal("300.000"), "M")),
+                new BigDecimal("300.000")));
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
+        .thenReturn(pricingResult());
+    when(salesQualityGradeService.resolveSnapshot(qualityGradeId))
+        .thenReturn(
+            new SalesQualityGradeSnapshot(qualityGradeId, "A", "Grade A", new BigDecimal("1.125")));
+    when(salesColorService.resolveUpdateSnapshot(colorId, line))
+        .thenReturn(new SalesColorSnapshot(colorId, "NAVY-01", "Navy", "#001F3F"));
+    when(salesLotService.resolveUpdateSelectionSnapshots(
+            req.getSelectedLots(), line.getLotSnapshot()))
+        .thenReturn(snapshots);
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Quote updated = quoteService.updateQuoteLine(quoteId, lineId, req);
+
+    QuoteLine updatedLine = updated.getLines().get(0);
+    assertEquals(qualityGradeId, updatedLine.getQualityGradeId());
+    assertEquals(colorId, updatedLine.getColorId());
+    assertEquals(0, updatedLine.getRequestedQty().compareTo(new BigDecimal("250.000")));
+    assertEquals(snapshots, QuoteLineLotSnapshotCodec.fromJson(updatedLine.getLotSnapshot()));
+    verify(stockUnitSoftHoldPort).replaceHolds(lineId, List.of(stockUnitId));
+  }
+
+  @Test
   @DisplayName("Should carry line currency when revising quote")
   void shouldCarryLineCurrencyWhenRevisingQuote() {
     quote.setCurrency("USD");
     quote.setStatus(QuoteStatus.APPROVED);
-    quote.addLine(quoteLine("USD", "12.00", "2.000"));
+    UUID qualityGradeId = UUID.randomUUID();
+    UUID colorId = UUID.randomUUID();
+    QuoteLine sourceLine = quoteLine("USD", "12.00", "2.000");
+    sourceLine.applyQualityGrade(qualityGradeId, "A", "Grade A", new BigDecimal("1.125"));
+    sourceLine.applyColor(colorId, "NAVY-01", "Navy", "#001F3F");
+    quote.addLine(sourceLine);
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(quote));
@@ -349,7 +568,16 @@ class QuoteServiceTest {
     verify(quoteApprovalService).expirePendingTokensForQuote(tenantId, quoteId);
     assertEquals(revised, savedRevision);
     assertEquals("USD", savedRevision.getCurrency());
-    assertEquals("USD", savedRevision.getLines().get(0).getCurrency());
+    QuoteLine revisedLine = savedRevision.getLines().get(0);
+    assertEquals("USD", revisedLine.getCurrency());
+    assertEquals(qualityGradeId, revisedLine.getQualityGradeId());
+    assertEquals("A", revisedLine.getQualityGradeCode());
+    assertEquals("Grade A", revisedLine.getQualityGradeName());
+    assertEquals(0, revisedLine.getQualityPriceFactor().compareTo(new BigDecimal("1.125")));
+    assertEquals(colorId, revisedLine.getColorId());
+    assertEquals("NAVY-01", revisedLine.getColorCode());
+    assertEquals("Navy", revisedLine.getColorName());
+    assertEquals("#001F3F", revisedLine.getColorHex());
     assertNotNull(savedRevision.getTotalAmount());
     assertNotNull(savedRevision.getReportingTotal());
   }
@@ -965,6 +1193,7 @@ class QuoteServiceTest {
     return new SalesProductDto(
         UUID.randomUUID(),
         productId,
+        "Combed cotton fabric",
         "FABRIC",
         new BigDecimal(listPrice),
         currency,

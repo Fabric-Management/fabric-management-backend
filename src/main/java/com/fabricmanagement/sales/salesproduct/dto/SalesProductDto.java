@@ -8,6 +8,7 @@ import lombok.Value;
 public class SalesProductDto {
   UUID id;
   UUID productId;
+  String productName;
   String moduleType;
   BigDecimal listPrice;
   String currency;

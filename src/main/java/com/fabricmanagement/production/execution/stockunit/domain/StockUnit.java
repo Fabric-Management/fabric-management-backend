@@ -138,6 +138,14 @@ public class StockUnit extends BaseEntity {
   @Column(name = "unit", nullable = false, length = 10)
   private String unit;
 
+  /** Length for roll-like inventory. Nullable; weight remains the mass measure. */
+  @Column(name = "length", precision = 15, scale = 3)
+  private BigDecimal length;
+
+  /** Unit of length measurement. Nullable when {@link #length} is null. */
+  @Column(name = "length_unit", length = 10)
+  private String lengthUnit;
+
   // ── Location ──────────────────────────────────────────────────────────────
 
   /**
@@ -558,6 +566,21 @@ public class StockUnit extends BaseEntity {
     return getConsumedWeight()
         .multiply(new BigDecimal("100"))
         .divide(initialWeight, 2, java.math.RoundingMode.HALF_UP);
+  }
+
+  public void recordLength(BigDecimal length, String lengthUnit) {
+    if (length != null && length.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new StockUnitDomainException("length must be positive when provided");
+    }
+    if (length == null && lengthUnit != null) {
+      throw new StockUnitDomainException("lengthUnit must be null when length is null");
+    }
+    if (length != null && (lengthUnit == null || lengthUnit.isBlank())) {
+      throw new StockUnitDomainException("lengthUnit must not be blank when length is provided");
+    }
+    this.length = length;
+    this.lengthUnit = lengthUnit;
+    onUpdate();
   }
 
   // ── Private Helpers ───────────────────────────────────────────────────────
