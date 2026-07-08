@@ -55,6 +55,12 @@ public class QuoteCreateRequest {
   @Size(max = 50, message = "Payment terms must be 50 characters or less")
   private String paymentTerms;
 
+  /**
+   * @deprecated Superseded by per-line {@code QuoteLine.deliveryStatus}/{@code deliveryDate}
+   *     (QLINE-ATP-1); retained for historical data, no longer written by the FE. See
+   *     docs/sales/tickets/QLINE-LEADTIME-1-remove-quote-header-lead-time.md.
+   */
+  @Deprecated
   @Min(value = 0, message = "Lead time days must be zero or greater")
   @Max(value = 3650, message = "Lead time days must be 3650 or less")
   private Integer leadTimeDays;
