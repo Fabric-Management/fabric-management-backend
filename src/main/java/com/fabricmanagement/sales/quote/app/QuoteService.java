@@ -211,11 +211,18 @@ public class QuoteService {
     assertDraftIdentityEditable(quote, req);
     assertEditable(quote, "edit");
 
+    LocalDate previousValidUntil = quote.getValidUntil();
     quote.updateDraftIdentity(req.getCustomerId(), req.getCurrency());
     quote.updateHeader(
         req.getValidUntil(), req.getPaymentTerms(), req.getLeadTimeDays(), req.getNotes());
     recomputeTotals(quote);
-    return quoteRepository.save(quote);
+    Quote saved = quoteRepository.save(quote);
+    if (!Objects.equals(previousValidUntil, saved.getValidUntil())) {
+      // Lot-quantity intents snapshot the quote's valid-until as their advisory expiry; keep
+      // them in sync so extended quotes don't lose their intents early (QLINE-ATP-1b).
+      batchLotQuantityIntentPort.resyncExpiry(saved.getId(), saved.getValidUntil());
+    }
+    return saved;
   }
 
   @Transactional
@@ -768,9 +775,9 @@ public class QuoteService {
     if (quote.getTenantId() == null || quote.getAssignedToId() == null) {
       return null;
     }
-    Optional<String> displayName =
-        userDisplayNameResolver.resolveDisplayName(quote.getTenantId(), quote.getAssignedToId());
-    return displayName != null ? displayName.orElse(null) : null;
+    return userDisplayNameResolver
+        .resolveDisplayName(quote.getTenantId(), quote.getAssignedToId())
+        .orElse(null);
   }
 
   private record DeliveryDecision(

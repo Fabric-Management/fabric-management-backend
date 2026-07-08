@@ -11,6 +11,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -129,6 +130,20 @@ public class BatchLotQuantityIntent extends BaseEntity {
       String unit,
       LocalDate expiresAt) {
     update(quoteId, quoteNumber, marketerId, marketerName, quantity, unit, expiresAt);
+  }
+
+  /**
+   * Aligns the advisory expiry with the quote's current valid-until. Only ACTIVE intents move;
+   * returns whether anything changed so callers can skip needless saves.
+   */
+  public boolean resyncExpiry(LocalDate expiresAt) {
+    if (status != BatchLotQuantityIntentStatus.ACTIVE
+        || Objects.equals(this.expiresAt, expiresAt)) {
+      return false;
+    }
+    this.expiresAt = expiresAt;
+    onUpdate();
+    return true;
   }
 
   public boolean release(Instant releasedAt) {

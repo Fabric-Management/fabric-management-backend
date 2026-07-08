@@ -100,6 +100,7 @@ public class TenantTransactionalPurgeService {
           "production.stock_unit_audit_log",
           "production.stock_unit_soft_hold",
           "production.stock_unit",
+          "production.batch_lot_quantity_intent",
           "production.goods_receipt_item",
           "production.goods_receipt",
           "production.prod_work_order_assignee",

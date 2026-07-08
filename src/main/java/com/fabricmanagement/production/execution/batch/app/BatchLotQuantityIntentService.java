@@ -141,6 +141,18 @@ public class BatchLotQuantityIntentService implements BatchLotQuantityIntentPort
         .forEach(intent -> release(tenantId, intent, Instant.now()));
   }
 
+  @Override
+  @Transactional
+  public void resyncExpiry(UUID quoteId, LocalDate expiresAt) {
+    UUID tenantId = TenantContext.requireTenantId();
+    intentRepository
+        .findByTenantIdAndQuoteIdAndStatusAndIsActiveTrue(
+            tenantId, quoteId, BatchLotQuantityIntentStatus.ACTIVE)
+        .stream()
+        .filter(intent -> intent.resyncExpiry(expiresAt))
+        .forEach(intentRepository::save);
+  }
+
   @Transactional
   public int releaseExpiredIntents(LocalDate expiredBefore) {
     UUID tenantId = TenantContext.requireTenantId();

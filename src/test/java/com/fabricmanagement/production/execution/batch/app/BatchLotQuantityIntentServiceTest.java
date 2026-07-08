@@ -168,6 +168,68 @@ class BatchLotQuantityIntentServiceTest {
     verify(eventPublisher).publishEvent(any(BatchLotQuantityIntentReleasedEvent.class));
   }
 
+  @Test
+  void shouldResyncExpiryOnActiveIntentsWhenValidUntilChanges() {
+    LocalDate oldExpiry = LocalDate.now().plusDays(5);
+    LocalDate newExpiry = LocalDate.now().plusDays(15);
+    BatchLotQuantityIntent intent = intent(oldExpiry);
+
+    when(intentRepository.findByTenantIdAndQuoteIdAndStatusAndIsActiveTrue(
+            tenantId, quoteId, BatchLotQuantityIntentStatus.ACTIVE))
+        .thenReturn(List.of(intent));
+    when(intentRepository.save(any(BatchLotQuantityIntent.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    service.resyncExpiry(quoteId, newExpiry);
+
+    assertEquals(newExpiry, intent.getExpiresAt());
+    verify(intentRepository).save(intent);
+  }
+
+  @Test
+  void shouldSkipSaveWhenExpiryAlreadyMatches() {
+    LocalDate expiry = LocalDate.now().plusDays(5);
+    BatchLotQuantityIntent intent = intent(expiry);
+
+    when(intentRepository.findByTenantIdAndQuoteIdAndStatusAndIsActiveTrue(
+            tenantId, quoteId, BatchLotQuantityIntentStatus.ACTIVE))
+        .thenReturn(List.of(intent));
+
+    service.resyncExpiry(quoteId, expiry);
+
+    verify(intentRepository, times(0)).save(any(BatchLotQuantityIntent.class));
+  }
+
+  @Test
+  void shouldNotResyncReleasedIntents() {
+    LocalDate oldExpiry = LocalDate.now().plusDays(5);
+    BatchLotQuantityIntent released = intent(oldExpiry);
+    released.release(java.time.Instant.now());
+
+    when(intentRepository.findByTenantIdAndQuoteIdAndStatusAndIsActiveTrue(
+            tenantId, quoteId, BatchLotQuantityIntentStatus.ACTIVE))
+        .thenReturn(List.of(released));
+
+    service.resyncExpiry(quoteId, oldExpiry.plusDays(10));
+
+    assertEquals(oldExpiry, released.getExpiresAt());
+    verify(intentRepository, times(0)).save(any(BatchLotQuantityIntent.class));
+  }
+
+  private BatchLotQuantityIntent intent(LocalDate expiresAt) {
+    return BatchLotQuantityIntent.place(
+        tenantId,
+        quoteId,
+        "Q-001",
+        quoteLineId,
+        UUID.randomUUID(),
+        "Ayse",
+        batchId,
+        new BigDecimal("10.000"),
+        "M",
+        expiresAt);
+  }
+
   private Batch batch(String physicalQuantity) {
     Batch batch =
         Batch.builder()

@@ -700,6 +700,45 @@ class QuoteServiceTest {
   }
 
   @Test
+  @DisplayName("Should resync lot-intent expiry when header validUntil changes")
+  void shouldResyncIntentExpiryWhenValidUntilChanges() {
+    quote.setValidUntil(LocalDate.now().plusDays(10));
+    LocalDate newValidUntil = LocalDate.now().plusDays(30);
+
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setValidUntil(newValidUntil);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    quoteService.updateQuoteHeader(quoteId, req);
+
+    verify(batchLotQuantityIntentPort).resyncExpiry(quoteId, newValidUntil);
+  }
+
+  @Test
+  @DisplayName("Should not resync lot-intent expiry when header validUntil is unchanged")
+  void shouldNotResyncIntentExpiryWhenValidUntilUnchanged() {
+    LocalDate validUntil = LocalDate.now().plusDays(10);
+    quote.setValidUntil(validUntil);
+
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setValidUntil(validUntil);
+    req.setNotes("Only the note changes");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
+
+    quoteService.updateQuoteHeader(quoteId, req);
+
+    verify(batchLotQuantityIntentPort, never()).resyncExpiry(any(), any());
+  }
+
+  @Test
   @DisplayName("Should update customer and currency before quote has lines")
   void shouldUpdateCustomerAndCurrencyBeforeQuoteHasLines() {
     UUID newCustomerId = UUID.randomUUID();

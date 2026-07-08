@@ -20,6 +20,9 @@ public interface BatchLotQuantityIntentPort {
 
   void releaseIntents(UUID quoteLineId);
 
+  /** Re-align active intent expiry with the quote's current valid-until (advisory metadata). */
+  void resyncExpiry(UUID quoteId, LocalDate expiresAt);
+
   record LotIntentRequest(UUID batchId, BigDecimal quantity, String unit) {}
 
   record LotIntentCoverage(boolean covered) {}

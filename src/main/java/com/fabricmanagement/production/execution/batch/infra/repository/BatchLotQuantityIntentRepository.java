@@ -25,6 +25,9 @@ public interface BatchLotQuantityIntentRepository
   List<BatchLotQuantityIntent> findByTenantIdAndStatusAndExpiresAtBeforeAndIsActiveTrue(
       UUID tenantId, BatchLotQuantityIntentStatus status, LocalDate expiresAt);
 
+  List<BatchLotQuantityIntent> findByTenantIdAndQuoteIdAndStatusAndIsActiveTrue(
+      UUID tenantId, UUID quoteId, BatchLotQuantityIntentStatus status);
+
   @Query(
       """
       SELECT i.batchId AS batchId, COALESCE(SUM(i.quantity), 0) AS quantity
