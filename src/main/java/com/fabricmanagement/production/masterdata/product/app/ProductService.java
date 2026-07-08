@@ -9,6 +9,7 @@ import com.fabricmanagement.production.masterdata.product.api.facade.ProductFaca
 import com.fabricmanagement.production.masterdata.product.domain.Product;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.domain.event.ProductCreatedEvent;
+import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
 import com.fabricmanagement.production.masterdata.product.dto.CreateProductRequest;
 import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
@@ -177,6 +178,47 @@ public class ProductService implements ProductFacade {
     return productAttributeRepository.findByIsActiveTrue().stream()
         .map(ProductAttributeDto::from)
         .toList();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The lookup is explicitly tenant-scoped: attribute codes repeat across tenants, and
+   * integration tests run as a superuser DB role that bypasses RLS, so an unscoped code lookup is
+   * not single-result-safe.
+   */
+  @Override
+  @Transactional
+  public ProductAttributeDto ensureAttribute(
+      String attributeCode,
+      String attributeName,
+      String attributeGroup,
+      String productScope,
+      String description,
+      Integer displayOrder) {
+    UUID tenantId = TenantContext.requireTenantId();
+
+    return productAttributeRepository
+        .findFirstByTenantIdAndAttributeCode(tenantId, attributeCode)
+        .map(ProductAttributeDto::from)
+        .orElseGet(
+            () -> {
+              ProductAttribute attribute =
+                  ProductAttribute.builder()
+                      .attributeCode(attributeCode)
+                      .attributeName(attributeName)
+                      .attributeGroup(attributeGroup)
+                      .productScope(productScope)
+                      .description(description)
+                      .displayOrder(displayOrder)
+                      .build();
+              attribute.setTenantId(tenantId);
+
+              ProductAttribute saved = productAttributeRepository.save(attribute);
+              log.info(
+                  "✅ Product attribute created: code={}, tenantId={}", attributeCode, tenantId);
+              return ProductAttributeDto.from(saved);
+            });
   }
 
   /**

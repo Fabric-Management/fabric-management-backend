@@ -67,4 +67,28 @@ public interface ProductFacade {
    */
   List<com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto> getAttributes(
       String scope);
+
+  /**
+   * Ensure a product attribute exists for the current tenant, creating it if missing.
+   *
+   * <p>The lookup is tenant-scoped (TenantContext); attribute codes repeat across tenants.
+   * ProductAttribute is read-only reference data with no create endpoint, so this is the sanctioned
+   * write path for in-process callers (e.g. bootstrap seeders) that need a tenant-local attribute
+   * axis such as COLOR.
+   *
+   * @param attributeCode Attribute code (e.g., COLOR)
+   * @param attributeName Display name used when the attribute has to be created
+   * @param attributeGroup Attribute group (e.g., VARIANT)
+   * @param productScope Product scope (e.g., FIBER, YARN, FABRIC, ALL)
+   * @param description Description used when the attribute has to be created
+   * @param displayOrder Display order used when the attribute has to be created
+   * @return Existing or newly created attribute
+   */
+  com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto ensureAttribute(
+      String attributeCode,
+      String attributeName,
+      String attributeGroup,
+      String productScope,
+      String description,
+      Integer displayOrder);
 }

@@ -14,5 +14,12 @@ public interface ProductAttributeRepository extends JpaRepository<ProductAttribu
 
   List<ProductAttribute> findByIsActiveTrueAndProductScopeIn(List<String> scopes);
 
-  Optional<ProductAttribute> findByAttributeCode(String attributeCode);
+  /**
+   * Tenant-scoped code lookup. Attribute codes repeat across tenants (each tenant carries its own
+   * copy of the reference rows), and integration tests run as a superuser DB role that bypasses RLS
+   * — so an unscoped code lookup is not single-result-safe. {@code findFirst} keeps the query safe
+   * even if a tenant ever ends up with duplicate rows for the same code.
+   */
+  Optional<ProductAttribute> findFirstByTenantIdAndAttributeCode(
+      UUID tenantId, String attributeCode);
 }

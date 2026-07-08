@@ -45,6 +45,7 @@ public class DemoTransactionSeeder {
   private final FinanceDemoSeeder financeDemoSeeder;
   private final SalesDemoSeeder salesDemoSeeder;
   private final ProcurementDemoSeeder procurementDemoSeeder;
+  private final SalesQuoteDemoSeeder salesQuoteDemoSeeder;
 
   @Value("${application.seed.demo-transactions.enabled:false}")
   private boolean enabled;
@@ -87,6 +88,7 @@ public class DemoTransactionSeeder {
       if (!existing.isEmpty()) {
         log.info("Demo transactions already exist for tenant: {}. Skipping.", tenantId);
         seedProcurementDemo(tenantId);
+        seedSalesQuoteDemo(tenantId);
         return;
       }
 
@@ -120,6 +122,7 @@ public class DemoTransactionSeeder {
       }
 
       seedProcurementDemo(tenantId);
+      seedSalesQuoteDemo(tenantId);
 
       // 3. Production demo (best-effort, isolated): sales order → work order → batch.
       // Pre-existing demo data. Wrapped in its own try/catch so a failure here can never roll back
@@ -224,6 +227,20 @@ public class DemoTransactionSeeder {
           "Procurement demo seeding failed for tenant {} - continuing; other demos unaffected.",
           tenantId,
           procurementEx);
+    }
+  }
+
+  private void seedSalesQuoteDemo(UUID tenantId) {
+    // Runs in its own transaction (REQUIRES_NEW, same pattern as SalesDemoSeeder): a DB-level
+    // failure inside the seeder aborts only ITS transaction, so catching here keeps signup /
+    // onboarding / reset flows (which call this from within their own transaction) healthy.
+    try {
+      salesQuoteDemoSeeder.seedFor(tenantId);
+    } catch (Exception salesQuoteEx) {
+      log.warn(
+          "Sales quote demo seeding failed for tenant {} - continuing; other demos unaffected.",
+          tenantId,
+          salesQuoteEx);
     }
   }
 }
