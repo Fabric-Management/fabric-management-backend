@@ -25,6 +25,9 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
+import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort;
+import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort.LotIntentCoverage;
 import com.fabricmanagement.production.execution.stockunit.api.StockUnitSoftHoldPort;
 import com.fabricmanagement.sales.color.app.SalesColorService;
 import com.fabricmanagement.sales.color.app.SalesColorSnapshot;
@@ -93,12 +96,14 @@ class QuoteServiceTest {
   @Mock private QuoteApprovalService quoteApprovalService;
   @Mock private TradingPartnerResolver tradingPartnerResolver;
   @Mock private PartnerContactService partnerContactService;
+  @Mock private UserRepository userRepository;
   @Mock private QuoteSendRequestRepository quoteSendRequestRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private SalesQualityGradeService salesQualityGradeService;
   @Mock private SalesColorService salesColorService;
   @Mock private SalesLotService salesLotService;
   @Mock private StockUnitSoftHoldPort stockUnitSoftHoldPort;
+  @Mock private BatchLotQuantityIntentPort batchLotQuantityIntentPort;
 
   @InjectMocks private QuoteService quoteService;
 
@@ -470,6 +475,8 @@ class QuoteServiceTest {
     when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
         .thenReturn(pricingResult());
     when(salesLotService.resolveNewSelectionSnapshots(req.getSelectedLots())).thenReturn(snapshots);
+    when(batchLotQuantityIntentPort.checkCoverage(eq(null), any()))
+        .thenReturn(new LotIntentCoverage(true));
     when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
 
     Quote updated = quoteService.addQuoteLine(quoteId, req);
@@ -478,6 +485,70 @@ class QuoteServiceTest {
     assertEquals(snapshots, QuoteLineLotSnapshotCodec.fromJson(line.getLotSnapshot()));
     assertEquals(0, line.getRequestedQty().compareTo(new BigDecimal("120.000")));
     verify(stockUnitSoftHoldPort).replaceHolds(lineId, List.of(stockUnitId));
+    verify(batchLotQuantityIntentPort)
+        .replaceIntents(eq(quoteId), any(), eq(lineId), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("Should reject selected lot quantities that do not equal requested quantity")
+  void shouldRejectSelectedLotQuantitiesThatDoNotEqualRequestedQuantity() {
+    UUID lotId = UUID.randomUUID();
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(new BigDecimal("120.000"));
+    req.setUnit("M");
+    req.setOfferedPrice(new BigDecimal("12.00"));
+    req.setSelectedLots(
+        List.of(new QuoteLineLotSelectionRequest(lotId, List.of(), new BigDecimal("100.000"))));
+    List<QuoteLineLotSnapshot> snapshots =
+        List.of(
+            new QuoteLineLotSnapshot(
+                lotId, "LOT-001", null, null, "LENGTH", "M", List.of(), new BigDecimal("100.000")));
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(catalogService.getActiveByProductId(productId)).thenReturn(product("GBP", "15.00"));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(salesLotService.resolveNewSelectionSnapshots(req.getSelectedLots())).thenReturn(snapshots);
+
+    SalesDomainException ex =
+        assertThrows(SalesDomainException.class, () -> quoteService.addQuoteLine(quoteId, req));
+
+    assertEquals("SALES_017_LOT_INTENT_QUANTITY_MISMATCH", ex.getErrorCode());
+    assertEquals(422, ex.getHttpStatus());
+    verify(quoteRepository, never()).save(any(Quote.class));
+  }
+
+  @Test
+  @DisplayName("Should require delivery status when lot free stock does not cover line")
+  void shouldRequireDeliveryStatusWhenLotFreeStockDoesNotCoverLine() {
+    UUID lotId = UUID.randomUUID();
+    AddQuoteLineRequest req = new AddQuoteLineRequest();
+    req.setProductId(productId);
+    req.setRequestedQty(new BigDecimal("120.000"));
+    req.setUnit("M");
+    req.setOfferedPrice(new BigDecimal("12.00"));
+    req.setSelectedLots(
+        List.of(new QuoteLineLotSelectionRequest(lotId, List.of(), new BigDecimal("120.000"))));
+    List<QuoteLineLotSnapshot> snapshots =
+        List.of(
+            new QuoteLineLotSnapshot(
+                lotId, "LOT-001", null, null, "LENGTH", "M", List.of(), new BigDecimal("120.000")));
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(catalogService.getActiveByProductId(productId)).thenReturn(product("GBP", "15.00"));
+    when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
+    when(salesLotService.resolveNewSelectionSnapshots(req.getSelectedLots())).thenReturn(snapshots);
+    when(batchLotQuantityIntentPort.checkCoverage(eq(null), any()))
+        .thenReturn(new LotIntentCoverage(false));
+
+    SalesDomainException ex =
+        assertThrows(SalesDomainException.class, () -> quoteService.addQuoteLine(quoteId, req));
+
+    assertEquals("SALES_016_DELIVERY_STATUS_REQUIRED", ex.getErrorCode());
+    assertEquals(422, ex.getHttpStatus());
+    verify(quoteRepository, never()).save(any(Quote.class));
   }
 
   @Test
@@ -500,7 +571,10 @@ class QuoteServiceTest {
     req.setRequestedQty(new BigDecimal("250.000"));
     req.setUnit("M");
     req.setOfferedPrice(new BigDecimal("80.00"));
-    req.setSelectedLots(List.of(new QuoteLineLotSelectionRequest(lotId, List.of(stockUnitId))));
+    req.setSelectedLots(
+        List.of(
+            new QuoteLineLotSelectionRequest(
+                lotId, List.of(stockUnitId), new BigDecimal("250.000"))));
     List<QuoteLineLotSnapshot> snapshots =
         List.of(
             new QuoteLineLotSnapshot(
@@ -513,7 +587,7 @@ class QuoteServiceTest {
                 List.of(
                     new QuoteLineLotPieceSnapshot(
                         stockUnitId, "ROLL-002", new BigDecimal("300.000"), "M")),
-                new BigDecimal("300.000")));
+                new BigDecimal("250.000")));
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(quote));
@@ -528,6 +602,8 @@ class QuoteServiceTest {
     when(salesLotService.resolveUpdateSelectionSnapshots(
             req.getSelectedLots(), line.getLotSnapshot()))
         .thenReturn(snapshots);
+    when(batchLotQuantityIntentPort.checkCoverage(eq(lineId), any()))
+        .thenReturn(new LotIntentCoverage(true));
     when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
     when(quoteRepository.save(any(Quote.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -539,6 +615,8 @@ class QuoteServiceTest {
     assertEquals(0, updatedLine.getRequestedQty().compareTo(new BigDecimal("250.000")));
     assertEquals(snapshots, QuoteLineLotSnapshotCodec.fromJson(updatedLine.getLotSnapshot()));
     verify(stockUnitSoftHoldPort).replaceHolds(lineId, List.of(stockUnitId));
+    verify(batchLotQuantityIntentPort)
+        .replaceIntents(eq(quoteId), any(), eq(lineId), any(), any(), any(), any());
   }
 
   @Test

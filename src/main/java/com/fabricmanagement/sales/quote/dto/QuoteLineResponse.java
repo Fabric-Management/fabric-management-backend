@@ -1,8 +1,10 @@
 package com.fabricmanagement.sales.quote.dto;
 
 import com.fabricmanagement.sales.quote.domain.QuoteLine;
+import com.fabricmanagement.sales.quote.domain.QuoteLineDeliveryStatus;
 import com.fabricmanagement.sales.quote.domain.QuotePriceZone;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
@@ -22,6 +24,9 @@ public class QuoteLineResponse {
   private final String colorName;
   private final String colorHex;
   private final List<QuoteLineLotSnapshot> selectedLots;
+  private final QuoteLineDeliveryStatus deliveryStatus;
+  private final LocalDate deliveryDate;
+  private final Boolean deliveryCovered;
   private final BigDecimal requestedQty;
   private final String unit;
   private final BigDecimal listPrice;
@@ -45,6 +50,9 @@ public class QuoteLineResponse {
     this.colorName = line.getColorName();
     this.colorHex = line.getColorHex();
     this.selectedLots = QuoteLineLotSnapshotCodec.fromJson(line.getLotSnapshot());
+    this.deliveryStatus = line.getDeliveryStatus();
+    this.deliveryDate = line.getDeliveryDate();
+    this.deliveryCovered = line.getDeliveryCovered();
     this.requestedQty = line.getRequestedQty();
     this.unit = line.getUnit();
     this.listPrice = line.getListPrice();

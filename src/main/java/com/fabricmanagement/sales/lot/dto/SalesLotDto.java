@@ -13,4 +13,9 @@ public record SalesLotDto(
     SalesLotQualityDto quality,
     SalesLotColourDto colour,
     BigDecimal availableQuantity,
+    BigDecimal physicalQuantity,
+    BigDecimal softIntentQuantity,
+    BigDecimal hardReservedQuantity,
+    BigDecimal freeQuantity,
+    List<SalesLotIntentDto> intents,
     List<SalesLotPieceDto> pieces) {}

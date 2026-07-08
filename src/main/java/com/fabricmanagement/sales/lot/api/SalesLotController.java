@@ -6,11 +6,13 @@ import com.fabricmanagement.sales.lot.dto.SalesLotDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -23,8 +25,11 @@ public class SalesLotController {
 
   @GetMapping
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
-  @Operation(operationId = "listSalesLots", summary = "List sales-readable lots and pieces")
-  public ResponseEntity<ApiResponse<List<SalesLotDto>>> listSalesLots() {
-    return ResponseEntity.ok(ApiResponse.success(salesLotService.listSalesLots()));
+  @Operation(
+      operationId = "listSalesLots",
+      summary = "List sales-readable lots, pieces, and advisory ATP quantities")
+  public ResponseEntity<ApiResponse<List<SalesLotDto>>> listSalesLots(
+      @RequestParam(required = false) UUID quoteLineId) {
+    return ResponseEntity.ok(ApiResponse.success(salesLotService.listSalesLots(quoteLineId)));
   }
 }

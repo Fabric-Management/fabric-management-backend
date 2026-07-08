@@ -9,6 +9,7 @@ import com.fabricmanagement.production.execution.batch.api.query.ProductionSales
 import com.fabricmanagement.sales.common.exception.SalesDomainException;
 import com.fabricmanagement.sales.lot.dto.SalesLotColourDto;
 import com.fabricmanagement.sales.lot.dto.SalesLotDto;
+import com.fabricmanagement.sales.lot.dto.SalesLotIntentDto;
 import com.fabricmanagement.sales.lot.dto.SalesLotPieceDto;
 import com.fabricmanagement.sales.lot.dto.SalesLotQualityDto;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotPieceSnapshot;
@@ -36,7 +37,13 @@ public class SalesLotService {
   private final ProductionSalesLotQueryService productionLotQueryService;
 
   public List<SalesLotDto> listSalesLots() {
-    return productionLotQueryService.listSaleableLots().stream().map(this::toDto).toList();
+    return listSalesLots(null);
+  }
+
+  public List<SalesLotDto> listSalesLots(UUID excludedQuoteLineId) {
+    return productionLotQueryService.listSaleableLots(excludedQuoteLineId).stream()
+        .map(this::toDto)
+        .toList();
   }
 
   public List<QuoteLineLotSnapshot> resolveNewSelectionSnapshots(
@@ -114,12 +121,7 @@ public class SalesLotService {
             .map(pieceId -> snapshotPiece(pieceId, piecesById.get(pieceId), existingPieces))
             .toList();
     BigDecimal derivedQuantity =
-        pieces.isEmpty()
-            ? lot.availableQuantity()
-            : pieces.stream()
-                .map(QuoteLineLotPieceSnapshot::measure)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        selection.quantity() != null ? selection.quantity() : derivedQuantity(lot, pieces);
     return new QuoteLineLotSnapshot(
         lot.id(),
         lot.lotNo(),
@@ -149,6 +151,16 @@ public class SalesLotService {
         piece.id(), piece.pieceNo(), piece.primaryMeasureValue(), piece.primaryMeasureUnit());
   }
 
+  private BigDecimal derivedQuantity(
+      ProductionSalesLotReference lot, List<QuoteLineLotPieceSnapshot> pieces) {
+    return pieces.isEmpty()
+        ? lot.availableQuantity()
+        : pieces.stream()
+            .map(QuoteLineLotPieceSnapshot::measure)
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
   private SalesLotDto toDto(ProductionSalesLotReference ref) {
     return new SalesLotDto(
         ref.id(),
@@ -159,6 +171,20 @@ public class SalesLotService {
         toQualityDto(ref.quality()),
         toColourDto(ref.colour()),
         ref.availableQuantity(),
+        ref.physicalQuantity(),
+        ref.softIntentQuantity(),
+        ref.hardReservedQuantity(),
+        ref.freeQuantity(),
+        ref.intents().stream()
+            .map(
+                intent ->
+                    new SalesLotIntentDto(
+                        intent.quoteId(),
+                        intent.quoteNumber(),
+                        intent.marketerName(),
+                        intent.quantity(),
+                        intent.expiresAt()))
+            .toList(),
         ref.pieces().stream().map(this::toPieceDto).toList());
   }
 

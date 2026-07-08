@@ -42,8 +42,12 @@ public class QualityGradeQueryService {
     if (productType == null || productType.isBlank()) {
       throw new IllegalArgumentException("productType is required");
     }
-    ProductType resolvedProductType =
-        ProductType.valueOf(productType.trim().toUpperCase(Locale.ROOT));
+    ProductType resolvedProductType;
+    try {
+      resolvedProductType = ProductType.valueOf(productType.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException ex) {
+      throw new IllegalArgumentException("Unknown productType: " + productType, ex);
+    }
     return findSalesGradeReferences(resolvedProductType, includeNonSaleable);
   }
 

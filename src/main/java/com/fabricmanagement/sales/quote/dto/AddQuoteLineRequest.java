@@ -1,11 +1,13 @@
 package com.fabricmanagement.sales.quote.dto;
 
+import com.fabricmanagement.sales.quote.domain.QuoteLineDeliveryStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.Data;
@@ -21,6 +23,10 @@ public class AddQuoteLineRequest {
   private UUID colorId;
 
   @Valid private List<QuoteLineLotSelectionRequest> selectedLots;
+
+  private QuoteLineDeliveryStatus deliveryStatus;
+
+  private LocalDate deliveryDate;
 
   @NotNull(message = "Requested quantity is required")
   @DecimalMin(value = "0.001", message = "Requested quantity must be greater than zero")

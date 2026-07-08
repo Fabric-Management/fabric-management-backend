@@ -6,7 +6,9 @@ import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchAttributeRepository;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
+import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatus;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
@@ -16,6 +18,7 @@ import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryServ
 import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService.ColorReference;
 import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -44,6 +47,8 @@ public class ProductionSalesLotQueryService {
       Set.of("COLOR", "COLOUR", "COLOR_ID", "COLOUR_ID", "SHADE");
 
   private final BatchRepository batchRepository;
+  private final BatchReservationRepository reservationRepository;
+  private final BatchLotQuantityIntentRepository lotIntentRepository;
   private final StockUnitRepository stockUnitRepository;
   private final StockUnitSoftHoldRepository softHoldRepository;
   private final BatchAttributeRepository batchAttributeRepository;
@@ -53,6 +58,10 @@ public class ProductionSalesLotQueryService {
   private final PrimaryMeasureResolver primaryMeasureResolver;
 
   public List<ProductionSalesLotReference> listSaleableLots() {
+    return listSaleableLots(null);
+  }
+
+  public List<ProductionSalesLotReference> listSaleableLots(UUID excludedQuoteLineId) {
     UUID tenantId = TenantContext.requireTenantId();
     List<Batch> batches =
         batchRepository.findByTenantIdAndStatusIn(tenantId, SALEABLE_BATCH_STATUSES).stream()
@@ -60,7 +69,7 @@ public class ProductionSalesLotQueryService {
             .sorted(
                 Comparator.comparing(Batch::getBatchCode, Comparator.nullsLast(String::compareTo)))
             .toList();
-    return toReferences(tenantId, batches);
+    return toReferences(tenantId, batches, excludedQuoteLineId);
   }
 
   public List<ProductionSalesLotReference> findLotsByIds(Collection<UUID> lotIds) {
@@ -73,10 +82,11 @@ public class ProductionSalesLotQueryService {
             .filter(batch -> tenantId.equals(batch.getTenantId()))
             .filter(batch -> Boolean.TRUE.equals(batch.getIsActive()))
             .toList();
-    return toReferences(tenantId, batches);
+    return toReferences(tenantId, batches, null);
   }
 
-  private List<ProductionSalesLotReference> toReferences(UUID tenantId, List<Batch> batches) {
+  private List<ProductionSalesLotReference> toReferences(
+      UUID tenantId, List<Batch> batches, UUID excludedQuoteLineId) {
     if (batches.isEmpty()) {
       return List.of();
     }
@@ -91,6 +101,17 @@ public class ProductionSalesLotQueryService {
                 .flatMap(Collection::stream)
                 .map(StockUnit::getId)
                 .toList());
+    Map<UUID, BigDecimal> softIntentQuantities =
+        lotIntentRepository.sumActiveByBatchIds(tenantId, batchIds, excludedQuoteLineId);
+    Map<UUID, BigDecimal> hardReservedQuantities =
+        reservationRepository.sumActiveRemainingByBatchIds(tenantId, batchIds);
+    Map<UUID, List<ProductionSalesLotIntentReference>> intentsByBatch =
+        lotIntentRepository.findActiveByBatchIds(tenantId, batchIds, excludedQuoteLineId).stream()
+            .map(BatchLotIntentView::from)
+            .collect(
+                Collectors.groupingBy(
+                    BatchLotIntentView::batchId,
+                    Collectors.mapping(BatchLotIntentView::intent, Collectors.toList())));
     Map<UUID, LotColourReference> coloursByBatch = resolveColoursByBatch(batchIds);
 
     return batches.stream()
@@ -114,6 +135,19 @@ public class ProductionSalesLotQueryService {
                                   primaryMeasure,
                                   softHoldCounts.getOrDefault(unit.getId(), 0L)))
                       .toList();
+              BigDecimal physicalQuantity =
+                  pieces.isEmpty()
+                      ? physicalBatchQuantity(batch)
+                      : sumSelectablePieces(pieces, primaryMeasure);
+              BigDecimal softIntentQuantity =
+                  softIntentQuantities.getOrDefault(batch.getId(), BigDecimal.ZERO);
+              BigDecimal hardReservedQuantity =
+                  hardReservedQuantities.getOrDefault(batch.getId(), BigDecimal.ZERO);
+              BigDecimal freeQuantity =
+                  physicalQuantity.subtract(softIntentQuantity).subtract(hardReservedQuantity);
+              if (freeQuantity.compareTo(BigDecimal.ZERO) < 0) {
+                freeQuantity = BigDecimal.ZERO;
+              }
               return new ProductionSalesLotReference(
                   batch.getId(),
                   batch.getBatchCode(),
@@ -126,6 +160,11 @@ public class ProductionSalesLotQueryService {
                   pieces.isEmpty()
                       ? batch.getAvailableQuantity()
                       : sumSelectablePieces(pieces, primaryMeasure),
+                  physicalQuantity,
+                  softIntentQuantity,
+                  hardReservedQuantity,
+                  freeQuantity,
+                  intentsByBatch.getOrDefault(batch.getId(), List.of()),
                   pieces);
             })
         .toList();
@@ -192,6 +231,10 @@ public class ProductionSalesLotQueryService {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
+  private BigDecimal physicalBatchQuantity(Batch batch) {
+    return batch.getQuantity().subtract(batch.getConsumedQuantity());
+  }
+
   private Optional<LotQualityReference> resolveLotQuality(List<StockUnit> units) {
     return units.stream()
         .map(StockUnit::getQualityGradeId)
@@ -245,7 +288,19 @@ public class ProductionSalesLotQueryService {
       LotQualityReference quality,
       LotColourReference colour,
       BigDecimal availableQuantity,
+      BigDecimal physicalQuantity,
+      BigDecimal softIntentQuantity,
+      BigDecimal hardReservedQuantity,
+      BigDecimal freeQuantity,
+      List<ProductionSalesLotIntentReference> intents,
       List<ProductionSalesPieceReference> pieces) {}
+
+  public record ProductionSalesLotIntentReference(
+      UUID quoteId,
+      String quoteNumber,
+      String marketerName,
+      BigDecimal quantity,
+      LocalDate expiresAt) {}
 
   public record ProductionSalesPieceReference(
       UUID id,
@@ -269,4 +324,18 @@ public class ProductionSalesLotQueryService {
       UUID id, String code, String name, String colorHex, String colourLabel) {}
 
   private record BatchColour(UUID batchId, LotColourReference colour) {}
+
+  private record BatchLotIntentView(UUID batchId, ProductionSalesLotIntentReference intent) {
+    private static BatchLotIntentView from(
+        com.fabricmanagement.production.execution.batch.domain.BatchLotQuantityIntent source) {
+      return new BatchLotIntentView(
+          source.getBatchId(),
+          new ProductionSalesLotIntentReference(
+              source.getQuoteId(),
+              source.getQuoteNumber(),
+              source.getMarketerName(),
+              source.getQuantity(),
+              source.getExpiresAt()));
+    }
+  }
 }

@@ -8,6 +8,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -56,6 +57,16 @@ public class QuoteLine extends BaseEntity {
   @Type(JsonType.class)
   @Column(name = "lot_snapshot", columnDefinition = "jsonb", nullable = false)
   private String lotSnapshot = "[]";
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "delivery_status", length = 30)
+  private QuoteLineDeliveryStatus deliveryStatus;
+
+  @Column(name = "delivery_date")
+  private LocalDate deliveryDate;
+
+  @Column(name = "delivery_covered")
+  private Boolean deliveryCovered;
 
   @Column(name = "requested_qty", nullable = false, precision = 15, scale = 3)
   private BigDecimal requestedQty;
@@ -130,6 +141,13 @@ public class QuoteLine extends BaseEntity {
 
   public void applyLotSnapshot(String lotSnapshot) {
     this.lotSnapshot = lotSnapshot == null || lotSnapshot.isBlank() ? "[]" : lotSnapshot;
+  }
+
+  public void applyDelivery(
+      QuoteLineDeliveryStatus deliveryStatus, LocalDate deliveryDate, Boolean deliveryCovered) {
+    this.deliveryStatus = deliveryStatus;
+    this.deliveryDate = deliveryDate;
+    this.deliveryCovered = deliveryCovered;
   }
 
   public void applyPricing(

@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.masterdata.qualitygrade.api.query;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -70,6 +71,17 @@ class QualityGradeQueryServiceTest {
         qualityGradeQueryService.findSalesGradeReferences("fabric", false);
 
     assertEquals(List.of("1A"), result.stream().map(r -> r.code()).toList());
+  }
+
+  @Test
+  @DisplayName("Should report unknown string product type explicitly")
+  void shouldReportUnknownStringProductTypeExplicitly() {
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> qualityGradeQueryService.findSalesGradeReferences("UNKNOWN", false));
+
+    assertEquals("Unknown productType: UNKNOWN", ex.getMessage());
   }
 
   @Test

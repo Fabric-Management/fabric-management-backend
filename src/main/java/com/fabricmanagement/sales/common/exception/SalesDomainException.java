@@ -100,4 +100,14 @@ public class SalesDomainException extends DomainException {
         "SALES_015_REFERENCE_NO_LONGER_AVAILABLE",
         HttpStatus.CONFLICT);
   }
+
+  public static SalesDomainException deliveryStatusRequired(String message) {
+    return new SalesDomainException(
+        message, "SALES_016_DELIVERY_STATUS_REQUIRED", HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+
+  public static SalesDomainException lotIntentQuantityMismatch(String message) {
+    return new SalesDomainException(
+        message, "SALES_017_LOT_INTENT_QUANTITY_MISMATCH", HttpStatus.UNPROCESSABLE_ENTITY);
+  }
 }

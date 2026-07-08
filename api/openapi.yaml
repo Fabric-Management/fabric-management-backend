@@ -36534,6 +36534,13 @@ paths:
   /api/v1/sales/lots:
     get:
       operationId: listSalesLots
+      parameters:
+      - in: query
+        name: quoteLineId
+        required: false
+        schema:
+          type: string
+          format: uuid
       responses:
         "200":
           content:
@@ -36592,7 +36599,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: List sales-readable lots and pieces
+      summary: "List sales-readable lots, pieces, and advisory ATP quantities"
       tags:
       - Sales Lot
   /api/v1/sales/orders:
@@ -42561,6 +42568,16 @@ components:
         colorId:
           type: string
           format: uuid
+        deliveryDate:
+          type: string
+          format: date
+        deliveryStatus:
+          type: string
+          enum:
+          - FROM_STOCK
+          - TO_BE_CONFIRMED
+          - FROM_PRODUCTION
+          - STOCK_OVERRIDE
         offeredPrice:
           type: number
           minimum: 0.0001
@@ -54488,6 +54505,18 @@ components:
           type: string
         currency:
           type: string
+        deliveryCovered:
+          type: boolean
+        deliveryDate:
+          type: string
+          format: date
+        deliveryStatus:
+          type: string
+          enum:
+          - FROM_STOCK
+          - TO_BE_CONFIRMED
+          - FROM_PRODUCTION
+          - STOCK_OVERRIDE
         discountRate:
           type: number
         id:
@@ -54900,6 +54929,9 @@ components:
         lotId:
           type: string
           format: uuid
+        quantity:
+          type: number
+          minimum: 0.001
         stockUnitIds:
           type: array
           items:
@@ -54943,6 +54975,18 @@ components:
           type: string
         currency:
           type: string
+        deliveryCovered:
+          type: boolean
+        deliveryDate:
+          type: string
+          format: date
+        deliveryStatus:
+          type: string
+          enum:
+          - FROM_STOCK
+          - TO_BE_CONFIRMED
+          - FROM_PRODUCTION
+          - STOCK_OVERRIDE
         discountRate:
           type: number
         id:
@@ -55781,11 +55825,21 @@ components:
           type: number
         colour:
           $ref: "#/components/schemas/SalesLotColourDto"
+        freeQuantity:
+          type: number
+        hardReservedQuantity:
+          type: number
         id:
           type: string
           format: uuid
+        intents:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesLotIntentDto"
         lotNo:
           type: string
+        physicalQuantity:
+          type: number
         pieces:
           type: array
           items:
@@ -55794,9 +55848,26 @@ components:
           type: string
         quality:
           $ref: "#/components/schemas/SalesLotQualityDto"
+        softIntentQuantity:
+          type: number
         status:
           type: string
         unit:
+          type: string
+    SalesLotIntentDto:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date
+        marketerName:
+          type: string
+        quantity:
+          type: number
+        quoteId:
+          type: string
+          format: uuid
+        quoteNumber:
           type: string
     SalesLotPieceDto:
       type: object
@@ -58051,6 +58122,16 @@ components:
         colorId:
           type: string
           format: uuid
+        deliveryDate:
+          type: string
+          format: date
+        deliveryStatus:
+          type: string
+          enum:
+          - FROM_STOCK
+          - TO_BE_CONFIRMED
+          - FROM_PRODUCTION
+          - STOCK_OVERRIDE
         offeredPrice:
           type: number
           minimum: 0.0001
