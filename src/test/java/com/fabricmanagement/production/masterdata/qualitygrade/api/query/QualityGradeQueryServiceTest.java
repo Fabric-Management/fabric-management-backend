@@ -58,6 +58,21 @@ class QualityGradeQueryServiceTest {
   }
 
   @Test
+  @DisplayName("Should resolve sales grade references from string product type")
+  void shouldResolveSalesGradeReferencesFromStringProductType() {
+    QualityGrade first = grade("1A", "First Quality", 1, "1.000", true);
+
+    when(qualityGradeRepository.findByTenantIdAndProductTypeAndIsActiveTrue(
+            tenantId, ProductType.FABRIC))
+        .thenReturn(List.of(first));
+
+    List<QualityGradeQueryService.QualityGradeReference> result =
+        qualityGradeQueryService.findSalesGradeReferences("fabric", false);
+
+    assertEquals(List.of("1A"), result.stream().map(r -> r.code()).toList());
+  }
+
+  @Test
   @DisplayName("Should include non-saleable grades only when explicitly requested")
   void shouldIncludeNonSaleableGradesOnlyWhenExplicitlyRequested() {
     QualityGrade waste = grade("WST", "Waste", 5, "0.000", false);

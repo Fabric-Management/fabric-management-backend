@@ -1,10 +1,11 @@
 package com.fabricmanagement.sales.qualitygrade.api;
 
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
-import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.sales.qualitygrade.app.SalesQualityGradeService;
 import com.fabricmanagement.sales.qualitygrade.dto.SalesQualityGradeDto;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,11 @@ public class SalesQualityGradeController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "List sales-readable quality grades")
   public ResponseEntity<ApiResponse<List<SalesQualityGradeDto>>> listSalesGrades(
-      @RequestParam ProductType productType,
+      @Parameter(
+              schema =
+                  @Schema(allowableValues = {"FIBER", "YARN", "FABRIC", "CHEMICAL", "CONSUMABLE"}))
+          @RequestParam
+          String productType,
       @RequestParam(defaultValue = "false") boolean includeNonSaleable) {
     return ResponseEntity.ok(
         ApiResponse.success(

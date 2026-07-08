@@ -520,7 +520,7 @@ class QuoteServiceTest {
     when(policyService.getActivePolicy("FABRIC")).thenReturn(new DiscountPolicy());
     when(pricingEngineService.evaluatePrice(any(), any(), any(), any()))
         .thenReturn(pricingResult());
-    when(salesQualityGradeService.resolveSnapshot(qualityGradeId))
+    when(salesQualityGradeService.resolveUpdateSnapshot(qualityGradeId, line))
         .thenReturn(
             new SalesQualityGradeSnapshot(qualityGradeId, "A", "Grade A", new BigDecimal("1.125")));
     when(salesColorService.resolveUpdateSnapshot(colorId, line))

@@ -207,7 +207,7 @@ public class QuoteService {
     QuoteLine line = getQuoteLine(quote, lineId);
     PricingResult pricing = evaluateLinePrice(quote, line, req.getOfferedPrice());
     SalesQualityGradeSnapshot qualitySnapshot =
-        salesQualityGradeService.resolveSnapshot(req.getQualityGradeId());
+        salesQualityGradeService.resolveUpdateSnapshot(req.getQualityGradeId(), line);
     SalesColorSnapshot colorSnapshot =
         salesColorService.resolveUpdateSnapshot(req.getColorId(), line);
     List<QuoteLineLotSnapshot> lotSnapshots =

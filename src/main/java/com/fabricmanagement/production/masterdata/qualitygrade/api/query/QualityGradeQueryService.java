@@ -7,6 +7,7 @@ import com.fabricmanagement.production.masterdata.qualitygrade.infra.repository.
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,16 @@ public class QualityGradeQueryService {
         .sorted(Comparator.comparingInt(QualityGrade::getRank))
         .map(QualityGradeReference::from)
         .toList();
+  }
+
+  public List<QualityGradeReference> findSalesGradeReferences(
+      String productType, boolean includeNonSaleable) {
+    if (productType == null || productType.isBlank()) {
+      throw new IllegalArgumentException("productType is required");
+    }
+    ProductType resolvedProductType =
+        ProductType.valueOf(productType.trim().toUpperCase(Locale.ROOT));
+    return findSalesGradeReferences(resolvedProductType, includeNonSaleable);
   }
 
   public Optional<QualityGradeReference> findActiveReferenceById(UUID gradeId) {
