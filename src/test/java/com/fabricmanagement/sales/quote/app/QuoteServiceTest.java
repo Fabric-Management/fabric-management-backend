@@ -25,7 +25,7 @@ import com.fabricmanagement.platform.tradingpartner.domain.PartnerContactRole;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartnerRegistry;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.app.UserDisplayNameResolver;
 import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort;
 import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort.LotIntentCoverage;
 import com.fabricmanagement.production.execution.stockunit.api.StockUnitSoftHoldPort;
@@ -96,7 +96,7 @@ class QuoteServiceTest {
   @Mock private QuoteApprovalService quoteApprovalService;
   @Mock private TradingPartnerResolver tradingPartnerResolver;
   @Mock private PartnerContactService partnerContactService;
-  @Mock private UserRepository userRepository;
+  @Mock private UserDisplayNameResolver userDisplayNameResolver;
   @Mock private QuoteSendRequestRepository quoteSendRequestRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private SalesQualityGradeService salesQualityGradeService;

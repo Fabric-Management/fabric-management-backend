@@ -9,7 +9,7 @@ import com.fabricmanagement.costing.domain.exception.ExchangeRateRequiredExcepti
 import com.fabricmanagement.platform.tradingpartner.app.PartnerContactService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerContact;
-import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.platform.user.app.UserDisplayNameResolver;
 import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort;
 import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort.LotIntentCoverage;
 import com.fabricmanagement.production.execution.batch.api.BatchLotQuantityIntentPort.LotIntentRequest;
@@ -77,7 +77,7 @@ public class QuoteService {
   private final QuoteApprovalService quoteApprovalService;
   private final TradingPartnerResolver tradingPartnerResolver;
   private final PartnerContactService partnerContactService;
-  private final UserRepository userRepository;
+  private final UserDisplayNameResolver userDisplayNameResolver;
   private final QuoteSendRequestRepository quoteSendRequestRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final SalesQualityGradeService salesQualityGradeService;
@@ -768,9 +768,9 @@ public class QuoteService {
     if (quote.getTenantId() == null || quote.getAssignedToId() == null) {
       return null;
     }
-    Optional<com.fabricmanagement.platform.user.domain.User> user =
-        userRepository.findByTenantIdAndId(quote.getTenantId(), quote.getAssignedToId());
-    return user != null ? user.map(found -> found.getDisplayName()).orElse(null) : null;
+    Optional<String> displayName =
+        userDisplayNameResolver.resolveDisplayName(quote.getTenantId(), quote.getAssignedToId());
+    return displayName != null ? displayName.orElse(null) : null;
   }
 
   private record DeliveryDecision(
