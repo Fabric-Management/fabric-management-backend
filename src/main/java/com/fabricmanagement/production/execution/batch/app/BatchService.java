@@ -233,6 +233,31 @@ public class BatchService {
         .toList();
   }
 
+  // ── QC release ─────────────────────────────────────────────────────────────
+
+  /**
+   * Releases a batch from QC by applying the PENDING_QC → AVAILABLE transition.
+   *
+   * <p>Exists because there is no QC-approval service API yet: the only production path that
+   * releases a batch is the async {@link BatchQcEventListener} reacting to {@code
+   * FiberTestResultApproved}. This method mirrors that listener's APPROVED → AVAILABLE mapping so
+   * in-process callers (e.g. demo seeders) can make freshly created batches saleable without
+   * reaching into the batch infra layer.
+   */
+  @Transactional
+  public BatchDto releaseFromQc(UUID batchId) {
+    UUID tenantId = TenantContext.requireTenantId();
+    log.debug("Releasing batch from QC: tenantId={}, batchId={}", tenantId, batchId);
+
+    Batch batch = loadBatchWithLock(batchId, tenantId);
+    batch.transitionStatus(BatchStatus.AVAILABLE, TenantContext.getCurrentUserId());
+    Batch saved = batchRepository.save(batch);
+
+    log.info("Batch released from QC: id={}, batchCode={}", saved.getId(), saved.getBatchCode());
+
+    return toBatchDto(saved);
+  }
+
   // ── Named Reservation ──────────────────────────────────────────────────────
 
   /**

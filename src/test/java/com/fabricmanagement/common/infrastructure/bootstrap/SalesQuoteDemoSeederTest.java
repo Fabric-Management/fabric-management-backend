@@ -1,7 +1,7 @@
 package com.fabricmanagement.common.infrastructure.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -25,22 +25,18 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.production.execution.batch.app.BatchAttributeService;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.dto.BatchDto;
 import com.fabricmanagement.production.execution.batch.dto.CreateBatchRequest;
 import com.fabricmanagement.production.execution.batch.dto.ReserveRequest;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.masterdata.color.app.ColorService;
 import com.fabricmanagement.production.masterdata.color.domain.Color;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
 import com.fabricmanagement.production.masterdata.product.dto.CreateProductRequest;
+import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
-import com.fabricmanagement.production.masterdata.product.infra.repository.ProductAttributeRepository;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
@@ -68,6 +64,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class SalesQuoteDemoSeederTest {
@@ -82,10 +80,8 @@ class SalesQuoteDemoSeederTest {
   @Mock private QualityGradeService qualityGradeService;
   @Mock private ColorService colorService;
   @Mock private BatchService batchService;
-  @Mock private BatchRepository batchRepository;
   @Mock private StockUnitService stockUnitService;
   @Mock private BatchAttributeService batchAttributeService;
-  @Mock private ProductAttributeRepository productAttributeRepository;
   @Mock private SalesProductService salesProductService;
   @Mock private DiscountPolicyService discountPolicyService;
   @Mock private ExchangeRateService exchangeRateService;
@@ -111,10 +107,8 @@ class SalesQuoteDemoSeederTest {
             qualityGradeService,
             colorService,
             batchService,
-            batchRepository,
             stockUnitService,
             batchAttributeService,
-            productAttributeRepository,
             salesProductService,
             discountPolicyService,
             exchangeRateService,
@@ -165,9 +159,19 @@ class SalesQuoteDemoSeederTest {
     verify(productFacade, times(3)).createProduct(any(CreateProductRequest.class));
     verify(salesProductService, times(3)).createEntry(any());
 
-    // 6 scenario lots + 1 waste-grade negative-test lot; all released from QC.
-    verify(batchService, times(7)).create(any(CreateBatchRequest.class));
-    verify(batchRepository, times(7)).save(any(Batch.class));
+    // 6 scenario lots + 1 waste-grade negative-test lot; all released from QC via the service.
+    ArgumentCaptor<CreateBatchRequest> batchCaptor =
+        ArgumentCaptor.forClass(CreateBatchRequest.class);
+    verify(batchService, times(7)).create(batchCaptor.capture());
+    verify(batchService, times(7)).releaseFromQc(any(UUID.class));
+    // Regression guard: production_execution_batch.chk_batch_unit admits only KG/MT/PIECE — a
+    // batch header with unit "M" aborts the INSERT and poisoned real signup transactions.
+    assertThat(batchCaptor.getAllValues())
+        .extracting(CreateBatchRequest::getUnit)
+        .allMatch(List.of("KG", "MT", "PIECE")::contains);
+
+    // The colour axis rides through the tenant-scoped app-layer ensure, not a repository write.
+    verify(productFacade, times(1)).ensureAttribute(eq("COLOR"), any(), any(), any(), any(), any());
 
     // 16 + 24 + 3 rolls, 48 yarn cartons, 2 waste rolls — each graded through the service.
     verify(stockUnitService, times(93))
@@ -228,14 +232,32 @@ class SalesQuoteDemoSeederTest {
   }
 
   @Test
-  void seedFor_neverThrowsWhenDependencyFails() {
+  void seedFor_propagatesDependencyFailure_soOwnTransactionRollsBack() {
     when(tradingPartnerService.searchByName(TENANT_ID, SalesQuoteDemoSeeder.CUSTOMER_ALBION))
         .thenReturn(List.of());
     when(qualityGradeService.findByProductType(any(ProductType.class)))
         .thenThrow(new IllegalStateException("grades unavailable"));
 
-    assertThatCode(() -> seeder.seedFor(TENANT_ID)).doesNotThrowAnyException();
+    // SalesDemoSeeder pattern: failures must ESCAPE seedFor so the REQUIRES_NEW transaction rolls
+    // back cleanly; DemoTransactionSeeder catches them outside the boundary. Swallowing inside
+    // would commit a rollback-only/aborted transaction and poison the caller's signup transaction.
+    assertThatThrownBy(() -> seeder.seedFor(TENANT_ID))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("grades unavailable");
     verify(tradingPartnerService, never()).createPartner(any());
+    // The finally block must still restore the previous tenant context.
+    assertThat(TenantContext.getCurrentTenantIdOrNull()).isNull();
+  }
+
+  @Test
+  void seedFor_declaresItsOwnTransactionBoundary() throws NoSuchMethodException {
+    Transactional transactional =
+        SalesQuoteDemoSeeder.class
+            .getMethod("seedFor", UUID.class)
+            .getAnnotation(Transactional.class);
+
+    assertThat(transactional).as("seedFor must run in its own transaction").isNotNull();
+    assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
   }
 
   private void stubHappyPath() {
@@ -300,14 +322,16 @@ class SalesQuoteDemoSeederTest {
               return colour;
             });
 
-    when(productAttributeRepository.findByAttributeCode("COLOR")).thenReturn(Optional.empty());
-    when(productAttributeRepository.save(any(ProductAttribute.class)))
+    when(productFacade.ensureAttribute(eq("COLOR"), any(), any(), any(), any(), any()))
         .thenAnswer(
-            invocation -> {
-              ProductAttribute attribute = invocation.getArgument(0);
-              attribute.setId(UUID.randomUUID());
-              return attribute;
-            });
+            invocation ->
+                ProductAttributeDto.builder()
+                    .id(UUID.randomUUID())
+                    .attributeCode(invocation.getArgument(0))
+                    .attributeName(invocation.getArgument(1))
+                    .attributeGroup(invocation.getArgument(2))
+                    .productScope(invocation.getArgument(3))
+                    .build());
 
     when(productFacade.createProduct(any(CreateProductRequest.class)))
         .thenAnswer(
@@ -335,25 +359,6 @@ class SalesQuoteDemoSeederTest {
                   .productType(req.getProductType())
                   .build();
             });
-    when(batchRepository.findByIdAndTenantId(any(UUID.class), eq(TENANT_ID)))
-        .thenAnswer(
-            invocation -> {
-              Batch batch =
-                  Batch.builder()
-                      .productId(UUID.randomUUID())
-                      .productType(ProductType.FABRIC)
-                      .batchCode("LOT-TEST")
-                      .quantity(BigDecimal.ONE)
-                      .unit("M")
-                      .status(BatchStatus.PENDING_QC)
-                      .build();
-              batch.setId(invocation.getArgument(0));
-              batch.setTenantId(TENANT_ID);
-              return Optional.of(batch);
-            });
-    when(batchRepository.save(any(Batch.class)))
-        .thenAnswer(invocation -> invocation.getArgument(0));
-
     when(stockUnitService.create(
             any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             any()))

@@ -22,14 +22,11 @@ import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.production.execution.batch.app.BatchAttributeService;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
-import com.fabricmanagement.production.execution.batch.domain.Batch;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
-import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
 import com.fabricmanagement.production.execution.batch.dto.AddBatchAttributeRequest;
 import com.fabricmanagement.production.execution.batch.dto.BatchDto;
 import com.fabricmanagement.production.execution.batch.dto.CreateBatchRequest;
 import com.fabricmanagement.production.execution.batch.dto.ReserveRequest;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
@@ -38,10 +35,9 @@ import com.fabricmanagement.production.masterdata.color.app.ColorService;
 import com.fabricmanagement.production.masterdata.color.domain.Color;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
-import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
 import com.fabricmanagement.production.masterdata.product.dto.CreateProductRequest;
+import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
-import com.fabricmanagement.production.masterdata.product.infra.repository.ProductAttributeRepository;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
 import com.fabricmanagement.sales.pricing.app.DiscountPolicyService;
@@ -62,6 +58,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Seeds the playground sales/ATP demo dataset (DEMO-SALES-1) for the "Pennine Mills Ltd" scenario:
@@ -71,9 +69,15 @@ import org.springframework.stereotype.Component;
  * behaviour (shade warning, remnant nudge, three-number stock, forced delivery status) on realistic
  * British data.
  *
- * <p>Mirrors {@link ProcurementDemoSeeder}: runs post-clone inside the cloned tenant's context,
- * writes via application services so real invariants apply, is idempotent (skips when the demo
- * customer already exists), and is best-effort — it must never break playground initialisation.
+ * <p>Runs post-clone inside the cloned tenant's context, writes via application services so real
+ * invariants apply, and is idempotent (skips when the demo customer already exists).
+ *
+ * <p>Runs in its OWN transaction ({@link Propagation#REQUIRES_NEW}) and is invoked from {@link
+ * DemoTransactionSeeder} inside a try/catch — the exact {@link SalesDemoSeeder} pattern. Signup and
+ * onboarding call the seeding chain from inside their own transaction; without this boundary a
+ * single failed INSERT here aborts the shared Postgres transaction ("current transaction is
+ * aborted") and turns the whole signup into a 500 even though the exception itself is caught. With
+ * it, a failure rolls back only the demo dataset and can never break playground initialisation.
  */
 @Component
 @RequiredArgsConstructor
@@ -95,6 +99,13 @@ public class SalesQuoteDemoSeeder {
   static final String MARKETER_LAST_NAME = "Whitfield";
   static final String MARKETER_EMAIL = "emma.whitfield@nexusfabrics.com";
 
+  /**
+   * Batch-header unit for fabric length lots. {@code chk_batch_unit} only admits KG / MT / PIECE
+   * (see V001 + {@code BatchUnit}); metre granularity is carried by the rolls' {@code
+   * StockUnit.lengthUnit = "M"}.
+   */
+  static final String BATCH_UNIT_METRES = "MT";
+
   private static final String CURRENCY = "GBP";
   private static final String QUOTE_MODULE_TYPE = "FABRIC";
   private static final String COLOUR_ATTRIBUTE_CODE = "COLOR";
@@ -107,10 +118,8 @@ public class SalesQuoteDemoSeeder {
   private final QualityGradeService qualityGradeService;
   private final ColorService colorService;
   private final BatchService batchService;
-  private final BatchRepository batchRepository;
   private final StockUnitService stockUnitService;
   private final BatchAttributeService batchAttributeService;
-  private final ProductAttributeRepository productAttributeRepository;
   private final SalesProductService salesProductService;
   private final DiscountPolicyService discountPolicyService;
   private final ExchangeRateService exchangeRateService;
@@ -122,6 +131,7 @@ public class SalesQuoteDemoSeeder {
   private final OrganizationService organizationService;
   private final Clock clock;
 
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void seedFor(UUID tenantId) {
     TenantContext.TenantSnapshot previous = TenantContext.capture();
     try {
@@ -147,7 +157,7 @@ public class SalesQuoteDemoSeeder {
       // Rust deliberately gets NO stock — the picker's passive-but-selectable colour case.
       ensureColour("RUST-04", "Rust", "#B7410E");
 
-      ProductAttribute colourAxis = ensureColourAxisAttribute(tenantId);
+      ProductAttributeDto colourAxis = ensureColourAxisAttribute();
 
       ProductDto gabardine = productFacade.createProduct(product(ProductType.FABRIC, "M"));
       ProductDto combedYarn = productFacade.createProduct(product(ProductType.YARN, "KG"));
@@ -163,19 +173,29 @@ public class SalesQuoteDemoSeeder {
           "USD", CURRENCY, new BigDecimal("0.79"), today, ExchangeRateSource.MANUAL);
 
       // ── Lots and pieces (per the DEMO-SALES-1 table) ──
+      // Fabric lot headers use BATCH_UNIT_METRES ("MT"): production_execution_batch carries
+      // chk_batch_unit CHECK (unit IN ('KG','MT','PIECE')) — "M" is rejected at INSERT. Metre
+      // detail lives on the rolls (StockUnit.lengthUnit = "M"), which is also what the lot picker
+      // surfaces for piece-backed length lots.
       BatchDto lot24011 =
-          saleableBatch(gabardine, "LOT-24011", "2000", "M", "Main Navy dye lot, spring run");
+          saleableBatch(
+              gabardine, "LOT-24011", "2000", BATCH_UNIT_METRES, "Main Navy dye lot, spring run");
       addRolls(lot24011.getId(), "24011", 16, "125", "36.800", fabricGrades.first().getId());
       attachColour(lot24011.getId(), colourAxis, navy);
 
       BatchDto lot24012 =
           saleableBatch(
-              gabardine, "LOT-24012", "3000", "M", "Second Navy dye lot — shade may vary");
+              gabardine,
+              "LOT-24012",
+              "3000",
+              BATCH_UNIT_METRES,
+              "Second Navy dye lot — shade may vary");
       addRolls(lot24012.getId(), "24012", 24, "125", "36.800", fabricGrades.first().getId());
       attachColour(lot24012.getId(), colourAxis, navy);
 
       BatchDto lot23087 =
-          saleableBatch(gabardine, "LOT-23087", "290", "M", "Remnant lot — close it out");
+          saleableBatch(
+              gabardine, "LOT-23087", "290", BATCH_UNIT_METRES, "Remnant lot — close it out");
       addRoll(lot23087.getId(), "23087", 1, "100", "29.500", fabricGrades.first().getId());
       addRoll(lot23087.getId(), "23087", 2, "95", "28.000", fabricGrades.first().getId());
       addRoll(lot23087.getId(), "23087", 3, "95", "28.000", fabricGrades.first().getId());
@@ -183,7 +203,11 @@ public class SalesQuoteDemoSeeder {
 
       BatchDto lot24020 =
           saleableBatch(
-              gabardine, "LOT-24020", "450", "M", "Second Quality Ecru — bulk, no pieces");
+              gabardine,
+              "LOT-24020",
+              "450",
+              BATCH_UNIT_METRES,
+              "Second Quality Ecru — bulk, no pieces");
       attachColour(lot24020.getId(), colourAxis, ecru);
 
       BatchDto lot24031 =
@@ -196,7 +220,8 @@ public class SalesQuoteDemoSeeder {
 
       // Waste-grade stock exists but must stay invisible to the picker (negative test).
       BatchDto lot23050 =
-          saleableBatch(gabardine, "LOT-23050", "120", "M", "Waste grade — not saleable");
+          saleableBatch(
+              gabardine, "LOT-23050", "120", BATCH_UNIT_METRES, "Waste grade — not saleable");
       addRoll(lot23050.getId(), "23050", 1, "60", "17.700", fabricGrades.waste().getId());
       addRoll(lot23050.getId(), "23050", 2, "60", "17.700", fabricGrades.waste().getId());
       attachColour(lot23050.getId(), colourAxis, navy);
@@ -253,9 +278,9 @@ public class SalesQuoteDemoSeeder {
           draftQuote.getId(), gabardine.getId(), fabricGrades.first().getId(), navy.getId());
 
       log.info("Successfully provisioned sales quote demo data for tenant: {}", tenantId);
-    } catch (Exception e) {
-      log.warn("Sales quote demo seeding failed for tenant {} - continuing.", tenantId, e);
     } finally {
+      // Failures propagate to DemoTransactionSeeder's try/catch so THIS transaction (REQUIRES_NEW)
+      // rolls back cleanly. Swallowing here would commit a rollback-only transaction instead.
       TenantContext.restore(previous);
     }
   }
@@ -310,27 +335,18 @@ public class SalesQuoteDemoSeeder {
   /**
    * The lot picker resolves a lot's colour from a {@code BatchAttribute} whose {@code
    * ProductAttribute} code is COLOR (see ProductionSalesLotQueryService). ProductAttribute is
-   * read-only reference data with no create service, so the seeder registers the colour axis
-   * directly through the repository — the one narrow repository write in this seeder.
+   * read-only reference data with no create endpoint, so the seeder registers the colour axis
+   * through {@link ProductFacade#ensureAttribute}, whose lookup is tenant-scoped and
+   * create-if-missing.
    */
-  private ProductAttribute ensureColourAxisAttribute(UUID tenantId) {
-    return productAttributeRepository
-        .findByAttributeCode(COLOUR_ATTRIBUTE_CODE)
-        .filter(attribute -> tenantId.equals(attribute.getTenantId()))
-        .orElseGet(
-            () -> {
-              ProductAttribute attribute =
-                  ProductAttribute.builder()
-                      .attributeCode(COLOUR_ATTRIBUTE_CODE)
-                      .attributeName("Colour")
-                      .attributeGroup("VARIANT")
-                      .productScope("ALL")
-                      .description("Colour card reference for dyed lots")
-                      .displayOrder(100)
-                      .build();
-              attribute.setTenantId(tenantId);
-              return productAttributeRepository.save(attribute);
-            });
+  private ProductAttributeDto ensureColourAxisAttribute() {
+    return productFacade.ensureAttribute(
+        COLOUR_ATTRIBUTE_CODE,
+        "Colour",
+        "VARIANT",
+        "ALL",
+        "Colour card reference for dyed lots",
+        100);
   }
 
   private CreateProductRequest product(ProductType productType, String unit) {
@@ -380,24 +396,9 @@ public class SalesQuoteDemoSeeder {
                 .sourceType(BatchSourceType.INITIAL_STOCK)
                 .remarks(remarks)
                 .build());
-    releaseFromQc(batch.getId());
+    // New batches start in PENDING_QC; the picker only lists AVAILABLE/RESERVED lots.
+    batchService.releaseFromQc(batch.getId());
     return batch;
-  }
-
-  /**
-   * New batches start in PENDING_QC; the picker only lists AVAILABLE/RESERVED lots. There is no
-   * QC-approval service API (the only production path is the async {@code FiberTestResultApproved}
-   * listener), so the seeder applies the same APPROVED→AVAILABLE transition through the aggregate —
-   * mirroring {@code BatchQcEventListener}.
-   */
-  private void releaseFromQc(UUID batchId) {
-    UUID tenantId = TenantContext.requireTenantId();
-    Batch batch =
-        batchRepository
-            .findByIdAndTenantId(batchId, tenantId)
-            .orElseThrow(() -> new IllegalStateException("Seeded batch not found: " + batchId));
-    batch.transitionStatus(BatchStatus.AVAILABLE, SystemUser.ID);
-    batchRepository.save(batch);
   }
 
   private void addRolls(
@@ -463,9 +464,9 @@ public class SalesQuoteDemoSeeder {
     return String.format("PM-%s-%02d", lotDigits, index);
   }
 
-  private void attachColour(UUID batchId, ProductAttribute colourAxis, Color colour) {
+  private void attachColour(UUID batchId, ProductAttributeDto colourAxis, Color colour) {
     batchAttributeService.add(
-        batchId, new AddBatchAttributeRequest(colourAxis.getId(), colour.getId().toString()));
+        batchId, new AddBatchAttributeRequest(colourAxis.id(), colour.getId().toString()));
   }
 
   // ── Actor helpers ───────────────────────────────────────────────────────────

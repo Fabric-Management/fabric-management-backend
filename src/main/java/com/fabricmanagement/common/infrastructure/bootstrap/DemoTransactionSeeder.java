@@ -231,6 +231,9 @@ public class DemoTransactionSeeder {
   }
 
   private void seedSalesQuoteDemo(UUID tenantId) {
+    // Runs in its own transaction (REQUIRES_NEW, same pattern as SalesDemoSeeder): a DB-level
+    // failure inside the seeder aborts only ITS transaction, so catching here keeps signup /
+    // onboarding / reset flows (which call this from within their own transaction) healthy.
     try {
       salesQuoteDemoSeeder.seedFor(tenantId);
     } catch (Exception salesQuoteEx) {
