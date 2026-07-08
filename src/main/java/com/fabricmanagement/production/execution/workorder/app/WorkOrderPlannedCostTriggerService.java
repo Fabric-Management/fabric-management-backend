@@ -12,6 +12,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -53,7 +54,14 @@ public class WorkOrderPlannedCostTriggerService {
    * @param workOrderId the WorkOrder to compute planned cost for
    * @return updated WorkOrderResponse with plannedCost and plannedCostCurrency
    */
-  @Transactional
+  // REQUIRES_NEW is deliberate: the WorkOrderApprovedEvent listener runs this inside
+  // IdempotentEventHandler.executeOnce's REQUIRES_NEW transaction. If this method joined that
+  // transaction (default REQUIRED) and threw, the outer transaction would be marked
+  // rollback-only even though the listener catches and swallows the exception — the
+  // idempotency INSERT would then roll back too, and Spring Modulith would retry the event
+  // forever (UnexpectedRollbackException on every commit). Running in its own transaction lets
+  // a cost-calculation failure roll back cleanly without poisoning the caller's transaction.
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public WorkOrderResponse triggerPlannedCost(UUID workOrderId) {
     UUID tenantId = TenantContext.requireTenantId();
 
