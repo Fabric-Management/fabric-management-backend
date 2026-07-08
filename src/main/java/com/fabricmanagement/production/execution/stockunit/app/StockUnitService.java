@@ -97,6 +97,8 @@ public class StockUnitService {
       BigDecimal initialWeight,
       BigDecimal grossWeight,
       String unit,
+      BigDecimal length,
+      String lengthUnit,
       UUID locationId,
       StockUnitSourceType sourceType,
       UUID sourceId) {
@@ -117,6 +119,8 @@ public class StockUnitService {
         initialWeight,
         grossWeight,
         unit,
+        length,
+        lengthUnit,
         locationId,
         sourceType,
         sourceId,
@@ -133,6 +137,8 @@ public class StockUnitService {
       BigDecimal initialWeight,
       BigDecimal grossWeight,
       String unit,
+      BigDecimal length,
+      String lengthUnit,
       UUID locationId,
       StockUnitSourceType sourceType,
       UUID sourceId,
@@ -152,6 +158,9 @@ public class StockUnitService {
             locationId,
             sourceType,
             sourceId);
+    if (length != null || lengthUnit != null) {
+      stockUnit.recordLength(length, lengthUnit);
+    }
 
     stockUnit = stockUnitRepository.save(stockUnit);
 
@@ -776,6 +785,8 @@ public class StockUnitService {
                     r.initialWeight(),
                     r.grossWeight(),
                     r.unit(),
+                    null,
+                    null,
                     r.locationId(),
                     r.sourceType(),
                     r.sourceId(),

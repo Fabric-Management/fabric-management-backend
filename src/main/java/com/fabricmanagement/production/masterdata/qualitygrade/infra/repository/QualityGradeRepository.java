@@ -15,6 +15,10 @@ public interface QualityGradeRepository extends JpaRepository<QualityGrade, UUID
   List<QualityGrade> findByTenantIdAndProductTypeAndIsActiveTrue(
       UUID tenantId, ProductType productType);
 
+  Optional<QualityGrade> findByTenantIdAndIdAndIsActiveTrue(UUID tenantId, UUID id);
+
+  Optional<QualityGrade> findByTenantIdAndId(UUID tenantId, UUID id);
+
   Optional<QualityGrade> findByTenantIdAndProductTypeAndCodeAndIsActiveTrue(
       UUID tenantId, ProductType productType, String code);
 

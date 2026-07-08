@@ -19,6 +19,8 @@ public record CreateStockUnitApiRequest(
     @NotNull @Positive BigDecimal initialWeight,
     BigDecimal grossWeight,
     @NotBlank String unit,
+    BigDecimal length,
+    @Size(max = 10) String lengthUnit,
     @NotNull UUID locationId,
     @NotNull StockUnitSourceType sourceType,
     UUID sourceId) {}

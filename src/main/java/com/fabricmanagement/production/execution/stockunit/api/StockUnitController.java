@@ -52,6 +52,8 @@ public class StockUnitController {
             request.initialWeight(),
             request.grossWeight(),
             request.unit(),
+            request.length(),
+            request.lengthUnit(),
             request.locationId(),
             request.sourceType(),
             request.sourceId());

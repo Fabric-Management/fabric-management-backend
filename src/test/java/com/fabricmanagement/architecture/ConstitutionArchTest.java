@@ -825,6 +825,7 @@ class ConstitutionArchTest {
       //   - LoginIdentityBackfillRunner  : IDENTITY-1 startup backfill from RLS source tables
       //   - QuoteApprovalService         : Public quote token→tenant lookup before tenant context
       //   - QuoteRetentionPurgeJob       : Scheduled sales retention purge across tenant data
+      //   - BatchLotQuantityIntentExpiryJob : Scheduled lot-intent expiry across tenants
       //   - SystemDataSourceConfig       : Altyapı: DataSource bean konfigürasyonu
       //   - SystemTransactionExecutor    : Self-reference (class itself)
 
@@ -856,6 +857,8 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("QuoteApprovalService")
               .and()
               .doNotHaveSimpleName("QuoteRetentionPurgeJob")
+              .and()
+              .doNotHaveSimpleName("BatchLotQuantityIntentExpiryJob")
               .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()

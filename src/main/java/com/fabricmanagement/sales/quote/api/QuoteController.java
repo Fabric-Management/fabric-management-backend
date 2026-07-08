@@ -93,14 +93,7 @@ public class QuoteController {
       @PathVariable UUID quoteId, @Valid @RequestBody AddQuoteLineRequest req) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            ApiResponse.success(
-                quoteService.toResponse(
-                    quoteService.addQuoteLine(
-                        quoteId,
-                        req.getProductId(),
-                        req.getRequestedQty(),
-                        req.getUnit(),
-                        req.getOfferedPrice()))));
+            ApiResponse.success(quoteService.toResponse(quoteService.addQuoteLine(quoteId, req))));
   }
 
   @PatchMapping("/{quoteId}")

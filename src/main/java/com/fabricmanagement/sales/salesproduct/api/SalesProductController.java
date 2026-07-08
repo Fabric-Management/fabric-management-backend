@@ -11,6 +11,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,7 @@ public class SalesProductController {
   private final SalesProductService salesProductService;
 
   @GetMapping
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   public ResponseEntity<ApiResponse<List<SalesProductDto>>> listCatalog(
       @RequestParam(value = "moduleType", required = false) String moduleType) {
     return ResponseEntity.ok(
@@ -36,12 +38,14 @@ public class SalesProductController {
   }
 
   @GetMapping("/product/{productId}")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   public ResponseEntity<ApiResponse<SalesProductDto>> getByProduct(@PathVariable UUID productId) {
     return ResponseEntity.ok(
         ApiResponse.success(salesProductService.getActiveByProductId(productId)));
   }
 
   @PostMapping
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   public ResponseEntity<ApiResponse<SalesProductDto>> createEntry(
       @Valid @RequestBody CreateSalesProductRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
@@ -49,6 +53,7 @@ public class SalesProductController {
   }
 
   @DeleteMapping("/{id}")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'write')")
   public ResponseEntity<ApiResponse<Void>> deactivateEntry(@PathVariable UUID id) {
     salesProductService.deactivateEntry(id);
     return ResponseEntity.ok(ApiResponse.success(null));

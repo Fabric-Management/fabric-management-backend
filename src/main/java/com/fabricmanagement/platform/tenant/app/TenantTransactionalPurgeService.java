@@ -98,7 +98,9 @@ public class TenantTransactionalPurgeService {
           "production.work_order_output",
           "production.work_order_consumption",
           "production.stock_unit_audit_log",
+          "production.stock_unit_soft_hold",
           "production.stock_unit",
+          "production.batch_lot_quantity_intent",
           "production.goods_receipt_item",
           "production.goods_receipt",
           "production.prod_work_order_assignee",
@@ -420,6 +422,12 @@ public class TenantTransactionalPurgeService {
         rows,
         "production.quality_grade",
         "DELETE FROM production.quality_grade WHERE tenant_id = ?",
+        tenantId);
+    delete(
+        jdbc,
+        rows,
+        "production.color",
+        "DELETE FROM production.color WHERE tenant_id = ?",
         tenantId);
     delete(
         jdbc,

@@ -22,6 +22,9 @@ public class SalesProduct extends BaseEntity {
   @Column(name = "product_id", nullable = false)
   private UUID productId;
 
+  @Column(name = "product_name", length = 255)
+  private String productName;
+
   @Column(name = "module_type", nullable = false, length = 50)
   private String moduleType;
 

@@ -88,4 +88,26 @@ public class SalesDomainException extends DomainException {
     return new SalesDomainException(
         message, "SALES_014_INVALID_QUOTE_SEND_REQUEST_DECISION", HttpStatus.BAD_REQUEST);
   }
+
+  public static SalesDomainException colorInactive(String colorId) {
+    return referenceNoLongerAvailable("color", colorId);
+  }
+
+  public static SalesDomainException referenceNoLongerAvailable(
+      String referenceType, String referenceId) {
+    return new SalesDomainException(
+        "Sales reference is no longer available: " + referenceType + " " + referenceId,
+        "SALES_015_REFERENCE_NO_LONGER_AVAILABLE",
+        HttpStatus.CONFLICT);
+  }
+
+  public static SalesDomainException deliveryStatusRequired(String message) {
+    return new SalesDomainException(
+        message, "SALES_016_DELIVERY_STATUS_REQUIRED", HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+
+  public static SalesDomainException lotIntentQuantityMismatch(String message) {
+    return new SalesDomainException(
+        message, "SALES_017_LOT_INTENT_QUANTITY_MISMATCH", HttpStatus.UNPROCESSABLE_ENTITY);
+  }
 }
