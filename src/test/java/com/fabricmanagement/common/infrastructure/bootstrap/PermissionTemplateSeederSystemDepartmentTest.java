@@ -43,6 +43,9 @@ class PermissionTemplateSeederSystemDepartmentTest {
               if ("existsByTenantId".equals(method.getName())) {
                 return false;
               }
+              if ("findByTenantId".equals(method.getName())) {
+                return List.of();
+              }
               return defaultValue(method.getReturnType());
             });
     PermissionTemplateSeeder seeder =

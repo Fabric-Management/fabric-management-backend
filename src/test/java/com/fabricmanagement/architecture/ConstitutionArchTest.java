@@ -850,7 +850,7 @@ class ConstitutionArchTest {
               .and()
               .doNotHaveSimpleName("SystemDataSourceConfig")
               .and()
-              .doNotHaveSimpleName("FinancePermissionBackfillRunner")
+              .doNotHaveSimpleName("PermissionTemplateBackfillRunner")
               .and()
               .doNotHaveSimpleName("LoginIdentityBackfillRunner")
               .and()
