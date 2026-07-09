@@ -185,11 +185,20 @@ public class EmailOutboxService {
     }
   }
 
-  /** Process single email (send with retry logic). */
-  private void processEmail(EmailOutbox email) {
+  /**
+   * Process single email (send with retry logic).
+   *
+   * <p>Each {@code save} runs in its own transaction and returns a fresh managed instance with an
+   * incremented {@code version}. The returned instance must replace the local one: keeping the
+   * stale reference makes the next save write an outdated version, which fails the optimistic-lock
+   * check. The email would already have been sent by then, so the row would sit in SENDING forever
+   * with no error recorded — sent, but never marked as sent.
+   */
+  private void processEmail(EmailOutbox pending) {
+    EmailOutbox email = pending;
     try {
       email.markAsSending();
-      emailOutboxRepository.save(email);
+      email = emailOutboxRepository.save(email);
 
       log.info(
           "📧 Sending email: recipient={}, retryCount={}",
@@ -201,7 +210,7 @@ public class EmailOutboxService {
 
       // Success - mark as sent
       email.markAsSent();
-      emailOutboxRepository.save(email);
+      email = emailOutboxRepository.save(email);
 
       // Record metric
       emailSentCounter.increment();
