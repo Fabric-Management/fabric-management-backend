@@ -35,7 +35,6 @@ import com.fabricmanagement.production.execution.workorder.dto.OpenProductionLot
 import com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest;
 import com.fabricmanagement.production.execution.workorder.dto.WorkOrderResponse;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
-import com.fabricmanagement.production.masterdata.fiber.domain.Fiber;
 import com.fabricmanagement.production.masterdata.fiber.infra.repository.FiberRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.sales.salesorder.app.SalesOrderService;
@@ -271,23 +270,40 @@ class WalkingSkeletonIT {
     // path).
     workOrderService.changeStatus(woReadyForProd.getId(), WorkOrderStatus.SENT);
 
-    // Batches must reference real prod_fiber rows (fk_exec_batch_product → prod_fiber.id).
-    // R__001 seeds fibers into the Template Tenant (golden clone source), not the System Tenant.
-    List<Fiber> seededFibers =
-        fiberRepository.findByTenantIdAndIsActiveTrue(TenantContext.TEMPLATE_TENANT_ID);
-    assertThat(seededFibers)
+    // A batch's product_id is a prod_product PK (fk_exec_batch_product → prod_product.id, repointed
+    // by V20260709110000). It is NOT a prod_fiber PK: the two are independent id spaces, and a
+    // fibre
+    // reaches its product through prod_fiber.product_id. This test used to pass fibre ids and the
+    // FK
+    // accepted them only because it pointed at the wrong table.
+    //
+    // R__001 seeds fibres into the Template Tenant (golden clone source), not the System Tenant.
+    // Fiber.product is a lazy @OneToOne, so resolve the product ids inside a transaction; touching
+    // the proxy afterwards would throw LazyInitializationException.
+    List<UUID> seededFiberProductIds =
+        transactionTemplate.execute(
+            status ->
+                fiberRepository
+                    .findByTenantIdAndIsActiveTrue(TenantContext.TEMPLATE_TENANT_ID)
+                    .stream()
+                    .map(fiber -> fiber.getProduct().getId())
+                    .toList());
+
+    assertThat(seededFiberProductIds)
         .as("R__001 fiber seeds for template tenant must be present")
         .hasSizeGreaterThanOrEqualTo(2);
-    UUID fiberId1 = seededFibers.get(0).getId();
-    UUID fiberId2 = seededFibers.get(1).getId();
-    // DB FK is prod_fiber only; output is typed YARN in domain while product_id stays a fiber PK.
-    UUID outputProductId = seededFibers.size() > 2 ? seededFibers.get(2).getId() : fiberId1;
+    UUID fiberProductId1 = seededFiberProductIds.get(0);
+    UUID fiberProductId2 = seededFiberProductIds.get(1);
+    // The output batch is typed YARN in the domain while its product_id remains one of the seeded
+    // fibre products; the FK constrains the table, not the product type.
+    UUID outputProductId =
+        seededFiberProductIds.size() > 2 ? seededFiberProductIds.get(2) : fiberProductId1;
 
     Batch rawBatch1 =
         Batch.create(
             new CreateBatchCommand(
                 tenantId,
-                fiberId1,
+                fiberProductId1,
                 ProductType.FIBER,
                 "RAW-FIBER1-" + testRunSuffix,
                 null,
@@ -324,7 +340,7 @@ class WalkingSkeletonIT {
         Batch.create(
             new CreateBatchCommand(
                 tenantId,
-                fiberId2,
+                fiberProductId2,
                 ProductType.FIBER,
                 "RAW-FIBER2-" + testRunSuffix,
                 null,
