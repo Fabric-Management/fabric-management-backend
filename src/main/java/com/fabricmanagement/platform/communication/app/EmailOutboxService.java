@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.domain.EmailOutbox;
@@ -10,8 +11,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
-import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -41,6 +42,7 @@ public class EmailOutboxService {
   private final EmailOutboxRepository emailOutboxRepository;
   private final EmailStrategy emailStrategy;
   private final EmailRecipientPolicy emailRecipientPolicy;
+  private final SystemTransactionExecutor systemTransactionExecutor;
   private final MeterRegistry meterRegistry;
 
   @org.springframework.beans.factory.annotation.Value(
@@ -112,45 +114,69 @@ public class EmailOutboxService {
    * <p><b>Performance:</b> Early return if no emails (minimal DB load). Query is optimized with
    * indexes for fast execution.
    */
+  /**
+   * Identity of a queued email, read without a tenant context.
+   *
+   * <p>The worker cannot ask JPA which emails are due: it runs on a scheduler thread where {@code
+   * app.current_tenant} is unset, and every table here enforces row-level security. The query
+   * returned zero rows, the worker concluded the queue was empty, and no email was ever sent — no
+   * error, just blindness. So the due list is read through {@link SystemTransactionExecutor}
+   * ({@code fabric_system}, BYPASSRLS), and each row is then loaded and updated inside its own
+   * tenant context, where RLS applies normally.
+   */
+  private record PendingEmail(UUID id, UUID tenantId) {}
+
+  private static final String DUE_EMAILS_SQL =
+      """
+      SELECT id, tenant_id
+      FROM common_communication.communication_email_outbox
+      WHERE status = 'PENDING'
+        AND retry_count < max_retries
+        AND is_active = true
+        AND deleted_at IS NULL
+        AND (next_retry_at IS NULL OR next_retry_at <= now())
+      ORDER BY created_at ASC
+      LIMIT 100
+      """;
+
   @Scheduled(fixedDelayString = "${application.email.outbox.poll-interval-ms:5000}")
-  @Transactional
   public void processEmailQueue() {
     if (!emailOutboxWorkerEnabled) {
       log.trace("Email outbox worker disabled; skipping queue processing.");
       return;
     }
     try {
-      // Fast check: Count pending emails first (uses index)
-      long pendingCount =
-          emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.PENDING);
-      if (pendingCount == 0) {
-        // No emails to process - early return (no log spam)
-        return;
+      List<PendingEmail> due =
+          systemTransactionExecutor.executeQuery(
+              DUE_EMAILS_SQL,
+              (rs, rowNum) ->
+                  new PendingEmail(
+                      rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class)));
+
+      if (due.isEmpty()) {
+        return; // Nothing ready (no log spam)
       }
 
-      // Fetch pending emails ready for sending
-      List<EmailOutbox> pendingEmails =
-          emailOutboxRepository.findPendingEmailsReadyForSending(
-              EmailOutboxStatus.PENDING, Instant.now());
+      log.info("📧 Processing {} pending email(s)", due.size());
 
-      if (pendingEmails.isEmpty()) {
-        log.debug(
-            "📧 Found {} pending email(s) but none ready for sending yet (waiting for retry time)",
-            pendingCount);
-        return; // No emails ready yet (waiting for retry time)
-      }
-
-      log.info(
-          "📧 Processing {} pending email(s) (total pending: {})",
-          pendingEmails.size(),
-          pendingCount);
-
-      for (EmailOutbox email : pendingEmails) {
-        var tenantId = email.getTenantId();
+      for (PendingEmail pending : due) {
         try {
-          TenantContext.executeInTenantContext(tenantId, () -> processEmail(email));
+          TenantContext.executeInTenantContext(
+              pending.tenantId(),
+              () ->
+                  emailOutboxRepository
+                      .findById(pending.id())
+                      .ifPresentOrElse(
+                          this::processEmail,
+                          () ->
+                              log.warn(
+                                  "⚠️ Email {} is invisible inside tenant {}; skipping",
+                                  pending.id(),
+                                  pending.tenantId())));
         } catch (ObjectOptimisticLockingFailureException optimisticLockException) {
-          log.warn("⚠️ Skipping email due to concurrent update: emailId={}", email.getId());
+          log.warn("⚠️ Skipping email due to concurrent update: emailId={}", pending.id());
+        } catch (Exception e) {
+          log.error("Error processing email {}", pending.id(), e);
         }
       }
 
@@ -252,16 +278,31 @@ public class EmailOutboxService {
     return emailOutboxRepository.save(email);
   }
 
-  /** Get pending email count (for monitoring). */
-  @Transactional(readOnly = true)
+  /**
+   * Get pending email count (for monitoring).
+   *
+   * <p>Counted through {@code fabric_system}: these are called from metric gauges and a scheduled
+   * alert, none of which carry a tenant context. Under RLS a tenant-scoped count from those threads
+   * is always zero — which is exactly what the dead-letter alarm reported while 80 emails sat
+   * unsent.
+   */
   public long getPendingEmailCount() {
-    return emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.PENDING);
+    return countByStatus(EmailOutboxStatus.PENDING);
   }
 
   /** Get failed email count (for monitoring). */
-  @Transactional(readOnly = true)
   public long getFailedEmailCount() {
-    return emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.FAILED);
+    return countByStatus(EmailOutboxStatus.FAILED);
+  }
+
+  private long countByStatus(EmailOutboxStatus status) {
+    Long count =
+        systemTransactionExecutor.executeQueryForObject(
+            "SELECT count(*) FROM common_communication.communication_email_outbox"
+                + " WHERE status = ? AND is_active = true AND deleted_at IS NULL",
+            (rs, rowNum) -> rs.getLong(1),
+            status.name());
+    return count == null ? 0L : count;
   }
 
   /**
