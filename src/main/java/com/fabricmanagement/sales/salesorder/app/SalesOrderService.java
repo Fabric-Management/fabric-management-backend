@@ -133,6 +133,7 @@ public class SalesOrderService {
     SalesOrder saved = orderRepository.save(order);
 
     // Persist embedded lines (validated + moduleSpecs checked)
+    List<SalesOrderLine> savedLines = List.of();
     if (request.getLines() != null && !request.getLines().isEmpty()) {
       List<SalesOrderLine> lines =
           request.getLines().stream()
@@ -142,18 +143,23 @@ public class SalesOrderService {
                     return mapLineRequestToEntity(lineReq, saved.getId(), saved.getCurrency());
                   })
               .toList();
-      lineRepository.saveAll(lines);
+      savedLines = lineRepository.saveAll(lines);
     }
 
     // Get partner details for response
     TradingPartnerDto partner = partnerService.findById(tenantId, tradingPartnerId).orElse(null);
 
+    // The two-arg SalesOrderDto.from(...) substitutes an empty line list. Creation must echo the
+    // lines it just persisted, as updateOrder and findById do — callers chain off the response.
+    List<SalesOrderLineResponse> lineResponses =
+        savedLines.stream().map(this::mapLineToResponse).toList();
+
     log.info(
         "Sales order created: uid={}, partner={}, lines={}",
         saved.getUid(),
         tradingPartnerId,
-        request.getLines() == null ? 0 : request.getLines().size());
-    return SalesOrderDto.from(saved, partner);
+        lineResponses.size());
+    return SalesOrderDto.from(saved, partner, lineResponses);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

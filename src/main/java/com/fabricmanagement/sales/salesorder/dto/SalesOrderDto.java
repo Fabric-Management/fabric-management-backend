@@ -66,10 +66,10 @@ public class SalesOrderDto {
     return from(order, null, Collections.emptyList());
   }
 
-  /** Create DTO from entity with partner info (no lines — used for list queries). */
-  public static SalesOrderDto from(SalesOrder order, TradingPartnerDto partner) {
-    return from(order, partner, Collections.emptyList());
-  }
+  // No from(order, partner) overload: it silently substituted an empty line list, and createOrder
+  // used it to answer a request that had just persisted lines. A caller holding a partner is
+  // answering a single-order query and should pass the lines explicitly, even if that is
+  // Collections.emptyList().
 
   /** Create DTO from entity with partner info and embedded lines. */
   public static SalesOrderDto from(
