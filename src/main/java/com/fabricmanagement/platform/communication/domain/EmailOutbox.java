@@ -45,6 +45,15 @@ public class EmailOutbox extends BaseEntity {
   @Column(name = "recipient", nullable = false, length = 255)
   private String recipient;
 
+  /**
+   * The address this email was addressed to before sandbox redirection; null when not redirected.
+   *
+   * <p>Kept so a redirected email can still say where it was headed. See {@code
+   * EmailRecipientPolicy}.
+   */
+  @Column(name = "original_recipient", length = 255)
+  private String originalRecipient;
+
   @Column(name = "subject", nullable = false, length = 500)
   private String subject;
 
@@ -75,8 +84,15 @@ public class EmailOutbox extends BaseEntity {
 
   /** Create new email outbox entry. */
   public static EmailOutbox create(String recipient, String subject, String htmlBody) {
+    return create(recipient, null, subject, htmlBody);
+  }
+
+  /** Create a new outbox entry, recording the address it was redirected away from. */
+  public static EmailOutbox create(
+      String recipient, String originalRecipient, String subject, String htmlBody) {
     return EmailOutbox.builder()
         .recipient(recipient)
+        .originalRecipient(originalRecipient)
         .subject(subject)
         .htmlBody(htmlBody)
         .status(EmailOutboxStatus.PENDING)

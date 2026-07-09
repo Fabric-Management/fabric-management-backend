@@ -59,6 +59,7 @@ public class VerificationService {
   private final WhatsAppClient whatsAppClient;
   private final VerificationLogRepository verificationLogRepository;
   private final MarketRoutingService routingService;
+  private final EmailRecipientPolicy emailRecipientPolicy;
   private final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
 
   /**
@@ -98,20 +99,32 @@ public class VerificationService {
       VerificationType verificationType) {
     log.info("Sending verification code to: {}", maskRecipient(recipient));
 
-    String countryCode = extractCountryCode(recipient);
+    // Verification codes never touch the email outbox — they go straight to JavaMailSender — so
+    // the sandbox must be applied here or a playground visitor could have a code delivered to any
+    // address or phone they type. See EMAIL-SANDBOX-1.
+    EmailRecipientPolicy.Resolution sandboxed =
+        emailRecipientPolicy.resolveWithoutSubject(tenantId, recipient, isEmail(recipient));
+    if (sandboxed.dropped()) {
+      log.warn("🛡️ [SANDBOX] Verification code not sent: recipient is outside the sandbox.");
+      return;
+    }
+
+    // Everything below addresses the sandboxed recipient, not the one the caller asked for.
+    final String target = sandboxed.recipient();
+    String countryCode = extractCountryCode(target);
 
     // Use market-based routing for phone numbers
-    if (isPhoneNumber(recipient)) {
-      sendViaMarketRouting(recipient, code, tenantId, userId, verificationType, countryCode);
+    if (isPhoneNumber(target)) {
+      sendViaMarketRouting(target, code, tenantId, userId, verificationType, countryCode);
       return;
     }
 
     // Email flow
-    if (isEmail(recipient)) {
+    if (isEmail(target)) {
       log.info("Email detected, using Email strategy");
-      sendViaStrategy("Email", recipient, code);
+      sendViaStrategy("Email", target, code);
       createVerificationLog(
-          tenantId, userId, recipient, verificationType, DeliveryChannel.EMAIL, countryCode, null);
+          tenantId, userId, target, verificationType, DeliveryChannel.EMAIL, countryCode, null);
       return;
     }
 
@@ -124,12 +137,12 @@ public class VerificationService {
         .ifPresentOrElse(
             strategy -> {
               log.info("Using {} strategy", strategy.name());
-              strategy.sendVerificationCode(recipient, code);
+              strategy.sendVerificationCode(target, code);
               log.info("✅ Verification code sent successfully via {}", strategy.name());
               createVerificationLog(
                   tenantId,
                   userId,
-                  recipient,
+                  target,
                   verificationType,
                   DeliveryChannel.EMAIL,
                   countryCode,

@@ -40,6 +40,7 @@ public class EmailOutboxService {
 
   private final EmailOutboxRepository emailOutboxRepository;
   private final EmailStrategy emailStrategy;
+  private final EmailRecipientPolicy emailRecipientPolicy;
   private final MeterRegistry meterRegistry;
 
   @org.springframework.beans.factory.annotation.Value(
@@ -228,14 +229,26 @@ public class EmailOutboxService {
    * <p>Email is saved to database in the same transaction as business logic. Background job will
    * process it later.
    *
-   * @param recipient Email recipient
+   * <p><b>Sandboxing happens here</b>, not in {@link #processEmail}. This method still runs inside
+   * the caller's tenant context; the worker does not. A row that reaches the queue is already
+   * addressed to somewhere it is allowed to go.
+   *
+   * @param recipient Email recipient the caller intended
    * @param subject Email subject
    * @param htmlBody Email HTML body
-   * @return EmailOutbox entity
+   * @return the queued entity, or null when the tenant's sandbox has nowhere to redirect to and the
+   *     email was dropped
    */
   @Transactional
   public EmailOutbox queueEmail(String recipient, String subject, String htmlBody) {
-    EmailOutbox email = EmailOutbox.create(recipient, subject, htmlBody);
+    EmailRecipientPolicy.Resolution resolution = emailRecipientPolicy.resolve(recipient, subject);
+    if (resolution.dropped()) {
+      return null;
+    }
+
+    EmailOutbox email =
+        EmailOutbox.create(
+            resolution.recipient(), resolution.intendedRecipient(), resolution.subject(), htmlBody);
     return emailOutboxRepository.save(email);
   }
 

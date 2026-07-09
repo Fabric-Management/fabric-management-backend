@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 public class TenantTransactionalPurgeService {
 
   private static final String TENANT_DEMOMODE_CACHE = "tenant-demomode";
+  private static final String TENANT_EMAIL_SANDBOX_CACHE = "tenant-emailsandbox";
 
   private static final List<String> TRANSACTIONAL_TABLES =
       List.of(
@@ -585,6 +586,7 @@ public class TenantTransactionalPurgeService {
             """
             UPDATE common_tenant.common_tenant
             SET demo_mode = false,
+                email_sandboxed = false,
                 trial_started_at = ?,
                 last_activity_at = ?,
                 trial_ends_at = ?,
@@ -610,7 +612,14 @@ public class TenantTransactionalPurgeService {
   }
 
   private void evictDemoModeCache(UUID tenantId) {
-    var cache = cacheManager.getCache(TENANT_DEMOMODE_CACHE);
+    evict(TENANT_DEMOMODE_CACHE, tenantId);
+    // Going real lifts the email sandbox in the same statement; a stale cache entry would keep
+    // redirecting a paying customer's mail to their billing address.
+    evict(TENANT_EMAIL_SANDBOX_CACHE, tenantId);
+  }
+
+  private void evict(String cacheName, UUID tenantId) {
+    var cache = cacheManager.getCache(cacheName);
     if (cache != null) {
       cache.evict(tenantId.toString());
     }

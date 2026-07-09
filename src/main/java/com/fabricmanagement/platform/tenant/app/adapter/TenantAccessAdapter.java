@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tenant.app.adapter;
 
+import com.fabricmanagement.common.infrastructure.tenant.EmailSandbox;
 import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
 import com.fabricmanagement.platform.tenant.app.TenantSystemService;
 import java.util.UUID;
@@ -53,6 +54,43 @@ public class TenantAccessAdapter implements TenantAccessPort {
                   "Tenant {} could not be resolved for demo-mode decision; failing closed",
                   tenantId);
               return false;
+            });
+  }
+
+  @Override
+  @Cacheable(
+      value = "tenant-emailsandbox",
+      key = "#tenantId.toString()",
+      condition = "#tenantId != null")
+  public EmailSandbox emailSandbox(UUID tenantId) {
+    if (tenantId == null) {
+      // No tenant-scoped actor: a platform alert, a boot-time notice. Nothing to sandbox.
+      return EmailSandbox.off();
+    }
+    return tenantSystemService
+        .findById(tenantId)
+        .map(
+            tenant -> {
+              if (!tenant.isEmailSandboxed()) {
+                return EmailSandbox.off();
+              }
+              String registrationEmail = tenant.getBillingEmail();
+              if (registrationEmail == null || registrationEmail.isBlank()) {
+                log.warn(
+                    "Tenant {} is email-sandboxed but has no billing_email; its mail will be"
+                        + " dropped. Anonymous playground clones never set one.",
+                    tenantId);
+                return EmailSandbox.withoutRecipient();
+              }
+              return EmailSandbox.redirectingTo(registrationEmail);
+            })
+        .orElseGet(
+            () -> {
+              log.warn(
+                  "Tenant {} could not be resolved for email-sandbox decision; failing closed"
+                      + " (email will be dropped)",
+                  tenantId);
+              return EmailSandbox.withoutRecipient();
             });
   }
 }

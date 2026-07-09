@@ -165,11 +165,16 @@ public class TenantSystemService {
     return systemExecutor.executeInTransaction(
         jdbc -> {
           UUID id = UUID.randomUUID();
+          // A tenant born in demo mode is born sandboxed: its users may not email a third party.
+          // The two flags are separate columns because they diverge later — TenantGoRealService
+          // clears demo_mode when a prospect converts, and the sandbox must lift with it, but a
+          // paying customer who later re-seeds demo data must not have their mail redirected.
+          boolean emailSandboxed = request.isDemoMode() || type == TenantType.PLAYGROUND;
           jdbc.update(
               "INSERT INTO common_tenant.common_tenant "
                   + "(id, uid, slug, name, type, status, settings, billing_email, "
-                  + "trial_ends_at, demo_mode, is_active, created_at, updated_at, version) "
-                  + "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, true, now(), now(), 0)",
+                  + "trial_ends_at, demo_mode, email_sandboxed, is_active, created_at, updated_at, version) "
+                  + "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, true, now(), now(), 0)",
               id,
               uid,
               slug,
@@ -179,7 +184,8 @@ public class TenantSystemService {
               settingsJson,
               request.getBillingEmail(),
               trialEndsAt != null ? java.sql.Timestamp.from(trialEndsAt) : null,
-              request.isDemoMode());
+              request.isDemoMode(),
+              emailSandboxed);
           return id;
         });
   }

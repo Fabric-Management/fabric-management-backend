@@ -158,6 +158,17 @@ public class Tenant implements Serializable {
   @Builder.Default
   private boolean demoMode = false;
 
+  /**
+   * When true, every outbound email for this tenant is redirected to {@link #billingEmail}.
+   *
+   * <p>Deliberately separate from {@link #demoMode}, which means "this tenant holds demo data". A
+   * paying trial customer may hold demo data and must still be able to email the people they
+   * invite. This flag means "this tenant's users may not reach a third party by email".
+   */
+  @Column(name = "email_sandboxed", nullable = false)
+  @Builder.Default
+  private boolean emailSandboxed = false;
+
   /** Subscription plan identifier (e.g., "professional", "enterprise") */
   @Column(name = "subscription_plan", length = 50)
   private String subscriptionPlan;
