@@ -29338,72 +29338,6 @@ paths:
       tags:
       - Color
   /api/v1/production/colors/{id}:
-    delete:
-      operationId: deactivateColor
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Bad Request
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unauthorized
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Forbidden
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Not Found
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Conflict
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Unprocessable Entity
-        "429":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Too Many Requests
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ApiProblemDetail"
-          description: Internal Server Error
-      summary: Deactivate a color card
-      tags:
-      - Color
     get:
       operationId: findColorById
       parameters:
@@ -29548,6 +29482,291 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Update a color card
+      tags:
+      - Color
+  /api/v1/production/colors/{id}/activate:
+    post:
+      operationId: activateColor
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reactivate a deactivated color card
+      tags:
+      - Color
+  /api/v1/production/colors/{id}/approve:
+    post:
+      operationId: approveColorStandard
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: "Approve the card's shade standard, freezing its standard-defining\
+        \ fields"
+      tags:
+      - Color
+  /api/v1/production/colors/{id}/deactivate:
+    post:
+      operationId: deactivateColor
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Deactivate a color card
+      tags:
+      - Color
+  /api/v1/production/colors/{id}/revert-to-draft:
+    post:
+      operationId: revertColorStandardToDraft
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseColorDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Reopen the card's shade standard for editing
       tags:
       - Color
   /api/v1/production/fiber-quality-standards:
@@ -48034,13 +48253,86 @@ components:
           type: boolean
         code:
           type: string
+        colorFamily:
+          type: string
+          enum:
+          - RED
+          - ORANGE
+          - YELLOW
+          - GREEN
+          - BLUE
+          - PURPLE
+          - PINK
+          - BROWN
+          - BEIGE
+          - GREY
+          - BLACK
+          - WHITE
+          - MULTI
+          - UNDEFINED
         colorHex:
           type: string
+        colorType:
+          type: string
+          enum:
+          - DYED
+          - YARN_DYED
+          - PRINTED
+          - OPTICAL_WHITE
+          - PFD
+          - GREIGE
+        deltaEFormula:
+          type: string
+          enum:
+          - CIE76
+          - CIE94
+          - CIEDE2000
+          - CMC_2_1
+        deltaETolerance:
+          type: number
         id:
           type: string
           format: uuid
         name:
           type: string
+        notes:
+          type: string
+        pantoneCode:
+          type: string
+        pantoneLabel:
+          type: string
+        pantoneSystem:
+          type: string
+          enum:
+          - TCX
+          - TPG
+          - TPX
+          - TN
+          - TSX
+        standardStatus:
+          type: string
+          enum:
+          - DRAFT
+          - APPROVED
+        targetLabA:
+          type: number
+        targetLabB:
+          type: number
+        targetLabIlluminant:
+          type: string
+          enum:
+          - D65
+          - D50
+          - A
+          - F11
+          - TL84
+        targetLabL:
+          type: number
+        targetLabObserver:
+          type: string
+          enum:
+          - DEG_2
+          - DEG_10
     CompanyTypeOptionDto:
       type: object
       properties:
@@ -48751,13 +49043,90 @@ components:
           type: string
           maxLength: 50
           minLength: 0
+        colorFamily:
+          type: string
+          enum:
+          - RED
+          - ORANGE
+          - YELLOW
+          - GREEN
+          - BLUE
+          - PURPLE
+          - PINK
+          - BROWN
+          - BEIGE
+          - GREY
+          - BLACK
+          - WHITE
+          - MULTI
+          - UNDEFINED
         colorHex:
           type: string
           pattern: "^#[0-9A-Fa-f]{6}$"
+        colorType:
+          type: string
+          enum:
+          - DYED
+          - YARN_DYED
+          - PRINTED
+          - OPTICAL_WHITE
+          - PFD
+          - GREIGE
+        deltaEFormula:
+          type: string
+          enum:
+          - CIE76
+          - CIE94
+          - CIEDE2000
+          - CMC_2_1
+        deltaETolerance:
+          type: number
+          maximum: 99.99
         name:
           type: string
           maxLength: 255
           minLength: 0
+        notes:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        pantoneCode:
+          type: string
+          maxLength: 20
+          minLength: 0
+        pantoneSystem:
+          type: string
+          enum:
+          - TCX
+          - TPG
+          - TPX
+          - TN
+          - TSX
+        targetLabA:
+          type: number
+          maximum: 127
+          minimum: -128
+        targetLabB:
+          type: number
+          maximum: 127
+          minimum: -128
+        targetLabIlluminant:
+          type: string
+          enum:
+          - D65
+          - D50
+          - A
+          - F11
+          - TL84
+        targetLabL:
+          type: number
+          maximum: 100
+          minimum: 0
+        targetLabObserver:
+          type: string
+          enum:
+          - DEG_2
+          - DEG_10
       required:
       - code
       - name
@@ -49769,6 +50138,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
         listPrice:
           type: number
           minimum: 0.0
@@ -50007,6 +50377,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
           description: Lead time in days
         moduleType:
           type: string
@@ -54550,6 +54921,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
         lines:
           type: array
           items:
@@ -54879,6 +55251,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
           maximum: 3650
           minimum: 0
         moduleType:
@@ -55055,6 +55428,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
         lines:
           type: array
           items:
@@ -56117,6 +56491,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
         listPrice:
           type: number
         moduleType:
@@ -56904,6 +57279,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
           description: Lead Time in Days
         lines:
           type: array
@@ -57819,13 +58195,90 @@ components:
           type: string
           maxLength: 50
           minLength: 0
+        colorFamily:
+          type: string
+          enum:
+          - RED
+          - ORANGE
+          - YELLOW
+          - GREEN
+          - BLUE
+          - PURPLE
+          - PINK
+          - BROWN
+          - BEIGE
+          - GREY
+          - BLACK
+          - WHITE
+          - MULTI
+          - UNDEFINED
         colorHex:
           type: string
           pattern: "^#[0-9A-Fa-f]{6}$"
+        colorType:
+          type: string
+          enum:
+          - DYED
+          - YARN_DYED
+          - PRINTED
+          - OPTICAL_WHITE
+          - PFD
+          - GREIGE
+        deltaEFormula:
+          type: string
+          enum:
+          - CIE76
+          - CIE94
+          - CIEDE2000
+          - CMC_2_1
+        deltaETolerance:
+          type: number
+          maximum: 99.99
         name:
           type: string
           maxLength: 255
           minLength: 0
+        notes:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        pantoneCode:
+          type: string
+          maxLength: 20
+          minLength: 0
+        pantoneSystem:
+          type: string
+          enum:
+          - TCX
+          - TPG
+          - TPX
+          - TN
+          - TSX
+        targetLabA:
+          type: number
+          maximum: 127
+          minimum: -128
+        targetLabB:
+          type: number
+          maximum: 127
+          minimum: -128
+        targetLabIlluminant:
+          type: string
+          enum:
+          - D65
+          - D50
+          - A
+          - F11
+          - TL84
+        targetLabL:
+          type: number
+          maximum: 100
+          minimum: 0
+        targetLabObserver:
+          type: string
+          enum:
+          - DEG_2
+          - DEG_10
       required:
       - code
       - name
@@ -58165,6 +58618,7 @@ components:
         leadTimeDays:
           type: integer
           format: int32
+          deprecated: true
           maximum: 3650
           minimum: 0
         notes:

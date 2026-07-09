@@ -3,6 +3,7 @@ package com.fabricmanagement.production.masterdata.color.app;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.masterdata.color.domain.Color;
+import com.fabricmanagement.production.masterdata.color.domain.ColorCardSpec;
 import com.fabricmanagement.production.masterdata.color.domain.exception.ColorDomainException;
 import com.fabricmanagement.production.masterdata.color.infra.repository.ColorRepository;
 import java.util.List;
@@ -36,26 +37,32 @@ public class ColorService {
         .orElseThrow(() -> new NotFoundException("Color not found: " + colorId));
   }
 
+  /** Convenience for seeders and callers that only need the three original fields. */
   @Transactional
   public Color create(String code, String name, String colorHex) {
+    return create(ColorCardSpec.basic(code, name, colorHex));
+  }
+
+  @Transactional
+  public Color create(ColorCardSpec spec) {
     UUID tenantId = TenantContext.requireTenantId();
-    String normalizedCode = normalizeCode(code);
+    String normalizedCode = normalizeCode(spec.code());
     if (colorRepository.existsByTenantIdAndCode(tenantId, normalizedCode)) {
       throw ColorDomainException.duplicateCode(normalizedCode);
     }
 
-    return colorRepository.save(Color.create(tenantId, normalizedCode, name, colorHex));
+    return colorRepository.save(Color.create(tenantId, spec));
   }
 
   @Transactional
-  public Color update(UUID colorId, String code, String name, String colorHex) {
+  public Color update(UUID colorId, ColorCardSpec spec) {
     UUID tenantId = TenantContext.requireTenantId();
     Color color =
         colorRepository
             .findByTenantIdAndId(tenantId, colorId)
             .orElseThrow(() -> new NotFoundException("Color not found: " + colorId));
 
-    String normalizedCode = normalizeCode(code);
+    String normalizedCode = normalizeCode(spec.code());
     colorRepository
         .findByTenantIdAndCode(tenantId, normalizedCode)
         .filter(existing -> !existing.getId().equals(colorId))
@@ -64,16 +71,48 @@ public class ColorService {
               throw ColorDomainException.duplicateCode(normalizedCode);
             });
 
-    color.update(normalizedCode, name, colorHex);
+    color.update(spec);
     return colorRepository.save(color);
   }
 
+  /** Soft-deletes the card. Idempotent: deactivating an inactive card is a no-op re-save. */
   @Transactional
-  public void deactivate(UUID colorId) {
+  public Color deactivate(UUID colorId) {
     Color color = findById(colorId);
     color.delete();
-    colorRepository.save(color);
     log.info("Color deactivated: id={}, code={}", colorId, color.getCode());
+    return colorRepository.save(color);
+  }
+
+  /**
+   * Restores a soft-deleted card. Counterpart of {@link #deactivate(UUID)} — without it a
+   * deactivated code stays permanently unusable, since {@link #create} rejects duplicate codes
+   * across active and inactive rows alike. Idempotent.
+   */
+  @Transactional
+  public Color activate(UUID colorId) {
+    Color color = findById(colorId);
+    color.activate();
+    log.info("Color activated: id={}, code={}", colorId, color.getCode());
+    return colorRepository.save(color);
+  }
+
+  /** Freezes the card's shade standard. Idempotent. */
+  @Transactional
+  public Color approve(UUID colorId) {
+    Color color = findById(colorId);
+    color.approve();
+    log.info("Color standard approved: id={}, code={}", colorId, color.getCode());
+    return colorRepository.save(color);
+  }
+
+  /** Reopens the card's shade standard for editing. Idempotent. */
+  @Transactional
+  public Color revertToDraft(UUID colorId) {
+    Color color = findById(colorId);
+    color.revertToDraft();
+    log.info("Color standard reverted to draft: id={}, code={}", colorId, color.getCode());
+    return colorRepository.save(color);
   }
 
   private String normalizeCode(String code) {
