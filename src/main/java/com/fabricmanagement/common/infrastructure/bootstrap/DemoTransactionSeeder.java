@@ -199,7 +199,9 @@ public class DemoTransactionSeeder {
           }
         }
       } catch (Exception prodEx) {
-        log.warn(
+        // Isolated so it cannot roll back the finance demo, but logged at ERROR: a swallowed
+        // warn here hid a foreign-key violation that silently produced zero batches (BATCH-FK-1).
+        log.error(
             "Production demo seeding failed for tenant {} — continuing; finance demo already seeded.",
             tenantId,
             prodEx);
