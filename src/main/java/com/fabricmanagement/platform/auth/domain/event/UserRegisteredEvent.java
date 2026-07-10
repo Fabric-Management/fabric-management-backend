@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.auth.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -17,6 +20,25 @@ public class UserRegisteredEvent extends DomainEvent {
 
   public UserRegisteredEvent(UUID tenantId, UUID userId, String contactValue) {
     super(tenantId, "USER_REGISTERED");
+    this.userId = userId;
+    this.contactValue = contactValue;
+  }
+
+  @JsonCreator
+  public UserRegisteredEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("userId") UUID userId,
+      @JsonProperty("contactValue") String contactValue) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "USER_REGISTERED",
+        occurredAt,
+        correlationId);
     this.userId = userId;
     this.contactValue = contactValue;
   }

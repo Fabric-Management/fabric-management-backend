@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.approval.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -24,6 +27,33 @@ public class ApprovalRejectedEvent extends DomainEvent {
       UUID requesterId,
       String rejectionReason) {
     super(tenantId, "APPROVAL_REJECTED");
+    this.approvalRequestId = approvalRequestId;
+    this.entityType = entityType;
+    this.entityId = entityId;
+    this.entityCode = entityCode;
+    this.requesterId = requesterId;
+    this.rejectionReason = rejectionReason;
+  }
+
+  @JsonCreator
+  public ApprovalRejectedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("approvalRequestId") UUID approvalRequestId,
+      @JsonProperty("entityType") String entityType,
+      @JsonProperty("entityId") UUID entityId,
+      @JsonProperty("entityCode") String entityCode,
+      @JsonProperty("requesterId") UUID requesterId,
+      @JsonProperty("rejectionReason") String rejectionReason) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "APPROVAL_REJECTED",
+        occurredAt,
+        correlationId);
     this.approvalRequestId = approvalRequestId;
     this.entityType = entityType;
     this.entityId = entityId;

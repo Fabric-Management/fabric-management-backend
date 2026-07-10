@@ -1,6 +1,9 @@
 package com.fabricmanagement.production.execution.stockunit.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -23,6 +26,33 @@ public class StockUnitGradeChangedEvent extends DomainEvent {
 
   /** True if this was a promotion (upgrade to better quality) — requires prior approval. */
   private final boolean promotion;
+
+  @JsonCreator
+  public StockUnitGradeChangedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("stockUnitId") UUID stockUnitId,
+      @JsonProperty("barcode") String barcode,
+      @JsonProperty("batchId") UUID batchId,
+      @JsonProperty("previousGradeId") UUID previousGradeId,
+      @JsonProperty("newGradeId") UUID newGradeId,
+      @JsonProperty("promotion") boolean promotion) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "STOCK_UNIT_GRADE_CHANGED",
+        occurredAt,
+        correlationId);
+    this.stockUnitId = stockUnitId;
+    this.barcode = barcode;
+    this.batchId = batchId;
+    this.previousGradeId = previousGradeId;
+    this.newGradeId = newGradeId;
+    this.promotion = promotion;
+  }
 
   public StockUnitGradeChangedEvent(
       UUID tenantId,

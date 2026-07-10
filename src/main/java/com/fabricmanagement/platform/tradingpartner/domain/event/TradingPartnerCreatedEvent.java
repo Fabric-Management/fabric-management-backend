@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.tradingpartner.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -33,6 +36,31 @@ public class TradingPartnerCreatedEvent extends DomainEvent {
       String displayName,
       UUID legacyCompanyId) {
     super(tenantId, "TRADING_PARTNER_CREATED");
+    this.tradingPartnerId = tradingPartnerId;
+    this.registryId = registryId;
+    this.partnerType = partnerType;
+    this.displayName = displayName;
+    this.legacyCompanyId = legacyCompanyId;
+  }
+
+  @JsonCreator
+  public TradingPartnerCreatedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("tradingPartnerId") UUID tradingPartnerId,
+      @JsonProperty("registryId") UUID registryId,
+      @JsonProperty("partnerType") String partnerType,
+      @JsonProperty("displayName") String displayName,
+      @JsonProperty("legacyCompanyId") UUID legacyCompanyId) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "TRADING_PARTNER_CREATED",
+        occurredAt,
+        correlationId);
     this.tradingPartnerId = tradingPartnerId;
     this.registryId = registryId;
     this.partnerType = partnerType;

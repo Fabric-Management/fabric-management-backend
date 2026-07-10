@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.policy.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -30,6 +33,33 @@ public class PolicyEvaluatedEvent extends DomainEvent {
       String reason,
       Long evaluationTimeMs) {
     super(tenantId, "POLICY_EVALUATED");
+    this.userId = userId;
+    this.resource = resource;
+    this.action = action;
+    this.allowed = allowed;
+    this.reason = reason;
+    this.evaluationTimeMs = evaluationTimeMs;
+  }
+
+  @JsonCreator
+  public PolicyEvaluatedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("userId") UUID userId,
+      @JsonProperty("resource") String resource,
+      @JsonProperty("action") String action,
+      @JsonProperty("allowed") boolean allowed,
+      @JsonProperty("reason") String reason,
+      @JsonProperty("evaluationTimeMs") Long evaluationTimeMs) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "POLICY_EVALUATED",
+        occurredAt,
+        correlationId);
     this.userId = userId;
     this.resource = resource;
     this.action = action;
