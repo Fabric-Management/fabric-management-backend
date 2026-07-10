@@ -24,7 +24,14 @@ public class PublicQuoteResponse {
   private final ConvertedMoneyDto reportingTotal;
   private final LocalDate validUntil;
   private final String paymentTerms;
-  private final Integer leadTimeDays;
+
+  /**
+   * @deprecated Superseded by per-line {@code QuoteLine.deliveryStatus}/{@code deliveryDate}
+   *     (QLINE-ATP-1); retained for historical data, no longer written by the FE. See
+   *     docs/sales/tickets/QLINE-LEADTIME-1-remove-quote-header-lead-time.md.
+   */
+  @Deprecated private final Integer leadTimeDays;
+
   private final String notes;
   private final Integer revisionNumber;
   private final List<PublicQuoteLineResponse> lines;

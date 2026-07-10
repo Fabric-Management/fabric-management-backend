@@ -109,6 +109,14 @@ public class CreateInternalUserRequest {
   /** Emergency contact information. */
   @Valid private EmergencyContactData emergencyContact;
 
+  /**
+   * When {@code true}, user creation does not publish an invitation email event.
+   *
+   * <p>Demo seeders create fictional employees and must set this flag so setup data does not
+   * generate real invitation mail.
+   */
+  @Builder.Default private boolean invitationEmailSuppressed = false;
+
   // ========== Nested DTOs ==========
 
   @Data

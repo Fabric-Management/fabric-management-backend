@@ -77,7 +77,8 @@ class SignupEmailListenerTest {
             org.mockito.ArgumentMatchers.anyString(),
             org.mockito.ArgumentMatchers.anyString());
     verify(notificationService)
-        .sendNotificationSync("owner@example.com", "Set up your password", "setup body");
+        .sendNotificationSync(
+            event.getTenantId(), "owner@example.com", "Set up your password", "setup body");
   }
 
   @Test
@@ -125,6 +126,6 @@ class SignupEmailListenerTest {
             org.mockito.ArgumentMatchers.anyString(),
             org.mockito.ArgumentMatchers.anyString());
     verify(notificationService)
-        .sendNotificationSync("admin@example.com", "Welcome", "welcome body");
+        .sendNotificationSync(event.getTenantId(), "admin@example.com", "Welcome", "welcome body");
   }
 }

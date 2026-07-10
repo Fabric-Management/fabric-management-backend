@@ -127,7 +127,10 @@ class PartnerUserInvitationEventListenerTest {
         .renderPartnerInvitation(anyString(), anyString(), anyString(), anyString());
     verify(notificationService)
         .sendNotificationSync(
-            event.getContactValue(), "You were added to an organization in FabricOS", "added-html");
+            event.getTenantId(),
+            event.getContactValue(),
+            "You were added to an organization in FabricOS",
+            "added-html");
   }
 
   @Test
@@ -175,7 +178,10 @@ class PartnerUserInvitationEventListenerTest {
         .renderAddedToOrganization(anyString(), anyString(), anyString());
     verify(notificationService)
         .sendNotificationSync(
-            "new@example.com", "You've been invited to the Partner Portal", "partner-setup-html");
+            event.getTenantId(),
+            "new@example.com",
+            "You've been invited to the Partner Portal",
+            "partner-setup-html");
   }
 
   private LoginIdentity identity(String email, String passwordHash) {

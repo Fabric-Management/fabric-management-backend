@@ -54,4 +54,13 @@ public interface PermissionTemplateRepository extends JpaRepository<PermissionTe
       @Param("deptCode") String departmentCode);
 
   boolean existsByTenantId(UUID tenantId);
+
+  /**
+   * All templates owned by a tenant, active or not.
+   *
+   * <p>Used by the seeder to diff its desired set against what is already stored. It must not
+   * filter on {@code isActive}: a deactivated row still occupies the {@code
+   * uq_permission_template_effective} key and re-inserting it would violate the constraint.
+   */
+  List<PermissionTemplate> findByTenantId(UUID tenantId);
 }

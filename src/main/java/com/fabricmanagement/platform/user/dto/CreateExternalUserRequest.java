@@ -74,7 +74,7 @@ public class CreateExternalUserRequest {
    * event (e.g., partner portal users publish {@link
    * com.fabricmanagement.platform.tradingpartner.domain.event.PartnerUserCreatedEvent}).
    */
-  @Builder.Default private boolean suppressEmailInvitation = false;
+  @Builder.Default private boolean invitationEmailSuppressed = false;
 
   /** Additional contacts (emails, phones) beyond the primary contact. */
   @Builder.Default @Valid private List<ContactData> additionalContacts = new ArrayList<>();

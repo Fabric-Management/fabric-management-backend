@@ -33,6 +33,10 @@ public class TenantDto {
   private Instant trialStartedAt;
   private Instant lastActivityAt;
   private boolean demoMode;
+
+  /** Whether this tenant's outbound email is redirected to {@link #billingEmail}. */
+  private boolean emailSandboxed;
+
   private String subscriptionPlan;
   private TenantSettings settings;
   private Instant createdAt;
@@ -60,6 +64,7 @@ public class TenantDto {
         .trialStartedAt(tenant.getTrialStartedAt())
         .lastActivityAt(tenant.getLastActivityAt())
         .demoMode(tenant.isDemoMode())
+        .emailSandboxed(tenant.isEmailSandboxed())
         .subscriptionPlan(tenant.getSubscriptionPlan())
         .settings(tenant.getSettings())
         .createdAt(tenant.getCreatedAt())

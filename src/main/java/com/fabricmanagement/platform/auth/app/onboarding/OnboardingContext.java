@@ -96,7 +96,7 @@ public class OnboardingContext {
         .firstName(adminFirstName)
         .lastName(adminLastName)
         .contactValue(adminContact)
-        .suppressInvitationEmail(existingIdentity)
+        .invitationEmailSuppressed(existingIdentity)
         .build();
   }
 

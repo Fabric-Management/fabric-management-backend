@@ -126,9 +126,6 @@ public class BatchService {
     UUID tenantId = TenantContext.requireTenantId();
     Optional<Fiber> fiberOpt = fiberRepository.findByProductId(request.getProductId());
     if (fiberOpt.isEmpty()) {
-      fiberOpt = fiberRepository.findById(request.getProductId());
-    }
-    if (fiberOpt.isEmpty()) {
       return null;
     }
     UUID isoCodeId = fiberOpt.get().getFiberIsoCodeId();
@@ -188,9 +185,10 @@ public class BatchService {
         return result;
       }
     }
-    // For FIBER, productId references prod_fiber.id (see V061 migration)
+    // batch.productId is a prod_product.id; a Fiber is reached through Fiber.productId
+    // (BATCH-FK-1).
     return fiberRepository
-        .findById(batch.getProductId())
+        .findByProductId(batch.getProductId())
         .map(Fiber::getComposition)
         .orElse(Map.of());
   }

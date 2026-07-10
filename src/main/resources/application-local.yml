@@ -105,6 +105,8 @@ application:
     outbox:
       worker-enabled: ${EMAIL_OUTBOX_WORKER_ENABLED:true}
       poll-interval-ms: ${EMAIL_OUTBOX_POLL_INTERVAL_MS:15000}
+      reclaim-after-minutes: ${EMAIL_OUTBOX_RECLAIM_AFTER_MINUTES:15}
+      reclaim-interval-ms: ${EMAIL_OUTBOX_RECLAIM_INTERVAL_MS:300000}
       dead-letter-monitor-enabled: ${EMAIL_OUTBOX_DEAD_LETTER_MONITOR_ENABLED:false}
 
   frontend:

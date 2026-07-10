@@ -14,8 +14,10 @@ import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.organization.api.facade.OrganizationFacade;
 import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.domain.event.UserCreatedEvent;
 import com.fabricmanagement.platform.user.dto.CreateAdminUserRequest;
 import com.fabricmanagement.platform.user.dto.CreateExternalUserRequest;
+import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import java.util.Optional;
@@ -166,6 +168,80 @@ class UserCreationServiceTest {
           .copyOrganizationPrimaryAddress(eq(USER_ID), eq(COMPANY_ID), eq(TENANT_ID));
       assertThat(result.getId()).isEqualTo(USER_ID);
       assertThat(result.getOrganizationId()).isEqualTo(COMPANY_ID);
+    }
+  }
+
+  @Nested
+  @DisplayName("createInternalUser")
+  class CreateInternalUser {
+
+    @Test
+    void publishesInvitationSuppressedFlagFromRequest() {
+      CreateInternalUserRequest request =
+          CreateInternalUserRequest.builder()
+              .firstName("Demo")
+              .lastName("Persona")
+              .contactValue(CONTACT_VALUE)
+              .contactType(com.fabricmanagement.platform.user.domain.ContactType.EMAIL)
+              .organizationId(COMPANY_ID)
+              .invitationEmailSuppressed(true)
+              .build();
+      when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
+          .thenReturn(false);
+      when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
+      User savedUser = User.create("Demo", "Persona", COMPANY_ID);
+      savedUser.setId(USER_ID);
+      savedUser.setTenantId(TENANT_ID);
+      when(userRepository.save(any(User.class))).thenReturn(savedUser);
+      Contact contact = new Contact();
+      contact.setId(CONTACT_ID);
+      contact.setContactValue(CONTACT_VALUE);
+      contact.setContactType(ContactType.EMAIL);
+      when(contactService.createContact(
+              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+          .thenReturn(contact);
+      when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+      service.createInternalUser(request);
+
+      ArgumentCaptor<UserCreatedEvent> eventCaptor =
+          ArgumentCaptor.forClass(UserCreatedEvent.class);
+      verify(eventPublisher).publish(eventCaptor.capture());
+      assertThat(eventCaptor.getValue().isInvitationEmailSuppressed()).isTrue();
+    }
+
+    @Test
+    void publishesInvitationByDefaultForRealInternalApiCalls() {
+      CreateInternalUserRequest request =
+          CreateInternalUserRequest.builder()
+              .firstName("Real")
+              .lastName("Colleague")
+              .contactValue(CONTACT_VALUE)
+              .contactType(com.fabricmanagement.platform.user.domain.ContactType.EMAIL)
+              .organizationId(COMPANY_ID)
+              .build();
+      when(userRepository.existsByTenantIdAndContactValue(TENANT_ID, CONTACT_VALUE))
+          .thenReturn(false);
+      when(organizationFacade.exists(TENANT_ID, COMPANY_ID)).thenReturn(true);
+      User savedUser = User.create("Real", "Colleague", COMPANY_ID);
+      savedUser.setId(USER_ID);
+      savedUser.setTenantId(TENANT_ID);
+      when(userRepository.save(any(User.class))).thenReturn(savedUser);
+      Contact contact = new Contact();
+      contact.setId(CONTACT_ID);
+      contact.setContactValue(CONTACT_VALUE);
+      contact.setContactType(ContactType.EMAIL);
+      when(contactService.createContact(
+              eq(CONTACT_VALUE), eq(ContactType.EMAIL), eq("Primary"), eq(true), eq(null)))
+          .thenReturn(contact);
+      when(employeeProjectionPort.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+      service.createInternalUser(request);
+
+      ArgumentCaptor<UserCreatedEvent> eventCaptor =
+          ArgumentCaptor.forClass(UserCreatedEvent.class);
+      verify(eventPublisher).publish(eventCaptor.capture());
+      assertThat(eventCaptor.getValue().isInvitationEmailSuppressed()).isFalse();
     }
   }
 

@@ -850,7 +850,7 @@ class ConstitutionArchTest {
               .and()
               .doNotHaveSimpleName("SystemDataSourceConfig")
               .and()
-              .doNotHaveSimpleName("FinancePermissionBackfillRunner")
+              .doNotHaveSimpleName("PermissionTemplateBackfillRunner")
               .and()
               .doNotHaveSimpleName("LoginIdentityBackfillRunner")
               .and()
@@ -859,6 +859,12 @@ class ConstitutionArchTest {
               .doNotHaveSimpleName("QuoteRetentionPurgeJob")
               .and()
               .doNotHaveSimpleName("BatchLotQuantityIntentExpiryJob")
+              .and()
+              // The outbox worker is a @Scheduled job with no ambient tenant. Under RLS its
+              // tenant-scoped query matched nothing, so 80 emails sat PENDING while the worker
+              // reported an empty queue. It reads its due list as fabric_system, then processes
+              // each row inside that row's own tenant context.
+              .doNotHaveSimpleName("EmailOutboxService")
               .and()
               .doNotHaveSimpleName("SystemTransactionExecutor")
               .should()

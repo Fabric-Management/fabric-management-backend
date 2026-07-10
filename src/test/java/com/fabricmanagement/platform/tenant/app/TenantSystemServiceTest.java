@@ -74,7 +74,21 @@ class TenantSystemServiceTest {
               return 1;
             })
         .when(jdbcTemplate)
-        .update(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        // sql + 11 values: id, uid, slug, name, type, status, settings, billing_email,
+        // trial_ends_at, demo_mode, email_sandboxed (EMAIL-SANDBOX-1)
+        .update(
+            anyString(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any());
     when(systemExecutor.executeQuery(
             anyString(), ArgumentMatchers.<RowMapper<TenantDto>>any(), any()))
         .thenReturn(

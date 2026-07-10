@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.platform.organization.app.OrganizationService;
+import com.fabricmanagement.platform.organization.dto.OrganizationDto;
 import com.fabricmanagement.platform.organization.infra.repository.DepartmentRepository;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerService;
 import com.fabricmanagement.platform.tradingpartner.domain.PartnerType;
@@ -21,7 +22,10 @@ import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequ
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.user.app.RoleService;
 import com.fabricmanagement.platform.user.app.UserCreationService;
+import com.fabricmanagement.platform.user.domain.Role;
 import com.fabricmanagement.platform.user.domain.User;
+import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
+import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
 import com.fabricmanagement.production.execution.batch.app.BatchAttributeService;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
@@ -195,6 +199,11 @@ class SalesQuoteDemoSeederTest {
     assertThat(draftQuote.getQuoteNumber())
         .startsWith(SalesQuoteDemoSeeder.DRAFT_QUOTE_NUMBER_STEM);
     assertThat(draftQuote.getAssignedToId()).isEqualTo(SANDRA_ID);
+
+    ArgumentCaptor<CreateInternalUserRequest> userCaptor =
+        ArgumentCaptor.forClass(CreateInternalUserRequest.class);
+    verify(userCreationService, times(1)).createInternalUser(userCaptor.capture());
+    assertThat(userCaptor.getValue().isInvitationEmailSuppressed()).isTrue();
 
     // Intents ride through QuoteService.addQuoteLine: per line, the selected-lot quantity must
     // equal the requested quantity so BatchLotQuantityIntentPort invariants hold.
@@ -373,10 +382,21 @@ class SalesQuoteDemoSeederTest {
             TENANT_ID,
             SalesQuoteDemoSeeder.MARKETER_FIRST_NAME,
             SalesQuoteDemoSeeder.MARKETER_LAST_NAME))
-        .thenReturn(Optional.of(user(EMMA_ID, "Emma", "Whitfield")));
+        .thenReturn(Optional.empty());
     when(userRepository.findFirstByTenantIdAndFirstNameAndLastNameAndIsActiveTrue(
             TENANT_ID, "Sandra", "Deal"))
         .thenReturn(Optional.of(user(SANDRA_ID, "Sandra", "Deal")));
+    when(organizationService.getRootOrganization())
+        .thenReturn(Optional.of(OrganizationDto.builder().id(UUID.randomUUID()).build()));
+    when(roleService.findByCode("WORKER"))
+        .thenReturn(Optional.of(Role.create("Worker", "WORKER", "Worker")));
+    when(departmentRepository.findByTenantIdAndOrganizationIdAndDepartmentCode(
+            eq(TENANT_ID), any(UUID.class), eq("SALES")))
+        .thenReturn(Optional.empty());
+    when(userCreationService.createInternalUser(any(CreateInternalUserRequest.class)))
+        .thenReturn(UserDto.builder().id(EMMA_ID).build());
+    when(userRepository.findByTenantIdAndId(TENANT_ID, EMMA_ID))
+        .thenReturn(Optional.of(user(EMMA_ID, "Emma", "Whitfield")));
 
     when(quoteService.createQuote(any(QuoteCreateRequest.class)))
         .thenAnswer(

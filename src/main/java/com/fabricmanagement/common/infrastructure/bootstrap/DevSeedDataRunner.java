@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
@@ -13,10 +14,15 @@ import org.springframework.stereotype.Component;
 /**
  * Coordinator for executing development seed data. It dynamically discovers all `DataSeeder`
  * implementations, sorts them by order, and executes them ONLY in safe profiles (local, dev).
+ *
+ * <p>Ordered explicitly: Spring guarantees nothing about the order of two {@code
+ * ApplicationReadyEvent} listeners, and {@link PermissionTemplateBackfillRunner} (200) must observe
+ * the tenants this runner creates.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Order(100)
 public class DevSeedDataRunner {
 
   private final List<DataSeeder> seeders;

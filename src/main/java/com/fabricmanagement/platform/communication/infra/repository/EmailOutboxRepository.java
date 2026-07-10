@@ -19,7 +19,12 @@ import org.springframework.stereotype.Repository;
 public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, UUID> {
 
   /**
-   * Find pending emails ready to be sent (for background job).
+   * Find pending emails ready to be sent.
+   *
+   * <p><b>Not usable from the outbox worker.</b> This runs as {@code fabric_app}, so RLS restricts
+   * it to the current tenant; on a scheduler thread there is none and it returns nothing. The
+   * worker reads its due list through {@code SystemTransactionExecutor} instead. Kept for
+   * tenant-scoped callers (diagnostics, dev tools).
    *
    * <p>Returns emails that are:
    *

@@ -122,6 +122,8 @@ class UserSeederTest {
               assertThat(email).doesNotContain("nexusfabrics.com");
             })
         .contains("owner+spin-mgr@acmetextiles.com", "owner+sales-rep@acmetextiles.com");
+    assertThat(requestCaptor.getAllValues())
+        .allSatisfy(request -> assertThat(request.isInvitationEmailSuppressed()).isTrue());
     assertThat(userCaptor.getAllValues())
         .hasSize(15)
         .allSatisfy(user -> assertThat(user.isDemoSeed()).isTrue());

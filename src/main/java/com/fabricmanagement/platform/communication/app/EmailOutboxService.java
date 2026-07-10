@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.SystemTransactionExecutor;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.domain.EmailOutbox;
@@ -10,8 +11,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
-import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -40,6 +41,8 @@ public class EmailOutboxService {
 
   private final EmailOutboxRepository emailOutboxRepository;
   private final EmailStrategy emailStrategy;
+  private final EmailRecipientPolicy emailRecipientPolicy;
+  private final SystemTransactionExecutor systemTransactionExecutor;
   private final MeterRegistry meterRegistry;
 
   @org.springframework.beans.factory.annotation.Value(
@@ -53,6 +56,10 @@ public class EmailOutboxService {
   @org.springframework.beans.factory.annotation.Value(
       "${application.email.outbox.dead-letter-monitor-enabled:true}")
   private boolean deadLetterMonitorEnabled;
+
+  @org.springframework.beans.factory.annotation.Value(
+      "${application.email.outbox.reclaim-after-minutes:15}")
+  private int reclaimAfterMinutes;
 
   // Track last alert time to prevent spam
   private volatile long lastDeadLetterAlertTime = 0;
@@ -76,6 +83,11 @@ public class EmailOutboxService {
     Gauge.builder("email.outbox.pending.count", this, EmailOutboxService::getPendingEmailCount)
         .description("Number of pending emails waiting to be sent")
         .tag("status", "pending")
+        .register(meterRegistry);
+
+    Gauge.builder("email.outbox.sending.count", this, EmailOutboxService::getSendingEmailCount)
+        .description("Number of emails currently leased by a worker")
+        .tag("status", "sending")
         .register(meterRegistry);
 
     // Counter: Total emails sent successfully
@@ -111,45 +123,82 @@ public class EmailOutboxService {
    * <p><b>Performance:</b> Early return if no emails (minimal DB load). Query is optimized with
    * indexes for fast execution.
    */
+  /**
+   * Identity of a queued email, read without a tenant context.
+   *
+   * <p>The worker cannot ask JPA which emails are due: it runs on a scheduler thread where {@code
+   * app.current_tenant} is unset, and every table here enforces row-level security. The query
+   * returned zero rows, the worker concluded the queue was empty, and no email was ever sent — no
+   * error, just blindness. So the due list is read through {@link SystemTransactionExecutor}
+   * ({@code fabric_system}, BYPASSRLS), and each row is then loaded and updated inside its own
+   * tenant context, where RLS applies normally.
+   */
+  private record PendingEmail(UUID id, UUID tenantId) {}
+
+  private static final String DUE_EMAILS_SQL =
+      """
+      SELECT id, tenant_id
+      FROM common_communication.communication_email_outbox
+      WHERE status = 'PENDING'
+        AND retry_count < max_retries
+        AND is_active = true
+        AND deleted_at IS NULL
+        AND (next_retry_at IS NULL OR next_retry_at <= now())
+      ORDER BY created_at ASC
+      LIMIT 100
+      """;
+
+  private static final String RECLAIM_STUCK_SENDING_SQL =
+      """
+      UPDATE common_communication.communication_email_outbox
+      SET status = 'PENDING',
+          next_retry_at = now(),
+          version = version + 1,
+          updated_at = now()
+      WHERE status = 'SENDING'
+        AND updated_at < now() - (? * interval '1 minute')
+        AND is_active = true
+        AND deleted_at IS NULL
+      """;
+
   @Scheduled(fixedDelayString = "${application.email.outbox.poll-interval-ms:5000}")
-  @Transactional
   public void processEmailQueue() {
     if (!emailOutboxWorkerEnabled) {
       log.trace("Email outbox worker disabled; skipping queue processing.");
       return;
     }
     try {
-      // Fast check: Count pending emails first (uses index)
-      long pendingCount =
-          emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.PENDING);
-      if (pendingCount == 0) {
-        // No emails to process - early return (no log spam)
-        return;
+      List<PendingEmail> due =
+          systemTransactionExecutor.executeQuery(
+              DUE_EMAILS_SQL,
+              (rs, rowNum) ->
+                  new PendingEmail(
+                      rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class)));
+
+      if (due.isEmpty()) {
+        return; // Nothing ready (no log spam)
       }
 
-      // Fetch pending emails ready for sending
-      List<EmailOutbox> pendingEmails =
-          emailOutboxRepository.findPendingEmailsReadyForSending(
-              EmailOutboxStatus.PENDING, Instant.now());
+      log.info("📧 Processing {} pending email(s)", due.size());
 
-      if (pendingEmails.isEmpty()) {
-        log.debug(
-            "📧 Found {} pending email(s) but none ready for sending yet (waiting for retry time)",
-            pendingCount);
-        return; // No emails ready yet (waiting for retry time)
-      }
-
-      log.info(
-          "📧 Processing {} pending email(s) (total pending: {})",
-          pendingEmails.size(),
-          pendingCount);
-
-      for (EmailOutbox email : pendingEmails) {
-        var tenantId = email.getTenantId();
+      for (PendingEmail pending : due) {
         try {
-          TenantContext.executeInTenantContext(tenantId, () -> processEmail(email));
+          TenantContext.executeInTenantContext(
+              pending.tenantId(),
+              () ->
+                  emailOutboxRepository
+                      .findById(pending.id())
+                      .ifPresentOrElse(
+                          this::processEmail,
+                          () ->
+                              log.warn(
+                                  "⚠️ Email {} is invisible inside tenant {}; skipping",
+                                  pending.id(),
+                                  pending.tenantId())));
         } catch (ObjectOptimisticLockingFailureException optimisticLockException) {
-          log.warn("⚠️ Skipping email due to concurrent update: emailId={}", email.getId());
+          log.warn("⚠️ Skipping email due to concurrent update: emailId={}", pending.id());
+        } catch (Exception e) {
+          log.error("Error processing email {}", pending.id(), e);
         }
       }
 
@@ -158,11 +207,45 @@ public class EmailOutboxService {
     }
   }
 
-  /** Process single email (send with retry logic). */
-  private void processEmail(EmailOutbox email) {
+  /**
+   * Reclaims abandoned {@code SENDING} rows so the normal retry path can send them again.
+   *
+   * <p>{@code SENDING} is a worker lease, not a terminal state. If a process dies after SMTP
+   * accepts the message but before the row is marked {@code SENT}, this can send the same email
+   * twice. That is intentional: the outbox is at-least-once, and a duplicate registration link is
+   * less harmful than one that never arrives.
+   */
+  @Scheduled(fixedDelayString = "${application.email.outbox.reclaim-interval-ms:300000}")
+  public void reclaimStuckSendingEmails() {
+    if (!emailOutboxWorkerEnabled) {
+      log.trace("Email outbox worker disabled; skipping stuck SENDING reclaim.");
+      return;
+    }
+
+    int reclaimed =
+        systemTransactionExecutor.executeUpdate(RECLAIM_STUCK_SENDING_SQL, reclaimAfterMinutes);
+    if (reclaimed > 0) {
+      log.warn(
+          "⚠️ Reclaimed {} email outbox row(s) stuck in SENDING for more than {} minute(s)",
+          reclaimed,
+          reclaimAfterMinutes);
+    }
+  }
+
+  /**
+   * Process single email (send with retry logic).
+   *
+   * <p>Each {@code save} runs in its own transaction and returns a fresh managed instance with an
+   * incremented {@code version}. The returned instance must replace the local one: keeping the
+   * stale reference makes the next save write an outdated version, which fails the optimistic-lock
+   * check. The email would already have been sent by then, so the row would sit in SENDING forever
+   * with no error recorded — sent, but never marked as sent.
+   */
+  private void processEmail(EmailOutbox pending) {
+    EmailOutbox email = pending;
     try {
       email.markAsSending();
-      emailOutboxRepository.save(email);
+      email = emailOutboxRepository.save(email);
 
       log.info(
           "📧 Sending email: recipient={}, retryCount={}",
@@ -174,7 +257,7 @@ public class EmailOutboxService {
 
       // Success - mark as sent
       email.markAsSent();
-      emailOutboxRepository.save(email);
+      email = emailOutboxRepository.save(email);
 
       // Record metric
       emailSentCounter.increment();
@@ -228,27 +311,62 @@ public class EmailOutboxService {
    * <p>Email is saved to database in the same transaction as business logic. Background job will
    * process it later.
    *
-   * @param recipient Email recipient
+   * <p><b>Sandboxing happens here</b>, not in {@link #processEmail}. This method still runs inside
+   * the caller's tenant context; the worker does not. A row that reaches the queue is already
+   * addressed to somewhere it is allowed to go.
+   *
+   * @param tenantId tenant that owns the email decision and outbox row
+   * @param recipient Email recipient the caller intended
    * @param subject Email subject
    * @param htmlBody Email HTML body
-   * @return EmailOutbox entity
+   * @return the queued entity, or null when the tenant's sandbox has nowhere to redirect to and the
+   *     email was dropped
    */
   @Transactional
-  public EmailOutbox queueEmail(String recipient, String subject, String htmlBody) {
-    EmailOutbox email = EmailOutbox.create(recipient, subject, htmlBody);
+  public EmailOutbox queueEmail(UUID tenantId, String recipient, String subject, String htmlBody) {
+    EmailRecipientPolicy.Resolution resolution =
+        emailRecipientPolicy.resolveFor(tenantId, recipient, subject);
+    if (resolution.dropped()) {
+      return null;
+    }
+
+    EmailOutbox email =
+        EmailOutbox.create(
+            resolution.recipient(), resolution.intendedRecipient(), resolution.subject(), htmlBody);
+    email.setTenantId(tenantId);
     return emailOutboxRepository.save(email);
   }
 
-  /** Get pending email count (for monitoring). */
-  @Transactional(readOnly = true)
+  /**
+   * Get pending email count (for monitoring).
+   *
+   * <p>Counted through {@code fabric_system}: these are called from metric gauges and a scheduled
+   * alert, none of which carry a tenant context. Under RLS a tenant-scoped count from those threads
+   * is always zero — which is exactly what the dead-letter alarm reported while 80 emails sat
+   * unsent.
+   */
   public long getPendingEmailCount() {
-    return emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.PENDING);
+    return countByStatus(EmailOutboxStatus.PENDING);
+  }
+
+  /** Get sending email count (for monitoring stuck worker leases). */
+  public long getSendingEmailCount() {
+    return countByStatus(EmailOutboxStatus.SENDING);
   }
 
   /** Get failed email count (for monitoring). */
-  @Transactional(readOnly = true)
   public long getFailedEmailCount() {
-    return emailOutboxRepository.countByStatusAndIsActiveTrue(EmailOutboxStatus.FAILED);
+    return countByStatus(EmailOutboxStatus.FAILED);
+  }
+
+  private long countByStatus(EmailOutboxStatus status) {
+    Long count =
+        systemTransactionExecutor.executeQueryForObject(
+            "SELECT count(*) FROM common_communication.communication_email_outbox"
+                + " WHERE status = ? AND is_active = true AND deleted_at IS NULL",
+            (rs, rowNum) -> rs.getLong(1),
+            status.name());
+    return count == null ? 0L : count;
   }
 
   /**

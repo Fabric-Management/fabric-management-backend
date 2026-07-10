@@ -21,7 +21,9 @@ import com.fabricmanagement.sales.salesorder.app.ruleengine.SalesOrderRuleEngine
 import com.fabricmanagement.sales.salesorder.domain.ModuleType;
 import com.fabricmanagement.sales.salesorder.domain.OrderType;
 import com.fabricmanagement.sales.salesorder.domain.SalesOrder;
+import com.fabricmanagement.sales.salesorder.domain.SalesOrderLine;
 import com.fabricmanagement.sales.salesorder.dto.CreateSalesOrderRequest;
+import com.fabricmanagement.sales.salesorder.dto.SalesOrderDto;
 import com.fabricmanagement.sales.salesorder.dto.SalesOrderLineRequest;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderLineRepository;
 import com.fabricmanagement.sales.salesorder.infra.repository.SalesOrderRepository;
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -197,6 +200,43 @@ class SalesOrderServiceCreateTest {
         .isInstanceOf(OrderDomainException.class)
         .hasMessageContaining("Discount amount cannot exceed calculated order total");
     verify(orderRepository, never()).save(any());
+  }
+
+  @Test
+  void createOrder_echoesThePersistedLinesInTheResponse() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(
+        List.of(
+            lineRequest(new BigDecimal("3"), new BigDecimal("10.00"), "TRY"),
+            lineRequest(new BigDecimal("4"), new BigDecimal("2.50"), "TRY")));
+    stubSuccessfulCreate();
+    when(lineRepository.saveAll(ArgumentMatchers.<List<SalesOrderLine>>any()))
+        .thenAnswer(
+            invocation -> {
+              List<SalesOrderLine> lines = invocation.getArgument(0);
+              lines.forEach(line -> ReflectionTestUtils.setField(line, "id", UUID.randomUUID()));
+              return lines;
+            });
+
+    SalesOrderDto created = salesOrderService.createOrder(request);
+
+    // Regression guard: creation used to answer with SalesOrderDto.from(order, partner), an
+    // overload that substituted an empty line list. Callers that chain off the response — the
+    // demo seeder among them — silently skipped everything downstream of the lines.
+    assertThat(created.getLines()).hasSize(2);
+    assertThat(created.getLines()).allSatisfy(line -> assertThat(line.getId()).isNotNull());
+  }
+
+  @Test
+  void createOrder_withoutLinesAnswersWithAnEmptyLineList() {
+    CreateSalesOrderRequest request = baseRequest();
+    request.setLines(List.of());
+    stubSuccessfulCreate();
+
+    SalesOrderDto created = salesOrderService.createOrder(request);
+
+    assertThat(created.getLines()).isEmpty();
+    verify(lineRepository, never()).saveAll(ArgumentMatchers.<List<SalesOrderLine>>any());
   }
 
   private CreateSalesOrderRequest baseRequest() {

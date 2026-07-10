@@ -195,7 +195,8 @@ public class UserInvitationEventListener {
     String message =
         emailTemplateRenderer.renderSetupPassword(firstName, "", event.getContactValue(), setupUrl);
 
-    notificationService.sendNotificationSync(event.getContactValue(), subject, message);
+    notificationService.sendNotificationSync(
+        event.getTenantId(), event.getContactValue(), subject, message);
 
     log.info(
         "Invitation email sent: userId={}, contact={}",
@@ -218,7 +219,8 @@ public class UserInvitationEventListener {
         emailTemplateRenderer.renderAddedToOrganization(
             firstName, organizationName, event.getContactValue());
 
-    notificationService.sendNotificationSync(event.getContactValue(), subject, message);
+    notificationService.sendNotificationSync(
+        event.getTenantId(), event.getContactValue(), subject, message);
 
     log.info(
         "Added-to-organization email sent: userId={}, contact={}",

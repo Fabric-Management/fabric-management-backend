@@ -57,7 +57,8 @@ class UserCacheInvalidationServiceTest {
     @DisplayName("onUserCreated evicts tenant and organization caches")
     void onUserCreated_evictsBothCaches() {
       UserCreatedEvent event =
-          new UserCreatedEvent(TENANT_ID, USER_ID, "Display", "email@test.com", ORGANIZATION_ID);
+          new UserCreatedEvent(
+              TENANT_ID, USER_ID, "Display", "email@test.com", ORGANIZATION_ID, false);
 
       service.onUserCreated(event);
 
@@ -109,7 +110,7 @@ class UserCacheInvalidationServiceTest {
 
       UserCacheInvalidationService service = new UserCacheInvalidationService(mockCacheManager);
       UserCreatedEvent event =
-          new UserCreatedEvent(TENANT_ID, USER_ID, "Display", "e@t.com", ORGANIZATION_ID);
+          new UserCreatedEvent(TENANT_ID, USER_ID, "Display", "e@t.com", ORGANIZATION_ID, false);
 
       service.onUserCreated(event);
 

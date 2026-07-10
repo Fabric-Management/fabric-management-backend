@@ -93,6 +93,12 @@ public class Quote extends BaseEntity {
   @Column(name = "payment_terms", length = 50)
   private String paymentTerms;
 
+  /**
+   * @deprecated Superseded by per-line {@code QuoteLine.deliveryStatus}/{@code deliveryDate}
+   *     (QLINE-ATP-1); retained for historical data, no longer written by the FE. See
+   *     docs/sales/tickets/QLINE-LEADTIME-1-remove-quote-header-lead-time.md.
+   */
+  @Deprecated
   @Column(name = "lead_time_days")
   private Integer leadTimeDays;
 
@@ -126,6 +132,12 @@ public class Quote extends BaseEntity {
     return this.lines.stream().filter(line -> Objects.equals(line.getId(), lineId)).findFirst();
   }
 
+  /**
+   * @deprecated the {@code leadTimeDays} parameter is superseded by per-line {@code
+   *     QuoteLine.deliveryStatus}/{@code deliveryDate} (QLINE-ATP-1); retained for historical data,
+   *     no longer written by the FE. See
+   *     docs/sales/tickets/QLINE-LEADTIME-1-remove-quote-header-lead-time.md.
+   */
   public void updateHeader(
       LocalDate validUntil, String paymentTerms, Integer leadTimeDays, String notes) {
     if (validUntil != null) {

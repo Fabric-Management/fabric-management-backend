@@ -1,7 +1,6 @@
 package com.fabricmanagement.platform.communication.app;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
-import com.fabricmanagement.common.infrastructure.tenant.TenantQueryPort;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.domain.strategy.EmailStrategy;
 import java.util.UUID;
@@ -42,7 +41,7 @@ public class NotificationService {
 
   private final EmailStrategy emailStrategy;
   private final EmailOutboxService emailOutboxService;
-  private final TenantQueryPort tenantQueryPort;
+  private final EmailRecipientPolicy emailRecipientPolicy;
 
   @Value("${application.email.use-outbox:true}")
   private boolean useOutbox;
@@ -62,25 +61,21 @@ public class NotificationService {
    */
   @Async
   public void sendNotification(String recipient, String subject, String message) {
-    if (isPlaygroundTenant()) {
-      log.info(
-          "🛡️ [PLAYGROUND SAFEGUARD] Skipping async email notification to: {} (Subject: {})",
-          PiiMaskingUtil.maskEmail(recipient),
-          subject);
-      return;
-    }
+    sendNotification(TenantContext.requireTenantId(), recipient, subject, message);
+  }
 
+  @Async
+  public void sendNotification(UUID tenantId, String recipient, String subject, String message) {
     log.info("Sending notification (async) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
     try {
       if (useOutbox) {
-        // Transactional Outbox pattern: Save to DB, background job will send
-        emailOutboxService.queueEmail(recipient, subject, message);
+        // Transactional Outbox pattern: Save to DB, background job will send.
+        // queueEmail applies the sandbox policy itself.
+        emailOutboxService.queueEmail(tenantId, recipient, subject, message);
         log.info("✅ Email queued for sending: recipient={}", PiiMaskingUtil.maskEmail(recipient));
       } else {
-        // Direct send (legacy mode - no persistence)
-        emailStrategy.sendEmail(recipient, subject, message);
-        log.info("✅ Notification sent successfully to: {}", PiiMaskingUtil.maskEmail(recipient));
+        sendDirectly(tenantId, recipient, subject, message);
       }
     } catch (Exception e) {
       log.error("❌ Failed to send notification to: {}", PiiMaskingUtil.maskEmail(recipient), e);
@@ -98,36 +93,39 @@ public class NotificationService {
    * @param message Email body
    */
   public void sendNotificationSync(String recipient, String subject, String message) {
-    if (isPlaygroundTenant()) {
-      log.info(
-          "🛡️ [PLAYGROUND SAFEGUARD] Skipping sync email notification to: {} (Subject: {})",
-          PiiMaskingUtil.maskEmail(recipient),
-          subject);
-      return;
-    }
+    sendNotificationSync(TenantContext.requireTenantId(), recipient, subject, message);
+  }
 
+  public void sendNotificationSync(
+      UUID tenantId, String recipient, String subject, String message) {
     log.info("Sending notification (sync) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
     if (useOutbox) {
-      // Queue email (still persisted, but called synchronously)
-      emailOutboxService.queueEmail(recipient, subject, message);
+      // Queue email (still persisted, but called synchronously). Sandbox applied in queueEmail.
+      emailOutboxService.queueEmail(tenantId, recipient, subject, message);
       log.info("✅ Email queued (sync) to: {}", PiiMaskingUtil.maskEmail(recipient));
     } else {
-      // Direct send (legacy mode)
-      emailStrategy.sendEmail(recipient, subject, message);
-      log.info("✅ Notification sent (sync) to: {}", PiiMaskingUtil.maskEmail(recipient));
+      sendDirectly(tenantId, recipient, subject, message);
     }
   }
 
-  private boolean isPlaygroundTenant() {
-    UUID tenantId = TenantContext.getCurrentTenantIdOrNull();
-    if (tenantId == null) {
-      return false;
+  /**
+   * Legacy path taken when {@code application.email.use-outbox=false}. It bypasses the outbox, so
+   * it must apply the sandbox policy itself — this branch was the reason a rewrite confined to
+   * {@code queueEmail} would not have been a choke point.
+   *
+   * <p>Replaces the previous playground safeguard, which dropped the email outright and, worse,
+   * recognised playgrounds by {@code type == PLAYGROUND} while the supported register-first
+   * playground carries {@code type=REGULAR}. It therefore protected nothing. Playground email is
+   * now redirected to the prospect rather than discarded: receiving it is part of the demo.
+   */
+  private void sendDirectly(UUID tenantId, String recipient, String subject, String message) {
+    EmailRecipientPolicy.Resolution resolution =
+        emailRecipientPolicy.resolveFor(tenantId, recipient, subject);
+    if (resolution.dropped()) {
+      return;
     }
-    // Uses TenantQueryPort (BYPASSRLS) — @Async may not propagate tenant context to async thread
-    return tenantQueryPort
-        .findById(tenantId)
-        .map(ref -> "PLAYGROUND".equals(ref.type()))
-        .orElse(false);
+    emailStrategy.sendEmail(resolution.recipient(), resolution.subject(), message);
+    log.info("✅ Notification sent to: {}", PiiMaskingUtil.maskEmail(resolution.recipient()));
   }
 }

@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
+import com.fabricmanagement.platform.communication.app.EmailRecipientPolicy.Resolution;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +38,7 @@ public class EmailService {
   private final EmailOutboxService emailOutboxService;
   private final com.fabricmanagement.platform.communication.domain.strategy.EmailStrategy
       emailStrategy;
+  private final EmailRecipientPolicy emailRecipientPolicy;
 
   @Value("${application.email.use-outbox:true}")
   private boolean useOutbox;
@@ -48,13 +52,22 @@ public class EmailService {
    */
   @Async
   public void sendAsync(String to, String subject, String body) {
+    sendAsync(TenantContext.requireTenantId(), to, subject, body);
+  }
+
+  @Async
+  public void sendAsync(UUID tenantId, String to, String subject, String body) {
     try {
       if (useOutbox) {
-        emailOutboxService.queueEmail(to, subject, body);
+        emailOutboxService.queueEmail(tenantId, to, subject, body);
         log.debug("Email queued: to={}", PiiMaskingUtil.maskEmail(to));
       } else {
-        emailStrategy.sendEmail(to, subject, body);
-        log.debug("Email sent: to={}", PiiMaskingUtil.maskEmail(to));
+        Resolution resolution = emailRecipientPolicy.resolveFor(tenantId, to, subject);
+        if (resolution.dropped()) {
+          return;
+        }
+        emailStrategy.sendEmail(resolution.recipient(), resolution.subject(), body);
+        log.debug("Email sent: to={}", PiiMaskingUtil.maskEmail(resolution.recipient()));
       }
     } catch (Exception e) {
       log.error("Failed to send email to {}: {}", PiiMaskingUtil.maskEmail(to), e.getMessage(), e);
@@ -76,9 +89,15 @@ public class EmailService {
    */
   @Async
   public void sendNotificationEmail(String to, String title, String message, String deepLink) {
+    sendNotificationEmail(TenantContext.requireTenantId(), to, title, message, deepLink);
+  }
+
+  @Async
+  public void sendNotificationEmail(
+      UUID tenantId, String to, String title, String message, String deepLink) {
     String subject = SUBJECT_PREFIX + title;
     String body = buildNotificationBody(title, message, deepLink);
-    sendAsync(to, subject, body);
+    sendAsync(tenantId, to, subject, body);
   }
 
   /**
