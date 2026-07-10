@@ -164,7 +164,7 @@ public class NotificationItemProcessor {
     userQueryService
         .findEmailByUserId(item.getRecipientId())
         .ifPresentOrElse(
-            email -> emailSender.send(email, title, body),
+            email -> emailSender.send(item.getTenantId(), email, title, body),
             () ->
                 log.warn(
                     "EMAIL notification skipped — no email found for userId={}",

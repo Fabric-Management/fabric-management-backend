@@ -1,6 +1,5 @@
 package com.fabricmanagement.platform.communication.app;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.EmailSandbox;
 import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
@@ -48,18 +47,17 @@ public class EmailRecipientPolicy {
     }
   }
 
-  /** Resolve for an email with a subject line, using the ambient tenant context. */
-  public Resolution resolve(String intendedRecipient, String subject) {
-    return resolveFor(TenantContext.getCurrentTenantIdOrNull(), intendedRecipient, subject);
-  }
-
   /**
    * Resolve for a caller that already knows its tenant.
    *
-   * <p>Prefer this. Where the tenant id is in hand, reading it from a thread-local instead is a bet
-   * on context propagation that pays nothing.
+   * <p>The tenant id is required because a missing tenant context must not read as "not sandboxed".
    */
   public Resolution resolveFor(UUID tenantId, String intendedRecipient, String subject) {
+    if (tenantId == null) {
+      throw new IllegalStateException(
+          "Tenant id must be known before deciding where an email may be sent");
+    }
+
     EmailSandbox sandbox = tenantAccessPort.emailSandbox(tenantId);
 
     if (!sandbox.enabled()) {

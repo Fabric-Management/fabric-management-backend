@@ -57,6 +57,10 @@ public class EmailOutboxService {
       "${application.email.outbox.dead-letter-monitor-enabled:true}")
   private boolean deadLetterMonitorEnabled;
 
+  @org.springframework.beans.factory.annotation.Value(
+      "${application.email.outbox.reclaim-after-minutes:15}")
+  private int reclaimAfterMinutes;
+
   // Track last alert time to prevent spam
   private volatile long lastDeadLetterAlertTime = 0;
   private static final long DEAD_LETTER_ALERT_COOLDOWN_MS = 3600000; // 1 hour
@@ -79,6 +83,11 @@ public class EmailOutboxService {
     Gauge.builder("email.outbox.pending.count", this, EmailOutboxService::getPendingEmailCount)
         .description("Number of pending emails waiting to be sent")
         .tag("status", "pending")
+        .register(meterRegistry);
+
+    Gauge.builder("email.outbox.sending.count", this, EmailOutboxService::getSendingEmailCount)
+        .description("Number of emails currently leased by a worker")
+        .tag("status", "sending")
         .register(meterRegistry);
 
     // Counter: Total emails sent successfully
@@ -139,6 +148,19 @@ public class EmailOutboxService {
       LIMIT 100
       """;
 
+  private static final String RECLAIM_STUCK_SENDING_SQL =
+      """
+      UPDATE common_communication.communication_email_outbox
+      SET status = 'PENDING',
+          next_retry_at = now(),
+          version = version + 1,
+          updated_at = now()
+      WHERE status = 'SENDING'
+        AND updated_at < now() - (? * interval '1 minute')
+        AND is_active = true
+        AND deleted_at IS NULL
+      """;
+
   @Scheduled(fixedDelayString = "${application.email.outbox.poll-interval-ms:5000}")
   public void processEmailQueue() {
     if (!emailOutboxWorkerEnabled) {
@@ -182,6 +204,31 @@ public class EmailOutboxService {
 
     } catch (Exception e) {
       log.error("Error processing email queue", e);
+    }
+  }
+
+  /**
+   * Reclaims abandoned {@code SENDING} rows so the normal retry path can send them again.
+   *
+   * <p>{@code SENDING} is a worker lease, not a terminal state. If a process dies after SMTP
+   * accepts the message but before the row is marked {@code SENT}, this can send the same email
+   * twice. That is intentional: the outbox is at-least-once, and a duplicate registration link is
+   * less harmful than one that never arrives.
+   */
+  @Scheduled(fixedDelayString = "${application.email.outbox.reclaim-interval-ms:300000}")
+  public void reclaimStuckSendingEmails() {
+    if (!emailOutboxWorkerEnabled) {
+      log.trace("Email outbox worker disabled; skipping stuck SENDING reclaim.");
+      return;
+    }
+
+    int reclaimed =
+        systemTransactionExecutor.executeUpdate(RECLAIM_STUCK_SENDING_SQL, reclaimAfterMinutes);
+    if (reclaimed > 0) {
+      log.warn(
+          "⚠️ Reclaimed {} email outbox row(s) stuck in SENDING for more than {} minute(s)",
+          reclaimed,
+          reclaimAfterMinutes);
     }
   }
 
@@ -268,6 +315,7 @@ public class EmailOutboxService {
    * the caller's tenant context; the worker does not. A row that reaches the queue is already
    * addressed to somewhere it is allowed to go.
    *
+   * @param tenantId tenant that owns the email decision and outbox row
    * @param recipient Email recipient the caller intended
    * @param subject Email subject
    * @param htmlBody Email HTML body
@@ -275,8 +323,9 @@ public class EmailOutboxService {
    *     email was dropped
    */
   @Transactional
-  public EmailOutbox queueEmail(String recipient, String subject, String htmlBody) {
-    EmailRecipientPolicy.Resolution resolution = emailRecipientPolicy.resolve(recipient, subject);
+  public EmailOutbox queueEmail(UUID tenantId, String recipient, String subject, String htmlBody) {
+    EmailRecipientPolicy.Resolution resolution =
+        emailRecipientPolicy.resolveFor(tenantId, recipient, subject);
     if (resolution.dropped()) {
       return null;
     }
@@ -284,6 +333,7 @@ public class EmailOutboxService {
     EmailOutbox email =
         EmailOutbox.create(
             resolution.recipient(), resolution.intendedRecipient(), resolution.subject(), htmlBody);
+    email.setTenantId(tenantId);
     return emailOutboxRepository.save(email);
   }
 
@@ -297,6 +347,11 @@ public class EmailOutboxService {
    */
   public long getPendingEmailCount() {
     return countByStatus(EmailOutboxStatus.PENDING);
+  }
+
+  /** Get sending email count (for monitoring stuck worker leases). */
+  public long getSendingEmailCount() {
+    return countByStatus(EmailOutboxStatus.SENDING);
   }
 
   /** Get failed email count (for monitoring). */

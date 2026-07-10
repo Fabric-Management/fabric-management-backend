@@ -103,7 +103,7 @@ class NotificationItemProcessorTest {
 
       processor.processItem(item.getId());
 
-      verify(emailSender).send("user@test.com", "Email body", "Email body");
+      verify(emailSender).send(TENANT_ID, "user@test.com", "Email body", "Email body");
       assertThat(item.getStatus()).isEqualTo(NotificationQueueStatus.SENT);
     }
 

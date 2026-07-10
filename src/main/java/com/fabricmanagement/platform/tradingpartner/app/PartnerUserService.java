@@ -97,7 +97,7 @@ public class PartnerUserService {
             .contactValue(request.getEmail())
             .contactType(com.fabricmanagement.platform.user.domain.ContactType.EMAIL)
             .organizationId(partner.getOrganizationId())
-            .suppressEmailInvitation(true) // partner listener sends its own invitation email
+            .invitationEmailSuppressed(true) // partner listener sends its own invitation email
             .build();
 
     // Delegate to existing external user creation (handles uniqueness check, contact assignment)

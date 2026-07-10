@@ -193,7 +193,7 @@ public class PartnerUserSeeder implements DataSeeder {
             .contactValue(profile.email())
             .contactType(ContactType.EMAIL)
             .organizationId(partnerOrgId)
-            .suppressEmailInvitation(true)
+            .invitationEmailSuppressed(true)
             .build();
 
     UserDto user = userCreationService.createExternalUser(req);

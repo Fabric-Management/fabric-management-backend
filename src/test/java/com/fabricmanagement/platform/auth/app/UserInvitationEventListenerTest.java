@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.infrastructure.config.FrontendUrlProvider;
@@ -73,13 +74,32 @@ class UserInvitationEventListenerTest {
   }
 
   @Test
+  void suppressedUserCreatedEventDoesNotQueueInvitationEmail() {
+    UserCreatedEvent event =
+        new UserCreatedEvent(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Demo Persona",
+            "owner+demo@example.com",
+            UUID.randomUUID(),
+            true);
+
+    listener.provisionExistingIdentityMembership(event);
+    listener.onUserCreated(event);
+
+    verifyNoInteractions(loginIdentityRepository);
+    verifyNoInteractions(registrationTokenRepository);
+    verifyNoInteractions(notificationService);
+  }
+
+  @Test
   void shouldAutoAddExistingIdentityAndSendAddedToOrganizationEmail() {
     UUID tenantId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID organizationId = UUID.randomUUID();
     UserCreatedEvent event =
         new UserCreatedEvent(
-            tenantId, userId, "Ada Lovelace", " Existing@Example.COM ", organizationId);
+            tenantId, userId, "Ada Lovelace", " Existing@Example.COM ", organizationId, false);
     LoginIdentity identity = identity("existing@example.com", "existing-hash");
     Contact contact = contact(UUID.randomUUID(), tenantId, "existing@example.com");
     OrganizationDto organization = OrganizationDto.builder().name("Nexus Fabrics").build();
@@ -126,7 +146,10 @@ class UserInvitationEventListenerTest {
         .renderSetupPassword(anyString(), anyString(), anyString(), anyString());
     verify(notificationService)
         .sendNotificationSync(
-            event.getContactValue(), "You were added to an organization in FabricOS", "added-html");
+            event.getTenantId(),
+            event.getContactValue(),
+            "You were added to an organization in FabricOS",
+            "added-html");
   }
 
   @Test
@@ -135,7 +158,8 @@ class UserInvitationEventListenerTest {
     UUID userId = UUID.randomUUID();
     UUID organizationId = UUID.randomUUID();
     UserCreatedEvent event =
-        new UserCreatedEvent(tenantId, userId, "Grace Hopper", "new@example.com", organizationId);
+        new UserCreatedEvent(
+            tenantId, userId, "Grace Hopper", "new@example.com", organizationId, false);
 
     when(loginIdentityRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
     when(authUserRepository.existsByUserId(userId)).thenReturn(false);
@@ -162,7 +186,11 @@ class UserInvitationEventListenerTest {
     verify(emailTemplateRenderer, never())
         .renderAddedToOrganization(anyString(), anyString(), anyString());
     verify(notificationService)
-        .sendNotificationSync("new@example.com", "You've been invited to FabricOS", "setup-html");
+        .sendNotificationSync(
+            event.getTenantId(),
+            "new@example.com",
+            "You've been invited to FabricOS",
+            "setup-html");
   }
 
   private LoginIdentity identity(String email, String passwordHash) {

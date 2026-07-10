@@ -460,6 +460,7 @@ public class UserSeeder implements DataSeeder {
             .departmentId(departmentId)
             .roleId(role.getId())
             .jobTitleCode(profile.jobTitleCode())
+            .invitationEmailSuppressed(true)
             .build();
 
     UserDto user = userCreationService.createInternalUser(req);

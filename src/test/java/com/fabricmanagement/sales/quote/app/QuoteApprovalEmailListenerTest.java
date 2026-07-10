@@ -79,6 +79,9 @@ class QuoteApprovalEmailListenerTest {
             "https://app.example.com/quotes/approve/token-123");
     verify(notificationService)
         .sendNotificationSync(
-            "buyer@example.com", "Quote Q-2026-001 is ready for approval", "email body");
+            event.getTenantId(),
+            "buyer@example.com",
+            "Quote Q-2026-001 is ready for approval",
+            "email body");
   }
 }

@@ -89,7 +89,7 @@ public class InAppNotificationService {
     List<String> emails = resolveRecipientEmails(request.tenantId(), request.recipientId());
     for (String email : emails) {
       notificationService.sendNotification(
-          email, notification.getTitle(), notification.getMessage());
+          request.tenantId(), email, notification.getTitle(), notification.getMessage());
     }
   }
 

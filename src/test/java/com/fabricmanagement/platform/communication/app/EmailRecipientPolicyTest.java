@@ -1,13 +1,12 @@
 package com.fabricmanagement.platform.communication.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.EmailSandbox;
 import com.fabricmanagement.common.infrastructure.tenant.TenantAccessPort;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -26,11 +25,6 @@ class EmailRecipientPolicyTest {
   private static final String STRANGER = "cfo@unsuspecting-mill.com";
 
   private final EmailRecipientPolicy policy = new EmailRecipientPolicy(stubPort());
-
-  @AfterEach
-  void clearTenantContext() {
-    TenantContext.clear();
-  }
 
   @Test
   @DisplayName("a sandboxed tenant's mail goes to the prospect, never to the stranger")
@@ -72,19 +66,11 @@ class EmailRecipientPolicyTest {
   }
 
   @Test
-  @DisplayName("no tenant at all is a platform email; the sandbox does not apply")
-  void platformEmailIsNotSandboxed() {
-    var resolution = policy.resolveFor(null, "ops@fabricos.example", "Dead letter queue alert");
-
-    assertThat(resolution.dropped()).isFalse();
-    assertThat(resolution.recipient()).isEqualTo("ops@fabricos.example");
-  }
-
-  @Test
-  @DisplayName("resolve() reads the ambient tenant context")
-  void resolveUsesTenantContext() {
-    TenantContext.setCurrentTenantId(SANDBOXED);
-    assertThat(policy.resolve(STRANGER, "s").recipient()).isEqualTo(PROSPECT);
+  @DisplayName("missing tenant fails loudly before sandbox lookup")
+  void missingTenantFailsLoudly() {
+    assertThatThrownBy(() -> policy.resolveFor(null, "ops@fabricos.example", "subject"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Tenant id must be known");
   }
 
   // --- verification codes: the path that never touches the outbox ---
@@ -135,9 +121,6 @@ class EmailRecipientPolicyTest {
 
       @Override
       public EmailSandbox emailSandbox(UUID tenantId) {
-        if (tenantId == null) {
-          return EmailSandbox.off();
-        }
         // Mirrors TenantAccessAdapter: an unresolved tenant fails closed.
         return sandboxes.getOrDefault(tenantId, EmailSandbox.withoutRecipient());
       }

@@ -60,9 +60,10 @@ class NotificationServiceTest {
     void queuesAsync() {
       notificationService.sendNotification("test@test.com", "Subject", "Message");
 
-      verify(emailOutboxService).queueEmail(eq("test@test.com"), eq("Subject"), eq("Message"));
+      verify(emailOutboxService)
+          .queueEmail(eq(TENANT_ID), eq("test@test.com"), eq("Subject"), eq("Message"));
       verify(emailStrategy, never()).sendEmail(anyString(), anyString(), anyString());
-      verify(emailRecipientPolicy, never()).resolve(anyString(), anyString());
+      verify(emailRecipientPolicy, never()).resolveFor(eq(TENANT_ID), anyString(), anyString());
     }
 
     @Test
@@ -70,7 +71,8 @@ class NotificationServiceTest {
     void queuesSync() {
       notificationService.sendNotificationSync("test@test.com", "Subject", "Message");
 
-      verify(emailOutboxService).queueEmail(eq("test@test.com"), eq("Subject"), eq("Message"));
+      verify(emailOutboxService)
+          .queueEmail(eq(TENANT_ID), eq("test@test.com"), eq("Subject"), eq("Message"));
       verify(emailStrategy, never()).sendEmail(anyString(), anyString(), anyString());
     }
   }
@@ -87,7 +89,8 @@ class NotificationServiceTest {
     @Test
     @DisplayName("a sandboxed tenant's email is redirected, not dropped")
     void redirectsWhenSandboxed() {
-      org.mockito.Mockito.when(emailRecipientPolicy.resolve("customer@mill.com", "Subject"))
+      org.mockito.Mockito.when(
+              emailRecipientPolicy.resolveFor(TENANT_ID, "customer@mill.com", "Subject"))
           .thenReturn(
               new EmailRecipientPolicy.Resolution(
                   false, "prospect@acme.co.uk", "customer@mill.com", "[Playground] Subject"));
@@ -100,7 +103,8 @@ class NotificationServiceTest {
     @Test
     @DisplayName("a dropped resolution never reaches the mail sender")
     void doesNotSendWhenDropped() {
-      org.mockito.Mockito.when(emailRecipientPolicy.resolve("customer@mill.com", "Subject"))
+      org.mockito.Mockito.when(
+              emailRecipientPolicy.resolveFor(TENANT_ID, "customer@mill.com", "Subject"))
           .thenReturn(
               new EmailRecipientPolicy.Resolution(true, null, "customer@mill.com", "Subject"));
 
@@ -112,7 +116,8 @@ class NotificationServiceTest {
     @Test
     @DisplayName("a real tenant's email passes through")
     void passesThroughForRealTenant() {
-      org.mockito.Mockito.when(emailRecipientPolicy.resolve("customer@mill.com", "Subject"))
+      org.mockito.Mockito.when(
+              emailRecipientPolicy.resolveFor(TENANT_ID, "customer@mill.com", "Subject"))
           .thenReturn(
               new EmailRecipientPolicy.Resolution(false, "customer@mill.com", null, "Subject"));
 

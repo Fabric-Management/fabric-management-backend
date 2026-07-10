@@ -1,6 +1,7 @@
 package com.fabricmanagement.notification.hub.app.adapter.email;
 
 import com.fabricmanagement.platform.communication.app.EmailOutboxService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,14 +27,14 @@ public class EmailNotificationSender {
    * @param title Email subject (i18n'den render edilmiş)
    * @param body Email body (HTML formatlanabilir)
    */
-  public void send(String recipientEmail, String title, String body) {
+  public void send(UUID tenantId, String recipientEmail, String title, String body) {
     if (recipientEmail == null || recipientEmail.isBlank()) {
       log.warn("EMAIL notification skipped — recipient email is blank");
       return;
     }
     try {
       String htmlBody = buildHtmlBody(body);
-      emailOutboxService.queueEmail(recipientEmail, title, htmlBody);
+      emailOutboxService.queueEmail(tenantId, recipientEmail, title, htmlBody);
       log.debug("EMAIL notification queued for recipient={}", maskEmail(recipientEmail));
     } catch (Exception ex) {
       log.error(

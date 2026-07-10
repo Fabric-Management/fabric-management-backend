@@ -39,5 +39,5 @@ public class CreateAdminUserRequest {
   @Size(max = 255, message = "Contact value must be at most 255 characters")
   private String contactValue;
 
-  @Builder.Default private boolean suppressInvitationEmail = false;
+  @Builder.Default private boolean invitationEmailSuppressed = false;
 }

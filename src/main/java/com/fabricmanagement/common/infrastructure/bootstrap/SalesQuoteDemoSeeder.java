@@ -528,6 +528,7 @@ public class SalesQuoteDemoSeeder {
                 .departmentId(departmentId)
                 .roleId(role.getId())
                 .jobTitleCode("SALES_REP")
+                .invitationEmailSuppressed(true)
                 .build());
 
     userRepository

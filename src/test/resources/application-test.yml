@@ -19,6 +19,8 @@ application:
   email:
     outbox:
       worker-enabled: false
+      reclaim-after-minutes: 15
+      reclaim-interval-ms: 300000
       dead-letter-monitor-enabled: false
 
 org:

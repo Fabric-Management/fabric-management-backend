@@ -46,7 +46,8 @@ public class QuoteApprovalEmailListener {
 
     String message =
         emailTemplateRenderer.renderQuoteApproval(heading, body, cta, expires, approvalUrl);
-    notificationService.sendNotificationSync(event.getCustomerEmail(), subject, message);
+    notificationService.sendNotificationSync(
+        event.getTenantId(), event.getCustomerEmail(), subject, message);
 
     log.info(
         "Quote approval email sent: quoteId={}, quoteNumber={}",

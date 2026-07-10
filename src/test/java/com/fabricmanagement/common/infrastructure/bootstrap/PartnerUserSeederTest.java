@@ -144,7 +144,7 @@ class PartnerUserSeederTest {
     CreateExternalUserRequest capturedReq = requestCaptor.getValue();
     assertThat(capturedReq.getContactValue()).isEqualTo("oscar@ozcotton.com");
     assertThat(capturedReq.getOrganizationId()).isEqualTo(partnerOrgId);
-    assertThat(capturedReq.isSuppressEmailInvitation()).isTrue();
+    assertThat(capturedReq.isInvitationEmailSuppressed()).isTrue();
 
     verify(authUserRepository).save(any(AuthUser.class));
     verify(mockContact).verify();

@@ -130,7 +130,8 @@ public class UserCreationService {
             saved.getId(),
             saved.getDisplayName(),
             contactValue,
-            saved.getOrganizationId()));
+            saved.getOrganizationId(),
+            request.isInvitationEmailSuppressed()));
 
     checkAndTrackHrCompliance(saved.getId(), request.getDepartment());
 
@@ -176,14 +177,16 @@ public class UserCreationService {
 
     String contactValue = request.getContactValue().trim().toLowerCase(Locale.ROOT);
 
-    if (!request.isSuppressEmailInvitation()) {
+    if (!request.isInvitationEmailSuppressed()) {
+      // Suppression here is expressed by not publishing at all; the path inconsistency is tracked.
       eventPublisher.publish(
           new UserCreatedEvent(
               userEntity.getTenantId(),
               userEntity.getId(),
               userEntity.getDisplayName(),
               contactValue,
-              userEntity.getOrganizationId()));
+              userEntity.getOrganizationId(),
+              false));
     }
 
     log.info(
@@ -273,7 +276,7 @@ public class UserCreationService {
                   saved.getDisplayName(),
                   contact.getContactValue(),
                   saved.getOrganizationId(),
-                  request.isSuppressInvitationEmail()));
+                  request.isInvitationEmailSuppressed()));
 
           log.info("Admin user created: id={}, uid={}", saved.getId(), saved.getUid());
           return UserDto.from(saved);

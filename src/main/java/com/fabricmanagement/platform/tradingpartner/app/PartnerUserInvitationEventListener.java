@@ -177,7 +177,8 @@ public class PartnerUserInvitationEventListener {
         emailTemplateRenderer.renderPartnerInvitation(
             firstName, event.getPartnerDisplayName(), event.getContactValue(), setupUrl);
 
-    notificationService.sendNotificationSync(event.getContactValue(), subject, message);
+    notificationService.sendNotificationSync(
+        event.getTenantId(), event.getContactValue(), subject, message);
 
     log.info(
         "Partner invitation email sent: userId={}, partnerId={}, contact={}",
@@ -200,7 +201,8 @@ public class PartnerUserInvitationEventListener {
         emailTemplateRenderer.renderAddedToOrganization(
             firstName, organizationName, event.getContactValue());
 
-    notificationService.sendNotificationSync(event.getContactValue(), subject, message);
+    notificationService.sendNotificationSync(
+        event.getTenantId(), event.getContactValue(), subject, message);
 
     log.info(
         "Partner added-to-organization email sent: userId={}, partnerId={}, contact={}",

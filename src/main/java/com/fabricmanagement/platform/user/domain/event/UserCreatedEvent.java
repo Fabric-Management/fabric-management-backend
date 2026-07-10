@@ -19,11 +19,6 @@ public class UserCreatedEvent extends DomainEvent {
   private final boolean invitationEmailSuppressed;
 
   public UserCreatedEvent(
-      UUID tenantId, UUID userId, String displayName, String contactValue, UUID organizationId) {
-    this(tenantId, userId, displayName, contactValue, organizationId, false);
-  }
-
-  public UserCreatedEvent(
       UUID tenantId,
       UUID userId,
       String displayName,

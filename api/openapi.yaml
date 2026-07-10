@@ -49229,6 +49229,8 @@ components:
           type: string
           maxLength: 100
           minLength: 0
+        invitationEmailSuppressed:
+          type: boolean
         lastName:
           type: string
           maxLength: 100
@@ -49236,8 +49238,6 @@ components:
         organizationId:
           type: string
           format: uuid
-        suppressEmailInvitation:
-          type: boolean
       required:
       - contactType
       - contactValue
@@ -49540,6 +49540,8 @@ components:
         hireDate:
           type: string
           format: date
+        invitationEmailSuppressed:
+          type: boolean
         jobTitleCode:
           type: string
         lastName:
@@ -57689,6 +57691,8 @@ components:
           type: string
           format: date-time
         demoMode:
+          type: boolean
+        emailSandboxed:
           type: boolean
         id:
           type: string

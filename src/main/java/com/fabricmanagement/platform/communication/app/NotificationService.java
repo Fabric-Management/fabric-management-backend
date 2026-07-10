@@ -1,7 +1,9 @@
 package com.fabricmanagement.platform.communication.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.util.PiiMaskingUtil;
 import com.fabricmanagement.platform.communication.domain.strategy.EmailStrategy;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,16 +61,21 @@ public class NotificationService {
    */
   @Async
   public void sendNotification(String recipient, String subject, String message) {
+    sendNotification(TenantContext.requireTenantId(), recipient, subject, message);
+  }
+
+  @Async
+  public void sendNotification(UUID tenantId, String recipient, String subject, String message) {
     log.info("Sending notification (async) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
     try {
       if (useOutbox) {
         // Transactional Outbox pattern: Save to DB, background job will send.
         // queueEmail applies the sandbox policy itself.
-        emailOutboxService.queueEmail(recipient, subject, message);
+        emailOutboxService.queueEmail(tenantId, recipient, subject, message);
         log.info("✅ Email queued for sending: recipient={}", PiiMaskingUtil.maskEmail(recipient));
       } else {
-        sendDirectly(recipient, subject, message);
+        sendDirectly(tenantId, recipient, subject, message);
       }
     } catch (Exception e) {
       log.error("❌ Failed to send notification to: {}", PiiMaskingUtil.maskEmail(recipient), e);
@@ -86,14 +93,19 @@ public class NotificationService {
    * @param message Email body
    */
   public void sendNotificationSync(String recipient, String subject, String message) {
+    sendNotificationSync(TenantContext.requireTenantId(), recipient, subject, message);
+  }
+
+  public void sendNotificationSync(
+      UUID tenantId, String recipient, String subject, String message) {
     log.info("Sending notification (sync) to: {}", PiiMaskingUtil.maskEmail(recipient));
 
     if (useOutbox) {
       // Queue email (still persisted, but called synchronously). Sandbox applied in queueEmail.
-      emailOutboxService.queueEmail(recipient, subject, message);
+      emailOutboxService.queueEmail(tenantId, recipient, subject, message);
       log.info("✅ Email queued (sync) to: {}", PiiMaskingUtil.maskEmail(recipient));
     } else {
-      sendDirectly(recipient, subject, message);
+      sendDirectly(tenantId, recipient, subject, message);
     }
   }
 
@@ -107,8 +119,9 @@ public class NotificationService {
    * playground carries {@code type=REGULAR}. It therefore protected nothing. Playground email is
    * now redirected to the prospect rather than discarded: receiving it is part of the demo.
    */
-  private void sendDirectly(String recipient, String subject, String message) {
-    EmailRecipientPolicy.Resolution resolution = emailRecipientPolicy.resolve(recipient, subject);
+  private void sendDirectly(UUID tenantId, String recipient, String subject, String message) {
+    EmailRecipientPolicy.Resolution resolution =
+        emailRecipientPolicy.resolveFor(tenantId, recipient, subject);
     if (resolution.dropped()) {
       return;
     }

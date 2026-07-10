@@ -48,7 +48,8 @@ public class SignupEmailListener {
             event.getOrganizationName(),
             buildOsList(event.getSubscriptionOsCodes()),
             event.getSetupUrl());
-    notificationService.sendNotificationSync(event.getRecipientEmail(), subject, message);
+    notificationService.sendNotificationSync(
+        event.getTenantId(), event.getRecipientEmail(), subject, message);
   }
 
   private void sendSelfServiceSetup(SelfSignupCompletedEvent event, Locale locale) {
@@ -59,7 +60,8 @@ public class SignupEmailListener {
             event.getOrganizationName(),
             event.getRecipientEmail(),
             event.getSetupUrl());
-    notificationService.sendNotificationSync(event.getRecipientEmail(), subject, message);
+    notificationService.sendNotificationSync(
+        event.getTenantId(), event.getRecipientEmail(), subject, message);
   }
 
   private String buildOsList(List<String> osCodes) {
