@@ -1,5 +1,7 @@
 package com.fabricmanagement.common.infrastructure.events;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -39,23 +41,45 @@ import org.slf4j.MDC;
 @Getter
 public abstract class DomainEvent {
 
-  private final UUID eventId;
-  private final UUID tenantId;
-  private final String eventType;
-  private final Instant occurredAt;
-  private final String correlationId;
+  @JsonProperty("eventId")
+  private UUID eventId;
+
+  @JsonProperty("tenantId")
+  private UUID tenantId;
+
+  @JsonProperty("eventType")
+  private String eventType;
+
+  @JsonProperty("occurredAt")
+  private Instant occurredAt;
+
+  @JsonProperty("correlationId")
+  private String correlationId;
 
   protected DomainEvent(UUID tenantId, String eventType) {
+    this(UUID.randomUUID(), tenantId, eventType, Instant.now(), null);
+  }
+
+  @JsonCreator
+  protected DomainEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId) {
     Objects.requireNonNull(tenantId, "tenantId must not be null");
-    this.eventId = UUID.randomUUID();
+    Objects.requireNonNull(eventType, "eventType must not be null");
+    this.eventId = eventId != null ? eventId : UUID.randomUUID();
     this.tenantId = tenantId;
     this.eventType = eventType;
-    this.occurredAt = Instant.now();
+    this.occurredAt = occurredAt != null ? occurredAt : Instant.now();
 
     // Capture traceId as correlationId if present, otherwise fallback to eventId
     String traceId = MDC.get("traceId");
     this.correlationId =
-        (traceId != null && !traceId.isBlank()) ? traceId : this.eventId.toString();
+        correlationId != null
+            ? correlationId
+            : (traceId != null && !traceId.isBlank()) ? traceId : this.eventId.toString();
   }
 
   @Override

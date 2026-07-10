@@ -20,20 +20,25 @@ import org.springframework.stereotype.Component;
  * {@code @TransactionalEventListener} and {@code @EventListener} methods, extracts the {@code
  * tenantId} from the {@link DomainEvent} payload, and sets the TenantContext before execution. It
  * restores or clears the context afterward.
+ *
+ * <p>The order matters because tenant restoration must happen before transaction advice acquires a
+ * database connection; setting the thread-local after the connection is bound does not update the
+ * PostgreSQL session variable used by RLS.
+ *
+ * <p>AspectJ {@code @annotation} pointcuts do not resolve meta-annotations. Composed annotations
+ * such as {@code @ApplicationModuleListener} must be listed explicitly, by their current package
+ * name.
  */
 @Aspect
 @Component
-@Order(
-    Ordered
-        .HIGHEST_PRECEDENCE) // Must run BEFORE @Transactional so TenantConnectionProvider sees the
-// correct tenant
+@Order(Ordered.HIGHEST_PRECEDENCE + 100)
 @Slf4j
 public class TenantRestoringEventListenerAspect {
 
   @Around(
       "@annotation(org.springframework.transaction.event.TransactionalEventListener) "
           + "|| @annotation(org.springframework.context.event.EventListener) "
-          + "|| @annotation(org.springframework.modulith.ApplicationModuleListener)")
+          + "|| @annotation(org.springframework.modulith.events.ApplicationModuleListener)")
   public Object restoreTenantContext(ProceedingJoinPoint pjp) throws Throwable {
     Object[] args = pjp.getArgs();
     DomainEvent event = extractDomainEvent(args);

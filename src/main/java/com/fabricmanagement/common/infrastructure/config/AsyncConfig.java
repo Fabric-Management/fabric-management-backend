@@ -3,6 +3,7 @@ package com.fabricmanagement.common.infrastructure.config;
 import java.util.concurrent.Executor;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -12,7 +13,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * uncaught-exception logging. (Spring allows only one {@code AsyncConfigurer} bean.)
  */
 @Configuration
-@EnableAsync(proxyTargetClass = true)
+@EnableAsync(proxyTargetClass = true, order = Ordered.HIGHEST_PRECEDENCE)
 public class AsyncConfig implements AsyncConfigurer {
 
   @Override
