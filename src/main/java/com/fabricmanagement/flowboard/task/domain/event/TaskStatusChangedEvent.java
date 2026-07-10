@@ -1,6 +1,9 @@
 package com.fabricmanagement.flowboard.task.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -24,6 +27,31 @@ public class TaskStatusChangedEvent extends DomainEvent {
   private final String oldStatus;
   private final String newStatus;
   private final UUID changedByUserId;
+
+  @JsonCreator
+  public TaskStatusChangedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("taskId") UUID taskId,
+      @JsonProperty("boardId") UUID boardId,
+      @JsonProperty("oldStatus") String oldStatus,
+      @JsonProperty("newStatus") String newStatus,
+      @JsonProperty("changedByUserId") UUID changedByUserId) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "TASK_STATUS_CHANGED",
+        occurredAt,
+        correlationId);
+    this.taskId = taskId;
+    this.boardId = boardId;
+    this.oldStatus = oldStatus;
+    this.newStatus = newStatus;
+    this.changedByUserId = changedByUserId;
+  }
 
   public TaskStatusChangedEvent(
       UUID tenantId,

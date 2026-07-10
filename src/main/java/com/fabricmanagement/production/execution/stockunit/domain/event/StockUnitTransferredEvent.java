@@ -1,7 +1,10 @@
 package com.fabricmanagement.production.execution.stockunit.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -20,6 +23,35 @@ public class StockUnitTransferredEvent extends DomainEvent {
   private final String unit;
   private final UUID fromLocationId;
   private final UUID toLocationId;
+
+  @JsonCreator
+  public StockUnitTransferredEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("stockUnitId") UUID stockUnitId,
+      @JsonProperty("barcode") String barcode,
+      @JsonProperty("batchId") UUID batchId,
+      @JsonProperty("weight") BigDecimal weight,
+      @JsonProperty("unit") String unit,
+      @JsonProperty("fromLocationId") UUID fromLocationId,
+      @JsonProperty("toLocationId") UUID toLocationId) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "STOCK_UNIT_TRANSFERRED",
+        occurredAt,
+        correlationId);
+    this.stockUnitId = stockUnitId;
+    this.barcode = barcode;
+    this.batchId = batchId;
+    this.weight = weight;
+    this.unit = unit;
+    this.fromLocationId = fromLocationId;
+    this.toLocationId = toLocationId;
+  }
 
   public StockUnitTransferredEvent(
       UUID tenantId,

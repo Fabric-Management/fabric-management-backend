@@ -1,6 +1,9 @@
 package com.fabricmanagement.flowboard.task.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -24,6 +27,31 @@ public class TaskCreatedEvent extends DomainEvent {
   private final String taskNumber;
   private final String status;
   private final String taskType;
+
+  @JsonCreator
+  public TaskCreatedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("taskId") UUID taskId,
+      @JsonProperty("boardId") UUID boardId,
+      @JsonProperty("taskNumber") String taskNumber,
+      @JsonProperty("status") String status,
+      @JsonProperty("taskType") String taskType) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "TASK_CREATED",
+        occurredAt,
+        correlationId);
+    this.taskId = taskId;
+    this.boardId = boardId;
+    this.taskNumber = taskNumber;
+    this.status = status;
+    this.taskType = taskType;
+  }
 
   public TaskCreatedEvent(
       UUID tenantId, UUID taskId, UUID boardId, String taskNumber, String status, String taskType) {

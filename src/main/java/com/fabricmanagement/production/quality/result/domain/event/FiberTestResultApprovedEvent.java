@@ -2,6 +2,9 @@ package com.fabricmanagement.production.quality.result.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
 import com.fabricmanagement.production.quality.result.domain.TestApprovalStatus;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -27,6 +30,29 @@ public class FiberTestResultApprovedEvent extends DomainEvent {
       TestApprovalStatus approvalStatus,
       UUID actorId) {
     super(tenantId, "FIBER_TEST_RESULT_APPROVED");
+    this.batchId = batchId;
+    this.stockUnitId = stockUnitId;
+    this.approvalStatus = approvalStatus;
+    this.actorId = actorId;
+  }
+
+  @JsonCreator
+  public FiberTestResultApprovedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("batchId") UUID batchId,
+      @JsonProperty("stockUnitId") UUID stockUnitId,
+      @JsonProperty("approvalStatus") TestApprovalStatus approvalStatus,
+      @JsonProperty("actorId") UUID actorId) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "FIBER_TEST_RESULT_APPROVED",
+        occurredAt,
+        correlationId);
     this.batchId = batchId;
     this.stockUnitId = stockUnitId;
     this.approvalStatus = approvalStatus;

@@ -3,7 +3,10 @@ package com.fabricmanagement.production.execution.output.domain.event;
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
@@ -47,4 +50,35 @@ public class ProductionOutputConfirmedEvent extends DomainEvent {
       BigDecimal netWeight,
       BigDecimal grossWeight,
       UUID locationId) {}
+
+  @JsonCreator
+  public ProductionOutputConfirmedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("recordId") UUID recordId,
+      @JsonProperty("workOrderId") UUID workOrderId,
+      @JsonProperty("batchId") UUID batchId,
+      @JsonProperty("outputProductId") UUID outputProductId,
+      @JsonProperty("outputProductType") ProductType outputProductType,
+      @JsonProperty("unit") String unit,
+      @JsonProperty("confirmedByUserId") UUID confirmedByUserId,
+      @JsonProperty("items") List<OutputItemData> items) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "PRODUCTION_OUTPUT_CONFIRMED",
+        occurredAt,
+        correlationId);
+    this.recordId = recordId;
+    this.workOrderId = workOrderId;
+    this.batchId = batchId;
+    this.outputProductId = outputProductId;
+    this.outputProductType = outputProductType;
+    this.unit = unit;
+    this.confirmedByUserId = confirmedByUserId;
+    this.items = items;
+  }
 }

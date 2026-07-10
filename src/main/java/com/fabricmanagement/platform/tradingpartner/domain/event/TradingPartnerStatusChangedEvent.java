@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.tradingpartner.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -31,6 +34,29 @@ public class TradingPartnerStatusChangedEvent extends DomainEvent {
       String newStatus,
       String partnerDisplayName) {
     super(tenantId, "TRADING_PARTNER_STATUS_CHANGED");
+    this.tradingPartnerId = tradingPartnerId;
+    this.previousStatus = previousStatus;
+    this.newStatus = newStatus;
+    this.partnerDisplayName = partnerDisplayName;
+  }
+
+  @JsonCreator
+  public TradingPartnerStatusChangedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("tradingPartnerId") UUID tradingPartnerId,
+      @JsonProperty("previousStatus") String previousStatus,
+      @JsonProperty("newStatus") String newStatus,
+      @JsonProperty("partnerDisplayName") String partnerDisplayName) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "TRADING_PARTNER_STATUS_CHANGED",
+        occurredAt,
+        correlationId);
     this.tradingPartnerId = tradingPartnerId;
     this.previousStatus = previousStatus;
     this.newStatus = newStatus;

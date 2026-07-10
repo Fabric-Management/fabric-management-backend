@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.auth.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
@@ -39,6 +42,46 @@ public class SelfSignupCompletedEvent extends DomainEvent {
       UUID trialTenantId,
       String localeLanguageTag) {
     super(tenantId, "SELF_SIGNUP_COMPLETED");
+    this.recipientEmail = recipientEmail;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.organizationName = organizationName;
+    this.taxId = taxId;
+    this.organizationType = organizationType;
+    this.setupUrl = setupUrl;
+    this.salesLed = salesLed;
+    this.subscriptionOsCodes =
+        subscriptionOsCodes == null ? List.of() : List.copyOf(subscriptionOsCodes);
+    this.signupIntent = signupIntent;
+    this.trialTenantId = trialTenantId;
+    this.localeLanguageTag = localeLanguageTag;
+  }
+
+  @JsonCreator
+  public SelfSignupCompletedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("recipientEmail") String recipientEmail,
+      @JsonProperty("firstName") String firstName,
+      @JsonProperty("lastName") String lastName,
+      @JsonProperty("organizationName") String organizationName,
+      @JsonProperty("taxId") String taxId,
+      @JsonProperty("organizationType") String organizationType,
+      @JsonProperty("setupUrl") String setupUrl,
+      @JsonProperty("salesLed") boolean salesLed,
+      @JsonProperty("subscriptionOsCodes") List<String> subscriptionOsCodes,
+      @JsonProperty("signupIntent") String signupIntent,
+      @JsonProperty("trialTenantId") UUID trialTenantId,
+      @JsonProperty("localeLanguageTag") String localeLanguageTag) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "SELF_SIGNUP_COMPLETED",
+        occurredAt,
+        correlationId);
     this.recipientEmail = recipientEmail;
     this.firstName = firstName;
     this.lastName = lastName;

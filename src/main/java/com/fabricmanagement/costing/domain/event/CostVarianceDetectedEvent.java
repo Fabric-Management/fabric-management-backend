@@ -3,7 +3,10 @@ package com.fabricmanagement.costing.domain.event;
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
 import com.fabricmanagement.costing.domain.calculation.CostEntityType;
 import com.fabricmanagement.costing.domain.calculation.CostStage;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Getter;
@@ -45,6 +48,39 @@ public class CostVarianceDetectedEvent extends DomainEvent {
       BigDecimal varianceRatio,
       String currency) {
     super(tenantId, "COST_VARIANCE_DETECTED");
+    this.costCalculationId = costCalculationId;
+    this.entityType = entityType;
+    this.entityId = entityId;
+    this.currentStage = currentStage;
+    this.previousStage = previousStage;
+    this.previousTotal = previousTotal;
+    this.currentTotal = currentTotal;
+    this.varianceRatio = varianceRatio;
+    this.currency = currency;
+  }
+
+  @JsonCreator
+  public CostVarianceDetectedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("costCalculationId") UUID costCalculationId,
+      @JsonProperty("entityType") CostEntityType entityType,
+      @JsonProperty("entityId") UUID entityId,
+      @JsonProperty("currentStage") CostStage currentStage,
+      @JsonProperty("previousStage") CostStage previousStage,
+      @JsonProperty("previousTotal") BigDecimal previousTotal,
+      @JsonProperty("currentTotal") BigDecimal currentTotal,
+      @JsonProperty("varianceRatio") BigDecimal varianceRatio,
+      @JsonProperty("currency") String currency) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "COST_VARIANCE_DETECTED",
+        occurredAt,
+        correlationId);
     this.costCalculationId = costCalculationId;
     this.entityType = entityType;
     this.entityId = entityId;

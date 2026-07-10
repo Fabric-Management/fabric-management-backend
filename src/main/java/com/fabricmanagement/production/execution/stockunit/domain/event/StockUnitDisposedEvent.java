@@ -1,7 +1,10 @@
 package com.fabricmanagement.production.execution.stockunit.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -25,6 +28,35 @@ public class StockUnitDisposedEvent extends DomainEvent {
 
   /** Mandatory reason provided by the admin at time of disposal. */
   private final String reason;
+
+  @JsonCreator
+  public StockUnitDisposedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("stockUnitId") UUID stockUnitId,
+      @JsonProperty("barcode") String barcode,
+      @JsonProperty("batchId") UUID batchId,
+      @JsonProperty("locationId") UUID locationId,
+      @JsonProperty("disposedWeight") BigDecimal disposedWeight,
+      @JsonProperty("unit") String unit,
+      @JsonProperty("reason") String reason) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "STOCK_UNIT_DISPOSED",
+        occurredAt,
+        correlationId);
+    this.stockUnitId = stockUnitId;
+    this.barcode = barcode;
+    this.batchId = batchId;
+    this.locationId = locationId;
+    this.disposedWeight = disposedWeight;
+    this.unit = unit;
+    this.reason = reason;
+  }
 
   public StockUnitDisposedEvent(
       UUID tenantId,

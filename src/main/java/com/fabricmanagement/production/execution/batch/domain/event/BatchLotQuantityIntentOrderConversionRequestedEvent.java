@@ -1,6 +1,9 @@
 package com.fabricmanagement.production.execution.batch.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -12,6 +15,23 @@ import lombok.Getter;
 @Getter
 public class BatchLotQuantityIntentOrderConversionRequestedEvent extends DomainEvent {
   private final UUID quoteId;
+
+  @JsonCreator
+  public BatchLotQuantityIntentOrderConversionRequestedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("quoteId") UUID quoteId) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "BATCH_LOT_QUANTITY_INTENT_ORDER_CONVERSION_REQUESTED",
+        occurredAt,
+        correlationId);
+    this.quoteId = quoteId;
+  }
 
   public BatchLotQuantityIntentOrderConversionRequestedEvent(UUID tenantId, UUID quoteId) {
     super(tenantId, "BATCH_LOT_QUANTITY_INTENT_ORDER_CONVERSION_REQUESTED");

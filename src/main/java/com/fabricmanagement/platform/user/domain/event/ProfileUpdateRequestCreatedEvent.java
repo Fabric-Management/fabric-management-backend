@@ -1,6 +1,9 @@
 package com.fabricmanagement.platform.user.domain.event;
 
 import com.fabricmanagement.common.infrastructure.events.DomainEvent;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
@@ -15,6 +18,27 @@ public class ProfileUpdateRequestCreatedEvent extends DomainEvent {
   public ProfileUpdateRequestCreatedEvent(
       UUID tenantId, UUID requestId, UUID userId, String profileCategory) {
     super(tenantId, "PROFILE_UPDATE_REQUEST_CREATED");
+    this.requestId = requestId;
+    this.userId = userId;
+    this.profileCategory = profileCategory;
+  }
+
+  @JsonCreator
+  public ProfileUpdateRequestCreatedEvent(
+      @JsonProperty("eventId") UUID eventId,
+      @JsonProperty("tenantId") UUID tenantId,
+      @JsonProperty("eventType") String eventType,
+      @JsonProperty("occurredAt") Instant occurredAt,
+      @JsonProperty("correlationId") String correlationId,
+      @JsonProperty("requestId") UUID requestId,
+      @JsonProperty("userId") UUID userId,
+      @JsonProperty("profileCategory") String profileCategory) {
+    super(
+        eventId,
+        tenantId,
+        eventType != null ? eventType : "PROFILE_UPDATE_REQUEST_CREATED",
+        occurredAt,
+        correlationId);
     this.requestId = requestId;
     this.userId = userId;
     this.profileCategory = profileCategory;
