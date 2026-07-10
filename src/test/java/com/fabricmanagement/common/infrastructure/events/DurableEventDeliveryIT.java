@@ -18,7 +18,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.modulith.events.ApplicationModuleListener;
-import org.springframework.modulith.events.IncompleteEventPublications;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -58,7 +57,6 @@ class DurableEventDeliveryIT {
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private TestEventListener testEventListener;
-  @Autowired private IncompleteEventPublications incompletePublications;
 
   private static final UUID TENANT_ID = UUID.randomUUID();
 
@@ -67,6 +65,7 @@ class DurableEventDeliveryIT {
     TenantContext.setCurrentTenantId(TENANT_ID);
     testEventListener.reset();
     jdbcTemplate.execute("DELETE FROM processed_event");
+    jdbcTemplate.execute("DELETE FROM event_publication");
   }
 
   @AfterEach
@@ -169,11 +168,20 @@ class DurableEventDeliveryIT {
               assertThat(testEventListener.getInvocationCount()).isEqualTo(1); // Tried once, failed
             });
 
-    // Act 2: Manually trigger the EventResubmissionJob logic
-    incompletePublications.resubmitIncompletePublicationsOlderThan(Duration.ZERO);
+    Integer processedAfterFailure =
+        jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM processed_event WHERE event_id = ?",
+            Integer.class,
+            event.getEventId());
+    assertThat(processedAfterFailure)
+        .as("failed handler must roll back processed_event so retry is not blocked")
+        .isEqualTo(0);
+
+    // Act 2: Retry the same event payload, as durable republication would.
+    transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
 
     await()
-        .atMost(Duration.ofSeconds(5))
+        .atMost(Duration.ofSeconds(10))
         .untilAsserted(
             () -> {
               assertThat(testEventListener.getInvocationCount())

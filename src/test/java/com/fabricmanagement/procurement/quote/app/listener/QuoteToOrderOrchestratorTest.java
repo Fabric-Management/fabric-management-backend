@@ -1,8 +1,10 @@
 package com.fabricmanagement.procurement.quote.app.listener;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
@@ -37,6 +39,7 @@ class QuoteToOrderOrchestratorTest {
   @Mock private PurchaseOrderService purchaseOrderService;
   @Mock private PurchaseOrderRepository purchaseOrderRepository;
   @Mock private SubcontractOrderService subcontractOrderService;
+  @Mock private TenantSessionBinder tenantSessionBinder;
   @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
   @InjectMocks private QuoteToOrderOrchestrator orchestrator;
@@ -73,6 +76,7 @@ class QuoteToOrderOrchestratorTest {
 
     quote = new SupplierQuote();
     quote.setId(quoteId);
+    quote.setTenantId(tenantId);
     quote.setRfqId(rfqId);
     quote.setQuoteNumber("Q-123");
     quote.setTradingPartnerId(UUID.randomUUID());
@@ -105,7 +109,9 @@ class QuoteToOrderOrchestratorTest {
         .thenReturn(Optional.of(quote));
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.of(rfq));
-    when(purchaseOrderRepository.existsBySupplierQuoteIdAndIsActiveTrue(quoteId)).thenReturn(false);
+    when(purchaseOrderRepository.existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
+            tenantId, quoteId))
+        .thenReturn(false);
 
     // Act
     orchestrator.onQuoteAccepted(event);
@@ -156,7 +162,9 @@ class QuoteToOrderOrchestratorTest {
         .thenReturn(Optional.of(quote));
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.of(rfq));
-    when(purchaseOrderRepository.existsBySupplierQuoteIdAndIsActiveTrue(quoteId)).thenReturn(true);
+    when(purchaseOrderRepository.existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
+            tenantId, quoteId))
+        .thenReturn(true);
 
     // Act
     orchestrator.onQuoteAccepted(event);
@@ -166,38 +174,40 @@ class QuoteToOrderOrchestratorTest {
   }
 
   @Test
-  void onQuoteAccepted_QuoteNotFound_DoesNothing() {
+  void onQuoteAccepted_QuoteNotFound_ThrowsForRetry() {
     // Arrange
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.empty());
 
-    // Act
-    orchestrator.onQuoteAccepted(event);
+    // Act / Assert
+    assertThatThrownBy(() -> orchestrator.onQuoteAccepted(event))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Quote not found");
 
-    // Assert
     verifyNoInteractions(rfqRepository);
     verifyNoInteractions(purchaseOrderService);
     verifyNoInteractions(subcontractOrderService);
   }
 
   @Test
-  void onQuoteAccepted_RfqNotFound_DoesNothing() {
+  void onQuoteAccepted_RfqNotFound_ThrowsForRetry() {
     // Arrange
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(quote));
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.empty());
 
-    // Act
-    orchestrator.onQuoteAccepted(event);
+    // Act / Assert
+    assertThatThrownBy(() -> orchestrator.onQuoteAccepted(event))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("RFQ not found");
 
-    // Assert
     verifyNoInteractions(purchaseOrderService);
     verifyNoInteractions(subcontractOrderService);
   }
 
   @Test
-  void onQuoteAccepted_PurchaseServiceThrowsException_SwallowsException() {
+  void onQuoteAccepted_PurchaseServiceThrowsException_PropagatesForRetry() {
     // Arrange
     rfq.setRfqType(SupplierRFQType.PURCHASE);
     quote.setLines(List.of());
@@ -206,15 +216,17 @@ class QuoteToOrderOrchestratorTest {
         .thenReturn(Optional.of(quote));
     when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
         .thenReturn(Optional.of(rfq));
-    when(purchaseOrderRepository.existsBySupplierQuoteIdAndIsActiveTrue(quoteId)).thenReturn(false);
+    when(purchaseOrderRepository.existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
+            tenantId, quoteId))
+        .thenReturn(false);
 
     doThrow(new RuntimeException("DB down")).when(purchaseOrderService).createPurchaseOrder(any());
 
-    // Act
-    // Should not throw
-    orchestrator.onQuoteAccepted(event);
+    // Act / Assert
+    assertThatThrownBy(() -> orchestrator.onQuoteAccepted(event))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("DB down");
 
-    // Assert
     verify(purchaseOrderService).createPurchaseOrder(any(CreatePurchaseOrderRequest.class));
   }
 }

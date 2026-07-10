@@ -2,6 +2,7 @@ package com.fabricmanagement.procurement.quote.app.listener;
 
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
@@ -43,6 +44,7 @@ public class QuoteToOrderOrchestrator {
   private final SubcontractOrderService subcontractOrderService;
   private final ObjectMapper objectMapper;
   private final IdempotentEventHandler idempotentHandler;
+  private final TenantSessionBinder tenantSessionBinder;
 
   @ApplicationModuleListener
   public void onQuoteAccepted(SupplierQuoteAcceptedEvent event) {
@@ -56,24 +58,28 @@ public class QuoteToOrderOrchestrator {
           TenantContext.executeInTenantContext(
               event.getTenantId(),
               () -> {
-                quoteRepository
-                    .findByTenantIdAndIdAndIsActiveTrue(event.getTenantId(), event.getQuoteId())
-                    .ifPresentOrElse(
-                        quote ->
-                            rfqRepository
-                                .findByTenantIdAndIdAndIsActiveTrue(
-                                    event.getTenantId(), quote.getRfqId())
-                                .ifPresentOrElse(
-                                    rfq -> routeToOrder(quote, rfq),
-                                    () ->
-                                        log.warn(
-                                            "RFQ not found for quote {} (rfqId={}), skipping order creation",
-                                            event.getQuoteId(),
-                                            quote.getRfqId())),
-                        () ->
-                            log.warn(
-                                "Quote not found: {}, skipping order creation",
-                                event.getQuoteId()));
+                tenantSessionBinder.bindToCurrentSession(event.getTenantId());
+                SupplierQuote quote =
+                    quoteRepository
+                        .findByTenantIdAndIdAndIsActiveTrue(event.getTenantId(), event.getQuoteId())
+                        .orElseThrow(
+                            () ->
+                                new IllegalStateException(
+                                    "Quote not found: "
+                                        + event.getQuoteId()
+                                        + ", retrying order creation"));
+                SupplierRFQ rfq =
+                    rfqRepository
+                        .findByTenantIdAndIdAndIsActiveTrue(event.getTenantId(), quote.getRfqId())
+                        .orElseThrow(
+                            () ->
+                                new IllegalStateException(
+                                    "RFQ not found for quote "
+                                        + event.getQuoteId()
+                                        + " (rfqId="
+                                        + quote.getRfqId()
+                                        + "), retrying order creation"));
+                routeToOrder(quote, rfq);
               });
         });
   }
@@ -93,7 +99,8 @@ public class QuoteToOrderOrchestrator {
 
   private void createPurchaseOrder(SupplierQuote quote, SupplierRFQ rfq) {
     // Idempotency check: prevent duplicate PO for the same quote
-    if (purchaseOrderRepository.existsBySupplierQuoteIdAndIsActiveTrue(quote.getId())) {
+    if (purchaseOrderRepository.existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
+        quote.getTenantId(), quote.getId())) {
       log.warn(
           "PurchaseOrder already exists for quote {}, skipping duplicate creation",
           quote.getQuoteNumber());
@@ -157,16 +164,8 @@ public class QuoteToOrderOrchestrator {
             .lines(lines)
             .build();
 
-    try {
-      purchaseOrderService.createPurchaseOrder(poRequest);
-      log.info("Successfully created PurchaseOrder for quote {}", quote.getQuoteNumber());
-    } catch (RuntimeException e) {
-      log.error(
-          "Failed to create PurchaseOrder for quote {}: {}",
-          quote.getQuoteNumber(),
-          e.getMessage(),
-          e);
-    }
+    purchaseOrderService.createPurchaseOrder(poRequest);
+    log.info("Successfully created PurchaseOrder for quote {}", quote.getQuoteNumber());
   }
 
   private void createSubcontractOrder(SupplierQuote quote, SupplierRFQ rfq) {
@@ -200,16 +199,8 @@ public class QuoteToOrderOrchestrator {
             .notes("Auto-generated from Subcontract Quote: " + quote.getQuoteNumber())
             .build();
 
-    try {
-      subcontractOrderService.createSubcontractOrder(soRequest);
-      log.info("Successfully created SubcontractOrder for quote {}", quote.getQuoteNumber());
-    } catch (RuntimeException e) {
-      log.error(
-          "Failed to create SubcontractOrder for quote {}: {}",
-          quote.getQuoteNumber(),
-          e.getMessage(),
-          e);
-    }
+    subcontractOrderService.createSubcontractOrder(soRequest);
+    log.info("Successfully created SubcontractOrder for quote {}", quote.getQuoteNumber());
   }
 
   private PurchaseOrderModuleType mapRfqModuleType(SupplierRFQModuleType rfqType) {
