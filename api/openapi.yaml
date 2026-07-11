@@ -26158,7 +26158,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AddQuoteLineRequest"
+              $ref: "#/components/schemas/SupplierQuoteAddLineRequest"
         required: true
       responses:
         "200":
@@ -51055,6 +51055,27 @@ components:
             description: CIELab L* target
             example: "45.0"
       description: Dye/finishing-specific purchase order specifications
+    DyeQuoteSpecs:
+      allOf:
+      - $ref: "#/components/schemas/SupplierQuoteSpecs"
+      - type: object
+        properties:
+          color:
+            type: string
+            description: Color code or name
+          finish:
+            type: string
+            description: "Finishing treatments (e.g., Sanforized, Water Repellent)"
+          processNotes:
+            type: string
+            description: Additional processing notes
+          processType:
+            type: string
+            description: "Dyeing process type (e.g., Reactive, Disperse)"
+          shrinkageExpected:
+            type: number
+            description: Expected shrinkage after wash
+      description: Dyeing and finishing specific quote specifications
     DyeRFQSpecs:
       allOf:
       - $ref: "#/components/schemas/SupplierRFQSpecs"
@@ -51364,6 +51385,30 @@ components:
             description: Width in cm (100-320)
             example: 150
       description: Fabric-specific purchase order specifications
+    FabricQuoteSpecs:
+      allOf:
+      - $ref: "#/components/schemas/SupplierQuoteSpecs"
+      - type: object
+        properties:
+          construction:
+            type: string
+            description: "Fabric construction (e.g., 20x20/60x60)"
+          fabricNotes:
+            type: string
+            description: Additional fabric notes
+          gsm:
+            type: number
+            description: Grams per square meter (GSM)
+          shrinkagePercentage:
+            type: number
+            description: Shrinkage percentage
+          type:
+            type: string
+            description: Weave or knit type
+          widthCm:
+            type: number
+            description: Fabric width in cm
+      description: Fabric-specific quote specifications
     FabricRFQSpecs:
       allOf:
       - $ref: "#/components/schemas/SupplierRFQSpecs"
@@ -51710,6 +51755,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FiberQualityStandardDto"
+    FiberQuoteSpecs:
+      allOf:
+      - $ref: "#/components/schemas/SupplierQuoteSpecs"
+      - type: object
+        properties:
+          micronaire:
+            type: number
+            description: Micronaire value
+          qualityNotes:
+            type: string
+            description: Additional fiber quality notes
+          stapleLengthMm:
+            type: number
+            description: Staple length in mm
+          strength:
+            type: number
+            description: Strength in g/tex
+          trashContentPercentage:
+            type: number
+            description: Trash content percentage
+      description: Fiber-specific quote specifications
     FiberRFQSpecs:
       allOf:
       - $ref: "#/components/schemas/SupplierRFQSpecs"
@@ -52061,6 +52127,15 @@ components:
             type: string
             description: Free-text description for untyped POs
       description: Generic purchase order specifications for unclassified items
+    GenericQuoteSpecs:
+      allOf:
+      - $ref: "#/components/schemas/SupplierQuoteSpecs"
+      - type: object
+        properties:
+          notes:
+            type: string
+            description: Any additional processing or requirement notes
+      description: Generic quote specs for undefined or basic modules
     GenericRFQSpecs:
       allOf:
       - $ref: "#/components/schemas/SupplierRFQSpecs"
@@ -57260,6 +57335,91 @@ components:
           type: string
         type:
           type: string
+    SupplierQuoteAddLineRequest:
+      type: object
+      description: Request to add a line to a supplier quote
+      properties:
+        currency:
+          type: string
+          description: Currency code
+          example: GBP
+          minLength: 1
+        moduleSpecs:
+          $ref: "#/components/schemas/SupplierQuoteSpecs"
+          description: Module-specific specifications
+        notes:
+          type: string
+          description: Line notes
+        qty:
+          type: number
+          description: Quantity
+          minimum: 0.001
+        rfqLineId:
+          type: string
+          format: uuid
+          description: RFQ Line ID
+        unit:
+          type: string
+          description: Unit of measure
+          minLength: 1
+        unitPrice:
+          type: number
+          description: Unit price
+          minimum: 0.0001
+        volumeDiscounts:
+          type: object
+          additionalProperties: {}
+          description: Volume discounts
+      required:
+      - currency
+      - qty
+      - rfqLineId
+      - unit
+      - unitPrice
+    SupplierQuoteLineResponse:
+      type: object
+      description: Supplier Quote Line Response
+      properties:
+        currency:
+          type: string
+          description: Currency
+        id:
+          type: string
+          format: uuid
+          description: Line ID
+        lineTotal:
+          type: number
+          description: Total Line Amount
+        moduleSpecs:
+          $ref: "#/components/schemas/SupplierQuoteSpecs"
+          description: Module Specs
+        notes:
+          type: string
+          description: Line Notes
+        productDesc:
+          type: string
+          description: Product description resolved from the RFQ line
+        productId:
+          type: string
+          format: uuid
+          description: Product ID resolved from the RFQ line
+        qty:
+          type: number
+          description: Quantity
+        rfqLineId:
+          type: string
+          format: uuid
+          description: RFQ Line ID
+        unit:
+          type: string
+          description: Unit of Measure
+        unitPrice:
+          type: number
+          description: Unit Price
+        volumeDiscounts:
+          type: object
+          additionalProperties: true
+          description: Volume Discounts
     SupplierQuoteResponse:
       type: object
       description: Supplier Quote Response
@@ -57287,7 +57447,7 @@ components:
           type: array
           description: Quote Lines
           items:
-            $ref: "#/components/schemas/QuoteLineResponse"
+            $ref: "#/components/schemas/SupplierQuoteLineResponse"
         moduleType:
           type: string
           description: Module Type
@@ -57340,6 +57500,21 @@ components:
           type: string
           format: date
           description: Valid Until Date
+    SupplierQuoteSpecs:
+      description: "Module-specific quote specs, discriminated by specType"
+      discriminator:
+        propertyName: specType
+      oneOf:
+      - $ref: "#/components/schemas/FiberQuoteSpecs"
+      - $ref: "#/components/schemas/YarnQuoteSpecs"
+      - $ref: "#/components/schemas/FabricQuoteSpecs"
+      - $ref: "#/components/schemas/DyeQuoteSpecs"
+      - $ref: "#/components/schemas/GenericQuoteSpecs"
+      properties:
+        specType:
+          type: string
+      required:
+      - specType
     SupplierRFQResponse:
       type: object
       properties:
@@ -60083,6 +60258,27 @@ components:
             description: Yarn count (Ne)
             example: 30/1
       description: Yarn-specific purchase order specifications
+    YarnQuoteSpecs:
+      allOf:
+      - $ref: "#/components/schemas/SupplierQuoteSpecs"
+      - type: object
+        properties:
+          blend:
+            type: string
+            description: "Blend composition (e.g., 100% Cotton)"
+          strength:
+            type: number
+            description: Strength (RKM)
+          twist:
+            type: number
+            description: Twist level (TPM or TPI)
+          yarnCount:
+            type: string
+            description: "Yarn count (e.g., Ne 30/1)"
+          yarnNotes:
+            type: string
+            description: Additional yarn notes
+      description: Yarn-specific quote specifications
     YarnRFQSpecs:
       allOf:
       - $ref: "#/components/schemas/SupplierRFQSpecs"

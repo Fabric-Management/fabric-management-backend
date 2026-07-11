@@ -4,8 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
@@ -14,6 +18,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteLine;
@@ -24,6 +29,7 @@ import com.fabricmanagement.procurement.quote.dto.SupplierQuoteResponse;
 import com.fabricmanagement.procurement.quote.infra.repository.SupplierQuoteRepository;
 import com.fabricmanagement.procurement.quote.mapper.SupplierQuoteMapper;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQLine;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -99,7 +105,7 @@ class SupplierQuoteServiceTest {
             null);
 
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(quoteMapper.toResponse(any(SupplierQuote.class), anyMap())).thenReturn(mockResponse);
     when(partnerResolver.resolvePartner(tenantId, partnerId)).thenReturn(Optional.empty());
     SupplierRFQ mockRfq = new SupplierRFQ();
     mockRfq.setModuleType(
@@ -115,12 +121,35 @@ class SupplierQuoteServiceTest {
   }
 
   @Test
+  @DisplayName("Should resolve RFQ lines before mapping a Supplier Quote response")
+  void shouldResolveRfqLinesBeforeMappingResponse() {
+    UUID rfqLineId = UUID.randomUUID();
+    SupplierRFQLine rfqLine = new SupplierRFQLine();
+    rfqLine.setId(rfqLineId);
+    SupplierRFQ rfq = new SupplierRFQ();
+    rfq.addLine(rfqLine);
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+    when(rfqRepository.findAllByTenantIdAndIdInAndIsActiveTrue(
+            eq(tenantId), argThat(ids -> ids.contains(rfqId))))
+        .thenReturn(List.of(rfq));
+    when(quoteMapper.toResponse(eq(mockQuote), anyMap())).thenReturn(mockResponse);
+
+    SupplierQuoteResponse response = quoteService.getQuoteById(quoteId);
+
+    assertEquals(mockResponse, response);
+    verify(quoteMapper)
+        .toResponse(eq(mockQuote), argThat(rfqLines -> rfqLines.get(rfqLineId) == rfqLine));
+  }
+
+  @Test
   @DisplayName("Should successfully add line when Quote is in RECEIVED status")
   void shouldAddLineToReceivedQuote() {
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(quoteMapper.toResponse(any(SupplierQuote.class), anyMap())).thenReturn(mockResponse);
     when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("USD");
 
     AddQuoteLineRequest req =
@@ -155,7 +184,7 @@ class SupplierQuoteServiceTest {
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(quoteMapper.toResponse(any(SupplierQuote.class), anyMap())).thenReturn(mockResponse);
     when(tenantReportingCurrencyPort.getReportingCurrency(tenantId)).thenReturn("GBP");
     when(exchangeRateService.convert(
             eq(tenantId), any(BigDecimal.class), eq("USD"), eq("TRY"), eq(docDate)))
@@ -241,8 +270,84 @@ class SupplierQuoteServiceTest {
   }
 
   @Test
+  @DisplayName("Should reject review when Supplier Quote has no active lines")
+  void shouldRejectReviewWithoutLines() {
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.startReview(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before review.", ex.getMessage());
+    verify(quoteRepository).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+    verifyNoMoreInteractions(quoteRepository);
+    verifyNoInteractions(eventPublisher);
+  }
+
+  @Test
+  @DisplayName("Should reject review when Supplier Quote has only an inactive line")
+  void shouldRejectReviewWithOnlyInactiveLine() {
+    SupplierQuoteLine inactiveLine = quoteLine("USD", "1.00", "1.000");
+    inactiveLine.setIsActive(false);
+    mockQuote.addLine(inactiveLine);
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.startReview(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before review.", ex.getMessage());
+  }
+
+  @Test
+  @DisplayName("Should start review when Supplier Quote has an active line")
+  void shouldStartReviewWithActiveLine() {
+    mockQuote.addLine(quoteLine("USD", "1.00", "1.000"));
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+    when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteMapper.toResponse(any(SupplierQuote.class), anyMap())).thenReturn(mockResponse);
+
+    SupplierQuoteResponse updated = quoteService.startReview(quoteId);
+
+    assertNotNull(updated);
+    assertEquals(SupplierQuoteStatus.UNDER_REVIEW, mockQuote.getStatus());
+  }
+
+  @Test
+  @DisplayName("Should reject acceptance without lines and perform no side effects")
+  void shouldRejectAcceptanceWithoutLinesAndPerformNoSideEffects() {
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.markAsAccepted(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before acceptance.", ex.getMessage());
+    verify(quoteRepository).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+    verifyNoMoreInteractions(quoteRepository);
+    verifyNoInteractions(eventPublisher);
+  }
+
+  @Test
+  @DisplayName("Should reject acceptance when Supplier Quote has only an inactive line")
+  void shouldRejectAcceptanceWithOnlyInactiveLine() {
+    SupplierQuoteLine inactiveLine = quoteLine("USD", "1.00", "1.000");
+    inactiveLine.setIsActive(false);
+    mockQuote.addLine(inactiveLine);
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.markAsAccepted(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before acceptance.", ex.getMessage());
+  }
+
+  @Test
   @DisplayName("Should mark quote as ACCEPTED and auto-reject siblings")
   void shouldMarkQuoteAsAcceptedAndRejectSiblings() {
+    mockQuote.addLine(quoteLine("USD", "1.00", "1.000"));
     UUID siblingId = UUID.randomUUID();
     SupplierQuote sibling = new SupplierQuote();
     sibling.setId(siblingId);
@@ -268,7 +373,7 @@ class SupplierQuoteServiceTest {
         .thenReturn(new ArrayList<>());
 
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(quoteMapper.toResponse(any(SupplierQuote.class), anyMap())).thenReturn(mockResponse);
 
     SupplierQuoteResponse updated = quoteService.markAsAccepted(quoteId);
 
@@ -280,6 +385,7 @@ class SupplierQuoteServiceTest {
   @Test
   @DisplayName("Should throw when accepting already REJECTED quote")
   void shouldThrowWhenAcceptingRejectedQuote() {
+    mockQuote.addLine(quoteLine("USD", "1.00", "1.000"));
     mockQuote.setStatus(SupplierQuoteStatus.REJECTED);
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
@@ -297,7 +403,7 @@ class SupplierQuoteServiceTest {
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
         .thenReturn(Optional.of(mockQuote));
     when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
-    when(quoteMapper.toResponse(any(SupplierQuote.class))).thenReturn(mockResponse);
+    when(quoteMapper.toResponse(any(SupplierQuote.class), anyMap())).thenReturn(mockResponse);
 
     SupplierQuoteResponse updated = quoteService.markAsRejected(quoteId);
 
