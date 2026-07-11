@@ -1,11 +1,12 @@
 package com.fabricmanagement.procurement.quote.app.listener;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
-import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
+import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderConstraintViolationMatcher;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
@@ -30,13 +31,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class QuoteToOrderOrchestratorTest {
 
   @Mock private SupplierQuoteRepository quoteRepository;
   @Mock private SupplierRFQRepository rfqRepository;
-  @Mock private PurchaseOrderService purchaseOrderService;
+  @Mock private PurchaseOrderCreationTransaction purchaseOrderCreationTransaction;
   @Mock private PurchaseOrderRepository purchaseOrderRepository;
   @Mock private SubcontractOrderService subcontractOrderService;
   @Mock private TenantSessionBinder tenantSessionBinder;
@@ -117,7 +119,7 @@ class QuoteToOrderOrchestratorTest {
     orchestrator.onQuoteAccepted(event);
 
     // Assert
-    verify(purchaseOrderService).createPurchaseOrder(any(CreatePurchaseOrderRequest.class));
+    verify(purchaseOrderCreationTransaction).createAndFlush(any(CreatePurchaseOrderRequest.class));
     verifyNoInteractions(subcontractOrderService);
   }
 
@@ -150,7 +152,7 @@ class QuoteToOrderOrchestratorTest {
     // Assert
     verify(subcontractOrderService)
         .createSubcontractOrder(any(CreateSubcontractOrderRequest.class));
-    verifyNoInteractions(purchaseOrderService);
+    verifyNoInteractions(purchaseOrderCreationTransaction);
   }
 
   @Test
@@ -170,7 +172,7 @@ class QuoteToOrderOrchestratorTest {
     orchestrator.onQuoteAccepted(event);
 
     // Assert
-    verify(purchaseOrderService, never()).createPurchaseOrder(any());
+    verify(purchaseOrderCreationTransaction, never()).createAndFlush(any());
   }
 
   @Test
@@ -185,7 +187,7 @@ class QuoteToOrderOrchestratorTest {
         .hasMessageContaining("Quote not found");
 
     verifyNoInteractions(rfqRepository);
-    verifyNoInteractions(purchaseOrderService);
+    verifyNoInteractions(purchaseOrderCreationTransaction);
     verifyNoInteractions(subcontractOrderService);
   }
 
@@ -202,7 +204,7 @@ class QuoteToOrderOrchestratorTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("RFQ not found");
 
-    verifyNoInteractions(purchaseOrderService);
+    verifyNoInteractions(purchaseOrderCreationTransaction);
     verifyNoInteractions(subcontractOrderService);
   }
 
@@ -220,13 +222,56 @@ class QuoteToOrderOrchestratorTest {
             tenantId, quoteId))
         .thenReturn(false);
 
-    doThrow(new RuntimeException("DB down")).when(purchaseOrderService).createPurchaseOrder(any());
+    doThrow(new RuntimeException("DB down"))
+        .when(purchaseOrderCreationTransaction)
+        .createAndFlush(any());
 
     // Act / Assert
     assertThatThrownBy(() -> orchestrator.onQuoteAccepted(event))
         .isInstanceOf(RuntimeException.class)
         .hasMessageContaining("DB down");
 
-    verify(purchaseOrderService).createPurchaseOrder(any(CreatePurchaseOrderRequest.class));
+    verify(purchaseOrderCreationTransaction).createAndFlush(any(CreatePurchaseOrderRequest.class));
+  }
+
+  @Test
+  void onQuoteAccepted_PurchaseOrderConstraintRace_CompletesWithoutRetry() {
+    rfq.setRfqType(SupplierRFQType.PURCHASE);
+    quote.setLines(List.of());
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
+        .thenReturn(Optional.of(rfq));
+    when(purchaseOrderRepository.existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
+            tenantId, quoteId))
+        .thenReturn(false);
+    doThrow(
+            new DataIntegrityViolationException(
+                "duplicate "
+                    + PurchaseOrderConstraintViolationMatcher.ACTIVE_SUPPLIER_QUOTE_CONSTRAINT))
+        .when(purchaseOrderCreationTransaction)
+        .createAndFlush(any());
+
+    assertThatCode(() -> orchestrator.onQuoteAccepted(event)).doesNotThrowAnyException();
+
+    verify(purchaseOrderCreationTransaction).createAndFlush(any());
+  }
+
+  @Test
+  void onQuoteAccepted_UnrelatedIntegrityViolation_PropagatesForRetry() {
+    rfq.setRfqType(SupplierRFQType.PURCHASE);
+    quote.setLines(List.of());
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(quote));
+    when(rfqRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, rfqId))
+        .thenReturn(Optional.of(rfq));
+    when(purchaseOrderRepository.existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
+            tenantId, quoteId))
+        .thenReturn(false);
+    DataIntegrityViolationException unrelated =
+        new DataIntegrityViolationException("ck_purchase_order_status");
+    doThrow(unrelated).when(purchaseOrderCreationTransaction).createAndFlush(any());
+
+    assertThatThrownBy(() -> orchestrator.onQuoteAccepted(event)).isSameAs(unrelated);
   }
 }

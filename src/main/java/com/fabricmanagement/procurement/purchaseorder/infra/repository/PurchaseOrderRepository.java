@@ -22,4 +22,7 @@ public interface PurchaseOrderRepository
   boolean existsByPoNumberAndIsActiveTrue(String poNumber);
 
   boolean existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(UUID tenantId, UUID supplierQuoteId);
+
+  Optional<PurchaseOrder> findByTenantIdAndSupplierQuoteIdAndIsActiveTrue(
+      UUID tenantId, UUID supplierQuoteId);
 }

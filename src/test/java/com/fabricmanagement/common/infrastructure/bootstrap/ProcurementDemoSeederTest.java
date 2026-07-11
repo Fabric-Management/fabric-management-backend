@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequ
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderConstraintViolationMatcher;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
@@ -64,6 +66,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class ProcurementDemoSeederTest {
@@ -314,6 +317,64 @@ class ProcurementDemoSeederTest {
         .thenThrow(new IllegalStateException("template unavailable"));
 
     assertThatCode(() -> seeder.seedFor(TENANT_ID)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void createConfirmedPurchaseOrder_whenSeederLosesRace_continuesWithWinningOrder() {
+    UUID quoteId = UUID.randomUUID();
+    UUID winningOrderId = UUID.randomUUID();
+    UUID ownerUserId = UUID.randomUUID();
+    SupplierRFQResponse.RfqLineResponse rfqLine =
+        SupplierRFQResponse.RfqLineResponse.builder()
+            .id(UUID.randomUUID())
+            .requestedQty(java.math.BigDecimal.TEN)
+            .unit("KG")
+            .build();
+
+    TenantContext.setCurrentTenantId(TENANT_ID);
+    doThrow(
+            new DataIntegrityViolationException(
+                "duplicate "
+                    + PurchaseOrderConstraintViolationMatcher.ACTIVE_SUPPLIER_QUOTE_CONSTRAINT))
+        .when(purchaseOrderService)
+        .createPurchaseOrder(any(CreatePurchaseOrderRequest.class));
+    when(purchaseOrderService.getActivePurchaseOrderBySupplierQuote(TENANT_ID, quoteId))
+        .thenReturn(
+            PurchaseOrderResponse.builder()
+                .id(winningOrderId)
+                .status(PurchaseOrderStatus.DRAFT)
+                .build());
+    when(purchaseOrderService.changeStatus(any(), any()))
+        .thenAnswer(
+            invocation ->
+                PurchaseOrderResponse.builder()
+                    .id(invocation.getArgument(0))
+                    .status(invocation.getArgument(1))
+                    .build());
+    UUID receiptId = UUID.randomUUID();
+    when(goodsReceiptService.createGoodsReceipt(any(CreateGoodsReceiptRequest.class)))
+        .thenReturn(
+            GoodsReceiptResponse.builder().id(receiptId).status(GoodsReceiptStatus.DRAFT).build());
+    when(goodsReceiptService.confirmGoodsReceipt(receiptId))
+        .thenReturn(
+            GoodsReceiptResponse.builder()
+                .id(receiptId)
+                .status(GoodsReceiptStatus.CONFIRMED)
+                .build());
+
+    PurchaseOrderResponse result =
+        seeder.createConfirmedPurchaseOrderAndReceipt(
+            UUID.randomUUID(), UUID.randomUUID(), quoteId, List.of(rfqLine), ownerUserId);
+
+    assertThat(result.getId()).isEqualTo(winningOrderId);
+    assertThat(result.getStatus()).isEqualTo(PurchaseOrderStatus.CONFIRMED);
+    verify(purchaseOrderService).getActivePurchaseOrderBySupplierQuote(TENANT_ID, quoteId);
+    verify(purchaseOrderService).changeStatus(winningOrderId, PurchaseOrderStatus.CONFIRMED);
+    ArgumentCaptor<CreateGoodsReceiptRequest> receiptCaptor =
+        ArgumentCaptor.forClass(CreateGoodsReceiptRequest.class);
+    verify(goodsReceiptService).createGoodsReceipt(receiptCaptor.capture());
+    assertThat(receiptCaptor.getValue().getSourceId()).isEqualTo(winningOrderId);
+    verify(goodsReceiptService).confirmGoodsReceipt(receiptId);
   }
 
   private ProductDto product(String name) {

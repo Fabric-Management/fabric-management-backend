@@ -62,6 +62,24 @@ public class PurchaseOrderService {
     return mapToResponse(po, lines);
   }
 
+  /**
+   * Resolves the active purchase order that won concurrent creation for a supplier quote. Tenant ID
+   * is explicit because callers must not rely on RLS as a query filter.
+   */
+  public PurchaseOrderResponse getActivePurchaseOrderBySupplierQuote(
+      UUID tenantId, UUID supplierQuoteId) {
+    PurchaseOrder po =
+        poRepository
+            .findByTenantIdAndSupplierQuoteIdAndIsActiveTrue(tenantId, supplierQuoteId)
+            .orElseThrow(
+                () ->
+                    new ProcurementDomainException(
+                        "Active PurchaseOrder not found for supplier quote: " + supplierQuoteId));
+    List<PurchaseOrderLine> lines =
+        lineRepository.findByPurchaseOrderIdAndIsActiveTrueOrderByCreatedAtAsc(po.getId());
+    return mapToResponse(po, lines);
+  }
+
   public PagedResponse<PurchaseOrderResponse> listPurchaseOrders(
       PurchaseOrderModuleType moduleType, PurchaseOrderStatus status, Pageable pageable) {
 
