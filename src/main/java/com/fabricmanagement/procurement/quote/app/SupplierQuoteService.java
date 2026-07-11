@@ -164,6 +164,11 @@ public class SupplierQuoteService {
   @Transactional
   public SupplierQuoteResponse startReview(UUID quoteId) {
     SupplierQuote quote = getActiveQuote(quoteId);
+    if (!hasActiveLines(quote)) {
+      throw new ProcurementDomainException(
+          "Quote has no lines; add at least one line before review.");
+    }
+
     quote.startReview();
     SupplierQuote saved = quoteRepository.save(quote);
     log.info("SupplierQuote review started: {}", saved.getQuoteNumber());
@@ -173,6 +178,10 @@ public class SupplierQuoteService {
   @Transactional
   public SupplierQuoteResponse markAsAccepted(UUID quoteId) {
     SupplierQuote quote = getActiveQuote(quoteId);
+    if (!hasActiveLines(quote)) {
+      throw new ProcurementDomainException(
+          "Quote has no lines; add at least one line before acceptance.");
+    }
 
     // Auto-reject siblings — tek query ile RECEIVED + UNDER_REVIEW çek
     List<SupplierQuote> receivedSiblings =
@@ -216,6 +225,10 @@ public class SupplierQuoteService {
   }
 
   // ── Private Helpers ────────────────────────────────────────────────────────
+
+  private boolean hasActiveLines(SupplierQuote quote) {
+    return quote.getLines().stream().anyMatch(line -> Boolean.TRUE.equals(line.getIsActive()));
+  }
 
   private SupplierQuoteResponse toResponse(SupplierQuote quote) {
     return quoteMapper.toResponse(quote, loadRfqLines(List.of(quote)));

@@ -8,6 +8,8 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
@@ -16,6 +18,7 @@ import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.platform.tradingpartner.app.TradingPartnerResolver;
+import com.fabricmanagement.procurement.common.exception.ProcurementDomainException;
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteLine;
@@ -267,8 +270,84 @@ class SupplierQuoteServiceTest {
   }
 
   @Test
+  @DisplayName("Should reject review when Supplier Quote has no active lines")
+  void shouldRejectReviewWithoutLines() {
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.startReview(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before review.", ex.getMessage());
+    verify(quoteRepository).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+    verifyNoMoreInteractions(quoteRepository);
+    verifyNoInteractions(eventPublisher);
+  }
+
+  @Test
+  @DisplayName("Should reject review when Supplier Quote has only an inactive line")
+  void shouldRejectReviewWithOnlyInactiveLine() {
+    SupplierQuoteLine inactiveLine = quoteLine("USD", "1.00", "1.000");
+    inactiveLine.setIsActive(false);
+    mockQuote.addLine(inactiveLine);
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.startReview(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before review.", ex.getMessage());
+  }
+
+  @Test
+  @DisplayName("Should start review when Supplier Quote has an active line")
+  void shouldStartReviewWithActiveLine() {
+    mockQuote.addLine(quoteLine("USD", "1.00", "1.000"));
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+    when(quoteRepository.save(any(SupplierQuote.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(quoteMapper.toResponse(any(SupplierQuote.class), anyMap())).thenReturn(mockResponse);
+
+    SupplierQuoteResponse updated = quoteService.startReview(quoteId);
+
+    assertNotNull(updated);
+    assertEquals(SupplierQuoteStatus.UNDER_REVIEW, mockQuote.getStatus());
+  }
+
+  @Test
+  @DisplayName("Should reject acceptance without lines and perform no side effects")
+  void shouldRejectAcceptanceWithoutLinesAndPerformNoSideEffects() {
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.markAsAccepted(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before acceptance.", ex.getMessage());
+    verify(quoteRepository).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+    verifyNoMoreInteractions(quoteRepository);
+    verifyNoInteractions(eventPublisher);
+  }
+
+  @Test
+  @DisplayName("Should reject acceptance when Supplier Quote has only an inactive line")
+  void shouldRejectAcceptanceWithOnlyInactiveLine() {
+    SupplierQuoteLine inactiveLine = quoteLine("USD", "1.00", "1.000");
+    inactiveLine.setIsActive(false);
+    mockQuote.addLine(inactiveLine);
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.of(mockQuote));
+
+    ProcurementDomainException ex =
+        assertThrows(ProcurementDomainException.class, () -> quoteService.markAsAccepted(quoteId));
+
+    assertEquals("Quote has no lines; add at least one line before acceptance.", ex.getMessage());
+  }
+
+  @Test
   @DisplayName("Should mark quote as ACCEPTED and auto-reject siblings")
   void shouldMarkQuoteAsAcceptedAndRejectSiblings() {
+    mockQuote.addLine(quoteLine("USD", "1.00", "1.000"));
     UUID siblingId = UUID.randomUUID();
     SupplierQuote sibling = new SupplierQuote();
     sibling.setId(siblingId);
@@ -306,6 +385,7 @@ class SupplierQuoteServiceTest {
   @Test
   @DisplayName("Should throw when accepting already REJECTED quote")
   void shouldThrowWhenAcceptingRejectedQuote() {
+    mockQuote.addLine(quoteLine("USD", "1.00", "1.000"));
     mockQuote.setStatus(SupplierQuoteStatus.REJECTED);
 
     when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
