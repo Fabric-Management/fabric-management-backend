@@ -21,6 +21,7 @@ import com.fabricmanagement.procurement.quote.dto.SupplierQuoteResponse;
 import com.fabricmanagement.procurement.quote.infra.repository.SupplierQuoteRepository;
 import com.fabricmanagement.procurement.quote.mapper.SupplierQuoteMapper;
 import com.fabricmanagement.procurement.rfq.domain.SupplierRFQ;
+import com.fabricmanagement.procurement.rfq.domain.SupplierRFQLine;
 import com.fabricmanagement.procurement.rfq.infra.repository.SupplierRFQRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,7 +29,10 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,7 +57,7 @@ public class SupplierQuoteService {
   private final TenantReportingCurrencyPort tenantReportingCurrencyPort;
 
   public SupplierQuoteResponse getQuoteById(UUID quoteId) {
-    return quoteMapper.toResponse(getActiveQuote(quoteId));
+    return toResponse(getActiveQuote(quoteId));
   }
 
   public PagedResponse<SupplierQuoteResponse> listQuotes(
@@ -77,16 +81,16 @@ public class SupplierQuoteService {
     }
 
     Page<SupplierQuote> page = quoteRepository.findAll(spec, pageable);
-    return PagedResponse.from(page, quoteMapper::toResponse);
+    Map<UUID, SupplierRFQLine> rfqLinesById = loadRfqLines(page.getContent());
+    return PagedResponse.from(page, quote -> quoteMapper.toResponse(quote, rfqLinesById));
   }
 
   public List<SupplierQuoteResponse> getQuotesByRfq(UUID rfqId) {
     UUID tenantId = TenantContext.requireTenantId();
-    return quoteRepository
-        .findByTenantIdAndRfqIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId, rfqId)
-        .stream()
-        .map(quoteMapper::toResponse)
-        .toList();
+    List<SupplierQuote> quotes =
+        quoteRepository.findByTenantIdAndRfqIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId, rfqId);
+    Map<UUID, SupplierRFQLine> rfqLinesById = loadRfqLines(quotes);
+    return quotes.stream().map(quote -> quoteMapper.toResponse(quote, rfqLinesById)).toList();
   }
 
   @Transactional
@@ -130,7 +134,7 @@ public class SupplierQuoteService {
 
     publishReceivedEvent(saved);
 
-    return quoteMapper.toResponse(saved);
+    return quoteMapper.toResponse(saved, indexRfqLines(parentRfq));
   }
 
   @Transactional
@@ -154,7 +158,7 @@ public class SupplierQuoteService {
 
     quote.addLine(line);
     recomputeTotals(quote);
-    return quoteMapper.toResponse(quoteRepository.save(quote));
+    return toResponse(quoteRepository.save(quote));
   }
 
   @Transactional
@@ -163,7 +167,7 @@ public class SupplierQuoteService {
     quote.startReview();
     SupplierQuote saved = quoteRepository.save(quote);
     log.info("SupplierQuote review started: {}", saved.getQuoteNumber());
-    return quoteMapper.toResponse(saved);
+    return toResponse(saved);
   }
 
   @Transactional
@@ -199,7 +203,7 @@ public class SupplierQuoteService {
     eventPublisher.publish(
         new SupplierQuoteAcceptedEvent(saved.getTenantId(), saved.getId(), saved.getRfqId()));
 
-    return quoteMapper.toResponse(saved);
+    return toResponse(saved);
   }
 
   @Transactional
@@ -208,10 +212,35 @@ public class SupplierQuoteService {
     quote.reject();
     SupplierQuote saved = quoteRepository.save(quote);
     log.info("SupplierQuote rejected: {}", saved.getQuoteNumber());
-    return quoteMapper.toResponse(saved);
+    return toResponse(saved);
   }
 
   // ── Private Helpers ────────────────────────────────────────────────────────
+
+  private SupplierQuoteResponse toResponse(SupplierQuote quote) {
+    return quoteMapper.toResponse(quote, loadRfqLines(List.of(quote)));
+  }
+
+  private Map<UUID, SupplierRFQLine> loadRfqLines(List<SupplierQuote> quotes) {
+    if (quotes.isEmpty()) {
+      return Map.of();
+    }
+
+    UUID tenantId = TenantContext.requireTenantId();
+    List<UUID> rfqIds = quotes.stream().map(SupplierQuote::getRfqId).distinct().toList();
+    return rfqRepository.findAllByTenantIdAndIdInAndIsActiveTrue(tenantId, rfqIds).stream()
+        .flatMap(rfq -> rfq.getLines().stream())
+        .collect(
+            Collectors.toMap(
+                SupplierRFQLine::getId, Function.identity(), (first, duplicate) -> first));
+  }
+
+  private Map<UUID, SupplierRFQLine> indexRfqLines(SupplierRFQ rfq) {
+    return rfq.getLines().stream()
+        .collect(
+            Collectors.toMap(
+                SupplierRFQLine::getId, Function.identity(), (first, duplicate) -> first));
+  }
 
   private SupplierQuote getActiveQuote(UUID quoteId) {
     UUID tenantId = TenantContext.requireTenantId();

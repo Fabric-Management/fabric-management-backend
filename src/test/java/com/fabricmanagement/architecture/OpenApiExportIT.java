@@ -60,6 +60,7 @@ public class OpenApiExportIT {
     String generatedSpec = response.getBody();
     assertThat(generatedSpec).isNotNull();
     assertThat(generatedSpec).contains("openapi: 3.");
+    assertThat(generatedSpec).doesNotContainPattern("(?m)^    [A-Za-z][A-Za-z0-9]*_1:$");
 
     // 2. Define the target spec file location
     File specFile = new File("api/openapi.yaml");

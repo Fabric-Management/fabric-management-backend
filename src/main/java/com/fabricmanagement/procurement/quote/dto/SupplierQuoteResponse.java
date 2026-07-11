@@ -74,13 +74,19 @@ public class SupplierQuoteResponse {
 
   @Value
   @Builder
-  @Schema(description = "Supplier Quote Line Response")
+  @Schema(name = "SupplierQuoteLineResponse", description = "Supplier Quote Line Response")
   public static class QuoteLineResponse {
     @Schema(description = "Line ID")
     UUID id;
 
     @Schema(description = "RFQ Line ID")
     UUID rfqLineId;
+
+    @Schema(description = "Product ID resolved from the RFQ line")
+    UUID productId;
+
+    @Schema(description = "Product description resolved from the RFQ line")
+    String productDesc;
 
     @Schema(description = "Unit Price")
     BigDecimal unitPrice;

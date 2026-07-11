@@ -9,7 +9,9 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.UUID;
 
-@Schema(description = "Request to add a line to a supplier quote")
+@Schema(
+    name = "SupplierQuoteAddLineRequest",
+    description = "Request to add a line to a supplier quote")
 public record AddQuoteLineRequest(
     @NotNull(message = "RFQ line ID is required")
         @Schema(description = "RFQ Line ID", requiredMode = Schema.RequiredMode.REQUIRED)
