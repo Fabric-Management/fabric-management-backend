@@ -4,16 +4,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
 import com.fabricmanagement.common.infrastructure.approval.ApprovalPort;
 import com.fabricmanagement.common.infrastructure.persistence.BaseEntity;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
+import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
 import com.fabricmanagement.common.infrastructure.security.DataScopeGuard;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
+import com.fabricmanagement.common.util.Money;
 import com.fabricmanagement.costing.app.exchange.ExchangeRateService;
 import com.fabricmanagement.procurement.purchaseorder.app.validation.PurchaseOrderValidationEngine;
+import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrder;
+import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
+import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
 import com.fabricmanagement.procurement.quote.domain.QuoteEntryMethod;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuote;
 import com.fabricmanagement.procurement.quote.domain.SupplierQuoteLine;
@@ -38,9 +44,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
@@ -57,6 +67,7 @@ import org.testcontainers.utility.DockerImageName;
 @ActiveProfiles("test")
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@ExtendWith(OutputCaptureExtension.class)
 class QuoteToOrderOrchestratorAsyncTenantIT {
 
   private static final UUID TENANT_ID = UUID.fromString("77777777-7777-4777-8777-777777777777");
@@ -99,6 +110,8 @@ class QuoteToOrderOrchestratorAsyncTenantIT {
   @Autowired private SupplierQuoteRepository quoteRepository;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private TenantSessionBinder tenantSessionBinder;
+  @SpyBean private PurchaseOrderRepository purchaseOrderRepository;
 
   @MockBean private PurchaseOrderValidationEngine validationEngine;
   @MockBean private ApprovalPort approvalPort;
@@ -145,6 +158,32 @@ class QuoteToOrderOrchestratorAsyncTenantIT {
                 assertThat(countPurchaseOrdersForQuoteAsOwner())
                     .as("purchase_order row for accepted supplier quote")
                     .isEqualTo(1));
+  }
+
+  @Test
+  void duplicateFlushRollsBackInnerTransactionAndCompletesEvent(CapturedOutput output)
+      throws Exception {
+    seedTenantAsOwner();
+    seedAcceptedQuote();
+    seedExistingPurchaseOrder();
+    doReturn(false)
+        .when(purchaseOrderRepository)
+        .existsByTenantIdAndSupplierQuoteIdAndIsActiveTrue(TENANT_ID, quoteId);
+    SupplierQuoteAcceptedEvent event = new SupplierQuoteAcceptedEvent(TENANT_ID, quoteId, rfqId);
+    TenantContext.clear();
+
+    transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () -> {
+              assertThat(countPurchaseOrdersForQuoteAsOwner()).isEqualTo(1);
+              assertThat(countProcessedEvents(event.getEventId())).isEqualTo(1);
+              assertThat(countIncompletePublications(event.getEventId())).isZero();
+              assertThat(output.getOut()).contains("PurchaseOrder creation lost the race");
+              assertThat(output.getAll()).doesNotContain("UnexpectedRollbackException");
+            });
   }
 
   private void seedAcceptedQuote() {
@@ -216,6 +255,57 @@ class QuoteToOrderOrchestratorAsyncTenantIT {
                 + "', 'ASYNC-TENANT', 'async-tenant', 'Async Tenant Test', 'ACTIVE', "
                 + "'{}'::jsonb, true, now(), now(), 0) "
                 + "ON CONFLICT (id) DO NOTHING");
+      }
+    }
+  }
+
+  private void seedExistingPurchaseOrder() {
+    TenantContext.setCurrentTenantId(TENANT_ID);
+    TenantContext.setCurrentTenantUid("ASYNC-TENANT");
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          tenantSessionBinder.bindToCurrentSession(TENANT_ID);
+          purchaseOrderRepository.saveAndFlush(
+              PurchaseOrder.builder()
+                  .poNumber("ASYNC-PO-" + UUID.randomUUID())
+                  .workOrderId(UUID.randomUUID())
+                  .tradingPartnerId(UUID.randomUUID())
+                  .supplierQuoteId(quoteId)
+                  .status(PurchaseOrderStatus.DRAFT)
+                  .totalAmount(Money.zero("USD"))
+                  .build());
+        });
+    TenantContext.clear();
+  }
+
+  private int countProcessedEvents(UUID eventId) throws Exception {
+    try (Connection conn =
+        DriverManager.getConnection(
+            postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+      try (var ps =
+          conn.prepareStatement("SELECT count(*) FROM processed_event WHERE event_id = ?")) {
+        ps.setObject(1, eventId);
+        try (var rs = ps.executeQuery()) {
+          rs.next();
+          return rs.getInt(1);
+        }
+      }
+    }
+  }
+
+  private int countIncompletePublications(UUID eventId) throws Exception {
+    try (Connection conn =
+        DriverManager.getConnection(
+            postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+      try (var ps =
+          conn.prepareStatement(
+              "SELECT count(*) FROM event_publication "
+                  + "WHERE serialized_event LIKE ? AND completion_date IS NULL")) {
+        ps.setString(1, "%" + eventId + "%");
+        try (var rs = ps.executeQuery()) {
+          rs.next();
+          return rs.getInt(1);
+        }
       }
     }
   }

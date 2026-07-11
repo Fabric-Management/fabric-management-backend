@@ -7,6 +7,7 @@ import com.fabricmanagement.platform.tradingpartner.dto.CreateTradingPartnerRequ
 import com.fabricmanagement.platform.tradingpartner.dto.TradingPartnerDto;
 import com.fabricmanagement.platform.user.domain.SystemUser;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
+import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderConstraintViolationMatcher;
 import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderStatus;
@@ -54,12 +55,17 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 /**
  * Seeds a coherent procurement demo dataset for master and playground tenants: suppliers,
  * PURCHASE/SUBCONTRACT work orders, an RFQ -> quote -> PO -> receipt chain, and an in-progress
  * subcontract order. It is best-effort and must never break playground initialization.
+ *
+ * <p>Quote acceptance also wakes the asynchronous quote-to-order orchestrator. If that writer wins
+ * the purchase-order race, this seeder resolves the named unique-constraint violation, fetches the
+ * winning order by tenant and quote, and continues the confirmation and receipt chain on it.
  */
 @Component
 @RequiredArgsConstructor
@@ -214,14 +220,12 @@ public class ProcurementDemoSeeder {
       SupplierQuoteResponse acceptedQuote =
           supplierQuoteService.markAsAccepted(anatoliaQuote.getId());
 
-      PurchaseOrderResponse po =
-          createConfirmedPurchaseOrder(
-              chainPurchaseWo.id(),
-              anatolia.getId(),
-              acceptedQuote.getId(),
-              rfqLines,
-              procurementPersonaUserId);
-      createConfirmedGoodsReceipt(po.getId());
+      createConfirmedPurchaseOrderAndReceipt(
+          chainPurchaseWo.id(),
+          anatolia.getId(),
+          acceptedQuote.getId(),
+          rfqLines,
+          procurementPersonaUserId);
 
       createInProgressSubcontract(chainSubcontractWo.id(), marmara.getId(), cotton, blend, today);
 
@@ -381,50 +385,76 @@ public class ProcurementDemoSeeder {
         notes);
   }
 
-  private PurchaseOrderResponse createConfirmedPurchaseOrder(
+  PurchaseOrderResponse createConfirmedPurchaseOrder(
       UUID workOrderId,
       UUID supplierId,
       UUID quoteId,
       List<SupplierRFQResponse.RfqLineResponse> rfqLines,
       UUID ownerUserId) {
-    PurchaseOrderResponse po =
-        executeAsUser(
-            ownerUserId,
-            () ->
-                purchaseOrderService.createPurchaseOrder(
-                    CreatePurchaseOrderRequest.builder()
-                        .workOrderId(workOrderId)
-                        .tradingPartnerId(supplierId)
-                        .supplierQuoteId(quoteId)
-                        .currency("USD")
-                        .paymentTerms("NET30")
-                        .expectedDelivery(LocalDate.now(clock).plusDays(16))
-                        .notes("Demo PO generated from accepted supplier quote")
-                        .moduleType(PurchaseOrderModuleType.FIBER)
-                        .moduleSpecs(fiberPurchaseSpecs())
-                        .lines(
-                            rfqLines.stream()
-                                .map(
-                                    line ->
-                                        CreatePurchaseOrderRequest.PurchaseOrderLineRequest
-                                            .builder()
-                                            .rfqLineId(line.getId())
-                                            .productId(line.getProductId())
-                                            .productDesc(line.getProductDesc())
-                                            .qty(line.getRequestedQty())
-                                            .unit(line.getUnit())
-                                            .unitPrice(new BigDecimal("3.78"))
-                                            .currency("USD")
-                                            .moduleSpecs(fiberPurchaseSpecs())
-                                            .build())
-                                .toList())
-                        .build()));
+    PurchaseOrderResponse po;
+    try {
+      po =
+          executeAsUser(
+              ownerUserId,
+              () ->
+                  purchaseOrderService.createPurchaseOrder(
+                      CreatePurchaseOrderRequest.builder()
+                          .workOrderId(workOrderId)
+                          .tradingPartnerId(supplierId)
+                          .supplierQuoteId(quoteId)
+                          .currency("USD")
+                          .paymentTerms("NET30")
+                          .expectedDelivery(LocalDate.now(clock).plusDays(16))
+                          .notes("Demo PO generated from accepted supplier quote")
+                          .moduleType(PurchaseOrderModuleType.FIBER)
+                          .moduleSpecs(fiberPurchaseSpecs())
+                          .lines(
+                              rfqLines.stream()
+                                  .map(
+                                      line ->
+                                          CreatePurchaseOrderRequest.PurchaseOrderLineRequest
+                                              .builder()
+                                              .rfqLineId(line.getId())
+                                              .productId(line.getProductId())
+                                              .productDesc(line.getProductDesc())
+                                              .qty(line.getRequestedQty())
+                                              .unit(line.getUnit())
+                                              .unitPrice(new BigDecimal("3.78"))
+                                              .currency("USD")
+                                              .moduleSpecs(fiberPurchaseSpecs())
+                                              .build())
+                                  .toList())
+                          .build()));
+    } catch (DataIntegrityViolationException exception) {
+      if (!PurchaseOrderConstraintViolationMatcher.isActiveSupplierQuoteViolation(exception)) {
+        throw exception;
+      }
+
+      UUID tenantId = TenantContext.requireTenantId();
+      po = purchaseOrderService.getActivePurchaseOrderBySupplierQuote(tenantId, quoteId);
+      log.info(
+          "Procurement demo PO creation lost the race for quote {}; continuing with PO {}",
+          quoteId,
+          po.getId());
+    }
 
     po = purchaseOrderService.changeStatus(po.getId(), PurchaseOrderStatus.SENT);
     if (po.getStatus() == PurchaseOrderStatus.PENDING_APPROVAL) {
       po = purchaseOrderService.changeStatusAsSystem(po.getId(), PurchaseOrderStatus.SENT);
     }
     return purchaseOrderService.changeStatus(po.getId(), PurchaseOrderStatus.CONFIRMED);
+  }
+
+  PurchaseOrderResponse createConfirmedPurchaseOrderAndReceipt(
+      UUID workOrderId,
+      UUID supplierId,
+      UUID quoteId,
+      List<SupplierRFQResponse.RfqLineResponse> rfqLines,
+      UUID ownerUserId) {
+    PurchaseOrderResponse po =
+        createConfirmedPurchaseOrder(workOrderId, supplierId, quoteId, rfqLines, ownerUserId);
+    createConfirmedGoodsReceipt(po.getId());
+    return po;
   }
 
   private UUID resolveProcurementPersonaUserId(UUID tenantId) {

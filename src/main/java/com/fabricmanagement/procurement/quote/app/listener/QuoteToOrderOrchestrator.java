@@ -3,7 +3,7 @@ package com.fabricmanagement.procurement.quote.app.listener;
 import com.fabricmanagement.common.infrastructure.events.IdempotentEventHandler;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.persistence.TenantSessionBinder;
-import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderService;
+import com.fabricmanagement.procurement.purchaseorder.app.PurchaseOrderConstraintViolationMatcher;
 import com.fabricmanagement.procurement.purchaseorder.domain.PurchaseOrderModuleType;
 import com.fabricmanagement.procurement.purchaseorder.dto.CreatePurchaseOrderRequest;
 import com.fabricmanagement.procurement.purchaseorder.infra.repository.PurchaseOrderRepository;
@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
@@ -39,7 +40,7 @@ public class QuoteToOrderOrchestrator {
 
   private final SupplierQuoteRepository quoteRepository;
   private final SupplierRFQRepository rfqRepository;
-  private final PurchaseOrderService purchaseOrderService;
+  private final PurchaseOrderCreationTransaction purchaseOrderCreationTransaction;
   private final PurchaseOrderRepository purchaseOrderRepository;
   private final SubcontractOrderService subcontractOrderService;
   private final ObjectMapper objectMapper;
@@ -164,8 +165,17 @@ public class QuoteToOrderOrchestrator {
             .lines(lines)
             .build();
 
-    purchaseOrderService.createPurchaseOrder(poRequest);
-    log.info("Successfully created PurchaseOrder for quote {}", quote.getQuoteNumber());
+    try {
+      purchaseOrderCreationTransaction.createAndFlush(poRequest);
+      log.info("Successfully created PurchaseOrder for quote {}", quote.getQuoteNumber());
+    } catch (DataIntegrityViolationException exception) {
+      if (!PurchaseOrderConstraintViolationMatcher.isActiveSupplierQuoteViolation(exception)) {
+        throw exception;
+      }
+      log.info(
+          "PurchaseOrder creation lost the race for quote {}; using the existing order",
+          quote.getQuoteNumber());
+    }
   }
 
   private void createSubcontractOrder(SupplierQuote quote, SupplierRFQ rfq) {
