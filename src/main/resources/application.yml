@@ -169,6 +169,11 @@ application:
     from-email: ${MAIL_FROM_EMAIL:noreply@fabricmanagement.com}
     from-name: ${MAIL_FROM_NAME:Fabric Management}
 
+  # Stuck-follow-up feedback reports (EVENT-VISIBILITY-1): where the "Report this"
+  # button sends its bug report. Override per environment via EVENT_VISIBILITY_OPS_EMAIL.
+  event-visibility:
+    ops-email: ${EVENT_VISIBILITY_OPS_EMAIL:akkaya064@gmail.com}
+
   # Email Template Configuration
   # Note: Frontend pi email render endpoint removed - backend uses its own HTML templates
   email:

@@ -51,6 +51,9 @@ public class IncompleteFollowUpFlag extends BaseEntity {
   @Column(name = "resolved_at")
   private Instant resolvedAt;
 
+  @Column(name = "feedback_reported_at")
+  private Instant feedbackReportedAt;
+
   public static IncompleteFollowUpFlag raise(
       UUID tenantId, UUID publicationId, String eventType, StuckEventPresentation presentation) {
     IncompleteFollowUpFlag flag = new IncompleteFollowUpFlag();
@@ -74,6 +77,10 @@ public class IncompleteFollowUpFlag extends BaseEntity {
     }
     status = FollowUpFlagStatus.RESOLVED;
     this.resolvedAt = resolvedAt;
+  }
+
+  public void markFeedbackReported(Instant feedbackReportedAt) {
+    this.feedbackReportedAt = feedbackReportedAt;
   }
 
   private void apply(StuckEventPresentation presentation) {
