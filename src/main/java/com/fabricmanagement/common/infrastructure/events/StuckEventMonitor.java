@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -45,15 +46,18 @@ public class StuckEventMonitor {
   private final boolean enabled;
   private final long thresholdMinutes;
   private final MultiGauge stuckGauge;
+  private final ObjectProvider<StuckEventHandler> handlerProvider;
 
   public StuckEventMonitor(
       JdbcTemplate jdbcTemplate,
       MeterRegistry meterRegistry,
       ObjectMapper objectMapper,
+      ObjectProvider<StuckEventHandler> handlerProvider,
       @Value("${modulith.events.stuck-monitor.enabled:true}") boolean enabled,
       @Value("${modulith.events.stuck-monitor.threshold-minutes:10}") long thresholdMinutes) {
     this.jdbcTemplate = jdbcTemplate;
     this.objectMapper = objectMapper;
+    this.handlerProvider = handlerProvider;
     this.enabled = enabled;
     this.thresholdMinutes = thresholdMinutes;
     this.stuckGauge =
@@ -153,8 +157,6 @@ public class StuckEventMonitor {
       return;
     }
 
-    StuckMarker marker =
-        new StuckMarker(row.id(), row.eventType(), row.listenerId(), tenantId, now, null);
     log.error(
         "Stuck event publication: eventType={} tenantId={} ageMinutes={} listenerId={} publicationId={}",
         row.eventType(),
@@ -162,7 +164,9 @@ public class StuckEventMonitor {
         Math.max(0, Duration.between(row.publicationDate(), now).toMinutes()),
         row.listenerId(),
         row.id());
-    onNewlyStuck(marker);
+    notifyNewlyStuckHandler(
+        new StuckEventContext(
+            row.id(), row.eventType(), row.listenerId(), tenantId, row.payload(), now));
   }
 
   private void markResolved(StuckMarker marker, Instant now) {
@@ -186,7 +190,14 @@ public class StuckEventMonitor {
         marker.tenantId(),
         marker.listenerId(),
         marker.publicationId());
-    onResolved(marker);
+    notifyResolvedHandler(
+        new StuckEventContext(
+            marker.publicationId(),
+            marker.eventType(),
+            marker.listenerId(),
+            marker.tenantId(),
+            null,
+            marker.firstSeenAt()));
   }
 
   private void refreshGauge(List<StuckRow> stuckRows) {
@@ -217,12 +228,26 @@ public class StuckEventMonitor {
     return timestamp == null ? null : timestamp.toInstant();
   }
 
-  protected void onNewlyStuck(StuckMarker marker) {
-    // TODO(EVENT-VISIBILITY-1 Slice B): write the tenant-scoped user-facing stuck marker here.
+  private void notifyNewlyStuckHandler(StuckEventContext context) {
+    try {
+      handlerProvider.ifAvailable(handler -> handler.onNewlyStuck(context));
+    } catch (Exception exception) {
+      log.warn(
+          "Failed to handle newly stuck event publication: publicationId={}",
+          context.publicationId(),
+          exception);
+    }
   }
 
-  protected void onResolved(StuckMarker marker) {
-    // TODO(EVENT-VISIBILITY-1 Slice B): fire the user-facing resolved notification here.
+  private void notifyResolvedHandler(StuckEventContext context) {
+    try {
+      handlerProvider.ifAvailable(handler -> handler.onResolved(context));
+    } catch (Exception exception) {
+      log.warn(
+          "Failed to handle resolved event publication: publicationId={}",
+          context.publicationId(),
+          exception);
+    }
   }
 
   record StuckRow(

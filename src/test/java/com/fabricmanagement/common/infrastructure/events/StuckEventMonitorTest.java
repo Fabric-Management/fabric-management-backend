@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +16,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +34,8 @@ import org.springframework.jdbc.core.RowMapper;
 class StuckEventMonitorTest {
 
   @Mock private JdbcTemplate jdbcTemplate;
+  @Mock private ObjectProvider<StuckEventHandler> handlerProvider;
+  @Mock private StuckEventHandler stuckEventHandler;
 
   private SimpleMeterRegistry meterRegistry;
   private StuckEventMonitor monitor;
@@ -37,7 +43,18 @@ class StuckEventMonitorTest {
   @BeforeEach
   void setUp() {
     meterRegistry = new SimpleMeterRegistry();
-    monitor = new StuckEventMonitor(jdbcTemplate, meterRegistry, new ObjectMapper(), true, 10);
+    lenient()
+        .doAnswer(
+            invocation -> {
+              Consumer<StuckEventHandler> consumer = invocation.getArgument(0);
+              consumer.accept(stuckEventHandler);
+              return null;
+            })
+        .when(handlerProvider)
+        .ifAvailable(any());
+    monitor =
+        new StuckEventMonitor(
+            jdbcTemplate, meterRegistry, new ObjectMapper(), handlerProvider, true, 10);
   }
 
   @Test
@@ -135,7 +152,9 @@ class StuckEventMonitorTest {
 
   @Test
   void disabledMonitorDoesNotAccessDatabaseOrRegisterGauge() {
-    monitor = new StuckEventMonitor(jdbcTemplate, meterRegistry, new ObjectMapper(), false, 10);
+    monitor =
+        new StuckEventMonitor(
+            jdbcTemplate, meterRegistry, new ObjectMapper(), handlerProvider, false, 10);
 
     monitor.sweep();
 
@@ -219,6 +238,60 @@ class StuckEventMonitorTest {
 
     assertThat(meterRegistry.find("events.publication.stuck").tag("eventType", "A").gauge())
         .isNull();
+  }
+
+  @Test
+  void handlerIsInvokedOnlyAfterWinningInsertAndResolutionRaces() {
+    UUID tenantId = UUID.randomUUID();
+    StuckEventMonitor.StuckRow insertedRow = stuckRow(UUID.randomUUID(), tenantId.toString());
+    stubSweep(List.of(insertedRow), List.of(), List.of());
+    when(jdbcTemplate.update(
+            startsWith("INSERT INTO public.stuck_event_publication"), any(Object[].class)))
+        .thenReturn(1);
+
+    monitor.sweep();
+
+    StuckEventMonitor.StuckMarker updatedMarker =
+        new StuckEventMonitor.StuckMarker(
+            insertedRow.id(),
+            insertedRow.eventType(),
+            insertedRow.listenerId(),
+            tenantId,
+            Instant.now().minusSeconds(60),
+            null);
+    stubSweep(List.of(), List.of(), List.of(updatedMarker));
+    when(jdbcTemplate.update(
+            startsWith("UPDATE public.stuck_event_publication"), any(Object[].class)))
+        .thenReturn(1);
+
+    monitor.sweep();
+
+    StuckEventMonitor.StuckRow lostInsertRace = stuckRow(UUID.randomUUID(), tenantId.toString());
+    stubSweep(List.of(lostInsertRace), List.of(), List.of());
+    when(jdbcTemplate.update(
+            startsWith("INSERT INTO public.stuck_event_publication"), any(Object[].class)))
+        .thenReturn(0);
+
+    monitor.sweep();
+
+    StuckEventMonitor.StuckMarker lostUpdateRace =
+        new StuckEventMonitor.StuckMarker(
+            UUID.randomUUID(),
+            insertedRow.eventType(),
+            insertedRow.listenerId(),
+            tenantId,
+            Instant.now().minusSeconds(60),
+            null);
+    stubSweep(List.of(), List.of(), List.of(lostUpdateRace));
+    when(jdbcTemplate.update(
+            startsWith("UPDATE public.stuck_event_publication"), any(Object[].class)))
+        .thenReturn(0);
+
+    monitor.sweep();
+
+    verify(stuckEventHandler, times(1)).onNewlyStuck(any(StuckEventContext.class));
+    verify(stuckEventHandler, times(1)).onResolved(any(StuckEventContext.class));
+    verifyNoMoreInteractions(stuckEventHandler);
   }
 
   private void stubSweep(
