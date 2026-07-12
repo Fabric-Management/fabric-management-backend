@@ -1,3 +1,10 @@
+modulith:
+  events:
+    stuck-monitor:
+      enabled: true
+      interval-ms: 60000
+      threshold-minutes: 10
+
 spring:
   application:
     name: fabric-management-system

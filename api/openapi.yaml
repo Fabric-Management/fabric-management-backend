@@ -74,6 +74,8 @@ tags:
   name: Sales Lot
 - description: Contact operations
   name: Contact
+- description: Incomplete background follow-up flags
+  name: Follow-up flags
 - description: Platform Notification operations
   name: Platform Notification
 - description: Task management and status updates
@@ -21723,6 +21725,146 @@ paths:
       summary: Get user's current workload
       tags:
       - FlowBoard — Workload
+  /api/v1/follow-up-flags:
+    get:
+      operationId: findForRecord
+      parameters:
+      - in: query
+        name: entityType
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: entityId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListFollowUpFlagDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List active follow-up flags for a record
+      tags:
+      - Follow-up flags
+  /api/v1/follow-up-flags/active:
+    get:
+      operationId: findActive
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseListFollowUpFlagDto"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: List active follow-up flags for the current tenant
+      tags:
+      - Follow-up flags
   /api/v1/health:
     get:
       operationId: health
@@ -44387,6 +44529,26 @@ components:
           type: array
           items:
             type: string
+    ApiResponseListFollowUpFlagDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FollowUpFlagDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
     ApiResponseListFxRevaluationDto:
       type: object
       properties:
@@ -52003,6 +52165,34 @@ components:
             format: double
             description: Target fabric width in cm
             example: 155.0
+    FollowUpFlagDto:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        entityId:
+          type: string
+          format: uuid
+        entityRef:
+          type: string
+        entityType:
+          type: string
+        id:
+          type: string
+          format: uuid
+        referenceId:
+          type: string
+          format: uuid
+        referenceType:
+          type: string
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - RESOLVED
+        summary:
+          type: string
     FxExposureCurrencyDto:
       type: object
       properties:
