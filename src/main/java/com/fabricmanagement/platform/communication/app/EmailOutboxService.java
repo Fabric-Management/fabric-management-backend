@@ -338,6 +338,21 @@ public class EmailOutboxService {
   }
 
   /**
+   * Queue mail to a TRUSTED, FIXED internal recipient (ops), bypassing the tenant email sandbox.
+   * The recipient must be config-supplied and never derived from user input — the sandbox exists to
+   * stop a visitor redirecting our domain's mail to an arbitrary address, which cannot happen for a
+   * fixed ops address. Runs in the caller's tenant context (RLS insert); the outbox worker sends
+   * later.
+   */
+  @Transactional
+  public EmailOutbox queueSystemEmail(
+      UUID tenantId, String recipient, String subject, String htmlBody) {
+    EmailOutbox email = EmailOutbox.create(recipient, subject, htmlBody);
+    email.setTenantId(tenantId);
+    return emailOutboxRepository.save(email);
+  }
+
+  /**
    * Get pending email count (for monitoring).
    *
    * <p>Counted through {@code fabric_system}: these are called from metric gauges and a scheduled

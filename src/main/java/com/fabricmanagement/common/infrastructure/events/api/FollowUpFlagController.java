@@ -1,5 +1,6 @@
 package com.fabricmanagement.common.infrastructure.events.api;
 
+import com.fabricmanagement.common.infrastructure.events.FollowUpFeedbackService;
 import com.fabricmanagement.common.infrastructure.events.FollowUpFlagDto;
 import com.fabricmanagement.common.infrastructure.events.FollowUpFlagService;
 import com.fabricmanagement.common.infrastructure.web.ApiResponse;
@@ -11,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class FollowUpFlagController {
 
   private final FollowUpFlagService flagService;
+  private final FollowUpFeedbackService feedbackService;
 
   @GetMapping
   @PreAuthorize("isAuthenticated()")
@@ -37,5 +41,13 @@ public class FollowUpFlagController {
   @Operation(summary = "List active follow-up flags for the current tenant")
   public ResponseEntity<ApiResponse<List<FollowUpFlagDto>>> findActive() {
     return ResponseEntity.ok(ApiResponse.success(flagService.findActiveForTenant()));
+  }
+
+  @PostMapping("/{flagId}/feedback")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Report an incomplete follow-up to operations")
+  public ResponseEntity<ApiResponse<Void>> reportFeedback(@PathVariable UUID flagId) {
+    feedbackService.report(flagId);
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 }
