@@ -1,7 +1,11 @@
 package com.fabricmanagement.common.infrastructure.events;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -15,13 +19,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
@@ -33,6 +40,8 @@ class FlagWritingStuckEventHandlerTest {
   @Mock private IncompleteFollowUpFlagRepository flagRepository;
   @Mock private StuckEventPresenter presenter;
   @Mock private TenantSessionBinder tenantSessionBinder;
+  @Mock private ObjectProvider<FollowUpResolutionNotifier> notifierProvider;
+  @Mock private FollowUpResolutionNotifier notifier;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
   private FlagWritingStuckEventHandler handler;
@@ -51,12 +60,22 @@ class FlagWritingStuckEventHandlerTest {
             "SUPPLIER_QUOTE",
             UUID.randomUUID(),
             UUID.randomUUID());
+    lenient()
+        .doAnswer(
+            invocation -> {
+              Consumer<FollowUpResolutionNotifier> consumer = invocation.getArgument(0);
+              consumer.accept(notifier);
+              return null;
+            })
+        .when(notifierProvider)
+        .ifAvailable(any());
     handler =
         new FlagWritingStuckEventHandler(
             flagRepository,
             List.of(presenter, new GenericStuckEventPresenter()),
             objectMapper,
-            tenantSessionBinder);
+            tenantSessionBinder,
+            notifierProvider);
   }
 
   @AfterEach
@@ -113,8 +132,41 @@ class FlagWritingStuckEventHandlerTest {
 
     assertThat(existing.getStatus()).isEqualTo(FollowUpFlagStatus.RESOLVED);
     assertThat(existing.getResolvedAt()).isNotNull().isBeforeOrEqualTo(Instant.now());
-    verify(flagRepository).save(existing);
+    InOrder notificationOrder = inOrder(flagRepository, notifier);
+    notificationOrder.verify(flagRepository).save(existing);
+    notificationOrder.verify(notifier).notifyResolved(any(ResolvedFollowUp.class));
     verify(tenantSessionBinder).bindToCurrentSession(tenantId);
+  }
+
+  @Test
+  void resolvedPublicationWithoutActiveFlagDoesNotNotify() {
+    StuckEventContext context = context(tenantId, UUID.randomUUID());
+    when(flagRepository.findByTenantIdAndPublicationId(tenantId, context.publicationId()))
+        .thenReturn(Optional.empty());
+
+    handler.onResolved(context);
+
+    verifyNoInteractions(notifier);
+  }
+
+  @Test
+  void notifierFailureDoesNotPreventFlagResolution(CapturedOutput output) {
+    StuckEventContext context = context(tenantId, UUID.randomUUID());
+    IncompleteFollowUpFlag existing =
+        IncompleteFollowUpFlag.raise(
+            tenantId, context.publicationId(), context.eventType(), presentation);
+    when(flagRepository.findByTenantIdAndPublicationId(tenantId, context.publicationId()))
+        .thenReturn(Optional.of(existing));
+    doThrow(new RuntimeException("notification unavailable"))
+        .when(notifier)
+        .notifyResolved(any(ResolvedFollowUp.class));
+
+    assertThatCode(() -> handler.onResolved(context)).doesNotThrowAnyException();
+
+    assertThat(existing.getStatus()).isEqualTo(FollowUpFlagStatus.RESOLVED);
+    assertThat(existing.getResolvedAt()).isNotNull();
+    verify(flagRepository).save(existing);
+    assertThat(output.getAll()).contains("Failed to notify resolved follow-up");
   }
 
   @Test

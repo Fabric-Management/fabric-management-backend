@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ public class FlagWritingStuckEventHandler implements StuckEventHandler {
   private final List<StuckEventPresenter> presenters;
   private final ObjectMapper objectMapper;
   private final TenantSessionBinder tenantSessionBinder;
+  private final ObjectProvider<FollowUpResolutionNotifier> notifierProvider;
 
   @Override
   @Transactional
@@ -77,8 +79,29 @@ public class FlagWritingStuckEventHandler implements StuckEventHandler {
                   flag -> {
                     flag.resolve(Instant.now());
                     flagRepository.save(flag);
+                    notifyResolved(flag);
                   });
         });
+  }
+
+  private void notifyResolved(IncompleteFollowUpFlag flag) {
+    ResolvedFollowUp resolvedFollowUp =
+        new ResolvedFollowUp(
+            flag.getTenantId(),
+            flag.getAffectedUserId(),
+            flag.getEntityType(),
+            flag.getEntityRef(),
+            flag.getReferenceId(),
+            flag.getReferenceType(),
+            flag.getSummary());
+    try {
+      notifierProvider.ifAvailable(notifier -> notifier.notifyResolved(resolvedFollowUp));
+    } catch (Exception exception) {
+      log.warn(
+          "Failed to notify resolved follow-up: publicationId={}",
+          flag.getPublicationId(),
+          exception);
+    }
   }
 
   private StuckEventPresenter presenterFor(String eventType) {
