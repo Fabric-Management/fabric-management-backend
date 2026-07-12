@@ -60,6 +60,11 @@ class RlsPolicyEnforcementIT {
           -- during pre-auth organization selection. The table is deliberately RLS-free so login
           -- can resolve active memberships before TenantContext exists.
           AND NOT (c.table_schema = 'common_auth' AND c.table_name = 'membership')
+          -- EVENT-VISIBILITY-1: public.stuck_event_publication is scheduler-owned, cross-tenant
+          -- bookkeeping written by StuckEventMonitor with no ambient tenant. RLS would blind the
+          -- sweep (the outbox-worker failure mode); tenant_id is informational for routing
+          -- resolution, not an isolation boundary. Deliberately RLS-free.
+          AND NOT (c.table_schema = 'public' AND c.table_name = 'stuck_event_publication')
           AND (
             pc.relrowsecurity = false
             OR pc.relforcerowsecurity = false

@@ -149,6 +149,7 @@ public class TenantTransactionalPurgeService {
           "human.human_leave_balance",
           "human.human_employee_number_sequence",
           "common_user.profile_update_request",
+          "common_infrastructure.incomplete_follow_up_flag",
           "common_infrastructure.document_sequence");
 
   static List<String> tenantScopedDeleteTables() {

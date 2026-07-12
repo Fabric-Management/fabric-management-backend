@@ -125,6 +125,10 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
   private static Map<String, String> purgeExemptTables() {
     Map<String, String> tables = new LinkedHashMap<>();
 
+    tables.put(
+        "public.stuck_event_publication",
+        "Scheduler-owned cross-tenant stuck-event bookkeeping (EVENT-VISIBILITY-1); non-RLS, "
+            + "self-purging by resolution/age. tenant_id is informational, not tenant business data.");
     tables.put("common_audit.common_audit_log", "Audit history is retained across demo reset.");
     tables.put("common_auth.common_auth_user", "Seed-user auth rows are deleted by demo_seed CTE.");
     tables.put(
