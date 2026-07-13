@@ -37,49 +37,7 @@ class OpenApiSchemaNameCollisionTest {
   private static final Pattern COMPONENT_SCHEMA_REF =
       Pattern.compile("#/components/schemas/([A-Za-z][A-Za-z0-9._-]*)");
 
-  private static final Map<String, Set<String>> ALLOWED_COLLISIONS =
-      Map.of(
-          // QUOTE-CONTRACT-2: give batch and stock-unit requests unique schema names.
-          "ConsumeRequest",
-              Set.of(
-                  "com.fabricmanagement.production.execution.batch.dto.ConsumeRequest",
-                  "com.fabricmanagement.production.execution.stockunit.dto.ConsumeRequest"),
-          // QUOTE-CONTRACT-2: separate approval policy and platform policy contracts.
-          "CreatePolicyRequest",
-              Set.of(
-                  "com.fabricmanagement.approval.dto.CreatePolicyRequest",
-                  "com.fabricmanagement.platform.policy.dto.CreatePolicyRequest"),
-          // QUOTE-CONTRACT-2: separate batch and work-order production requests.
-          "StartProductionRequest",
-              Set.of(
-                  "com.fabricmanagement.production.execution.batch.dto.StartProductionRequest",
-                  "com.fabricmanagement.production.execution.workorder.dto.StartProductionRequest"),
-          // QUOTE-CONTRACT-2: separate approval policy and platform policy contracts.
-          "UpdatePolicyRequest",
-              Set.of(
-                  "com.fabricmanagement.approval.dto.UpdatePolicyRequest",
-                  "com.fabricmanagement.platform.policy.dto.UpdatePolicyRequest"),
-          // QUOTE-CONTRACT-2: disambiguate organization and user address payloads.
-          "AddressData",
-              Set.of(
-                  "com.fabricmanagement.platform.organization.dto.OrganizationAddressDto$AddressData",
-                  "com.fabricmanagement.platform.user.dto.AddressData",
-                  "com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest$AddressData"),
-          // QUOTE-CONTRACT-2: disambiguate organization and user contact payloads.
-          "ContactData",
-              Set.of(
-                  "com.fabricmanagement.platform.organization.dto.OrganizationContactDto$ContactData",
-                  "com.fabricmanagement.platform.user.dto.ContactData"),
-          // QUOTE-CONTRACT-2: disambiguate user creation and profile-update emergency contacts.
-          "EmergencyContactData",
-              Set.of(
-                  "com.fabricmanagement.platform.user.dto.CreateInternalUserRequest$EmergencyContactData",
-                  "com.fabricmanagement.platform.user.dto.UpdateUserProfileRequest$EmergencyContactData"),
-          // QUOTE-CONTRACT-2: disambiguate production and consumption summary breakdowns.
-          "ProductBreakdown",
-              Set.of(
-                  "com.fabricmanagement.production.execution.workorder.dto.ProductionSummaryResponse$ProductBreakdown",
-                  "com.fabricmanagement.production.execution.workorder.dto.WorkOrderConsumptionSummaryResponse$ProductBreakdown"));
+  private static final Map<String, Set<String>> ALLOWED_COLLISIONS = Map.of();
 
   @Test
   void publicDtoTypesShouldHaveUniqueEffectiveSchemaNamesExceptForExplicitAllowlist() {
@@ -110,8 +68,8 @@ class OpenApiSchemaNameCollisionTest {
     assertThat(actualCollisions)
         .as(
             "Public DTO types must have unique effective OpenAPI schema names. "
-                + "Rename new collisions with @Schema(name = ...); keep only QUOTE-CONTRACT-2 "
-                + "debt in the explicit allowlist. Actual collisions name every Java class.")
+                + "Rename collisions with @Schema(name = ...); new collisions are not allowlisted. "
+                + "Actual collisions name every Java class.")
         .isEqualTo(ALLOWED_COLLISIONS);
   }
 

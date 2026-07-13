@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.user.dto;
 import com.fabricmanagement.common.infrastructure.identity.Gender;
 import com.fabricmanagement.common.infrastructure.identity.Title;
 import com.fabricmanagement.platform.user.domain.value.ProfileCategory;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -143,6 +144,7 @@ public class UpdateUserProfileRequest {
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
+  @Schema(name = "UserProfileAddressData")
   public static class AddressData {
     private String streetAddress;
     private String city;
@@ -156,6 +158,7 @@ public class UpdateUserProfileRequest {
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
+  @Schema(name = "UserProfileEmergencyContactData")
   public static class EmergencyContactData {
     private String name;
     private String phone;

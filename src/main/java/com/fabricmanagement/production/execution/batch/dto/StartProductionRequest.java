@@ -1,5 +1,6 @@
 package com.fabricmanagement.production.execution.batch.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -18,6 +19,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(name = "StartBatchProductionRequest")
 public class StartProductionRequest {
 
   @NotNull(message = "Machine location ID is required")

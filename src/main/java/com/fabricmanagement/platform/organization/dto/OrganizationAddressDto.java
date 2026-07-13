@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.organization.dto;
 import com.fabricmanagement.platform.communication.domain.Address;
 import com.fabricmanagement.platform.communication.domain.AddressType;
 import com.fabricmanagement.platform.organization.domain.OrganizationAddress;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,6 +29,7 @@ public class OrganizationAddressDto {
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
+  @Schema(name = "OrganizationAddressData")
   public static class AddressData {
     private UUID id;
     private String streetAddress;

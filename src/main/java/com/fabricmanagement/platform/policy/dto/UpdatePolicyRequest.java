@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(name = "UpdatePlatformPolicyRequest")
 public class UpdatePolicyRequest {
 
   private String resource;

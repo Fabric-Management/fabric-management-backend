@@ -2,12 +2,14 @@ package com.fabricmanagement.approval.dto;
 
 import com.fabricmanagement.approval.domain.ApproverRole;
 import com.fabricmanagement.approval.domain.PolicyTargetLevel;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
+@Schema(name = "UpdateApprovalPolicyRequest")
 public class UpdatePolicyRequest {
 
   @NotNull private PolicyTargetLevel requiredLevel;
