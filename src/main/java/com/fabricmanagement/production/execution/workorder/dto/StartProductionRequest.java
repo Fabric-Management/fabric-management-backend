@@ -1,6 +1,7 @@
 package com.fabricmanagement.production.execution.workorder.dto;
 
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(name = "StartWorkOrderProductionRequest")
 public class StartProductionRequest {
 
   /**

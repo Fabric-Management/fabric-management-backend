@@ -1293,7 +1293,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePolicyRequest"
+              $ref: "#/components/schemas/CreateApprovalPolicyRequest"
         required: true
       responses:
         "200":
@@ -1446,7 +1446,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdatePolicyRequest"
+              $ref: "#/components/schemas/UpdateApprovalPolicyRequest"
         required: true
       responses:
         "200":
@@ -8437,7 +8437,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePolicyRequest"
+              $ref: "#/components/schemas/CreatePlatformPolicyRequest"
         required: true
       responses:
         "200":
@@ -8651,7 +8651,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdatePolicyRequest"
+              $ref: "#/components/schemas/UpdatePlatformPolicyRequest"
         required: true
       responses:
         "200":
@@ -28349,7 +28349,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ConsumeRequest"
+              $ref: "#/components/schemas/BatchConsumeRequest"
         required: true
       responses:
         "200":
@@ -28971,7 +28971,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/StartProductionRequest"
+              $ref: "#/components/schemas/StartBatchProductionRequest"
         required: true
       responses:
         "200":
@@ -34312,7 +34312,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ConsumeRequest"
+              $ref: "#/components/schemas/StockUnitConsumeRequest"
         required: true
       responses:
         "200":
@@ -36535,7 +36535,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/StartProductionRequest"
+              $ref: "#/components/schemas/StartWorkOrderProductionRequest"
         required: true
       responses:
         "200":
@@ -43131,21 +43131,6 @@ components:
       required:
       - title
       - type
-    AddressData:
-      type: object
-      properties:
-        city:
-          type: string
-        country:
-          type: string
-        placeId:
-          type: string
-        postalCode:
-          type: string
-        state:
-          type: string
-        streetAddress:
-          type: string
     AddressDeletionImpactDto:
       type: object
       properties:
@@ -47958,6 +47943,22 @@ components:
         version:
           type: integer
           format: int64
+    BatchConsumeRequest:
+      type: object
+      properties:
+        quantity:
+          type: number
+          minimum: 0.001
+        remarks:
+          type: string
+        reservationId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int64
+      required:
+      - quantity
     BatchDto:
       type: object
       description: Response object representing a product batch in the system
@@ -48761,13 +48762,6 @@ components:
       required:
       - amount
       - stockUnitId
-    ConsumeRequest:
-      type: object
-      properties:
-        amount:
-          type: number
-      required:
-      - amount
     ConsumeReservedRequest:
       type: object
       properties:
@@ -48779,33 +48773,22 @@ components:
       required:
       - amount
       - workOrderId
-    ContactData:
+    ConsumptionSummaryProductBreakdown:
       type: object
       properties:
-        contactType:
+        consumedWeight:
+          type: number
+        consumptionCount:
+          type: integer
+          format: int64
+        productType:
           type: string
           enum:
-          - EMAIL
-          - MOBILE
-          - LANDLINE
-          - PHONE_EXTENSION
-          - FAX
-          - WEBSITE
-          - SOCIAL_MEDIA
-        contactValue:
-          type: string
-        id:
-          type: string
-          format: uuid
-        isPersonal:
-          type: boolean
-        isVerified:
-          type: boolean
-        label:
-          type: string
-        parentContactId:
-          type: string
-          format: uuid
+          - FIBER
+          - YARN
+          - FABRIC
+          - CHEMICAL
+          - CONSUMABLE
     ContactDto:
       type: object
       properties:
@@ -49055,6 +49038,45 @@ components:
       required:
       - amount
       - invoiceId
+    CreateApprovalPolicyRequest:
+      type: object
+      properties:
+        approverRole:
+          type: string
+          enum:
+          - TENANT_ADMIN
+          - DEPARTMENT_MANAGER
+          - MANAGER
+          - HR
+          - CEO
+          - QUALITY_MANAGER
+        entityType:
+          type: string
+          enum:
+          - WORK_ORDER
+          - RECIPE_CREATE
+          - CRITICAL_ACTION
+          - PURCHASE_ORDER
+          - SALES_ORDER
+        expiryHours:
+          type: integer
+          format: int32
+          maximum: 720
+          minimum: 1
+        promotionThreshold:
+          type: integer
+          format: int32
+          minimum: 1
+        requiredLevel:
+          type: string
+          enum:
+          - ALL
+          - PROBATION
+          - STANDARD
+      required:
+      - approverRole
+      - entityType
+      - requiredLevel
     CreateBatchLineageRequest:
       type: object
       properties:
@@ -49442,11 +49464,11 @@ components:
         additionalContacts:
           type: array
           items:
-            $ref: "#/components/schemas/ContactData"
+            $ref: "#/components/schemas/UserContactData"
         addresses:
           type: array
           items:
-            $ref: "#/components/schemas/AddressData"
+            $ref: "#/components/schemas/UserAddressData"
         contactType:
           type: string
           enum:
@@ -49731,11 +49753,11 @@ components:
         additionalContacts:
           type: array
           items:
-            $ref: "#/components/schemas/ContactData"
+            $ref: "#/components/schemas/UserContactData"
         addresses:
           type: array
           items:
-            $ref: "#/components/schemas/AddressData"
+            $ref: "#/components/schemas/UserAddressData"
         birthDate:
           type: string
           format: date
@@ -49754,7 +49776,7 @@ components:
           type: string
           format: uuid
         emergencyContact:
-          $ref: "#/components/schemas/EmergencyContactData"
+          $ref: "#/components/schemas/UserEmergencyContactData"
         employeeNumber:
           type: string
           maxLength: 50
@@ -50045,7 +50067,7 @@ components:
       - dataScope
       - resource
       - roleCode
-    CreatePolicyRequest:
+    CreatePlatformPolicyRequest:
       type: object
       properties:
         action:
@@ -51403,15 +51425,6 @@ components:
         isPersonal:
           type: boolean
         label:
-          type: string
-    EmergencyContactData:
-      type: object
-      properties:
-        name:
-          type: string
-        phone:
-          type: string
-        relationship:
           type: string
     EmergencyContactDto:
       type: object
@@ -53430,11 +53443,63 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MarginWarningDto"
+    OrganizationAddressData:
+      type: object
+      properties:
+        addressType:
+          type: string
+          enum:
+          - HOME
+          - BILLING
+          - MAILING
+          - TEMPORARY
+          - ALTERNATE
+          - OFFICE
+          - HEADQUARTERS
+          - BRANCH
+          - WAREHOUSE
+          - FACTORY
+          - SHIPPING
+          - WORKSITE
+          - REMOTE
+        city:
+          type: string
+        contactEmail:
+          type: string
+        contactPerson:
+          type: string
+        contactPhone:
+          type: string
+        country:
+          type: string
+        countryCode:
+          type: string
+        district:
+          type: string
+        formattedAddress:
+          type: string
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        postalCode:
+          type: string
+        state:
+          type: string
+        streetAddress:
+          type: string
     OrganizationAddressDto:
       type: object
       properties:
         address:
-          $ref: "#/components/schemas/AddressData"
+          $ref: "#/components/schemas/OrganizationAddressData"
         addressId:
           type: string
           format: uuid
@@ -53485,11 +53550,38 @@ components:
         version:
           type: integer
           format: int64
+    OrganizationContactData:
+      type: object
+      properties:
+        contactType:
+          type: string
+          enum:
+          - EMAIL
+          - MOBILE
+          - LANDLINE
+          - PHONE_EXTENSION
+          - FAX
+          - WEBSITE
+          - SOCIAL_MEDIA
+        contactValue:
+          type: string
+        id:
+          type: string
+          format: uuid
+        isPersonal:
+          type: boolean
+        isVerified:
+          type: boolean
+        label:
+          type: string
+        parentContactId:
+          type: string
+          format: uuid
     OrganizationContactDto:
       type: object
       properties:
         contact:
-          $ref: "#/components/schemas/ContactData"
+          $ref: "#/components/schemas/OrganizationContactData"
         contactId:
           type: string
           format: uuid
@@ -54870,22 +54962,6 @@ components:
       required:
       - attributeCode
       - attributeName
-    ProductBreakdown:
-      type: object
-      properties:
-        outputCount:
-          type: integer
-          format: int64
-        outputWeight:
-          type: number
-        productType:
-          type: string
-          enum:
-          - FIBER
-          - YARN
-          - FABRIC
-          - CHEMICAL
-          - CONSUMABLE
     ProductCostBreakdown:
       type: object
       properties:
@@ -55134,6 +55210,22 @@ components:
         workOrderId:
           type: string
           format: uuid
+    ProductionSummaryProductBreakdown:
+      type: object
+      properties:
+        outputCount:
+          type: integer
+          format: int64
+        outputWeight:
+          type: number
+        productType:
+          type: string
+          enum:
+          - FIBER
+          - YARN
+          - FABRIC
+          - CHEMICAL
+          - CONSUMABLE
     ProductionSummaryResponse:
       type: object
       properties:
@@ -55145,7 +55237,7 @@ components:
         productBreakdown:
           type: array
           items:
-            $ref: "#/components/schemas/ProductBreakdown"
+            $ref: "#/components/schemas/ProductionSummaryProductBreakdown"
         totalConsumedWeight:
           type: number
         totalOutputWeight:
@@ -57263,7 +57355,25 @@ components:
           - integer
           - "null"
           format: int64
-    StartProductionRequest:
+    StartBatchProductionRequest:
+      type: object
+      properties:
+        machineLocationId:
+          type: string
+          format: uuid
+        remarks:
+          type: string
+      required:
+      - machineLocationId
+    StartTransferRequest:
+      type: object
+      properties:
+        targetLocationId:
+          type: string
+          format: uuid
+      required:
+      - targetLocationId
+    StartWorkOrderProductionRequest:
       type: object
       properties:
         outputProductId:
@@ -57282,14 +57392,6 @@ components:
       required:
       - outputProductId
       - outputProductType
-    StartTransferRequest:
-      type: object
-      properties:
-        targetLocationId:
-          type: string
-          format: uuid
-      required:
-      - targetLocationId
     Status:
       type: object
       properties:
@@ -57343,6 +57445,13 @@ components:
           - ACTIVE
           - RELEASED
           - CONVERTED
+    StockUnitConsumeRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+      required:
+      - amount
     StockUnitDto:
       type: object
       properties:
@@ -58584,6 +58693,36 @@ components:
           type: string
         streetAddress:
           type: string
+    UpdateApprovalPolicyRequest:
+      type: object
+      properties:
+        approverRole:
+          type: string
+          enum:
+          - TENANT_ADMIN
+          - DEPARTMENT_MANAGER
+          - MANAGER
+          - HR
+          - CEO
+          - QUALITY_MANAGER
+        expiryHours:
+          type: integer
+          format: int32
+          maximum: 720
+          minimum: 1
+        promotionThreshold:
+          type: integer
+          format: int32
+          minimum: 1
+        requiredLevel:
+          type: string
+          enum:
+          - ALL
+          - PROBATION
+          - STANDARD
+      required:
+      - approverRole
+      - requiredLevel
     UpdateApprovalRequest:
       type: object
       properties:
@@ -58960,7 +59099,7 @@ components:
       required:
       - dataScope
       - isActive
-    UpdatePolicyRequest:
+    UpdatePlatformPolicyRequest:
       type: object
       properties:
         action:
@@ -59392,7 +59531,7 @@ components:
           type: string
           format: uuid
         emergencyContact:
-          $ref: "#/components/schemas/EmergencyContactData"
+          $ref: "#/components/schemas/UserProfileEmergencyContactData"
         employeeNumber:
           type: string
           maxLength: 50
@@ -59410,7 +59549,7 @@ components:
           type: string
           format: date
         homeAddress:
-          $ref: "#/components/schemas/AddressData"
+          $ref: "#/components/schemas/UserProfileAddressData"
         lastName:
           type: string
         nationality:
@@ -59442,7 +59581,7 @@ components:
             - PERSONAL_PROFILE
           uniqueItems: true
         workAddress:
-          $ref: "#/components/schemas/AddressData"
+          $ref: "#/components/schemas/UserProfileAddressData"
         workEmail:
           type: string
         workPhone:
@@ -59503,6 +59642,34 @@ components:
       required:
       - name
       - version
+    UserAddressData:
+      type: object
+      properties:
+        addressType:
+          type: string
+        city:
+          type: string
+          minLength: 1
+        country:
+          type: string
+          minLength: 1
+        isPrimary:
+          type: boolean
+        label:
+          type: string
+        placeId:
+          type: string
+        postalCode:
+          type: string
+        state:
+          type: string
+        streetAddress:
+          type: string
+          minLength: 1
+      required:
+      - city
+      - country
+      - streetAddress
     UserAddressDto:
       type: object
       properties:
@@ -59520,6 +59687,29 @@ components:
         userId:
           type: string
           format: uuid
+    UserContactData:
+      type: object
+      properties:
+        contactType:
+          type: string
+          enum:
+          - EMAIL
+          - PHONE
+        contactValue:
+          type: string
+          maxLength: 255
+          minLength: 0
+        isPersonal:
+          type: boolean
+        isWhatsApp:
+          type: boolean
+        label:
+          type: string
+        phoneType:
+          type: string
+      required:
+      - contactType
+      - contactValue
     UserContactDto:
       type: object
       properties:
@@ -59670,6 +59860,15 @@ components:
           format: int32
         workLocationLabel:
           type: string
+    UserEmergencyContactData:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        relationship:
+          type: string
     UserPerformanceSnapshotDto:
       type: object
       properties:
@@ -59708,6 +59907,30 @@ components:
         userId:
           type: string
           format: uuid
+    UserProfileAddressData:
+      type: object
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+        placeId:
+          type: string
+        postalCode:
+          type: string
+        state:
+          type: string
+        streetAddress:
+          type: string
+    UserProfileEmergencyContactData:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        relationship:
+          type: string
     UserPromotionResponse:
       type: object
       properties:
@@ -60175,7 +60398,7 @@ components:
         productBreakdown:
           type: array
           items:
-            $ref: "#/components/schemas/ProductBreakdown"
+            $ref: "#/components/schemas/ConsumptionSummaryProductBreakdown"
         totalConsumedWeight:
           type: number
         unit:

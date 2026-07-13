@@ -1,6 +1,7 @@
 package com.fabricmanagement.platform.user.dto;
 
 import com.fabricmanagement.platform.user.domain.ContactType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -18,6 +19,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(name = "UserContactData")
 public class ContactData {
   @NotBlank(message = "Contact value is required")
   @Size(max = 255, message = "Contact value must be at most 255 characters")

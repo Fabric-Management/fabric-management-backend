@@ -2,6 +2,7 @@ package com.fabricmanagement.platform.user.dto;
 
 import com.fabricmanagement.common.infrastructure.identity.Gender;
 import com.fabricmanagement.common.infrastructure.identity.Title;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -123,6 +124,7 @@ public class CreateInternalUserRequest {
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
+  @Schema(name = "UserEmergencyContactData")
   public static class EmergencyContactData {
     private String name;
     private String phone;

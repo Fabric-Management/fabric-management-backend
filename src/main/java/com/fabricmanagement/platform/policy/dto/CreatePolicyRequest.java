@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(name = "CreatePlatformPolicyRequest")
 public class CreatePolicyRequest {
 
   @NotBlank(message = "Policy ID is required")

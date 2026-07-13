@@ -3,6 +3,7 @@ package com.fabricmanagement.platform.organization.dto;
 import com.fabricmanagement.platform.communication.domain.Contact;
 import com.fabricmanagement.platform.communication.domain.ContactType;
 import com.fabricmanagement.platform.organization.domain.OrganizationContact;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,6 +29,7 @@ public class OrganizationContactDto {
   @Builder
   @NoArgsConstructor
   @AllArgsConstructor
+  @Schema(name = "OrganizationContactData")
   public static class ContactData {
     private UUID id;
     private String contactValue;
