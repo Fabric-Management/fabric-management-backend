@@ -940,6 +940,27 @@ class QuoteServiceTest {
   }
 
   @Test
+  @DisplayName("Should preserve tenant isolation when updating customer and currency")
+  void shouldPreserveTenantIsolationWhenUpdatingCustomerAndCurrency() {
+    UpdateQuoteRequest req = new UpdateQuoteRequest();
+    req.setCustomerId(UUID.randomUUID());
+    req.setCurrency("USD");
+
+    when(quoteRepository.findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId))
+        .thenReturn(Optional.empty());
+
+    SalesDomainException ex =
+        assertThrows(
+            SalesDomainException.class, () -> quoteService.updateQuoteHeader(quoteId, req));
+
+    assertEquals("SALES_002_QUOTE_NOT_FOUND", ex.getErrorCode());
+    verify(quoteRepository).findByTenantIdAndIdAndIsActiveTrue(tenantId, quoteId);
+    verify(quoteRepository, never()).save(any(Quote.class));
+    verify(tradingPartnerResolver, never()).resolveDisplayNames(eq(tenantId), any());
+    verify(tenantReportingCurrencyPort, never()).getReportingCurrency(any());
+  }
+
+  @Test
   @DisplayName("Should update line quantity and price, re-evaluate zone, and recompute totals")
   void shouldUpdateLineQuantityAndPriceReevaluateZoneAndRecomputeTotals() {
     UUID lineId = UUID.randomUUID();
