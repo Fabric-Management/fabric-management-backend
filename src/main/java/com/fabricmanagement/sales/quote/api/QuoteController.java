@@ -6,11 +6,13 @@ import com.fabricmanagement.common.infrastructure.web.PagedResponse;
 import com.fabricmanagement.sales.quote.app.QuoteApprovalService;
 import com.fabricmanagement.sales.quote.app.QuoteService;
 import com.fabricmanagement.sales.quote.app.SendQuoteResult;
+import com.fabricmanagement.sales.quote.domain.QuoteStatus;
 import com.fabricmanagement.sales.quote.dto.AddQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.GenerateQuoteTokenRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteApprovalTokenDto;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
 import com.fabricmanagement.sales.quote.dto.QuoteSendRequestDto;
+import com.fabricmanagement.sales.quote.dto.QuoteStatusCountsResponse;
 import com.fabricmanagement.sales.quote.dto.RejectQuoteSendRequest;
 import com.fabricmanagement.sales.quote.dto.SendQuoteRequest;
 import com.fabricmanagement.sales.quote.dto.SendQuoteResponse;
@@ -18,6 +20,7 @@ import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.mapper.QuoteMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -36,6 +39,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -57,9 +61,24 @@ public class QuoteController {
   @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
   @Operation(summary = "List all quotes (paginated)")
   public ResponseEntity<ApiResponse<PagedResponse<QuoteResponse>>> listQuotes(
+      @Parameter(description = "Optional quote status filter") @RequestParam(required = false)
+          QuoteStatus status,
+      @Parameter(
+              description =
+                  "Literal quote-number or customer-name search; trimmed values shorter than two characters are ignored")
+          @RequestParam(required = false)
+          String q,
       @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
     return ResponseEntity.ok(
-        ApiResponse.success(PagedResponse.from(quoteService.findAllResponses(pageable))));
+        ApiResponse.success(
+            PagedResponse.from(quoteService.findAllResponses(status, q, pageable))));
+  }
+
+  @GetMapping("/status-counts")
+  @PreAuthorize("@auth.can(authentication, 'sales', 'read')")
+  @Operation(summary = "Count active quotes by status")
+  public ResponseEntity<ApiResponse<QuoteStatusCountsResponse>> getStatusCounts() {
+    return ResponseEntity.ok(ApiResponse.success(quoteService.getStatusCounts()));
   }
 
   @GetMapping("/{quoteId}")

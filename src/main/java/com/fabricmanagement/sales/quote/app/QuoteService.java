@@ -1,6 +1,7 @@
 package com.fabricmanagement.sales.quote.app;
 
 import com.fabricmanagement.common.domain.vo.ConvertedMoney;
+import com.fabricmanagement.common.infrastructure.persistence.LikePattern;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.tenant.TenantReportingCurrencyPort;
 import com.fabricmanagement.common.util.Money;
@@ -40,6 +41,7 @@ import com.fabricmanagement.sales.quote.dto.QuoteLineLotSelectionRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshot;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshotCodec;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
+import com.fabricmanagement.sales.quote.dto.QuoteStatusCountsResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
@@ -50,6 +52,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,8 +97,14 @@ public class QuoteService {
 
   @Transactional(readOnly = true)
   public Page<QuoteResponse> findAllResponses(Pageable pageable) {
+    return findAllResponses(null, null, pageable);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<QuoteResponse> findAllResponses(QuoteStatus status, String query, Pageable pageable) {
     UUID tenantId = TenantContext.requireTenantId();
-    Page<Quote> page = quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
+    String normalizedQuery = normalizeSearchQuery(query);
+    Page<Quote> page = findQuotePage(tenantId, status, normalizedQuery, pageable);
     Map<UUID, String> customerNames =
         tradingPartnerResolver.resolveDisplayNames(
             tenantId,
@@ -106,6 +115,43 @@ public class QuoteService {
                 .toList());
     Map<UUID, String> safeCustomerNames = customerNames != null ? customerNames : Map.of();
     return page.map(quote -> toResponse(quote, safeCustomerNames));
+  }
+
+  @Transactional(readOnly = true)
+  public QuoteStatusCountsResponse getStatusCounts() {
+    UUID tenantId = TenantContext.requireTenantId();
+    Map<QuoteStatus, Long> counts = new EnumMap<>(QuoteStatus.class);
+    quoteRepository
+        .countActiveByStatus(tenantId)
+        .forEach(row -> counts.put(row.getStatus(), row.getCount()));
+    return QuoteStatusCountsResponse.from(counts);
+  }
+
+  private Page<Quote> findQuotePage(
+      UUID tenantId, QuoteStatus status, String normalizedQuery, Pageable pageable) {
+    if (normalizedQuery == null) {
+      return status == null
+          ? quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable)
+          : quoteRepository.findAllByTenantIdAndStatusAndIsActiveTrue(tenantId, status, pageable);
+    }
+
+    String pattern = LikePattern.literalContains(normalizedQuery);
+    List<UUID> customerIds =
+        tradingPartnerResolver.findCustomerIdsByNameContains(tenantId, normalizedQuery);
+    if (customerIds.isEmpty()) {
+      return quoteRepository.searchByQuoteNumber(
+          tenantId, status, pattern, LikePattern.ESCAPE_CHARACTER, pageable);
+    }
+    return quoteRepository.searchByQuoteNumberOrCustomerId(
+        tenantId, status, pattern, LikePattern.ESCAPE_CHARACTER, customerIds, pageable);
+  }
+
+  private String normalizeSearchQuery(String query) {
+    if (query == null) {
+      return null;
+    }
+    String trimmed = query.trim();
+    return trimmed.length() >= 2 ? trimmed : null;
   }
 
   @Transactional(readOnly = true)

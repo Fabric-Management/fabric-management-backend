@@ -1,5 +1,6 @@
 package com.fabricmanagement.platform.tradingpartner.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.LikePattern;
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
 import java.util.List;
@@ -189,6 +190,16 @@ public class TradingPartnerResolver {
     }
     return partnerRepository.findByTenantIdAndIdInWithRegistry(tenantId, partnerIds).stream()
         .collect(Collectors.toMap(TradingPartner::getId, this::displayNameOrFallback));
+  }
+
+  /** Returns every active CUSTOMER/BOTH partner whose display name contains {@code query}. */
+  public List<UUID> findCustomerIdsByNameContains(UUID tenantId, String query) {
+    if (query == null || query.isBlank()) {
+      return List.of();
+    }
+    String pattern = LikePattern.literalContains(query.trim());
+    return partnerRepository.findActiveCustomerIdsByNamePattern(
+        tenantId, pattern, LikePattern.ESCAPE_CHARACTER);
   }
 
   private String displayNameOrFallback(TradingPartner partner) {

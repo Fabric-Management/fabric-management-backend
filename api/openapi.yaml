@@ -38683,6 +38683,28 @@ paths:
     get:
       operationId: listQuotes
       parameters:
+      - description: Optional quote status filter
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - DRAFT
+          - EVALUATION
+          - PENDING_APPROVAL
+          - APPROVED
+          - REJECTED
+          - CONVERTED
+          - EXPIRED
+          - SUPERSEDED
+      - description: Literal quote-number or customer-name search; trimmed values
+          shorter than two characters are ignored
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
       - in: query
         name: pageable
         required: true
@@ -38816,6 +38838,70 @@ paths:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
       summary: Create a new quote
+      tags:
+      - Quotes
+  /api/v1/sales/quotes/status-counts:
+    get:
+      operationId: getStatusCounts
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResponseQuoteStatusCountsResponse"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Bad Request
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Not Found
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Conflict
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ApiProblemDetail"
+          description: Internal Server Error
+      summary: Count active quotes by status
       tags:
       - Quotes
   /api/v1/sales/quotes/{quoteId}:
@@ -46662,6 +46748,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/QuoteSendRequestDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponseQuoteStatusCountsResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/QuoteStatusCountsResponse"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -55942,6 +56046,51 @@ components:
       - requestedAt
       - requestedBy
       - status
+    QuoteStatusCountsResponse:
+      type: object
+      description: Active quote totals by status for the current tenant
+      properties:
+        approved:
+          type: integer
+          format: int64
+          description: APPROVED quote count
+        converted:
+          type: integer
+          format: int64
+          description: CONVERTED quote count
+        draft:
+          type: integer
+          format: int64
+          description: DRAFT quote count
+        evaluation:
+          type: integer
+          format: int64
+          description: EVALUATION quote count
+        expired:
+          type: integer
+          format: int64
+          description: EXPIRED quote count
+        pendingApproval:
+          type: integer
+          format: int64
+          description: PENDING_APPROVAL quote count
+        rejected:
+          type: integer
+          format: int64
+          description: REJECTED quote count
+        superseded:
+          type: integer
+          format: int64
+          description: SUPERSEDED quote count
+      required:
+      - approved
+      - converted
+      - draft
+      - evaluation
+      - expired
+      - pendingApproval
+      - rejected
+      - superseded
     RealizedFxCurrencyDto:
       type: object
       properties:
