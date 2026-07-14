@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyChar;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -57,6 +59,7 @@ import com.fabricmanagement.sales.quote.dto.QuoteLineLotSelectionRequest;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshot;
 import com.fabricmanagement.sales.quote.dto.QuoteLineLotSnapshotCodec;
 import com.fabricmanagement.sales.quote.dto.QuoteResponse;
+import com.fabricmanagement.sales.quote.dto.QuoteStatusCountsResponse;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteLineRequest;
 import com.fabricmanagement.sales.quote.dto.UpdateQuoteRequest;
 import com.fabricmanagement.sales.quote.infra.repository.QuoteRepository;
@@ -172,6 +175,85 @@ class QuoteServiceTest {
     Page<QuoteResponse> page = quoteService.findAllResponses(pageable);
 
     assertNull(page.getContent().get(0).getCustomerName());
+  }
+
+  @Test
+  @DisplayName("Should filter quote list by status without searching partners")
+  void shouldFilterQuoteListByStatus() {
+    PageRequest pageable = PageRequest.of(0, 20);
+    when(quoteRepository.findAllByTenantIdAndStatusAndIsActiveTrue(
+            tenantId, QuoteStatus.APPROVED, pageable))
+        .thenReturn(Page.empty(pageable));
+
+    quoteService.findAllResponses(QuoteStatus.APPROVED, null, pageable);
+
+    verify(tradingPartnerResolver, never()).findCustomerIdsByNameContains(any(), any());
+  }
+
+  @Test
+  @DisplayName("Should treat a trimmed query shorter than two characters as unfiltered")
+  void shouldTreatShortQueryAsUnfiltered() {
+    PageRequest pageable = PageRequest.of(0, 20);
+    when(quoteRepository.findAllByTenantIdAndIsActiveTrue(tenantId, pageable))
+        .thenReturn(Page.empty(pageable));
+
+    quoteService.findAllResponses(null, " a ", pageable);
+
+    verify(quoteRepository).findAllByTenantIdAndIsActiveTrue(tenantId, pageable);
+    verify(tradingPartnerResolver, never()).findCustomerIdsByNameContains(any(), any());
+  }
+
+  @Test
+  @DisplayName("Should search quote number only when no customer IDs match")
+  void shouldSearchQuoteNumberWhenCustomerIdsAreEmpty() {
+    PageRequest pageable = PageRequest.of(0, 20);
+    when(tradingPartnerResolver.findCustomerIdsByNameContains(tenantId, "50%_"))
+        .thenReturn(List.of());
+    when(quoteRepository.searchByQuoteNumber(tenantId, null, "%50\\%\\_%", '\\', pageable))
+        .thenReturn(Page.empty(pageable));
+
+    quoteService.findAllResponses(null, " 50%_ ", pageable);
+
+    verify(quoteRepository, never())
+        .searchByQuoteNumberOrCustomerId(any(), any(), any(), anyChar(), any(), any());
+  }
+
+  @Test
+  @DisplayName("Should combine status with quote-number or customer-name search")
+  void shouldCombineStatusAndCustomerSearch() {
+    PageRequest pageable = PageRequest.of(0, 20);
+    UUID matchingCustomerId = UUID.randomUUID();
+    when(tradingPartnerResolver.findCustomerIdsByNameContains(tenantId, "Acme"))
+        .thenReturn(List.of(matchingCustomerId));
+    when(quoteRepository.searchByQuoteNumberOrCustomerId(
+            tenantId, QuoteStatus.DRAFT, "%Acme%", '\\', List.of(matchingCustomerId), pageable))
+        .thenReturn(Page.empty(pageable));
+
+    quoteService.findAllResponses(QuoteStatus.DRAFT, "Acme", pageable);
+
+    verify(quoteRepository)
+        .searchByQuoteNumberOrCustomerId(
+            tenantId, QuoteStatus.DRAFT, "%Acme%", '\\', List.of(matchingCustomerId), pageable);
+  }
+
+  @Test
+  @DisplayName("Should zero-fill every quote status count")
+  void shouldZeroFillEveryQuoteStatusCount() {
+    QuoteRepository.StatusCountProjection draft = mock(QuoteRepository.StatusCountProjection.class);
+    QuoteRepository.StatusCountProjection expired =
+        mock(QuoteRepository.StatusCountProjection.class);
+    when(draft.getStatus()).thenReturn(QuoteStatus.DRAFT);
+    when(draft.getCount()).thenReturn(4L);
+    when(expired.getStatus()).thenReturn(QuoteStatus.EXPIRED);
+    when(expired.getCount()).thenReturn(2L);
+    when(quoteRepository.countActiveByStatus(tenantId)).thenReturn(List.of(draft, expired));
+
+    QuoteStatusCountsResponse counts = quoteService.getStatusCounts();
+
+    assertEquals(4L, counts.draft());
+    assertEquals(2L, counts.expired());
+    assertEquals(0L, counts.converted());
+    assertEquals(0L, counts.countFor(QuoteStatus.SUPERSEDED));
   }
 
   @Test

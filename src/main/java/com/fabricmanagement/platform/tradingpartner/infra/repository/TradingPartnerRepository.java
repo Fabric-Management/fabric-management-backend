@@ -150,6 +150,30 @@ public interface TradingPartnerRepository extends JpaRepository<TradingPartner, 
       @Param("tenantId") UUID tenantId, @Param("term") String searchTerm);
 
   /**
+   * Find active customer IDs whose tenant-specific or official name contains a literal pattern.
+   *
+   * <p>The caller supplies an escaped contains pattern and its escape character so {@code %} and
+   * {@code _} in user input retain their literal meaning.
+   */
+  @Query(
+      """
+      SELECT tp.id
+      FROM TradingPartner tp
+      JOIN tp.registry registry
+      WHERE tp.tenantId = :tenantId
+        AND tp.isActive = true
+        AND tp.partnerType IN ('CUSTOMER', 'BOTH')
+        AND (
+          LOWER(tp.customName) LIKE LOWER(:pattern) ESCAPE :escapeCharacter
+          OR LOWER(registry.officialName) LIKE LOWER(:pattern) ESCAPE :escapeCharacter
+        )
+      """)
+  List<UUID> findActiveCustomerIdsByNamePattern(
+      @Param("tenantId") UUID tenantId,
+      @Param("pattern") String pattern,
+      @Param("escapeCharacter") char escapeCharacter);
+
+  /**
    * Count partners by type for tenant.
    *
    * @param tenantId Tenant ID

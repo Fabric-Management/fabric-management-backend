@@ -2,11 +2,14 @@ package com.fabricmanagement.platform.tradingpartner.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fabricmanagement.platform.tradingpartner.domain.TradingPartner;
 import com.fabricmanagement.platform.tradingpartner.infra.repository.TradingPartnerRepository;
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -234,6 +237,34 @@ class TradingPartnerResolverTest {
       Optional<TradingPartner> result = resolver.resolvePartner(tenantId, unknownId);
 
       assertThat(result).isEmpty();
+    }
+  }
+
+  @Nested
+  @DisplayName("findCustomerIdsByNameContains")
+  class FindCustomerIdsByNameContains {
+
+    @Test
+    @DisplayName("escapes literal wildcards before querying active customer IDs")
+    void escapesLiteralWildcards() {
+      List<UUID> matches = List.of(tradingPartnerId);
+      when(partnerRepository.findActiveCustomerIdsByNamePattern(tenantId, "%Acme\\%\\_%", '\\'))
+          .thenReturn(matches);
+
+      assertThat(resolver.findCustomerIdsByNameContains(tenantId, " Acme%_ "))
+          .containsExactly(tradingPartnerId);
+    }
+
+    @Test
+    @DisplayName("does not query for blank text")
+    void skipsBlankText() {
+      assertThat(resolver.findCustomerIdsByNameContains(tenantId, "  ")).isEmpty();
+
+      verify(partnerRepository, never())
+          .findActiveCustomerIdsByNamePattern(
+              org.mockito.ArgumentMatchers.any(),
+              org.mockito.ArgumentMatchers.any(),
+              org.mockito.ArgumentMatchers.anyChar());
     }
   }
 
