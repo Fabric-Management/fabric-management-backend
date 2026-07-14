@@ -11,6 +11,7 @@ import com.fabricmanagement.production.common.exception.ProductionDomainExceptio
  * <ul>
  *   <li>{@link InsufficientWeightException} — consumption exceeds available weight
  *   <li>{@link InvalidPackageTypeException} — incompatible package/product type combination
+ *   <li>{@link StockUnitMaterializationException} — a receipt could not be materialized as stock
  *   <li>{@link WeightReconciliationException} — Batch ↔ StockUnit weight sum mismatch
  * </ul>
  */
@@ -26,5 +27,10 @@ public class StockUnitDomainException extends ProductionDomainException {
 
   protected StockUnitDomainException(String message, String errorCode, int httpStatus) {
     super(message, errorCode, httpStatus);
+  }
+
+  protected StockUnitDomainException(
+      String message, String errorCode, int httpStatus, Throwable cause) {
+    super(message, errorCode, httpStatus, cause);
   }
 }

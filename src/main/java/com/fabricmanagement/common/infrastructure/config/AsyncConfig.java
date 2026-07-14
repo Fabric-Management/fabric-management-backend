@@ -11,9 +11,15 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 /**
  * Single application {@link AsyncConfigurer}: tenant propagation for {@code @Async} and global
  * uncaught-exception logging. (Spring allows only one {@code AsyncConfigurer} bean.)
+ *
+ * <p>The async bean post-processor must run after infrastructure auto-proxy creators so it can add
+ * its advisor to proxies that already carry transaction and Spring Modulith publication-completion
+ * advice. {@code AsyncAnnotationBeanPostProcessor} inserts its advisor before existing advisors, so
+ * asynchronous execution remains the outer boundary and tenant restoration still runs on the
+ * executor thread before the transaction starts.
  */
 @Configuration
-@EnableAsync(proxyTargetClass = true, order = Ordered.HIGHEST_PRECEDENCE)
+@EnableAsync(proxyTargetClass = true, order = Ordered.LOWEST_PRECEDENCE)
 public class AsyncConfig implements AsyncConfigurer {
 
   @Override
