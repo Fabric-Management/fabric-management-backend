@@ -14,6 +14,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
@@ -64,14 +65,21 @@ class QuoteRetentionPurgeJobTest {
   @Test
   void scheduledJobIteratesAllActiveTenantsInTenantContext() {
     ReflectionTestUtils.setField(job, "enabled", true);
+    List<UUID> observedTenantContexts = new ArrayList<>();
     when(systemExecutor.executeQuery(eq(QuoteRetentionPurgeJob.ACTIVE_TENANTS_SQL), any()))
         .thenReturn(List.of(TENANT_A, TENANT_B));
-    when(systemExecutor.executeInTransaction(any())).thenAnswer(invocation -> runSql(invocation));
+    when(systemExecutor.executeInTransaction(any()))
+        .thenAnswer(
+            invocation -> {
+              observedTenantContexts.add(TenantContext.requireTenantId());
+              return runSql(invocation);
+            });
     when(jdbcTemplate.update(any(String.class), any(), any(Timestamp.class))).thenReturn(1);
 
     job.purgeQuotesAndTokens();
 
     verify(systemExecutor, times(2)).executeInTransaction(any());
+    assertThat(observedTenantContexts).containsExactly(TENANT_A, TENANT_B);
     assertThat(TenantContext.getCurrentTenantIdOrNull()).isNull();
   }
 

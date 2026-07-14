@@ -55755,6 +55755,7 @@ components:
           - PENDING
           - USED
           - EXPIRED
+          - REVOKED
         token:
           type: string
         usedAt:
