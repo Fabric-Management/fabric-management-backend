@@ -262,6 +262,14 @@ batch:
   certification:
     enforce-on-reserve: ${BATCH_CERT_ENFORCE_ON_RESERVE:true}
 
+# Quote transient-data retention. Local development overrides this to disabled.
+retention:
+  quote:
+    enabled: ${QUOTE_RETENTION_ENABLED:true}
+    abandonedDraftDays: ${QUOTE_RETENTION_ABANDONED_DRAFT_DAYS:90}
+    deadTokenDays: ${QUOTE_RETENTION_DEAD_TOKEN_DAYS:365}
+    cron: ${QUOTE_RETENTION_CRON:0 30 3 * * ?}
+
 # Feature Flags
 feature:
   trading-partner:

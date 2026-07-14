@@ -14,6 +14,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+/**
+ * Purges quote data that has no business or evidential value.
+ *
+ * <p>{@link Scheduled} methods have no ambient tenant and are therefore blind under RLS. This job
+ * must keep the explicit active-tenant iteration and execute each tenant's deletes through the
+ * privileged {@link SystemTransactionExecutor} inside {@link TenantContext}.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -30,7 +37,8 @@ public class QuoteRetentionPurgeJob {
         AND q.updated_at < ?
         AND NOT EXISTS (
           SELECT 1 FROM sales.quote_line ql
-          WHERE ql.quote_id = q.id
+          WHERE ql.tenant_id = q.tenant_id
+            AND ql.quote_id = q.id
         )
       """;
 
@@ -46,7 +54,7 @@ public class QuoteRetentionPurgeJob {
   private final SystemTransactionExecutor systemExecutor;
   private final Clock clock;
 
-  @Value("${retention.quote.enabled:false}")
+  @Value("${retention.quote.enabled:true}")
   private boolean enabled;
 
   @Value("${retention.quote.abandonedDraftDays:90}")

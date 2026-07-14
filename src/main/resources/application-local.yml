@@ -79,6 +79,11 @@ logging:
 server:
   port: ${LOCAL_SERVER_PORT:8081}
 
+# Retention jobs are opt-in for local development.
+retention:
+  quote:
+    enabled: ${QUOTE_RETENTION_ENABLED:false}
+
 application:
   jwt:
     secret: local-dev-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm
