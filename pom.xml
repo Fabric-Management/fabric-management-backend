@@ -36,7 +36,7 @@
         <spring-cloud.version>2025.0.2</spring-cloud.version>
 
         <!-- Database Versions -->
-        <postgresql.version>42.7.11</postgresql.version>
+        <postgresql.version>42.7.12</postgresql.version>
         <flyway.version>10.15.0</flyway.version>
 
         <!-- Security & JWT Versions -->
@@ -80,7 +80,7 @@
         <commons-fileupload.version>1.6.0</commons-fileupload.version>
         <angus-mail.version>2.0.4</angus-mail.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
-        <tomcat.version>10.1.56</tomcat.version>
+        <tomcat.version>10.1.57</tomcat.version>
         <spring-security.version>6.5.11</spring-security.version>
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <kotlin.version>2.2.21</kotlin.version>
