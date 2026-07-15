@@ -14,9 +14,17 @@ updates:
       maven-minor-and-patch:
         patterns:
           - "*"
+        exclude-patterns:
+          - "org.springframework.cloud:spring-cloud-dependencies"
         update-types:
           - minor
           - patch
+    # Spring Cloud uses CalVer release trains: 2025.1 requires Spring Boot 4.x.
+    # Keep the project on the Boot 3.5-compatible 2025.0 train until a coordinated upgrade.
+    ignore:
+      - dependency-name: "org.springframework.cloud:spring-cloud-dependencies"
+        versions:
+          - "[2025.1,)"
     commit-message:
       prefix: "chore(deps)"
 

@@ -33,7 +33,7 @@
         <!-- TODO: remove when Spring Boot >= 3.5.15 ships with Framework 6.2.19 -->
         <spring-framework.version>6.2.19</spring-framework.version>
         <spring-modulith.version>1.2.5</spring-modulith.version>
-        <spring-cloud.version>2025.0.2</spring-cloud.version>
+        <spring-cloud.version>2025.0.3</spring-cloud.version>
 
         <!-- Database Versions -->
         <postgresql.version>42.7.12</postgresql.version>
