@@ -7,7 +7,7 @@
 # =============================================================================
 # Stage 1: Build (Maven Build with Dependency Caching)
 # =============================================================================
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
+FROM maven:3.9.15-eclipse-temurin-26-alpine AS build
 
 WORKDIR /build
 
