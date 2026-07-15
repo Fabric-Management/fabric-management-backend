@@ -6,17 +6,20 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -269,6 +272,26 @@ public class GlobalExceptionHandler {
 
     return buildProblemDetail(
         HttpStatus.BAD_REQUEST, "Bad Request", "TYPE_MISMATCH", message, req.getRequestURI());
+  }
+
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ApiProblemDetail> handleMethodNotSupported(
+      HttpRequestMethodNotSupportedException ex, HttpServletRequest req) {
+    log.info("HTTP method not supported: {} — {}", req.getRequestURI(), ex.getMethod());
+    ApiProblemDetail problemDetail =
+        buildProblemDetail(
+            HttpStatus.METHOD_NOT_ALLOWED,
+            "Method Not Allowed",
+            "METHOD_NOT_ALLOWED",
+            ex.getMessage(),
+            req.getRequestURI());
+
+    ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+    Set<HttpMethod> supportedMethods = ex.getSupportedHttpMethods();
+    if (supportedMethods != null) {
+      response.allow(supportedMethods.toArray(HttpMethod[]::new));
+    }
+    return response.body(problemDetail);
   }
 
   @ExceptionHandler(Exception.class)

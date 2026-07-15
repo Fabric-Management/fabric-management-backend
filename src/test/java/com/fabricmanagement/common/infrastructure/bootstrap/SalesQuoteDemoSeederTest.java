@@ -36,6 +36,8 @@ import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.masterdata.color.app.ColorService;
 import com.fabricmanagement.production.masterdata.color.domain.Color;
+import com.fabricmanagement.production.masterdata.color.domain.ColorCardSpec;
+import com.fabricmanagement.production.masterdata.color.domain.ColorType;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.dto.CreateProductRequest;
@@ -159,7 +161,15 @@ class SalesQuoteDemoSeederTest {
             anyBoolean());
     assertThat(saleableCaptor.getAllValues()).containsSequence(true, true, false);
 
-    verify(colorService, times(5)).create(any(), any(), any());
+    verify(colorService, times(4)).create(any(), any(), any());
+    ArgumentCaptor<ColorCardSpec> colorSpecCaptor = ArgumentCaptor.forClass(ColorCardSpec.class);
+    verify(colorService).create(colorSpecCaptor.capture());
+    assertThat(colorSpecCaptor.getValue().code()).isEqualTo("PFD-00");
+    assertThat(colorSpecCaptor.getValue().colorType()).isEqualTo(ColorType.PFD);
+    assertThat(colorSpecCaptor.getValue().colorHex()).isNull();
+    assertThat(colorSpecCaptor.getValue().pantoneCode()).isNull();
+    assertThat(colorSpecCaptor.getValue().targetLabL()).isNull();
+    assertThat(colorSpecCaptor.getValue().deltaETolerance()).isNull();
     verify(productFacade, times(3)).createProduct(any(CreateProductRequest.class));
     verify(salesProductService, times(3)).createEntry(any());
 
@@ -328,6 +338,14 @@ class SalesQuoteDemoSeederTest {
                       .build();
               colour.setId(UUID.randomUUID());
               colour.setTenantId(TENANT_ID);
+              return colour;
+            });
+    when(colorService.create(any(ColorCardSpec.class)))
+        .thenAnswer(
+            invocation -> {
+              ColorCardSpec spec = invocation.getArgument(0);
+              Color colour = Color.create(TENANT_ID, spec);
+              colour.setId(UUID.randomUUID());
               return colour;
             });
 

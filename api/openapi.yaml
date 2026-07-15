@@ -29412,20 +29412,99 @@ paths:
       - Batch
   /api/v1/production/colors:
     get:
+      description: "Returns a tenant-scoped, filtered and paginated list of color\
+        \ cards."
       operationId: listColors
       parameters:
-      - in: query
+      - description: Case-insensitive literal substring of the color code or name
+        in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - description: Optional color-process classification filter
+        in: query
+        name: colorType
+        required: false
+        schema:
+          type: string
+          enum:
+          - DYED
+          - YARN_DYED
+          - PRINTED
+          - OPTICAL_WHITE
+          - PFD
+          - GREIGE
+      - description: Optional visual color-family filter
+        in: query
+        name: colorFamily
+        required: false
+        schema:
+          type: string
+          enum:
+          - RED
+          - ORANGE
+          - YELLOW
+          - GREEN
+          - BLUE
+          - PURPLE
+          - PINK
+          - BROWN
+          - BEIGE
+          - GREY
+          - BLACK
+          - WHITE
+          - MULTI
+          - UNDEFINED
+      - description: Optional shade-standard lifecycle filter
+        in: query
+        name: standardStatus
+        required: false
+        schema:
+          type: string
+          enum:
+          - DRAFT
+          - APPROVED
+      - description: Include soft-deleted color cards; defaults to false
+        in: query
         name: includeInactive
         required: false
         schema:
           type: boolean
           default: false
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          default:
+          - "code,ASC"
+          items:
+            type: string
       responses:
         "200":
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ApiResponseListColorDto"
+                $ref: "#/components/schemas/ApiResponsePagedResponseColorDto"
           description: OK
         "400":
           content:
@@ -29621,7 +29700,7 @@ paths:
       summary: Get a color card by ID
       tags:
       - Color
-    patch:
+    put:
       operationId: updateColor
       parameters:
       - in: path
@@ -44411,26 +44490,6 @@ components:
           type: array
           items:
             type: string
-    ApiResponseListColorDto:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/ColorDto"
-        error:
-          $ref: "#/components/schemas/ErrorDetail"
-        message:
-          type: string
-        success:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
-        warnings:
-          type: array
-          items:
-            type: string
     ApiResponseListCompanyTypeOptionDto:
       type: object
       properties:
@@ -45956,6 +46015,24 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PagedResponseBatchLineageDto"
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+        message:
+          type: string
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    ApiResponsePagedResponseColorDto:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PagedResponseColorDto"
         error:
           $ref: "#/components/schemas/ErrorDetail"
         message:
@@ -48589,10 +48666,13 @@ components:
       properties:
         active:
           type: boolean
+          description: Whether the color card is active; false means soft-deleted
         code:
           type: string
+          description: "Canonical tenant-unique code, stored trimmed and uppercase"
         colorFamily:
           type: string
+          description: Visual family used for classification and filtering
           enum:
           - RED
           - ORANGE
@@ -48610,8 +48690,10 @@ components:
           - UNDEFINED
         colorHex:
           type: string
+          description: Screen approximation only; never an authoritative colour standard
         colorType:
           type: string
+          description: Process classification of the color card
           enum:
           - DYED
           - YARN_DYED
@@ -48621,6 +48703,7 @@ components:
           - GREIGE
         deltaEFormula:
           type: string
+          description: Formula used to calculate Delta-E against the target
           enum:
           - CIE76
           - CIE94
@@ -48628,19 +48711,26 @@ components:
           - CMC_2_1
         deltaETolerance:
           type: number
+          description: Maximum accepted Delta-E; requires a target and a formula
         id:
           type: string
           format: uuid
+          description: Tenant-owned color-card identifier
         name:
           type: string
+          description: "Human-readable color-card name, stored trimmed"
         notes:
           type: string
+          description: Optional internal notes about the color card
         pantoneCode:
           type: string
+          description: "Optional external Pantone reference, stored trimmed and uppercase"
         pantoneLabel:
           type: string
+          description: Display-ready Pantone reference such as '19-4024 TCX'
         pantoneSystem:
           type: string
+          description: Pantone carrier system; null when no Pantone reference exists
           enum:
           - TCX
           - TPG
@@ -48649,15 +48739,20 @@ components:
           - TSX
         standardStatus:
           type: string
+          description: Shade-standard lifecycle state; changed only by transition
+            endpoints
           enum:
           - DRAFT
           - APPROVED
         targetLabA:
           type: number
+          description: "Target CIE Lab green-red axis a*, from -128 to 127"
         targetLabB:
           type: number
+          description: "Target CIE Lab blue-yellow axis b*, from -128 to 127"
         targetLabIlluminant:
           type: string
+          description: Illuminant under which the target Lab values are defined
           enum:
           - D65
           - D50
@@ -48666,8 +48761,11 @@ components:
           - TL84
         targetLabL:
           type: number
+          description: "Target CIE Lab lightness L*, from 0 to 100; not a measured\
+            \ batch value"
         targetLabObserver:
           type: string
+          description: Standard observer angle used for the target Lab values
           enum:
           - DEG_2
           - DEG_10
@@ -49400,10 +49498,12 @@ components:
       properties:
         code:
           type: string
+          description: Tenant-unique code; trimmed and normalized to uppercase
           maxLength: 50
           minLength: 0
         colorFamily:
           type: string
+          description: Visual family; defaults to UNDEFINED when omitted
           enum:
           - RED
           - ORANGE
@@ -49421,9 +49521,11 @@ components:
           - UNDEFINED
         colorHex:
           type: string
+          description: Screen approximation only; never an authoritative colour standard
           pattern: "^#[0-9A-Fa-f]{6}$"
         colorType:
           type: string
+          description: Process classification; defaults to DYED when omitted
           enum:
           - DYED
           - YARN_DYED
@@ -49433,6 +49535,7 @@ components:
           - GREIGE
         deltaEFormula:
           type: string
+          description: Delta-E calculation formula; valid only with a tolerance
           enum:
           - CIE76
           - CIE94
@@ -49440,21 +49543,27 @@ components:
           - CMC_2_1
         deltaETolerance:
           type: number
+          description: Maximum accepted Delta-E; requires a target and a formula
           maximum: 99.99
         name:
           type: string
+          description: Human-readable color-card name; stored trimmed
           maxLength: 255
           minLength: 0
         notes:
           type: string
+          description: Optional internal notes
           maxLength: 1000
           minLength: 0
         pantoneCode:
           type: string
+          description: Optional external Pantone reference; trimmed and normalized
+            to uppercase
           maxLength: 20
           minLength: 0
         pantoneSystem:
           type: string
+          description: Pantone carrier system; defaults to TCX when a code is supplied
           enum:
           - TCX
           - TPG
@@ -49463,14 +49572,18 @@ components:
           - TSX
         targetLabA:
           type: number
+          description: "Target CIE Lab green-red axis a*, from -128 to 127"
           maximum: 127
           minimum: -128
         targetLabB:
           type: number
+          description: "Target CIE Lab blue-yellow axis b*, from -128 to 127"
           maximum: 127
           minimum: -128
         targetLabIlluminant:
           type: string
+          description: Illuminant defining the target Lab values; supplied with all
+            Lab fields
           enum:
           - D65
           - D50
@@ -49479,10 +49592,14 @@ components:
           - TL84
         targetLabL:
           type: number
+          description: "Target CIE Lab lightness L*, from 0 to 100; not a measured\
+            \ batch value"
           maximum: 100
           minimum: 0
         targetLabObserver:
           type: string
+          description: Observer angle defining the target Lab values; supplied with
+            all Lab fields
           enum:
           - DEG_2
           - DEG_10
@@ -53874,6 +53991,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BatchLineageDto"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagedResponseColorDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColorDto"
         first:
           type: boolean
         last:
@@ -58922,10 +59062,12 @@ components:
       properties:
         code:
           type: string
+          description: Tenant-unique code; trimmed and normalized to uppercase
           maxLength: 50
           minLength: 0
         colorFamily:
           type: string
+          description: Visual family; omission resolves to UNDEFINED
           enum:
           - RED
           - ORANGE
@@ -58943,9 +59085,11 @@ components:
           - UNDEFINED
         colorHex:
           type: string
+          description: Screen approximation only; omission clears the stored approximation
           pattern: "^#[0-9A-Fa-f]{6}$"
         colorType:
           type: string
+          description: Process classification; omission resolves to DYED
           enum:
           - DYED
           - YARN_DYED
@@ -58955,6 +59099,7 @@ components:
           - GREIGE
         deltaEFormula:
           type: string
+          description: Delta-E calculation formula; valid only with a tolerance
           enum:
           - CIE76
           - CIE94
@@ -58962,21 +59107,28 @@ components:
           - CMC_2_1
         deltaETolerance:
           type: number
+          description: Maximum accepted Delta-E; omission clears tolerance and formula
           maximum: 99.99
         name:
           type: string
+          description: Human-readable color-card name; stored trimmed
           maxLength: 255
           minLength: 0
         notes:
           type: string
+          description: Optional internal notes; omission clears notes
           maxLength: 1000
           minLength: 0
         pantoneCode:
           type: string
+          description: External Pantone reference; omission clears it; stored trimmed
+            and uppercase
           maxLength: 20
           minLength: 0
         pantoneSystem:
           type: string
+          description: Pantone carrier system; omission clears it when no code is
+            supplied
           enum:
           - TCX
           - TPG
@@ -58985,14 +59137,18 @@ components:
           - TSX
         targetLabA:
           type: number
+          description: "Target CIE Lab green-red axis a*, from -128 to 127"
           maximum: 127
           minimum: -128
         targetLabB:
           type: number
+          description: "Target CIE Lab blue-yellow axis b*, from -128 to 127"
           maximum: 127
           minimum: -128
         targetLabIlluminant:
           type: string
+          description: Illuminant defining the target Lab values; supplied with all
+            Lab fields
           enum:
           - D65
           - D50
@@ -59001,10 +59157,14 @@ components:
           - TL84
         targetLabL:
           type: number
+          description: "Target CIE Lab lightness L*, from 0 to 100; omission clears\
+            \ target Lab"
           maximum: 100
           minimum: 0
         targetLabObserver:
           type: string
+          description: Observer angle defining the target Lab values; supplied with
+            all Lab fields
           enum:
           - DEG_2
           - DEG_10
