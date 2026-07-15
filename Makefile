@@ -91,7 +91,7 @@ verify: ## Run all tests and generate coverage report (no coverage gate)
 	$(MVN) verify
 	@echo "$(GREEN)✅ All tests passed. Report: target/site/jacoco/index.html$(NC)"
 
-verify-coverage: ## Run tests and enforce 80%% line coverage (e.g. for CI)
+verify-coverage: ## Run all tests and enforce the ratcheted line-coverage baseline
 	@echo "$(YELLOW)🧪 Running tests with coverage gate...$(NC)"
 	$(MVN) verify -Pcoverage
 	@echo "$(GREEN)✅ Tests and coverage check passed.$(NC)"

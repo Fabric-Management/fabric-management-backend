@@ -32,7 +32,7 @@ if [ "${SKIP_TESTS:-}" = "1" ]; then
   echo "== Tests: skipped (SKIP_TESTS=1) =="
 else
   echo "== Tests =="
-  step "$MVN" clean verify
+  step "$MVN" clean verify -Pcoverage
 fi
 
 if [ -z "${NVD_API_KEY:-}" ]; then

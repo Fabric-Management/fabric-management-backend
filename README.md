@@ -88,33 +88,30 @@ fabric-management-backend/
 
 ```bash
 # Infrastructure
-make dev             # Start PostgreSQL
 make up              # Start all infrastructure
 make down            # Stop all services
 
 # Application
-make app-build       # Build application
-make app-run         # Run application
+make build           # Build application without tests
+make run             # Run application with the local profile
 
 # Testing
 make test            # Run unit tests
-make coverage        # Generate coverage report
+make verify          # Run unit + integration tests and generate coverage
+make verify-coverage # Run all tests and enforce the coverage baseline
 
 # Database
 make db-migrate      # Run migrations
 make db-shell        # Open PostgreSQL shell
 
 # Development
-make health               # Check application health
-make logs                 # View logs
-make format               # Format code
-make format-check         # Verify format only (no changes)
-make code-quality         # Format + Checkstyle + SpotBugs (reports)
-make code-quality-strict  # Same, but fail on any violation
-make lint                 # Code quality checks (verify, no tests)
+make logs            # View Docker service logs
+make format          # Format code
+make lint            # Blocking format + Checkstyle + SpotBugs checks
 ```
 
 See `make help` for all available commands. **Code quality & automatic error detection:** [docs/CODE_QUALITY.md](docs/CODE_QUALITY.md).
+The CI gates and container-release policy are documented in [docs/CI_CD.md](docs/CI_CD.md).
 
 ## 🔐 Security Features
 
@@ -128,10 +125,10 @@ See `make help` for all available commands. **Code quality & automatic error det
 
 ```bash
 # Run all tests
-make test
+make verify
 
-# Run with coverage
-make coverage
+# Run all tests with the ratcheted coverage gate
+make verify-coverage
 ```
 
 ## 🔍 Code Quality & Error Detection
@@ -145,4 +142,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Version:** 2.0.0  
-**Status:** ✅ Production Ready
+**Status:** 🚧 Active Development
