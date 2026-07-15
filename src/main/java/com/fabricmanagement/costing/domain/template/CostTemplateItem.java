@@ -1,5 +1,7 @@
 package com.fabricmanagement.costing.domain.template;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 /**
@@ -21,4 +23,8 @@ public record CostTemplateItem(
     BigDecimal weight,
 
     /** When false, the item is suppressed from calculation without being removed. */
-    boolean isIncluded) {}
+    boolean isIncluded)
+    implements Serializable {
+
+  @Serial private static final long serialVersionUID = 1L;
+}
