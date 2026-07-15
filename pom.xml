@@ -72,7 +72,7 @@
 
         <!-- MFA & Integrations -->
         <totp.version>1.7.1</totp.version>
-        <jobrunr.version>7.1.1</jobrunr.version>
+        <jobrunr.version>8.7.1</jobrunr.version>
         <libphonenumber.version>8.13.27</libphonenumber.version>
 
         <!-- CVE Fix Overrides (Sprint 2) ODC -->
