@@ -26,7 +26,7 @@ RUN mvn clean package -DskipTests -B
 # =============================================================================
 # Stage 2: Runtime Image (Minimal & Secure)
 # =============================================================================
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Install essential tools
 RUN apk add --no-cache curl bash && \
