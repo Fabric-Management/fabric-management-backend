@@ -33,6 +33,8 @@ import com.fabricmanagement.production.execution.stockunit.domain.StockUnit;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
 import com.fabricmanagement.production.masterdata.color.app.ColorService;
 import com.fabricmanagement.production.masterdata.color.domain.Color;
+import com.fabricmanagement.production.masterdata.color.domain.ColorCardSpec;
+import com.fabricmanagement.production.masterdata.color.domain.ColorType;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.dto.CreateProductRequest;
@@ -153,7 +155,13 @@ public class SalesQuoteDemoSeeder {
       Color navy = ensureColour("NAVY-01", "Navy", "#1F2A44");
       Color ecru = ensureColour("ECRU-02", "Ecru", "#F0EAD6");
       ensureColour("CHAR-03", "Charcoal", "#36454F");
-      Color pfd = ensureColour("PFD-00", "Prepared For Dyeing", null);
+      Color pfd =
+          ensureColour(
+              ColorCardSpec.builder()
+                  .code("PFD-00")
+                  .name("Prepared For Dyeing")
+                  .colorType(ColorType.PFD)
+                  .build());
       // Rust deliberately gets NO stock — the picker's passive-but-selectable colour case.
       ensureColour("RUST-04", "Rust", "#B7410E");
 
@@ -330,6 +338,13 @@ public class SalesQuoteDemoSeeder {
         .filter(colour -> code.equalsIgnoreCase(colour.getCode()))
         .findFirst()
         .orElseGet(() -> colorService.create(code, name, colorHex));
+  }
+
+  private Color ensureColour(ColorCardSpec spec) {
+    return colorService.list(true).stream()
+        .filter(colour -> spec.code().equalsIgnoreCase(colour.getCode()))
+        .findFirst()
+        .orElseGet(() -> colorService.create(spec));
   }
 
   /**

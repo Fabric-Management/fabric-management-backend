@@ -11,6 +11,8 @@ import com.fabricmanagement.production.execution.goodsreceipt.domain.event.Goods
 import com.fabricmanagement.production.execution.stockunit.app.StockUnitService;
 import com.fabricmanagement.production.execution.stockunit.domain.PackageType;
 import com.fabricmanagement.production.execution.stockunit.domain.StockUnitSourceType;
+import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitMaterializationException;
+import com.fabricmanagement.production.execution.stockunit.domain.exception.StockUnitMaterializationException.Reason;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import java.util.List;
@@ -26,8 +28,10 @@ import org.springframework.stereotype.Component;
  * <p><b>Idempotency:</b> Before creating any units, the listener checks whether StockUnits for the
  * first item of this receipt already exist. If they do, the event is a duplicate and is skipped.
  *
- * <p><b>Scope:</b> BATCH and SUBCONTRACT_ORDER source types are handled. PO requires a cross-module
- * Batch-creation step first (planned for Phase 4).
+ * <p><b>Failure contract:</b> Every non-duplicate receipt either creates its StockUnits or fails
+ * closed. The exception is allowed to escape so the idempotency record rolls back and Spring
+ * Modulith can retry the incomplete publication. BATCH and SUBCONTRACT_ORDER source types are
+ * handled; PURCHASE_ORDER remains incomplete until its cross-module Batch creation flow exists.
  */
 @Slf4j
 @Component
@@ -47,22 +51,22 @@ public class GoodsReceiptConfirmedEventListener {
         this.getClass(),
         "onGoodsReceiptConfirmed",
         () -> {
-          // C2: PO/SC receipts require a prior Batch-creation step (Phase 4). Log at INFO, not WARN
-          // —
-          // every PO delivery would generate a WARN otherwise, causing alert fatigue.
           if (event.getSourceType() == GoodsReceiptSourceType.PURCHASE_ORDER) {
             log.info(
-                "StockUnit auto-creation skipped for {} source type (not yet implemented). Receipt: {}. "
-                    + "TODO: Phase 4 — resolve Batch from PO before creating StockUnits.",
+                "StockUnit materialization pending: reason={}, receipt={}, sourceType={}, eventId={}",
+                Reason.PO_MATERIALIZATION_PENDING,
+                event.getReceiptNumber(),
                 event.getSourceType(),
-                event.getReceiptNumber());
-            return;
+                event.getEventId());
+            throw materializationFailure(
+                Reason.PO_MATERIALIZATION_PENDING,
+                event,
+                "purchase-order materialization is not implemented");
           }
 
-          if (event.getItems().isEmpty()) {
-            log.warn(
-                "GoodsReceiptConfirmedEvent has no items. Receipt: {}", event.getReceiptNumber());
-            return;
+          if (event.getItems() == null || event.getItems().isEmpty()) {
+            throw materializationFailure(
+                Reason.EMPTY_RECEIPT_ITEMS, event, "confirmed receipt contains no items");
           }
 
           UUID tenantId = event.getTenantId();
@@ -85,19 +89,20 @@ public class GoodsReceiptConfirmedEventListener {
                     return null;
                   }
 
-                  if (event.getSourceType() == GoodsReceiptSourceType.BATCH) {
-                    handleBatchReceipt(event, tenantId);
-                  } else if (event.getSourceType() == GoodsReceiptSourceType.SUBCONTRACT_ORDER) {
-                    handleSubcontractReceipt(event, tenantId);
+                  switch (event.getSourceType()) {
+                    case BATCH -> handleBatchReceipt(event, tenantId);
+                    case SUBCONTRACT_ORDER -> handleSubcontractReceipt(event, tenantId);
+                    case PURCHASE_ORDER ->
+                        throw new IllegalStateException(
+                            "PURCHASE_ORDER must be rejected before tenant processing");
                   }
                   return null;
                 });
+          } catch (StockUnitMaterializationException e) {
+            throw e;
           } catch (Exception e) {
-            log.error(
-                "Failed to auto-create StockUnits for GoodsReceipt {}: {}",
-                event.getReceiptNumber(),
-                e.getMessage(),
-                e);
+            throw materializationFailure(
+                Reason.PROCESSING_FAILED, event, "unexpected processing failure", e);
           }
         });
   }
@@ -142,10 +147,10 @@ public class GoodsReceiptConfirmedEventListener {
         scQueryService.getSubcontractOutputInfo(tenantId, event.getSourceId());
 
     if (outputInfo.outputProductType() == null) {
-      log.warn(
-          "SubcontractOrder {} has no output product type, skipping StockUnit creation",
-          outputInfo.scNumber());
-      return;
+      throw materializationFailure(
+          Reason.MISSING_SC_OUTPUT_TYPE,
+          event,
+          "subcontractOrder=" + outputInfo.scNumber() + " has no output product type");
     }
 
     PackageType packageType = determineDefaultPackageType(outputInfo.outputProductType());
@@ -183,5 +188,26 @@ public class GoodsReceiptConfirmedEventListener {
       case CHEMICAL -> PackageType.DRUM;
       default -> PackageType.CARTON;
     };
+  }
+
+  private StockUnitMaterializationException materializationFailure(
+      Reason reason, GoodsReceiptConfirmedEvent event, String detail) {
+    return new StockUnitMaterializationException(reason, failureContext(event, detail));
+  }
+
+  private StockUnitMaterializationException materializationFailure(
+      Reason reason, GoodsReceiptConfirmedEvent event, String detail, Throwable cause) {
+    return new StockUnitMaterializationException(reason, failureContext(event, detail), cause);
+  }
+
+  private String failureContext(GoodsReceiptConfirmedEvent event, String detail) {
+    return "receiptNumber="
+        + event.getReceiptNumber()
+        + ", sourceType="
+        + event.getSourceType()
+        + ", eventId="
+        + event.getEventId()
+        + ", detail="
+        + detail;
   }
 }

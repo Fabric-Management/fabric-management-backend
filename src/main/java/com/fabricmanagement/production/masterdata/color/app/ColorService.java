@@ -1,16 +1,25 @@
 package com.fabricmanagement.production.masterdata.color.app;
 
+import com.fabricmanagement.common.infrastructure.persistence.LikePattern;
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.common.infrastructure.web.exception.NotFoundException;
 import com.fabricmanagement.production.masterdata.color.domain.Color;
 import com.fabricmanagement.production.masterdata.color.domain.ColorCardSpec;
+import com.fabricmanagement.production.masterdata.color.domain.ColorFamily;
+import com.fabricmanagement.production.masterdata.color.domain.ColorStandardStatus;
+import com.fabricmanagement.production.masterdata.color.domain.ColorType;
 import com.fabricmanagement.production.masterdata.color.domain.exception.ColorDomainException;
 import com.fabricmanagement.production.masterdata.color.infra.repository.ColorRepository;
+import jakarta.persistence.criteria.Predicate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +30,54 @@ public class ColorService {
 
   private final ColorRepository colorRepository;
 
+  @Transactional(readOnly = true)
+  public Page<Color> list(
+      String q,
+      ColorType colorType,
+      ColorFamily colorFamily,
+      ColorStandardStatus standardStatus,
+      boolean includeInactive,
+      Pageable pageable) {
+    UUID tenantId = TenantContext.requireTenantId();
+
+    Specification<Color> specification =
+        (root, query, criteriaBuilder) -> {
+          List<Predicate> predicates = new ArrayList<>();
+          predicates.add(criteriaBuilder.equal(root.get("tenantId"), tenantId));
+
+          if (!includeInactive) {
+            predicates.add(criteriaBuilder.isTrue(root.get("isActive")));
+          }
+          if (q != null && !q.isBlank()) {
+            String pattern = LikePattern.literalContains(q.trim().toLowerCase(Locale.ROOT));
+            predicates.add(
+                criteriaBuilder.or(
+                    criteriaBuilder.like(
+                        criteriaBuilder.lower(root.<String>get("code")),
+                        pattern,
+                        LikePattern.ESCAPE_CHARACTER),
+                    criteriaBuilder.like(
+                        criteriaBuilder.lower(root.<String>get("name")),
+                        pattern,
+                        LikePattern.ESCAPE_CHARACTER)));
+          }
+          if (colorType != null) {
+            predicates.add(criteriaBuilder.equal(root.get("colorType"), colorType));
+          }
+          if (colorFamily != null) {
+            predicates.add(criteriaBuilder.equal(root.get("colorFamily"), colorFamily));
+          }
+          if (standardStatus != null) {
+            predicates.add(criteriaBuilder.equal(root.get("standardStatus"), standardStatus));
+          }
+
+          return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+
+    return colorRepository.findAll(specification, pageable);
+  }
+
+  /** Internal convenience for seeders and query ports that still require an unpaged snapshot. */
   @Transactional(readOnly = true)
   public List<Color> list(boolean includeInactive) {
     UUID tenantId = TenantContext.requireTenantId();
