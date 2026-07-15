@@ -1,11 +1,14 @@
-name: CD - Build & Deploy
+name: Container Release
 
 on:
   push:
-    branches: [main, develop]
     tags:
       - "v*"
   workflow_dispatch:
+
+concurrency:
+  group: backend-container-release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -14,47 +17,114 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  SCAN_IMAGE: fabric-management-backend:security-scan
 
 jobs:
-  build-and-push:
-    name: Build & Push Docker Image
+  validate-release-source:
+    name: Validate Release Source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Require a main-line commit and semantic version tag
+        shell: bash
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::Container releases must point to a commit contained in main."
+            exit 1
+          fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && \
+             [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tags must use semantic versioning, for example v1.2.3."
+            exit 1
+          fi
+
+  quality-gate:
+    name: Reuse Backend Quality Gate
+    needs: validate-release-source
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  scan-container:
+    name: Scan Container Before Publish
+    needs: quality-gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
-      - name: Log in to Container Registry
+      - name: Build local scan image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.service
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ env.SCAN_IMAGE }}
+          cache-from: type=gha,scope=backend-container
+          cache-to: type=gha,mode=max,scope=backend-container
+
+      - name: Block HIGH and CRITICAL container vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.SCAN_IMAGE }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+
+  publish-container:
+    name: Publish Multi-Architecture Image
+    needs: scan-container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and publish with SBOM and provenance attestations
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile.service
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=backend-container
+          cache-to: type=gha,mode=max,scope=backend-container

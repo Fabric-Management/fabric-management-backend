@@ -67,6 +67,8 @@
         <google-java-format.version>1.19.2</google-java-format.version>
         <checkstyle.version>10.12.7</checkstyle.version>
         <spotbugs-maven-plugin.version>4.8.3.1</spotbugs-maven-plugin.version>
+        <!-- Ratchet upward as coverage improves; the project target remains 0.80. -->
+        <jacoco.coverage.minimum>0.40</jacoco.coverage.minimum>
 
         <!-- MFA & Integrations -->
         <totp.version>1.7.1</totp.version>
@@ -515,6 +517,21 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco-maven-plugin.version}</version>
+                <configuration>
+                    <!-- Keep generated transport/configuration code out of both the report and gate. -->
+                    <excludes>
+                        <exclude>**/dto/**/*Dto.class</exclude>
+                        <exclude>**/dto/**/*Request.class</exclude>
+                        <exclude>**/dto/**/*Response.class</exclude>
+                        <exclude>**/*Dto$*Builder.class</exclude>
+                        <exclude>**/*Request$*Builder.class</exclude>
+                        <exclude>**/*Response$*Builder.class</exclude>
+                        <exclude>**/event/**/*Event.class</exclude>
+                        <exclude>**/*Event$*Builder.class</exclude>
+                        <exclude>**/*Application.class</exclude>
+                        <exclude>**/config/**/*Config.class</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -523,7 +540,8 @@
                     </execution>
                     <execution>
                         <id>report</id>
-                        <phase>test</phase>
+                        <!-- Run after Failsafe so integration-test coverage is included. -->
+                        <phase>verify</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
@@ -617,7 +635,8 @@
                     <fork>true</fork>
                     <maxHeap>3072</maxHeap>
                     <threshold>High</threshold>
-                    <failOnError>false</failOnError>
+                    <!-- spotbugs:check must be a real blocking quality gate. -->
+                    <failOnError>true</failOnError>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
                     <!-- Skip detector that crashes on generic return types (Map&lt;String,Object&gt;, ApiResponse&lt;Map&gt;) -->
                     <omitVisitors>SpringEntityLeakDetector</omitVisitors>
@@ -696,7 +715,7 @@
             </properties>
         </profile>
 
-        <!-- Enforce coverage only in CI; local verify skips check when tests are skipped (e.g. no Docker). -->
+        <!-- Enforce the ratcheted coverage baseline in CI and release verification. -->
         <profile>
             <id>coverage</id>
             <build>
@@ -708,22 +727,11 @@
                         <executions>
                             <execution>
                                 <id>jacoco-check</id>
+                                <phase>verify</phase>
                                 <goals>
                                     <goal>check</goal>
                                 </goals>
                                 <configuration>
-                                    <excludes>
-                                        <exclude>**/dto/**/*Dto.class</exclude>
-                                        <exclude>**/dto/**/*Request.class</exclude>
-                                        <exclude>**/dto/**/*Response.class</exclude>
-                                        <exclude>**/*Dto$*Builder.class</exclude>
-                                        <exclude>**/*Request$*Builder.class</exclude>
-                                        <exclude>**/*Response$*Builder.class</exclude>
-                                        <exclude>**/event/**/*Event.class</exclude>
-                                        <exclude>**/*Event$*Builder.class</exclude>
-                                        <exclude>**/*Application.class</exclude>
-                                        <exclude>**/config/**/*Config.class</exclude>
-                                    </excludes>
                                     <rules>
                                         <rule>
                                             <element>BUNDLE</element>
@@ -731,7 +739,7 @@
                                                 <limit>
                                                     <counter>LINE</counter>
                                                     <value>COVEREDRATIO</value>
-                                                    <minimum>0.10</minimum>
+                                                    <minimum>${jacoco.coverage.minimum}</minimum>
                                                 </limit>
                                             </limits>
                                         </rule>

@@ -1,19 +1,23 @@
-name: CI - Code Quality & Tests
+name: CI - Backend Quality Gate
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   push:
-    branches: [main, develop]
+    branches: [main]
   workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   code-quality:
-    name: Code Quality Checks
+    name: Code Quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,17 +27,47 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: "21"
-          distribution: "temurin"
+          distribution: temurin
           cache: maven
 
-      - name: Format code
-        run: mvn fmt:check
+      - name: Verify formatting
+        run: ./mvnw fmt:check
 
       - name: Run Checkstyle
-        run: mvn checkstyle:check
+        run: ./mvnw checkstyle:check
 
-      - name: Run SpotBugs
-        run: mvn spotbugs:check
+      - name: Run blocking SpotBugs analysis
+        run: ./mvnw spotbugs:check
+
+      - name: Upload Checkstyle results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: checkstyle-results
+          path: target/checkstyle-result.xml
+          if-no-files-found: ignore
+
+      - name: Upload SpotBugs results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spotbugs-results
+          path: target/spotbugsXml.xml
+          if-no-files-found: ignore
+
+  security:
+    name: Dependency Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
 
       - name: Cache Dependency-Check data
         uses: actions/cache@v4
@@ -52,16 +86,13 @@ jobs:
             exit 1
           fi
 
-      - name: Run Security Scan (Dependency Check)
+      - name: Run blocking dependency vulnerability scan
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        # Resilient to NVD API outages: nvdValidForHours=168 reuses cached NVD data for 7 days
-        # (so a warm cache never re-contacts NVD), nvdApiDelay throttles to avoid 429/503 rate
-        # limits, and the loop retries transient NVD 5xx failures before failing the gate.
         run: |
           set -e
           for attempt in 1 2 3; do
-            if mvn org.owasp:dependency-check-maven:check \
+            if ./mvnw org.owasp:dependency-check-maven:check \
                 -DfailBuildOnCVSS=7 \
                 -DdataDirectory="${HOME}/.m2/dependency-check-data" \
                 -DskipProvidedScope=true \
@@ -72,34 +103,24 @@ jobs:
               echo "Dependency-Check passed on attempt ${attempt}."
               exit 0
             fi
-            echo "::warning::Dependency-Check attempt ${attempt} failed (likely NVD API 5xx). Retrying in 60s..."
+            echo "::warning::Dependency-Check attempt ${attempt} failed. Retrying in 60s..."
             sleep 60
           done
-          echo "::error::Dependency-Check failed after 3 attempts — NVD API likely unavailable. Re-run once NVD recovers."
+          echo "::error::Dependency-Check failed after 3 attempts."
           exit 1
 
-      - name: Upload Checkstyle results
+      - name: Upload dependency vulnerability report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: checkstyle-results
-          path: target/checkstyle-result.xml
-          if-no-files-found: ignore
-
-      - name: Upload SpotBugs results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: spotbugs-results
-          path: target/spotbugsXml.xml
+          name: dependency-check-results
+          path: target/dependency-check-report.*
           if-no-files-found: ignore
 
   test:
-    name: Run Tests
+    name: Tests & Coverage
     runs-on: ubuntu-latest
-    # Testcontainers uses Docker daemon directly, no explicit service needed.
-    # requires: docker
-    needs: code-quality
+    # Testcontainers uses the runner's Docker daemon; no explicit service is needed.
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -108,11 +129,11 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: "21"
-          distribution: "temurin"
+          distribution: temurin
           cache: maven
 
-      - name: Run tests
-        run: mvn clean verify
+      - name: Run unit, integration and coverage gates
+        run: ./mvnw clean verify -Pcoverage
 
       - name: Print test failures
         if: always()
@@ -139,8 +160,8 @@ jobs:
       - name: Generate test report
         if: always()
         run: |
-          mvn surefire-report:report-only || true
-          mvn surefire-report:failsafe-report-only || true
+          ./mvnw surefire-report:report-only || true
+          ./mvnw surefire-report:failsafe-report-only || true
 
       - name: Upload test results
         if: always()
@@ -159,3 +180,25 @@ jobs:
           name: jacoco-coverage
           path: target/site/jacoco
           if-no-files-found: ignore
+
+  container-build:
+    name: Container Build
+    if: github.event_name == 'pull_request'
+    needs: [code-quality, security, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Verify production container build without publishing
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.service
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=backend-container
+          cache-to: type=gha,mode=max,scope=backend-container
