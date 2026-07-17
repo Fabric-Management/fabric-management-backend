@@ -81,6 +81,9 @@ public class ColorController {
   @PostMapping
   @PreAuthorize("@auth.can(authentication, 'colors', 'write')")
   @Operation(operationId = "createColor", summary = "Create a color card")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "201",
+      description = "Created")
   public ResponseEntity<ApiResponse<ColorDto>> create(
       @Valid @RequestBody CreateColorRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
