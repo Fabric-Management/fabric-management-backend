@@ -59,6 +59,10 @@ class TenantIsolationIT {
   private static final UUID TENANT_B = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
   private static final String STRICT_PARTNER_UID = "TEST-A-STRICT-TP";
   private static final String STRICT_REGISTRY_UID = "TEST-A-STRICT-REG";
+  private static final UUID COLOR_A = UUID.fromString("aaaaaaaa-0000-4000-8000-000000000001");
+  private static final UUID COLOR_B = UUID.fromString("bbbbbbbb-0000-4000-8000-000000000002");
+  private static final UUID COLOR_REF_A = UUID.fromString("aaaaaaaa-0000-4000-8000-000000000011");
+  private static final UUID COLOR_REF_B = UUID.fromString("bbbbbbbb-0000-4000-8000-000000000012");
 
   @Container
   @SuppressWarnings("resource")
@@ -175,6 +179,61 @@ class TenantIsolationIT {
               + "AND NOT EXISTS (SELECT 1 FROM common_company.common_trading_partner WHERE uid = '"
               + STRICT_PARTNER_UID
               + "')");
+
+      stmt.execute(
+          "INSERT INTO production.color "
+              + "(id, tenant_id, uid, code, name, color_type, color_family, standard_status, "
+              + "is_active, created_at, updated_at, version) VALUES "
+              + "('"
+              + COLOR_A
+              + "', '"
+              + TENANT_A
+              + "', 'TEST-A-COLOR', 'RLS-COLOR-A', "
+              + "'RLS Color A', 'DYED', 'BLUE', 'DRAFT', true, now(), now(), 0), "
+              + "('"
+              + COLOR_B
+              + "', '"
+              + TENANT_B
+              + "', 'TEST-B-COLOR', 'RLS-COLOR-B', "
+              + "'RLS Color B', 'DYED', 'BLUE', 'DRAFT', true, now(), now(), 0) "
+              + "ON CONFLICT (id) DO NOTHING");
+      stmt.execute(
+          "INSERT INTO production.color_partner_ref "
+              + "(id, tenant_id, uid, color_id, partner_id, role, is_active, created_at, updated_at, version) VALUES "
+              + "('"
+              + COLOR_REF_A
+              + "', '"
+              + TENANT_A
+              + "', 'TEST-A-COLOR-REF', '"
+              + COLOR_A
+              + "', gen_random_uuid(), 'CUSTOMER', true, now(), now(), 0), "
+              + "('"
+              + COLOR_REF_B
+              + "', '"
+              + TENANT_B
+              + "', 'TEST-B-COLOR-REF', '"
+              + COLOR_B
+              + "', gen_random_uuid(), 'CUSTOMER', true, now(), now(), 0) "
+              + "ON CONFLICT (id) DO NOTHING");
+      stmt.execute(
+          "INSERT INTO production.color_partner_code "
+              + "(id, tenant_id, uid, color_partner_ref_id, partner_id, role, external_code, "
+              + "external_code_key, is_primary, is_active, created_at, updated_at, version) "
+              + "SELECT gen_random_uuid(), ref.tenant_id, ref.uid || '-CODE', ref.id, ref.partner_id, "
+              + "ref.role, CASE WHEN ref.tenant_id = '"
+              + TENANT_A
+              + "' THEN 'RLS-A' ELSE 'RLS-B' END, "
+              + "CASE WHEN ref.tenant_id = '"
+              + TENANT_A
+              + "' THEN 'RLS-A' ELSE 'RLS-B' END, "
+              + "true, true, now(), now(), 0 FROM production.color_partner_ref ref "
+              + "WHERE ref.id IN ('"
+              + COLOR_REF_A
+              + "', '"
+              + COLOR_REF_B
+              + "') "
+              + "AND NOT EXISTS (SELECT 1 FROM production.color_partner_code code "
+              + "WHERE code.color_partner_ref_id = ref.id)");
 
       stmt.close();
     }
@@ -326,5 +385,51 @@ class TenantIsolationIT {
             TENANT_B);
 
     assertThat(count).isEqualTo(2);
+  }
+
+  @Test
+  @Order(7)
+  @DisplayName("Color partner refs and codes are isolated through the NOBYPASSRLS runtime role")
+  void colorPartnerRefsUseRealRlsIsolation() throws Exception {
+    try (Connection tenantA = getAppConnection(TENANT_A)) {
+      ResultSet refs =
+          tenantA.createStatement().executeQuery("SELECT id FROM production.color_partner_ref");
+      List<UUID> refIds = new ArrayList<>();
+      while (refs.next()) {
+        refIds.add(refs.getObject(1, UUID.class));
+      }
+      assertThat(refIds).contains(COLOR_REF_A).doesNotContain(COLOR_REF_B);
+
+      ResultSet codes =
+          tenantA
+              .createStatement()
+              .executeQuery("SELECT external_code FROM production.color_partner_code");
+      List<String> externalCodes = new ArrayList<>();
+      while (codes.next()) {
+        externalCodes.add(codes.getString(1));
+      }
+      assertThat(externalCodes).contains("RLS-A").doesNotContain("RLS-B");
+    }
+  }
+
+  @Test
+  @Order(8)
+  @DisplayName("Color partner ref WITH CHECK rejects a cross-tenant write")
+  void colorPartnerRefWithCheckRejectsCrossTenantWrite() throws Exception {
+    try (Connection tenantA = getAppConnection(TENANT_A)) {
+      assertThatThrownBy(
+              () ->
+                  tenantA
+                      .createStatement()
+                      .execute(
+                          "INSERT INTO production.color_partner_ref "
+                              + "(id, tenant_id, color_id, partner_id, role, is_active, created_at, updated_at, version) "
+                              + "VALUES (gen_random_uuid(), '"
+                              + TENANT_B
+                              + "', '"
+                              + COLOR_B
+                              + "', gen_random_uuid(), 'CUSTOMER', true, now(), now(), 0)"))
+          .hasMessageContaining("row-level security");
+    }
   }
 }

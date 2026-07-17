@@ -416,6 +416,18 @@ public class TenantTransactionalPurgeService {
     delete(
         jdbc,
         rows,
+        "production.color_partner_code",
+        "DELETE FROM production.color_partner_code WHERE tenant_id = ?",
+        tenantId);
+    delete(
+        jdbc,
+        rows,
+        "production.color_partner_ref",
+        "DELETE FROM production.color_partner_ref WHERE tenant_id = ?",
+        tenantId);
+    delete(
+        jdbc,
+        rows,
         "production.prod_product_attribute",
         "DELETE FROM production.prod_product_attribute WHERE tenant_id = ?",
         tenantId);

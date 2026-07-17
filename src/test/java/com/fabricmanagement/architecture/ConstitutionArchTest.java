@@ -380,6 +380,24 @@ class ConstitutionArchTest {
     }
 
     @Test
+    @DisplayName("Rule 6.4: Color partner aliases have no independently injectable repository")
+    void colorPartnerCodesMustOnlyBeWrittenThroughTheirAggregateRoot() {
+      ArchRule rule =
+          classes()
+              .that()
+              .resideInAPackage(
+                  "com.fabricmanagement.production.masterdata.color.infra.repository..")
+              .and()
+              .areAssignableTo(org.springframework.data.repository.Repository.class)
+              .should()
+              .haveSimpleNameNotContaining("ColorPartnerCode")
+              .as(
+                  "Rule 6.4: ColorPartnerCode is an aggregate child and must not expose its own repository");
+
+      rule.check(allClasses);
+    }
+
+    @Test
     @DisplayName("Rule 6.2: Domain Events must end with 'Event' suffix")
     void domainEventsShouldEndWithEvent() {
       ArchRule rule =
