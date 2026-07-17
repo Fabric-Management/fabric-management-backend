@@ -1,6 +1,7 @@
 package com.fabricmanagement.common.infrastructure.web.exception;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -206,6 +207,7 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler({
+    OptimisticLockException.class,
     ObjectOptimisticLockingFailureException.class,
     StaleObjectStateException.class
   })

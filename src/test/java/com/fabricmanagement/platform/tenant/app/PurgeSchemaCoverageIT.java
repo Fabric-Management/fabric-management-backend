@@ -216,6 +216,12 @@ class PurgeSchemaCoverageIT extends AbstractIntegrationTest {
         "notification.user_notification_preference",
         "Seed-user notification preferences are deleted by demo_seed CTE.");
     tables.put(
+        "production.color_partner_code",
+        "Partner color aliases are deleted by dedicated product-reference cleanup.");
+    tables.put(
+        "production.color_partner_ref",
+        "Partner color relationships are deleted by dedicated product-reference cleanup.");
+    tables.put(
         "production.color",
         "Product reference data is deleted by dedicated product-reference cleanup.");
     tables.put(

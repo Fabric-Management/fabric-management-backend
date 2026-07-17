@@ -176,6 +176,8 @@ class TenantTransactionalPurgeServiceTest {
             "sales.quote",
             "procurement.purchase_order",
             "production.prod_product",
+            "production.color_partner_code",
+            "production.color_partner_ref",
             "production.color",
             "production.production_execution_batch_override_log",
             "sales_ord.sales_order_line_processed_shipments",
@@ -260,6 +262,10 @@ class TenantTransactionalPurgeServiceTest {
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.quality_grade WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_product WHERE tenant_id = ?"));
+    assertThat(indexOf(sql, "DELETE FROM production.color_partner_code WHERE tenant_id = ?"))
+        .isLessThan(indexOf(sql, "DELETE FROM production.color_partner_ref WHERE tenant_id = ?"));
+    assertThat(indexOf(sql, "DELETE FROM production.color_partner_ref WHERE tenant_id = ?"))
+        .isLessThan(indexOf(sql, "DELETE FROM production.color WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.color WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_product WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.prod_fiber_certification WHERE tenant_id = ?"))
