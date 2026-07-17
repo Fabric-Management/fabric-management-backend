@@ -25,6 +25,8 @@ import com.fabricmanagement.production.masterdata.color.domain.ColorStandardStat
 import com.fabricmanagement.production.masterdata.color.domain.ColorType;
 import com.fabricmanagement.production.masterdata.color.domain.exception.ColorDomainException;
 import com.fabricmanagement.production.masterdata.color.mapper.ColorMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +54,7 @@ class ColorControllerTest {
   private static final UUID COLOR_ID = UUID.fromString("22222222-2222-4222-8222-222222222222");
 
   @Autowired private MockMvc mockMvc;
+  @Autowired private ObjectMapper objectMapper;
 
   @MockBean private ColorService colorService;
   @MockBean private ColorMapper colorMapper;
@@ -153,19 +156,31 @@ class ColorControllerTest {
               return updated;
             });
 
-    mockMvc
-        .perform(
-            put("/api/v1/production/colors/{id}", COLOR_ID)
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"code":"navy-02","name":"Replacement"}
-                    """))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.code").value("NAVY-02"))
-        .andExpect(jsonPath("$.data.notes").doesNotExist())
-        .andExpect(jsonPath("$.data.colorHex").doesNotExist());
+    String responseBody =
+        mockMvc
+            .perform(
+                put("/api/v1/production/colors/{id}", COLOR_ID)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"code":"navy-02","name":"Replacement"}
+                        """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.code").value("NAVY-02"))
+            .andExpect(jsonPath("$.data.colorType").value("DYED"))
+            .andExpect(jsonPath("$.data.colorFamily").value("UNDEFINED"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    JsonNode responseData = objectMapper.readTree(responseBody).path("data");
+    assertThat(responseData.has("notes")).isTrue();
+    assertThat(responseData.get("notes").isNull()).isTrue();
+    assertThat(responseData.has("colorHex")).isTrue();
+    assertThat(responseData.get("colorHex").isNull()).isTrue();
+    assertThat(responseData.has("pantoneCode")).isTrue();
+    assertThat(responseData.get("pantoneCode").isNull()).isTrue();
 
     ArgumentCaptor<ColorCardSpec> specCaptor = ArgumentCaptor.forClass(ColorCardSpec.class);
     verify(colorService).update(eq(COLOR_ID), specCaptor.capture());
@@ -244,11 +259,98 @@ class ColorControllerTest {
 
   @Test
   @WithMockUser
-  void readAndWritePermissionsAreIndependentlyEnforced() throws Exception {
-    when(authEvaluator.can(any(Authentication.class), eq("products"), eq("read")))
-        .thenReturn(false);
+  void colorsReadPermitsBothReadEndpoints() throws Exception {
+    allow("read");
+    when(colorService.list(isNull(), isNull(), isNull(), isNull(), eq(false), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+    when(colorService.findById(eq(COLOR_ID))).thenReturn(color("NAVY-01", "Navy"));
+
+    mockMvc.perform(get("/api/v1/production/colors")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/production/colors/{id}", COLOR_ID)).andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser
+  void colorsWritePermitsCreateAndReplace() throws Exception {
+    allow("write");
+    when(colorService.create(any(ColorCardSpec.class))).thenReturn(color("NAVY-01", "Navy"));
+    when(colorService.update(eq(COLOR_ID), any(ColorCardSpec.class)))
+        .thenReturn(color("NAVY-01", "Navy"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/production/colors")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"code":"NAVY-01","name":"Navy"}
+                    """))
+        .andExpect(status().isCreated());
+    mockMvc
+        .perform(
+            put("/api/v1/production/colors/{id}", COLOR_ID)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"code":"NAVY-01","name":"Navy"}
+                    """))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser
+  void colorsApprovePermitsApproveAndRevert() throws Exception {
+    allow("approve");
+    when(colorService.approve(eq(COLOR_ID))).thenReturn(color("NAVY-01", "Navy"));
+    when(colorService.revertToDraft(eq(COLOR_ID))).thenReturn(color("NAVY-01", "Navy"));
+
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/approve", COLOR_ID).with(csrf()))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/revert-to-draft", COLOR_ID).with(csrf()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser
+  void colorsManagePermitsActivateAndDeactivate() throws Exception {
+    allow("manage");
+    when(colorService.activate(eq(COLOR_ID))).thenReturn(color("NAVY-01", "Navy"));
+    when(colorService.deactivate(eq(COLOR_ID))).thenReturn(color("NAVY-01", "Navy"));
+
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/activate", COLOR_ID).with(csrf()))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/deactivate", COLOR_ID).with(csrf()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser
+  void oneColourActionDoesNotImplyAnother() throws Exception {
+    // colors:write must not confer approve or manage authority.
+    allow("write");
+
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/approve", COLOR_ID).with(csrf()))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/activate", COLOR_ID).with(csrf()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser
+  void legacyProductsPermissionGrantsNoColourAuthority() throws Exception {
+    // Clean cutover: a caller who still holds the old broad products grant is fully locked out.
+    when(authEvaluator.can(any(Authentication.class), eq("products"), eq("read"))).thenReturn(true);
     when(authEvaluator.can(any(Authentication.class), eq("products"), eq("write")))
-        .thenReturn(false);
+        .thenReturn(true);
+    // No colors:* stubbed -> every colours action resolves false.
 
     mockMvc.perform(get("/api/v1/production/colors")).andExpect(status().isForbidden());
     mockMvc
@@ -261,10 +363,16 @@ class ColorControllerTest {
                     {"code":"NAVY-01","name":"Navy"}
                     """))
         .andExpect(status().isForbidden());
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/approve", COLOR_ID).with(csrf()))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(post("/api/v1/production/colors/{id}/deactivate", COLOR_ID).with(csrf()))
+        .andExpect(status().isForbidden());
   }
 
   private void allow(String action) {
-    when(authEvaluator.can(any(Authentication.class), eq("products"), eq(action))).thenReturn(true);
+    when(authEvaluator.can(any(Authentication.class), eq("colors"), eq(action))).thenReturn(true);
   }
 
   private Color color(String code, String name) {

@@ -19,6 +19,7 @@ public final class PermissionRegistry {
           "fiber",
           "projects",
           "products",
+          "colors",
           "partners",
           "procurement",
           "flowboard",

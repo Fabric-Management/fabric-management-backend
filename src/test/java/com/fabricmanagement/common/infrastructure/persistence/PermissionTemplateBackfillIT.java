@@ -94,6 +94,12 @@ class PermissionTemplateBackfillIT {
         .withFailMessage("the generic backfill must subsume the old finance-only backfill")
         .isGreaterThan(0);
 
+    // COLOR-RBAC-1: the dedicated colours resource reaches existing tenants through the same path.
+    assertThat(countOf(crippled, "colors", "read")).isGreaterThan(0);
+    assertThat(countOf(crippled, "colors", "write")).isGreaterThan(0);
+    assertThat(countOf(crippled, "colors", "approve")).isGreaterThan(0);
+    assertThat(countOf(crippled, "colors", "manage")).isGreaterThan(0);
+
     // A tenant that never existed before the fix still gets the full set.
     assertThat(countOf(healthy, "sales", "read")).isGreaterThan(0);
 

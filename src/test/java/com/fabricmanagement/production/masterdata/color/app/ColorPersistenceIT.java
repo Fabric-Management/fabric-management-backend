@@ -13,8 +13,12 @@ import com.fabricmanagement.production.masterdata.color.domain.ColorType;
 import com.fabricmanagement.production.masterdata.color.domain.PantoneSystem;
 import java.sql.DriverManager;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
@@ -175,27 +179,79 @@ class ColorPersistenceIT {
         .isInstanceOf(NotFoundException.class);
   }
 
-  @Test
-  void databaseRejectsLowercaseCodeWhenDomainIsBypassed() {
-    assertThatThrownBy(
-            () -> {
-              try (var connection =
-                      DriverManager.getConnection(
-                          postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-                  var statement =
-                      connection.prepareStatement(
-                          "INSERT INTO production.color "
-                              + "(id, tenant_id, created_at, updated_at, is_active, version, "
-                              + "code, name, color_type, color_family, standard_status) "
-                              + "VALUES (?, ?, now(), now(), true, 0, ?, ?, 'DYED', "
-                              + "'UNDEFINED', 'DRAFT')")) {
-                statement.setObject(1, UUID.randomUUID());
-                statement.setObject(2, UUID.randomUUID());
-                statement.setString(3, "lower-case");
-                statement.setString(4, "Raw writer");
-                statement.executeUpdate();
-              }
-            })
-        .hasMessageContaining("chk_color_code_canonical");
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("nonCanonicalRawColorRows")
+  void databaseRejectsNonCanonicalValuesWhenDomainIsBypassed(
+      String scenario,
+      String code,
+      String name,
+      String pantoneCode,
+      String colorHex,
+      String expectedConstraint) {
+    assertThatThrownBy(() -> insertRawColor(code, name, pantoneCode, colorHex))
+        .hasMessageContaining(expectedConstraint);
+  }
+
+  private static Stream<Arguments> nonCanonicalRawColorRows() {
+    return Stream.of(
+        Arguments.of(
+            "lowercase code", "lower-case", "Raw writer", null, null, "chk_color_code_canonical"),
+        Arguments.of(
+            "untrimmed code", " PADDED ", "Raw writer", null, null, "chk_color_code_canonical"),
+        Arguments.of("blank code", "", "Raw writer", null, null, "chk_color_code_not_blank"),
+        Arguments.of(
+            "untrimmed name", "VALID-CODE", " Raw writer ", null, null, "chk_color_name_canonical"),
+        Arguments.of("blank name", "VALID-CODE", "", null, null, "chk_color_name_not_blank"),
+        Arguments.of(
+            "lowercase Pantone code",
+            "VALID-CODE",
+            "Raw writer",
+            "19-4024 tcx",
+            null,
+            "chk_color_pantone_code_canonical"),
+        Arguments.of(
+            "untrimmed Pantone code",
+            "VALID-CODE",
+            "Raw writer",
+            " 19-4024 ",
+            null,
+            "chk_color_pantone_code_canonical"),
+        Arguments.of(
+            "blank Pantone code",
+            "VALID-CODE",
+            "Raw writer",
+            "",
+            null,
+            "chk_color_pantone_code_not_blank"),
+        Arguments.of(
+            "lowercase color hex",
+            "VALID-CODE",
+            "Raw writer",
+            null,
+            "#abcdef",
+            "chk_color_hex_uppercase"));
+  }
+
+  private void insertRawColor(String code, String name, String pantoneCode, String colorHex)
+      throws Exception {
+    try (var connection =
+            DriverManager.getConnection(
+                postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+        var statement =
+            connection.prepareStatement(
+                "INSERT INTO production.color "
+                    + "(id, tenant_id, created_at, updated_at, is_active, version, "
+                    + "code, name, pantone_code, color_hex, color_type, color_family, "
+                    + "standard_status) "
+                    + "VALUES (?, ?, now(), now(), true, 0, ?, ?, ?, ?, 'DYED', "
+                    + "'UNDEFINED', 'DRAFT')")) {
+      statement.setObject(1, UUID.randomUUID());
+      statement.setObject(2, UUID.randomUUID());
+      statement.setString(3, code);
+      statement.setString(4, name);
+      statement.setString(5, pantoneCode);
+      statement.setString(6, colorHex);
+      statement.executeUpdate();
+    }
   }
 }
