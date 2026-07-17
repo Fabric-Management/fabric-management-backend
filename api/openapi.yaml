@@ -29748,12 +29748,12 @@ paths:
               $ref: "#/components/schemas/CreateColorRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiResponseColorDto"
-          description: OK
+          description: Created
         "400":
           content:
             application/problem+json:
