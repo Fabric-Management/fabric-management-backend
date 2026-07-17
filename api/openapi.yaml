@@ -29701,6 +29701,9 @@ paths:
       tags:
       - Color
     put:
+      description: "Full replacement: code and name are required; omitted nullable\
+        \ fields are cleared. Omitted colorType and colorFamily resolve to DYED and\
+        \ UNDEFINED. The standard lifecycle changes only through approve/revert endpoints."
       operationId: updateColor
       parameters:
       - in: path
@@ -29773,7 +29776,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiProblemDetail"
           description: Internal Server Error
-      summary: Update a color card
+      summary: Replace a color card's mutable state
       tags:
       - Color
   /api/v1/production/colors/{id}/activate:
@@ -48663,6 +48666,8 @@ components:
           format: int32
     ColorDto:
       type: object
+      description: Complete color-card representation. Every property is present;
+        optional values are explicit nulls.
       properties:
         active:
           type: boolean
@@ -48689,7 +48694,9 @@ components:
           - MULTI
           - UNDEFINED
         colorHex:
-          type: string
+          type:
+          - string
+          - "null"
           description: Screen approximation only; never an authoritative colour standard
         colorType:
           type: string
@@ -48702,16 +48709,21 @@ components:
           - PFD
           - GREIGE
         deltaEFormula:
-          type: string
-          description: Formula used to calculate Delta-E against the target
+          type:
+          - string
+          - "null"
+          description: Formula used to calculate Delta-E; null when no tolerance is
+            configured
           enum:
           - CIE76
           - CIE94
           - CIEDE2000
           - CMC_2_1
         deltaETolerance:
-          type: number
-          description: Maximum accepted Delta-E; requires a target and a formula
+          type:
+          - number
+          - "null"
+          description: Maximum accepted Delta-E; null when no tolerance is configured
         id:
           type: string
           format: uuid
@@ -48720,16 +48732,24 @@ components:
           type: string
           description: "Human-readable color-card name, stored trimmed"
         notes:
-          type: string
+          type:
+          - string
+          - "null"
           description: Optional internal notes about the color card
         pantoneCode:
-          type: string
+          type:
+          - string
+          - "null"
           description: "Optional external Pantone reference, stored trimmed and uppercase"
         pantoneLabel:
-          type: string
+          type:
+          - string
+          - "null"
           description: Display-ready Pantone reference such as '19-4024 TCX'
         pantoneSystem:
-          type: string
+          type:
+          - string
+          - "null"
           description: Pantone carrier system; null when no Pantone reference exists
           enum:
           - TCX
@@ -48745,14 +48765,23 @@ components:
           - DRAFT
           - APPROVED
         targetLabA:
-          type: number
-          description: "Target CIE Lab green-red axis a*, from -128 to 127"
+          type:
+          - number
+          - "null"
+          description: "Target CIE Lab green-red axis a*, from -128 to 127; null with\
+            \ no target"
         targetLabB:
-          type: number
-          description: "Target CIE Lab blue-yellow axis b*, from -128 to 127"
+          type:
+          - number
+          - "null"
+          description: "Target CIE Lab blue-yellow axis b*, from -128 to 127; null\
+            \ with no target"
         targetLabIlluminant:
-          type: string
-          description: Illuminant under which the target Lab values are defined
+          type:
+          - string
+          - "null"
+          description: Illuminant under which the target Lab values are defined; null
+            with no target
           enum:
           - D65
           - D50
@@ -48760,15 +48789,40 @@ components:
           - F11
           - TL84
         targetLabL:
-          type: number
-          description: "Target CIE Lab lightness L*, from 0 to 100; not a measured\
-            \ batch value"
+          type:
+          - number
+          - "null"
+          description: "Target CIE Lab lightness L*, from 0 to 100; null when no target\
+            \ is defined"
         targetLabObserver:
-          type: string
-          description: Standard observer angle used for the target Lab values
+          type:
+          - string
+          - "null"
+          description: Standard observer angle used for the target Lab values; null
+            with no target
           enum:
           - DEG_2
           - DEG_10
+      required:
+      - active
+      - code
+      - colorFamily
+      - colorHex
+      - colorType
+      - deltaEFormula
+      - deltaETolerance
+      - id
+      - name
+      - notes
+      - pantoneCode
+      - pantoneLabel
+      - pantoneSystem
+      - standardStatus
+      - targetLabA
+      - targetLabB
+      - targetLabIlluminant
+      - targetLabL
+      - targetLabObserver
     CompanyTypeOptionDto:
       type: object
       properties:
@@ -59059,6 +59113,10 @@ components:
       - changeReason
     UpdateColorRequest:
       type: object
+      description: "Full replacement of mutable color-card state. Code and name are\
+        \ required; omitted nullable values are cleared, colorType defaults to DYED,\
+        \ and colorFamily defaults to UNDEFINED. standardStatus is changed only through\
+        \ transition endpoints."
       properties:
         code:
           type: string
@@ -59066,8 +59124,10 @@ components:
           maxLength: 50
           minLength: 0
         colorFamily:
-          type: string
-          description: Visual family; omission resolves to UNDEFINED
+          type:
+          - string
+          - "null"
+          description: Visual family; omission or null resolves to UNDEFINED
           enum:
           - RED
           - ORANGE
@@ -59084,12 +59144,17 @@ components:
           - MULTI
           - UNDEFINED
         colorHex:
-          type: string
-          description: Screen approximation only; omission clears the stored approximation
+          type:
+          - string
+          - "null"
+          description: Screen approximation only; omission or null clears the stored
+            approximation
           pattern: "^#[0-9A-Fa-f]{6}$"
         colorType:
-          type: string
-          description: Process classification; omission resolves to DYED
+          type:
+          - string
+          - "null"
+          description: Process classification; omission or null resolves to DYED
           enum:
           - DYED
           - YARN_DYED
@@ -59098,16 +59163,22 @@ components:
           - PFD
           - GREIGE
         deltaEFormula:
-          type: string
-          description: Delta-E calculation formula; valid only with a tolerance
+          type:
+          - string
+          - "null"
+          description: Delta-E formula; omission or null defaults to CMC_2_1 when
+            a tolerance is supplied and is cleared otherwise
           enum:
           - CIE76
           - CIE94
           - CIEDE2000
           - CMC_2_1
         deltaETolerance:
-          type: number
-          description: Maximum accepted Delta-E; omission clears tolerance and formula
+          type:
+          - number
+          - "null"
+          description: Maximum accepted Delta-E; omission or null clears both tolerance
+            and formula
           maximum: 99.99
         name:
           type: string
@@ -59115,20 +59186,26 @@ components:
           maxLength: 255
           minLength: 0
         notes:
-          type: string
-          description: Optional internal notes; omission clears notes
+          type:
+          - string
+          - "null"
+          description: "Optional internal notes; omission, null, or blank clears notes"
           maxLength: 1000
           minLength: 0
         pantoneCode:
-          type: string
-          description: External Pantone reference; omission clears it; stored trimmed
-            and uppercase
+          type:
+          - string
+          - "null"
+          description: "External Pantone reference; omission, null, or blank clears\
+            \ it; stored trimmed and uppercase"
           maxLength: 20
           minLength: 0
         pantoneSystem:
-          type: string
-          description: Pantone carrier system; omission clears it when no code is
-            supplied
+          type:
+          - string
+          - "null"
+          description: "Pantone carrier system; omission or null defaults to TCX when\
+            \ pantoneCode is supplied, otherwise it is cleared"
           enum:
           - TCX
           - TPG
@@ -59136,19 +59213,27 @@ components:
           - TN
           - TSX
         targetLabA:
-          type: number
-          description: "Target CIE Lab green-red axis a*, from -128 to 127"
+          type:
+          - number
+          - "null"
+          description: "Target CIE Lab green-red axis a*, from -128 to 127; supplied\
+            \ with all target fields"
           maximum: 127
           minimum: -128
         targetLabB:
-          type: number
-          description: "Target CIE Lab blue-yellow axis b*, from -128 to 127"
+          type:
+          - number
+          - "null"
+          description: "Target CIE Lab blue-yellow axis b*, from -128 to 127; supplied\
+            \ with all target fields"
           maximum: 127
           minimum: -128
         targetLabIlluminant:
-          type: string
+          type:
+          - string
+          - "null"
           description: Illuminant defining the target Lab values; supplied with all
-            Lab fields
+            target fields
           enum:
           - D65
           - D50
@@ -59156,15 +59241,19 @@ components:
           - F11
           - TL84
         targetLabL:
-          type: number
-          description: "Target CIE Lab lightness L*, from 0 to 100; omission clears\
-            \ target Lab"
+          type:
+          - number
+          - "null"
+          description: "Target CIE Lab lightness L*, from 0 to 100; omit or null all\
+            \ five target fields to clear the target"
           maximum: 100
           minimum: 0
         targetLabObserver:
-          type: string
+          type:
+          - string
+          - "null"
           description: Observer angle defining the target Lab values; supplied with
-            all Lab fields
+            all target fields
           enum:
           - DEG_2
           - DEG_10

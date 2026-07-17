@@ -41,7 +41,7 @@ public class ColorController {
   private final ColorMapper colorMapper;
 
   @GetMapping
-  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'read')")
   @Operation(
       operationId = "listColors",
       summary = "List color cards",
@@ -72,14 +72,14 @@ public class ColorController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'products', 'read')")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'read')")
   @Operation(operationId = "findColorById", summary = "Get a color card by ID")
   public ResponseEntity<ApiResponse<ColorDto>> findById(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(colorMapper.toDto(colorService.findById(id))));
   }
 
   @PostMapping
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'write')")
   @Operation(operationId = "createColor", summary = "Create a color card")
   public ResponseEntity<ApiResponse<ColorDto>> create(
       @Valid @RequestBody CreateColorRequest request) {
@@ -88,8 +88,14 @@ public class ColorController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
-  @Operation(operationId = "updateColor", summary = "Update a color card")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'write')")
+  @Operation(
+      operationId = "updateColor",
+      summary = "Replace a color card's mutable state",
+      description =
+          "Full replacement: code and name are required; omitted nullable fields are cleared. "
+              + "Omitted colorType and colorFamily resolve to DYED and UNDEFINED. "
+              + "The standard lifecycle changes only through approve/revert endpoints.")
   public ResponseEntity<ApiResponse<ColorDto>> update(
       @PathVariable UUID id, @Valid @RequestBody UpdateColorRequest request) {
     return ResponseEntity.ok(
@@ -97,21 +103,21 @@ public class ColorController {
   }
 
   @PostMapping("/{id}/deactivate")
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'manage')")
   @Operation(operationId = "deactivateColor", summary = "Deactivate a color card")
   public ResponseEntity<ApiResponse<ColorDto>> deactivate(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(colorMapper.toDto(colorService.deactivate(id))));
   }
 
   @PostMapping("/{id}/activate")
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'manage')")
   @Operation(operationId = "activateColor", summary = "Reactivate a deactivated color card")
   public ResponseEntity<ApiResponse<ColorDto>> activate(@PathVariable UUID id) {
     return ResponseEntity.ok(ApiResponse.success(colorMapper.toDto(colorService.activate(id))));
   }
 
   @PostMapping("/{id}/approve")
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'approve')")
   @Operation(
       operationId = "approveColorStandard",
       summary = "Approve the card's shade standard, freezing its standard-defining fields")
@@ -120,7 +126,7 @@ public class ColorController {
   }
 
   @PostMapping("/{id}/revert-to-draft")
-  @PreAuthorize("@auth.can(authentication, 'products', 'write')")
+  @PreAuthorize("@auth.can(authentication, 'colors', 'approve')")
   @Operation(
       operationId = "revertColorStandardToDraft",
       summary = "Reopen the card's shade standard for editing")

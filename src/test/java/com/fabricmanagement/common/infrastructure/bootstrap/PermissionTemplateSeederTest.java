@@ -141,6 +141,75 @@ class PermissionTemplateSeederTest {
             Tuple.tuple("SUPERVISOR", null, "sales", "approve", DataScope.ORGANIZATION));
   }
 
+  @Test
+  @DisplayName("COLOR-RBAC-1: colours matrix is ORGANIZATION-scoped with the right grants/absences")
+  void seedsColourMatrix() {
+    List<PermissionTemplate> saved = new ArrayList<>();
+    seeder(List.of(), saved).seed();
+
+    List<PermissionTemplate> colours =
+        saved.stream().filter(t -> "colors".equals(t.getResource())).toList();
+
+    assertThat(colours)
+        .as("colour cards are tenant-wide master data")
+        .isNotEmpty()
+        .allSatisfy(t -> assertThat(t.getDataScope()).isEqualTo(DataScope.ORGANIZATION));
+
+    List<Tuple> grants =
+        colours.stream()
+            .map(t -> Tuple.tuple(t.getRoleCode(), t.getDepartmentCode(), t.getAction()))
+            .toList();
+
+    // Quality: worker read; supervisor read+write; manager full.
+    assertThat(grants)
+        .contains(
+            Tuple.tuple("WORKER", "QUALITY", "read"),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "read"),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "write"),
+            Tuple.tuple("MANAGER", "QUALITY", "read"),
+            Tuple.tuple("MANAGER", "QUALITY", "write"),
+            Tuple.tuple("MANAGER", "QUALITY", "approve"),
+            Tuple.tuple("MANAGER", "QUALITY", "manage"))
+        .doesNotContain(
+            Tuple.tuple("WORKER", "QUALITY", "write"),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "approve"),
+            Tuple.tuple("SUPERVISOR", "QUALITY", "manage"));
+
+    // Dyeing supervisor/manager write; dyeing worker read only.
+    assertThat(grants)
+        .contains(
+            Tuple.tuple("WORKER", "DYEING", "read"),
+            Tuple.tuple("SUPERVISOR", "DYEING", "write"),
+            Tuple.tuple("MANAGER", "DYEING", "write"))
+        .doesNotContain(Tuple.tuple("WORKER", "DYEING", "write"));
+
+    // Non-dyeing production departments read only (e.g. WEAVING).
+    assertThat(grants)
+        .contains(Tuple.tuple("SUPERVISOR", "WEAVING", "read"))
+        .doesNotContain(
+            Tuple.tuple("SUPERVISOR", "WEAVING", "write"),
+            Tuple.tuple("MANAGER", "WEAVING", "write"));
+
+    // Sales, Warehouse & Procurement read only.
+    assertThat(grants)
+        .contains(
+            Tuple.tuple("WORKER", "SALES", "read"),
+            Tuple.tuple("MANAGER", "WAREHOUSE", "read"),
+            Tuple.tuple("MANAGER", "PROCUREMENT", "read"))
+        .doesNotContain(
+            Tuple.tuple("MANAGER", "SALES", "write"),
+            Tuple.tuple("MANAGER", "WAREHOUSE", "write"),
+            Tuple.tuple("MANAGER", "PROCUREMENT", "write"));
+
+    // Finance, HR and partner roles receive no colours rows at all.
+    assertThat(colours)
+        .noneMatch(
+            t ->
+                "FINANCE".equals(t.getDepartmentCode())
+                    || "HR".equals(t.getDepartmentCode())
+                    || t.getRoleCode().startsWith("PARTNER_"));
+  }
+
   private static PermissionTemplate template(
       String roleCode, String departmentCode, String resource, String action, DataScope scope) {
     PermissionTemplate template =

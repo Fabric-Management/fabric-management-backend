@@ -78,6 +78,24 @@ class PermissionTemplateSeederSystemDepartmentTest {
                 "MANAGER", "products", "read", DataScope.ORGANIZATION),
             org.assertj.core.groups.Tuple.tuple(
                 "MANAGER", "products", "write", DataScope.DEPARTMENT));
+
+    assertThat(savedTemplates)
+        .filteredOn(
+            template -> SystemDepartment.PROCUREMENT.code().equals(template.getDepartmentCode()))
+        .extracting(
+            PermissionTemplate::getRoleCode,
+            PermissionTemplate::getResource,
+            PermissionTemplate::getAction,
+            PermissionTemplate::getDataScope)
+        .contains(
+            org.assertj.core.groups.Tuple.tuple("WORKER", "colors", "read", DataScope.ORGANIZATION),
+            org.assertj.core.groups.Tuple.tuple(
+                "MANAGER", "colors", "read", DataScope.ORGANIZATION))
+        .doesNotContain(
+            org.assertj.core.groups.Tuple.tuple(
+                "SUPERVISOR", "colors", "write", DataScope.ORGANIZATION),
+            org.assertj.core.groups.Tuple.tuple(
+                "MANAGER", "colors", "write", DataScope.ORGANIZATION));
   }
 
   @SuppressWarnings("unchecked")

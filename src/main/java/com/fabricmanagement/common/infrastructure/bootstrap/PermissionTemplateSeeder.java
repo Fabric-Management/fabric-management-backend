@@ -192,6 +192,9 @@ public class PermissionTemplateSeeder {
             new String[] {"MANAGER", "reports", "export", "DEPARTMENT"},
             new String[] {"WORKER", "finance", "read", "OWN"},
             new String[] {"SUPERVISOR", "finance", "read", "DEPARTMENT"},
+            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "finance", "read", "ORGANIZATION"}));
 
     // 3. Production sub-departments (FIBER, YARN, WEAVING, KNITTING, DYEING, GARMENT)
@@ -213,7 +216,11 @@ public class PermissionTemplateSeeder {
             new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
             new String[] {"MANAGER", "projects", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "projects", "write", "DEPARTMENT"},
-            new String[] {"MANAGER", "projects", "manage", "DEPARTMENT"});
+            new String[] {"MANAGER", "projects", "manage", "DEPARTMENT"},
+            // COLOR-RBAC-1: every production department reads tenant colour cards.
+            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"});
     for (String deptCode :
         List.of(
             SystemDepartment.FIBER.code(),
@@ -224,6 +231,15 @@ public class PermissionTemplateSeeder {
             SystemDepartment.GARMENT.code())) {
       seedDepartment(templates, deptCode, productionRules);
     }
+
+    // COLOR-RBAC-1: only the Dyeing department gets colour write by template; every other
+    // production department stays read-only, so this cannot live in the shared productionRules.
+    seedDepartment(
+        templates,
+        SystemDepartment.DYEING.code(),
+        List.of(
+            new String[] {"SUPERVISOR", "colors", "write", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "write", "ORGANIZATION"}));
 
     // 4. QUALITY
     seedDepartment(
@@ -238,6 +254,13 @@ public class PermissionTemplateSeeder {
             new String[] {"MANAGER", "fiber", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "products", "write", "DEPARTMENT"},
+            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "colors", "write", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "write", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "approve", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "manage", "ORGANIZATION"},
             new String[] {"MANAGER", "reports", "export", "DEPARTMENT"}));
 
     // 5. WAREHOUSE
@@ -266,6 +289,9 @@ public class PermissionTemplateSeeder {
             new String[] {"MANAGER", "logistics", "prepare", "DEPARTMENT"},
             new String[] {"MANAGER", "logistics", "ship", "ORGANIZATION"},
             new String[] {"MANAGER", "logistics", "deliver", "ORGANIZATION"},
+            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "logistics", "cancel", "ORGANIZATION"}));
 
     // 6. FINANCE
@@ -330,6 +356,9 @@ public class PermissionTemplateSeeder {
             new String[] {"MANAGER", "partners", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "partners", "write", "DEPARTMENT"},
             new String[] {"MANAGER", "products", "read", "ORGANIZATION"},
+            new String[] {"WORKER", "colors", "read", "ORGANIZATION"},
+            new String[] {"SUPERVISOR", "colors", "read", "ORGANIZATION"},
+            new String[] {"MANAGER", "colors", "read", "ORGANIZATION"},
             new String[] {"MANAGER", "products", "write", "DEPARTMENT"}));
 
     // 9. PARTNER roles — visible only in partner invitation UIs
