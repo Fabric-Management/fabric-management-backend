@@ -34,6 +34,11 @@ public class CreateBatchRequest {
       requiredMode = Schema.RequiredMode.REQUIRED)
   private UUID productId;
 
+  @Schema(
+      description = "Optional active tenant color-card ID; null means unassigned",
+      nullable = true)
+  private UUID colorId;
+
   @NotNull(message = "Product type is required")
   @Schema(
       description = "Type of the product (FIBER, YARN, FABRIC)",

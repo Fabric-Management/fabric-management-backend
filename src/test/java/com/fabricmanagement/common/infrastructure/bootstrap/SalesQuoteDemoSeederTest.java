@@ -27,7 +27,6 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
-import com.fabricmanagement.production.execution.batch.app.BatchAttributeService;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
 import com.fabricmanagement.production.execution.batch.dto.BatchDto;
 import com.fabricmanagement.production.execution.batch.dto.CreateBatchRequest;
@@ -41,7 +40,6 @@ import com.fabricmanagement.production.masterdata.color.domain.ColorType;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.dto.CreateProductRequest;
-import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
@@ -87,7 +85,6 @@ class SalesQuoteDemoSeederTest {
   @Mock private ColorService colorService;
   @Mock private BatchService batchService;
   @Mock private StockUnitService stockUnitService;
-  @Mock private BatchAttributeService batchAttributeService;
   @Mock private SalesProductService salesProductService;
   @Mock private DiscountPolicyService discountPolicyService;
   @Mock private ExchangeRateService exchangeRateService;
@@ -114,7 +111,6 @@ class SalesQuoteDemoSeederTest {
             colorService,
             batchService,
             stockUnitService,
-            batchAttributeService,
             salesProductService,
             discountPolicyService,
             exchangeRateService,
@@ -184,8 +180,15 @@ class SalesQuoteDemoSeederTest {
         .extracting(CreateBatchRequest::getUnit)
         .allMatch(List.of("KG", "MT", "PIECE")::contains);
 
-    // The colour axis rides through the tenant-scoped app-layer ensure, not a repository write.
-    verify(productFacade, times(1)).ensureAttribute(eq("COLOR"), any(), any(), any(), any(), any());
+    assertThat(batchCaptor.getAllValues())
+        .extracting(CreateBatchRequest::getColorId)
+        .filteredOn(java.util.Objects::nonNull)
+        .hasSize(6);
+    assertThat(batchCaptor.getAllValues())
+        .filteredOn(request -> "LOT-24040".equals(request.getBatchCode()))
+        .singleElement()
+        .extracting(CreateBatchRequest::getColorId)
+        .isNull();
 
     // 16 + 24 + 3 rolls, 48 yarn cartons, 2 waste rolls — each graded through the service.
     verify(stockUnitService, times(93))
@@ -348,17 +351,6 @@ class SalesQuoteDemoSeederTest {
               colour.setId(UUID.randomUUID());
               return colour;
             });
-
-    when(productFacade.ensureAttribute(eq("COLOR"), any(), any(), any(), any(), any()))
-        .thenAnswer(
-            invocation ->
-                ProductAttributeDto.builder()
-                    .id(UUID.randomUUID())
-                    .attributeCode(invocation.getArgument(0))
-                    .attributeName(invocation.getArgument(1))
-                    .attributeGroup(invocation.getArgument(2))
-                    .productScope(invocation.getArgument(3))
-                    .build());
 
     when(productFacade.createProduct(any(CreateProductRequest.class)))
         .thenAnswer(

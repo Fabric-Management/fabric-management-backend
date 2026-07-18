@@ -1,0 +1,83 @@
+version: 2
+
+updates:
+  - package-ecosystem: maven
+    directory: "/"
+    target-branch: main
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    groups:
+      maven-minor-and-patch:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "org.springframework.cloud:spring-cloud-dependencies"
+        update-types:
+          - minor
+          - patch
+    # Spring Cloud uses CalVer release trains: 2025.1 requires Spring Boot 4.x.
+    # Keep the project on the Boot 3.5-compatible 2025.0 train until a coordinated upgrade.
+    #
+    # Major bumps of the infrastructure spine are DELIBERATE upgrades with their own
+    # tickets and full IT runs, never drive-by dependabot merges (decision 2026-07-18):
+    # - Flyway: migrations are the product's spine (see ADR-0010 cutover work)
+    # - JobRunr: upgrade belongs inside the parked BUG-jobrunr investigation
+    # - checkstyle / logstash-logback-encoder: tooling majors, batch deliberately
+    ignore:
+      - dependency-name: "org.springframework.cloud:spring-cloud-dependencies"
+        versions:
+          - "[2025.1,)"
+      - dependency-name: "org.flywaydb:*"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "org.jobrunr:*"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "com.puppycrawl.tools:checkstyle"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "net.logstash.logback:logstash-logback-encoder"
+        update-types:
+          - "version-update:semver-major"
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: main
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: docker
+    directory: "/"
+    target-branch: main
+    schedule:
+      interval: monthly
+      time: "06:30"
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    # The project is pinned to Java 21 LTS. JDK/JRE image major bumps (temurin 25/26)
+    # are a platform decision, not a dependency patch (decision 2026-07-18).
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "maven"
+        update-types:
+          - "version-update:semver-major"
+    commit-message:
+      prefix: "chore(container)"

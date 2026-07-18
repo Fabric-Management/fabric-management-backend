@@ -20,10 +20,8 @@ import com.fabricmanagement.platform.user.domain.User;
 import com.fabricmanagement.platform.user.dto.CreateInternalUserRequest;
 import com.fabricmanagement.platform.user.dto.UserDto;
 import com.fabricmanagement.platform.user.infra.repository.UserRepository;
-import com.fabricmanagement.production.execution.batch.app.BatchAttributeService;
 import com.fabricmanagement.production.execution.batch.app.BatchService;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
-import com.fabricmanagement.production.execution.batch.dto.AddBatchAttributeRequest;
 import com.fabricmanagement.production.execution.batch.dto.BatchDto;
 import com.fabricmanagement.production.execution.batch.dto.CreateBatchRequest;
 import com.fabricmanagement.production.execution.batch.dto.ReserveRequest;
@@ -38,7 +36,6 @@ import com.fabricmanagement.production.masterdata.color.domain.ColorType;
 import com.fabricmanagement.production.masterdata.product.api.facade.ProductFacade;
 import com.fabricmanagement.production.masterdata.product.domain.ProductType;
 import com.fabricmanagement.production.masterdata.product.dto.CreateProductRequest;
-import com.fabricmanagement.production.masterdata.product.dto.ProductAttributeDto;
 import com.fabricmanagement.production.masterdata.product.dto.ProductDto;
 import com.fabricmanagement.production.masterdata.qualitygrade.app.QualityGradeService;
 import com.fabricmanagement.production.masterdata.qualitygrade.domain.QualityGrade;
@@ -110,7 +107,6 @@ public class SalesQuoteDemoSeeder {
 
   private static final String CURRENCY = "GBP";
   private static final String QUOTE_MODULE_TYPE = "FABRIC";
-  private static final String COLOUR_ATTRIBUTE_CODE = "COLOR";
   private static final String GRADING_REASON = "Initial grading (demo seed)";
   private static final String GABARDINE_LIST_PRICE = "6.80";
   private static final String GABARDINE_OFFERED_PRICE = "6.50";
@@ -121,7 +117,6 @@ public class SalesQuoteDemoSeeder {
   private final ColorService colorService;
   private final BatchService batchService;
   private final StockUnitService stockUnitService;
-  private final BatchAttributeService batchAttributeService;
   private final SalesProductService salesProductService;
   private final DiscountPolicyService discountPolicyService;
   private final ExchangeRateService exchangeRateService;
@@ -165,8 +160,6 @@ public class SalesQuoteDemoSeeder {
       // Rust deliberately gets NO stock — the picker's passive-but-selectable colour case.
       ensureColour("RUST-04", "Rust", "#B7410E");
 
-      ProductAttributeDto colourAxis = ensureColourAxisAttribute();
-
       ProductDto gabardine = productFacade.createProduct(product(ProductType.FABRIC, "M"));
       ProductDto combedYarn = productFacade.createProduct(product(ProductType.YARN, "KG"));
       ProductDto rawCotton = productFacade.createProduct(product(ProductType.FIBER, "KG"));
@@ -187,9 +180,13 @@ public class SalesQuoteDemoSeeder {
       // surfaces for piece-backed length lots.
       BatchDto lot24011 =
           saleableBatch(
-              gabardine, "LOT-24011", "2000", BATCH_UNIT_METRES, "Main Navy dye lot, spring run");
+              gabardine,
+              "LOT-24011",
+              "2000",
+              BATCH_UNIT_METRES,
+              navy.getId(),
+              "Main Navy dye lot, spring run");
       addRolls(lot24011.getId(), "24011", 16, "125", "36.800", fabricGrades.first().getId());
-      attachColour(lot24011.getId(), colourAxis, navy);
 
       BatchDto lot24012 =
           saleableBatch(
@@ -197,17 +194,21 @@ public class SalesQuoteDemoSeeder {
               "LOT-24012",
               "3000",
               BATCH_UNIT_METRES,
+              navy.getId(),
               "Second Navy dye lot — shade may vary");
       addRolls(lot24012.getId(), "24012", 24, "125", "36.800", fabricGrades.first().getId());
-      attachColour(lot24012.getId(), colourAxis, navy);
 
       BatchDto lot23087 =
           saleableBatch(
-              gabardine, "LOT-23087", "290", BATCH_UNIT_METRES, "Remnant lot — close it out");
+              gabardine,
+              "LOT-23087",
+              "290",
+              BATCH_UNIT_METRES,
+              navy.getId(),
+              "Remnant lot — close it out");
       addRoll(lot23087.getId(), "23087", 1, "100", "29.500", fabricGrades.first().getId());
       addRoll(lot23087.getId(), "23087", 2, "95", "28.000", fabricGrades.first().getId());
       addRoll(lot23087.getId(), "23087", 3, "95", "28.000", fabricGrades.first().getId());
-      attachColour(lot23087.getId(), colourAxis, navy);
 
       BatchDto lot24020 =
           saleableBatch(
@@ -215,24 +216,33 @@ public class SalesQuoteDemoSeeder {
               "LOT-24020",
               "450",
               BATCH_UNIT_METRES,
+              ecru.getId(),
               "Second Quality Ecru — bulk, no pieces");
-      attachColour(lot24020.getId(), colourAxis, ecru);
 
       BatchDto lot24031 =
-          saleableBatch(combedYarn, "LOT-24031", "1200", "KG", "Combed yarn, prepared for dyeing");
+          saleableBatch(
+              combedYarn,
+              "LOT-24031",
+              "1200",
+              "KG",
+              pfd.getId(),
+              "Combed yarn, prepared for dyeing");
       addCartons(lot24031.getId(), "24031", 48, "25.000", yarnGrades.first().getId());
-      attachColour(lot24031.getId(), colourAxis, pfd);
 
       // Raw cotton skips the colour axis entirely — fibre cascade has no Colour step.
-      saleableBatch(rawCotton, "LOT-24040", "5000", "KG", "Raw cotton, bulk store");
+      saleableBatch(rawCotton, "LOT-24040", "5000", "KG", null, "Raw cotton, bulk store");
 
       // Waste-grade stock exists but must stay invisible to the picker (negative test).
       BatchDto lot23050 =
           saleableBatch(
-              gabardine, "LOT-23050", "120", BATCH_UNIT_METRES, "Waste grade — not saleable");
+              gabardine,
+              "LOT-23050",
+              "120",
+              BATCH_UNIT_METRES,
+              navy.getId(),
+              "Waste grade — not saleable");
       addRoll(lot23050.getId(), "23050", 1, "60", "17.700", fabricGrades.waste().getId());
       addRoll(lot23050.getId(), "23050", 2, "60", "17.700", fabricGrades.waste().getId());
-      attachColour(lot23050.getId(), colourAxis, navy);
 
       // ── Actors ──
       TradingPartnerDto albion = createAlbionCustomer(tenantId);
@@ -347,23 +357,6 @@ public class SalesQuoteDemoSeeder {
         .orElseGet(() -> colorService.create(spec));
   }
 
-  /**
-   * The lot picker resolves a lot's colour from a {@code BatchAttribute} whose {@code
-   * ProductAttribute} code is COLOR (see ProductionSalesLotQueryService). ProductAttribute is
-   * read-only reference data with no create endpoint, so the seeder registers the colour axis
-   * through {@link ProductFacade#ensureAttribute}, whose lookup is tenant-scoped and
-   * create-if-missing.
-   */
-  private ProductAttributeDto ensureColourAxisAttribute() {
-    return productFacade.ensureAttribute(
-        COLOUR_ATTRIBUTE_CODE,
-        "Colour",
-        "VARIANT",
-        "ALL",
-        "Colour card reference for dyed lots",
-        100);
-  }
-
   private CreateProductRequest product(ProductType productType, String unit) {
     return CreateProductRequest.builder().productType(productType).unit(unit).build();
   }
@@ -399,13 +392,19 @@ public class SalesQuoteDemoSeeder {
   // ── Lot helpers ─────────────────────────────────────────────────────────────
 
   private BatchDto saleableBatch(
-      ProductDto product, String batchCode, String quantity, String unit, String remarks) {
+      ProductDto product,
+      String batchCode,
+      String quantity,
+      String unit,
+      UUID colorId,
+      String remarks) {
     BatchDto batch =
         batchService.create(
             CreateBatchRequest.builder()
                 .productId(product.getId())
                 .productType(product.getProductType())
                 .batchCode(batchCode)
+                .colorId(colorId)
                 .quantity(new BigDecimal(quantity))
                 .unit(unit)
                 .sourceType(BatchSourceType.INITIAL_STOCK)
@@ -477,11 +476,6 @@ public class SalesQuoteDemoSeeder {
 
   private String barcode(String lotDigits, int index) {
     return String.format("PM-%s-%02d", lotDigits, index);
-  }
-
-  private void attachColour(UUID batchId, ProductAttributeDto colourAxis, Color colour) {
-    batchAttributeService.add(
-        batchId, new AddBatchAttributeRequest(colourAxis.id(), colour.getId().toString()));
   }
 
   // ── Actor helpers ───────────────────────────────────────────────────────────

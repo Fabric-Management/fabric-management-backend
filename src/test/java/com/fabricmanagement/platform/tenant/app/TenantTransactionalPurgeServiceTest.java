@@ -82,6 +82,7 @@ class TenantTransactionalPurgeServiceTest {
             "sales.quote",
             "procurement.purchase_order",
             "production.prod_product",
+            "production.production_execution_batch_color_archive",
             "production.stock_unit_soft_hold",
             "iwm.warehouse_location",
             "finance.finance_invoice",
@@ -106,6 +107,11 @@ class TenantTransactionalPurgeServiceTest {
     verify(jdbc)
         .update(
             contains("DELETE FROM production.stock_unit_soft_hold WHERE tenant_id = ?"),
+            eq(TENANT_ID));
+    verify(jdbc)
+        .update(
+            contains(
+                "DELETE FROM production.production_execution_batch_color_archive WHERE tenant_id = ?"),
             eq(TENANT_ID));
     verify(jdbc)
         .update(
@@ -279,6 +285,14 @@ class TenantTransactionalPurgeServiceTest {
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber_iso_code WHERE tenant_id = ?"));
     assertThat(indexOf(sql, "DELETE FROM production.prod_fiber WHERE tenant_id = ?"))
         .isLessThan(indexOf(sql, "DELETE FROM production.prod_fiber_category WHERE tenant_id = ?"));
+  }
+
+  @Test
+  void shouldDeleteBatchColorArchiveBeforeLegacyBatchAttributes() {
+    List<String> tables = TenantTransactionalPurgeService.tenantScopedDeleteTables();
+
+    assertThat(tables.indexOf("production.production_execution_batch_color_archive"))
+        .isLessThan(tables.indexOf("production.production_execution_batch_attribute"));
   }
 
   @Test

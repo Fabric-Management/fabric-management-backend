@@ -12,6 +12,8 @@ import com.fabricmanagement.production.execution.batch.infra.repository.BatchRep
 import com.fabricmanagement.production.masterdata.product.domain.reference.ProductAttribute;
 import com.fabricmanagement.production.masterdata.product.infra.repository.ProductAttributeRepository;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class BatchAttributeService {
+
+  static final String LEGACY_COLOR_ATTRIBUTE_WRITE = "LEGACY_COLOR_ATTRIBUTE_WRITE";
+  static final Set<String> LEGACY_COLOR_ATTRIBUTE_CODES =
+      Set.of("COLOR", "COLOUR", "COLOR_ID", "COLOUR_ID", "SHADE");
 
   private final BatchAttributeRepository attributeRepository;
   private final BatchRepository batchRepository;
@@ -55,6 +61,8 @@ public class BatchAttributeService {
             .filter(a -> tenantId.equals(a.getTenantId()))
             .orElseThrow(
                 () -> new NotFoundException("Attribute not found: " + request.attributeId()));
+
+    rejectLegacyColorMutation(tenantId, batch, attribute);
 
     if (attributeRepository
         .findByBatch_IdAndAttribute_Id(batch.getId(), attribute.getId())
@@ -96,8 +104,34 @@ public class BatchAttributeService {
                     new NotFoundException(
                         "Batch attribute not found: " + attributeId + " for batch " + batchId));
 
+    rejectLegacyColorMutation(tenantId, batch, entity.getAttribute());
+
     entity.delete();
     attributeRepository.save(entity);
     log.info("Deleted batch attribute: batch={}, attr={}", batch.getBatchCode(), attributeId);
+  }
+
+  /**
+   * Guards every generic attribute mutation against the legacy color family. Any future generic
+   * update path must invoke this method before mutating or persisting the attribute.
+   */
+  private void rejectLegacyColorMutation(UUID tenantId, Batch batch, ProductAttribute attribute) {
+    String rawCode = attribute.getAttributeCode();
+    String normalizedCode = rawCode == null ? "" : rawCode.trim().toUpperCase(Locale.ROOT);
+    if (!LEGACY_COLOR_ATTRIBUTE_CODES.contains(normalizedCode)) {
+      return;
+    }
+
+    log.warn(
+        "Rejected legacy color attribute mutation: tenantId={}, batchId={}, batchCode={}, attributeCode={}",
+        tenantId,
+        batch.getId(),
+        batch.getBatchCode(),
+        rawCode);
+    throw new BatchDomainException(
+        "Legacy color attributes are read-only after the batch color cutover",
+        LEGACY_COLOR_ATTRIBUTE_WRITE,
+        409,
+        new Object[] {rawCode});
   }
 }

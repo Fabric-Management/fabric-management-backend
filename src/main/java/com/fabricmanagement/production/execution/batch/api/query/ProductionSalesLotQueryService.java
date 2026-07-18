@@ -2,10 +2,8 @@ package com.fabricmanagement.production.execution.batch.api.query;
 
 import com.fabricmanagement.common.infrastructure.persistence.TenantContext;
 import com.fabricmanagement.production.execution.batch.domain.Batch;
-import com.fabricmanagement.production.execution.batch.domain.BatchAttribute;
 import com.fabricmanagement.production.execution.batch.domain.BatchSourceType;
 import com.fabricmanagement.production.execution.batch.domain.BatchStatus;
-import com.fabricmanagement.production.execution.batch.infra.repository.BatchAttributeRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchLotQuantityIntentRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchRepository;
 import com.fabricmanagement.production.execution.batch.infra.repository.BatchReservationRepository;
@@ -14,15 +12,12 @@ import com.fabricmanagement.production.execution.stockunit.domain.StockUnitStatu
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitRepository;
 import com.fabricmanagement.production.execution.stockunit.infra.repository.StockUnitSoftHoldRepository;
 import com.fabricmanagement.production.execution.workorder.infra.repository.WorkOrderRepository;
-import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService;
-import com.fabricmanagement.production.masterdata.color.api.query.ColorQueryService.ColorReference;
 import com.fabricmanagement.production.masterdata.qualitygrade.api.query.QualityGradeQueryService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,17 +38,12 @@ public class ProductionSalesLotQueryService {
       Set.of(BatchStatus.AVAILABLE, BatchStatus.RESERVED);
   private static final Set<StockUnitStatus> SELECTABLE_PIECE_STATUSES =
       Set.of(StockUnitStatus.AVAILABLE, StockUnitStatus.PARTIAL);
-  private static final Set<String> COLOUR_ATTRIBUTE_CODES =
-      Set.of("COLOR", "COLOUR", "COLOR_ID", "COLOUR_ID", "SHADE");
-
   private final BatchRepository batchRepository;
   private final BatchReservationRepository reservationRepository;
   private final BatchLotQuantityIntentRepository lotIntentRepository;
   private final StockUnitRepository stockUnitRepository;
   private final StockUnitSoftHoldRepository softHoldRepository;
-  private final BatchAttributeRepository batchAttributeRepository;
   private final QualityGradeQueryService qualityGradeQueryService;
-  private final ColorQueryService colorQueryService;
   private final WorkOrderRepository workOrderRepository;
   private final PrimaryMeasureResolver primaryMeasureResolver;
 
@@ -112,7 +102,7 @@ public class ProductionSalesLotQueryService {
                 Collectors.groupingBy(
                     BatchLotIntentView::batchId,
                     Collectors.mapping(BatchLotIntentView::intent, Collectors.toList())));
-    Map<UUID, LotColourReference> coloursByBatch = resolveColoursByBatch(batchIds);
+    Map<UUID, LotColourReference> coloursByBatch = resolveColoursByBatch(tenantId, batchIds);
 
     return batches.stream()
         .map(
@@ -247,35 +237,18 @@ public class ProductionSalesLotQueryService {
                     ref.id(), ref.code(), ref.name(), ref.saleable(), ref.active()));
   }
 
-  private Map<UUID, LotColourReference> resolveColoursByBatch(List<UUID> batchIds) {
-    return batchAttributeRepository
-        .findActiveColourAttributesByBatchIds(batchIds, COLOUR_ATTRIBUTE_CODES)
-        .stream()
-        .map(attr -> new BatchColour(attr.getBatch().getId(), toColourReference(attr)))
-        .filter(entry -> entry.colour() != null)
+  private Map<UUID, LotColourReference> resolveColoursByBatch(UUID tenantId, List<UUID> batchIds) {
+    return batchRepository.findColorReferencesByBatchIds(tenantId, batchIds).stream()
         .collect(
-            Collectors.toMap(BatchColour::batchId, BatchColour::colour, (left, right) -> left));
-  }
-
-  private LotColourReference toColourReference(BatchAttribute attribute) {
-    String rawValue = attribute.getValue();
-    if (rawValue == null || rawValue.isBlank()) {
-      return null;
-    }
-    String trimmed = rawValue.trim();
-    Optional<ColorReference> resolved = resolveColourCard(trimmed);
-    return resolved
-        .map(ref -> new LotColourReference(ref.id(), ref.code(), ref.name(), ref.colorHex(), null))
-        .orElseGet(() -> new LotColourReference(null, null, null, null, trimmed));
-  }
-
-  private Optional<ColorReference> resolveColourCard(String rawValue) {
-    try {
-      return colorQueryService.findReferenceById(UUID.fromString(rawValue));
-    } catch (IllegalArgumentException ignored) {
-      String code = rawValue.toUpperCase(Locale.ROOT);
-      return colorQueryService.findReferenceByCode(code);
-    }
+            Collectors.toMap(
+                BatchRepository.BatchColorProjection::getBatchId,
+                projection ->
+                    new LotColourReference(
+                        projection.getColorId(),
+                        projection.getColorCode(),
+                        projection.getColorName(),
+                        projection.getColorHex(),
+                        null)));
   }
 
   public record ProductionSalesLotReference(
@@ -322,8 +295,6 @@ public class ProductionSalesLotQueryService {
 
   public record LotColourReference(
       UUID id, String code, String name, String colorHex, String colourLabel) {}
-
-  private record BatchColour(UUID batchId, LotColourReference colour) {}
 
   private record BatchLotIntentView(UUID batchId, ProductionSalesLotIntentReference intent) {
     private static BatchLotIntentView from(
